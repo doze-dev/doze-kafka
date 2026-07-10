@@ -7,7 +7,14 @@
 #   curl -fsSL https://raw.githubusercontent.com/doze-dev/doze-kafka/main/install.sh | sh
 #   wget -qO-  https://raw.githubusercontent.com/doze-dev/doze-kafka/main/install.sh | sh
 #
-# Configuration (all optional, via environment):
+# Install a specific version by passing --version through the pipe:
+#   curl -fsSL .../install.sh | sh -s -- --version v1.0.0
+#
+# Uninstall (removes the binary and the PATH entry; leaves your data alone):
+#   curl -fsSL .../install.sh | sh -s -- --uninstall
+#
+# Options (see --help): --version <tag>, --dir <path>, --no-modify-path, --uninstall.
+# Each has an equivalent environment variable (the flag wins if both are set):
 #   DOZE_KAFKA_VERSION         pin a version, e.g. v1.0.0 (default: latest release)
 #   DOZE_KAFKA_DIR             install prefix (default: ~/.doze-kafka; binary in bin/)
 #   DOZE_KAFKA_NO_MODIFY_PATH  set to 1 to leave your shell profile untouched
@@ -18,8 +25,6 @@
 set -eu
 
 REPO="doze-dev/doze-kafka"
-INSTALL_DIR="${DOZE_KAFKA_DIR:-$HOME/.doze-kafka}"
-BIN_DIR="$INSTALL_DIR/bin"
 
 die() {
 	echo "install: $*" >&2
@@ -28,6 +33,110 @@ die() {
 
 have() { command -v "$1" >/dev/null 2>&1; }
 need() { have "$1" || die "required command not found: $1"; }
+
+usage() {
+	cat <<'EOF'
+doze-kafka installer — download the prebuilt broker binary for your OS/arch.
+
+Usage:
+  install.sh [options]
+  curl -fsSL .../install.sh | sh -s -- [options]
+
+Options:
+  -v, --version <tag>   install a specific release, e.g. v1.0.0 (default: latest)
+  -d, --dir <path>      install prefix (default: ~/.doze-kafka; binary in bin/)
+      --no-modify-path  leave your shell profile untouched
+      --uninstall       remove the binary and PATH entry (your data is left alone)
+  -h, --help            show this help
+
+Each option also has an environment variable (the flag wins if both are set):
+  DOZE_KAFKA_VERSION, DOZE_KAFKA_DIR, DOZE_KAFKA_NO_MODIFY_PATH
+EOF
+}
+
+# uninstall removes the installed binary and the PATH entry the installer added. It
+# deliberately does NOT touch broker data (data-dir/meta-db live in your working
+# directories, not here).
+uninstall() {
+	removed=0
+	if [ -d "$INSTALL_DIR" ]; then
+		rm -rf "$INSTALL_DIR"
+		echo "Removed $INSTALL_DIR"
+		removed=1
+	fi
+	for p in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile"; do
+		[ -f "$p" ] || continue
+		grep -qs -F "$BIN_DIR" "$p" 2>/dev/null || continue
+		tmp="$(mktemp)"
+		awk -v bindir="$BIN_DIR" '
+			index($0, bindir) { next }   # the "export PATH=..." line we added
+			$0 == "# doze-kafka" { next } # our marker comment
+			{ print }
+		' "$p" >"$tmp" && cat "$tmp" >"$p"
+		rm -f "$tmp"
+		echo "Removed the PATH entry from $p"
+		removed=1
+	done
+	if [ "$removed" = 0 ]; then
+		echo "Nothing to uninstall (looked in $INSTALL_DIR and your shell profiles)."
+	else
+		echo "Uninstalled. Open a new shell to refresh your PATH."
+		echo "Your data (data-dir/meta-db, by default ./data and ./meta.db) was left untouched."
+	fi
+}
+
+# --- arguments ------------------------------------------------------------------
+
+version="${DOZE_KAFKA_VERSION:-}"
+install_dir="${DOZE_KAFKA_DIR:-}"
+no_modify_path="${DOZE_KAFKA_NO_MODIFY_PATH:-}"
+action=install
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+	-v | --version)
+		[ $# -ge 2 ] || die "--version needs a value, e.g. --version v1.0.0"
+		version="$2"
+		shift 2
+		;;
+	--version=*)
+		version="${1#*=}"
+		shift
+		;;
+	-d | --dir)
+		[ $# -ge 2 ] || die "--dir needs a value"
+		install_dir="$2"
+		shift 2
+		;;
+	--dir=*)
+		install_dir="${1#*=}"
+		shift
+		;;
+	--no-modify-path)
+		no_modify_path=1
+		shift
+		;;
+	--uninstall)
+		action=uninstall
+		shift
+		;;
+	-h | --help)
+		usage
+		exit 0
+		;;
+	*)
+		die "unknown option: $1 (try --help)"
+		;;
+	esac
+done
+
+INSTALL_DIR="${install_dir:-$HOME/.doze-kafka}"
+BIN_DIR="$INSTALL_DIR/bin"
+
+if [ "$action" = uninstall ]; then
+	uninstall
+	exit 0
+fi
 
 # --- preflight ------------------------------------------------------------------
 
@@ -75,7 +184,6 @@ fi
 
 # --- resolve version ------------------------------------------------------------
 
-version="${DOZE_KAFKA_VERSION:-}"
 if [ -z "$version" ]; then
 	echo "Resolving the latest release..."
 	version="$(fetch "https://api.github.com/repos/$REPO/releases/latest" |
@@ -121,7 +229,7 @@ fi
 add_path_line="export PATH=\"$BIN_DIR:\$PATH\""
 
 profile=""
-if [ "${DOZE_KAFKA_NO_MODIFY_PATH:-}" != "1" ]; then
+if [ "$no_modify_path" != "1" ]; then
 	case "${SHELL:-}" in
 	*/zsh) profile="$HOME/.zshrc" ;;
 	*/bash)

@@ -23,21 +23,41 @@ nothing else: **it's a single standalone binary you run.**
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/doze-dev/doze-kafka/main/install.sh | sh
-# or
+```
+
+or
+
+```sh
 wget -qO- https://raw.githubusercontent.com/doze-dev/doze-kafka/main/install.sh | sh
 ```
 
 This grabs the prebuilt binary for your OS and architecture, verifies its SHA-256
 checksum, and installs it to `~/.doze-kafka/bin`. The script is plain POSIX `sh` (no
-bash required). Tune it with environment variables:
+bash required). Linux and macOS, amd64 and arm64. No Homebrew, no package manager.
 
-| Variable | Effect |
-| --- | --- |
-| `DOZE_KAFKA_VERSION` | Pin a version, e.g. `v1.0.0` (default: latest release). You can also put the tag in the URL: `.../doze-dev/doze-kafka/v1.0.0/install.sh`. |
-| `DOZE_KAFKA_DIR` | Install prefix (default `~/.doze-kafka`; the binary lands in `bin/`). |
-| `DOZE_KAFKA_NO_MODIFY_PATH` | Set to `1` to leave your shell profile untouched. |
+**Install a specific version** by passing `--version` through the pipe:
 
-Linux and macOS, amd64 and arm64. No Homebrew, no package manager.
+```sh
+curl -fsSL https://raw.githubusercontent.com/doze-dev/doze-kafka/main/install.sh | sh -s -- --version v1.0.0
+```
+
+Run the script with `--help` for the full list. Each option also has an environment
+variable — the flag wins if both are set:
+
+| Option | Environment variable | Effect |
+| --- | --- | --- |
+| `--version <tag>` | `DOZE_KAFKA_VERSION` | Install a specific release, e.g. `v1.0.0` (default: latest). You can also put the tag in the URL: `.../doze-dev/doze-kafka/v1.0.0/install.sh`. |
+| `--dir <path>` | `DOZE_KAFKA_DIR` | Install prefix (default `~/.doze-kafka`; the binary lands in `bin/`). |
+| `--no-modify-path` | `DOZE_KAFKA_NO_MODIFY_PATH` | Leave your shell profile untouched. |
+
+**To uninstall**, run the same script with `--uninstall` — it removes the binary and
+the PATH entry it added, and leaves your data alone:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/doze-dev/doze-kafka/main/install.sh | sh -s -- --uninstall
+```
+
+(If you installed to a custom `--dir`, pass the same `--dir` when uninstalling.)
 
 Prefer to build it yourself? See below.
 
