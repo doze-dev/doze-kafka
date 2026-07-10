@@ -1,0 +1,37 @@
+name: Soak
+
+# Weekly (and on demand) sustained-load runs against the real binary: a leak run and
+# a chaos run (SIGKILL/SIGTERM restarts under load, asserting no acknowledged record
+# is lost). Kept off the PR path because it takes minutes.
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: "Soak duration per mode (e.g. 10m, 1h)"
+        default: "10m"
+
+permissions:
+  contents: read
+
+jobs:
+  soak:
+    strategy:
+      fail-fast: false
+      matrix:
+        mode:
+          - { name: leak, chaos: "0" }
+          - { name: chaos, chaos: "1" }
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: ${{ matrix.mode.name }} soak
+        env:
+          SOAK_CHAOS: ${{ matrix.mode.chaos }}
+          SOAK_DURATION: ${{ github.event.inputs.duration || '10m' }}
+        run: go test -tags soak -run TestSoak -timeout 35m -v ./internal/broker/

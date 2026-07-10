@@ -1,0 +1,91 @@
+# Taskfile for doze-kafka. Run with `go tool task <name>` (task is a go tool
+# dependency, so no separate install is needed). `go tool task --list` shows all.
+#
+# doze-kafka is a standalone module inside a go workspace, so every go command runs
+# with GOWORK=off (set globally below).
+version: '3'
+
+env:
+  GOWORK: off
+
+vars:
+  BINARY: doze-kafka
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - go tool task --list
+    silent: true
+
+  build:
+    desc: Build the broker binary into bin/
+    cmds:
+      - go build -o bin/{{.BINARY}} ./cmd/doze-kafka
+
+  run:
+    desc: Build and run the broker (zero-config on :9092)
+    deps: [build]
+    cmds:
+      - ./bin/{{.BINARY}}
+
+  test:
+    desc: Run the whole test suite (unit + integration)
+    cmds:
+      - go test ./...
+
+  test:unit:
+    desc: Unit tests only — no broker, no sockets (integration is gated by -short)
+    cmds:
+      - go test -short ./...
+
+  test:integration:
+    desc: Integration tests — a real broker driven over a socket by real clients
+    cmds:
+      - go test ./internal/broker/...
+
+  test:race:
+    desc: Run the whole suite with the race detector
+    cmds:
+      - go test -race ./...
+
+  vet:
+    desc: go vet
+    cmds:
+      - go vet ./...
+
+  fmt:
+    desc: Format all Go files
+    cmds:
+      - gofmt -w .
+
+  tidy:
+    desc: go mod tidy
+    cmds:
+      - go mod tidy
+
+  fuzz:
+    desc: Fuzz the wire-protocol decoder for 30s
+    cmds:
+      - go test ./internal/protocol/ -run '^$' -fuzz FuzzParseAndDecodeRequest -fuzztime 30s
+
+  soak:
+    desc: 'Leak-detection soak: sustained load, no faults (SOAK_DURATION, default 2m)'
+    env:
+      SOAK_CHAOS: '0'
+      SOAK_DURATION: '{{.SOAK_DURATION | default "2m"}}'
+    cmds:
+      - go test -tags soak -run TestSoak -timeout 24h -v ./internal/broker/
+
+  chaos:
+    desc: 'Chaos soak: kill/restart the broker under load (SOAK_DURATION, default 2m)'
+    env:
+      SOAK_CHAOS: '1'
+      SOAK_DURATION: '{{.SOAK_DURATION | default "2m"}}'
+    cmds:
+      - go test -tags soak -run TestSoak -timeout 24h -v ./internal/broker/
+
+  clean:
+    desc: Remove build output and local broker data
+    cmds:
+      - rm -rf bin data meta.db

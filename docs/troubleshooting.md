@@ -1,0 +1,89 @@
+# Troubleshooting
+
+Most problems connecting to doze-kafka are the same ones you'd hit with any Kafka
+broker. Here are the common ones and their fixes.
+
+## The client connects, then hangs or fails on the next request
+
+Almost always an **advertised address** problem. A client bootstraps to the address
+you gave it, asks for Metadata, then reconnects to the host/port the broker
+*advertises*. By default that's `localhost:<port>` — perfect for a client on the same
+machine, wrong for one somewhere else.
+
+If your client runs in another container, VM, or host, set `--advertised-host` (and
+`--advertised-port` if it's remapped) to an address that client can actually reach:
+
+```sh
+./doze-kafka --advertised-host 192.168.1.50
+# or, from inside Docker talking to a broker on the host:
+./doze-kafka --advertised-host host.docker.internal
+```
+
+Check what's being advertised with `kcat -b <bootstrap> -L` — the broker list it
+prints is what clients will reconnect to.
+
+## "Broker is too old" / an API isn't supported
+
+The client wants a feature at a version doze-kafka doesn't advertise for the emulated
+Kafka major. Run with the default `--version 4` (the most capable) if you've lowered
+it. If it still happens with a mainstream client doing an ordinary operation, that's
+worth reporting — see [API support](api-support.md) for what's advertised.
+
+## Authentication fails / connection dropped immediately
+
+If you started the broker with `--sasl-mechanisms` or TLS, **every** client must be
+configured to match:
+
+- SASL on, client sends nothing → the broker drops the connection. Configure the
+  client's `security.protocol` (`SASL_PLAINTEXT` or `SASL_SSL`), `sasl.mechanism`, and
+  credentials.
+- Mechanism mismatch → make sure the client's mechanism is one you enabled.
+- TLS on, client connects in the clear → it can't complete the handshake. Set the
+  client to use `SSL`/`SASL_SSL` and trust your certificate (or skip verification).
+
+See [Auth & TLS](auth-and-tls.md) for matching client snippets. Usernames and
+passwords must be ASCII (no `SASLprep`).
+
+## A topic doesn't exist / "unknown topic"
+
+Auto-create is on by default, so producing to a new topic creates it. If you ran with
+`--auto-create-topics=false`, create it explicitly first:
+
+```sh
+kafka-topics.sh --bootstrap-server localhost:9092 --create --topic demo --partitions 1
+```
+
+## My data disappeared after a restart
+
+doze-kafka only persists what's under `--data-dir` and `--meta-db`. If you didn't set
+them, they default to `./data` and `./meta.db` **relative to the current working
+directory** — start the broker from a different directory and it looks like a fresh
+broker. Pin absolute paths to avoid this:
+
+```sh
+./doze-kafka --data-dir /var/tmp/kafka/data --meta-db /var/tmp/kafka/meta.db
+```
+
+Also make sure you stopped it cleanly (Ctrl-C / `SIGTERM`); a hard `kill -9` can lose
+the last sub-second of unsynced writes (see
+[Storage & durability](storage-and-durability.md)).
+
+## A Kafka UI shows errors but produce/consume works
+
+Some UIs probe admin APIs doze-kafka doesn't implement (e.g. `DescribeConfigs` is
+supported, but `AlterConfigs`, `CreatePartitions`, or `DescribeLogDirs` aren't). The
+broker closes that individual call cleanly; the UI may show a warning but the core
+topic/group/message views keep working. See [Limitations](limitations.md).
+
+## Consumer group isn't rebalancing when a member dies
+
+A member that crashes (rather than leaving cleanly) is removed only after its
+**session timeout** elapses. For KIP-848 groups that's `--consumer-session-timeout`
+(default 45s); for classic groups it's the timeout the client requested. Until then,
+its partitions stay assigned. This matches Kafka's behavior.
+
+## Still stuck?
+
+Turn up the broker's logs — it logs every request at INFO, including the API, version,
+and client id, which usually makes it obvious what the client tried and where it
+stopped. If a mainstream client can't do an ordinary operation, please file an issue.

@@ -1,0 +1,163 @@
+// Package broker implements the Kafka request handlers, wiring the wire protocol
+// to the storage engine (partition logs) and the metadata store. Handlers are
+// deliberately thin: decode a request, call into log/meta, encode a response.
+// See docs/api-support.md for the API set.
+package broker
+
+import (
+	"log/slog"
+	"net"
+	"strconv"
+	"sync"
+
+	"github.com/doze-dev/doze-kafka/internal/config"
+	"github.com/doze-dev/doze-kafka/internal/protocol"
+	"github.com/doze-dev/doze-kafka/internal/storage/log"
+	"github.com/doze-dev/doze-kafka/internal/storage/meta"
+)
+
+// Broker holds the shared state every handler needs.
+type Broker struct {
+	cfg     config.Config
+	log     *slog.Logger
+	logs    *log.Manager
+	meta    meta.Store
+	groups  *groupManager
+	cg848   *cg848Manager    // KIP-848 broker-driven groups (Kafka-4 profile).
+	auth    *authenticator   // nil when SASL is disabled.
+	idem    *idempotency     // idempotent-producer sequence dedup.
+	profile protocol.Profile // version profile selected by cfg.Version.
+	produce *notifier        // wakes long-polling fetchers when data is produced.
+}
+
+// New constructs a Broker over an open log manager and metadata store. The
+// version profile is resolved from cfg.Version (already validated by
+// config.Validate); an out-of-range value falls back to the default major
+// defensively rather than panicking. An error is returned only if the SASL
+// credential set fails to initialize.
+func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store) (*Broker, error) {
+	profile, ok := protocol.ProfileFor(cfg.Version)
+	if !ok {
+		profile, _ = protocol.ProfileFor(protocol.DefaultKafkaMajor)
+	}
+	auth, err := newAuthenticator(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return &Broker{
+		cfg:     cfg,
+		log:     logger,
+		logs:    logs,
+		meta:    m,
+		groups:  newGroupManager(),
+		cg848:   newCG848Manager(m, logger, cfg.ConsumerSessionTimeout),
+		auth:    auth,
+		idem:    newIdempotency(),
+		profile: profile,
+		produce: newNotifier(),
+	}, nil
+}
+
+// Register binds every handler to its API key on the router. Which group-protocol
+// handlers are registered depends on the active version profile.
+func (b *Broker) Register(r *protocol.Router) {
+	// Available on every supported Kafka major.
+	r.Register(protocol.APIApiVersions, b.handleAPIVersions)
+	r.Register(protocol.APIMetadata, b.handleMetadata)
+	r.Register(protocol.APICreateTopics, b.handleCreateTopics)
+	r.Register(protocol.APIDeleteTopics, b.handleDeleteTopics)
+	r.Register(protocol.APIProduce, b.handleProduce)
+	r.Register(protocol.APIFetch, b.handleFetch)
+	r.Register(protocol.APIListOffsets, b.handleListOffsets)
+	r.Register(protocol.APIInitProducerID, b.handleInitProducerID)
+
+	// Classic consumer-group protocol (the JoinGroup/SyncGroup relay).
+	r.Register(protocol.APIFindCoordinator, b.handleFindCoordinator)
+	r.Register(protocol.APIJoinGroup, b.handleJoinGroup)
+	r.Register(protocol.APISyncGroup, b.handleSyncGroup)
+	r.Register(protocol.APIHeartbeat, b.handleHeartbeat)
+	r.Register(protocol.APILeaveGroup, b.handleLeaveGroup)
+	r.Register(protocol.APIOffsetCommit, b.handleOffsetCommit)
+	r.Register(protocol.APIOffsetFetch, b.handleOffsetFetch)
+	r.Register(protocol.APIListGroups, b.handleListGroups)
+	r.Register(protocol.APIDescribeGroups, b.handleDescribeGroups)
+	r.Register(protocol.APIDescribeConfigs, b.handleDescribeConfigs)
+	r.Register(protocol.APIDescribeCluster, b.handleDescribeCluster)
+
+	// SASL authentication — only when configured. The connection gate
+	// (protocol.Server.RequireAuth) blocks every other API until the handshake
+	// completes; these two handlers, and ApiVersions, are the pre-auth exceptions.
+	if b.auth != nil {
+		r.Register(protocol.APISASLHandshake, b.handleSASLHandshake)
+		r.Register(protocol.APISASLAuthenticate, b.handleSASLAuthenticate)
+	}
+
+	// KIP-848 broker-driven group protocol — Kafka 4+ profiles only. A client at
+	// the default group.protocol=consumer negotiates this via the advertised
+	// ConsumerGroupHeartbeat/Describe APIs.
+	if b.profile.GroupProtocol == protocol.GroupClassicAndConsumer {
+		r.Register(protocol.APIConsumerGroupHeartbeat, b.handleConsumerGroupHeartbeat)
+		r.Register(protocol.APIConsumerGroupDescribe, b.handleConsumerGroupDescribe)
+	}
+}
+
+// nodeID is this broker's node id. Single-node, so it is a constant.
+func (b *Broker) nodeID() int32 { return 1 }
+
+// clusterID is the (stable, cosmetic) cluster id reported in Metadata.
+func (b *Broker) clusterID() string { return "doze-kafka" }
+
+// advertisedPort is the port returned to clients in Metadata: the configured
+// override if set, else the port from the listen address, else 9092.
+func (b *Broker) advertisedPort() int32 {
+	if b.cfg.AdvertisedPort > 0 {
+		return int32(b.cfg.AdvertisedPort)
+	}
+	if _, portStr, err := net.SplitHostPort(b.cfg.ListenAddr); err == nil {
+		if p, err := strconv.Atoi(portStr); err == nil && p > 0 {
+			return int32(p)
+		}
+	}
+	return 9092
+}
+
+// resolveTopic looks up a topic by name, or by UUID when the name is empty (the
+// topic-ID addressing used by modern Fetch/Produce). It returns the resolved name,
+// the topic record, and whether it was found.
+func (b *Broker) resolveTopic(name string, id [16]byte) (string, meta.Topic, bool) {
+	if name != "" {
+		t, ok, err := b.meta.Topic(name)
+		if err != nil || !ok {
+			return name, meta.Topic{}, false
+		}
+		return name, t, true
+	}
+	t, ok, err := b.meta.TopicByID(meta.TopicID(id))
+	if err != nil || !ok {
+		return "", meta.Topic{}, false
+	}
+	return t.Name, t, true
+}
+
+// notifier is a broadcast wakeup: signal() wakes everyone currently waiting on
+// wait(). It backs Fetch long-polling — any Produce wakes blocked fetchers, which
+// then re-check their partitions.
+type notifier struct {
+	mu sync.Mutex
+	ch chan struct{}
+}
+
+func newNotifier() *notifier { return &notifier{ch: make(chan struct{})} }
+
+func (n *notifier) wait() <-chan struct{} {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.ch
+}
+
+func (n *notifier) signal() {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	close(n.ch)
+	n.ch = make(chan struct{})
+}

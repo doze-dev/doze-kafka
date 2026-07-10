@@ -1,0 +1,17 @@
+# Runtime data — the message logs and metadata DB are never committed.
+/data/
+/meta.db
+*.db
+
+# Build output.
+/bin/
+/dist/
+/doze-kafka
+
+# Go test / coverage artifacts.
+*.test
+*.out
+coverage.*
+
+# Editor / OS noise.
+.DS_Store

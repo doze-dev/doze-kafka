@@ -1,0 +1,34 @@
+name: Fuzz
+
+# Weekly (and on demand) extended fuzzing of the wire-protocol decoder — the code
+# that parses untrusted bytes off the socket. On a crash the failing input is saved
+# as an artifact so it can be replayed locally.
+on:
+  schedule:
+    - cron: "0 7 * * 1" # Mondays 07:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [FuzzParseAndDecodeRequest, FuzzSkipTaggedFields, FuzzReadFrame]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Fuzz ${{ matrix.target }}
+        run: go test ./internal/protocol/ -run '^$' -fuzz '^${{ matrix.target }}$' -fuzztime 5m
+      - name: Upload failing inputs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashers-${{ matrix.target }}
+          path: internal/protocol/testdata/fuzz/
+          if-no-files-found: ignore
