@@ -31,6 +31,17 @@ func NewServer(addr string, router *Router, log *slog.Logger) *Server {
 // UseTLS makes the listener terminate TLS with the given config. Call before Bind.
 func (s *Server) UseTLS(cfg *tls.Config) { s.tlsConfig = cfg }
 
+// UseListener injects a caller-provided listener instead of binding s.addr —
+// used by embedders (e.g. the doze proxy hands us a unix-socket listener; the
+// Kafka wire protocol is transport-agnostic). Wraps in TLS when configured.
+// Call before Serve.
+func (s *Server) UseListener(ln net.Listener) {
+	if s.tlsConfig != nil {
+		ln = tls.NewListener(ln, s.tlsConfig)
+	}
+	s.ln = ln
+}
+
 // RequireAuth gates every non-SASL API behind a completed SASL handshake. Call
 // before Serve.
 func (s *Server) RequireAuth() { s.authRequired = true }

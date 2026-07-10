@@ -19,11 +19,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/doze-dev/doze-kafka/internal/broker"
 	"github.com/doze-dev/doze-kafka/internal/config"
-	"github.com/doze-dev/doze-kafka/internal/protocol"
-	"github.com/doze-dev/doze-kafka/internal/storage/log"
-	"github.com/doze-dev/doze-kafka/internal/storage/meta"
+	"github.com/doze-dev/doze-kafka/server"
 )
 
 // version is the build version, injected by the release tooling
@@ -130,52 +127,17 @@ func parseFlags(args []string, dst *config.Config) (configPath, pprofAddr string
 	return *cp, *pp
 }
 
-// run wires the subsystems together and serves until interrupted.
+// run builds the broker via the shared server package and serves until
+// interrupted, so the CLI and the embed API can't drift.
 func run(cfg config.Config, logger *slog.Logger) error {
-	if err := cfg.Validate(); err != nil {
-		return err
-	}
-
-	// Metadata store: topic registry, committed offsets, producer-id counter.
-	metaStore, err := meta.Open(cfg.MetaDB)
+	srv, err := server.NewFromConfig(cfg, logger)
 	if err != nil {
 		return err
 	}
-	defer metaStore.Close()
-
-	// Partition log manager: the append-only, disk-backed message logs. It runs the
-	// coarse fsync timer and retention sweeps, and flushes on Close.
-	logs, err := log.OpenManager(cfg.DataDir, log.ManagerOptions{
-		SegmentBytes:       cfg.SegmentBytes,
-		IndexIntervalBytes: cfg.IndexIntervalBytes,
-		FsyncInterval:      cfg.FsyncInterval,
-		Retention:          cfg.Retention(),
-		Logger:             logger,
-	})
-	if err != nil {
-		return err
-	}
-	defer logs.Close()
-
-	b, err := broker.New(cfg, logger, logs, metaStore)
-	if err != nil {
-		return err
-	}
-
-	router := protocol.NewRouter(logger)
-	b.Register(router)
-
-	srv := protocol.NewServer(cfg.ListenAddr, router, logger)
 	if cfg.TLSEnabled() {
-		tlsCfg, err := cfg.TLSConfig()
-		if err != nil {
-			return err
-		}
-		srv.UseTLS(tlsCfg)
 		logger.Info("TLS enabled on listener", "cert", cfg.TLSCertFile)
 	}
 	if cfg.AuthEnabled() {
-		srv.RequireAuth()
 		logger.Info("SASL required", "mechanisms", cfg.SASLMechanisms)
 	}
 
@@ -186,8 +148,8 @@ func run(cfg config.Config, logger *slog.Logger) error {
 	if err := srv.Serve(ctx); err != nil {
 		return err
 	}
-	// Serve has returned: accepting stopped and connections drained. The deferred
-	// Close calls now flush+fsync the logs and close the metadata store before exit.
+	// Serve has returned: accepting stopped and connections drained; storage was
+	// flushed and closed on the way out.
 	logger.Info("shutting down: flushing logs to disk")
 	return nil
 }
