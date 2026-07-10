@@ -42,6 +42,7 @@ archives:
       - README.md
       - LICENSE
       - NOTICE
+      - doze-kafka.example.toml
 
 checksum:
   name_template: checksums.txt

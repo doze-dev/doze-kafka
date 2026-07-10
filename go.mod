@@ -7,6 +7,7 @@ go 1.26.0
 //   go.etcd.io/bbolt                   — metadata store (phase 2+)
 
 require (
+	github.com/BurntSushi/toml v1.6.0
 	github.com/IBM/sarama v1.50.3
 	github.com/twmb/franz-go v1.21.5
 	github.com/twmb/franz-go/pkg/kmsg v1.13.1

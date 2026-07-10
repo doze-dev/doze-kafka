@@ -40,28 +40,94 @@ func main() {
 		return
 	}
 
-	cfg := config.Default()
-	registerFlags(flag.CommandLine, &cfg)
-	pprofAddr := flag.String("pprof-addr", "", "if set, serve net/http/pprof here (goroutine/heap profiling for soak/debug)")
-	flag.Parse()
+	// `doze-kafka config print` writes the effective configuration (defaults, then
+	// the config file, then flags) as TOML — a ready-to-edit starting point.
+	if len(os.Args) > 1 && os.Args[1] == "config" {
+		if len(os.Args) < 3 || os.Args[2] != "print" {
+			fmt.Fprintln(os.Stderr, "usage: doze-kafka config print [flags]")
+			os.Exit(2)
+		}
+		st, err := loadConfig(os.Args[3:])
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := config.WriteTOML(os.Stdout, st.cfg); err != nil {
+			fmt.Fprintln(os.Stderr, "config print:", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	st, err := loadConfig(os.Args[1:])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	// version is doze-kafka's own; kafka_compat is the emulated Kafka major.
-	logger.Info("doze-kafka", "version", version, "kafka_compat", cfg.Version)
+	logger.Info("doze-kafka", "version", version, "kafka_compat", st.cfg.Version)
+	if st.configFile != "" {
+		logger.Info("loaded config file", "path", st.configFile)
+	}
 
-	if *pprofAddr != "" {
+	if st.pprofAddr != "" {
 		go func() {
-			logger.Info("pprof listening", "addr", *pprofAddr)
-			if err := http.ListenAndServe(*pprofAddr, nil); err != nil { //nolint:gosec // debug-only, local
+			logger.Info("pprof listening", "addr", st.pprofAddr)
+			if err := http.ListenAndServe(st.pprofAddr, nil); err != nil { //nolint:gosec // debug-only, local
 				logger.Warn("pprof server stopped", "err", err)
 			}
 		}()
 	}
 
-	if err := run(cfg, logger); err != nil {
+	if err := run(st.cfg, logger); err != nil {
 		logger.Error("fatal", "err", err)
 		os.Exit(1)
 	}
+}
+
+// startup holds everything resolved from the command line before the broker runs.
+type startup struct {
+	cfg        config.Config
+	pprofAddr  string
+	configFile string // the config file actually loaded, or "" if none.
+}
+
+// loadConfig resolves the effective configuration with flags > file > defaults
+// precedence. It parses once to discover --config (falling back to
+// ./doze-kafka.toml if present), overlays that file onto the defaults, then parses
+// the flags again on top so any flag still wins for a one-off override.
+func loadConfig(args []string) (startup, error) {
+	probe := config.Default()
+	configPath, _ := parseFlags(args, &probe)
+	if configPath == "" {
+		if _, err := os.Stat(config.DefaultConfigFile); err == nil {
+			configPath = config.DefaultConfigFile
+		}
+	}
+
+	c := config.Default()
+	if configPath != "" {
+		if err := config.LoadFile(configPath, &c); err != nil {
+			return startup{}, err
+		}
+	}
+	_, pprofAddr := parseFlags(args, &c)
+	return startup{cfg: c, pprofAddr: pprofAddr, configFile: configPath}, nil
+}
+
+// parseFlags binds the broker flags onto dst and parses args, returning the
+// --config path and --pprof-addr value. Because the flags' defaults are dst's
+// current field values, keys already set from a config file survive unless the
+// corresponding flag is explicitly passed.
+func parseFlags(args []string, dst *config.Config) (configPath, pprofAddr string) {
+	fs := flag.NewFlagSet("doze-kafka", flag.ExitOnError)
+	cp := fs.String("config", "", "path to a TOML config file (default: ./doze-kafka.toml if present)")
+	pp := fs.String("pprof-addr", "", "if set, serve net/http/pprof here (goroutine/heap profiling for soak/debug)")
+	registerFlags(fs, dst)
+	fs.Parse(args) //nolint:errcheck // flag.ExitOnError exits on a parse error.
+	return *cp, *pp
 }
 
 // run wires the subsystems together and serves until interrupted.

@@ -1,10 +1,58 @@
 # Configuration
 
-doze-kafka is configured entirely with command-line flags — there's no config file
-to manage. Every flag has a sensible default, so `./doze-kafka` with no arguments is
-a complete, working broker. Run `./doze-kafka -h` to see the list at any time.
+doze-kafka is configured with command-line flags **or** a TOML config file — every
+setting is available either way, under the same name. Every setting has a sensible
+default, so `./doze-kafka` with no arguments is a complete, working broker. Run
+`./doze-kafka -h` to see the flags at any time.
+
+## Config file
+
+Drop a `doze-kafka.toml` in your working directory and doze-kafka loads it
+automatically; point elsewhere with `--config path/to/file.toml`. The keys match the
+flags one-to-one:
+
+```toml
+listen = ":9092"
+data-dir = "./data"
+retention-ms = 604800000   # 7 days
+fsync-interval = "500ms"
+
+sasl-mechanisms = ["SCRAM-SHA-256"]
+
+[credentials]
+alice = "s3cret"
+
+[tls]
+cert = "./certs/server.pem"
+key  = "./certs/server-key.pem"
+```
+
+Copy [`doze-kafka.example.toml`](../doze-kafka.example.toml) for a fully commented
+starting point.
+
+**Precedence is flags > file > defaults.** The file overlays only the keys it names
+— everything else stays at its default — and any flag still wins for a one-off
+override, so you can commit a `doze-kafka.toml` for your project and still run
+`./doze-kafka --version 3` for a quick experiment. A mistyped key is rejected rather
+than silently ignored.
+
+Two things a file does better than flags: it keeps a **list of SASL users** readable
+(and keeps passwords out of your shell history and `ps` output), and it's
+**committable** — check `doze-kafka.toml` into your repo and the whole team gets the
+same broker.
+
+`doze-kafka config print` writes your *effective* configuration — defaults, then the
+file, then any flags — as TOML, so you can see exactly what the broker will run with,
+or generate a starter file:
+
+```sh
+doze-kafka config print > doze-kafka.toml
+```
 
 ## All flags
+
+Every flag below has the same name as its config-file key (durations like
+`--fsync-interval` are written as strings, e.g. `fsync-interval = "500ms"`).
 
 ### Network
 

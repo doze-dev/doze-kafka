@@ -101,7 +101,7 @@ Start here → **[docs/](docs/README.md)**
 | Guide | What's in it |
 |---|---|
 | [Getting started](docs/getting-started.md) | Build, run, and round-trip your first message. |
-| [Configuration](docs/configuration.md) | Every flag, its default, and worked examples. |
+| [Configuration](docs/configuration.md) | Every flag and TOML config-file key, defaults, and worked examples. |
 | [Clients](docs/clients.md) | Connecting franz-go, Sarama, kafkajs, librdkafka/kcat, Java. |
 | [Consumer groups](docs/consumer-groups.md) | Classic vs KIP-848, offsets, rebalancing. |
 | [Auth & TLS](docs/auth-and-tls.md) | Turning on SASL and TLS, with client snippets. |
