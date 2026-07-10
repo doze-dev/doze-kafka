@@ -120,6 +120,7 @@ Start here → **[docs/](docs/README.md)**
 
 | Guide | What's in it |
 |---|---|
+| [Installer](install.sh) | Install/uninstall, version pinning, and options — its header, or `install.sh --help`. |
 | [Getting started](docs/getting-started.md) | Build, run, and round-trip your first message. |
 | [Configuration](docs/configuration.md) | Every flag and TOML config-file key, defaults, and worked examples. |
 | [Clients](docs/clients.md) | Connecting franz-go, Sarama, kafkajs, librdkafka/kcat, Java. |
