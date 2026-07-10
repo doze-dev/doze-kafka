@@ -22,16 +22,22 @@ nothing else: **it's a single standalone binary you run.**
 ## Install
 
 ```sh
-curl -o- https://raw.githubusercontent.com/doze-dev/doze-kafka/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/doze-dev/doze-kafka/main/install.sh | sh
 # or
-wget -qO- https://raw.githubusercontent.com/doze-dev/doze-kafka/main/install.sh | bash
+wget -qO- https://raw.githubusercontent.com/doze-dev/doze-kafka/main/install.sh | sh
 ```
 
-This grabs the prebuilt binary for your OS and architecture, verifies its checksum,
-and installs it to `~/.doze-kafka/bin`. Pin a version by putting its tag in the URL
-(`.../doze-kafka/v1.0.0/install.sh`) or setting `DOZE_KAFKA_VERSION=v1.0.0`; change
-where it lands with `DOZE_KAFKA_DIR`. Linux and macOS, amd64 and arm64. No Homebrew,
-no package manager.
+This grabs the prebuilt binary for your OS and architecture, verifies its SHA-256
+checksum, and installs it to `~/.doze-kafka/bin`. The script is plain POSIX `sh` (no
+bash required). Tune it with environment variables:
+
+| Variable | Effect |
+| --- | --- |
+| `DOZE_KAFKA_VERSION` | Pin a version, e.g. `v1.0.0` (default: latest release). You can also put the tag in the URL: `.../doze-dev/doze-kafka/v1.0.0/install.sh`. |
+| `DOZE_KAFKA_DIR` | Install prefix (default `~/.doze-kafka`; the binary lands in `bin/`). |
+| `DOZE_KAFKA_NO_MODIFY_PATH` | Set to `1` to leave your shell profile untouched. |
+
+Linux and macOS, amd64 and arm64. No Homebrew, no package manager.
 
 Prefer to build it yourself? See below.
 
