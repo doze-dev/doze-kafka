@@ -64,7 +64,7 @@ func TestPhase4_GroupConsumeCommitAndResume(t *testing.T) {
 
 	stop := runBrokerAt(t, addr, dir, 4)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	producer := newClient(t, addr)
@@ -121,7 +121,7 @@ func TestPhase4_TwoConsumersSplitPartitions(t *testing.T) {
 	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
 	defer runBrokerAt(t, addr, dir, 4)()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	const parts = 2

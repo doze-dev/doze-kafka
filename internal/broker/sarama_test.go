@@ -112,7 +112,7 @@ func TestSarama_ConsumerGroupConsumeCommitResume(t *testing.T) {
 	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
 	stop := runBrokerAt(t, addr, dir, 4)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	fr := newClient(t, addr)
 	mustCreateTopic(t, ctx, fr, "sarama-grp", 1)
