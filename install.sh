@@ -68,10 +68,14 @@ uninstall() {
 		[ -f "$p" ] || continue
 		grep -qs -F "$BIN_DIR" "$p" 2>/dev/null || continue
 		tmp="$(mktemp)"
+		# Remove our marker + export lines, and the single blank line the installer
+		# added just before the marker, so the profile is restored cleanly. A blank is
+		# held back one line and dropped if the marker follows it, else emitted.
 		awk -v bindir="$BIN_DIR" '
-			index($0, bindir) { next }   # the "export PATH=..." line we added
-			$0 == "# doze-kafka" { next } # our marker comment
-			{ print }
+			$0 == "# doze-kafka" || index($0, bindir) { blank = 0; next }
+			/^[[:space:]]*$/ { if (blank) print saved; blank = 1; saved = $0; next }
+			{ if (blank) { print saved; blank = 0 } print }
+			END { if (blank) print saved }
 		' "$p" >"$tmp" && cat "$tmp" >"$p"
 		rm -f "$tmp"
 		echo "Removed the PATH entry from $p"
