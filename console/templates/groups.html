@@ -1,0 +1,74 @@
+{{define "group_lp"}}
+{{template "lp_head" dict "Glyph" "users" "Label" "Consumer groups"}}
+{{range .List}}
+<a class="li {{if eq .ID $.Sel}}on{{end}}" href="{{$.Prefix}}/groups/{{.ID}}"
+   x-data x-show="!$store.filter.q || '{{.ID}}'.toLowerCase().includes($store.filter.q.toLowerCase())">
+  <span class="nm mono">{{.ID}}</span>
+  <span class="meta">
+    <span class="badge {{protoBadge .Protocol}}">{{protoLabel .Protocol}}</span>
+    <span class="badge {{stateBadge .State}}">{{.State}}</span>
+    <span class="mono">{{.Members}} member{{if ne .Members 1}}s{{end}}</span>
+  </span>
+</a>
+{{end}}
+{{template "lp_foot" .}}
+{{end}}
+
+{{define "groups_home"}}{{template "shell_top" .}}
+  {{template "group_lp" (dict "Prefix" .Prefix "List" .List "Sel" "")}}
+  {{template "empty_detail" dict "Glyph" "users" "Hint" "Select a consumer group to see its members and lag."}}
+{{template "shell_bottom" .}}{{end}}
+
+{{define "group_detail"}}{{template "shell_top" .}}
+  {{template "group_lp" (dict "Prefix" .Prefix "List" .List "Sel" .Group.ID)}}
+  <section class="detail"><div class="detail-inner">
+    <div class="idband">
+      <div>
+        <h1>{{.Group.ID}}</h1>
+        <div class="idchips">
+          <span class="badge {{protoBadge .Group.Protocol}}">{{protoLabel .Group.Protocol}}</span>
+          <span class="badge {{stateBadge .Group.State}}">{{.Group.State}}</span>
+          {{if .Group.Assignor}}<span class="chip mono">assignor: {{.Group.Assignor}}</span>{{end}}
+          <span class="chip mono">{{len .Group.Members}} member{{if ne (len .Group.Members) 1}}s{{end}}</span>
+          {{if .Offsets}}<span class="chip mono {{if eq .TotalLag 0}}lag-zero{{else}}lag-some{{end}}">{{if eq .TotalLag 0}}caught up{{else}}lag {{.TotalLag}}{{end}}</span>{{end}}
+        </div>
+      </div>
+    </div>
+
+    {{if .Group.Members}}
+    <div class="sec-title">Members</div>
+    <div class="tbl-wrap" style="margin-bottom:8px">
+      <table class="tbl"><thead><tr><th>Member</th><th>Assigned partitions</th></tr></thead>
+        <tbody>{{range .Group.Members}}<tr style="cursor:default">
+          <td class="mono">{{.ID}}</td>
+          <td class="mono">{{$first := true}}{{range $topic, $parts := .Assigned}}{{if not $first}}, {{end}}{{$first = false}}{{$topic}} {{$parts}}{{end}}{{if not .Assigned}}—{{end}}</td>
+        </tr>{{end}}</tbody>
+      </table>
+    </div>
+    {{else}}
+    <div class="honest">
+      {{icon "info"}}
+      <div>No members connected. Offsets, if any were committed before, are still held — they're durable even when the group is empty.</div>
+    </div>
+    {{end}}
+
+    {{if .Offsets}}
+    <div class="sec-title">Offsets &amp; lag</div>
+    <div class="tbl-wrap">
+      <table class="tbl"><thead><tr><th>Topic</th><th class="num">Partition</th><th class="num">Committed</th><th class="num">Latest</th><th>Lag</th></tr></thead>
+        <tbody>{{range .Offsets}}<tr style="cursor:default">
+          <td class="mono">{{.Topic}}</td>
+          <td class="num mono">{{.Partition}}</td>
+          <td class="num mono">{{.Committed}}</td>
+          <td class="num mono">{{.Latest}}</td>
+          <td><div class="lagcell"><div class="lagbar {{if eq .Lag 0}}caught{{end}}"><span style="width:{{if eq .Lag 0}}100{{else}}{{.LagPercent}}{{end}}%"></span></div><span class="lagnum {{if eq .Lag 0}}zero{{end}}">{{.Lag}}</span></div></td>
+        </tr>{{end}}</tbody>
+      </table>
+    </div>
+    <div class="honest">
+      {{icon "info"}}
+      <div>Lag isn't a server-reported number — it's <b>latest &minus; committed</b>, computed here the same way <span class="mono">kafka-consumer-groups.sh</span> does.</div>
+    </div>
+    {{end}}
+  </div></section>
+{{template "shell_bottom" .}}{{end}}

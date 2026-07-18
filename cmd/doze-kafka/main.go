@@ -9,9 +9,13 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/tls"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	_ "net/http/pprof" // registers /debug/pprof on the default mux; only served if --pprof-addr is set.
 	"os"
@@ -19,6 +23,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/doze-dev/doze-kafka/console"
 	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/server"
 )
@@ -78,7 +83,7 @@ func main() {
 		}()
 	}
 
-	if err := run(st.cfg, logger); err != nil {
+	if err := run(st, logger); err != nil {
 		logger.Error("fatal", "err", err)
 		os.Exit(1)
 	}
@@ -86,9 +91,11 @@ func main() {
 
 // startup holds everything resolved from the command line before the broker runs.
 type startup struct {
-	cfg        config.Config
-	pprofAddr  string
-	configFile string // the config file actually loaded, or "" if none.
+	cfg         config.Config
+	pprofAddr   string
+	configFile  string // the config file actually loaded, or "" if none.
+	console     bool
+	consoleAddr string
 }
 
 // loadConfig resolves the effective configuration with flags > file > defaults
@@ -97,7 +104,8 @@ type startup struct {
 // the flags again on top so any flag still wins for a one-off override.
 func loadConfig(args []string) (startup, error) {
 	probe := config.Default()
-	configPath, _ := parseFlags(args, &probe)
+	fl, _ := parseFlags(args, &probe)
+	configPath := fl.config
 	if configPath == "" {
 		if _, err := os.Stat(config.DefaultConfigFile); err == nil {
 			configPath = config.DefaultConfigFile
@@ -110,26 +118,61 @@ func loadConfig(args []string) (startup, error) {
 			return startup{}, err
 		}
 	}
-	_, pprofAddr := parseFlags(args, &c)
-	return startup{cfg: c, pprofAddr: pprofAddr, configFile: configPath}, nil
+	fl, err := parseFlags(args, &c)
+	if err != nil {
+		return startup{}, err
+	}
+	return startup{
+		cfg: c, pprofAddr: fl.pprofAddr, configFile: configPath,
+		console: fl.console, consoleAddr: fl.consoleAddr,
+	}, nil
 }
 
-// parseFlags binds the broker flags onto dst and parses args, returning the
-// --config path and --pprof-addr value. Because the flags' defaults are dst's
-// current field values, keys already set from a config file survive unless the
-// corresponding flag is explicitly passed.
-func parseFlags(args []string, dst *config.Config) (configPath, pprofAddr string) {
+// cliFlags holds the flags that aren't part of config.Config itself.
+type cliFlags struct {
+	config      string
+	pprofAddr   string
+	console     bool
+	consoleAddr string
+}
+
+// parseFlags binds the broker flags onto dst and parses args.
+// Because the flags' defaults are dst's current field values, keys already
+// set from a config file survive unless the corresponding flag is explicitly
+// passed.
+func parseFlags(args []string, dst *config.Config) (cliFlags, error) {
 	fs := flag.NewFlagSet("doze-kafka", flag.ExitOnError)
-	cp := fs.String("config", "", "path to a TOML config file (default: ./doze-kafka.toml if present)")
-	pp := fs.String("pprof-addr", "", "if set, serve net/http/pprof here (goroutine/heap profiling for soak/debug)")
+	var fl cliFlags
+	fs.StringVar(&fl.config, "config", "", "path to a TOML config file (default: ./doze-kafka.toml if present)")
+	fs.StringVar(&fl.pprofAddr, "pprof-addr", "", "if set, serve net/http/pprof here (goroutine/heap profiling for soak/debug)")
+	fs.BoolVar(&fl.console, "console", true, "serve the web console (topics, messages, consumer groups)")
+	fs.StringVar(&fl.consoleAddr, "console-addr", "127.0.0.1:9093", "host:port for the web console — distinct from --listen, since Kafka's wire protocol can't share a port with HTTP")
 	registerFlags(fs, dst)
-	fs.Parse(args) //nolint:errcheck // flag.ExitOnError exits on a parse error.
-	return *cp, *pp
+	if err := fs.Parse(args); err != nil {
+		return cliFlags{}, err
+	}
+	return fl, nil
 }
 
 // run builds the broker via the shared server package and serves until
 // interrupted, so the CLI and the embed API can't drift.
-func run(cfg config.Config, logger *slog.Logger) error {
+func run(st startup, logger *slog.Logger) error {
+	cfg := st.cfg
+
+	// The console has no trusted-caller bypass to reach for (doze-kafka gates
+	// every connection, loopback included, behind the same RequireAuth check
+	// once SASL is configured) — so if auth is on, it needs a real credential
+	// of its own. Provisioned here, before the server is built, so it lands
+	// in cfg.Credentials before SASL verifiers are set up.
+	var consoleUser, consolePass, consoleMech string
+	if st.console && cfg.AuthEnabled() {
+		var err error
+		consoleUser, consolePass, consoleMech, err = provisionConsoleCredential(&cfg)
+		if err != nil {
+			return err
+		}
+	}
+
 	srv, err := server.NewFromConfig(cfg, logger)
 	if err != nil {
 		return err
@@ -145,6 +188,14 @@ func run(cfg config.Config, logger *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	if st.console {
+		closeConsole, err := startConsole(ctx, st, cfg, srv, logger, consoleUser, consolePass, consoleMech)
+		if err != nil {
+			return fmt.Errorf("console: %w", err)
+		}
+		defer closeConsole()
+	}
+
 	if err := srv.Serve(ctx); err != nil {
 		return err
 	}
@@ -152,6 +203,91 @@ func run(cfg config.Config, logger *slog.Logger) error {
 	// flushed and closed on the way out.
 	logger.Info("shutting down: flushing logs to disk")
 	return nil
+}
+
+// provisionConsoleCredential generates a random password for a reserved
+// "__console" SASL user and injects it into cfg.Credentials — a real
+// credential, not a bypass, using whichever mechanism the broker already has
+// enabled (PLAIN preferred for simplicity, else SCRAM). Never logged.
+func provisionConsoleCredential(cfg *config.Config) (user, pass, mech string, err error) {
+	buf := make([]byte, 18)
+	if _, err := rand.Read(buf); err != nil {
+		return "", "", "", fmt.Errorf("generate console credential: %w", err)
+	}
+	mech = ""
+	for _, m := range cfg.SASLMechanisms {
+		if m == "PLAIN" {
+			mech = m
+			break
+		}
+	}
+	if mech == "" && len(cfg.SASLMechanisms) > 0 {
+		mech = cfg.SASLMechanisms[0]
+	}
+	user, pass = "__console", hex.EncodeToString(buf)
+	if cfg.Credentials == nil {
+		cfg.Credentials = map[string]string{}
+	}
+	cfg.Credentials[user] = pass
+	return user, pass, mech, nil
+}
+
+// startConsole binds a console HTTP listener on st.consoleAddr and dials the
+// broker as a real Kafka client at its own bound address. Returns a func
+// that shuts the console down; the caller defers it.
+func startConsole(ctx context.Context, st startup, cfg config.Config, srv *server.Server, logger *slog.Logger, user, pass, mech string) (func(), error) {
+	addr, err := srv.Bind(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("bind: %w", err)
+	}
+	dialAddr, err := consoleDialAddr(cfg, addr)
+	if err != nil {
+		return nil, err
+	}
+
+	var tlsCfg *tls.Config
+	if cfg.TLSEnabled() {
+		if tlsCfg, err = cfg.TLSConfig(); err != nil {
+			return nil, err
+		}
+	}
+
+	con, err := console.New(console.Options{
+		Addr: dialAddr, SASLUser: user, SASLPass: pass, SASLMechanism: mech, TLSConfig: tlsCfg,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	httpSrv := &http.Server{Addr: st.consoleAddr, Handler: con}
+	go func() {
+		logger.Info("console listening", "addr", st.consoleAddr)
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Warn("console server stopped", "err", err)
+		}
+	}()
+	go func() {
+		<-ctx.Done()
+		httpSrv.Close()
+	}()
+
+	return func() { con.Close() }, nil
+}
+
+// consoleDialAddr is the address the console's own Kafka client dials — the
+// broker's real bound port, on cfg.AdvertisedHost (the same host doze-kafka
+// tells every other client to use, so the console never guesses at a
+// different answer than a real SDK would get from Metadata).
+func consoleDialAddr(cfg config.Config, bound net.Addr) (string, error) {
+	_, port, err := net.SplitHostPort(bound.String())
+	if err != nil {
+		return "", fmt.Errorf("console: parse bound addr %q: %w", bound.String(), err)
+	}
+	host := cfg.AdvertisedHost
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	return net.JoinHostPort(host, port), nil
 }
 
 // registerFlags binds command-line flags onto cfg, using its current values as

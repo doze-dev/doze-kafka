@@ -1,0 +1,552 @@
+package console
+
+import (
+	"context"
+	"fmt"
+	"hash/fnv"
+	"net"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/twmb/franz-go/pkg/kerr"
+	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/kmsg"
+	"github.com/twmb/franz-go/pkg/sasl"
+	"github.com/twmb/franz-go/pkg/sasl/plain"
+	"github.com/twmb/franz-go/pkg/sasl/scram"
+)
+
+// backend is the console's connection to the broker — a real Kafka client
+// (franz-go), never a bypass. It dials opts.Addr over loopback TCP exactly
+// as any SDK would, authenticating with SASL when the broker requires it.
+//
+// Four clients, not one: admin/metadata calls share cl, but "acks" is a
+// producer-wide franz-go option (not a per-record one), so each acks level
+// the compose panel offers gets its own pre-built client. All are cheap,
+// idle TCP connections to a local broker.
+type backend struct {
+	addr string
+	opts Options
+
+	cl                                     *kgo.Client // metadata/admin
+	produceLeader, produceAll, produceNone *kgo.Client // acks=1, acks=all, acks=0
+
+	mu    sync.Mutex
+	rrctr map[string]int // topic -> next partition, for auto-partition round robin
+}
+
+// seedOpts is a client's dial target: a TCP seed, or — for a "unix://" Addr,
+// the embedded (doze module) topology — a placeholder seed plus a dialer to
+// the broker's own socket. Unix matters there: a TCP dial would go through the
+// supervisor's proxy, where an idle console client counts as a live connection
+// and pins the instance awake forever. EVERY client build must go through this
+// (the tape's short-lived fetch consumer included), or a unix Addr leaks into
+// SeedBrokers and fails host:port parsing.
+func seedOpts(addr string) []kgo.Opt {
+	if path, ok := strings.CutPrefix(addr, "unix://"); ok {
+		return []kgo.Opt{
+			kgo.SeedBrokers("kafka.local:9092"), // placeholder; the dialer ignores it
+			kgo.Dialer(func(ctx context.Context, _, _ string) (net.Conn, error) {
+				var d net.Dialer
+				return d.DialContext(ctx, "unix", path)
+			}),
+		}
+	}
+	return []kgo.Opt{kgo.SeedBrokers(addr)}
+}
+
+// displayAddr is the bootstrap address pages show clients: DisplayAddr when
+// set (the embedded topology, where the dial addr is a unix socket apps can't
+// use), the dial addr otherwise.
+func (b *backend) displayAddr() string {
+	if b.opts.DisplayAddr != "" {
+		return b.opts.DisplayAddr
+	}
+	return b.addr
+}
+
+// newBackend dials the broker. Connections are lazy (franz-go connects on
+// first request), so this only validates options and builds the clients.
+func newBackend(opts Options) (*backend, error) {
+	if opts.Addr == "" {
+		return nil, fmt.Errorf("console: Addr is required")
+	}
+	base := append([]kgo.Opt{kgo.ClientID("doze-kafka-console")}, seedOpts(opts.Addr)...)
+	if opts.SASLUser != "" {
+		mech, err := saslMechanism(opts.SASLMechanism, opts.SASLUser, opts.SASLPass)
+		if err != nil {
+			return nil, err
+		}
+		base = append(base, kgo.SASL(mech))
+	}
+	if opts.TLSConfig != nil {
+		base = append(base, kgo.DialTLSConfig(opts.TLSConfig))
+	}
+
+	cl, err := kgo.NewClient(base...)
+	if err != nil {
+		return nil, fmt.Errorf("console: connect to %s: %w", opts.Addr, err)
+	}
+	// Partition is always chosen explicitly (see pickPartition) so the console
+	// can honestly report which partition a message landed on, rather than
+	// leaving it to a client-side partitioner it doesn't control. Idempotent
+	// producing (franz-go's default) requires acks=all, so the acks=1/acks=0
+	// clients must explicitly opt out of it.
+	produce := func(acks kgo.Acks, idempotent bool) (*kgo.Client, error) {
+		popts := append(append([]kgo.Opt{}, base...),
+			kgo.RequiredAcks(acks), kgo.RecordPartitioner(kgo.ManualPartitioner()))
+		if !idempotent {
+			popts = append(popts, kgo.DisableIdempotentWrite())
+		}
+		c, err := kgo.NewClient(popts...)
+		if err != nil {
+			cl.Close()
+			return nil, fmt.Errorf("console: connect to %s: %w", opts.Addr, err)
+		}
+		return c, nil
+	}
+	produceLeader, err := produce(kgo.LeaderAck(), false)
+	if err != nil {
+		return nil, err
+	}
+	produceAll, err := produce(kgo.AllISRAcks(), true)
+	if err != nil {
+		return nil, err
+	}
+	produceNone, err := produce(kgo.NoAck(), false)
+	if err != nil {
+		return nil, err
+	}
+
+	return &backend{
+		addr: opts.Addr, opts: opts,
+		cl: cl, produceLeader: produceLeader, produceAll: produceAll, produceNone: produceNone,
+		rrctr: map[string]int{},
+	}, nil
+}
+
+func (b *backend) close() {
+	b.cl.Close()
+	b.produceLeader.Close()
+	b.produceAll.Close()
+	b.produceNone.Close()
+}
+
+// saslMechanism builds the sasl.Mechanism the console authenticates with.
+// The console always knows exactly which mechanism its own credential was
+// registered for (main.go picks one when it provisions the credential), so
+// this isn't a negotiation — just a lookup.
+func saslMechanism(name, user, pass string) (sasl.Mechanism, error) {
+	switch name {
+	case "", "PLAIN":
+		return plain.Auth{User: user, Pass: pass}.AsMechanism(), nil
+	case "SCRAM-SHA-256":
+		return scram.Auth{User: user, Pass: pass}.AsSha256Mechanism(), nil
+	case "SCRAM-SHA-512":
+		return scram.Auth{User: user, Pass: pass}.AsSha512Mechanism(), nil
+	default:
+		return nil, fmt.Errorf("console: unsupported SASL mechanism %q", name)
+	}
+}
+
+// ---- topics ----
+
+// TopicSummary is one row in the topics list. Msgs is the number of records
+// currently on disk across all partitions (Σ latest−earliest) — exact, not an
+// estimate, since doze-kafka has no compaction or transaction markers to
+// leave gaps in the offset space.
+type TopicSummary struct {
+	Name       string
+	Partitions int32
+	Msgs       int64
+}
+
+// TopicDetail is a topic's identity plus its effective (read-only) config.
+// doze-kafka has no AlterConfigs — see console's honesty constraints — so
+// there is deliberately no corresponding "set config" method.
+type TopicDetail struct {
+	Name       string
+	ID         string // hex-encoded topic UUID
+	Partitions int32
+	Config     []ConfigEntry // stable order: the order DescribeConfigs returned
+}
+
+// ConfigEntry is one effective-config key/value pair.
+type ConfigEntry struct {
+	Name, Value string
+}
+
+// ListTopics returns every topic, sorted by name. AllowAutoTopicCreation is
+// deliberately left false: this is a read, and doze-kafka would otherwise
+// create a topic just because the console asked about it.
+func (b *backend) ListTopics(ctx context.Context) ([]TopicSummary, error) {
+	req := kmsg.NewPtrMetadataRequest()
+	req.Topics = nil // null = "all topics" (v1+)
+	resp, err := req.RequestWith(ctx, b.cl)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]TopicSummary, 0, len(resp.Topics))
+	loReq := kmsg.NewPtrListOffsetsRequest()
+	loReq.ReplicaID = -1
+	for _, t := range resp.Topics {
+		if t.IsInternal || t.Topic == nil {
+			continue
+		}
+		if t.ErrorCode != 0 {
+			return nil, fmt.Errorf("metadata for %s: %w", *t.Topic, kerr.ErrorForCode(t.ErrorCode))
+		}
+		out = append(out, TopicSummary{Name: *t.Topic, Partitions: int32(len(t.Partitions))})
+		rt := kmsg.NewListOffsetsRequestTopic()
+		rt.Topic = *t.Topic
+		for _, p := range t.Partitions {
+			for _, ts := range []int64{-2, -1} { // earliest, latest
+				rp := kmsg.NewListOffsetsRequestTopicPartition()
+				rp.Partition = p.Partition
+				rp.Timestamp = ts
+				rt.Partitions = append(rt.Partitions, rp)
+			}
+		}
+		loReq.Topics = append(loReq.Topics, rt)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+
+	// One batched ListOffsets round trip covers every partition of every
+	// topic; message counts fill in best-effort (a topic deleted mid-flight
+	// just shows 0 rather than failing the whole list).
+	if len(loReq.Topics) > 0 {
+		loResp, err := loReq.RequestWith(ctx, b.cl)
+		if err == nil {
+			counts := map[string]int64{}
+			for _, t := range loResp.Topics {
+				// Request order per partition is preserved: earliest then
+				// latest. Sum latest−earliest by pairing successive entries.
+				byPart := map[int32][]int64{}
+				for _, p := range t.Partitions {
+					if p.ErrorCode == 0 {
+						byPart[p.Partition] = append(byPart[p.Partition], p.Offset)
+					}
+				}
+				for _, offs := range byPart {
+					if len(offs) == 2 {
+						counts[t.Topic] += offs[1] - offs[0]
+					}
+				}
+			}
+			for i := range out {
+				out[i].Msgs = counts[out[i].Name]
+			}
+		}
+	}
+	return out, nil
+}
+
+// PartitionCount is a cheap Metadata-only lookup (no DescribeConfigs round
+// trip) — for call sites like the tape's live poll that need to know how
+// many partition tabs to draw but not the full effective config.
+func (b *backend) PartitionCount(ctx context.Context, name string) (int32, error) {
+	req := kmsg.NewPtrMetadataRequest()
+	mt := kmsg.NewMetadataRequestTopic()
+	mt.Topic = &name
+	req.Topics = []kmsg.MetadataRequestTopic{mt}
+	resp, err := req.RequestWith(ctx, b.cl)
+	if err != nil {
+		return 0, err
+	}
+	if len(resp.Topics) == 0 {
+		return 0, fmt.Errorf("topic %q not found", name)
+	}
+	if resp.Topics[0].ErrorCode != 0 {
+		return 0, kerr.ErrorForCode(resp.Topics[0].ErrorCode)
+	}
+	return int32(len(resp.Topics[0].Partitions)), nil
+}
+
+// CreateTopic creates a topic. Replication factor is always 1 — doze-kafka
+// is single-node, so there's no meaningful choice to offer here.
+func (b *backend) CreateTopic(ctx context.Context, name string, partitions int32) error {
+	req := kmsg.NewPtrCreateTopicsRequest()
+	rt := kmsg.NewCreateTopicsRequestTopic()
+	rt.Topic = name
+	rt.NumPartitions = partitions
+	rt.ReplicationFactor = 1
+	req.Topics = []kmsg.CreateTopicsRequestTopic{rt}
+	resp, err := req.RequestWith(ctx, b.cl)
+	if err != nil {
+		return err
+	}
+	for _, t := range resp.Topics {
+		if t.ErrorCode != 0 {
+			return kerr.ErrorForCode(t.ErrorCode)
+		}
+	}
+	return nil
+}
+
+// DeleteTopic deletes a topic.
+func (b *backend) DeleteTopic(ctx context.Context, name string) error {
+	req := kmsg.NewPtrDeleteTopicsRequest()
+	req.TopicNames = []string{name}
+	dt := kmsg.NewDeleteTopicsRequestTopic()
+	dt.Topic = &name
+	req.Topics = []kmsg.DeleteTopicsRequestTopic{dt}
+	resp, err := req.RequestWith(ctx, b.cl)
+	if err != nil {
+		return err
+	}
+	for _, t := range resp.Topics {
+		if t.ErrorCode != 0 {
+			return kerr.ErrorForCode(t.ErrorCode)
+		}
+	}
+	return nil
+}
+
+// PurgeTopic deletes and recreates a topic with the same partition count —
+// the only way to clear a topic's data over doze-kafka's wire protocol
+// (DeleteRecords isn't implemented, and retention can't be altered per-topic).
+// The recreated topic gets a fresh topic ID, and any committed consumer
+// offsets now point past the (empty) log — consumers restart from their
+// auto.offset.reset policy, exactly as the confirm dialog warns.
+func (b *backend) PurgeTopic(ctx context.Context, name string) error {
+	partitions, err := b.PartitionCount(ctx, name)
+	if err != nil {
+		return err
+	}
+	if err := b.DeleteTopic(ctx, name); err != nil {
+		return err
+	}
+	// doze-kafka deletes synchronously, but tolerate a beat of lag before the
+	// name frees up rather than surfacing a spurious ALREADY_EXISTS.
+	var lastErr error
+	for range 20 {
+		if lastErr = b.CreateTopic(ctx, name, partitions); lastErr == nil {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+	return fmt.Errorf("recreate after purge: %w", lastErr)
+}
+
+// DescribeTopic returns a topic's identity and effective config.
+func (b *backend) DescribeTopic(ctx context.Context, name string) (*TopicDetail, error) {
+	mreq := kmsg.NewPtrMetadataRequest()
+	mt := kmsg.NewMetadataRequestTopic()
+	mt.Topic = &name
+	mreq.Topics = []kmsg.MetadataRequestTopic{mt}
+	mresp, err := mreq.RequestWith(ctx, b.cl)
+	if err != nil {
+		return nil, err
+	}
+	if len(mresp.Topics) == 0 {
+		return nil, fmt.Errorf("topic %q not found", name)
+	}
+	mt0 := mresp.Topics[0]
+	if mt0.ErrorCode != 0 {
+		return nil, kerr.ErrorForCode(mt0.ErrorCode)
+	}
+
+	creq := kmsg.NewPtrDescribeConfigsRequest()
+	cr := kmsg.NewDescribeConfigsRequestResource()
+	cr.ResourceType = kmsg.ConfigResourceTypeTopic
+	cr.ResourceName = name
+	creq.Resources = []kmsg.DescribeConfigsRequestResource{cr}
+	cresp, err := creq.RequestWith(ctx, b.cl)
+	if err != nil {
+		return nil, err
+	}
+	var cfg []ConfigEntry
+	if len(cresp.Resources) > 0 {
+		res := cresp.Resources[0]
+		if res.ErrorCode != 0 {
+			return nil, kerr.ErrorForCode(res.ErrorCode)
+		}
+		for _, c := range res.Configs {
+			v := ""
+			if c.Value != nil {
+				v = *c.Value
+			}
+			cfg = append(cfg, ConfigEntry{Name: c.Name, Value: v})
+		}
+	}
+
+	return &TopicDetail{
+		Name:       name,
+		ID:         fmt.Sprintf("%x", mt0.TopicID),
+		Partitions: int32(len(mt0.Partitions)),
+		Config:     cfg,
+	}, nil
+}
+
+// PartitionOffsets returns a partition's earliest and latest (log-end)
+// offsets, one round trip, via the -2/-1 special ListOffsets timestamps.
+func (b *backend) PartitionOffsets(ctx context.Context, topic string, partition int32) (earliest, latest int64, err error) {
+	req := kmsg.NewPtrListOffsetsRequest()
+	req.ReplicaID = -1
+	rt := kmsg.NewListOffsetsRequestTopic()
+	rt.Topic = topic
+	for _, ts := range []int64{-2, -1} {
+		p := kmsg.NewListOffsetsRequestTopicPartition()
+		p.Partition = partition
+		p.Timestamp = ts
+		rt.Partitions = append(rt.Partitions, p)
+	}
+	req.Topics = []kmsg.ListOffsetsRequestTopic{rt}
+	resp, err := req.RequestWith(ctx, b.cl)
+	if err != nil {
+		return 0, 0, err
+	}
+	if len(resp.Topics) == 0 || len(resp.Topics[0].Partitions) != 2 {
+		return 0, 0, fmt.Errorf("unexpected ListOffsets response shape")
+	}
+	for _, p := range resp.Topics[0].Partitions {
+		if p.ErrorCode != 0 {
+			return 0, 0, kerr.ErrorForCode(p.ErrorCode)
+		}
+	}
+	// Request order is preserved: [0]=earliest(-2), [1]=latest(-1).
+	return resp.Topics[0].Partitions[0].Offset, resp.Topics[0].Partitions[1].Offset, nil
+}
+
+// ---- messages ----
+
+// Message is one decoded record.
+type Message struct {
+	Offset    int64
+	Partition int32
+	Timestamp time.Time
+	Key       []byte
+	Value     []byte
+	Headers   []MessageHeader
+}
+
+// MessageHeader is one record header.
+type MessageHeader struct {
+	Key   string
+	Value []byte
+}
+
+// FetchWindow returns up to limit records starting at fromOffset, ascending
+// by offset. It opens a short-lived direct-partition consumer (not a
+// subscribing consumer group) and polls briefly — the console wants a
+// bounded snapshot for its live-polled tape, not an ongoing subscription.
+// Using kgo's own PollFetches (rather than hand-decoding raw record
+// batches) means decompression and batch parsing are the same
+// battle-tested code path every real consumer uses.
+func (b *backend) FetchWindow(ctx context.Context, topic string, partition int32, fromOffset int64, limit int) ([]Message, error) {
+	if limit <= 0 {
+		limit = 1
+	}
+	kopts := append(seedOpts(b.addr), kgo.ClientID("doze-kafka-console-fetch"),
+		kgo.ConsumePartitions(map[string]map[int32]kgo.Offset{topic: {partition: kgo.NewOffset().At(fromOffset)}}),
+		kgo.FetchMaxBytes(4<<20),
+	)
+	if b.opts.SASLUser != "" {
+		mech, err := saslMechanism(b.opts.SASLMechanism, b.opts.SASLUser, b.opts.SASLPass)
+		if err != nil {
+			return nil, err
+		}
+		kopts = append(kopts, kgo.SASL(mech))
+	}
+	if b.opts.TLSConfig != nil {
+		kopts = append(kopts, kgo.DialTLSConfig(b.opts.TLSConfig))
+	}
+	cl, err := kgo.NewClient(kopts...)
+	if err != nil {
+		return nil, err
+	}
+	defer cl.Close()
+
+	fctx, cancel := context.WithTimeout(ctx, 800*time.Millisecond)
+	defer cancel()
+
+	var out []Message
+	for len(out) < limit {
+		fs := cl.PollFetches(fctx)
+		if fs.IsClientClosed() {
+			break
+		}
+		if err := fs.Err0(); err != nil && fctx.Err() == nil {
+			return nil, err
+		}
+		done := false
+		fs.EachRecord(func(r *kgo.Record) {
+			if done || len(out) >= limit {
+				return
+			}
+			hdrs := make([]MessageHeader, len(r.Headers))
+			for i, h := range r.Headers {
+				hdrs[i] = MessageHeader{Key: h.Key, Value: h.Value}
+			}
+			out = append(out, Message{
+				Offset: r.Offset, Partition: r.Partition, Timestamp: r.Timestamp,
+				Key: r.Key, Value: r.Value, Headers: hdrs,
+			})
+		})
+		if fctx.Err() != nil {
+			break
+		}
+	}
+	return out, nil
+}
+
+// ProduceResult reports where a message landed.
+type ProduceResult struct {
+	Partition int32
+	Offset    int64 // -1 when Confirmed is false (acks=0: the broker sent no response)
+	Confirmed bool
+}
+
+// Produce sends one message. acks is "1" (default), "0", or "all" — see the
+// compose panel. Partition is always explicit (see pickPartition): the
+// console never leaves partition assignment to an opaque client-side
+// partitioner it can't report back accurately.
+func (b *backend) Produce(ctx context.Context, topic string, partition int32, key, value []byte, headers []MessageHeader, acks string) (ProduceResult, error) {
+	cl := b.produceLeader
+	confirmed := true
+	switch acks {
+	case "0":
+		cl, confirmed = b.produceNone, false
+	case "all":
+		cl = b.produceAll
+	}
+	hdrs := make([]kgo.RecordHeader, len(headers))
+	for i, h := range headers {
+		hdrs[i] = kgo.RecordHeader{Key: h.Key, Value: h.Value}
+	}
+	rec := &kgo.Record{Topic: topic, Partition: partition, Key: key, Value: value, Headers: hdrs}
+	results := cl.ProduceSync(ctx, rec)
+	if err := results.FirstErr(); err != nil {
+		return ProduceResult{}, err
+	}
+	if !confirmed {
+		return ProduceResult{Partition: partition, Offset: -1, Confirmed: false}, nil
+	}
+	got, _ := results.First()
+	return ProduceResult{Partition: got.Partition, Offset: got.Offset, Confirmed: true}, nil
+}
+
+// PickPartition chooses a partition for "Auto" in the compose panel: a
+// stable hash of the key if one was given (so same-key messages land
+// together, same as a real keyed producer), otherwise simple round robin.
+func (b *backend) PickPartition(topic string, key []byte, partitionCount int32) int32 {
+	if partitionCount <= 1 {
+		return 0
+	}
+	if len(key) > 0 {
+		h := fnv.New32a()
+		h.Write(key)
+		return int32(h.Sum32() % uint32(partitionCount))
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	p := b.rrctr[topic] % int(partitionCount)
+	b.rrctr[topic]++
+	return int32(p)
+}

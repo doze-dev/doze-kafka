@@ -1,0 +1,124 @@
+{{define "shell_top"}}<!-- the workbench shell: topstrip · rail · workspace(list+detail) -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{if .Title}}{{.Title}} — {{end}}doze-kafka</title>
+<link rel="icon" type="image/svg+xml" href="{{.Prefix}}/static/favicon.svg">
+<!-- Vendor CSS before app.css: app.css re-themes CodeMirror (background, syntax
+     colors) at equal specificity, so it must come later to win the cascade. -->
+<link rel="stylesheet" href="{{.Prefix}}/static/cm/codemirror.min.css">
+<link rel="stylesheet" href="{{.Prefix}}/static/app.css">
+<script>(function(){try{var t=localStorage.getItem("theme");if(t)document.documentElement.setAttribute("data-theme",t);
+var r=localStorage.getItem("rail");if(r==="slim")document.documentElement.setAttribute("data-rail","slim");}catch(e){}})();</script>
+<script>document.addEventListener("alpine:init",function(){window.Alpine.store("filter",{q:""});});</script>
+<script src="{{.Prefix}}/static/htmx.min.js"></script>
+<script src="{{.Prefix}}/static/idiomorph-ext.min.js"></script>
+<script defer src="{{.Prefix}}/static/alpine.min.js"></script>
+<script src="{{.Prefix}}/static/cm/codemirror.min.js"></script>
+<script src="{{.Prefix}}/static/cm/javascript.min.js"></script>
+<script src="{{.Prefix}}/static/cm/yaml.min.js"></script>
+<script src="{{.Prefix}}/static/cm/sql.min.js"></script>
+<script src="{{.Prefix}}/static/cm/matchbrackets.min.js"></script>
+<script src="{{.Prefix}}/static/cm/closebrackets.min.js"></script>
+<script src="{{.Prefix}}/static/editor.js"></script>
+<script src="{{.Prefix}}/static/shell.js" defer></script>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><img src="{{.Prefix}}/static/favicon.svg" alt="" style="width:15px;height:15px"> doze-kafka <span class="sub">console</span></div>
+    <button class="tb-palette" id="palette-open">{{icon "search"}} <span>Jump or act…</span> <span class="kbd">⌘K</span></button>
+    <div class="tb-spacer"></div>
+    <div class="tb-right">
+      <span class="chip live mono">{{if .Endpoint}}{{.Endpoint}}{{else}}127.0.0.1:9092{{end}}</span>
+      <div class="theme-seg" id="theme-seg" role="group" aria-label="Theme">
+        <button type="button" data-mode="light" title="Light" aria-label="Light theme">{{icon "sun"}}</button>
+        <button type="button" data-mode="system" title="Match system" aria-label="System theme">{{icon "monitor"}}</button>
+        <button type="button" data-mode="dark" title="Dark" aria-label="Dark theme">{{icon "moon"}}</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="body">
+    <nav class="rail" hx-boost="true" hx-target="#workspace" hx-select="#workspace" hx-swap="outerHTML">
+      <div class="rgroup">Broker</div>
+      {{template "ri" dict "P" .Prefix "URL" "/topics" "On" (hasPrefix .Page "topics") "Name" "Topics" "Glyph" "layers" "Ct" "topics"}}
+      {{template "ri" dict "P" .Prefix "URL" "/groups" "On" (hasPrefix .Page "groups") "Name" "Consumer groups" "Glyph" "users" "Ct" "groups"}}
+      {{template "ri" dict "P" .Prefix "URL" "/cluster" "On" (eq .Page "cluster") "Name" "Cluster" "Glyph" "server"}}
+      <button type="button" class="rail-toggle" id="rail-toggle" title="Collapse / expand ([)">
+        <span class="rt-ic">{{icon "chevron"}}</span><span class="ri-nm">Collapse</span>
+      </button>
+    </nav>
+
+    {{/* NOTE: hx-target/hx-select here are INHERITED by every htmx actuator
+         inside the workspace. Any element with its own partial hx-target MUST
+         also set hx-select="unset", or htmx selects #workspace out of the
+         partial response, finds nothing, and swaps in emptiness. */}}
+    <div id="workspace" class="workspace" hx-boost="true" hx-target="#workspace" hx-select="#workspace" hx-swap="outerHTML show:none">
+      {{if .Flash}}
+      <div class="flash anim" id="flashbar">
+        {{icon "check"}} <span>{{.Flash}}</span>
+        <button class="icon-btn sm" style="margin-left:auto" onclick="this.closest('.flash').remove()">{{icon "x"}}</button>
+      </div>
+      {{end}}
+      <div class="panes">
+{{end}}
+
+{{define "shell_bottom"}}
+      </div><!-- /panes -->
+    </div><!-- /workspace -->
+  </div>
+
+  <!-- command palette (vanilla — survives every swap since it's outside #workspace) -->
+  <div class="overlay palette-overlay" id="palette" hidden>
+    <div class="palette anim">
+      <div class="pal-input">
+        {{icon "search"}}
+        <input id="pal-q" placeholder="Search topics, groups, actions…" spellcheck="false" autocomplete="off">
+        <span class="kbd">esc</span>
+      </div>
+      <div class="pal-list" id="pal-list"></div>
+    </div>
+  </div>
+
+  <!-- styled confirm (replaces native hx-confirm dialogs) -->
+  <div class="overlay" id="confirm" hidden>
+    <div class="dialog anim" role="alertdialog" aria-modal="true">
+      <div class="dialog-h"><h3 id="confirm-title">Are you sure?</h3><p id="confirm-msg"></p></div>
+      <div class="dialog-f">
+        <button type="button" class="btn btn-outline" id="confirm-no">Cancel</button>
+        <button type="button" class="btn btn-destructive" id="confirm-yes">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- message drawer (topic detail's table rows open here) -->
+  <div class="overlay" id="drawer-overlay" hidden onclick="if(event.target===this)this.hidden=true">
+    <div class="drawer anim" id="drawer"></div>
+  </div>
+
+  <div class="toasts" id="toasts"></div>
+</div>
+{{end}}
+
+{{/* ri = one rail item. Ct, if set, gets a live count via shell.js's refreshCounts. */}}
+{{define "ri"}}
+<a href="{{.P}}{{.URL}}" class="ri {{if .On}}on{{end}}">
+  <span class="ri-ic">{{icon .Glyph}}</span>
+  <span class="ri-nm">{{.Name}}</span>
+  {{if .Ct}}<span class="ri-ct" data-ct="{{.Ct}}"></span>{{end}}
+  <span class="ri-fly">{{.Name}}</span>
+</a>
+{{end}}
+
+{{define "copychip"}}<span class="copychip">{{if .Label}}<span class="cc-label">{{.Label}}</span>{{end}}<span class="cc-val" title="{{.Value}}">{{.Value}}</span><button type="button" class="copy-btn" data-copy="{{.Value}}" title="Copy">{{icon "copy"}}</button></span>{{end}}
+
+{{define "kvcopy"}}<span class="kv-copy"><span class="trunc" title="{{.}}">{{.}}</span><button type="button" class="copy-btn" data-copy="{{.}}" title="Copy">{{icon "copy"}}</button></span>{{end}}
+
+{{define "empty_detail"}}
+<section class="detail">
+  <div class="empty-detail">
+    {{icon .Glyph}}
+    <p>{{.Hint}}</p>
+    {{if .CTA}}<a class="btn primary" href="{{.CTAURL}}">{{icon "plus"}} {{.CTA}}</a>{{end}}
+  </div>
+</section>
+{{end}}

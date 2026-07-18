@@ -1,0 +1,23 @@
+{{define "cluster_detail"}}{{template "shell_top" .}}
+  <section class="detail"><div class="detail-inner clusterwrap">
+    <div class="idband">
+      <div>
+        <h1 style="font-family:var(--ui);font-size:18px">Cluster</h1>
+        <p class="dim" style="margin:4px 0 0;font-size:12px">One broker. No replication, no controller quorum — that's the whole point.</p>
+      </div>
+    </div>
+    <div class="cpanel">
+      <div class="crow2"><span class="k">Broker</span><span class="v">node {{.Cluster.NodeID}} · {{.Cluster.Host}}:{{.Cluster.Port}}</span></div>
+      <div class="crow2"><span class="k">Cluster ID</span><span class="v">{{.Cluster.ClusterID}}</span></div>
+      <div class="crow2"><span class="k">This connection</span><span class="v">{{if .Cluster.AuthMech}}SASL {{.Cluster.AuthMech}}{{else}}no authentication{{end}} · {{if .Cluster.TLS}}TLS{{else}}plaintext{{end}}</span></div>
+      <div class="crow2" style="border-bottom:none;flex-direction:column;align-items:flex-start;gap:8px">
+        <span class="k">Supported APIs · {{len .Cluster.SupportedAPIs}}</span>
+        <div class="apilist">{{range .Cluster.SupportedAPIs}}<span class="apichip">{{.}}</span>{{end}}</div>
+      </div>
+    </div>
+    <div class="honest">
+      {{icon "info"}}
+      <div>Transactions, log compaction, ACLs, and adding partitions to an existing topic aren't implemented. If a client asks for one of these, the connection closes cleanly on that call — everything else keeps working. See <span class="mono">docs/limitations.md</span>.</div>
+    </div>
+  </div></section>
+{{template "shell_bottom" .}}{{end}}
