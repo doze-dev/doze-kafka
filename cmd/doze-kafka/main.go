@@ -42,6 +42,13 @@ func main() {
 		return
 	}
 
+	// `doze-kafka dns-setup` is the one-time machine setup for the shared .doze
+	// zone. It lives in every doze binary because the setup belongs to the zone
+	// rather than to any one of them — whichever you installed first can do it.
+	if len(os.Args) > 1 && os.Args[1] == "dns-setup" {
+		os.Exit(runDNSSetup(os.Args[2:]))
+	}
+
 	// `doze-kafka config print` writes the effective configuration (defaults, then
 	// the config file, then flags) as TOML — a ready-to-edit starting point.
 	if len(os.Args) > 1 && os.Args[1] == "config" {
@@ -188,12 +195,32 @@ func run(st startup, logger *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// Bind before anything advertises an address. With a ":0" listen address the
+	// real port is not known until now, and both the zone and the console need
+	// it; Serve picks up the listener Bind opened.
+	bound, err := srv.Bind(ctx)
+	if err != nil {
+		return fmt.Errorf("bind: %w", err)
+	}
+
+	// Join the shared .doze zone. Additive: the configured address above is the
+	// contract, and every failure in here is a log line rather than a refusal
+	// to start.
+	z := joinZone(ctx, logger)
+	defer z.close()
+	if addr := z.brokerURL(logger, bound); addr != "" {
+		logger.Info("broker also reachable by name", "addr", addr)
+	}
+
 	if st.console {
-		closeConsole, err := startConsole(ctx, st, cfg, srv, logger, consoleUser, consolePass, consoleMech)
+		closeConsole, err := startConsole(ctx, st, cfg, bound, logger, consoleUser, consolePass, consoleMech)
 		if err != nil {
 			return fmt.Errorf("console: %w", err)
 		}
 		defer closeConsole()
+		if u := z.routeConsole(logger, st.consoleAddr); u != "" {
+			logger.Info("console also reachable by name", "url", u)
+		}
 	}
 
 	if err := srv.Serve(ctx); err != nil {
@@ -233,14 +260,10 @@ func provisionConsoleCredential(cfg *config.Config) (user, pass, mech string, er
 }
 
 // startConsole binds a console HTTP listener on st.consoleAddr and dials the
-// broker as a real Kafka client at its own bound address. Returns a func
+// broker as a real Kafka client at its already-bound address. Returns a func
 // that shuts the console down; the caller defers it.
-func startConsole(ctx context.Context, st startup, cfg config.Config, srv *server.Server, logger *slog.Logger, user, pass, mech string) (func(), error) {
-	addr, err := srv.Bind(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("bind: %w", err)
-	}
-	dialAddr, err := consoleDialAddr(cfg, addr)
+func startConsole(ctx context.Context, st startup, cfg config.Config, bound net.Addr, logger *slog.Logger, user, pass, mech string) (func(), error) {
+	dialAddr, err := consoleDialAddr(cfg, bound)
 	if err != nil {
 		return nil, err
 	}
