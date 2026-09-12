@@ -9,7 +9,7 @@ go 1.26.0
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/IBM/sarama v1.50.3
-	github.com/doze-dev/doze-names v0.0.0-20260811203824-59a9141a92d9
+	github.com/doze-dev/doze-names v0.0.0-20260912101014-06107ced21f0
 	github.com/twmb/franz-go v1.21.5
 	github.com/twmb/franz-go/pkg/kmsg v1.13.1
 	go.etcd.io/bbolt v1.5.0
