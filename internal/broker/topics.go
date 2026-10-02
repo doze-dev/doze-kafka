@@ -3,6 +3,7 @@ package broker
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/twmb/franz-go/pkg/kmsg"
 
@@ -37,6 +38,18 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 	if partitions <= 0 {
 		partitions = int32(b.cfg.DefaultPartitions)
 	}
+	if err := meta.ValidateTopicName(t.Topic); err != nil {
+		rt.ErrorCode = int16(protocol.ErrInvalidTopic)
+		msg := err.Error()
+		rt.ErrorMessage = &msg
+		return rt
+	}
+	if int(partitions) > b.cfg.MaxPartitions {
+		rt.ErrorCode = int16(protocol.ErrInvalidPartitions)
+		msg := fmt.Sprintf("%d partitions is above this broker's limit of %d (--max-partitions)", partitions, b.cfg.MaxPartitions)
+		rt.ErrorMessage = &msg
+		return rt
+	}
 	if validateOnly {
 		rt.NumPartitions = partitions
 		rt.ReplicationFactor = 1
@@ -56,14 +69,15 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 	}
 
 	// Materialize the partition directories so they recover after a restart even
-	// if nothing is ever produced to them.
-	for p := range created.Partitions {
-		if _, err := b.logs.Partition(created.Name, p); err != nil {
-			rt.ErrorCode = int16(protocol.ErrUnknownServer)
-			msg := err.Error()
-			rt.ErrorMessage = &msg
-			return rt
-		}
+	// if nothing is ever produced to them. Registering the topic and creating its
+	// directories are two steps with no shared transaction, so a failure in the
+	// second must undo the first: otherwise the name stays registered, every later
+	// produce fails, and CreateTopics answers TOPIC_ALREADY_EXISTS.
+	if err := b.materialize(created); err != nil {
+		rt.ErrorCode = int16(protocol.ErrUnknownServer)
+		msg := err.Error()
+		rt.ErrorMessage = &msg
+		return rt
 	}
 
 	rt.TopicID = created.ID
@@ -100,12 +114,29 @@ func (b *Broker) maybeAutoCreate(name string, requested bool) (meta.Topic, bool)
 		}
 		return meta.Topic{}, false
 	}
-	for p := range created.Partitions {
-		if _, err := b.logs.Partition(created.Name, p); err != nil {
-			return meta.Topic{}, false
-		}
+	if err := b.materialize(created); err != nil {
+		b.log.Warn("auto-create topic failed", "topic", name, "err", err)
+		return meta.Topic{}, false
 	}
 	return created, true
+}
+
+// materialize opens (creating) every partition of a freshly registered topic.
+// On failure it rolls the registration back and removes whatever was created, so
+// a topic is either fully there or not there at all.
+func (b *Broker) materialize(t meta.Topic) error {
+	for p := range t.Partitions {
+		if _, err := b.logs.Partition(t.Name, p); err != nil {
+			if derr := b.meta.DeleteTopic(t.Name); derr != nil {
+				b.log.Warn("create topic: rollback of registration failed", "topic", t.Name, "err", derr)
+			}
+			if rerr := b.logs.RemoveTopic(t.Name, t.Partitions); rerr != nil {
+				b.log.Warn("create topic: rollback of partition data failed", "topic", t.Name, "err", rerr)
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 // handleDeleteTopics removes each topic from the registry and deletes its partition

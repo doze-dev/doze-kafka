@@ -330,6 +330,7 @@ func registerFlags(fs *flag.FlagSet, cfg *config.Config) {
 	fs.DurationVar(&cfg.ConsumerSessionTimeout, "consumer-session-timeout", cfg.ConsumerSessionTimeout, "KIP-848 group session timeout before evicting a silent member")
 	fs.BoolVar(&cfg.AutoCreateTopics, "auto-create-topics", cfg.AutoCreateTopics, "create unknown topics on first reference")
 	fs.IntVar(&cfg.DefaultPartitions, "default-partitions", cfg.DefaultPartitions, "partition count for auto-created topics")
+	fs.IntVar(&cfg.MaxPartitions, "max-partitions", cfg.MaxPartitions, "most partitions one topic may have (each is a directory and open files)")
 
 	// Auth.
 	if cfg.Credentials == nil {

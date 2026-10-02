@@ -6,11 +6,14 @@
 package log
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -61,6 +64,13 @@ type topicPartition struct {
 	partition int32
 }
 
+// ErrUnsafeTopicName is returned for a topic name that would resolve outside the
+// data directory. The registry refuses to create such names, so this is the
+// second lock on the same door: a name that predates that check, or reaches the
+// log some other way, still cannot make the broker read, write or delete a
+// directory that isn't its own.
+var ErrUnsafeTopicName = errors.New("log: topic name is not safe to use as a directory")
+
 // OpenManager opens (creating if needed) the data directory. Existing partitions
 // are opened and recovered lazily, on first access. If a fsync cadence or a
 // retention policy is configured, a background maintenance goroutine is started
@@ -97,7 +107,11 @@ func (m *Manager) Partition(topic string, partition int32) (*Partition, error) {
 	if p, ok := m.partitions[tp]; ok {
 		return p, nil
 	}
-	p, err := openPartition(m.dirFor(tp), m.opts)
+	dir, err := m.dirFor(tp)
+	if err != nil {
+		return nil, err
+	}
+	p, err := openPartition(dir, m.opts)
 	if err != nil {
 		return nil, err
 	}
@@ -105,9 +119,20 @@ func (m *Manager) Partition(topic string, partition int32) (*Partition, error) {
 	return p, nil
 }
 
-// dirFor returns the on-disk directory for a partition, e.g. data/orders-0.
-func (m *Manager) dirFor(tp topicPartition) string {
-	return filepath.Join(m.dir, tp.topic+"-"+strconv.Itoa(int(tp.partition)))
+// dirFor returns the on-disk directory for a partition, e.g. data/orders-0. The
+// topic name is one path component by construction; anything that is not (a
+// separator, a NUL, or a name that is itself "." / "..") is refused rather than
+// cleaned, because cleaning is how "../x" turns into a sibling of the data dir.
+func (m *Manager) dirFor(tp topicPartition) (string, error) {
+	t := tp.topic
+	if t == "" || t == "." || t == ".." || strings.ContainsAny(t, "/\\\x00") {
+		return "", fmt.Errorf("%w: %q", ErrUnsafeTopicName, t)
+	}
+	base := t + "-" + strconv.Itoa(int(tp.partition))
+	if !filepath.IsLocal(base) {
+		return "", fmt.Errorf("%w: %q", ErrUnsafeTopicName, t)
+	}
+	return filepath.Join(m.dir, base), nil
 }
 
 // RemoveTopic closes and deletes every partition of a topic from disk (used by
@@ -120,13 +145,21 @@ func (m *Manager) RemoveTopic(topic string, partitions int32) error {
 	var firstErr error
 	for p := int32(0); p < partitions; p++ {
 		tp := topicPartition{topic, p}
+		dir, err := m.dirFor(tp)
+		if err != nil {
+			// Never RemoveAll a path we could not prove is ours.
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
 		if part, ok := m.partitions[tp]; ok {
 			if err := part.close(); err != nil && firstErr == nil {
 				firstErr = err
 			}
 			delete(m.partitions, tp)
 		}
-		if err := os.RemoveAll(m.dirFor(tp)); err != nil && firstErr == nil {
+		if err := os.RemoveAll(dir); err != nil && firstErr == nil {
 			firstErr = err
 		}
 	}

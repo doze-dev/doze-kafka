@@ -14,6 +14,7 @@ const (
 	ErrUnknownMemberID     ErrorCode = 25
 	ErrIllegalGeneration   ErrorCode = 22
 	ErrMemberIDRequired    ErrorCode = 79
+	ErrInvalidTopic        ErrorCode = 17 // INVALID_TOPIC_EXCEPTION: the name breaks Kafka's rules.
 	ErrInvalidPartitions   ErrorCode = 37
 	ErrTopicAlreadyExists  ErrorCode = 36
 	ErrUnknownServer       ErrorCode = -1

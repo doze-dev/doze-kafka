@@ -50,6 +50,14 @@ func (b *Broker) handleMetadata(ctx context.Context, req *protocol.Request) ([]b
 			continue
 		}
 		name := *reqTopic.Topic
+		if err := meta.ValidateTopicName(name); err != nil && !b.topicRegistered(name) {
+			// A name Kafka would refuse is INVALID_TOPIC_EXCEPTION, not "unknown":
+			// the difference tells a client its request can never succeed. Topics
+			// already in the registry are exempt so ones created before names were
+			// validated stay reachable.
+			resp.Topics = append(resp.Topics, b.topicMetadata(name, meta.TopicID{}, 0, protocol.ErrInvalidTopic))
+			continue
+		}
 		t, found, err := b.meta.Topic(name)
 		if err != nil {
 			return nil, err
@@ -85,4 +93,10 @@ func (b *Broker) topicMetadata(name string, id meta.TopicID, partitions int32, e
 		rt.Partitions = append(rt.Partitions, pt)
 	}
 	return rt
+}
+
+// topicRegistered reports whether the registry already holds a topic by this name.
+func (b *Broker) topicRegistered(name string) bool {
+	_, ok, err := b.meta.Topic(name)
+	return err == nil && ok
 }

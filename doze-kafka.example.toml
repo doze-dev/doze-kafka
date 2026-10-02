@@ -45,6 +45,7 @@ consumer-session-timeout = "45s"
 
 auto-create-topics = true # create unknown topics on first reference.
 default-partitions = 1    # partition count for auto-created topics.
+max-partitions = 1000     # most partitions one topic may have; each is a directory and open files.
 
 # --- auth (all optional; omit these sections to disable) -----------------------
 

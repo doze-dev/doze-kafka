@@ -101,8 +101,8 @@ type OffsetEntry struct {
 }
 
 func (s *boltStore) CreateTopic(name string, partitions int32, config map[string]string) (Topic, error) {
-	if name == "" {
-		return Topic{}, fmt.Errorf("meta: empty topic name")
+	if err := ValidateTopicName(name); err != nil {
+		return Topic{}, err
 	}
 	if partitions <= 0 {
 		return Topic{}, fmt.Errorf("meta: partitions must be positive, got %d", partitions)

@@ -54,6 +54,7 @@ type Config struct {
 	// Topics.
 	AutoCreateTopics  bool
 	DefaultPartitions int // partition count for auto-created topics.
+	MaxPartitions     int // most partitions a single topic may have; every one is open files and a directory.
 
 	// Auth (all optional; empty = disabled). SASL gates the listener behind a
 	// handshake; TLS encrypts it. The two are independent — SASL over plaintext,
@@ -68,6 +69,13 @@ const (
 	defaultListenAddr   = ":9092"
 	defaultSegmentBytes = 128 << 20 // 128 MiB
 	defaultIndexStride  = 4 << 10   // 4 KiB
+
+	// defaultMaxPartitions bounds one topic, not the broker. A partition is a
+	// directory and two open files, so an unbounded count lets a typo take the
+	// process out: a 5,000-partition topic measured ~10,000 file descriptors and
+	// a 25-30s shutdown. A real Kafka cluster rarely goes past a few hundred for
+	// a single topic, and local development never needs more.
+	defaultMaxPartitions = 1000
 )
 
 // Default returns a Config suitable for zero-config local development.
@@ -84,6 +92,7 @@ func Default() Config {
 		ConsumerSessionTimeout: 45 * time.Second,
 		AutoCreateTopics:       true,
 		DefaultPartitions:      1,
+		MaxPartitions:          defaultMaxPartitions,
 	}
 }
 
@@ -105,6 +114,10 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: index-interval-bytes must be positive, got %d", c.IndexIntervalBytes)
 	case c.DefaultPartitions <= 0:
 		return fmt.Errorf("config: default-partitions must be positive, got %d", c.DefaultPartitions)
+	case c.MaxPartitions <= 0:
+		return fmt.Errorf("config: max-partitions must be positive, got %d", c.MaxPartitions)
+	case c.DefaultPartitions > c.MaxPartitions:
+		return fmt.Errorf("config: default-partitions (%d) is above max-partitions (%d)", c.DefaultPartitions, c.MaxPartitions)
 	case c.RetentionBytes < 0:
 		return fmt.Errorf("config: retention-bytes must be non-negative (0 disables), got %d", c.RetentionBytes)
 	case c.RetentionMs < 0:
