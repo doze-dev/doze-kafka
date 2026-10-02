@@ -209,11 +209,10 @@
   document.addEventListener("click", function (e) {
     var b = e.target.closest("#drawer-resend");
     if (!b) return;
-    var overlay = document.getElementById("drawer-overlay");
-    if (overlay) overlay.hidden = true;
+    if (window.dozeCloseDrawer) dozeCloseDrawer();
     var panel = document.getElementById("compose-panel");
     if (!panel) return;
-    panel.classList.add("open");
+    setDock(true, true);
     var form = panel.querySelector("form");
     var st = window.Alpine ? Alpine.$data(form) : null;
     var key = form.querySelector('input[name="key"]');
@@ -435,10 +434,7 @@
       var dk = document.getElementById("compose-panel");
       if (dk) {
         e.preventDefault();
-        if (!dk.classList.contains("open")) {
-          var bar = document.getElementById("compose-head");
-          if (bar) bar.click(); else dk.classList.add("open");
-        }
+        if (!dk.classList.contains("open")) setDock(true, true);
         var ta = dk.querySelector('textarea[name="value"]');
         requestAnimationFrame(function () { if (ta && ta.__cm) ta.__cm.focus(); else if (ta) ta.focus(); });
       }
@@ -446,6 +442,118 @@
     else if (e.key === "[") { setRail(!railSlim()); }
     else if (e.key === "Escape") { var back = document.querySelector("[data-esc-back]"); if (back) history.back(); }
   });
+
+  // ---------- the message drawer ----------
+  // A real dialog: it takes focus when it opens, keeps Tab inside, closes on Esc or
+  // a click outside, and hands focus back to what opened it. Its record is in the
+  // URL (?open=OFFSET), so a refresh or a shared link reopens it.
+  var drawerOverlay = document.getElementById("drawer-overlay");
+  var drawerOpener = null;
+  function drawerIsOpen() { return !!drawerOverlay && !drawerOverlay.hidden; }
+  function setOpenParam(offset) {
+    try {
+      var u = new URL(location.href);
+      if (offset == null) u.searchParams.delete("open"); else u.searchParams.set("open", offset);
+      history.replaceState(history.state, "", u.pathname + (u.search || "") + u.hash);
+    } catch (e) {}
+  }
+  function openDrawer(from) {
+    if (!drawerOverlay) return;
+    if (!drawerIsOpen()) drawerOpener = from || document.activeElement;
+    drawerOverlay.hidden = false;
+  }
+  function closeDrawer(restoreFocus) {
+    if (!drawerIsOpen()) return;
+    drawerOverlay.hidden = true;
+    setOpenParam(null);
+    if (restoreFocus !== false && drawerOpener && document.contains(drawerOpener) && drawerOpener.focus) drawerOpener.focus();
+    drawerOpener = null;
+  }
+  document.addEventListener("click", function (e) {
+    var row = e.target.closest("[data-drawer-open]");
+    if (row) { openDrawer(row); return; }
+    if (e.target.closest("[data-drawer-close]")) { closeDrawer(); return; }
+    if (e.target === drawerOverlay) closeDrawer();
+  });
+  document.addEventListener("keydown", function (e) {
+    var row = e.target.closest && e.target.closest("[data-drawer-open]");
+    if (row && (e.key === "Enter" || e.key === " ")) { openDrawer(row); return; } // htmx fires the request.
+    if (!drawerIsOpen()) return;
+    if (e.key === "Escape") { closeDrawer(); e.preventDefault(); e.stopPropagation(); return; }
+    if (e.key === "Tab") {
+      var focusable = drawerOverlay.querySelectorAll('button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])');
+      if (!focusable.length) return;
+      var first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { last.focus(); e.preventDefault(); }
+      else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); }
+    }
+  }, true);
+  // New content landed in the drawer: record it in the URL and move focus in.
+  document.addEventListener("htmx:afterSwap", function (e) {
+    var t = e.detail.target;
+    if (!t || t.id !== "drawer") return;
+    var title = document.getElementById("drawer-title");
+    var m = title && /offset (\d+)/.exec(title.textContent);
+    if (m) setOpenParam(m[1]);
+    var btn = t.querySelector("[data-drawer-close]");
+    if (btn) btn.focus();
+  });
+  // A link or refresh with ?open=N reopens that record.
+  function reopenFromURL() {
+    var open = new URLSearchParams(location.search).get("open");
+    var region = document.getElementById("tape-and-table");
+    if (open == null || !region || !window.htmx) return;
+    openDrawer(null);
+    // No `select` here: "unset" is an attribute-only value (it cancels an inherited
+    // hx-select), and #drawer is outside #workspace so there is none to cancel.
+    htmx.ajax("GET", region.getAttribute("data-msg-base") + "&offset=" + encodeURIComponent(open), {
+      target: "#drawer", swap: "innerHTML",
+    }).catch(function () {});
+  }
+  document.addEventListener("DOMContentLoaded", reopenFromURL);
+  // Sending a record again dismisses the drawer without stealing focus back.
+  window.dozeCloseDrawer = function () { closeDrawer(false); };
+
+  // ---------- docked composer ----------
+  // Open or closed is remembered, and the toggle is a real button that says so.
+  function setDock(open, remember) {
+    var panel = document.getElementById("compose-panel");
+    if (!panel) return;
+    panel.classList.toggle("open", open);
+    var bar = document.getElementById("compose-head");
+    if (bar) bar.setAttribute("aria-expanded", open ? "true" : "false");
+    if (remember) { try { localStorage.setItem("dock", open ? "open" : "closed"); } catch (e) {} }
+    if (open && window.dozeEditor) requestAnimationFrame(function () { dozeEditor.refresh(panel); });
+  }
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-dock-toggle]");
+    if (!t) return;
+    var panel = document.getElementById("compose-panel");
+    if (panel) setDock(!panel.classList.contains("open"), true);
+  });
+  function restoreDock() {
+    var panel = document.getElementById("compose-panel");
+    if (!panel) return;
+    try { if (localStorage.getItem("dock") === "open") setDock(true, false); } catch (e) {}
+  }
+  document.addEventListener("DOMContentLoaded", restoreDock);
+  document.addEventListener("htmx:afterSwap", function (e) { if (e.detail.target && e.detail.target.id === "workspace") restoreDock(); });
+
+  // ---------- relative times ----------
+  // The server renders "3m ago" once; on a quiet or paused view it would freeze
+  // there while the clock moved on. Tick them in the browser.
+  function agoText(ms) {
+    var s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+    if (s < 60) return "just now";
+    if (s < 3600) return Math.floor(s / 60) + "m ago";
+    if (s < 86400) return Math.floor(s / 3600) + "h ago";
+    return Math.floor(s / 86400) + "d ago";
+  }
+  setInterval(function () {
+    document.querySelectorAll(".ago[data-ts]").forEach(function (el) {
+      el.textContent = "· " + agoText(parseInt(el.getAttribute("data-ts"), 10));
+    });
+  }, 20000);
 
   // ---------- flash banner ----------
   // The server shows a one-shot "Topic created" banner for a ?flash= redirect. Left

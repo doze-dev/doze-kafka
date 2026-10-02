@@ -2,6 +2,7 @@ package console
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"sort"
@@ -377,7 +378,7 @@ func (b *backend) DescribeTopic(ctx context.Context, name string) (*TopicDetail,
 
 	return &TopicDetail{
 		Name:       name,
-		ID:         fmt.Sprintf("%x", mt0.TopicID),
+		ID:         topicIDString(mt0.TopicID),
 		Partitions: int32(len(mt0.Partitions)),
 		Config:     cfg,
 	}, nil
@@ -385,6 +386,67 @@ func (b *backend) DescribeTopic(ctx context.Context, name string) (*TopicDetail,
 
 // PartitionOffsets returns a partition's earliest and latest (log-end)
 // offsets, one round trip, via the -2/-1 special ListOffsets timestamps.
+// topicIDString renders a topic's UUID the way Kafka prints it (kafka-topics.sh,
+// the Java client's Uuid.toString): URL-safe base64 without padding, 22 characters.
+// It used to be raw hex, which matches nothing else a developer will see.
+func topicIDString(id [16]byte) string { return base64.RawURLEncoding.EncodeToString(id[:]) }
+
+// PartitionBound is one partition's retained range of offsets.
+type PartitionBound struct {
+	Partition        int32
+	Earliest, Latest int64
+}
+
+// Count is how many records the partition holds (latest minus earliest; there is
+// no compaction here to leave gaps). It is NOT the log-end offset, which is what
+// the tape used to label "total" — wrong as soon as retention trims the log.
+func (p PartitionBound) Count() int64 { return p.Latest - p.Earliest }
+
+// PartitionBounds returns the retained range of every partition of a topic in one
+// ListOffsets round trip.
+func (b *backend) PartitionBounds(ctx context.Context, topic string, partitions int32) ([]PartitionBound, error) {
+	req := kmsg.NewPtrListOffsetsRequest()
+	req.ReplicaID = -1
+	rt := kmsg.NewListOffsetsRequestTopic()
+	rt.Topic = topic
+	for p := int32(0); p < partitions; p++ {
+		for _, ts := range []int64{-2, -1} { // earliest, latest
+			rp := kmsg.NewListOffsetsRequestTopicPartition()
+			rp.Partition, rp.Timestamp = p, ts
+			rt.Partitions = append(rt.Partitions, rp)
+		}
+	}
+	req.Topics = []kmsg.ListOffsetsRequestTopic{rt}
+	resp, err := req.RequestWith(ctx, b.cl)
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.Topics) != 1 {
+		return nil, fmt.Errorf("unexpected ListOffsets response shape")
+	}
+	out := make([]PartitionBound, partitions)
+	for i := range out {
+		out[i].Partition = int32(i)
+	}
+	seen := make([]int, partitions)
+	for _, p := range resp.Topics[0].Partitions {
+		if p.ErrorCode != 0 {
+			return nil, kerr.ErrorForCode(p.ErrorCode)
+		}
+		if p.Partition < 0 || p.Partition >= partitions {
+			continue
+		}
+		// Each partition was asked for twice, earliest first.
+		if seen[p.Partition] == 0 {
+			out[p.Partition].Earliest = p.Offset
+		} else {
+			out[p.Partition].Latest = p.Offset
+		}
+		seen[p.Partition]++
+	}
+	return out, nil
+}
+
 func (b *backend) PartitionOffsets(ctx context.Context, topic string, partition int32) (earliest, latest int64, err error) {
 	req := kmsg.NewPtrListOffsetsRequest()
 	req.ReplicaID = -1

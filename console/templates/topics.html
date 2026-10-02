@@ -66,14 +66,14 @@
     {{template "tape_and_table" .}}
 
     <div class="dock" id="compose-panel">
-      <div class="dock-bar" id="compose-head" onclick="var p=this.closest('.dock'); p.classList.toggle('open'); if(p.classList.contains('open')&&window.dozeEditor) requestAnimationFrame(function(){dozeEditor.refresh(p)});">
+      <button type="button" class="dock-bar" id="compose-head" data-dock-toggle aria-expanded="false" aria-controls="compose-body">
         {{icon "send"}}
         <span class="t">Send a message</span>
         <span class="sub">to {{.Topic.Name}} · P{{.Partition}}</span>
         <span class="kbd">m</span>
         <span class="twist">{{icon "chevron"}}</span>
-      </div>
-      <div class="dock-form">
+      </button>
+      <div class="dock-form" id="compose-body">
         <form hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML" x-data="{hdrs:[], acks:'1', keyB64:false, valB64:false, tomb:false}" x-effect="window.dozeEditor && dozeEditor.setValidate($refs.value, !(valB64 || tomb), tomb ? 'null value — nothing is sent' : (valB64 ? 'base64 — sent as raw bytes' : ''))" @htmx:after-request="if($event.detail.successful){window.dozeEditor?dozeEditor.set($refs.value,''):$refs.value.value='';$refs.key.value='';hdrs=[];keyB64=false;valB64=false;tomb=false}">
           <input type="hidden" name="partition_ctx" value="{{.Partition}}">
           <div class="crow">
@@ -141,15 +141,22 @@
 {{/* tape_and_table is the live-polled unit: the tick strip + message table
      together, so a new message appearing updates both from one partial. */}}
 {{define "tape_and_table"}}
-<div class="tapetable" id="tape-and-table" {{if .AtTail}}data-live="{{topicURL .Topic.Name}}/tape?partition={{.Partition}}" data-hash="{{.Hash}}" data-live-ms="2500"{{end}}>
+<div class="tapetable" id="tape-and-table" data-msg-base="{{topicURL .Topic.Name}}/message?partition={{.Partition}}" {{if .AtTail}}data-live="{{topicURL .Topic.Name}}/tape?partition={{.Partition}}" data-hash="{{.Hash}}" data-live-ms="2500"{{end}}>
   <div class="tape-panel">
   <div class="tape-head">
-    <div class="ptabs">
-      {{range $i := .PartitionRange}}<a class="ptab {{if eq $i $.Partition}}on{{end}}" href="{{topicURL $.Topic.Name}}?partition={{$i}}">P{{$i}}</a>{{end}}
+    {{if .PartSelect}}
+    <label class="psel-wrap"><span class="sr-only">Partition</span>
+      <select class="input psel" aria-label="Partition" onchange="location.href=this.value">
+        {{range .Bounds}}<option value="{{topicURL $.Topic.Name}}?partition={{.Partition}}" {{if eq .Partition $.Partition}}selected{{end}}>P{{.Partition}} · {{.Count}} record{{if ne .Count 1}}s{{end}}</option>{{end}}
+      </select></label>
+    {{else}}
+    <div class="ptabs" role="group" aria-label="Partitions">
+      {{range .Bounds}}<a class="ptab {{if eq .Partition $.Partition}}on{{end}}" href="{{topicURL $.Topic.Name}}?partition={{.Partition}}" title="partition {{.Partition}} · {{.Count}} record{{if ne .Count 1}}s{{end}} · offsets {{.Earliest}}–{{.Latest}}" {{if eq .Partition $.Partition}}aria-current="true"{{end}}>P{{.Partition}}{{if gt .Count 0}}<span class="pc">{{.Count}}</span>{{end}}</a>{{end}}
     </div>
+    {{end}}
     <div class="tape-head-spacer"></div>
     {{if .AtTail}}<button type="button" class="livetoggle" data-live-toggle aria-pressed="false" title="Pause live updates"><span class="livedot" aria-hidden="true"></span><span class="livetoggle-l">Live</span></button>{{else}}<span class="pinned mono">pinned to history</span>{{end}}
-    <div class="counter"><span class="lbl">next offset</span><span class="mono">{{printf "%07d" .Latest}}</span></div>
+    <div class="counter" title="The log-end offset: where the next message will be written"><span class="lbl">log end</span><span class="mono">{{printf "%07d" .Latest}}</span></div>
   </div>
   <div class="tape-strip">
     {{if .Messages}}{{range .Messages}}<div class="tick {{if .Hot}}hot{{end}}" style="height:{{.TickHeight}}px" title="offset {{.Offset}}{{if not .Key.Null}} · {{.Key.Preview}}{{end}} · {{.Value.SizeText}}" onclick="document.getElementById('msg-{{.Offset}}')?.scrollIntoView({block:'center',behavior:'smooth'})"></div>{{end}}
@@ -157,24 +164,28 @@
   </div>
   <div class="tape-foot">
     <span>{{if .Messages}}offsets <b class="mono">{{.WindowFrom}}</b> – <b class="mono">{{.WindowLast}}</b> · {{end}}each mark is one record on disk, newest on the right</span>
-    <span class="mono">{{.Latest}} total</span>
+    <span class="mono" title="Records currently retained on this partition">{{.Count}} record{{if ne .Count 1}}s{{end}}</span>
   </div>
   </div>
 
   <div class="secrow">
     <span class="sec-title">Messages · partition {{.Partition}}</span>
-    <span class="jump">go to offset
-      <input class="input mono" aria-label="Go to offset" placeholder="e.g. 4183"
-        onkeydown="if(event.key==='Enter'){var n=parseInt(this.value,10); if(!isNaN(n)&&n>=0) location='{{topicURL .Topic.Name}}?partition={{.Partition}}&from='+Math.max(0,n-20)+'&hl='+n;}"></span>
+    <form class="jump" method="get" action="{{topicURL .Topic.Name}}">
+      <input type="hidden" name="partition" value="{{.Partition}}">
+      <label for="jump-to">go to offset</label>
+      <input class="input mono" id="jump-to" name="jump" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. {{if gt .Latest 0}}{{.Latest}}{{else}}0{{end}}" autocomplete="off">
+      <button type="submit" class="btn btn-outline jump-go">Go</button>
+    </form>
   </div>
+  {{if .JumpNote}}<div class="jumpnote" role="status">{{icon "info"}} {{.JumpNote}}</div>{{end}}
   <div class="tbl-wrap">
     <table class="tbl">
       <thead><tr><th class="num">Offset</th><th>Time</th><th>Key</th><th>Value</th><th>Headers</th></tr></thead>
       <tbody>
         {{if .Messages}}{{range .MessagesDesc}}
-        <tr id="msg-{{.Offset}}" {{if eq .Offset $.HL}}class="hl" data-hl{{end}} hx-get="{{topicURL $.Topic.Name}}/message?partition={{$.Partition}}&offset={{.Offset}}" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML" onclick="document.getElementById('drawer-overlay').hidden=false">
+        <tr id="msg-{{.Offset}}" {{if eq .Offset $.HL}}class="hl" data-hl{{end}} tabindex="0" role="button" aria-label="Open offset {{.Offset}}" data-drawer-open hx-get="{{topicURL $.Topic.Name}}/message?partition={{$.Partition}}&offset={{.Offset}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML">
           <td class="cell-offset num">{{.Offset}}</td>
-          <td class="cell-time mono" title="{{.TimeFull}}">{{.TimeStr}} <span class="dim">· {{ago .Timestamp}}</span></td>
+          <td class="cell-time mono" title="{{.TimeFull}}">{{.TimeStr}} <span class="dim ago" data-ts="{{.Timestamp.UnixMilli}}">· {{ago .Timestamp}}</span></td>
           <td class="cell-key {{if or .Key.Null .Key.Empty}}none{{end}}" title="{{if .Key.Null}}null key{{else}}{{.Key.Preview}} · {{.Key.SizeText}}{{end}}">{{if .Key.Null}}no key{{else}}{{.Key.Preview}}{{end}}</td>
           <td class="cell-val {{if .Value.Binary}}binary{{end}} {{if .Value.Null}}tomb{{end}}" title="{{.Value.SizeText}}">{{if or .Value.Binary .Value.Null .Value.Empty}}<span class="vspecial">{{.Value.Preview}}</span>{{else}}{{jsonTint .Value.Preview}}{{end}}</td>
           <td>{{if .Headers}}<span class="hdrct">{{len .Headers}}</span>{{else}}<span class="dim">—</span>{{end}}</td>
@@ -189,7 +200,7 @@
       <span class="pager">
         {{if .HasOlder}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.OlderFrom}}">← Older</a>{{end}}
         {{if .HasNewer}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.NewerFrom}}">Newer</a><a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}">Latest →</a>{{end}}
-        <span>earliest {{.Earliest}} · latest {{.Latest}}</span>
+        <span title="The oldest retained offset, and the log-end offset (where the next message goes)">log start {{.Earliest}} · log end {{.Latest}}</span>
       </span>
     </div>
   </div>
@@ -199,7 +210,11 @@
 {{define "message_drawer"}}
 <div class="drawer-h">
   <div><span class="t" id="drawer-title">P{{.Partition}} · offset {{.Msg.Offset}}</span><span class="drawer-sub mono">{{.Topic}}</span></div>
-  <button type="button" class="icon-btn" aria-label="Close" onclick="document.getElementById('drawer-overlay').hidden=true">{{icon "x"}}</button></div>
+  <div class="drawer-nav">
+    <button type="button" class="icon-btn" aria-label="Older record" title="Older (offset {{if ge .Older 0}}{{.Older}}{{end}})" {{if lt .Older 0}}disabled{{else}}hx-get="{{topicURL .Topic}}/message?partition={{.Partition}}&offset={{.Older}}" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML"{{end}}>{{icon "chevron-up"}}</button>
+    <button type="button" class="icon-btn" aria-label="Newer record" title="Newer (offset {{if ge .Newer 0}}{{.Newer}}{{end}})" {{if lt .Newer 0}}disabled{{else}}hx-get="{{topicURL .Topic}}/message?partition={{.Partition}}&offset={{.Newer}}" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML"{{end}}>{{icon "chevron-down"}}</button>
+    <button type="button" class="icon-btn" aria-label="Close" data-drawer-close>{{icon "x"}}</button>
+  </div></div>
 <div class="drawer-b">
   <div class="meta-row"><span class="k">Timestamp</span><span class="v">{{.TimeStr}}</span></div>
   <div class="meta-row"><span class="k">Key</span><span class="v">

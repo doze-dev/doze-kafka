@@ -107,8 +107,8 @@ var r=localStorage.getItem("rail");if(r==="slim")document.documentElement.setAtt
   </div>
 
   <!-- message drawer (topic detail's table rows open here) -->
-  <div class="overlay" id="drawer-overlay" hidden onclick="if(event.target===this)this.hidden=true">
-    <div class="drawer anim" id="drawer"></div>
+  <div class="overlay" id="drawer-overlay" hidden data-drawer-backdrop>
+    <div class="drawer anim" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title"></div>
   </div>
 
   <div class="toasts" id="toasts"></div>

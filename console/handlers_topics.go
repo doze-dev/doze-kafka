@@ -74,7 +74,7 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	partition := partitionParam(r, detail.Partitions)
 
-	tape, err := c.tapeData(ctx, name, partition, detail.Partitions, fromParam(r), hlParam(r))
+	tape, err := c.tapeData(ctx, name, partition, detail.Partitions, fromParam(r), hlParam(r), jumpParam(r))
 	if err != nil {
 		c.fail(w, r, err)
 		return
@@ -100,17 +100,17 @@ func (c *Console) topicTape(w http.ResponseWriter, r *http.Request) {
 	}
 	partition := partitionParam(r, count)
 
-	_, latest, err := c.be.PartitionOffsets(ctx, name, partition)
+	bounds, err := c.be.PartitionBounds(ctx, name, count)
 	if err != nil {
 		c.fail(w, r, err)
 		return
 	}
-	hash := strconv.FormatInt(latest, 10)
+	hash := boundsHash(bounds)
 	if liveUnchanged(w, r, hash) {
 		return
 	}
 
-	tape, err := c.tapeData(ctx, name, partition, count, -1, -1)
+	tape, err := c.tapeData(ctx, name, partition, count, -1, -1, -1)
 	if err != nil {
 		c.fail(w, r, err)
 		return
@@ -154,7 +154,7 @@ func (c *Console) topicProduce(w http.ResponseWriter, r *http.Request) {
 	// Re-render the tape/table for the partition the message actually landed
 	// on, so a produce to a different partition than the one being viewed is
 	// still honestly reflected (not silently shown against the wrong tape).
-	tape, err := c.tapeData(ctx, name, result.Partition, count, -1, -1)
+	tape, err := c.tapeData(ctx, name, result.Partition, count, -1, -1, -1)
 	if err != nil {
 		c.fail(w, r, err)
 		return
@@ -187,11 +187,21 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m := msgs[0]
+	// Neighbouring records, for the drawer's older/newer buttons.
+	older, newer := int64(-1), int64(-1)
+	if earliest, latest, err := c.be.PartitionOffsets(r.Context(), name, partition); err == nil {
+		if offset-1 >= earliest {
+			older = offset - 1
+		}
+		if offset+1 < latest {
+			newer = offset + 1
+		}
+	}
 	hdrs := headerViews(m.Headers)
 	valueV := newBytesView(m.Value, m.Value == nil)
 	keyV := newBytesView(m.Key, m.Key == nil)
 	c.partial(w, "message_drawer", map[string]any{
-		"Topic": name, "Partition": partition, "Msg": m,
+		"Topic": name, "Partition": partition, "Msg": m, "Older": older, "Newer": newer,
 		"TimeStr": m.Timestamp.Format(time.RFC3339), "Key": keyV, "Value": valueV, "Headers": hdrs,
 		// What "Send again" carries. Text travels as text; anything else as base64
 		// with its encoding named, so the resend is byte-identical.
@@ -257,6 +267,15 @@ func fromParam(r *http.Request) int64 {
 	return n
 }
 
+// jumpParam reads ?jump= (the "go to offset" box); -1 when absent or malformed.
+func jumpParam(r *http.Request) int64 {
+	n, err := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("jump")), 10, 64)
+	if err != nil || n < 0 {
+		return -1
+	}
+	return n
+}
+
 // hlParam reads ?hl= — an offset to highlight and scroll to (the jump-to-
 // offset control sets it); -1 when absent.
 func hlParam(r *http.Request) int64 {
@@ -284,6 +303,20 @@ type msgView struct {
 
 const tapeWindow = 60 // how many messages the tape/table show at once
 
+// maxPartitionTabs is how many partitions get a tab each. Past it the tabs would
+// overflow the panel (a 1000-partition topic is allowed), so a select replaces them.
+const maxPartitionTabs = 24
+
+// boundsHash identifies what the tape shows: every partition's retained range, so
+// a produce to ANY partition changes it and the tabs' counts refresh.
+func boundsHash(bounds []PartitionBound) string {
+	var b strings.Builder
+	for _, p := range bounds {
+		fmt.Fprintf(&b, "%d-%d,", p.Earliest, p.Latest)
+	}
+	return b.String()
+}
+
 // tapeData fetches one tapeWindow-sized window of messages on a partition
 // and shapes them for both the tick strip (ascending, oldest→newest) and the
 // table (descending, newest first) — one fetch, two view orders. from=-1
@@ -291,10 +324,29 @@ const tapeWindow = 60 // how many messages the tape/table show at once
 // the tail window live-polls: paging back pins the view, so the 2.5s
 // refresher can't yank the reader back to the newest messages. hl, when ≥0,
 // marks that offset's row for highlight-and-scroll (jump-to-offset).
-func (c *Console) tapeData(ctx context.Context, topic string, partition, partitionCount int32, from, hl int64) (map[string]any, error) {
-	earliest, latest, err := c.be.PartitionOffsets(ctx, topic, partition)
+func (c *Console) tapeData(ctx context.Context, topic string, partition, partitionCount int32, from, hl, jump int64) (map[string]any, error) {
+	bounds, err := c.be.PartitionBounds(ctx, topic, partitionCount)
 	if err != nil {
 		return nil, err
+	}
+	earliest, latest := bounds[partition].Earliest, bounds[partition].Latest
+
+	// A jump to an offset the log does not hold says so, rather than quietly
+	// landing somewhere else.
+	jumpNote := ""
+	if jump >= 0 {
+		switch {
+		case latest == earliest:
+			jumpNote = "This partition has no messages to jump to."
+		case jump < earliest:
+			jumpNote = fmt.Sprintf("Offset %d is before the start of the log (the oldest is %d) — showing from there.", jump, earliest)
+			from, hl = earliest, -1
+		case jump >= latest:
+			jumpNote = fmt.Sprintf("Offset %d has not been written yet (the newest is %d) — showing the latest messages.", jump, latest-1)
+			from, hl = -1, -1
+		default:
+			from, hl = max(jump-20, earliest), jump
+		}
 	}
 	atTail := from < 0 || from >= max(latest-tapeWindow, earliest)
 	if atTail {
@@ -330,11 +382,15 @@ func (c *Console) tapeData(ctx context.Context, topic string, partition, partiti
 
 	return map[string]any{
 		"PartitionRange": partitionRange(partitionCount),
+		"Bounds":         bounds,
+		"PartSelect":     partitionCount > maxPartitionTabs,
+		"JumpNote":       jumpNote,
 		"Messages":       asc,
 		"MessagesDesc":   desc,
 		"Earliest":       earliest,
 		"Latest":         latest,
-		"Hash":           strconv.FormatInt(latest, 10),
+		"Count":          latest - earliest,
+		"Hash":           boundsHash(bounds),
 		"AtTail":         atTail,
 		"HasOlder":       from > earliest,
 		"HasNewer":       !atTail,
