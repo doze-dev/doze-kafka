@@ -1,18 +1,42 @@
 package protocol
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
 )
 
-// maxFrameBytes caps a single request to guard against a malformed or hostile
-// length prefix. Kafka's own default max request size is 100 MiB.
-const maxFrameBytes = 100 << 20
+const (
+	// maxFrameBytes caps a single request to guard against a malformed or hostile
+	// length prefix. Kafka's own default max request size is 100 MiB.
+	maxFrameBytes = 100 << 20
+
+	// maxPreAuthFrameBytes is the cap on a connection that must still
+	// authenticate. Everything such a connection may legitimately send —
+	// ApiVersions and the SASL exchange — is well under a kilobyte, so there is
+	// no reason to let a stranger ask for more than this.
+	maxPreAuthFrameBytes = 1 << 20
+
+	// frameChunk is how much of a frame is trusted up front. A frame bigger than
+	// this is read as the bytes arrive, so memory follows what the peer actually
+	// sends rather than what its length prefix claims.
+	frameChunk = 64 << 10
+)
 
 // ReadFrame reads one length-prefixed Kafka message — a 4-byte big-endian length
 // followed by that many bytes — and returns the payload without the prefix.
-func ReadFrame(r io.Reader) ([]byte, error) {
+func ReadFrame(r io.Reader) ([]byte, error) { return ReadFrameLimit(r, maxFrameBytes) }
+
+// ReadFrameLimit is ReadFrame with a caller-chosen size cap, refusing an
+// over-limit frame before reading any of its body.
+//
+// The length prefix is attacker-controlled and arrives before any proof the peer
+// will send that much, so allocating n bytes up front lets a four-byte message
+// pin up to the cap of memory per connection (and a few hundred connections
+// exhaust the machine). Past frameChunk the buffer therefore grows as data
+// arrives: a peer that claims 100 MiB and sends nothing costs one chunk.
+func ReadFrameLimit(r io.Reader, limit int) ([]byte, error) {
 	var lenBuf [4]byte
 	if _, err := io.ReadFull(r, lenBuf[:]); err != nil {
 		return nil, err
@@ -21,14 +45,25 @@ func ReadFrame(r io.Reader) ([]byte, error) {
 	if n == 0 {
 		return nil, fmt.Errorf("protocol: zero-length frame")
 	}
-	if n > maxFrameBytes {
-		return nil, fmt.Errorf("protocol: frame of %d bytes exceeds max %d", n, maxFrameBytes)
+	if int64(n) > int64(limit) {
+		return nil, fmt.Errorf("protocol: frame of %d bytes exceeds max %d", n, limit)
 	}
-	payload := make([]byte, n)
-	if _, err := io.ReadFull(r, payload); err != nil {
+	if n <= frameChunk {
+		payload := make([]byte, n)
+		if _, err := io.ReadFull(r, payload); err != nil {
+			return nil, err
+		}
+		return payload, nil
+	}
+	var buf bytes.Buffer
+	buf.Grow(frameChunk)
+	if _, err := io.CopyN(&buf, r, int64(n)); err != nil {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
 		return nil, err
 	}
-	return payload, nil
+	return buf.Bytes(), nil
 }
 
 // WriteFrame writes payload prefixed with its 4-byte big-endian length.

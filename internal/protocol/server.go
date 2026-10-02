@@ -3,9 +3,11 @@ package protocol
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"log/slog"
 	"net"
 	"sync"
+	"time"
 )
 
 // Server accepts TCP connections and serves each one with the Router.
@@ -18,6 +20,8 @@ type Server struct {
 	tlsConfig    *tls.Config // when set, the listener terminates TLS.
 	authRequired bool        // when true, connections must complete SASL before other APIs.
 
+	preAuthTimeout time.Duration // idle limit for a connection that has yet to authenticate.
+
 	mu    sync.Mutex
 	conns map[*Conn]struct{} // in-flight connections, for shutdown drain.
 	wg    sync.WaitGroup     // tracks conn.serve goroutines.
@@ -25,7 +29,7 @@ type Server struct {
 
 // NewServer returns a Server that will listen on addr.
 func NewServer(addr string, router *Router, log *slog.Logger) *Server {
-	return &Server{addr: addr, router: router, log: log, conns: make(map[*Conn]struct{})}
+	return &Server{addr: addr, router: router, log: log, conns: make(map[*Conn]struct{}), preAuthTimeout: defaultPreAuthTimeout}
 }
 
 // UseTLS makes the listener terminate TLS with the given config. Call before Bind.
@@ -81,6 +85,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		s.closeConns()
 	}()
 
+	var backoff time.Duration
 	for {
 		raw, err := ln.Accept()
 		if err != nil {
@@ -88,9 +93,28 @@ func (s *Server) Serve(ctx context.Context) error {
 				s.wg.Wait() // let in-flight connections drain before returning.
 				return nil  // clean shutdown
 			}
-			return err
+			if errors.Is(err, net.ErrClosed) {
+				return err
+			}
+			// Anything else (EMFILE when descriptors run out, ECONNABORTED, a
+			// transient network blip) is a problem with one accept, not with the
+			// listener. Ending the broker here turned "too many open files" into
+			// a dead process; wait and try again, as net/http does.
+			if backoff == 0 {
+				backoff = 5 * time.Millisecond
+			} else if backoff *= 2; backoff > time.Second {
+				backoff = time.Second
+			}
+			s.log.Warn("accept failed; retrying", "err", err, "in", backoff)
+			select {
+			case <-time.After(backoff):
+			case <-ctx.Done():
+			}
+			continue
 		}
+		backoff = 0
 		conn := newConn(raw, s.router, s.log, s.authRequired)
+		conn.preAuthTimeout = s.preAuthTimeout
 		s.track(conn)
 		s.wg.Add(1)
 		go func() {

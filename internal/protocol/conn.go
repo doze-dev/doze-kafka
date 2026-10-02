@@ -4,10 +4,20 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
+	"runtime/debug"
+	"time"
 )
+
+// defaultPreAuthTimeout is how long a connection that must authenticate may sit
+// without sending a complete request before it is dropped. A client that
+// connects and then says nothing would otherwise hold a goroutine and a socket
+// for as long as it liked. Authenticated connections have no such limit:
+// long-polling consumers are idle by design.
+const defaultPreAuthTimeout = 30 * time.Second
 
 // Conn is a single client connection. Requests on one connection are processed
 // and answered in order; a handler echoes the request's correlation id.
@@ -23,20 +33,22 @@ type Conn struct {
 	router *Router
 	log    *slog.Logger
 
-	authRequired  bool
-	authenticated bool
-	saslMechanism string
-	saslState     any // opaque per-connection state owned by the SASL handler (e.g. SCRAM step).
+	authRequired   bool
+	authenticated  bool
+	preAuthTimeout time.Duration
+	saslMechanism  string
+	saslState      any // opaque per-connection state owned by the SASL handler (e.g. SCRAM step).
 }
 
 func newConn(raw net.Conn, router *Router, logger *slog.Logger, authRequired bool) *Conn {
 	return &Conn{
-		raw:          raw,
-		r:            bufio.NewReader(raw),
-		w:            bufio.NewWriter(raw),
-		router:       router,
-		log:          logger.With("remote", raw.RemoteAddr().String()),
-		authRequired: authRequired,
+		raw:            raw,
+		r:              bufio.NewReader(raw),
+		w:              bufio.NewWriter(raw),
+		router:         router,
+		log:            logger.With("remote", raw.RemoteAddr().String()),
+		authRequired:   authRequired,
+		preAuthTimeout: defaultPreAuthTimeout,
 	}
 }
 
@@ -84,7 +96,14 @@ func (c *Conn) serve(ctx context.Context) {
 			return
 		}
 
-		frame, err := ReadFrame(c.r)
+		limit := maxFrameBytes
+		if c.authRequired && !c.authenticated {
+			limit = maxPreAuthFrameBytes
+			_ = c.raw.SetReadDeadline(time.Now().Add(c.preAuthTimeout))
+		} else if c.authRequired {
+			_ = c.raw.SetReadDeadline(time.Time{}) // authenticated: idle is fine.
+		}
+		frame, err := ReadFrameLimit(c.r, limit)
 		if err != nil {
 			if !errors.Is(err, io.EOF) && !errors.Is(err, net.ErrClosed) {
 				c.log.Debug("connection closed", "err", err)
@@ -113,7 +132,15 @@ func (c *Conn) serve(ctx context.Context) {
 		}
 
 		req := &Request{Header: header, Body: frame[bodyOffset:], Conn: c}
-		resp, err := c.router.Route(ctx, req)
+		resp, err := c.route(ctx, req)
+		var pe *handlerPanic
+		if errors.As(err, &pe) {
+			// The handler's bug must cost this connection, not the broker: every
+			// other client keeps being served.
+			c.log.Error("handler panicked; closing the connection", "api", header.APIKey.Name(),
+				"version", header.APIVersion, "client_id", header.ClientID, "panic", pe.value, "stack", pe.stack)
+			return
+		}
 		if err != nil {
 			// An unhandled API (one not advertised in ApiVersions) has no response
 			// we can frame, and the client is now blocked waiting for this
@@ -136,4 +163,23 @@ func (c *Conn) serve(ctx context.Context) {
 			return
 		}
 	}
+}
+
+// handlerPanic is a recovered panic from a request handler.
+type handlerPanic struct {
+	value any
+	stack string
+}
+
+func (p *handlerPanic) Error() string { return fmt.Sprintf("handler panic: %v", p.value) }
+
+// route dispatches a request, converting a handler panic into an error so one
+// connection's bad request cannot take the process down.
+func (c *Conn) route(ctx context.Context, req *Request) (resp []byte, err error) {
+	defer func() {
+		if v := recover(); v != nil {
+			resp, err = nil, &handlerPanic{value: v, stack: string(debug.Stack())}
+		}
+	}()
+	return c.router.Route(ctx, req)
 }
