@@ -46,7 +46,7 @@ func (ix *Index) load() error {
 	if err != nil {
 		return err
 	}
-	count := info.Size() / indexEntryBytes
+	count := info.Size() / indexEntryBytes // a trailing partial entry is ignored.
 	ix.entries = make([]indexEntry, 0, count)
 	var buf [indexEntryBytes]byte
 	for i := range count {
@@ -81,6 +81,25 @@ func (ix *Index) lookup(target int64) int64 {
 		return 0
 	}
 	return ix.entries[i-1].position
+}
+
+// rewrite replaces the index's contents with entries. Recovery uses it to put
+// right an index that disagrees with the log it describes: the index is derived
+// data, so the log wins.
+func (ix *Index) rewrite(entries []indexEntry) error {
+	if err := ix.file.Truncate(0); err != nil {
+		return err
+	}
+	var buf [indexEntryBytes]byte
+	for i, e := range entries {
+		binary.BigEndian.PutUint64(buf[0:], uint64(e.offset))
+		binary.BigEndian.PutUint64(buf[8:], uint64(e.position))
+		if _, err := ix.file.WriteAt(buf[:], int64(i)*indexEntryBytes); err != nil {
+			return err
+		}
+	}
+	ix.entries = append(ix.entries[:0], entries...)
+	return nil
 }
 
 // sync flushes appended index entries to stable storage.

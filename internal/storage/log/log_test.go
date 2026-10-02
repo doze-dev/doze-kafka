@@ -3,6 +3,7 @@ package log
 import (
 	"bytes"
 	"encoding/binary"
+	"hash/crc32"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,15 +14,23 @@ func testOpts() ManagerOptions {
 	return ManagerOptions{SegmentBytes: 1 << 20, IndexIntervalBytes: 4096}
 }
 
-// makeBatch builds a minimal but well-formed record-batch-v2 blob: a valid header
-// (correct batchLength and lastOffsetDelta) followed by opaque payload. The engine
-// only reads the header, so the payload can be anything.
+// makeBatch builds a well-formed record-batch-v2 blob: a full header with the
+// right length, magic, record counts and CRC, followed by opaque payload (the
+// engine never looks inside the records).
 func makeBatch(recordCount int32, payload []byte) []byte {
-	buf := make([]byte, batchHeaderMinBytes+len(payload))
+	buf := make([]byte, batchFullHeaderBytes+len(payload))
 	binary.BigEndian.PutUint32(buf[batchLengthOff:], uint32(len(buf)-batchOverhead))
+	buf[batchMagicOff] = batchMagicV2
 	binary.BigEndian.PutUint32(buf[batchLastOffsetDeltaOff:], uint32(recordCount-1))
-	copy(buf[batchHeaderMinBytes:], payload)
+	binary.BigEndian.PutUint32(buf[batchRecordCountOff:], uint32(recordCount))
+	copy(buf[batchFullHeaderBytes:], payload)
+	sealCRC(buf)
 	return buf
+}
+
+// sealCRC writes the batch's CRC32C, as a real producer does last.
+func sealCRC(b []byte) {
+	binary.BigEndian.PutUint32(b[batchCRCOff:], crc32.Checksum(b[batchAttributesOff:], crcTable))
 }
 
 func TestPartitionAppendReadRoundTrip(t *testing.T) {

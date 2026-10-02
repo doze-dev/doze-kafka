@@ -14,6 +14,7 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -215,31 +216,40 @@ func (s *Server) Addr() net.Addr {
 
 // Serve accepts connections until ctx is cancelled, drains in-flight
 // connections, then flushes partition logs and closes the metadata store.
-func (s *Server) Serve(ctx context.Context) error {
+func (s *Server) Serve(ctx context.Context) (err error) {
+	defer s.closeStorage(&err)
 	if s.extLn != nil {
 		s.srv.UseListener(s.extLn)
 	} else if s.Addr() == nil {
 		// Bind here rather than letting protocol.Server do it, so the broker
 		// learns the real port before the first client connects.
 		if _, err := s.Bind(ctx); err != nil {
-			s.logs.Close()
-			s.meta.Close()
 			return err
 		}
 	}
-	defer s.logs.Close()
-	defer s.meta.Close()
 	return s.srv.Serve(ctx)
 }
 
 // ServeListener is Serve on a caller-provided listener — the doze module passes
 // a unix-socket listener the proxy splices TCP clients onto. Kafka framing is
 // transport-agnostic, so this works unmodified.
-func (s *Server) ServeListener(ctx context.Context, ln net.Listener) error {
+func (s *Server) ServeListener(ctx context.Context, ln net.Listener) (err error) {
 	s.srv.UseListener(ln)
-	defer s.logs.Close()
-	defer s.meta.Close()
+	defer s.closeStorage(&err)
 	return s.srv.Serve(ctx)
+}
+
+// closeStorage flushes and closes the partition logs and the metadata store, and
+// folds a failure into the Serve result. A shutdown whose final fsync failed has
+// not made the data durable, and exiting 0 over that hid it from every script
+// that checks the exit status.
+func (s *Server) closeStorage(err *error) {
+	if cerr := s.meta.Close(); cerr != nil && *err == nil {
+		*err = fmt.Errorf("close metadata store: %w", cerr)
+	}
+	if cerr := s.logs.Close(); cerr != nil && *err == nil {
+		*err = fmt.Errorf("flush partition logs on shutdown: %w", cerr)
+	}
 }
 
 // Config returns the effective configuration (read-only view).

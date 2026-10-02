@@ -19,14 +19,17 @@ type Segment struct {
 	indexInterval int64
 	sinceIndex    int64     // bytes appended since the last index entry.
 	lastModified  time.Time // wall-clock time of the most recent append (for age-based retention).
+	beforeSync    func() error
 }
 
 // segmentName is the 20-digit zero-padded base offset used for a segment's files.
 func segmentName(baseOffset int64) string { return fmt.Sprintf("%020d", baseOffset) }
 
 // openSegment opens (creating if needed) the .log and .index files for a segment.
-func openSegment(dir string, baseOffset, indexInterval int64) (*Segment, error) {
+func openSegment(dir string, baseOffset, indexInterval int64, beforeSync func() error) (*Segment, error) {
 	base := filepath.Join(dir, segmentName(baseOffset))
+	_, statErr := os.Stat(base + ".log")
+	created := os.IsNotExist(statErr)
 	logFile, err := os.OpenFile(base+".log", os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {
 		return nil, err
@@ -41,7 +44,14 @@ func openSegment(dir string, baseOffset, indexInterval int64) (*Segment, error) 
 		logFile.Close()
 		return nil, err
 	}
+	if created {
+		// A new file is only a directory entry until the directory is flushed: an
+		// fsynced segment can still vanish in a power cut if its name was never
+		// persisted.
+		syncDir(dir)
+	}
 	return &Segment{
+		beforeSync:    beforeSync,
 		baseOffset:    baseOffset,
 		log:           logFile,
 		index:         index,
@@ -75,6 +85,11 @@ func (s *Segment) append(offset int64, batch []byte) error {
 // durability: the coarse fsync timer syncs the active segment, a roll syncs the
 // segment being sealed, and graceful shutdown syncs everything before close.
 func (s *Segment) sync() error {
+	if s.beforeSync != nil {
+		if err := s.beforeSync(); err != nil {
+			return err
+		}
+	}
 	if err := s.log.Sync(); err != nil {
 		return err
 	}
@@ -98,7 +113,21 @@ func (s *Segment) truncate(size int64) error {
 		return err
 	}
 	s.sizeBytes = size
-	return nil
+	// Make the cut durable: otherwise a second crash resurrects the torn bytes
+	// that this recovery just decided were not part of the log.
+	return s.log.Sync()
+}
+
+// syncDir flushes a directory's entries to stable storage. Best effort: some
+// platforms and filesystems cannot fsync a directory (Windows, certain network
+// mounts), and refusing to run there would be worse than the gap it closes.
+func syncDir(path string) {
+	d, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	_ = d.Sync()
+	_ = d.Close()
 }
 
 func (s *Segment) close() error {

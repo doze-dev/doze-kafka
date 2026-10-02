@@ -22,6 +22,7 @@ type Partition struct {
 	dir           string
 	segmentBytes  int64
 	indexInterval int64
+	beforeSync    func() error
 
 	mu             sync.Mutex
 	segments       []*Segment // sorted by base offset; last == active.
@@ -32,17 +33,21 @@ type Partition struct {
 // openPartition opens (creating if needed) a partition directory, loading its
 // segments and recovering the active segment's tail.
 func openPartition(dir string, opts ManagerOptions) (*Partition, error) {
+	_, statErr := os.Stat(dir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
-	p := &Partition{dir: dir, segmentBytes: opts.SegmentBytes, indexInterval: opts.IndexIntervalBytes}
+	if os.IsNotExist(statErr) {
+		syncDir(filepath.Dir(dir)) // persist the new directory's entry.
+	}
+	p := &Partition{dir: dir, segmentBytes: opts.SegmentBytes, indexInterval: opts.IndexIntervalBytes, beforeSync: opts.BeforeSync}
 
 	bases, err := listSegmentBases(dir)
 	if err != nil {
 		return nil, err
 	}
 	if len(bases) == 0 {
-		seg, err := openSegment(dir, 0, p.indexInterval)
+		seg, err := openSegment(dir, 0, p.indexInterval, p.beforeSync)
 		if err != nil {
 			return nil, err
 		}
@@ -51,7 +56,7 @@ func openPartition(dir string, opts ManagerOptions) (*Partition, error) {
 	}
 
 	for _, base := range bases {
-		seg, err := openSegment(dir, base, p.indexInterval)
+		seg, err := openSegment(dir, base, p.indexInterval, p.beforeSync)
 		if err != nil {
 			return nil, err
 		}
@@ -84,6 +89,11 @@ func (p *Partition) Append(records []byte) (int64, error) {
 		if !ok || pos+int(info.totalBytes) > len(records) {
 			return 0, fmt.Errorf("log: malformed record batch at byte %d of %d", pos, len(records))
 		}
+		if info.recordCount <= 0 {
+			// A non-positive count would move the log-end offset backwards and
+			// hand out offsets twice, permanently.
+			return 0, fmt.Errorf("%w: record count %d at byte %d", ErrCorruptBatch, info.recordCount, pos)
+		}
 		batch := records[pos : pos+int(info.totalBytes)]
 		offset := p.logEndOffset
 		stampBaseOffset(batch, offset)
@@ -95,7 +105,7 @@ func (p *Partition) Append(records []byte) (int64, error) {
 			if err := p.active().sync(); err != nil {
 				return 0, err
 			}
-			seg, err := openSegment(p.dir, offset, p.indexInterval)
+			seg, err := openSegment(p.dir, offset, p.indexInterval, p.beforeSync)
 			if err != nil {
 				return 0, err
 			}

@@ -53,6 +53,11 @@ const DefaultKafkaMajor = 4
 // (franz-go's kversion is the authoritative reference); the hard floor is record
 // batch format v2 (Kafka 0.11), so major 1 is the minimum.
 //
+// Produce starts at v3 and Fetch at v4: those are the first versions that carry
+// record batch format v2, which is the only format this broker stores and serves.
+// Earlier versions use the legacy message-set layout; advertising them invited
+// clients to send a format the log would have stored as garbage.
+//
 // Phase 1 implements ApiVersions + Metadata; phase 2 adds CreateTopics; phase 3
 // adds Produce, Fetch, ListOffsets, InitProducerId; phase 4 adds the classic
 // consumer-group set (FindCoordinator, Join/Sync/Heartbeat/Leave,
@@ -64,8 +69,8 @@ var profiles = map[int]Profile{
 		APIApiVersions:     {Min: 0, Max: 1},
 		APIMetadata:        {Min: 0, Max: 6},
 		APICreateTopics:    {Min: 0, Max: 2},
-		APIProduce:         {Min: 0, Max: 5},
-		APIFetch:           {Min: 0, Max: 6},
+		APIProduce:         {Min: 3, Max: 5},
+		APIFetch:           {Min: 4, Max: 6},
 		APIListOffsets:     {Min: 0, Max: 2},
 		APIInitProducerID:  {Min: 0, Max: 1},
 		APIFindCoordinator: {Min: 0, Max: 2},
@@ -85,8 +90,8 @@ var profiles = map[int]Profile{
 		APIApiVersions:     {Min: 0, Max: 2},
 		APIMetadata:        {Min: 0, Max: 8},
 		APICreateTopics:    {Min: 0, Max: 3},
-		APIProduce:         {Min: 0, Max: 7},
-		APIFetch:           {Min: 0, Max: 10},
+		APIProduce:         {Min: 3, Max: 7},
+		APIFetch:           {Min: 4, Max: 10},
 		APIListOffsets:     {Min: 0, Max: 5},
 		APIInitProducerID:  {Min: 0, Max: 1},
 		APIFindCoordinator: {Min: 0, Max: 2},
@@ -107,8 +112,8 @@ var profiles = map[int]Profile{
 		APIApiVersions:     {Min: 0, Max: 3},
 		APIMetadata:        {Min: 0, Max: 12},
 		APICreateTopics:    {Min: 0, Max: 7},
-		APIProduce:         {Min: 0, Max: 9},
-		APIFetch:           {Min: 0, Max: 13},
+		APIProduce:         {Min: 3, Max: 9},
+		APIFetch:           {Min: 4, Max: 13},
 		APIListOffsets:     {Min: 0, Max: 7},
 		APIInitProducerID:  {Min: 0, Max: 4},
 		APIFindCoordinator: {Min: 0, Max: 4},
@@ -130,8 +135,8 @@ var profiles = map[int]Profile{
 		APIApiVersions:     {Min: 0, Max: 3},
 		APIMetadata:        {Min: 0, Max: 12},
 		APICreateTopics:    {Min: 0, Max: 7},
-		APIProduce:         {Min: 0, Max: 9},
-		APIFetch:           {Min: 0, Max: 13},
+		APIProduce:         {Min: 3, Max: 9},
+		APIFetch:           {Min: 4, Max: 13},
 		APIListOffsets:     {Min: 0, Max: 7},
 		APIInitProducerID:  {Min: 0, Max: 4},
 		APIFindCoordinator: {Min: 0, Max: 4},

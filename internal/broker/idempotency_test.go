@@ -3,6 +3,7 @@ package broker_test
 import (
 	"context"
 	"encoding/binary"
+	"hash/crc32"
 	"testing"
 	"time"
 
@@ -11,7 +12,8 @@ import (
 
 // idempotentBatch builds a minimal but header-valid record batch v2 stamped with
 // the idempotent-producer fields. The body is opaque (the broker stores batches
-// verbatim and never validates the CRC), which lets a test forge an exact retry.
+// verbatim), which lets a test forge an exact retry; the CRC is sealed last, as a
+// real producer does, because the broker rejects a batch that does not check out.
 func idempotentBatch(pid int64, epoch int16, baseSeq, records int32) []byte {
 	const bodyLen = 8
 	total := 61 + bodyLen
@@ -23,7 +25,13 @@ func idempotentBatch(pid int64, epoch int16, baseSeq, records int32) []byte {
 	binary.BigEndian.PutUint16(b[51:], uint16(epoch))     // producerEpoch
 	binary.BigEndian.PutUint32(b[53:], uint32(baseSeq))   // baseSequence
 	binary.BigEndian.PutUint32(b[57:], uint32(records))   // recordsCount
+	sealCRC(b)
 	return b
+}
+
+// sealCRC writes a batch's CRC32C (over every byte from the attributes field on).
+func sealCRC(b []byte) {
+	binary.BigEndian.PutUint32(b[17:], crc32.Checksum(b[21:], crc32.MakeTable(crc32.Castagnoli)))
 }
 
 // TestIdempotence_DeduplicatesRetries drives the idempotent-producer sequence logic

@@ -38,6 +38,11 @@ type ManagerOptions struct {
 	// Retention bounds on-disk size; a zero policy keeps everything.
 	Retention RetentionPolicy
 
+	// BeforeSync, if set, runs before every fsync, and a non-nil error is returned
+	// in its place. It is fault injection for tests ("the disk failed"); leave it
+	// nil in production.
+	BeforeSync func() error
+
 	// Logger receives background-loop warnings (fsync/retention errors). Nil
 	// discards them.
 	Logger *slog.Logger

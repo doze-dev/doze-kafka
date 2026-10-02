@@ -64,3 +64,18 @@ func TestDecodeRequestHostileInputIsCheap(t *testing.T) {
 		t.Fatalf("decoding hostile bytes across all keys took %v; something is walking attacker-controlled counts", d)
 	}
 }
+
+// Produce below v3 and Fetch below v4 carry the legacy message-set format, which
+// the log does not understand; advertising them invited clients to send bytes it
+// would have stored as garbage.
+func TestProfilesDoNotAdvertiseLegacyMessageSetVersions(t *testing.T) {
+	for _, major := range SupportedKafkaMajors() {
+		prof, _ := ProfileFor(major)
+		if r, ok := prof.RangeFor(APIProduce); !ok || r.Min < 3 {
+			t.Errorf("Kafka %d profile advertises Produce from v%d; record batches start at v3", major, r.Min)
+		}
+		if r, ok := prof.RangeFor(APIFetch); !ok || r.Min < 4 {
+			t.Errorf("Kafka %d profile advertises Fetch from v%d; record batches start at v4", major, r.Min)
+		}
+	}
+}

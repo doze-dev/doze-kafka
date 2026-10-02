@@ -31,7 +31,10 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 	resp.SetVersion(req.Header.APIVersion)
 
 	var produced bool
-	written := map[topicPartition]struct{}{} // partitions to fsync for a durable ack.
+	// Partitions written by this request, with where their response entries sit,
+	// so an fsync failure can be reported against exactly those entries.
+	type slot struct{ topic, part int }
+	written := map[topicPartition][]slot{}
 
 	for _, t := range pr.Topics {
 		rt := kmsg.NewProduceResponseTopic()
@@ -49,7 +52,8 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 			default:
 				if b.appendRecords(name, part, &rp) {
 					produced = true
-					written[topicPartition{name, part.Partition}] = struct{}{}
+					tp := topicPartition{name, part.Partition}
+					written[tp] = append(written[tp], slot{len(resp.Topics), len(rt.Partitions)})
 				}
 			}
 			rt.Partitions = append(rt.Partitions, rp)
@@ -64,9 +68,22 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 		return nil, nil // fire-and-forget: the client expects no response.
 	}
 	if pr.Acks == -1 { // acks=all: make the acknowledgement durable.
-		for tp := range written {
-			if err := b.logs.SyncPartition(tp.topic, tp.partition); err != nil {
-				b.log.Warn("durable ack fsync failed", "topic", tp.topic, "partition", tp.partition, "err", err)
+		for tp, slots := range written {
+			err := b.logs.SyncPartition(tp.topic, tp.partition)
+			if err == nil {
+				continue
+			}
+			// acks=all is a promise that the record is on disk. If the disk says
+			// otherwise the producer must hear it, not be told "success" about data
+			// that may vanish: it will retry (idempotently), and the failure is
+			// visible instead of silent.
+			b.log.Error("durable ack: fsync failed; reporting the produce as failed", "topic", tp.topic, "partition", tp.partition, "err", err)
+			msg := "fsync failed: " + err.Error()
+			for _, s := range slots {
+				rp := &resp.Topics[s.topic].Partitions[s.part]
+				rp.ErrorCode = int16(protocol.ErrKafkaStorageError)
+				rp.ErrorMessage = &msg
+				rp.BaseOffset = -1
 			}
 		}
 	}
@@ -80,6 +97,17 @@ func (b *Broker) appendRecords(topic string, part kmsg.ProduceRequestTopicPartit
 	plog, err := b.logs.Partition(topic, part.Partition)
 	if err != nil {
 		rp.ErrorCode = int16(protocol.ErrUnknownServer)
+		return false
+	}
+
+	// Validate every batch before writing any: shape and CRC. A bad batch must not
+	// be stored (every consumer would then fail on it, forever) and must not leave
+	// the batches before it half-appended.
+	if err := log.ValidateBatches(part.Records); err != nil {
+		rp.ErrorCode = int16(protocol.ErrCorruptMessage)
+		msg := err.Error()
+		rp.ErrorMessage = &msg
+		rp.BaseOffset = -1
 		return false
 	}
 

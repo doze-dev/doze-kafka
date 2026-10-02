@@ -3,9 +3,12 @@ package broker
 import (
 	"context"
 	"encoding/binary"
+	"errors"
+	"hash/crc32"
 	"io"
 	"log/slog"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/twmb/franz-go/pkg/kmsg"
@@ -26,6 +29,7 @@ func plainBatch() []byte {
 		b[i] = 0xff // producerId = -1 (non-idempotent)
 	}
 	binary.BigEndian.PutUint32(b[57:], 1) // recordsCount
+	binary.BigEndian.PutUint32(b[17:], crc32.Checksum(b[21:], crc32.MakeTable(crc32.Castagnoli)))
 	return b
 }
 
@@ -93,5 +97,136 @@ func TestProduceAcksFsync(t *testing.T) {
 	produce(-1)
 	if got := logs.SyncOps(); got <= before {
 		t.Fatalf("acks=all did not fsync (%d -> %d); the acknowledgement is not durable", before, got)
+	}
+}
+
+// produceOnce runs handleProduce directly and returns the decoded response, so a
+// test can read the per-partition error code and message.
+func produceOnce(t *testing.T, b *Broker, acks int16, records []byte) *kmsg.ProduceResponse {
+	t.Helper()
+	req := kmsg.NewPtrProduceRequest()
+	req.SetVersion(8) // v8 is the first with an error message, still non-flexible.
+	req.Acks = acks
+	req.TimeoutMillis = 1000
+	pt := kmsg.NewProduceRequestTopic()
+	pt.Topic = "t"
+	pp := kmsg.NewProduceRequestTopicPartition()
+	pp.Records = records
+	pt.Partitions = append(pt.Partitions, pp)
+	req.Topics = append(req.Topics, pt)
+	out, err := b.handleProduce(context.Background(), &protocol.Request{
+		Header: protocol.RequestHeader{APIKey: protocol.APIProduce, APIVersion: 8, CorrelationID: 1},
+		Body:   req.AppendTo(nil),
+	})
+	if err != nil {
+		t.Fatalf("handleProduce: %v", err)
+	}
+	resp := kmsg.NewPtrProduceResponse()
+	resp.SetVersion(8)
+	if err := resp.ReadFrom(out[4:]); err != nil { // skip the correlation id.
+		t.Fatalf("decode response: %v", err)
+	}
+	return resp
+}
+
+// newTestBroker builds a broker over a real log manager whose fsync can be made
+// to fail on demand.
+func newTestBroker(t *testing.T, failSync *bool) (*Broker, *log.Manager) {
+	t.Helper()
+	dir := t.TempDir()
+	metaStore, err := meta.Open(filepath.Join(dir, "meta.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { metaStore.Close() })
+	logs, err := log.OpenManager(filepath.Join(dir, "data"), log.ManagerOptions{
+		SegmentBytes:       1 << 20,
+		IndexIntervalBytes: 4096,
+		BeforeSync: func() error {
+			if *failSync {
+				return errDiskOnFire
+			}
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { logs.Close() })
+	cfg := config.Default()
+	cfg.FsyncInterval = 0
+	b, err := New(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), logs, metaStore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := metaStore.CreateTopic("t", 1, nil); err != nil {
+		t.Fatal(err)
+	}
+	return b, logs
+}
+
+var errDiskOnFire = errors.New("input/output error")
+
+// acks=all promises the record is on disk. When the fsync fails the producer
+// must be told; it used to be acknowledged as a success.
+func TestProduceFsyncFailureIsReportedNotAcknowledged(t *testing.T) {
+	var failSync bool
+	b, _ := newTestBroker(t, &failSync)
+
+	failSync = true
+	resp := produceOnce(t, b, -1, plainBatch())
+	p := resp.Topics[0].Partitions[0]
+	if p.ErrorCode != int16(protocol.ErrKafkaStorageError) {
+		t.Fatalf("acks=all with a failing fsync: error code %d, want KAFKA_STORAGE_ERROR (%d)", p.ErrorCode, protocol.ErrKafkaStorageError)
+	}
+	if p.ErrorMessage == nil || !strings.Contains(*p.ErrorMessage, "input/output error") {
+		t.Errorf("the failure should say why, got %v", p.ErrorMessage)
+	}
+
+	// acks=1 never promised durability, so it must not fail on a sync it never makes.
+	if p := produceOnce(t, b, 1, plainBatch()).Topics[0].Partitions[0]; p.ErrorCode != 0 {
+		t.Errorf("acks=1 failed with %d though it does not fsync", p.ErrorCode)
+	}
+
+	// And a healthy disk acknowledges normally.
+	failSync = false
+	if p := produceOnce(t, b, -1, plainBatch()).Topics[0].Partitions[0]; p.ErrorCode != 0 {
+		t.Errorf("acks=all on a healthy disk: error code %d", p.ErrorCode)
+	}
+}
+
+// A batch that fails validation is refused whole, before anything is written —
+// including the good batches that precede it in the same payload.
+func TestProduceRefusesCorruptBatches(t *testing.T) {
+	var failSync bool
+	b, logs := newTestBroker(t, &failSync)
+
+	good := plainBatch()
+	flip := func(batch []byte, i int) []byte { c := append([]byte{}, batch...); c[i] ^= 0xFF; return c }
+	cases := map[string][]byte{
+		"payload byte flipped (CRC)": flip(good, len(good)-1),
+		"header byte flipped (CRC)":  flip(good, 22),
+		"wrong magic":                flip(good, 16),
+		"good batch then a bad one":  append(append([]byte{}, good...), flip(good, len(good)-1)...),
+		"truncated batch":            good[:len(good)-4],
+		"trailing junk":              append(append([]byte{}, good...), 1, 2, 3),
+	}
+	for name, records := range cases {
+		p := produceOnce(t, b, 1, records).Topics[0].Partitions[0]
+		if p.ErrorCode != int16(protocol.ErrCorruptMessage) {
+			t.Errorf("%s: error code %d, want CORRUPT_MESSAGE (%d)", name, p.ErrorCode, protocol.ErrCorruptMessage)
+		}
+	}
+	part, err := logs.Partition("t", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if leo := part.LogEndOffset(); leo != 0 {
+		t.Fatalf("log end offset = %d after only invalid produces; something was written", leo)
+	}
+
+	// The partition is untouched, so the next valid batch is offset 0.
+	if p := produceOnce(t, b, 1, good).Topics[0].Partitions[0]; p.ErrorCode != 0 || p.BaseOffset != 0 {
+		t.Fatalf("a valid batch after the refusals: code %d offset %d, want 0 at 0", p.ErrorCode, p.BaseOffset)
 	}
 }
