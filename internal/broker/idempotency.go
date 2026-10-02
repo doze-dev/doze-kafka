@@ -61,12 +61,22 @@ func (i *idempotency) dropPartitions(topic string, partitions int32) {
 type partitionProducers struct {
 	mu        sync.Mutex
 	producers map[int64]*producerSequence
+	tick      int64 // advances on every accepted batch; orders producers by recency.
 }
 
 type producerSequence struct {
-	epoch  int16
-	recent []batchSeq // ascending by sequence; most recent last.
+	epoch    int16
+	recent   []batchSeq // ascending by sequence; most recent last.
+	lastUsed int64
 }
+
+// maxProducersPerPartition bounds the sequence state kept per partition. Every
+// idempotent producer session gets a fresh producer id, so a long-running
+// broker driven by short-lived clients (a test suite, say) otherwise accrues one
+// entry per session forever. Evicting the least recently used is safe: that
+// producer's next batch is taken as a new baseline, which is what Kafka itself
+// does once a producer id expires.
+const maxProducersPerPartition = 1000
 
 type batchSeq struct {
 	firstSeq, lastSeq int32
@@ -133,5 +143,27 @@ func (pp *partitionProducers) record(pid int64, epoch int16, firstSeq, lastSeq i
 	st.recent = append(st.recent, batchSeq{firstSeq, lastSeq, baseOffset})
 	if len(st.recent) > maxTrackedBatches {
 		st.recent = st.recent[len(st.recent)-maxTrackedBatches:]
+	}
+	pp.tick++
+	st.lastUsed = pp.tick
+	if len(pp.producers) > maxProducersPerPartition {
+		pp.evictOldest(pid)
+	}
+}
+
+// evictOldest drops the least recently used producer other than keep.
+func (pp *partitionProducers) evictOldest(keep int64) {
+	var oldest int64
+	var oldestUsed int64 = -1
+	for id, st := range pp.producers {
+		if id == keep {
+			continue
+		}
+		if oldestUsed < 0 || st.lastUsed < oldestUsed {
+			oldest, oldestUsed = id, st.lastUsed
+		}
+	}
+	if oldestUsed >= 0 {
+		delete(pp.producers, oldest)
 	}
 }

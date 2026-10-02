@@ -29,13 +29,17 @@ func (b *Broker) handleFetch(ctx context.Context, req *protocol.Request) ([]byte
 	deadline := time.Now().Add(time.Duration(fr.MaxWaitMillis) * time.Millisecond)
 
 	for {
+		// Take the wakeup channel BEFORE reading. A produce that lands between the
+		// read and the wait would otherwise close a channel nobody holds yet, and
+		// this fetch would sleep the full MaxWait with data already there.
+		wake := b.produce.wait()
 		resp, total := b.buildFetchResponse(fr, req.Header.APIVersion)
 		if total >= minBytes || fr.MaxWaitMillis <= 0 || !time.Now().Before(deadline) {
 			return protocol.EncodeResponse(req.Header, resp), nil
 		}
 		// Wait for a produce or the deadline, then re-read.
 		select {
-		case <-b.produce.wait():
+		case <-wake:
 		case <-time.After(time.Until(deadline)):
 		case <-ctx.Done():
 			return protocol.EncodeResponse(req.Header, resp), nil
@@ -50,6 +54,7 @@ func (b *Broker) buildFetchResponse(fr *kmsg.FetchRequest, version int16) (*kmsg
 	resp.SetVersion(version)
 
 	total := 0
+	budget := newFetchBudget(fr.MaxBytes)
 	for _, t := range fr.Topics {
 		rt := kmsg.NewFetchResponseTopic()
 		rt.TopicID = t.TopicID
@@ -65,7 +70,7 @@ func (b *Broker) buildFetchResponse(fr *kmsg.FetchRequest, version int16) (*kmsg
 				rt.Partitions = append(rt.Partitions, rp)
 				continue
 			}
-			total += b.readPartition(name, part, fr, &rp)
+			total += b.readPartition(name, part, fr, &rp, budget)
 			rt.Partitions = append(rt.Partitions, rp)
 		}
 		resp.Topics = append(resp.Topics, rt)
@@ -73,11 +78,29 @@ func (b *Broker) buildFetchResponse(fr *kmsg.FetchRequest, version int16) (*kmsg
 	return resp, total
 }
 
+// fetchBudget enforces the request-level MaxBytes across partitions. It is a soft
+// limit, as in Kafka: the first partition that has data is returned whole even if
+// it alone exceeds the budget (so a large batch can always be fetched), and no
+// partition after it may push the response past what is left. Without it a
+// request naming 100 backlogged partitions assembled a response 100 times the
+// limit the client asked for.
+type fetchBudget struct {
+	remaining int64
+	gaveData  bool // a partition has already returned data.
+}
+
+func newFetchBudget(maxBytes int32) *fetchBudget {
+	if maxBytes <= 0 {
+		return &fetchBudget{remaining: 1<<62 - 1}
+	}
+	return &fetchBudget{remaining: int64(maxBytes)}
+}
+
 // readPartition fills rp from one partition and returns the record bytes read.
-func (b *Broker) readPartition(topic string, part kmsg.FetchRequestTopicPartition, fr *kmsg.FetchRequest, rp *kmsg.FetchResponseTopicPartition) int {
+func (b *Broker) readPartition(topic string, part kmsg.FetchRequestTopicPartition, fr *kmsg.FetchRequest, rp *kmsg.FetchResponseTopicPartition, budget *fetchBudget) int {
 	plog, err := b.logs.Partition(topic, part.Partition)
 	if err != nil {
-		rp.ErrorCode = int16(protocol.ErrUnknownServer)
+		rp.ErrorCode = b.storageFault("fetch: open partition", err, "topic", topic, "partition", part.Partition)
 		return 0
 	}
 
@@ -99,8 +122,17 @@ func (b *Broker) readPartition(topic string, part kmsg.FetchRequestTopicPartitio
 		rp.ErrorCode = int16(protocol.ErrOffsetOutOfRange)
 		return 0
 	case err != nil:
-		rp.ErrorCode = int16(protocol.ErrUnknownServer)
+		rp.ErrorCode = b.storageFault("fetch: read", err, "topic", topic, "partition", part.Partition, "offset", part.FetchOffset)
 		return 0
+	}
+	if budget.gaveData && int64(len(data)) > budget.remaining {
+		// This partition's first batch does not fit in what the request has left,
+		// and an earlier partition already took the one oversize allowance.
+		return 0
+	}
+	budget.remaining -= int64(len(data))
+	if len(data) > 0 {
+		budget.gaveData = true
 	}
 	rp.RecordBatches = data
 	return len(data)

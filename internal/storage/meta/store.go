@@ -12,9 +12,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"go.etcd.io/bbolt"
 )
+
+// lockTimeout bounds the wait for bbolt's exclusive file lock (a variable so a
+// test need not wait the full two seconds).
+var lockTimeout = 2 * time.Second
 
 // ErrTopicExists is returned by CreateTopic when the name is already registered.
 var ErrTopicExists = errors.New("meta: topic already exists")
@@ -65,8 +70,14 @@ type Store interface {
 // Open opens (creating if needed) the metadata database at path and ensures its
 // buckets exist.
 func Open(path string) (Store, error) {
-	db, err := bbolt.Open(path, 0o600, nil)
+	// bbolt takes an exclusive file lock. With no timeout a second broker on the
+	// same file (a forgotten terminal, a crashed run still shutting down) blocks
+	// forever in silence; a short timeout turns it into an error that says why.
+	db, err := bbolt.Open(path, 0o600, &bbolt.Options{Timeout: lockTimeout})
 	if err != nil {
+		if errors.Is(err, bbolt.ErrTimeout) {
+			return nil, fmt.Errorf("meta: %s is locked by another process; is another doze-kafka already using this --meta-db (or --data-dir)?", path)
+		}
 		return nil, fmt.Errorf("meta: open %s: %w", path, err)
 	}
 	err = db.Update(func(tx *bbolt.Tx) error {

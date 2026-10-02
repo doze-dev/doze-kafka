@@ -179,3 +179,23 @@ func TestNoListenAddrIsLoopbackEphemeral(t *testing.T) {
 	cancel()
 	_ = srv.Serve(ctx)
 }
+
+// The package's own doc example used a data dir that did not exist yet and
+// failed with "no such file or directory": bbolt creates the file, not its
+// directory, and the log manager made the data dir only after the metadata store
+// was open.
+func TestNewCreatesMissingDirectories(t *testing.T) {
+	root := t.TempDir()
+	srv, err := server.New(server.Options{
+		DataDir: root + "/does/not/exist/yet/data",
+		MetaDB:  root + "/elsewhere/also/new/meta.db",
+	})
+	if err != nil {
+		t.Fatalf("New with missing parent directories: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := srv.Serve(ctx); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+}

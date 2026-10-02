@@ -62,18 +62,18 @@ func TestRetention_TrimsUnderLoadAndSurvivesRestart(t *testing.T) {
 
 	// The retained tail consumes contiguously, correctly offset: record at offset o
 	// has value "m{o}".
-	verifyTail := func(when string) {
-		got := consumeFromStart(t, ctx, addr, "logs", int(int64(n)-earliest))
-		if want := fmt.Sprintf("m%d", earliest); got[0] != want {
+	verifyTail := func(when string, from int64) {
+		got := consumeFromStart(t, ctx, addr, "logs", int(int64(n)-from))
+		if want := fmt.Sprintf("m%d", from); got[0] != want {
 			t.Fatalf("%s: first retained record = %q, want %q", when, got[0], want)
 		}
 		for i, v := range got {
-			if want := fmt.Sprintf("m%d", earliest+int64(i)); v != want {
+			if want := fmt.Sprintf("m%d", from+int64(i)); v != want {
 				t.Fatalf("%s: record %d = %q, want %q (tail not contiguous)", when, i, v, want)
 			}
 		}
 	}
-	verifyTail("before restart")
+	verifyTail("before restart", earliest)
 
 	// Graceful restart over the same data dir: the trimmed state and the retained
 	// tail must persist exactly.
@@ -83,11 +83,15 @@ func TestRetention_TrimsUnderLoadAndSurvivesRestart(t *testing.T) {
 
 	admin2 := newClient(t, addr)
 	defer admin2.Close()
-	if e := listOffset(t, ctx, admin2, "logs", 0, -2); e != earliest {
-		t.Fatalf("after restart earliest = %d, want %d (retention state not durable)", e, earliest)
+	// Retention keeps trimming after a restart (a sweep now covers partitions that
+	// have not been opened yet), so the start offset may move FORWARD; what must
+	// never happen is trimmed data coming back.
+	restartedEarliest := listOffset(t, ctx, admin2, "logs", 0, -2)
+	if restartedEarliest < earliest {
+		t.Fatalf("after restart earliest = %d, below %d: trimmed data came back (retention state not durable)", restartedEarliest, earliest)
 	}
 	if l := listOffset(t, ctx, admin2, "logs", 0, -1); l != n {
 		t.Fatalf("after restart latest = %d, want %d", l, n)
 	}
-	verifyTail("after restart")
+	verifyTail("after restart", restartedEarliest)
 }

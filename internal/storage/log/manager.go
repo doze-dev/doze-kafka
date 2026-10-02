@@ -25,6 +25,9 @@ import (
 // memory, so a sweep touches no disk unless it deletes).
 const retentionCheckInterval = time.Second
 
+// closedRetentionInterval is how often partitions that are not open are swept.
+const closedRetentionInterval = time.Minute
+
 // ManagerOptions tunes newly opened partitions and the background maintenance loop.
 type ManagerOptions struct {
 	SegmentBytes       int64
@@ -233,6 +236,18 @@ func (m *Manager) EnforceRetention() error {
 func (m *Manager) maintain() {
 	defer m.wg.Done()
 
+	// Cold partitions are swept once now and then once a minute: it reads the
+	// whole data directory, which is not something to do every second.
+	var closedC <-chan time.Time
+	if m.opts.Retention.enabled() {
+		if err := m.EnforceClosedRetention(); err != nil {
+			m.log.Warn("retention of unopened partitions failed", "err", err)
+		}
+		t := time.NewTicker(closedRetentionInterval)
+		defer t.Stop()
+		closedC = t.C
+	}
+
 	var fsyncC, retentionC <-chan time.Time
 	if m.opts.FsyncInterval > 0 {
 		t := time.NewTicker(m.opts.FsyncInterval)
@@ -256,6 +271,10 @@ func (m *Manager) maintain() {
 		case <-retentionC:
 			if err := m.EnforceRetention(); err != nil {
 				m.log.Warn("retention enforcement failed", "err", err)
+			}
+		case <-closedC:
+			if err := m.EnforceClosedRetention(); err != nil {
+				m.log.Warn("retention of unopened partitions failed", "err", err)
 			}
 		}
 	}

@@ -126,3 +126,34 @@ func TestConsoleAllowHostFlagAndImpliedHosts(t *testing.T) {
 		t.Errorf("consoleHosts for an IP bind = %v, want none", h)
 	}
 }
+
+// A flag replaces the config file's value, like every other flag. Appending meant
+// --sasl-mechanisms PLAIN could never switch off a mechanism the file enabled.
+func TestSASLMechanismsFlagReplacesTheFilesValue(t *testing.T) {
+	path := writeTOML(t, t.TempDir(), "sasl-mechanisms = [\"PLAIN\", \"SCRAM-SHA-256\"]\n[credentials]\nalice = \"pw\"\n")
+
+	st, err := loadConfig([]string{"--config", path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := st.cfg.SASLMechanisms; len(got) != 2 {
+		t.Fatalf("from the file alone: %v, want both", got)
+	}
+
+	st, err = loadConfig([]string{"--config", path, "--sasl-mechanisms", "PLAIN"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := st.cfg.SASLMechanisms; len(got) != 1 || got[0] != "PLAIN" {
+		t.Fatalf("with --sasl-mechanisms PLAIN: %v, want only PLAIN", got)
+	}
+
+	// Repeats on the command line still accumulate.
+	st, err = loadConfig([]string{"--config", path, "--sasl-mechanisms", "PLAIN", "--sasl-mechanisms", "SCRAM-SHA-512"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := st.cfg.SASLMechanisms; len(got) != 2 || got[0] != "PLAIN" || got[1] != "SCRAM-SHA-512" {
+		t.Fatalf("repeated flags: %v, want [PLAIN SCRAM-SHA-512]", got)
+	}
+}

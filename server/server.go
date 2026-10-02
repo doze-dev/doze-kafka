@@ -18,6 +18,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -150,6 +151,15 @@ func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
+	}
+	// bbolt creates the file but not its directory, and the log manager creates
+	// the data dir only after the metadata store is open — so a fresh data dir
+	// failed with "no such file or directory", including the example in this
+	// package's doc comment.
+	for _, dir := range []string{cfg.DataDir, filepath.Dir(cfg.MetaDB)} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, fmt.Errorf("create %s: %w", dir, err)
+		}
 	}
 	metaStore, err := meta.Open(cfg.MetaDB)
 	if err != nil {

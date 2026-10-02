@@ -45,7 +45,7 @@ func (b *Broker) handleOffsetCommit(ctx context.Context, req *protocol.Request) 
 					md = *p.Metadata
 				}
 				if err := b.meta.CommitOffset(oc.Group, name, p.Partition, p.Offset, md); err != nil {
-					rp.ErrorCode = int16(protocol.ErrUnknownServer)
+					rp.ErrorCode = b.storageFault("offset commit", err, "group", oc.Group, "topic", name, "partition", p.Partition)
 				}
 			}
 			rt.Partitions = append(rt.Partitions, rp)

@@ -113,6 +113,14 @@ func (b *Broker) Register(r *protocol.Router) {
 	}
 }
 
+// storageFault logs an internal error that is about to be reported to a client as
+// UNKNOWN_SERVER_ERROR and returns that code. The client sees only a code; without
+// this, the cause of "my produce fails" existed nowhere a developer could look.
+func (b *Broker) storageFault(op string, err error, attrs ...any) int16 {
+	b.log.Error("request failed: "+op, append(attrs, "err", err)...)
+	return int16(protocol.ErrUnknownServer)
+}
+
 // nodeID is this broker's node id. Single-node, so it is a constant.
 func (b *Broker) nodeID() int32 { return 1 }
 

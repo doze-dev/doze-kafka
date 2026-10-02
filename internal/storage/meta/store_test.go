@@ -1,6 +1,10 @@
 package meta
 
-import "testing"
+import (
+	"strings"
+	"testing"
+	"time"
+)
 
 func openStore(t *testing.T) Store {
 	t.Helper()
@@ -96,5 +100,32 @@ func TestGroupOffsetHelpers(t *testing.T) {
 	}
 	if groups, _ := s.OffsetGroups(); len(groups) != 1 || groups[0] != "g10" {
 		t.Errorf("OffsetGroups after deletes = %v, want [g10]", groups)
+	}
+}
+
+// Two brokers on one metadata file used to block forever in silence (bbolt waits
+// for the lock with no timeout). It must be an error that says why.
+func TestSecondOpenOfTheSameFileFailsWithAReason(t *testing.T) {
+	old := lockTimeout
+	lockTimeout = 200 * time.Millisecond
+	defer func() { lockTimeout = old }()
+
+	path := t.TempDir() + "/meta.db"
+	first, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first.Close()
+
+	start := time.Now()
+	_, err = Open(path)
+	if err == nil {
+		t.Fatal("a second Open of a locked metadata file should fail")
+	}
+	if took := time.Since(start); took > 3*time.Second {
+		t.Fatalf("it took %v to fail; it must not wait indefinitely", took)
+	}
+	if !strings.Contains(err.Error(), "another doze-kafka") || !strings.Contains(err.Error(), path) {
+		t.Fatalf("the error should name the file and the likely cause, got: %v", err)
 	}
 }

@@ -1,7 +1,9 @@
 package log
 
 import (
+	"bytes"
 	"errors"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -175,5 +177,70 @@ func TestManagerSyncAndRetention(t *testing.T) {
 	}
 	if p.LogStartOffset() == 0 {
 		t.Fatalf("retention via manager did not advance the log-start offset")
+	}
+}
+
+// After a restart nothing is open, and a sweep of only the open set never trims a
+// topic nobody has touched since: its old segments would stay on disk forever.
+func TestRetentionTrimsPartitionsThatAreNotOpen(t *testing.T) {
+	dir := t.TempDir()
+	opts := ManagerOptions{SegmentBytes: 512, IndexIntervalBytes: 64}
+
+	m, err := OpenManager(dir, opts) // no retention yet: just write data.
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := m.Partition("cold", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 40; i++ {
+		if _, err := p.Append(makeBatch(1, bytes.Repeat([]byte{'x'}, 100))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	segs := func() int { b, _ := listSegmentBases(filepath.Join(dir, "cold-0")); return len(b) }
+	before := segs()
+	if before < 4 {
+		t.Fatalf("setup: only %d segments", before)
+	}
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	opts.Retention = RetentionPolicy{MaxBytes: 1024}
+	m2, err := OpenManager(dir, opts) // restarted: "cold" is not open.
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m2.Close()
+	if err := m2.EnforceRetention(); err != nil { // the open-set sweep alone does nothing here.
+		t.Fatal(err)
+	}
+	if got := segs(); got != before {
+		t.Fatalf("the open-set sweep changed an unopened partition (%d -> %d segments)", before, got)
+	}
+	if err := m2.EnforceClosedRetention(); err != nil {
+		t.Fatal(err)
+	}
+	after := segs()
+	if after >= before || after < 1 {
+		t.Fatalf("segments %d -> %d; the cold partition was not trimmed (or the newest was lost)", before, after)
+	}
+
+	// Opening it afterwards finds a consistent log: the start offset follows the
+	// first surviving segment and the end offset is untouched.
+	p2, err := m2.Partition("cold", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p2.LogEndOffset() != 40 {
+		t.Errorf("LEO = %d, want 40", p2.LogEndOffset())
+	}
+	if p2.LogStartOffset() <= 0 {
+		t.Errorf("log start offset = %d, want it advanced past the removed segments", p2.LogStartOffset())
+	}
+	if _, err := p2.Read(p2.LogStartOffset(), 1<<20); err != nil {
+		t.Errorf("the first retained offset is not readable: %v", err)
 	}
 }

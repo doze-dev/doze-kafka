@@ -186,7 +186,7 @@ func (b *Broker) handleDeleteTopics(ctx context.Context, req *protocol.Request) 
 		default:
 			rt.TopicID = topic.ID
 			if err := b.meta.DeleteTopic(name); err != nil {
-				rt.ErrorCode = int16(protocol.ErrUnknownServer)
+				rt.ErrorCode = b.storageFault("delete topic", err, "topic", name)
 				break
 			}
 			// Registry gone; best-effort remove the on-disk partition data and forget

@@ -33,7 +33,11 @@ func (b *Broker) handleMetadata(ctx context.Context, req *protocol.Request) ([]b
 	resp.ClusterID = &clusterID
 	resp.ControllerID = b.nodeID()
 
-	if len(mr.Topics) == 0 {
+	// A null topic list means "all topics" and an empty one means "none" — from v1.
+	// v0 cannot express null, so there an empty list is how a client asks for
+	// everything. Treating v1+ empty as "all" made a client that asked for nothing
+	// (to learn the brokers, say) pay for and parse the whole topic registry.
+	if mr.Topics == nil || (len(mr.Topics) == 0 && req.Header.APIVersion == 0) {
 		// All topics.
 		topics, err := b.meta.ListTopics()
 		if err != nil {
@@ -47,6 +51,17 @@ func (b *Broker) handleMetadata(ctx context.Context, req *protocol.Request) ([]b
 
 	for _, reqTopic := range mr.Topics {
 		if reqTopic.Topic == nil {
+			// Addressed by id (Metadata v10+).
+			if reqTopic.TopicID == ([16]byte{}) {
+				continue
+			}
+			if t, ok, err := b.meta.TopicByID(meta.TopicID(reqTopic.TopicID)); err == nil && ok {
+				resp.Topics = append(resp.Topics, b.topicMetadata(t.Name, t.ID, t.Partitions, protocol.ErrNone))
+			} else {
+				rt := b.topicMetadata("", meta.TopicID(reqTopic.TopicID), 0, protocol.ErrUnknownTopicID)
+				rt.Topic = nil
+				resp.Topics = append(resp.Topics, rt)
+			}
 			continue
 		}
 		name := *reqTopic.Topic

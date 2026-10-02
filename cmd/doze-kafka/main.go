@@ -156,7 +156,7 @@ func parseFlags(args []string, dst *config.Config) (cliFlags, error) {
 	fs.StringVar(&fl.pprofAddr, "pprof-addr", "", "if set, serve net/http/pprof here (goroutine/heap profiling for soak/debug)")
 	fs.BoolVar(&fl.console, "console", true, "serve the web console (topics, messages, consumer groups)")
 	fs.StringVar(&fl.consoleAddr, "console-addr", "127.0.0.1:9093", "host:port for the web console — distinct from --listen, since Kafka's wire protocol can't share a port with HTTP")
-	fs.Var(stringSliceFlag{&fl.allowHosts}, "console-allow-host", "extra host name the console answers to, besides localhost, IP addresses and *.doze (comma-separated or repeated); guards against DNS rebinding")
+	fs.Var(&stringSliceFlag{vals: &fl.allowHosts}, "console-allow-host", "extra host name the console answers to, besides localhost, IP addresses and *.doze (comma-separated or repeated); guards against DNS rebinding")
 	registerFlags(fs, dst)
 	if err := fs.Parse(args); err != nil {
 		return cliFlags{}, err
@@ -352,23 +352,34 @@ func registerFlags(fs *flag.FlagSet, cfg *config.Config) {
 	if cfg.Credentials == nil {
 		cfg.Credentials = map[string]string{}
 	}
-	fs.Var(stringSliceFlag{&cfg.SASLMechanisms}, "sasl-mechanisms", "comma-separated SASL mechanisms to enable (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512)")
+	fs.Var(&stringSliceFlag{vals: &cfg.SASLMechanisms}, "sasl-mechanisms", "comma-separated SASL mechanisms to enable (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512)")
 	fs.Var(credsFlag{cfg.Credentials}, "sasl-user", "SASL credential as user:password (repeatable)")
 	fs.StringVar(&cfg.TLSCertFile, "tls-cert", cfg.TLSCertFile, "PEM certificate file (enables TLS together with --tls-key)")
 	fs.StringVar(&cfg.TLSKeyFile, "tls-key", cfg.TLSKeyFile, "PEM private key file")
 }
 
 // stringSliceFlag collects a comma-separated (and/or repeated) flag into a slice.
-type stringSliceFlag struct{ vals *[]string }
+// The first use replaces whatever the slice held (a value from the config file),
+// as every other flag does; only repeats within the command line accumulate.
+// Appending to the file's value meant --sasl-mechanisms PLAIN could never turn
+// off a mechanism the file had enabled.
+type stringSliceFlag struct {
+	vals    *[]string
+	touched bool
+}
 
-func (f stringSliceFlag) String() string {
-	if f.vals == nil {
+func (f *stringSliceFlag) String() string {
+	if f == nil || f.vals == nil {
 		return ""
 	}
 	return strings.Join(*f.vals, ",")
 }
 
-func (f stringSliceFlag) Set(s string) error {
+func (f *stringSliceFlag) Set(s string) error {
+	if !f.touched {
+		*f.vals = nil
+		f.touched = true
+	}
 	for _, part := range strings.Split(s, ",") {
 		if part = strings.TrimSpace(part); part != "" {
 			*f.vals = append(*f.vals, part)

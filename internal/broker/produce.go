@@ -96,7 +96,7 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 func (b *Broker) appendRecords(topic string, part kmsg.ProduceRequestTopicPartition, rp *kmsg.ProduceResponseTopicPartition) bool {
 	plog, err := b.logs.Partition(topic, part.Partition)
 	if err != nil {
-		rp.ErrorCode = int16(protocol.ErrUnknownServer)
+		rp.ErrorCode = b.storageFault("produce: open partition", err, "topic", topic, "partition", part.Partition)
 		return false
 	}
 
@@ -123,7 +123,7 @@ func (b *Broker) appendRecords(topic string, part kmsg.ProduceRequestTopicPartit
 func (b *Broker) appendPlain(plog *log.Partition, records []byte, rp *kmsg.ProduceResponseTopicPartition) bool {
 	baseOffset, err := plog.Append(records)
 	if err != nil {
-		rp.ErrorCode = int16(protocol.ErrUnknownServer)
+		rp.ErrorCode = b.storageFault("produce: append", err)
 		msg := err.Error()
 		rp.ErrorMessage = &msg
 		return false
@@ -162,7 +162,7 @@ func (b *Broker) appendIdempotent(topic string, partition int32, plog *log.Parti
 		case seqAccept:
 			off, err := plog.Append(batch)
 			if err != nil {
-				rp.ErrorCode = int16(protocol.ErrUnknownServer)
+				rp.ErrorCode = b.storageFault("produce: append (idempotent)", err, "topic", topic, "partition", partition)
 				msg := err.Error()
 				rp.ErrorMessage = &msg
 				return wrote

@@ -45,7 +45,7 @@ func (b *Broker) handleListOffsets(ctx context.Context, req *protocol.Request) (
 			}
 			plog, err := b.logs.Partition(name, part.Partition)
 			if err != nil {
-				rp.ErrorCode = int16(protocol.ErrUnknownServer)
+				rp.ErrorCode = b.storageFault("list offsets: open partition", err, "topic", name, "partition", part.Partition)
 				rt.Partitions = append(rt.Partitions, rp)
 				continue
 			}
