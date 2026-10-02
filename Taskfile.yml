@@ -54,6 +54,23 @@ tasks:
     cmds:
       - go vet ./...
 
+  check:
+    desc: 'Pre-push gate: gofmt check, go vet, Windows cross-vet, and the full race suite. Wire it as a git pre-push hook (task hooks:install).'
+    cmds:
+      - test -z "$(gofmt -l .)" || { echo 'gofmt needed:'; gofmt -l .; exit 1; }
+      - go vet ./...
+      # Windows ships in the release and nobody here runs it; this at least proves it compiles.
+      - GOOS=windows GOARCH=amd64 go vet ./...
+      - go test -race ./...
+
+  hooks:install:
+    desc: Install a git pre-push hook that runs `task check`.
+    cmds:
+      - mkdir -p .git/hooks
+      - printf '#!/bin/sh\nexec go tool task check\n' > .git/hooks/pre-push
+      - chmod +x .git/hooks/pre-push
+      - echo 'installed .git/hooks/pre-push -> task check'
+
   fmt:
     desc: Format all Go files
     cmds:

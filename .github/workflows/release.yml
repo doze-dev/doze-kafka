@@ -12,7 +12,23 @@ permissions:
   contents: write # needed to create the release and upload assets.
 
 jobs:
+  # A tag must not publish what the suite has not passed. goreleaser needs this.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Vet (all release targets)
+        run: |
+          go vet ./...
+          GOOS=windows GOARCH=amd64 go vet ./...
+      - name: Tests
+        run: go test -race ./...
+
   goreleaser:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

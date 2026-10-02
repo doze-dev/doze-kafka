@@ -24,6 +24,13 @@ jobs:
           fi
       - name: go vet
         run: go vet ./...
+      # The release ships a Windows archive. Vet compiles the tests too, so this
+      # is the whole tree, and it is what catches a dependency that stopped
+      # building there (as doze-names did) before a tag does.
+      - name: go vet (windows, cross-compiled)
+        run: GOOS=windows GOARCH=amd64 go vet ./...
+      - name: build the binary
+        run: go build ./cmd/doze-kafka
 
   test:
     strategy:

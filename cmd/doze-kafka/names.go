@@ -1,3 +1,5 @@
+//go:build !windows
+
 package main
 
 // Adoption of the shared .doze zone.
