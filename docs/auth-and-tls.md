@@ -5,8 +5,8 @@ what you want on `localhost`. When you need to test an authenticated or encrypte
 setup, it supports SASL (PLAIN and SCRAM) and TLS. They're independent: use either,
 both, or neither.
 
-The credential store is your config — usernames and passwords you pass on the command
-line. There's no Kerberos, no KDC, no external identity provider. The point is to
+The credential store is your config — usernames and passwords you pass as flags or
+list in the config file (the file keeps them out of your shell history). There's no Kerberos, no KDC, no external identity provider. The point is to
 exercise the *handshake* your client and app do, not to be an auth server.
 
 ## SASL

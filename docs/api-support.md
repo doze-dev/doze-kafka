@@ -5,7 +5,7 @@ consume, use consumer groups, and do basic administration. It advertises them th
 `ApiVersions`, so clients negotiate versions automatically and only ever call what's
 supported.
 
-The `--version` flag (1–4, default 4) selects which Kafka major to emulate, which
+The `--kafka-version` flag (1–4, default 4) selects which Kafka major to emulate, which
 controls the version ranges advertised for each API and whether the KIP-848
 consumer-group protocol is offered. Higher versions advertise wider ranges; **version
 4 is the default and the most capable**, and is what you want unless you're
@@ -31,38 +31,46 @@ specifically testing an older client's paths.
 | ListGroups | 16 | List consumer groups. |
 | DescribeGroups | 15 | Describe classic consumer groups. |
 | DescribeConfigs | 32 | Read topic and broker configuration (read-only). |
+| DeleteGroups | 42 | Delete empty consumer groups and their committed offsets. |
+| OffsetDelete | 47 | Delete a group's committed offsets for a topic. |
 | DescribeCluster | 60 | Describe the cluster (this single node). |
-| SaslHandshake / SaslAuthenticate | 17 / 36 | SASL, advertised only when auth is enabled. |
+| SaslHandshake / SaslAuthenticate | 17 / 36 | SASL, advertised only when auth is enabled (handshake 0–1, authenticate 0–2, in every profile). |
 
 ## Advertised version ranges
 
-Each emulated major advertises the ranges below (min–max). A client uses the highest
-version you both support. This mirrors what a real broker of that major offers, so
-clients behave as they would against Apache Kafka.
+Each emulated major advertises the ranges below (min–max); a client uses the highest
+version you both support. This table is the broker's own, printed from the code.
+The maxima follow what a real broker of that major offers, so clients negotiate as
+they would against Apache Kafka. The minima are **ours**: Produce starts at v3 and
+Fetch at v4, the first versions that carry record batch format v2, the only format
+the log stores. A client that insists on older versions is told so by `ApiVersions`
+rather than being allowed to write data the broker would store as garbage.
 
-| API | v1 | v2 | v3 | v4 |
-|---|---|---|---|---|
-| ApiVersions | 0–1 | 0–2 | 0–3 | 0–3 |
-| Metadata | 0–6 | 0–8 | 0–12 | 0–12 |
-| Produce | 0–5 | 0–7 | 0–9 | 0–9 |
-| Fetch | 0–6 | 0–10 | 0–13 | 0–13 |
-| ListOffsets | 0–2 | 0–5 | 0–7 | 0–7 |
-| CreateTopics | 0–2 | 0–3 | 0–7 | 0–7 |
-| DeleteTopics | 0–1 | 0–3 | 0–5 | 0–6 |
-| InitProducerId | 0–1 | 0–1 | 0–4 | 0–4 |
-| FindCoordinator | 0–2 | 0–2 | 0–4 | 0–4 |
-| JoinGroup | 0–2 | 0–4 | 0–7 | 0–9 |
-| SyncGroup | 0–1 | 0–3 | 0–4 | 0–5 |
-| Heartbeat | 0–1 | 0–2 | 0–4 | 0–4 |
-| LeaveGroup | 0–1 | 0–2 | 0–4 | 0–5 |
-| OffsetCommit | 0–3 | 0–6 | 0–8 | 0–9 |
-| OffsetFetch | 0–3 | 0–5 | 0–8 | 0–9 |
-| ListGroups | 0–2 | 0–2 | 0–4 | 0–5 |
-| DescribeGroups | 0–1 | 0–3 | 0–5 | 0–5 |
-| DescribeConfigs | 0–1 | 0–2 | 0–4 | 0–4 |
-| DescribeCluster | — | — | 0–1 | 0–2 |
-| ConsumerGroupHeartbeat | — | — | — | 0–1 |
-| ConsumerGroupDescribe | — | — | — | 0–1 |
+| API | Key | v1 | v2 | v3 | v4 |
+|---|---|---|---|---|---|
+| Produce | 0 | 3–5 | 3–7 | 3–9 | 3–9 |
+| Fetch | 1 | 4–6 | 4–10 | 4–13 | 4–13 |
+| ListOffsets | 2 | 0–2 | 0–5 | 0–7 | 0–7 |
+| Metadata | 3 | 0–6 | 0–8 | 0–12 | 0–12 |
+| OffsetCommit | 8 | 0–3 | 0–6 | 0–8 | 0–9 |
+| OffsetFetch | 9 | 0–3 | 0–5 | 0–8 | 0–9 |
+| FindCoordinator | 10 | 0–2 | 0–2 | 0–4 | 0–4 |
+| JoinGroup | 11 | 0–2 | 0–4 | 0–7 | 0–9 |
+| Heartbeat | 12 | 0–1 | 0–2 | 0–4 | 0–4 |
+| LeaveGroup | 13 | 0–1 | 0–2 | 0–4 | 0–5 |
+| SyncGroup | 14 | 0–1 | 0–3 | 0–4 | 0–5 |
+| DescribeGroups | 15 | 0–1 | 0–3 | 0–5 | 0–5 |
+| ListGroups | 16 | 0–2 | 0–2 | 0–4 | 0–5 |
+| ApiVersions | 18 | 0–1 | 0–2 | 0–3 | 0–3 |
+| CreateTopics | 19 | 0–2 | 0–3 | 0–7 | 0–7 |
+| DeleteTopics | 20 | 0–1 | 0–3 | 0–5 | 0–6 |
+| InitProducerId | 22 | 0–1 | 0–1 | 0–4 | 0–4 |
+| DescribeConfigs | 32 | 0–1 | 0–2 | 0–4 | 0–4 |
+| DeleteGroups | 42 | 0–1 | 0–2 | 0–2 | 0–2 |
+| OffsetDelete | 47 | — | 0–0 | 0–0 | 0–0 |
+| DescribeCluster | 60 | — | — | 0–1 | 0–2 |
+| ConsumerGroupHeartbeat | 68 | — | — | — | 0–1 |
+| ConsumerGroupDescribe | 69 | — | — | — | 0–1 |
 
 The hard floor is Kafka's record-batch format v2 (Kafka 0.11), so the oldest
 emulated major is 1; the pre-0.11 message-set format is not supported.

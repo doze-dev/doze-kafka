@@ -31,7 +31,7 @@ two. Stop one and its partitions move to the survivor.
 ## Committing and resuming offsets
 
 Committed offsets are the one piece of group state that is **durable** — they're
-written to `--meta-db` and survive a broker restart. Membership and assignments are
+written to the metadata database (`<data-dir>/meta.db`) and survive a broker restart. Membership and assignments are
 in-memory and simply rebuilt when clients reconnect.
 
 Most clients auto-commit periodically; you can also commit manually. Either way, when
@@ -57,15 +57,16 @@ its own session timeout.
 
 The newer protocol (`ConsumerGroupHeartbeat`), where the **broker** computes the
 assignment and drives an incremental rebalance. doze-kafka advertises it only when
-emulating **Kafka 4** (`--version 4`, the default), so a modern client at its default
-`group.protocol=consumer` uses it with no override. The broker's `uniform` (round
+emulating **Kafka 4** (`--kafka-version 4`, the default). Clients choose it themselves:
+the Java client uses it when configured with `group.protocol=consumer` (its default is
+still `classic`, as of Kafka 4.1), and a client that has opted in needs no other change. The broker's `uniform` (round
 robin) and `range` assignors are both supported. The session timeout is the broker's,
 set with `--consumer-session-timeout` (default 45s).
 
 A practical note on franz-go: as of v1.21 it keeps its KIP-848 support behind a beta
 opt-in, so franz uses the classic protocol against doze-kafka unless you opt in. Most
-other clients (including the Kafka 4 Java client) use KIP-848 by default. Both paths
-are fully supported by the broker.
+clients default to the classic protocol and need an explicit opt-in. Both paths are
+supported by the broker.
 
 ## Rebalancing and member health
 

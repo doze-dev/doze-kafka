@@ -39,7 +39,7 @@ flexible/tagged-field encoding for free and only has to decide *what* to answer,
 *how* to frame it.
 
 `ApiVersions` is answered from a **version profile** (`internal/protocol/versions.go`)
-selected by `--version`. A profile is just the set of API version ranges to advertise
+selected by `--kafka-version`. A profile is just the set of API version ranges to advertise
 plus whether the KIP-848 group protocol is on. An API is only advertised once a
 handler actually serves it.
 
@@ -78,6 +78,24 @@ durable but aren't the message log: the topic registry (name ⇄ UUID, partition
 per-topic config), committed consumer-group offsets, and the monotonic producer-id
 counter.
 
+## The console — `console/`
+
+A server-rendered web UI (Go templates, htmx, Alpine) that is deliberately **a client
+of the broker**: it talks Kafka wire protocol through franz-go like any application,
+and imports nothing from `internal/`. That keeps it honest (it shows what clients
+see) and lets it run in the same process (the CLI) or against a unix socket (the doze
+module). Pages are plain HTML; live views poll a partial that answers `204` when
+nothing changed. See [Console](console.md).
+
+## Embedding and the CLI — `server/`, `cmd/doze-kafka`
+
+`server` is the public, embeddable seam: `server.New(Options)` wires storage, broker,
+router and listener exactly as the CLI does, so the two cannot drift
+([Embedding](embedding.md)). `cmd/doze-kafka` resolves configuration (defaults, then
+`doze-kafka.toml`, then flags — one `config.Config` for all of it), validates it, binds
+the broker and the console, joins the `.doze` zone ([Endpoints](endpoints.md)), and
+prints the start-up summary. `names.go` is the zone; on Windows a stub stands in.
+
 ## Why this stays small
 
 Most of Kafka's size is distributed-systems machinery — replication, the controller
@@ -88,4 +106,4 @@ encoding burden. The design goal throughout: **be indistinguishable from Kafka t
 client on the socket, and nothing more.**
 
 For the blow-by-blow of how each piece was built and verified, see
-[reports/](reports/).
+[reports/history/](reports/history/).

@@ -25,7 +25,7 @@ prints is what clients will reconnect to.
 ## "Broker is too old" / an API isn't supported
 
 The client wants a feature at a version doze-kafka doesn't advertise for the emulated
-Kafka major. Run with the default `--version 4` (the most capable) if you've lowered
+Kafka major. Run with the default `--kafka-version 4` (the most capable) if you've lowered
 it. If it still happens with a mainstream client doing an ordinary operation, that's
 worth reporting — see [API support](api-support.md) for what's advertised.
 
@@ -55,13 +55,14 @@ kafka-topics.sh --bootstrap-server localhost:9092 --create --topic demo --partit
 
 ## My data disappeared after a restart
 
-doze-kafka only persists what's under `--data-dir` and `--meta-db`. If you didn't set
-them, they default to `./data` and `./meta.db` **relative to the current working
+doze-kafka only persists what's under `--data-dir` (the logs, and `meta.db` inside
+it). If you didn't set it, it defaults to `./data` **relative to the current working
 directory** — start the broker from a different directory and it looks like a fresh
-broker. Pin absolute paths to avoid this:
+broker. The start-up summary prints the absolute `Data` path it is using. Pin an
+absolute path to avoid this:
 
 ```sh
-./doze-kafka --data-dir /var/tmp/kafka/data --meta-db /var/tmp/kafka/meta.db
+./doze-kafka --data-dir /var/tmp/kafka/data
 ```
 
 Also make sure you stopped it cleanly (Ctrl-C / `SIGTERM`); a hard `kill -9` can lose
@@ -84,6 +85,6 @@ its partitions stay assigned. This matches Kafka's behavior.
 
 ## Still stuck?
 
-Turn up the broker's logs — it logs every request at INFO, including the API, version,
-and client id, which usually makes it obvious what the client tried and where it
+Turn up the broker's logs — `--log-level debug` logs every request, including the API,
+version and client id, which usually makes it obvious what the client tried and where it
 stopped. If a mainstream client can't do an ordinary operation, please file an issue.

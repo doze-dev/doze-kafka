@@ -12,34 +12,39 @@ through it, and confirms your data survives a restart. It takes a couple of minu
 
 ## Build
 
-doze-kafka is a normal Go program with one wrinkle: the repository lives inside a Go
-workspace, so builds and tests need `GOWORK=off` to treat it as a standalone module.
+doze-kafka is a normal Go program:
 
 ```sh
 git clone https://github.com/doze-dev/doze-kafka
 cd doze-kafka
-GOWORK=off go build -o doze-kafka ./cmd/doze-kafka
+go build -o doze-kafka ./cmd/doze-kafka
 ```
 
 You now have a single self-contained binary named `doze-kafka`.
 
 ## Run
 
-With no flags at all, it listens on `:9092` and stores everything under the current
-directory (`./data` for the logs, `./meta.db` for the topic/offset registry):
+With no flags at all, it listens on `127.0.0.1:9092` (this machine only) and stores
+everything under the current directory in `./data`: the partition logs, and
+`meta.db`, the topic and offset registry:
 
 ```sh
 ./doze-kafka
 ```
 
-You'll see it come up:
+You'll see it come up, with everything you need to connect:
 
-```
-level=INFO msg=listening addr=[::]:9092
+```text
+doze-kafka dev ready — emulating Kafka 4
+  Kafka      127.0.0.1:9092
+  Console    http://127.0.0.1:9093
+  Data       /home/you/project/data
+  Security   no auth · plaintext
 ```
 
-That's it — there's a Kafka broker on `localhost:9092`. Leave it running in this
-terminal; open another for the client.
+That's it — there's a Kafka broker on `localhost:9092`, and a web console at the
+URL on the next line ([Console](console.md)). Leave it running in this terminal;
+open another for the client.
 
 ## Produce and consume
 
@@ -93,12 +98,16 @@ three
 ```
 
 Your messages — and any committed consumer-group offsets — are still there, because
-they were written to `./data` and `./meta.db`, not held in memory.
+they were written to `./data` (the logs and `meta.db`), not held in memory.
 
 ## Where to next
 
+- Look at your topics, messages and consumer groups in a browser →
+  [Console](console.md).
 - Change ports, storage location, retention, or the emulated Kafka version →
-  [Configuration](configuration.md).
+  [Configuration](configuration.md). Reach the broker from a container or another
+  machine → [Endpoints](endpoints.md).
+- Start a broker inside a Go test → [Embedding](embedding.md).
 - Wire it into your app's Kafka client → [Clients](clients.md).
 - Use consumer groups → [Consumer groups](consumer-groups.md).
 - Turn on authentication → [Auth & TLS](auth-and-tls.md).

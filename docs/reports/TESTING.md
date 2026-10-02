@@ -2,7 +2,9 @@
 
 The suite is integration-first: almost every test boots a broker on a real loopback
 socket and drives it with a real Kafka client, exercising the true
-`frame → codec → handler → storage` path. 61 tests; `go test -race` clean.
+`frame → codec → handler → storage` path. About 210 test functions across the
+packages; the gate (`go tool task check`) runs them all under `-race`, plus `gofmt`,
+`go vet`, and a Windows cross-vet.
 
 The highest-confidence test goes end-to-end against the **real compiled binary**
 out-of-process (`TestBinary_RealProcessDurabilityAndSignals`: build → produce →
@@ -22,15 +24,15 @@ handling), answering "does it work when someone actually runs it."
   test:unit` (~1.5s) runs exactly the unit tests — the storage engine, the wire codec,
   and the white-box handler tests — wherever they live, and `go tool task
   test:integration` runs the socket-level suite. `go tool task test` runs both.
-- Run with `GOWORK=off` (the module lives inside a workspace); the `go tool task`
-  targets set it automatically.
+- `go tool task check` is the one gate: format, vet (Linux and Windows), then the whole
+  suite with the race detector. `go tool task hooks:install` runs it before each commit.
 
 ## What's covered
 
-- **Every one of the 23 client APIs** is advertised and exercised; an ApiVersions
+- **Every client API the broker serves** is advertised and exercised; an ApiVersions
   surface-guard test fails if a served API isn't advertised.
 - **Both consumer-group protocols**: classic (franz + Sarama) and KIP-848 (franz,
-  behind its beta opt-in — see PHASE_6_REPORT.md), each consume→commit→resume across
+  behind its beta opt-in — see history/PHASE_6_REPORT.md), each consume→commit→resume across
   a restart and split partitions across two members.
 - **Durability**: five tests restart the broker over the same data dir; crash
   recovery (torn tail + synced-but-not-closed); retention under load; flat-memory
@@ -44,7 +46,9 @@ handling), answering "does it work when someone actually runs it."
   instead of hanging the client — `TestUnhandledAPI_ClosesConnectionNotHang`.
 - **Codec fuzzing**: `FuzzParseAndDecodeRequest`, `FuzzSkipTaggedFields`,
   `FuzzReadFrame` — arbitrary bytes through the request decoder must never panic;
-  ~350k execs/target found no crashes, and the seeds run in the normal suite.
+  the seeds (including a once-found crasher, a tagged-field loop in the upstream
+  `kmsg` decoder, now fixed in a vendored patch under `third_party/kmsg`) run in the
+  normal suite, and a scheduled job fuzzes for longer and opens an issue when it fails.
 - **Session-timeout eviction** (the ungraceful-death path every graceful-close group
   test skips): a member joins at the wire level and goes silent; the coordinator
   evicts it — covered for both classic and KIP-848 (the 848 session timeout is
@@ -80,12 +84,22 @@ Observed (run longer for more confidence — the harness scales via `SOAK_DURATI
 
 These are minutes, not multi-hour; a longer soak would raise the confidence further.
 
+## Console
+
+The web console is covered without a browser by guards that read the source: every
+template class is styled, every CSS variable is defined, the type scale is closed,
+inline styles are on a ratchet, every GET route renders (with data, with none, and
+with the broker down), and every POST is refused from a foreign origin and fails with
+a 4xx rather than a 5xx. Behaviour that needs a real browser (live tail, history,
+focus handling) has been checked by hand with Playwright; automated browser tests are
+not in the suite yet.
+
 ## Known gaps (honest)
 
-- **No Java / kcat client** in CI (need a JVM / native install); franz + Sarama are
-  the automated cross-check, the rest is manual smoke.
+- **No Java / kcat / kafkajs client** in CI (they need a JVM / native / Node install);
+  franz + Sarama are the automated cross-check, the rest is manual smoke.
 - The soak/chaos runs above are short (seconds/minutes), not multi-hour — the harness
   scales via `SOAK_DURATION`, but long-run results aren't recorded here yet.
 - Many-connection churn and network-partition faults aren't injected.
-- Idempotent-producer sequence dedup, static membership, and classic
-  leader-dies-mid-sync are not directly tested.
+- Static membership is not directly tested. Idempotent-producer dedup state is in
+  memory and starts empty after a restart.

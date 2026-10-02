@@ -11,7 +11,7 @@ knowing.
 
 Every client starts by asking the broker which API versions it supports (an
 `ApiVersions` request). doze-kafka answers with the set for the emulated Kafka major
-(`--version`, default 4 — see [API support](api-support.md)). The client then uses
+(`--kafka-version`, default 4 — see [API support](api-support.md)). The client then uses
 the highest version you both support for each request. You don't configure any of
 this; it's automatic. If a client needs an API the broker doesn't advertise, it
 simply won't use it.
@@ -97,9 +97,9 @@ kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic demo --from-
   disk before the ack** (see [storage & durability](storage-and-durability.md)). The
   one gap is transactions (exactly-once *processing*), which aren't implemented.
 - **Consumer group protocol** is negotiated for you. Older clients use the classic
-  protocol; a Kafka-4 client (e.g. the current Java client at its default
-  `group.protocol=consumer`) uses the new KIP-848 protocol, which doze-kafka also
-  serves. See [Consumer groups](consumer-groups.md).
+  protocol; a client that opts in to KIP-848 (the Java client with
+  `group.protocol=consumer`, which is **not** its default even in Kafka 4.x, where the
+  default is still `classic`) uses the new protocol, which doze-kafka also serves. See [Consumer groups](consumer-groups.md).
 - **Auth is off by default.** If you start the broker with SASL or TLS, every client
   must be configured to match, or it won't get past the handshake. See
   [Auth & TLS](auth-and-tls.md).

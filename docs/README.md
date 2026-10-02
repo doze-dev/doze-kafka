@@ -11,30 +11,35 @@ at a local broker. If you just want to get going, read
 
 1. **[Getting started](getting-started.md)** — build it, run it, produce and consume
    your first message, confirm it survives a restart.
-2. **[Configuration](configuration.md)** — every command-line flag, its default and
+2. **[Console](console.md)** — the web console: topics, messages, consumer groups,
+   cluster, and what each page shows.
+3. **[Configuration](configuration.md)** — every command-line flag, its default and
    meaning, and copy-paste examples (data location, retention, partitions, Kafka
    version to emulate).
-3. **[Clients](clients.md)** — how to connect from franz-go, Sarama, kafkajs,
+4. **[Endpoints](endpoints.md)** — every port and file it opens, the `.doze` names,
+   reaching it from a container.
+5. **[Clients](clients.md)** — how to connect from franz-go, Sarama, kafkajs,
    librdkafka (kcat, confluent-kafka-python, node-rdkafka), and the Java client;
    version negotiation and the common connection gotchas.
-4. **[Consumer groups](consumer-groups.md)** — using consumer groups, the classic
+6. **[Consumer groups](consumer-groups.md)** — using consumer groups, the classic
    and KIP-848 protocols, committing and resuming offsets, and rebalancing.
-5. **[Auth & TLS](auth-and-tls.md)** — enabling SASL/PLAIN, SASL/SCRAM, and TLS, with
+7. **[Auth & TLS](auth-and-tls.md)** — enabling SASL/PLAIN, SASL/SCRAM, and TLS, with
    matching client configuration.
-6. **[Storage & durability](storage-and-durability.md)** — how messages are stored,
+8. **[Storage & durability](storage-and-durability.md)** — how messages are stored,
    how retention works, what a restart or crash keeps, and the flat-memory property.
-7. **[API support](api-support.md)** — the exact set of Kafka APIs and versions the
+9. **[API support](api-support.md)** — the exact set of Kafka APIs and versions the
    broker advertises, per emulated Kafka major.
-8. **[Architecture](architecture.md)** — a tour of the internals for the curious and
+10. **[Architecture](architecture.md)** — a tour of the internals for the curious and
    for contributors.
-9. **[Limitations](limitations.md)** — the deliberate boundary: what doze-kafka does
+11. **[Limitations](limitations.md)** — the deliberate boundary: what doze-kafka does
    not do, and why.
-10. **[Troubleshooting](troubleshooting.md)** — fixes for the usual "my client won't
+12. **[Troubleshooting](troubleshooting.md)** — fixes for the usual "my client won't
     connect" situations.
+13. **[Embedding](embedding.md)** — start a broker from Go code, for tests.
 
 ## Development history
 
-The [reports/](reports/) folder holds the phase-by-phase build notes and acceptance
-evidence, plus the [testing strategy](reports/TESTING.md). They're a record of how
+The [testing strategy](reports/TESTING.md) is current. The phase-by-phase build notes
+and acceptance evidence are in [reports/history/](reports/history/), a record of how
 the broker was built and verified — useful if you're contributing, skippable if
 you're just using it.

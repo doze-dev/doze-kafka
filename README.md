@@ -12,9 +12,10 @@ data on disk, and shuts down cleanly. No JVM. No ZooKeeper. No KRaft quorum. No
 Docker.
 
 It is not a re-implementation of Apache Kafka's internals. It is a broker that
-**behaves like Kafka to any client on the socket** — franz-go, Sarama, kafkajs,
-librdkafka (kcat, confluent-kafka), the Java client. If your app can't tell the
-difference through `bootstrap.servers`, it has done its job.
+**is built to behave like Kafka to any client on the socket**: franz-go and Sarama
+are tested in CI, and kafkajs, librdkafka (kcat, confluent-kafka) and the Java client
+speak the same protocol. If your app can't tell the difference through
+`bootstrap.servers`, it has done its job.
 
 doze-kafka is part of the [doze](https://github.com/doze-dev) family, but it needs
 nothing else: **it's a single standalone binary you run.**
@@ -64,14 +65,14 @@ Prefer to build it yourself? See below.
 ## Quickstart
 
 ```sh
-# zero config: listens on :9092, stores logs in ./data and metadata in ./meta.db
+# zero config: listens on 127.0.0.1:9092, console on :9093, data (logs and metadata) in ./data
 doze-kafka
 ```
 
-Or build from source (the module lives inside a go workspace, hence `GOWORK=off`):
+Or build from source:
 
 ```sh
-GOWORK=off go build -o doze-kafka ./cmd/doze-kafka && ./doze-kafka
+go build -o doze-kafka ./cmd/doze-kafka && ./doze-kafka
 ```
 
 Point any Kafka client at `localhost:9092`:
@@ -82,9 +83,16 @@ echo "hello" | kcat -b localhost:9092 -t demo -P
 kcat -b localhost:9092 -t demo -C -o beginning -e
 ```
 
+Open **http://127.0.0.1:9093** for the web console: browse topics and messages,
+send a record, watch a consumer group's lag. ([Console](docs/console.md))
+
 Press Ctrl-C to stop — it flushes to disk and exits cleanly. Start it again over the
 same `--data-dir` and your topics, messages, and committed offsets are all still
 there.
+
+The broker listens on **loopback only** by default, so nothing on your network can
+reach it. To reach it from a container or another machine, see
+[Endpoints](docs/endpoints.md).
 
 Full walkthrough: **[docs/getting-started.md](docs/getting-started.md)**.
 
@@ -93,8 +101,12 @@ Full walkthrough: **[docs/getting-started.md](docs/getting-started.md)**.
 - **Produce & consume**, with correct per-partition ordering and monotonic offsets.
 - **Consumer groups** — both the classic protocol and the new KIP-848
   broker-driven protocol, chosen automatically by the client.
-- **Admin** — create/delete topics, list/describe groups, describe configs and
+- **Admin** — create/delete topics, list/describe/delete groups, describe configs and
   cluster. Enough for the CLI tools and most Kafka UIs.
+- **A web console** — topics, messages (binary-safe), consumer-group lag, a command
+  palette. On by default, off with `--console=false`.
+- **Embeddable** — `server.New(...)` starts a broker inside a Go test, on a free
+  port, with nothing to clean up. ([Embedding](docs/embedding.md))
 - **Durable** — messages and committed offsets survive a restart; with `acks=all` an
   acknowledged write is fsynced to disk before the ack (a full device flush on
   macOS), not merely held in memory — as durable as `fsync` gets on your hardware.
@@ -122,7 +134,10 @@ Start here → **[docs/](docs/README.md)**
 |---|---|
 | [Installer](install.sh) | Install/uninstall, version pinning, and options — its header, or `install.sh --help`. |
 | [Getting started](docs/getting-started.md) | Build, run, and round-trip your first message. |
+| [Console](docs/console.md) | The web console: what each page shows and does. |
 | [Configuration](docs/configuration.md) | Every flag and TOML config-file key, defaults, and worked examples. |
+| [Endpoints](docs/endpoints.md) | Every port and file it opens, the `.doze` names, containers. |
+| [Embedding](docs/embedding.md) | Starting a broker from Go code, for tests. |
 | [Clients](docs/clients.md) | Connecting franz-go, Sarama, kafkajs, librdkafka/kcat, Java. |
 | [Consumer groups](docs/consumer-groups.md) | Classic vs KIP-848, offsets, rebalancing. |
 | [Auth & TLS](docs/auth-and-tls.md) | Turning on SASL and TLS, with client snippets. |
@@ -136,18 +151,19 @@ Start here → **[docs/](docs/README.md)**
 
 doze-kafka has its **own** version (starting at **1.0.0**), separate from the Kafka
 protocol. **One binary speaks Kafka 1–4** — you pick which at runtime with
-`--version` (default 4). So `doze-kafka 1.0.0` is *this tool's* version, not a Kafka
-version; `doze-kafka version` prints it and spells out the range. Support for a future
+`--kafka-version` (default 4). So `doze-kafka 1.0.0` is *this tool's* version, not a
+Kafka version; `doze-kafka --version` prints it and spells out the range. Support for a future
 Kafka 5 would be a normal minor release of doze-kafka, not "doze-kafka 5".
 
 ## Status
 
-Feature-complete for local development. The automated suite verifies it end-to-end
-against **franz-go** and **Sarama** (two independent client implementations) plus the
-real compiled binary; kafkajs, librdkafka (kcat), and the Java client speak the same
-protocol and work, but aren't in CI. Not production software and not trying to be.
-Development history and acceptance notes
-live in [docs/reports/](docs/reports/).
+Built for local development. The automated suite verifies it end-to-end against
+**franz-go** and **Sarama** (two independent client implementations) plus the real
+compiled binary. kafkajs, librdkafka (kcat) and the Java client speak the same wire
+protocol and are expected to work, but are not yet exercised in CI; if one doesn't,
+that is a bug worth reporting. Not production software and not trying to be: see
+[Limitations](docs/limitations.md) for what is deliberately out of scope.
+Development history and acceptance notes live in [docs/reports/](docs/reports/history/).
 
 ## License
 

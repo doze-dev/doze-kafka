@@ -11,11 +11,13 @@ Two things:
 - **`--data-dir`** (default `./data`) — the message logs. One directory per
   partition, e.g. `data/demo-0/`, holding append-only segment files (`.log`) and
   their sparse indexes (`.index`).
-- **`--meta-db`** (default `./meta.db`) — a small embedded database (bbolt) holding
-  the topic registry, committed consumer-group offsets, and the producer-id counter.
+- **`meta.db`**, inside the data directory by default (`--meta-db` moves it) — a small
+  embedded database (bbolt) holding the topic registry, committed consumer-group
+  offsets, and the producer-id counter.
 
-Delete both and you have a fresh broker. Copy them elsewhere and you've moved your
-broker's state.
+Delete the data directory and you have a fresh broker. Copy it elsewhere and you've
+moved your broker's state. (Earlier versions kept `meta.db` beside `./data`; that
+file is still used, with a notice, until you move it in.)
 
 ## How messages are stored
 
@@ -95,7 +97,7 @@ or set it to `0` to rely purely on `acks=all` fsyncs plus the flush-on-shutdown.
 
 ## Committed offsets
 
-Consumer-group offsets are the other durable thing. They're written to `--meta-db`,
+Consumer-group offsets are the other durable thing. They're written to `meta.db`,
 not to a `__consumer_offsets` topic (doze-kafka doesn't emulate that topic). A
 consumer that restarts, or a broker that does, resumes each group from its last
 committed offset. See [Consumer groups](consumer-groups.md).

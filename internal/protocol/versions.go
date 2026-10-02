@@ -34,9 +34,9 @@ type AdvertisedAPI struct {
 // per-API version ranges advertised in ApiVersions, plus the feature toggles
 // that change observable behavior (currently the consumer-group protocol).
 //
-// Selecting a profile is how `version = N` in doze.hcl maps to what clients see.
-// Unlike other doze engines, the declared version does NOT fetch an upstream
-// binary — our own code is the engine, so the version is a profile we implement.
+// Selecting a profile is how `--kafka-version N` (or `kafka-version` in the config
+// file) maps to what clients see. The version does not fetch an upstream binary:
+// our own code is the engine, so the version is a profile we implement.
 // See docs/api-support.md.
 type Profile struct {
 	KafkaMajor    int                     // the Kafka major this profile emulates (1..4).

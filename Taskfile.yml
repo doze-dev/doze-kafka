@@ -1,8 +1,8 @@
 # Taskfile for doze-kafka. Run with `go tool task <name>` (task is a go tool
 # dependency, so no separate install is needed). `go tool task --list` shows all.
 #
-# doze-kafka is a standalone module inside a go workspace, so every go command runs
-# with GOWORK=off (set globally below).
+# Every go command runs with GOWORK=off (set globally below) so a go.work in some
+# parent directory can never change what is built or tested here.
 version: '3'
 
 env:

@@ -2,10 +2,6 @@ module github.com/doze-dev/doze-kafka
 
 go 1.26.0
 
-// Dependencies are introduced as the roadmap phases need them:
-//   github.com/twmb/franz-go/pkg/kmsg  — Kafka wire message types (phase 1+)
-//   go.etcd.io/bbolt                   — metadata store (phase 2+)
-
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/IBM/sarama v1.50.3
