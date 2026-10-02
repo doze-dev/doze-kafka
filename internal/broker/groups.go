@@ -61,7 +61,7 @@ func (b *Broker) handleJoinGroup(ctx context.Context, req *protocol.Request) ([]
 	// also be a classic group, or every partition would go to both.
 	res := joinResult{errorCode: int16(protocol.ErrInconsistentGroupProtocol), memberID: jr.MemberID}
 	if !b.cg848.hasMembers(jr.Group) {
-		res, err = b.groups.join(ctx, jr)
+		res, err = b.groups.join(ctx, jr, clientRef{req.Header.ClientID, req.Conn.RemoteHost()})
 		if err != nil {
 			return nil, err
 		}

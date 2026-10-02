@@ -78,7 +78,13 @@ type group struct {
 	joinGen     uint64 // bumped whenever the join timer is stopped or re-armed; see armJoinTimer.
 }
 
+// clientRef says who a member is: the client.id it connected with and the host it
+// connected from. A group's members are otherwise only opaque generated ids, which
+// tells nobody which of their applications is which.
+type clientRef struct{ clientID, host string }
+
 type groupMember struct {
+	client         clientRef
 	id             string
 	instanceID     *string
 	protocols      []groupProtocolEntry // ordered by client preference.
@@ -155,7 +161,7 @@ func (gm *groupManager) forget(group string) bool {
 // with a fresh id and must retry (KIP-394) — but only from JoinGroup v4, the
 // first version that knows the code. An older client would not know what to do
 // with it, so it is given an id and joined in one step, as Kafka does.
-func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest) (joinResult, error) {
+func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who clientRef) (joinResult, error) {
 	gm.mu.Lock()
 
 	if r.MemberID == "" {
@@ -177,6 +183,7 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest) (joi
 	// waiting on an answer that this one supersedes, so release it (Kafka answers
 	// it UNKNOWN_MEMBER_ID) instead of leaving its goroutine blocked.
 	m.failPendingJoin()
+	m.client = who
 	m.instanceID = r.InstanceID
 	m.protocols = protocolEntries(r.Protocols)
 	m.sessionTimeout = time.Duration(r.SessionTimeoutMillis) * time.Millisecond

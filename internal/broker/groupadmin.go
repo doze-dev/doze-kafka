@@ -96,6 +96,7 @@ type classicGroupDesc struct {
 }
 
 type classicMemberDesc struct {
+	client     clientRef
 	id         string
 	instanceID *string
 	metadata   []byte // subscription from JoinGroup, for the selected protocol.
@@ -113,6 +114,7 @@ func (gm *groupManager) describe(id string) (classicGroupDesc, bool) {
 	for _, mid := range sortedMemberIDs(g) {
 		m := g.members[mid]
 		d.members = append(d.members, classicMemberDesc{
+			client:     m.client,
 			id:         m.id,
 			instanceID: m.instanceID,
 			metadata:   m.metadataFor(g.protocol),
@@ -188,6 +190,8 @@ func (b *Broker) handleDescribeGroups(ctx context.Context, req *protocol.Request
 		for _, m := range d.members {
 			rm := kmsg.NewDescribeGroupsResponseGroupMember()
 			rm.MemberID = m.id
+			rm.ClientID = m.client.clientID
+			rm.ClientHost = m.client.host
 			rm.InstanceID = m.instanceID
 			rm.ProtocolMetadata = m.metadata
 			rm.MemberAssignment = m.assignment

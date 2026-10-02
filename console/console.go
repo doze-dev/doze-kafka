@@ -148,12 +148,16 @@ func (c *Console) routes() {
 	m.HandleFunc("POST "+p+"/topics/{name}/purge", c.topicPurge)
 	m.HandleFunc("GET "+p+"/topics/{name}/tape", c.topicTape) // HTMX partial (polled)
 	m.HandleFunc("POST "+p+"/topics/{name}/produce", c.topicProduce)
+	m.HandleFunc("GET "+p+"/topics/{name}/groups", c.topicGroups)   // "who consumes this" strip
 	m.HandleFunc("GET "+p+"/topics/{name}/message", c.topicMessage) // drawer partial
 	m.HandleFunc("GET "+p+"/topics/{name}/message/raw", c.topicMessageRaw)
 
 	// Consumer groups.
 	m.HandleFunc("GET "+p+"/groups", c.groups)
 	m.HandleFunc("GET "+p+"/groups/{id}", c.groupDetail)
+	m.HandleFunc("GET "+p+"/groups/{id}/live", c.groupLive) // HTMX partial (polled)
+	m.HandleFunc("POST "+p+"/groups/{id}/reset", c.groupReset)
+	m.HandleFunc("POST "+p+"/groups/{id}/delete", c.groupDelete)
 
 	// Cluster.
 	m.HandleFunc("GET "+p+"/cluster", c.cluster)

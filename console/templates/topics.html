@@ -63,6 +63,8 @@
       </div>
     </details>
 
+    <div class="topic-groups" id="topic-groups" hx-get="{{topicURL .Topic.Name}}/groups" hx-trigger="load" hx-target="this" hx-select="unset" hx-swap="innerHTML"></div>
+
     {{template "tape_and_table" .}}
 
     <div class="dock" id="compose-panel">

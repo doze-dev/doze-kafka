@@ -3,9 +3,11 @@ package broker_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
@@ -194,5 +196,55 @@ func TestGroupAdmin_OffsetDelete(t *testing.T) {
 	r = od("live", "t", 0)
 	if len(r.Topics) == 0 || r.Topics[0].Partitions[0].ErrorCode != int16(protocol.ErrGroupSubscribedToTopic) {
 		t.Errorf("OffsetDelete on a group with live members: %+v, want GROUP_SUBSCRIBED_TO_TOPIC", r)
+	}
+}
+
+// Opaque generated member ids tell nobody which of their applications is which.
+// Members must be reported with the client.id they connected with and where from,
+// under both coordinators.
+func TestGroupAdmin_MembersCarryClientIDAndHost(t *testing.T) {
+	addr := startBroker(t, 4)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	admin := newClient(t, addr)
+	defer admin.Close()
+	mustCreateTopic(t, ctx, admin, "t", 1)
+
+	named := func(id string) *kgo.Client {
+		cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.ClientID(id), kgo.DialTimeout(2*time.Second))
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(cl.Close)
+		return cl
+	}
+
+	// Classic.
+	billing := named("billing-service")
+	id := acquireID(t, ctx, billing, "classic-who")
+	mustJoin(t, await(t, joinAsync(ctx, billing, "classic-who", id, testSessionMs, testRebalanceMsDefault), 5*time.Second, "join"), "join")
+	dg := kmsg.NewPtrDescribeGroupsRequest()
+	dg.Groups = []string{"classic-who"}
+	resp, err := dg.RequestWith(ctx, admin)
+	if err != nil || len(resp.Groups) != 1 || len(resp.Groups[0].Members) != 1 {
+		t.Fatalf("DescribeGroups: %v %+v", err, resp)
+	}
+	m := resp.Groups[0].Members[0]
+	if m.ClientID != "billing-service" || !strings.HasPrefix(m.ClientHost, "/127.0.0.1") {
+		t.Errorf("classic member client = %q host = %q, want billing-service from /127.0.0.1", m.ClientID, m.ClientHost)
+	}
+
+	// KIP-848.
+	analytics := &cgMember{cl: named("analytics-7"), group: "new-who", id: "m-1", held: map[[16]byte][]int32{}}
+	analytics.heartbeat(t, ctx, []string{"t"}, false)
+	cd := kmsg.NewPtrConsumerGroupDescribeRequest()
+	cd.Groups = []string{"new-who"}
+	cresp, err := cd.RequestWith(ctx, admin)
+	if err != nil || len(cresp.Groups) != 1 || len(cresp.Groups[0].Members) != 1 {
+		t.Fatalf("ConsumerGroupDescribe: %v %+v", err, cresp)
+	}
+	cm := cresp.Groups[0].Members[0]
+	if cm.ClientID != "analytics-7" || !strings.HasPrefix(cm.ClientHost, "/127.0.0.1") {
+		t.Errorf("KIP-848 member client = %q host = %q, want analytics-7 from /127.0.0.1", cm.ClientID, cm.ClientHost)
 	}
 }

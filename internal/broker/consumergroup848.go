@@ -67,6 +67,7 @@ type cg848Group struct {
 }
 
 type cg848Member struct {
+	client       clientRef
 	id           string
 	epoch        int32
 	instanceID   *string
@@ -89,7 +90,7 @@ type cg848Result struct {
 
 // heartbeat processes one ConsumerGroupHeartbeat: join (epoch 0), poll (epoch > 0),
 // or leave (epoch < 0), returning this member's slice of the reconciliation.
-func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest) cg848Result {
+func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clientRef) cg848Result {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -126,12 +127,16 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest) cg848Res
 	}
 
 	mem := g.members[r.MemberID]
+	if mem != nil {
+		mem.client = who
+	}
 	if r.MemberEpoch == 0 {
 		// (Re)join fresh: reset owned state and rebalance.
 		if mem == nil {
 			mem = &cg848Member{id: r.MemberID}
 			g.members[r.MemberID] = mem
 		}
+		mem.client = who
 		mem.owned = map[string][]int32{}
 		mem.lastSent = nil
 		mem.subscribed = append([]string(nil), r.SubscribedTopicNames...)
@@ -471,7 +476,7 @@ func (b *Broker) handleConsumerGroupHeartbeat(ctx context.Context, req *protocol
 		resp.ErrorCode = int16(protocol.ErrGroupIDNotFound)
 		return protocol.EncodeResponse(req.Header, resp), nil
 	}
-	res := b.cg848.heartbeat(hr)
+	res := b.cg848.heartbeat(hr, clientRef{req.Header.ClientID, req.Conn.RemoteHost()})
 
 	resp := kmsg.NewPtrConsumerGroupHeartbeatResponse()
 	resp.SetVersion(req.Header.APIVersion)
@@ -516,6 +521,8 @@ func (b *Broker) handleConsumerGroupDescribe(ctx context.Context, req *protocol.
 			mem := &members[i]
 			rm := kmsg.NewConsumerGroupDescribeResponseGroupMember()
 			rm.MemberID = mem.id
+			rm.ClientID = mem.client.clientID
+			rm.ClientHost = mem.client.host
 			rm.InstanceID = mem.instanceID
 			rm.RackID = mem.rack
 			rm.MemberEpoch = mem.epoch

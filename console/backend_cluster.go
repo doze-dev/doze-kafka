@@ -2,11 +2,18 @@ package console
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
+
+// APIRange is one API the broker advertises and the versions it speaks.
+type APIRange struct {
+	Name     string
+	Min, Max int16
+}
 
 // ClusterInfo is a snapshot of the broker's own identity and capabilities —
 // deliberately modest. doze-kafka is single-node, so there's genuinely
@@ -16,26 +23,13 @@ type ClusterInfo struct {
 	ClusterID     string
 	Host          string
 	Port          int32
-	SupportedAPIs []string // human-readable names, sorted
+	SupportedAPIs []APIRange    // sorted by name
+	BrokerConfig  []ConfigEntry // the broker's effective, read-only configuration
 
 	// How this console's own connection is secured — facts the console knows
 	// first-hand from its dial options, not read off the wire.
 	AuthMech string // SASL mechanism in use, "" when the broker runs open
 	TLS      bool
-}
-
-// apiKeyNames is the small set of API keys doze-kafka implements — a public
-// Kafka-protocol fact (see docs/api-support.md), not something read from
-// doze-kafka's internal packages: the console is a pure external client and
-// deliberately never imports internal/protocol.
-var apiKeyNames = map[int16]string{
-	0: "Produce", 1: "Fetch", 2: "ListOffsets", 3: "Metadata",
-	8: "OffsetCommit", 9: "OffsetFetch", 10: "FindCoordinator",
-	11: "JoinGroup", 12: "Heartbeat", 13: "LeaveGroup", 14: "SyncGroup",
-	15: "DescribeGroups", 16: "ListGroups", 17: "SaslHandshake",
-	18: "ApiVersions", 19: "CreateTopics", 20: "DeleteTopics",
-	22: "InitProducerId", 32: "DescribeConfigs", 36: "SaslAuthenticate",
-	60: "DescribeCluster", 68: "ConsumerGroupHeartbeat", 69: "ConsumerGroupDescribe",
 }
 
 // ClusterInfo describes the broker itself, via DescribeCluster + ApiVersions
@@ -74,10 +68,27 @@ func (b *backend) ClusterInfo(ctx context.Context) (*ClusterInfo, error) {
 		return nil, err
 	}
 	for _, k := range vresp.ApiKeys {
-		if name, ok := apiKeyNames[k.ApiKey]; ok {
-			info.SupportedAPIs = append(info.SupportedAPIs, name)
+		// The name comes from the protocol library, not a table kept here: a
+		// hand-kept list silently omitted every API added after it was written.
+		info.SupportedAPIs = append(info.SupportedAPIs, APIRange{Name: kmsg.NameForKey(k.ApiKey), Min: k.MinVersion, Max: k.MaxVersion})
+	}
+	sort.Slice(info.SupportedAPIs, func(i, j int) bool { return info.SupportedAPIs[i].Name < info.SupportedAPIs[j].Name })
+
+	// The broker's effective configuration, as `kafka-configs --describe --entity-type
+	// brokers` shows it. Best effort: the page is still useful without it.
+	creq := kmsg.NewPtrDescribeConfigsRequest()
+	cr := kmsg.NewDescribeConfigsRequestResource()
+	cr.ResourceType = kmsg.ConfigResourceTypeBroker
+	cr.ResourceName = fmt.Sprint(info.NodeID)
+	creq.Resources = []kmsg.DescribeConfigsRequestResource{cr}
+	if cresp, err := creq.RequestWith(ctx, b.cl); err == nil && len(cresp.Resources) > 0 && cresp.Resources[0].ErrorCode == 0 {
+		for _, c := range cresp.Resources[0].Configs {
+			v := ""
+			if c.Value != nil {
+				v = *c.Value
+			}
+			info.BrokerConfig = append(info.BrokerConfig, ConfigEntry{Name: c.Name, Value: v})
 		}
 	}
-	sort.Strings(info.SupportedAPIs)
 	return info, nil
 }

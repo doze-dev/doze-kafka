@@ -52,6 +52,16 @@ func newConn(raw net.Conn, router *Router, logger *slog.Logger, authRequired boo
 	}
 }
 
+// RemoteHost is the peer's address without the port, in the form Kafka reports a
+// member's host: the IP preceded by a slash ("/127.0.0.1").
+func (c *Conn) RemoteHost() string {
+	host, _, err := net.SplitHostPort(c.raw.RemoteAddr().String())
+	if err != nil {
+		host = c.raw.RemoteAddr().String()
+	}
+	return "/" + host
+}
+
 // Authenticated reports whether this connection has completed SASL auth.
 func (c *Conn) Authenticated() bool { return c.authenticated }
 

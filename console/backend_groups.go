@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kmsg"
@@ -20,6 +21,8 @@ type GroupSummary struct {
 // GroupMember is one member of a group, with its assigned partitions.
 type GroupMember struct {
 	ID       string
+	ClientID string             // the client.id the member connected with.
+	Host     string             // where it connected from.
 	Assigned map[string][]int32 // topic -> partitions
 }
 
@@ -170,7 +173,7 @@ func (b *backend) describeGroupClassic(ctx context.Context, id string) (*GroupDe
 				assigned[t.Topic] = t.Partitions
 			}
 		}
-		members[i] = GroupMember{ID: m.MemberID, Assigned: assigned}
+		members[i] = GroupMember{ID: m.MemberID, ClientID: m.ClientID, Host: cleanHost(m.ClientHost), Assigned: assigned}
 	}
 	return &GroupDetail{ID: id, Protocol: "classic", State: g.State, Members: members}, nil
 }
@@ -195,7 +198,7 @@ func (b *backend) describeGroup848(ctx context.Context, id string) (*GroupDetail
 		for _, tp := range m.Assignment.TopicPartitions {
 			assigned[tp.Topic] = tp.Partitions
 		}
-		members[i] = GroupMember{ID: m.MemberID, Assigned: assigned}
+		members[i] = GroupMember{ID: m.MemberID, ClientID: m.ClientID, Host: cleanHost(m.ClientHost), Assigned: assigned}
 	}
 	return &GroupDetail{ID: id, Protocol: "848", State: g.State, Assignor: g.AssignorName, Members: members}, nil
 }
@@ -228,5 +231,161 @@ func (b *backend) GroupOffsets(ctx context.Context, id string) ([]GroupOffset, e
 		}
 		return out[i].Partition < out[j].Partition
 	})
+	return out, nil
+}
+
+// cleanHost drops the leading slash Kafka puts on a client host ("/127.0.0.1").
+func cleanHost(h string) string { return strings.TrimPrefix(h, "/") }
+
+// ResetGroupOffsets moves every committed offset of an inactive group to the
+// earliest or latest offset of its partition, the way `kafka-consumer-groups
+// --reset-offsets` does. A group with live members is refused: its consumers would
+// overwrite the change on their next commit, and moving a position under a running
+// consumer is exactly what the broker's fencing exists to prevent.
+func (b *backend) ResetGroupOffsets(ctx context.Context, id, to string) (int, error) {
+	if to != "earliest" && to != "latest" {
+		return 0, fmt.Errorf("%w: reset to earliest or latest, not %q", errBadInput, to)
+	}
+	d, err := b.DescribeGroup(ctx, id)
+	if err != nil {
+		return 0, err
+	}
+	if len(d.Members) > 0 {
+		return 0, badInput("the group has %d active member%s; stop its consumers before resetting offsets", len(d.Members), plural(len(d.Members)))
+	}
+	offsets, err := b.GroupOffsets(ctx, id)
+	if err != nil {
+		return 0, err
+	}
+	if len(offsets) == 0 {
+		return 0, badInput("the group has no committed offsets to reset")
+	}
+
+	bounds := map[string][]PartitionBound{}
+	targets := map[string][]kmsg.OffsetCommitRequestTopicPartition{}
+	for _, o := range offsets {
+		if _, ok := bounds[o.Topic]; !ok {
+			parts, err := b.PartitionCount(ctx, o.Topic)
+			if err != nil {
+				bounds[o.Topic] = nil
+				continue // a deleted topic's offset is left alone.
+			}
+			if bounds[o.Topic], err = b.PartitionBounds(ctx, o.Topic, parts); err != nil {
+				return 0, err
+			}
+		}
+		if o.Partition < 0 || int(o.Partition) >= len(bounds[o.Topic]) {
+			continue
+		}
+		target := bounds[o.Topic][o.Partition].Latest
+		if to == "earliest" {
+			target = bounds[o.Topic][o.Partition].Earliest
+		}
+		rp := kmsg.NewOffsetCommitRequestTopicPartition()
+		rp.Partition, rp.Offset = o.Partition, target
+		targets[o.Topic] = append(targets[o.Topic], rp)
+	}
+
+	req := kmsg.NewPtrOffsetCommitRequest()
+	req.Group, req.Generation = id, -1
+	n := 0
+	topics := make([]string, 0, len(targets))
+	for t := range targets {
+		topics = append(topics, t)
+	}
+	sort.Strings(topics)
+	for _, t := range topics {
+		rt := kmsg.NewOffsetCommitRequestTopic()
+		rt.Topic, rt.Partitions = t, targets[t]
+		req.Topics = append(req.Topics, rt)
+		n += len(rt.Partitions)
+	}
+	if n == 0 {
+		return 0, badInput("none of the group's offsets are on topics that still exist")
+	}
+	resp, err := req.RequestWith(ctx, b.cl)
+	if err != nil {
+		return 0, err
+	}
+	for _, t := range resp.Topics {
+		for _, p := range t.Partitions {
+			if p.ErrorCode != 0 {
+				return 0, kerr.ErrorForCode(p.ErrorCode)
+			}
+		}
+	}
+	return n, nil
+}
+
+// DeleteGroup removes an inactive group and its committed offsets.
+func (b *backend) DeleteGroup(ctx context.Context, id string) error {
+	req := kmsg.NewPtrDeleteGroupsRequest()
+	req.Groups = []string{id}
+	resp, err := req.RequestWith(ctx, b.cl)
+	if err != nil {
+		return err
+	}
+	for _, g := range resp.Groups {
+		if g.ErrorCode == 68 { // NON_EMPTY_GROUP
+			return badInput("the group still has active members; stop its consumers first")
+		}
+		if g.ErrorCode != 0 {
+			return kerr.ErrorForCode(g.ErrorCode)
+		}
+	}
+	return nil
+}
+
+func plural(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
+
+// TopicConsumer is a group that has committed offsets on a topic, with its lag there.
+type TopicConsumer struct {
+	Group    string
+	Protocol string
+	State    string
+	Members  int
+	Lag      int64
+}
+
+// TopicConsumers lists the groups consuming a topic (those with committed offsets
+// on it) and how far behind each is. It asks per group, so it is for a lazily
+// loaded panel, not something to run on every poll.
+func (b *backend) TopicConsumers(ctx context.Context, topic string) ([]TopicConsumer, error) {
+	groups, err := b.ListGroups(ctx)
+	if err != nil {
+		return nil, err
+	}
+	parts, err := b.PartitionCount(ctx, topic)
+	if err != nil {
+		return nil, err
+	}
+	bounds, err := b.PartitionBounds(ctx, topic, parts)
+	if err != nil {
+		return nil, err
+	}
+	var out []TopicConsumer
+	for _, g := range groups {
+		offs, err := b.GroupOffsets(ctx, g.ID)
+		if err != nil {
+			continue
+		}
+		var on bool
+		var lag int64
+		for _, o := range offs {
+			if o.Topic != topic || o.Partition < 0 || int(o.Partition) >= len(bounds) {
+				continue
+			}
+			on = true
+			lag += max(bounds[o.Partition].Latest-o.Committed, 0)
+		}
+		if on {
+			out = append(out, TopicConsumer{Group: g.ID, Protocol: g.Protocol, State: g.State, Members: g.Members, Lag: lag})
+		}
+	}
 	return out, nil
 }
