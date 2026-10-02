@@ -4,11 +4,19 @@
 // exactly the wiring cmd/doze-kafka does — so the CLI and embedders can't
 // drift — while keeping internal/ internal.
 //
-//	srv, err := server.New(server.Options{DataDir: "./data", Version: 4})
+// A broker for a test:
+//
+//	srv, err := server.New(server.Options{DataDir: t.TempDir()})
 //	if err != nil { ... }
-//	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-//	defer stop()
-//	srv.Serve(ctx) // flushes logs + closes storage on return
+//	ctx, stop := context.WithCancel(context.Background())
+//	done := make(chan error, 1)
+//	go func() { done <- srv.Serve(ctx) }()
+//	<-srv.Ready()                       // the listener is bound
+//	brokers := srv.Addr().String()      // 127.0.0.1:<free port>
+//	defer func() { stop(); <-done }()   // flushes logs and closes storage
+//
+// With no ListenAddr the broker binds loopback on a free port, so parallel tests
+// never collide; Addr reports where. See docs/embedding.md.
 package server
 
 import (
@@ -59,9 +67,22 @@ type Options struct {
 	RetentionBytes int64
 	RetentionMs    int64
 
-	// FsyncInterval is the coarse fsync cadence; 0 uses the default, a
-	// negative value disables periodic fsync.
+	// Storage tuning. Zero uses the default (128 MiB segments, a sparse index
+	// entry per 4 KiB). Tests that exercise segment rolling or retention set
+	// SegmentBytes small.
+	SegmentBytes       int64
+	IndexIntervalBytes int64
+
+	// FsyncInterval is the coarse fsync cadence for active segments. An options
+	// struct's zero value means "the default" (500ms), so — unlike the CLI's
+	// --fsync-interval 0 — zero does not disable it; a negative value does.
+	// acks=all always fsyncs before acknowledging, whatever this is.
 	FsyncInterval time.Duration
+
+	// ConsumerSessionTimeout is how long a consumer group member may go without a
+	// heartbeat before it is evicted; 0 uses the default (45s). Tests of failure
+	// handling set it low.
+	ConsumerSessionTimeout time.Duration
 
 	// Auth (all optional). SASL and TLS are independent and composable.
 	SASLMechanisms []string
@@ -87,6 +108,9 @@ type Server struct {
 
 	closeOnce sync.Once
 	closeErr  error
+
+	ready     chan struct{} // closed once the listener is bound, or Serve has returned.
+	readyOnce sync.Once
 }
 
 // New validates the options and opens storage + broker + router. It does not
@@ -120,6 +144,15 @@ func New(opts Options) (*Server, error) {
 	}
 	cfg.RetentionBytes = opts.RetentionBytes
 	cfg.RetentionMs = opts.RetentionMs
+	if opts.SegmentBytes != 0 {
+		cfg.SegmentBytes = opts.SegmentBytes
+	}
+	if opts.IndexIntervalBytes != 0 {
+		cfg.IndexIntervalBytes = opts.IndexIntervalBytes
+	}
+	if opts.ConsumerSessionTimeout != 0 {
+		cfg.ConsumerSessionTimeout = opts.ConsumerSessionTimeout
+	}
 	if opts.FsyncInterval != 0 {
 		cfg.FsyncInterval = opts.FsyncInterval
 		if opts.FsyncInterval < 0 {
@@ -203,7 +236,7 @@ func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	if cfg.AuthEnabled() {
 		srv.RequireAuth()
 	}
-	return &Server{cfg: cfg, log: logger, meta: metaStore, logs: logs, srv: srv, b: b}, nil
+	return &Server{cfg: cfg, log: logger, meta: metaStore, logs: logs, srv: srv, b: b, ready: make(chan struct{})}, nil
 }
 
 // Bind opens the TCP listener without accepting and returns the bound address
@@ -217,8 +250,17 @@ func (s *Server) Bind(ctx context.Context) (net.Addr, error) {
 	s.mu.Lock()
 	s.bound = addr
 	s.mu.Unlock()
+	s.markReady()
 	return addr, nil
 }
+
+func (s *Server) markReady() { s.readyOnce.Do(func() { close(s.ready) }) }
+
+// Ready is closed once the broker's listener is bound, so Addr is valid and
+// clients can connect: a goroutine running Serve can be waited on without a
+// sleep or a retry loop. It is also closed if Serve returns first (a failed bind,
+// an immediate cancel), so waiting on it never hangs; check Addr for nil.
+func (s *Server) Ready() <-chan struct{} { return s.ready }
 
 // AlsoListen opens another TCP listener, on addr, that serves this same broker —
 // for a second address the broker should answer on (the shared .doze zone's
@@ -241,6 +283,7 @@ func (s *Server) Addr() net.Addr {
 // connections, then flushes partition logs and closes the metadata store.
 func (s *Server) Serve(ctx context.Context) (err error) {
 	defer s.closeStorage(&err)
+	defer s.markReady()
 	if s.extLn != nil {
 		s.srv.UseListener(s.extLn)
 	} else if s.Addr() == nil {
@@ -258,6 +301,10 @@ func (s *Server) Serve(ctx context.Context) (err error) {
 // transport-agnostic, so this works unmodified.
 func (s *Server) ServeListener(ctx context.Context, ln net.Listener) (err error) {
 	s.srv.UseListener(ln)
+	s.mu.Lock()
+	s.bound = ln.Addr()
+	s.mu.Unlock()
+	s.markReady()
 	defer s.closeStorage(&err)
 	return s.srv.Serve(ctx)
 }
@@ -290,5 +337,25 @@ func (s *Server) Close() error {
 	return err
 }
 
-// Config returns the effective configuration (read-only view).
-func (s *Server) Config() config.Config { return s.cfg }
+// Config is the effective configuration of a Server, as far as an embedder needs
+// to know it.
+type Config struct {
+	KafkaVersion   int    // the Kafka major being emulated.
+	ListenAddr     string // the address asked for; Addr has the one actually bound.
+	AdvertisedHost string // what clients are told to dial.
+	AdvertisedPort int    // 0 means the bound port.
+	DataDir        string
+	MetaDB         string
+	SASL           bool // SASL authentication is required.
+	TLS            bool // the listener terminates TLS.
+}
+
+// Config returns the effective configuration.
+func (s *Server) Config() Config {
+	return Config{
+		KafkaVersion: s.cfg.Version, ListenAddr: s.cfg.ListenAddr,
+		AdvertisedHost: s.cfg.AdvertisedHost, AdvertisedPort: s.cfg.AdvertisedPort,
+		DataDir: s.cfg.DataDir, MetaDB: s.cfg.MetaDB,
+		SASL: s.cfg.AuthEnabled(), TLS: s.cfg.TLSEnabled(),
+	}
+}

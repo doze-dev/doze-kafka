@@ -348,3 +348,99 @@ func TestCloseWithoutServeIsSafeAndIdempotent(t *testing.T) {
 	}
 	again.Close()
 }
+
+// Ready is how an embedder waits for the listener without sleeping, and it never
+// hangs: it is also closed when Serve returns without ever binding.
+func TestReadyAndConfig(t *testing.T) {
+	dir := t.TempDir()
+	srv, err := server.New(server.Options{DataDir: dir, Version: 3, SegmentBytes: 1 << 20, IndexIntervalBytes: 1024,
+		ConsumerSessionTimeout: 7 * time.Second, FsyncInterval: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-srv.Ready():
+		t.Fatal("Ready is closed before anything is bound")
+	default:
+	}
+	if srv.Addr() != nil {
+		t.Fatal("Addr is set before Bind")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- srv.Serve(ctx) }()
+	select {
+	case <-srv.Ready():
+	case <-time.After(5 * time.Second):
+		t.Fatal("Ready never closed")
+	}
+	if srv.Addr() == nil {
+		t.Fatal("Ready is closed but Addr is nil")
+	}
+	cfg := srv.Config()
+	if cfg.KafkaVersion != 3 || cfg.DataDir != dir || cfg.MetaDB != filepath.Join(dir, "meta.db") || cfg.SASL || cfg.TLS ||
+		cfg.ListenAddr != "127.0.0.1:0" {
+		t.Errorf("Config() = %+v", cfg)
+	}
+	cancel()
+	<-done
+
+	// A server that fails to bind still closes Ready.
+	busy, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer busy.Close()
+	srv2, err := server.New(server.Options{DataDir: t.TempDir(), ListenAddr: busy.Addr().String()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := srv2.Serve(context.Background()); err == nil {
+		t.Fatal("Serve on a taken port should fail")
+	}
+	select {
+	case <-srv2.Ready():
+	default:
+		t.Error("Ready should be closed after a failed Serve, so waiters do not hang")
+	}
+	if srv2.Addr() != nil {
+		t.Error("Addr should stay nil when binding failed")
+	}
+}
+
+// The tuning options reach the broker: a tiny segment size rolls segments after a
+// few records, which is how an embedder tests retention.
+func TestSegmentOptionRolls(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping broker integration test in -short mode")
+	}
+	dir := t.TempDir()
+	srv, err := server.New(server.Options{DataDir: dir, SegmentBytes: 4096})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- srv.Serve(ctx) }()
+	<-srv.Ready()
+	cl, err := kgo.NewClient(kgo.SeedBrokers(srv.Addr().String()), kgo.AllowAutoTopicCreation(),
+		kgo.ProducerBatchCompression(kgo.NoCompression())) // a run of "x" would compress to nothing and never fill a segment.
+	if err != nil {
+		t.Fatal(err)
+	}
+	pctx, pcancel := context.WithTimeout(ctx, 20*time.Second)
+	payload := bytes.Repeat([]byte("x"), 1000)
+	for i := 0; i < 20; i++ {
+		if err := cl.ProduceSync(pctx, &kgo.Record{Topic: "roll", Value: payload}).FirstErr(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	pcancel()
+	cl.Close()
+	cancel()
+	<-done
+	logs, _ := filepath.Glob(filepath.Join(dir, "roll-0", "*.log"))
+	if len(logs) < 3 {
+		t.Errorf("20 x 1 KB records with SegmentBytes=4096 left %d segment file(s), want several", len(logs))
+	}
+}
