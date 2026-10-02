@@ -379,17 +379,17 @@ func (m *cg848Manager) encodeAssignment(deliver map[string][]int32) *kmsg.Consum
 
 // describe returns the KIP-848 view of a group for ConsumerGroupDescribe, or
 // ok=false if the group is unknown.
-func (m *cg848Manager) describe(group string) (epoch int32, assignor string, members []cg848Member, ok bool) {
+func (m *cg848Manager) describe(group string) (state string, epoch int32, assignor string, members []cg848Member, ok bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	g := m.groups[group]
 	if g == nil {
-		return 0, "", nil, false
+		return "", 0, "", nil, false
 	}
 	for _, mem := range g.members {
 		members = append(members, *mem)
 	}
-	return g.epoch, g.assignor, members, true
+	return g.stateName(), g.epoch, g.assignor, members, true
 }
 
 // --- small helpers ---
@@ -502,13 +502,13 @@ func (b *Broker) handleConsumerGroupDescribe(ctx context.Context, req *protocol.
 	for _, group := range dr.Groups {
 		rg := kmsg.NewConsumerGroupDescribeResponseGroup()
 		rg.Group = group
-		epoch, assignor, members, ok := b.cg848.describe(group)
+		state, epoch, assignor, members, ok := b.cg848.describe(group)
 		if !ok {
 			rg.ErrorCode = int16(protocol.ErrGroupIDNotFound)
 			resp.Groups = append(resp.Groups, rg)
 			continue
 		}
-		rg.State = "Stable"
+		rg.State = state
 		rg.Epoch = epoch
 		rg.AssignmentEpoch = epoch
 		rg.AssignorName = assignor

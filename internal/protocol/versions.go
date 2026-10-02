@@ -79,6 +79,7 @@ var profiles = map[int]Profile{
 		APIListGroups:      {Min: 0, Max: 2},
 		APIDescribeGroups:  {Min: 0, Max: 1},
 		APIDescribeConfigs: {Min: 0, Max: 1},
+		APIDeleteGroups:    {Min: 0, Max: 1},
 	}},
 	2: {KafkaMajor: 2, GroupProtocol: GroupClassic, APIRanges: map[APIKey]VersionRange{
 		APIApiVersions:     {Min: 0, Max: 2},
@@ -99,6 +100,8 @@ var profiles = map[int]Profile{
 		APIListGroups:      {Min: 0, Max: 2},
 		APIDescribeGroups:  {Min: 0, Max: 3},
 		APIDescribeConfigs: {Min: 0, Max: 2},
+		APIDeleteGroups:    {Min: 0, Max: 2},
+		APIOffsetDelete:    {Min: 0, Max: 0},
 	}},
 	3: {KafkaMajor: 3, GroupProtocol: GroupClassic, APIRanges: map[APIKey]VersionRange{
 		APIApiVersions:     {Min: 0, Max: 3},
@@ -120,6 +123,8 @@ var profiles = map[int]Profile{
 		APIDescribeGroups:  {Min: 0, Max: 5},
 		APIDescribeConfigs: {Min: 0, Max: 4},
 		APIDescribeCluster: {Min: 0, Max: 1},
+		APIDeleteGroups:    {Min: 0, Max: 2},
+		APIOffsetDelete:    {Min: 0, Max: 0},
 	}},
 	4: {KafkaMajor: 4, GroupProtocol: GroupClassicAndConsumer, APIRanges: map[APIKey]VersionRange{
 		APIApiVersions:     {Min: 0, Max: 3},
@@ -141,6 +146,8 @@ var profiles = map[int]Profile{
 		APIDescribeGroups:  {Min: 0, Max: 5},
 		APIDescribeConfigs: {Min: 0, Max: 4},
 		APIDescribeCluster: {Min: 0, Max: 2},
+		APIDeleteGroups:    {Min: 0, Max: 2},
+		APIOffsetDelete:    {Min: 0, Max: 0},
 		// KIP-848 broker-driven protocol — advertised only on the Kafka-4 profile,
 		// so a client at default group.protocol=consumer negotiates the new path.
 		APIConsumerGroupHeartbeat: {Min: 0, Max: 1},

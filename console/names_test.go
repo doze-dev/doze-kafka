@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
 func TestResourcePathsEscapeNames(t *testing.T) {
@@ -172,5 +173,46 @@ func TestCreateTopicWithInvalidNameShowsTheReason(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "INVALID_TOPIC_EXCEPTION") {
 		t.Fatalf("the error should name the Kafka error, got %q", rec.Body.String())
+	}
+}
+
+// A group known only by its committed offsets (every consumer gone, or the broker
+// restarted) must still be listed and openable, with its lag — the offsets are
+// what it is.
+func TestGroupKnownOnlyByOffsetsIsShown(t *testing.T) {
+	c, addr := newTestConsoleAddr(t)
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"orders"}, "partitions": {"1"}})
+	if rec := req(t, c, "POST", "/_console/topics/orders/produce", url.Values{"partition": {"0"}, "value": {"x"}, "acks": {"1"}}); rec.Code != 200 {
+		t.Fatalf("produce: %d", rec.Code)
+	}
+
+	cl, err := kgo.NewClient(kgo.SeedBrokers(addr))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cl.Close()
+	oc := kmsg.NewPtrOffsetCommitRequest()
+	oc.Group, oc.Generation = "retired", -1
+	rt := kmsg.NewOffsetCommitRequestTopic()
+	rt.Topic = "orders"
+	rp := kmsg.NewOffsetCommitRequestTopicPartition()
+	rp.Offset = 0
+	rt.Partitions = append(rt.Partitions, rp)
+	oc.Topics = append(oc.Topics, rt)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := oc.RequestWith(ctx, cl); err != nil {
+		t.Fatal(err)
+	}
+
+	if list := req(t, c, "GET", "/_console/groups", nil); !strings.Contains(list.Body.String(), "retired") {
+		t.Fatal("a group with only committed offsets is missing from the list")
+	}
+	page := req(t, c, "GET", "/_console/groups/retired", nil)
+	if page.Code != http.StatusOK {
+		t.Fatalf("GET /groups/retired = %d: %s", page.Code, page.Body.String())
+	}
+	if body := page.Body.String(); !strings.Contains(body, "lag 1") || !strings.Contains(body, "Empty") {
+		t.Errorf("the group page should show it Empty with lag 1:\n%s", body)
 	}
 }

@@ -37,10 +37,54 @@ func (m *cg848Manager) list() []adminGroupListing {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	out := make([]adminGroupListing, 0, len(m.groups))
-	for id := range m.groups {
-		out = append(out, adminGroupListing{id: id, state: "Stable", groupType: "consumer"})
+	for id, g := range m.groups {
+		out = append(out, adminGroupListing{id: id, state: g.stateName(), groupType: "consumer"})
 	}
 	return out
+}
+
+// stateName is the group's state as ConsumerGroupDescribe / ListGroups report it.
+// A group is Stable once every member has been told, and reports it holds, exactly
+// its target assignment; until then partitions are still moving between members
+// and the honest state is Reconciling. (Empty groups are removed, so none is Empty.)
+func (g *cg848Group) stateName() string {
+	for _, mem := range g.members {
+		if mem.lastSent == nil || !assignmentsEqual(mem.lastSent, mem.target) || !assignmentsEqual(mem.owned, mem.target) {
+			return "Reconciling"
+		}
+	}
+	return "Stable"
+}
+
+// listAllGroups is every group a client could ask about: the live ones from both
+// coordinators, plus any group that exists only as committed offsets. Offsets
+// outlive the members (they are the durable state), and the in-memory group
+// objects do not survive a restart — so without this a group with 40 committed
+// offsets vanishes from every listing the moment the broker restarts, even
+// though its consumers will resume from them.
+func (b *Broker) listAllGroups() []adminGroupListing {
+	groups := append(b.groups.list(), b.cg848.list()...)
+	known := make(map[string]bool, len(groups))
+	for _, g := range groups {
+		known[g.id] = true
+	}
+	ids, err := b.meta.OffsetGroups()
+	if err != nil {
+		b.log.Warn("list groups: could not read committed offsets", "err", err)
+		return groups
+	}
+	for _, id := range ids {
+		if !known[id] {
+			groups = append(groups, adminGroupListing{id: id, state: "Empty", groupType: "classic"})
+		}
+	}
+	return groups
+}
+
+// groupHasOffsets reports whether a group id holds committed offsets.
+func (b *Broker) groupHasOffsets(id string) bool {
+	entries, err := b.meta.ListOffsets(id)
+	return err == nil && len(entries) > 0
 }
 
 // classicGroupDesc is a classic group's DescribeGroups view: its state, selected
@@ -93,8 +137,7 @@ func (b *Broker) handleListGroups(ctx context.Context, req *protocol.Request) ([
 	resp := kmsg.NewPtrListGroupsResponse()
 	resp.SetVersion(req.Header.APIVersion)
 
-	groups := append(b.groups.list(), b.cg848.list()...)
-	for _, g := range groups {
+	for _, g := range b.listAllGroups() {
 		if len(stateFilter) > 0 && !stateFilter[g.state] {
 			continue
 		}
@@ -131,7 +174,12 @@ func (b *Broker) handleDescribeGroups(ctx context.Context, req *protocol.Request
 
 		d, ok := b.groups.describe(id)
 		if !ok {
+			// Known only by its committed offsets: Empty, not Dead. Dead is a
+			// group Kafka has never heard of.
 			rg.State = "Dead"
+			if b.groupHasOffsets(id) {
+				rg.State = "Empty"
+			}
 			resp.Groups = append(resp.Groups, rg)
 			continue
 		}

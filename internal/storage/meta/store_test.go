@@ -65,3 +65,36 @@ func TestDeleteTopicRemovesItsOffsetsOnly(t *testing.T) {
 		t.Error("a recreated topic inherited the old topic's offsets")
 	}
 }
+
+func TestGroupOffsetHelpers(t *testing.T) {
+	s := openStore(t)
+	for _, c := range []struct {
+		g, topic string
+		p        int32
+	}{{"g1", "a", 0}, {"g1", "a", 1}, {"g1", "b", 0}, {"g2", "a", 0}, {"g10", "a", 0}} {
+		if err := s.CommitOffset(c.g, c.topic, c.p, 7, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	groups, err := s.OffsetGroups()
+	if err != nil || len(groups) != 3 || groups[0] != "g1" || groups[1] != "g10" || groups[2] != "g2" {
+		t.Fatalf("OffsetGroups = %v, %v; want [g1 g10 g2] each once", groups, err)
+	}
+	// "g1" must not match "g10": the group id is delimited, not a prefix.
+	n, err := s.DeleteGroupOffsets("g1")
+	if err != nil || n != 3 {
+		t.Fatalf("DeleteGroupOffsets(g1) = %d, %v; want 3", n, err)
+	}
+	if es, _ := s.ListOffsets("g10"); len(es) != 1 {
+		t.Errorf("deleting g1 disturbed g10: %v", es)
+	}
+	if err := s.DeleteOffset("g2", "a", 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeleteOffset("g2", "a", 0); err != nil { // already gone: a no-op.
+		t.Fatalf("deleting a missing offset should be a no-op: %v", err)
+	}
+	if groups, _ := s.OffsetGroups(); len(groups) != 1 || groups[0] != "g10" {
+		t.Errorf("OffsetGroups after deletes = %v, want [g10]", groups)
+	}
+}

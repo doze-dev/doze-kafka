@@ -12,6 +12,8 @@ const (
 	ErrRebalanceInProgress       ErrorCode = 27
 	ErrUnsupportedVersion        ErrorCode = 35
 	ErrInconsistentGroupProtocol ErrorCode = 23 // the group already runs under another protocol.
+	ErrNonEmptyGroup             ErrorCode = 68 // the group has live members.
+	ErrGroupSubscribedToTopic    ErrorCode = 86 // a live member of the group reads this topic.
 	ErrUnknownMemberID           ErrorCode = 25
 	ErrIllegalGeneration         ErrorCode = 22
 	ErrMemberIDRequired          ErrorCode = 79

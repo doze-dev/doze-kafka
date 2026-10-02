@@ -135,6 +135,20 @@ func (gm *groupManager) hasMembers(group string) bool {
 	return g != nil && len(g.members) > 0
 }
 
+// forget drops an empty group object, reporting whether there was one. A group
+// with live members is left alone (callers check first).
+func (gm *groupManager) forget(group string) bool {
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
+	g := gm.groups[group]
+	if g == nil || len(g.members) > 0 {
+		return false
+	}
+	g.stopJoinTimer()
+	delete(gm.groups, group)
+	return true
+}
+
 // join runs the classic JoinGroup relay. It blocks until the rebalance completes
 // (all known members rejoined, or the collect timeout), returning this member's
 // slice of the result. A first-contact member (empty id) gets MEMBER_ID_REQUIRED

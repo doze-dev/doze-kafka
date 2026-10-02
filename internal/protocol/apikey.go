@@ -27,6 +27,8 @@ const (
 	APIDeleteTopics     APIKey = 20
 	APIInitProducerID   APIKey = 22
 	APIDescribeConfigs  APIKey = 32
+	APIDeleteGroups     APIKey = 42
+	APIOffsetDelete     APIKey = 47
 	APISASLAuthenticate APIKey = 36
 	APIDescribeCluster  APIKey = 60
 
@@ -55,6 +57,8 @@ var apiKeyNames = map[APIKey]string{
 	APIDeleteTopics:     "DeleteTopics",
 	APIInitProducerID:   "InitProducerId",
 	APIDescribeConfigs:  "DescribeConfigs",
+	APIDeleteGroups:     "DeleteGroups",
+	APIOffsetDelete:     "OffsetDelete",
 	APISASLAuthenticate: "SaslAuthenticate",
 	APIDescribeCluster:  "DescribeCluster",
 

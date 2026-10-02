@@ -50,6 +50,12 @@ type Store interface {
 	CommitOffset(group, topic string, partition int32, offset int64, metadata string) error
 	FetchOffset(group, topic string, partition int32) (offset int64, ok bool, err error)
 	ListOffsets(group string) ([]OffsetEntry, error)
+	// OffsetGroups lists every group id that has at least one committed offset.
+	OffsetGroups() ([]string, error)
+	// DeleteGroupOffsets removes every committed offset of a group and reports how many.
+	DeleteGroupOffsets(group string) (int, error)
+	// DeleteOffset removes one committed offset (a no-op if there is none).
+	DeleteOffset(group, topic string, partition int32) error
 
 	NextProducerID() (int64, error)
 
@@ -266,6 +272,54 @@ func (s *boltStore) FetchOffset(group, topic string, partition int32) (int64, bo
 // group\0topic\0partition(4B); we scan the group\0 prefix and split each key back
 // into (topic, partition). The trailing \0 in the prefix keeps group "foo" from
 // matching group "foobar".
+// OffsetGroups lists the distinct group ids that hold committed offsets, sorted.
+func (s *boltStore) OffsetGroups() ([]string, error) {
+	var out []string
+	err := s.db.View(func(tx *bbolt.Tx) error {
+		c := tx.Bucket(bucketOffsets).Cursor()
+		var last string
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			i := bytes.IndexByte(k, 0)
+			if i < 0 {
+				continue
+			}
+			if g := string(k[:i]); g != last || len(out) == 0 {
+				out = append(out, g)
+				last = g
+			}
+		}
+		return nil
+	})
+	return out, err
+}
+
+func (s *boltStore) DeleteGroupOffsets(group string) (int, error) {
+	prefix := append([]byte(group), 0)
+	var n int
+	err := s.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(bucketOffsets)
+		var keys [][]byte
+		c := b.Cursor()
+		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
+			keys = append(keys, append([]byte(nil), k...))
+		}
+		for _, k := range keys {
+			if err := b.Delete(k); err != nil {
+				return err
+			}
+		}
+		n = len(keys)
+		return nil
+	})
+	return n, err
+}
+
+func (s *boltStore) DeleteOffset(group, topic string, partition int32) error {
+	return s.db.Update(func(tx *bbolt.Tx) error {
+		return tx.Bucket(bucketOffsets).Delete(offsetKey(group, topic, partition))
+	})
+}
+
 func (s *boltStore) ListOffsets(group string) ([]OffsetEntry, error) {
 	prefix := append([]byte(group), 0)
 	var out []OffsetEntry

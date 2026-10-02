@@ -90,6 +90,8 @@ func (b *Broker) Register(r *protocol.Router) {
 	r.Register(protocol.APIOffsetCommit, b.handleOffsetCommit)
 	r.Register(protocol.APIOffsetFetch, b.handleOffsetFetch)
 	r.Register(protocol.APIListGroups, b.handleListGroups)
+	r.Register(protocol.APIDeleteGroups, b.handleDeleteGroups)
+	r.Register(protocol.APIOffsetDelete, b.handleOffsetDelete)
 	r.Register(protocol.APIDescribeGroups, b.handleDescribeGroups)
 	r.Register(protocol.APIDescribeConfigs, b.handleDescribeConfigs)
 	r.Register(protocol.APIDescribeCluster, b.handleDescribeCluster)
