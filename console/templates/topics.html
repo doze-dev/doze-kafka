@@ -74,7 +74,7 @@
         <span class="twist">{{icon "chevron"}}</span>
       </div>
       <div class="dock-form">
-        <form hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML" x-data="{hdrs:[], acks:'1'}" @htmx:after-request="if($event.detail.successful){window.dozeEditor?dozeEditor.set($refs.value,''):$refs.value.value='';$refs.key.value='';hdrs=[]}">
+        <form hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML" x-data="{hdrs:[], acks:'1', keyB64:false, valB64:false, tomb:false}" x-effect="window.dozeEditor && dozeEditor.setValidate($refs.value, !(valB64 || tomb), tomb ? 'null value — nothing is sent' : (valB64 ? 'base64 — sent as raw bytes' : ''))" @htmx:after-request="if($event.detail.successful){window.dozeEditor?dozeEditor.set($refs.value,''):$refs.value.value='';$refs.key.value='';hdrs=[];keyB64=false;valB64=false;tomb=false}">
           <input type="hidden" name="partition_ctx" value="{{.Partition}}">
           <div class="crow">
             <div class="field" style="flex:0 0 140px">
@@ -85,8 +85,10 @@
               </select>
             </div>
             <div class="field">
-              <label>Key <span class="hint">optional</span></label>
-              <input class="input mono" name="key" x-ref="key" placeholder="e.g. ord_8901" autocomplete="off">
+              <label for="f-key">Key <span class="hint">optional</span>
+                <button type="button" class="b64tog" :class="keyB64&&'on'" :aria-pressed="keyB64" @click="keyB64=!keyB64" title="The key is base64 for binary bytes">b64</button></label>
+              <input class="input mono" id="f-key" name="key" x-ref="key" placeholder="e.g. ord_8901" autocomplete="off">
+              <input type="hidden" name="key_enc" :value="keyB64 ? 'base64' : 'text'">
             </div>
             <div class="field" style="flex:0 0 210px">
               <label>Acknowledgment</label>
@@ -106,18 +108,22 @@
                   <div class="hdr-row">
                     <input class="input mono" placeholder="key" x-model="h.k" style="flex:0 0 40%">
                     <input class="input mono" placeholder="value" x-model="h.v">
-                    <button type="button" class="icon-btn" title="Remove" @click="hdrs.splice(i,1)">{{icon "x"}}</button>
+                    <button type="button" class="b64tog" :class="h.b64&&'on'" :aria-pressed="!!h.b64" @click="h.b64=!h.b64" title="The value is base64 for binary bytes">b64</button>
+                    <button type="button" class="icon-btn" title="Remove" aria-label="Remove header" @click="hdrs.splice(i,1)">{{icon "x"}}</button>
                   </div>
                 </template>
               </div>
-              <button type="button" class="btn" style="align-self:flex-start;margin-top:6px;padding:5px 10px;font-size:11px" @click="hdrs.push({k:'',v:''})">+ Add header</button>
+              <button type="button" class="btn" style="align-self:flex-start;margin-top:6px;padding:5px 10px;font-size:11px" @click="hdrs.push({k:'',v:'',b64:false})">+ Add header</button>
               <input type="hidden" name="headers" :value="JSON.stringify(hdrs)">
             </div>
           </div>
           <div class="crow">
-            <div class="field">
-              <label>Value</label>
-              <textarea class="input mono" name="value" x-ref="value" data-editor="json" rows="4" placeholder='{"orderId": "ord_8901"}'></textarea>
+            <div class="field" :class="tomb && 'dimmed'">
+              <label for="f-value">Value
+                <button type="button" class="b64tog" :class="valB64&&'on'" :aria-pressed="valB64" @click="valB64=!valB64" title="The value is base64 for binary bytes">b64</button>
+                <label class="chk"><input type="checkbox" name="tombstone" value="1" x-model="tomb"> null value (tombstone)</label></label>
+              <textarea class="input mono" id="f-value" name="value" x-ref="value" data-editor="json" rows="4" placeholder='{"orderId": "ord_8901"}'></textarea>
+              <input type="hidden" name="value_enc" :value="valB64 ? 'base64' : 'text'">
             </div>
           </div>
           <div class="err form-err" data-err-slot hidden role="alert"></div>
@@ -146,7 +152,7 @@
     <div class="counter"><span class="lbl">next offset</span><span class="mono">{{printf "%07d" .Latest}}</span></div>
   </div>
   <div class="tape-strip">
-    {{if .Messages}}{{range .Messages}}<div class="tick {{if .Hot}}hot{{end}}" style="height:{{.TickHeight}}px" title="offset {{.Offset}}{{if .KeyStr}} · {{.KeyStr}}{{end}}" onclick="document.getElementById('msg-{{.Offset}}')?.scrollIntoView({block:'center',behavior:'smooth'})"></div>{{end}}
+    {{if .Messages}}{{range .Messages}}<div class="tick {{if .Hot}}hot{{end}}" style="height:{{.TickHeight}}px" title="offset {{.Offset}}{{if not .Key.Null}} · {{.Key.Preview}}{{end}} · {{.Value.SizeText}}" onclick="document.getElementById('msg-{{.Offset}}')?.scrollIntoView({block:'center',behavior:'smooth'})"></div>{{end}}
     {{else}}<div class="dim" style="padding:8px 2px;font-size:11.5px">No messages on this partition yet.</div>{{end}}
   </div>
   <div class="tape-foot">
@@ -168,9 +174,9 @@
         {{if .Messages}}{{range .MessagesDesc}}
         <tr id="msg-{{.Offset}}" {{if eq .Offset $.HL}}class="hl" data-hl{{end}} hx-get="{{topicURL $.Topic.Name}}/message?partition={{$.Partition}}&offset={{.Offset}}" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML" onclick="document.getElementById('drawer-overlay').hidden=false">
           <td class="cell-offset num">{{.Offset}}</td>
-          <td class="cell-time mono">{{.TimeStr}} <span class="dim">· {{ago .Timestamp}}</span></td>
-          <td class="{{if .KeyStr}}cell-key{{else}}cell-key none{{end}}">{{if .KeyStr}}{{.KeyStr}}{{else}}no key{{end}}</td>
-          <td class="cell-val">{{jsonTint .ValuePreview}}</td>
+          <td class="cell-time mono" title="{{.TimeFull}}">{{.TimeStr}} <span class="dim">· {{ago .Timestamp}}</span></td>
+          <td class="cell-key {{if or .Key.Null .Key.Empty}}none{{end}}" title="{{if .Key.Null}}null key{{else}}{{.Key.Preview}} · {{.Key.SizeText}}{{end}}">{{if .Key.Null}}no key{{else}}{{.Key.Preview}}{{end}}</td>
+          <td class="cell-val {{if .Value.Binary}}binary{{end}} {{if .Value.Null}}tomb{{end}}" title="{{.Value.SizeText}}">{{if or .Value.Binary .Value.Null .Value.Empty}}<span class="vspecial">{{.Value.Preview}}</span>{{else}}{{jsonTint .Value.Preview}}{{end}}</td>
           <td>{{if .Headers}}<span class="hdrct">{{len .Headers}}</span>{{else}}<span class="dim">—</span>{{end}}</td>
         </tr>
         {{end}}{{else}}
@@ -192,21 +198,51 @@
 
 {{define "message_drawer"}}
 <div class="drawer-h">
-  <div><span class="t">P{{.Partition}} · offset {{.Msg.Offset}}</span><span class="drawer-sub mono">{{.Topic}}</span></div>
-  <button class="icon-btn" onclick="document.getElementById('drawer-overlay').hidden=true">{{icon "x"}}</button></div>
+  <div><span class="t" id="drawer-title">P{{.Partition}} · offset {{.Msg.Offset}}</span><span class="drawer-sub mono">{{.Topic}}</span></div>
+  <button type="button" class="icon-btn" aria-label="Close" onclick="document.getElementById('drawer-overlay').hidden=true">{{icon "x"}}</button></div>
 <div class="drawer-b">
   <div class="meta-row"><span class="k">Timestamp</span><span class="v">{{.TimeStr}}</span></div>
-  <div class="meta-row"><span class="k">Key</span><span class="v">{{if .KeyStr}}{{template "kvcopy" .KeyStr}}{{else}}—{{end}}</span></div>
-  <div class="sec-title" style="margin-top:18px">Headers{{if .Msg.Headers}} · {{len .Msg.Headers}}{{end}}</div>
-  {{if .Msg.Headers}}<div class="hdrlist">{{range .Msg.Headers}}<div class="hdrpair"><span class="hk">{{.Key}}</span><span class="dim">=</span><span class="hv">{{printf "%s" .Value}}</span></div>{{end}}</div>
+  <div class="meta-row"><span class="k">Key</span><span class="v">
+    {{if .Key.Null}}<span class="dim">null</span>{{else if .Key.Empty}}<span class="dim">"" (empty)</span>
+    {{else if .Key.Binary}}<span class="mono">{{.Key.Preview}}</span> <button type="button" class="copy-btn" data-copy="{{.Key.B64}}" title="Copy as base64">{{icon "copy"}}</button>
+    {{else}}{{template "kvcopy" .Key.Text}}{{end}}
+    {{if and (not .Key.Null) (not .Key.Empty)}}<span class="dim sz">{{.Key.SizeText}}</span>{{end}}</span></div>
+
+  <div class="sec-title" style="margin-top:18px">Headers{{if .Headers}} · {{len .Headers}}{{end}}</div>
+  {{if .Headers}}<div class="hdrlist">{{range .Headers}}<div class="hdrpair"><span class="hk">{{.Key}}</span><span class="dim">=</span><span class="hv">{{if .V.Null}}<span class="dim">null</span>{{else if .V.Empty}}<span class="dim">""</span>{{else if .V.Binary}}{{.V.Preview}}{{else}}{{.V.Text}}{{end}}</span></div>{{end}}</div>
   {{else}}<div class="dim" style="font-size:11.5px">No headers on this record.</div>{{end}}
-  <div class="sec-title" style="display:flex;align-items:center;gap:8px">Value
-    <button type="button" class="copy-btn" data-copy="{{.RawValue}}" title="Copy value">{{icon "copy"}}</button></div>
-  <div class="valuebox">{{jsonTint .ValueStr}}</div>
+
+  <div x-data="{f: '{{if .Value.Binary}}hex{{else}}text{{end}}'}">
+    <div class="sec-title" style="display:flex;align-items:center;gap:8px">Value
+      {{if or .Value.Null .Value.Empty}}<span class="dim sz">{{if .Value.Null}}null — a tombstone{{else}}empty{{end}}</span>
+      {{else}}<span class="dim sz">{{.Value.SizeText}}{{if .Value.Binary}} · binary{{else if .Value.Pretty}} · JSON{{end}}</span>
+      <span class="seg fmt" role="group" aria-label="Value format">
+        {{if not .Value.Binary}}<button type="button" :class="f==='text'&&'on'" :aria-pressed="f==='text'" @click="f='text'">Text</button>{{end}}
+        <button type="button" :class="f==='hex'&&'on'" :aria-pressed="f==='hex'" @click="f='hex'">Hex</button>
+        {{if .Value.B64}}<button type="button" :class="f==='b64'&&'on'" :aria-pressed="f==='b64'" @click="f='b64'">Base64</button>{{end}}
+      </span>
+      {{if .Value.B64}}<button type="button" class="copy-btn" data-copy="{{.Value.B64}}" title="Copy as base64">{{icon "copy"}}</button>{{end}}{{end}}
+    </div>
+    {{if or .Value.Null .Value.Empty}}
+    <div class="valuebox dim">{{if .Value.Null}}This record has a null value.{{else}}This record has an empty value.{{end}}</div>
+    {{else}}
+    {{if not .Value.Binary}}<div class="valuebox" x-show="f==='text'">{{jsonTint .Value.Text}}</div>{{end}}
+    <div class="valuebox hexbox" x-show="f==='hex'" {{if not .Value.Binary}}style="display:none"{{end}}>{{.Value.Hex}}</div>
+    {{if .Value.B64}}<div class="valuebox" x-show="f==='b64'" style="display:none">{{.Value.B64}}</div>{{end}}
+    {{if .Value.Truncated}}<div class="honest" style="margin-top:8px">{{icon "info"}}<div>Showing the start of a {{.Value.SizeText}} value.</div></div>{{end}}
+    <div class="drawer-dl"><a class="btn btn-outline" href="{{topicURL .Topic}}/message/raw?partition={{.Partition}}&offset={{.Msg.Offset}}&field=value" download>Download value</a></div>
+    {{end}}
+  </div>
+
   <div class="drawer-acts">
+    {{if .CanResend}}
     <button type="button" class="btn btn-outline" id="drawer-resend"
-      data-key="{{.KeyStr}}" data-value="{{.RawValue}}" data-partition="{{.Partition}}"
-      title="Prefill the compose panel with this message">{{icon "send"}} Send again…</button>
+      data-key="{{.ResendKey}}" data-key-enc="{{.ResendKeyEnc}}" data-value="{{.ResendValue}}" data-value-enc="{{.ResendValueEnc}}"
+      data-headers="{{.ResendHeaders}}" data-partition="{{.Partition}}" data-tombstone="{{if .Value.Null}}1{{end}}"
+      title="Prefill the compose panel with this record, byte for byte">{{icon "send"}} Send again…</button>
+    {{else}}
+    <span class="dim" style="font-size:11.5px">Too large to resend from the browser — download it instead.</span>
+    {{end}}
   </div>
 </div>
 {{end}}

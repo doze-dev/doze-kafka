@@ -201,8 +201,11 @@
   });
 
   // ---------- "Send again" (drawer → compose) ----------
-  // Prefills the compose panel from a message in the drawer. Delegated,
-  // because the drawer's content is swapped in per-message by htmx.
+  // Prefills the compose panel from a record in the drawer: key, value, headers,
+  // partition, and how each is encoded. A binary value arrives as base64 with the
+  // composer's b64 switch on, and a tombstone as the null-value box ticked, so
+  // sending it reproduces the record rather than a lossy rendering of it.
+  // Delegated, because the drawer's content is swapped in per record by htmx.
   document.addEventListener("click", function (e) {
     var b = e.target.closest("#drawer-resend");
     if (!b) return;
@@ -212,16 +215,28 @@
     if (!panel) return;
     panel.classList.add("open");
     var form = panel.querySelector("form");
+    var st = window.Alpine ? Alpine.$data(form) : null;
     var key = form.querySelector('input[name="key"]');
     if (key) key.value = b.getAttribute("data-key") || "";
     var sel = form.querySelector('select[name="partition"]');
     if (sel) sel.value = b.getAttribute("data-partition");
     var ta = form.querySelector('textarea[name="value"]');
+    var val = b.getAttribute("data-value") || "";
     if (ta && window.dozeEditor) {
-      dozeEditor.set(ta, b.getAttribute("data-value") || "");
+      dozeEditor.set(ta, val);
       requestAnimationFrame(function () { dozeEditor.refresh(panel); });
     } else if (ta) {
-      ta.value = b.getAttribute("data-value") || "";
+      ta.value = val;
+    }
+    if (st) {
+      st.keyB64 = b.getAttribute("data-key-enc") === "base64";
+      st.valB64 = b.getAttribute("data-value-enc") === "base64";
+      st.tomb = b.getAttribute("data-tombstone") === "1";
+      try {
+        st.hdrs = JSON.parse(b.getAttribute("data-headers") || "[]").map(function (r) {
+          return { k: r.k, v: r.v, b64: !!r.b64 };
+        });
+      } catch (err) { st.hdrs = []; }
     }
     panel.scrollIntoView({ behavior: "smooth", block: "center" });
   });

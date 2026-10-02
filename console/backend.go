@@ -3,7 +3,6 @@ package console
 import (
 	"context"
 	"fmt"
-	"hash/fnv"
 	"net"
 	"sort"
 	"strings"
@@ -532,17 +531,22 @@ func (b *backend) Produce(ctx context.Context, topic string, partition int32, ke
 	return ProduceResult{Partition: got.Partition, Offset: got.Offset, Confirmed: true}, nil
 }
 
-// PickPartition chooses a partition for "Auto" in the compose panel: a
-// stable hash of the key if one was given (so same-key messages land
-// together, same as a real keyed producer), otherwise simple round robin.
+// keyPartitioner hashes keys the way Kafka's default partitioner does (murmur2),
+// so a record the console sends with key K lands on the partition a real Java or
+// franz-go producer would pick for K. The console used to use FNV-1a, so "the same
+// key" went to a different partition from the application's own records.
+var keyPartitioner = kgo.StickyKeyPartitioner(nil)
+
+// PickPartition chooses a partition for "Auto" in the compose panel: the Kafka
+// hash of the key if one was given (so same-key messages land together, exactly
+// as a real keyed producer would place them), otherwise simple round robin.
 func (b *backend) PickPartition(topic string, key []byte, partitionCount int32) int32 {
 	if partitionCount <= 1 {
 		return 0
 	}
 	if len(key) > 0 {
-		h := fnv.New32a()
-		h.Write(key)
-		return int32(h.Sum32() % uint32(partitionCount))
+		tp := keyPartitioner.ForTopic(topic)
+		return int32(tp.Partition(&kgo.Record{Key: key}, int(partitionCount)))
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()

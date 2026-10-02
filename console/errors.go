@@ -17,6 +17,10 @@ import (
 // helps (did you mean…) rather than a generic failure.
 var errNotFound = errors.New("not found")
 
+// errBadInput marks a request the person can correct (a malformed header, a
+// partition that does not exist). It is shown beside the form, not as a failure.
+var errBadInput = errors.New("invalid input")
+
 // failure is a backend error sorted into what the person looking at the screen
 // needs to be told.
 type failure struct {
@@ -36,6 +40,8 @@ func classify(err error) failure {
 		errors.Is(err, kerr.UnknownTopicID),
 		errors.Is(err, kerr.GroupIDNotFound):
 		return failure{http.StatusNotFound, "notfound", "Not found", err.Error()}
+	case errors.Is(err, errBadInput):
+		return failure{http.StatusBadRequest, "refused", "Check the form", err.Error()}
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled), isNetworkError(err):
 		return failure{http.StatusBadGateway, "unreachable", "Can't reach the broker",
 			"The console could not get an answer from the broker. It may have stopped, or be busy."}

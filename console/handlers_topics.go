@@ -1,13 +1,13 @@
 package console
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"maps"
+	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -130,33 +130,17 @@ func (c *Console) topicProduce(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var key, value []byte
-	if v := r.FormValue("key"); v != "" {
-		key = []byte(v)
+	in, err := parseProduceForm(r, count)
+	if err != nil {
+		c.fail(w, r, err)
+		return
 	}
-	value = []byte(r.FormValue("value"))
-
-	var headers []MessageHeader
-	if raw := r.FormValue("headers"); raw != "" {
-		var rows []struct{ K, V string }
-		if err := json.Unmarshal([]byte(raw), &rows); err == nil {
-			for _, row := range rows {
-				if row.K == "" {
-					continue
-				}
-				headers = append(headers, MessageHeader{Key: row.K, Value: []byte(row.V)})
-			}
-		}
+	partition := in.Partition
+	if in.Auto {
+		partition = c.be.PickPartition(name, in.Key, count)
 	}
 
-	partition := int32(0)
-	if p := r.FormValue("partition"); p == "" || p == "auto" {
-		partition = c.be.PickPartition(name, key, count)
-	} else if n, err := strconv.Atoi(p); err == nil {
-		partition = int32(n)
-	}
-
-	result, err := c.be.Produce(ctx, name, partition, key, value, headers, r.FormValue("acks"))
+	result, err := c.be.Produce(ctx, name, partition, in.Key, in.Value, in.Headers, in.Acks)
 	if err != nil {
 		c.fail(w, r, err)
 		return
@@ -203,21 +187,55 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m := msgs[0]
-	value := string(m.Value)
-	// Pretty-print JSON payloads for reading; RawValue keeps the exact bytes
-	// for "Send again" so a resend is byte-identical to the original.
-	pretty := value
-	if json.Valid(m.Value) {
-		var buf bytes.Buffer
-		if json.Indent(&buf, m.Value, "", "  ") == nil {
-			pretty = buf.String()
-		}
-	}
+	hdrs := headerViews(m.Headers)
+	valueV := newBytesView(m.Value, m.Value == nil)
+	keyV := newBytesView(m.Key, m.Key == nil)
 	c.partial(w, "message_drawer", map[string]any{
 		"Topic": name, "Partition": partition, "Msg": m,
-		"TimeStr": m.Timestamp.Format(time.RFC3339), "KeyStr": string(m.Key),
-		"ValueStr": pretty, "RawValue": value,
+		"TimeStr": m.Timestamp.Format(time.RFC3339), "Key": keyV, "Value": valueV, "Headers": hdrs,
+		// What "Send again" carries. Text travels as text; anything else as base64
+		// with its encoding named, so the resend is byte-identical.
+		"ResendKey": resendField(keyV), "ResendKeyEnc": resendEnc(keyV),
+		"ResendValue": resendField(valueV), "ResendValueEnc": resendEnc(valueV),
+		"ResendHeaders": resendHeaders(hdrs),
+		"CanResend":     valueV.Null || valueV.Empty || valueV.B64 != "",
 	})
+}
+
+// resendField is the text a field is carried as when resent.
+func resendField(v bytesView) string {
+	switch {
+	case v.Null || v.Empty:
+		return ""
+	case v.Binary:
+		return v.B64
+	default:
+		return v.Text
+	}
+}
+
+func resendEnc(v bytesView) string {
+	if v.Binary {
+		return "base64"
+	}
+	return "text"
+}
+
+// previewOnly is newBytesView without the hex dump and base64 the table never
+// shows: for 60 rows of up-to-megabyte values those are not free.
+func previewOnly(b []byte) bytesView {
+	v := bytesView{Size: len(b), SizeText: humanBytes(len(b))}
+	switch {
+	case b == nil:
+		v.Null, v.Preview = true, "∅ null"
+	case len(b) == 0:
+		v.Empty, v.Preview = true, `""`
+	case looksBinary(b[:min(len(b), 4096)]) || !utf8Valid(b[:min(len(b), 4096)]):
+		v.Binary, v.Preview = true, binaryPreview(b)
+	default:
+		v.Preview = oneLine(string(b[:min(len(b), previewRunes*4)]), previewRunes)
+	}
+	return v
 }
 
 // partitionParam reads ?partition=, clamped to [0, count).
@@ -253,14 +271,15 @@ func hlParam(r *http.Request) int64 {
 // and the tape's visual hints, computed once per render rather than in the
 // template itself.
 type msgView struct {
-	Offset       int64
-	Timestamp    time.Time
-	TimeStr      string
-	KeyStr       string
-	ValuePreview string
-	Headers      []MessageHeader
-	Hot          bool
-	TickHeight   int
+	Offset     int64
+	Timestamp  time.Time
+	TimeStr    string
+	TimeFull   string // full RFC 3339 timestamp, for the hover title.
+	Key        bytesView
+	Value      bytesView
+	Headers    []MessageHeader
+	Hot        bool
+	TickHeight int
 }
 
 const tapeWindow = 60 // how many messages the tape/table show at once
@@ -296,9 +315,12 @@ func (c *Console) tapeData(ctx context.Context, topic string, partition, partiti
 	for i, m := range msgs {
 		asc[i] = msgView{
 			Offset: m.Offset, Timestamp: m.Timestamp, TimeStr: m.Timestamp.Format("15:04:05"),
-			KeyStr: string(m.Key), ValuePreview: preview(string(m.Value)), Headers: m.Headers,
+			TimeFull:   m.Timestamp.Format(time.RFC3339),
+			Key:        newBytesView(m.Key, m.Key == nil),
+			Value:      previewOnly(m.Value),
+			Headers:    m.Headers,
 			Hot:        atTail && i >= len(msgs)-3,
-			TickHeight: 8 + int((m.Offset*7+int64(len(m.Headers))*6)%40),
+			TickHeight: tickHeight(len(m.Value)),
 		}
 	}
 	desc := make([]msgView, len(asc))
@@ -332,10 +354,52 @@ func partitionRange(n int32) []int32 {
 	return out
 }
 
-func preview(s string) string {
-	const max = 220 // CSS truncates at the real column width; this just bounds payload size
-	if len(s) <= max {
-		return s
+// tickHeight is the height in pixels of a tape mark: how big the record is, on a
+// log scale from empty (6 px) to a megabyte and beyond (40 px). It used to be a
+// pseudo-random function of the offset, which looked meaningful and was not.
+func tickHeight(size int) int {
+	if size <= 0 {
+		return 6
 	}
-	return s[:max] + "…"
+	h := 6 + int(34*math.Log2(1+float64(size))/math.Log2(1+(1<<20)))
+	return min(h, 40)
+}
+
+// topicMessageRaw serves a record's key or value as the exact bytes, for a value
+// too large to read in the drawer or one that is binary.
+func (c *Console) topicMessageRaw(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	partition64, _ := strconv.ParseInt(r.URL.Query().Get("partition"), 10, 32)
+	offset, err := strconv.ParseInt(r.URL.Query().Get("offset"), 10, 64)
+	if err != nil {
+		c.fail(w, r, fmt.Errorf("%w: offset is not a number", errBadInput))
+		return
+	}
+	partition := int32(partition64)
+	msgs, err := c.be.FetchWindow(r.Context(), name, partition, offset, 1)
+	if err == nil && (len(msgs) == 0 || msgs[0].Offset != offset) {
+		err = fmt.Errorf("%w: no record at offset %d of partition %d", errNotFound, offset, partition)
+	}
+	if err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	field, data := "value", msgs[0].Value
+	if r.URL.Query().Get("field") == "key" {
+		field, data = "key", msgs[0].Key
+	}
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-%d-%d.%s.bin"`, safeFilename(name), partition, offset, field))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Write(data)
+}
+
+// safeFilename keeps a topic name fit for a Content-Disposition filename.
+func safeFilename(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '.' || r == '-' || r == '_' {
+			return r
+		}
+		return '_'
+	}, s)
 }

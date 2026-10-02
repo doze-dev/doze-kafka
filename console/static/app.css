@@ -587,3 +587,19 @@ button[disabled], .btn[disabled] { opacity: .55; cursor: not-allowed; }
 .lp-empty p { margin: 0; }
 .lp-nomatch { padding: 18px 12px; text-align: center; color: var(--dim); font-size: 12px; }
 .linklike { background: none; border: 0; padding: 0; color: var(--brass); cursor: pointer; font: inherit; text-decoration: underline; }
+
+/* Message fidelity: binary, null, size, formats, composer encodings. */
+.cell-val.binary .vspecial { color: var(--brass); font-style: normal; }
+.cell-val.tomb .vspecial, .cell-key.none { color: var(--dim-2); font-style: italic; }
+.dim.sz { font-size: 11px; font-weight: 400; margin-left: 6px; }
+.seg.fmt { margin-left: auto; }
+.seg.fmt button { padding: 2px 8px; font-size: 11px; }
+.hexbox { font-size: 11px; white-space: pre; overflow-x: auto; word-break: normal; }
+.drawer-dl { margin-top: 8px; }
+.b64tog { margin-left: 6px; padding: 0 5px; font: 600 9.5px var(--mono); line-height: 15px; color: var(--dim-2); background: transparent; border: 1px solid var(--line); border-radius: 4px; cursor: pointer; vertical-align: 1px; }
+.b64tog.on { color: var(--ink); background: var(--brass); border-color: var(--brass); }
+.chk { margin-left: 10px; font-weight: 400; font-size: 11px; color: var(--dim); cursor: pointer; }
+.chk input { margin-right: 4px; }
+.field.dimmed textarea, .field.dimmed .CodeMirror { opacity: .4; pointer-events: none; }
+.meta-row .v { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 4px 8px; }
+.meta-row .v .sz { margin-left: 0; }

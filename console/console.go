@@ -149,6 +149,7 @@ func (c *Console) routes() {
 	m.HandleFunc("GET "+p+"/topics/{name}/tape", c.topicTape) // HTMX partial (polled)
 	m.HandleFunc("POST "+p+"/topics/{name}/produce", c.topicProduce)
 	m.HandleFunc("GET "+p+"/topics/{name}/message", c.topicMessage) // drawer partial
+	m.HandleFunc("GET "+p+"/topics/{name}/message/raw", c.topicMessageRaw)
 
 	// Consumer groups.
 	m.HandleFunc("GET "+p+"/groups", c.groups)
@@ -275,19 +276,22 @@ func templateFuncs(prefix string) template.FuncMap {
 			}
 			return "classic"
 		},
-		"humanBytes": func(n int) string {
-			const u = "BKMGT"
-			f, i := float64(n), 0
-			for f >= 1024 && i < len(u)-1 {
-				f /= 1024
-				i++
-			}
-			if i == 0 {
-				return strconv.Itoa(n) + " B"
-			}
-			return trimFloat(f) + " " + string(u[i]) + "B"
-		},
+		"humanBytes": humanBytes,
 	}
+}
+
+// humanBytes renders a byte count the way a person reads it: 512 B, 2.1 KB, 3 MB.
+func humanBytes(n int) string {
+	const u = "BKMGT"
+	f, i := float64(n), 0
+	for f >= 1024 && i < len(u)-1 {
+		f /= 1024
+		i++
+	}
+	if i == 0 {
+		return strconv.Itoa(n) + " B"
+	}
+	return trimFloat(f) + " " + string(u[i]) + "B"
 }
 
 func trimFloat(f float64) string {

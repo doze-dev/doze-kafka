@@ -1,20 +1,26 @@
-// editor.js — upgrades every textarea[data-editor] into a CodeMirror editor
-// with JSON/YAML highlighting. Mode auto-detects from content ('{' or '[' →
-// JSON, otherwise YAML) unless data-editor names one explicitly. Values sync
-// back to the textarea before any htmx request or native form submit.
+// editor.js — upgrades every textarea[data-editor] into a CodeMirror editor.
+// The mode follows the content: text that starts with '{' or '[' is highlighted
+// as JSON, anything else is plain text. Values sync back to the textarea before
+// any htmx request or native form submit.
 //
-// data-editor="json" additionally gets a first-class JSON experience: a live
-// validity pill, a Format button, and an inline error marker at the exact line
-// where parsing fails.
+// data-editor="json" additionally gets a first-class JSON experience — a live
+// validity pill, a Format button, and an inline error marker at the line where
+// parsing fails — but only for content that looks like JSON. A payload that is
+// plain text, or base64 for binary bytes, is not an error, so it is not flagged
+// as one. The textarea's data-validate="off" (with data-why) switches validation
+// off and says why.
 (function () {
   "use strict";
 
-  function detectMode(text, hint) {
-    if (hint === "sql") return "text/x-sql";
-    if (hint === "json" || hint === "yaml") return hint === "json" ? { name: "javascript", json: true } : "yaml";
+  function detectMode(text) {
     var t = (text || "").trimStart();
     if (t.startsWith("{") || t.startsWith("[")) return { name: "javascript", json: true };
-    return "yaml";
+    return null; // plain text.
+  }
+
+  function looksLikeJSON(text) {
+    var t = text.trimStart();
+    return t.startsWith("{") || t.startsWith("[");
   }
 
   // jsonError parses text and, on failure, returns {message, line}. The
@@ -43,7 +49,7 @@
   var GUTTER = "cm-json-gutter";
 
   // attachJsonChrome adds the validity toolbar and wires live linting.
-  function attachJsonChrome(cm) {
+  function attachJsonChrome(cm, ta) {
     var wrap = cm.getWrapperElement();
     var bar = document.createElement("div");
     bar.className = "cm-jsonbar";
@@ -61,8 +67,13 @@
       cm.clearGutter(GUTTER);
       if (errLine >= 0) { cm.removeLineClass(errLine, "background", "cm-error-line"); errLine = -1; }
       var text = cm.getValue();
-      var err = jsonError(text);
+      if (ta.getAttribute("data-validate") === "off") {
+        pill.className = "cm-valid"; pill.textContent = ta.getAttribute("data-why") || "";
+        return;
+      }
       if (!text.trim()) { pill.className = "cm-valid"; pill.textContent = ""; return; }
+      if (!looksLikeJSON(text)) { pill.className = "cm-valid"; pill.textContent = "plain text"; return; }
+      var err = jsonError(text);
       if (!err) { pill.className = "cm-valid ok"; pill.textContent = "✓ valid JSON"; return; }
       pill.className = "cm-valid bad";
       pill.textContent = "✗ " + (err.line >= 0 ? "line " + (err.line + 1) + ": " : "") + err.message;
@@ -75,6 +86,7 @@
       }
     }
     cm.on("change", validate);
+    cm.__revalidate = validate;
     validate();
   }
 
@@ -82,9 +94,8 @@
     if (ta.__cm || typeof CodeMirror === "undefined") return;
     var hint = ta.getAttribute("data-editor");
     var isJSON = hint === "json";
-    var explicit = hint === "json" || hint === "yaml" || hint === "sql";
     var opts = {
-      mode: detectMode(ta.value, hint),
+      mode: detectMode(ta.value),
       lineNumbers: true,
       matchBrackets: true,
       autoCloseBrackets: true,
@@ -98,19 +109,17 @@
     ta.__cm = cm;
     cm.on("change", function () {
       cm.save();
-      if (!explicit) { // only auto-detect when the caller didn't name a mode
-        var m = detectMode(cm.getValue(), null);
-        var cur = cm.getOption("mode");
-        var curIsJSON = typeof cur === "object" && cur.json;
-        var nextIsJSON = typeof m === "object" && m.json;
-        if (curIsJSON !== nextIsJSON) cm.setOption("mode", m);
-      }
+      var m = detectMode(cm.getValue());
+      var cur = cm.getOption("mode");
+      var curIsJSON = !!cur && typeof cur === "object" && cur.json;
+      var nextIsJSON = !!m;
+      if (curIsJSON !== nextIsJSON) cm.setOption("mode", m);
       // Re-emit as a bubbling input event so live listeners (debounced htmx
       // triggers, dirty flags) hear edits made inside the editor.
       ta.dispatchEvent(new Event("input", { bubbles: true }));
     });
     cm.setSize("100%", null);
-    if (isJSON) attachJsonChrome(cm);
+    if (isJSON) attachJsonChrome(cm, ta);
   }
 
   function upgradeAll(root) {
@@ -150,25 +159,13 @@
       });
     },
     upgradeAll: upgradeAll,
-  };
-
-  // Fetch a random password from Secrets Manager and drop it into the panel's
-  // editor as a starter JSON secret. Used by the "Generate password" button.
-  window.dozeGenPassword = function (btn, prefix) {
-    var ta = btn.closest(".panel").querySelector("textarea[data-editor]");
-    if (!ta) return;
-    btn.disabled = true;
-    fetch(prefix + "/sm/password").then(function (r) { return r.text(); }).then(function (pw) {
-      var cur = (ta.__cm ? ta.__cm.getValue() : ta.value).trim();
-      var next;
-      try {
-        var obj = cur ? JSON.parse(cur) : {};
-        obj.password = pw;
-        next = JSON.stringify(obj, null, 2);
-      } catch (e) {
-        next = JSON.stringify({ password: pw }, null, 2);
-      }
-      window.dozeEditor.set(ta, next);
-    }).finally(function () { btn.disabled = false; });
+    // Turn JSON validation on or off for an editor (and say why when off).
+    setValidate: function (ta, on, why) {
+      if (typeof ta === "string") ta = document.querySelector(ta);
+      if (!ta) return;
+      ta.setAttribute("data-validate", on ? "on" : "off");
+      ta.setAttribute("data-why", on ? "" : (why || ""));
+      if (ta.__cm && ta.__cm.__revalidate) ta.__cm.__revalidate();
+    },
   };
 })();
