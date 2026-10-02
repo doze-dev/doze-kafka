@@ -13,12 +13,6 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 )
 
-// joinCollectTimeout bounds how long the coordinator waits for all known members
-// to (re)join a rebalance before proceeding with whoever showed up. On localhost
-// members rejoin in milliseconds, so this is only a backstop for a member that
-// never comes back (its session timer normally evicts it first).
-const joinCollectTimeout = 3 * time.Second
-
 // defaultSessionTimeout is used when a client requests a non-positive one.
 const defaultSessionTimeout = 30 * time.Second
 
@@ -35,10 +29,15 @@ const defaultSessionTimeout = 30 * time.Second
 type groupManager struct {
 	mu     sync.Mutex
 	groups map[string]*group
+
+	// hasOffsets reports whether a group has committed offsets. An empty group
+	// that has none holds nothing worth keeping and is forgotten; one that has
+	// some stays listed (as Empty) because its offsets are durable.
+	hasOffsets func(group string) bool
 }
 
-func newGroupManager() *groupManager {
-	return &groupManager{groups: make(map[string]*group)}
+func newGroupManager(hasOffsets func(string) bool) *groupManager {
+	return &groupManager{groups: make(map[string]*group), hasOffsets: hasOffsets}
 }
 
 // groupState is the classic-protocol group lifecycle state.
@@ -76,6 +75,7 @@ type group struct {
 	members     map[string]*groupMember
 	pendingSync map[string]chan syncResult
 	joinTimer   *time.Timer
+	joinGen     uint64 // bumped whenever the join timer is stopped or re-armed; see armJoinTimer.
 }
 
 type groupMember struct {
@@ -86,7 +86,14 @@ type groupMember struct {
 	rejoined       bool
 	sessionTimeout time.Duration
 	sessionTimer   *time.Timer
+	sessionGen     uint64 // bumped on every reset; a timer callback from an older one is stale.
 	joinResult     chan joinResult
+	awaitingJoin   bool // a JoinGroup is parked on joinResult.
+
+	// rebalanceTimeout is how long this member says it may take to rejoin a
+	// rebalance (the client's max.poll.interval.ms). Zero means "not stated",
+	// which JoinGroup v0 cannot state: Kafka then uses the session timeout.
+	rebalanceTimeout time.Duration
 }
 
 type groupProtocolEntry struct {
@@ -122,35 +129,49 @@ type leaveResult struct {
 // join runs the classic JoinGroup relay. It blocks until the rebalance completes
 // (all known members rejoined, or the collect timeout), returning this member's
 // slice of the result. A first-contact member (empty id) gets MEMBER_ID_REQUIRED
-// with a fresh id and must retry (KIP-394).
+// with a fresh id and must retry (KIP-394) — but only from JoinGroup v4, the
+// first version that knows the code. An older client would not know what to do
+// with it, so it is given an id and joined in one step, as Kafka does.
 func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest) (joinResult, error) {
 	gm.mu.Lock()
-	g := gm.getOrCreate(r.Group)
 
 	if r.MemberID == "" {
 		id := generateMemberID(r.InstanceID)
-		gm.mu.Unlock()
-		return joinResult{errorCode: int16(protocol.ErrMemberIDRequired), memberID: id}, nil
+		if r.GetVersion() >= 4 {
+			gm.mu.Unlock()
+			return joinResult{errorCode: int16(protocol.ErrMemberIDRequired), memberID: id}, nil
+		}
+		r.MemberID = id
 	}
+	g := gm.getOrCreate(r.Group)
 
 	m := g.members[r.MemberID]
 	if m == nil {
 		m = &groupMember{id: r.MemberID}
 		g.members[r.MemberID] = m
 	}
+	// A retried JoinGroup replaces one still parked: the old request's client is
+	// waiting on an answer that this one supersedes, so release it (Kafka answers
+	// it UNKNOWN_MEMBER_ID) instead of leaving its goroutine blocked.
+	m.failPendingJoin()
 	m.instanceID = r.InstanceID
 	m.protocols = protocolEntries(r.Protocols)
 	m.sessionTimeout = time.Duration(r.SessionTimeoutMillis) * time.Millisecond
+	m.rebalanceTimeout = 0
+	if r.RebalanceTimeoutMillis > 0 {
+		m.rebalanceTimeout = time.Duration(r.RebalanceTimeoutMillis) * time.Millisecond
+	}
 
 	if g.state != statePreparingRebalance {
 		g.beginRebalance()
 	}
 	m.rejoined = true
+	m.awaitingJoin = true
 	m.joinResult = make(chan joinResult, 1)
 	gm.resetSession(g, m)
 
 	if g.allRejoined() {
-		g.completeJoin()
+		gm.completeJoin(g)
 	} else {
 		gm.armJoinTimer(g)
 	}
@@ -304,6 +325,73 @@ func (g *group) beginRebalance() {
 	for _, m := range g.members {
 		m.rejoined = false
 	}
+	// Followers parked in SyncGroup are waiting for an assignment the leader has
+	// not delivered, and this rebalance supersedes the generation it belongs to.
+	// Tell them so; otherwise they sit until their own client timeout (30s for
+	// the Java client) while the server goroutine stays blocked.
+	g.failPendingSyncs(protocol.ErrRebalanceInProgress)
+}
+
+// failPendingSyncs answers every parked SyncGroup with code and forgets them.
+func (g *group) failPendingSyncs(code protocol.ErrorCode) {
+	for id, ch := range g.pendingSync {
+		ch <- syncResult{errorCode: int16(code)} // buffered, never blocks.
+		delete(g.pendingSync, id)
+	}
+}
+
+// failPendingJoin answers a JoinGroup still parked for this member, if any.
+func (m *groupMember) failPendingJoin() {
+	if m.awaitingJoin && m.joinResult != nil {
+		m.joinResult <- joinResult{errorCode: int16(protocol.ErrUnknownMemberID), memberID: m.id, generation: -1}
+	}
+	m.awaitingJoin = false
+}
+
+// stopSession cancels the member's session timer and invalidates any callback
+// already past Stop() and waiting on the manager lock — time.Timer.Stop cannot
+// recall one that has fired, and without the generation it would evict a member
+// that heartbeated an instant earlier.
+func (m *groupMember) stopSession() {
+	if m.sessionTimer != nil {
+		m.sessionTimer.Stop()
+		m.sessionTimer = nil
+	}
+	m.sessionGen++
+}
+
+// stopJoinTimer cancels the rebalance collect timer, invalidating a callback
+// that has already fired. It must run whenever a rebalance ends by any route;
+// a timer left behind makes armJoinTimer think one is running, so no later
+// rebalance of the group would ever time out.
+func (g *group) stopJoinTimer() {
+	if g.joinTimer != nil {
+		g.joinTimer.Stop()
+		g.joinTimer = nil
+	}
+	g.joinGen++
+}
+
+// rebalanceTimeout is how long a rebalance may wait for members to rejoin: the
+// longest any member asked for (Kafka's rule), each falling back to its session
+// timeout. This is the client's max.poll.interval.ms, so a consumer busy in a
+// handler is waited for rather than evicted.
+func (g *group) rebalanceTimeout() time.Duration {
+	var longest time.Duration
+	for _, m := range g.members {
+		t := m.rebalanceTimeout
+		if t <= 0 {
+			t = m.sessionTimeout
+		}
+		if t <= 0 {
+			t = defaultSessionTimeout
+		}
+		longest = max(longest, t)
+	}
+	if longest == 0 {
+		longest = defaultSessionTimeout
+	}
+	return longest
 }
 
 func (g *group) allRejoined() bool {
@@ -322,15 +410,10 @@ func (g *group) allRejoined() bool {
 // generation, elect a leader, pick a common protocol, and deliver every waiting
 // JoinGroup response.
 func (g *group) completeJoin() {
-	if g.joinTimer != nil {
-		g.joinTimer.Stop()
-		g.joinTimer = nil
-	}
+	g.stopJoinTimer()
 	for id, m := range g.members {
 		if !m.rejoined {
-			if m.sessionTimer != nil {
-				m.sessionTimer.Stop()
-			}
+			m.stopSession()
 			delete(g.members, id)
 		}
 	}
@@ -341,6 +424,12 @@ func (g *group) completeJoin() {
 	}
 
 	g.generation++
+	// A new generation starts with no assignments. If the leader's SyncGroup
+	// omits a member, it must get an empty assignment — not the previous
+	// generation's, which would hand it partitions another member now owns.
+	for _, m := range g.members {
+		m.assignment = nil
+	}
 	g.protocol = g.selectProtocol()
 	g.leader = g.electLeader()
 	g.state = stateCompletingRebalance
@@ -358,35 +447,62 @@ func (g *group) completeJoin() {
 			res.members = leaderView
 		}
 		m.joinResult <- res
+		m.awaitingJoin = false
 	}
+}
+
+// completeJoin closes the rebalance and forgets the group if nobody was left.
+func (gm *groupManager) completeJoin(g *group) {
+	g.completeJoin()
+	if g.state == stateEmpty {
+		gm.dropIfUnused(g)
+	}
+}
+
+// dropIfUnused forgets an Empty group that has no committed offsets. A group
+// that still has offsets stays, because those are durable and a consumer
+// resuming under the same id expects to find them.
+func (gm *groupManager) dropIfUnused(g *group) {
+	if gm.groups[g.id] != g || len(g.members) != 0 {
+		return
+	}
+	if gm.hasOffsets != nil && gm.hasOffsets(g.id) {
+		return
+	}
+	delete(gm.groups, g.id)
 }
 
 func (gm *groupManager) armJoinTimer(g *group) {
 	if g.joinTimer != nil {
 		return
 	}
-	g.joinTimer = time.AfterFunc(joinCollectTimeout, func() {
+	g.joinGen++
+	gen := g.joinGen
+	g.joinTimer = time.AfterFunc(g.rebalanceTimeout(), func() {
 		gm.mu.Lock()
 		defer gm.mu.Unlock()
-		if g.state == statePreparingRebalance {
-			g.completeJoin()
+		// Stale if the rebalance already ended (or restarted) while this waited
+		// for the lock.
+		if g.joinGen != gen || g.state != statePreparingRebalance {
+			return
 		}
+		gm.completeJoin(g)
 	})
 }
 
 func (gm *groupManager) resetSession(g *group, m *groupMember) {
-	if m.sessionTimer != nil {
-		m.sessionTimer.Stop()
-	}
+	m.stopSession()
 	timeout := m.sessionTimeout
 	if timeout <= 0 {
 		timeout = defaultSessionTimeout
 	}
-	id := m.id
+	id, gen := m.id, m.sessionGen
 	m.sessionTimer = time.AfterFunc(timeout, func() {
 		gm.mu.Lock()
 		defer gm.mu.Unlock()
-		if g.members[id] == nil {
+		// Stale if the member was replaced, or heartbeated, while this waited
+		// for the lock.
+		if g.members[id] != m || m.sessionGen != gen {
 			return
 		}
 		gm.removeMember(g, id)
@@ -395,8 +511,12 @@ func (gm *groupManager) resetSession(g *group, m *groupMember) {
 }
 
 func (gm *groupManager) removeMember(g *group, id string) {
-	if m := g.members[id]; m != nil && m.sessionTimer != nil {
-		m.sessionTimer.Stop()
+	if m := g.members[id]; m != nil {
+		m.stopSession()
+		m.failPendingJoin()
+	}
+	if ch, ok := g.pendingSync[id]; ok {
+		ch <- syncResult{errorCode: int16(protocol.ErrUnknownMemberID)}
 	}
 	delete(g.members, id)
 	delete(g.pendingSync, id)
@@ -407,14 +527,16 @@ func (gm *groupManager) removeMember(g *group, id string) {
 // in-flight one if the departure made everyone-left rejoined.
 func (gm *groupManager) rebalanceAfterChange(g *group) {
 	if len(g.members) == 0 {
+		g.stopJoinTimer()
 		g.state = stateEmpty
 		g.leader = ""
+		gm.dropIfUnused(g)
 		return
 	}
 	if g.state != statePreparingRebalance {
 		g.beginRebalance()
 	} else if g.allRejoined() {
-		g.completeJoin()
+		gm.completeJoin(g)
 	}
 }
 

@@ -52,11 +52,14 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 		return nil, err
 	}
 	return &Broker{
-		cfg:     cfg,
-		log:     logger,
-		logs:    logs,
-		meta:    m,
-		groups:  newGroupManager(),
+		cfg:  cfg,
+		log:  logger,
+		logs: logs,
+		meta: m,
+		groups: newGroupManager(func(group string) bool {
+			entries, err := m.ListOffsets(group)
+			return err == nil && len(entries) > 0
+		}),
 		cg848:   newCG848Manager(m, logger, cfg.ConsumerSessionTimeout),
 		auth:    auth,
 		idem:    newIdempotency(),
