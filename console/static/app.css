@@ -546,3 +546,9 @@ table.tbl tbody tr:hover td { background: var(--chassis-2); }
 .cm-json-gutter { width: 14px; }
 .cm-gutter-err { color: var(--bad); font-size: 11px; padding-left: 3px; }
 .CodeMirror .cm-error-line { background: color-mix(in srgb, var(--bad) 9%, transparent); }
+
+/* Live-tail pause control: the dot is the status, the button the affordance. */
+.livetoggle { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px solid transparent; border-radius: 6px; padding: 3px 8px; color: var(--dim); font: inherit; font-size: 11px; cursor: pointer; }
+.livetoggle:hover { border-color: var(--line); color: var(--text); }
+.livetoggle.on .livedot { animation: none; background: var(--dim-2); box-shadow: none; }
+.livetoggle.on .livetoggle-l::after { content: " paused"; }

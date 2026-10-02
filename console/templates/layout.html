@@ -1,6 +1,17 @@
-{{define "shell_top"}}<!-- the workbench shell: topstrip · rail · workspace(list+detail) -->
+{{define "shell_top"}}<!DOCTYPE html>
+{{/* The doctype is not decoration: without it browsers render in quirks mode,
+     which changes table font inheritance and box sizing. This is the workbench
+     shell: topstrip · rail · workspace(list+detail). */}}
+<html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+{{/* Back/Forward must be a real page load. htmx's default is to restore a cached
+     snapshot by replacing <body>'s contents, which detaches every node shell.js
+     is holding (the confirm dialog, the palette, the theme and rail buttons) and
+     leaves polling dead. Pages render in milliseconds; reloading is cheap and
+     leaves nothing stale. */}}
+<meta name="htmx-config" content='{"historyCacheSize":0,"refreshOnHistoryMiss":true}'>
 <title>{{if .Title}}{{.Title}} — {{end}}doze-kafka</title>
 <link rel="icon" type="image/svg+xml" href="{{.Prefix}}/static/favicon.svg">
 <!-- Vendor CSS before app.css: app.css re-themes CodeMirror (background, syntax
@@ -11,17 +22,15 @@
 var r=localStorage.getItem("rail");if(r==="slim")document.documentElement.setAttribute("data-rail","slim");}catch(e){}})();</script>
 <script>document.addEventListener("alpine:init",function(){window.Alpine.store("filter",{q:""});});</script>
 <script src="{{.Prefix}}/static/htmx.min.js"></script>
-<script src="{{.Prefix}}/static/idiomorph-ext.min.js"></script>
 <script defer src="{{.Prefix}}/static/alpine.min.js"></script>
 <script src="{{.Prefix}}/static/cm/codemirror.min.js"></script>
 <script src="{{.Prefix}}/static/cm/javascript.min.js"></script>
-<script src="{{.Prefix}}/static/cm/yaml.min.js"></script>
-<script src="{{.Prefix}}/static/cm/sql.min.js"></script>
 <script src="{{.Prefix}}/static/cm/matchbrackets.min.js"></script>
 <script src="{{.Prefix}}/static/cm/closebrackets.min.js"></script>
 <script src="{{.Prefix}}/static/editor.js"></script>
 <script src="{{.Prefix}}/static/shell.js" defer></script>
-
+</head>
+<body>
 <div class="app">
   <header class="topbar">
     <div class="brand"><img src="{{.Prefix}}/static/favicon.svg" alt="" style="width:15px;height:15px"> doze-kafka <span class="sub">console</span></div>
@@ -97,6 +106,8 @@ var r=localStorage.getItem("rail");if(r==="slim")document.documentElement.setAtt
 
   <div class="toasts" id="toasts"></div>
 </div>
+</body>
+</html>
 {{end}}
 
 {{/* ri = one rail item. Ct, if set, gets a live count via shell.js's refreshCounts. */}}

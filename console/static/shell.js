@@ -196,15 +196,28 @@
   // The rail lives outside #workspace, so boosted navigation swaps the page
   // without repainting the server-rendered `.on` class. Recompute the active
   // item from the URL after every navigation (and on back/forward).
+  // The section a URL belongs to: the console's home (and the create-topic form)
+  // is the Topics section, which the old "starts with the rail link's path" test
+  // missed — it left no rail item lit on the landing page.
+  function sectionFor(path) {
+    if (path.indexOf(PREFIX) !== 0) return "";
+    var seg = path.slice(PREFIX.length).replace(/^\/+/, "").split("/")[0];
+    if (seg === "" || seg === "topics" || seg === "new") return "topics";
+    return seg;
+  }
+  var currentSection = sectionFor(location.pathname);
   function syncRail() {
-    var here = location.pathname;
+    var section = sectionFor(location.pathname);
     document.querySelectorAll(".rail .ri").forEach(function (a) {
       var ip = new URL(a.href, location.origin).pathname;
-      var on = ip.charAt(ip.length - 1) === "/"
-        ? (here === ip || here === ip.slice(0, -1))       // Flows (root)
-        : (here === ip || here.indexOf(ip + "/") === 0);  // a service section
-      a.classList.toggle("on", on);
+      a.classList.toggle("on", sectionFor(ip) === section);
     });
+    // A filter typed in one section means nothing in the next (topic names do
+    // not filter groups), and used to carry over and hide everything.
+    if (section !== currentSection) {
+      currentSection = section;
+      if (window.Alpine && Alpine.store("filter")) Alpine.store("filter").q = "";
+    }
   }
   document.addEventListener("DOMContentLoaded", syncRail);
   document.addEventListener("htmx:pushedIntoHistory", syncRail);
@@ -335,6 +348,20 @@
     else if (e.key === "Escape") { var back = document.querySelector("[data-esc-back]"); if (back) history.back(); }
   });
 
+  // ---------- flash banner ----------
+  // The server shows a one-shot "Topic created" banner for a ?flash= redirect. Left
+  // in the address bar, a refresh (or a copied link) replays it; drop the
+  // parameter once it has been shown.
+  function stripFlash() {
+    try {
+      var u = new URL(location.href);
+      if (!u.searchParams.has("flash")) return;
+      u.searchParams.delete("flash");
+      history.replaceState(history.state, "", u.pathname + (u.search || "") + u.hash);
+    } catch (e) {}
+  }
+  document.addEventListener("DOMContentLoaded", stripFlash);
+
   // ---------- jump-to-offset landing ----------
   // The ?hl= row gets .hl server-side; scroll it into view once the page
   // (or a swap that carries it) lands.
@@ -345,9 +372,31 @@
   document.addEventListener("DOMContentLoaded", revealHL);
 
   // ---------- live polling with change detection ----------
-  // Elements with data-live="URL" poll every data-live-ms (default 3000);
-  // the server echoes a content hash — when unchanged it replies 204 and
-  // nothing moves. Changed content is morph-swapped so selection survives.
+  // Elements with data-live="URL" poll every data-live-ms (default 3000); the
+  // server echoes a content hash, and when nothing changed it replies 204 and
+  // nothing moves. Changed content REPLACES the element (outerHTML).
+  //
+  // Not a morph, deliberately. This used to say morph:outerHTML, but no element
+  // carried hx-ext="morph", so htmx fell back to its default innerHTML swap and
+  // inserted the response (itself a #tape-and-table) INSIDE the existing one on
+  // the first change: two regions, two pollers, double the requests. Fixing it
+  // by enabling morph on <body> broke unrelated swaps; a plain replace is the
+  // boring thing that works. What a replace costs — the jump field's text and
+  // focus, the table's scroll position — is saved and restored around the swap
+  // (see preserveLiveState).
+  var livePaused = false;
+  function setPaused(p) {
+    livePaused = p;
+    document.querySelectorAll("[data-live-toggle]").forEach(function (b) {
+      b.setAttribute("aria-pressed", p ? "true" : "false");
+      b.classList.toggle("on", p);
+      b.title = p ? "Resume live updates" : "Pause live updates";
+    });
+    document.querySelectorAll("[data-live]").forEach(function (el) { el.classList.toggle("paused", p); });
+  }
+  document.addEventListener("click", function (e) {
+    if (e.target.closest("[data-live-toggle]")) setPaused(!livePaused);
+  });
   var liveTimers = [];
   function setupLive() {
     liveTimers.forEach(clearInterval);
@@ -361,13 +410,10 @@
         // would go stale and the poll would silently die. The morph poll itself
         // re-includes data-live, so a morphed element keeps the same id too.
         var cur = document.getElementById(id);
-        if (document.hidden || !cur) return;
+        if (document.hidden || livePaused || !cur) return;
         var url = cur.getAttribute("data-live");
         if (!url) return;
-        // Most live regions morph so selection/scroll survive; a small self-
-        // contained element can opt into a plain outerHTML swap via
-        // data-live-swap to avoid idiomorph nesting its replacement.
-        var swap = cur.getAttribute("data-live-swap") || "morph:outerHTML";
+        var swap = cur.getAttribute("data-live-swap") || "outerHTML";
         var hash = cur.getAttribute("data-hash") || "";
         htmx.ajax("GET", url + (url.indexOf("?") >= 0 ? "&" : "?") + "h=" + hash, {
           target: "#" + id, swap: swap,
@@ -384,7 +430,49 @@
     var t = e.detail.target;
     if (t && (t.id === "workspace" ||
               (t.matches && t.matches("[data-live]")) ||
-              (t.querySelector && t.querySelector("[data-live]")))) setupLive();
+              (t.querySelector && t.querySelector("[data-live]")))) {
+      setupLive();
+      setPaused(livePaused); // a replaced region comes back unpaused-looking.
+    }
+  });
+
+  // What a replace would otherwise destroy: the "go to offset" text and focus, and
+  // the message table's scroll position. Saved just before a live swap, put back
+  // just after it.
+  var liveState = null;
+  document.addEventListener("htmx:beforeSwap", function (e) {
+    var t = e.detail.target;
+    if (!t || !t.matches || !t.matches("[data-live]")) return;
+    var jump = t.querySelector(".jump input");
+    var wrap = t.querySelector(".tbl-wrap");
+    liveState = {
+      jumpValue: jump ? jump.value : "",
+      jumpFocused: !!jump && document.activeElement === jump,
+      selStart: jump ? jump.selectionStart : null,
+      selEnd: jump ? jump.selectionEnd : null,
+      scrollTop: wrap ? wrap.scrollTop : 0,
+      atTop: !wrap || wrap.scrollTop < 4,
+    };
+  });
+  document.addEventListener("htmx:afterSettle", function (e) {
+    var st = liveState;
+    liveState = null;
+    var t = e.detail.target;
+    if (!st) return;
+    var region = document.querySelector("[data-live]");
+    if (!region) return;
+    var jump = region.querySelector(".jump input");
+    if (jump && st.jumpValue) {
+      jump.value = st.jumpValue;
+      if (st.jumpFocused) {
+        jump.focus();
+        try { jump.setSelectionRange(st.selStart, st.selEnd); } catch (err) {}
+      }
+    }
+    var wrap = region.querySelector(".tbl-wrap");
+    // Someone reading down the table keeps their place; someone parked at the top
+    // (the newest rows) just sees the new ones arrive.
+    if (wrap && !st.atTop) wrap.scrollTop = st.scrollTop;
   });
   // After each poll, stamp the element's data-hash from the response header — a
   // morph swap doesn't reliably update the root's attributes, so without this the
@@ -400,28 +488,6 @@
       if (base && path.indexOf(base) === 0) el.setAttribute("data-hash", h);
     });
   });
-
-  // ---------- sleep countdowns ----------
-  // A .rt-cd inside an element carrying data-sleep-left="<seconds>" counts down
-  // every second. The server sends seconds-remaining (not an absolute time), and
-  // each fresh element re-bases it against the browser's own clock — so a
-  // browser/server clock skew can't drift the countdown. The 3s live poll swaps
-  // in a fresh element (with a new _deadline) only on a reset; the going-cold
-  // flip is server-authoritative, arriving as a swapped-in grey badge.
-  function fmtLeft(s) {
-    return s >= 60 ? Math.floor(s / 60) + "m " + String(s % 60).padStart(2, "0") + "s" : s + "s";
-  }
-  setInterval(function () {
-    document.querySelectorAll(".rt-cd").forEach(function (cd) {
-      var host = cd.closest("[data-sleep-left]");
-      if (!host) return;
-      if (host._deadline == null) {
-        host._deadline = Date.now() + parseInt(host.getAttribute("data-sleep-left") || "0", 10) * 1000;
-      }
-      var left = Math.round((host._deadline - Date.now()) / 1000);
-      cd.textContent = left > 0 ? fmtLeft(left) : "any moment";
-    });
-  }, 1000);
 
   window.dozeShell = { toast: toast, openPalette: openPalette };
 })();

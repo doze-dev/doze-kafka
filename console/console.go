@@ -171,7 +171,12 @@ func (c *Console) render(w http.ResponseWriter, r *http.Request, page string, da
 		data = map[string]any{}
 	}
 	data["Prefix"] = c.prefix
-	data["Page"] = page
+	// The handler says which rail section a page belongs to (a topic's detail page
+	// is "topics"); only fall back to the template name when it did not. Overwriting
+	// it made the rail's server-rendered highlight wrong on every detail page.
+	if _, ok := data["Page"]; !ok {
+		data["Page"] = page
+	}
 	data["Endpoint"] = c.be.displayAddr()
 	if f := r.URL.Query().Get("flash"); f != "" {
 		data["Flash"] = f

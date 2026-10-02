@@ -139,7 +139,7 @@
       {{range $i := .PartitionRange}}<a class="ptab {{if eq $i $.Partition}}on{{end}}" href="{{topicURL $.Topic.Name}}?partition={{$i}}">P{{$i}}</a>{{end}}
     </div>
     <div class="tape-head-spacer"></div>
-    {{if .AtTail}}<span class="livedot" title="Following the log tail — refreshes every 2.5s"></span>{{else}}<span class="pinned mono">pinned to history</span>{{end}}
+    {{if .AtTail}}<button type="button" class="livetoggle" data-live-toggle aria-pressed="false" title="Pause live updates"><span class="livedot" aria-hidden="true"></span><span class="livetoggle-l">Live</span></button>{{else}}<span class="pinned mono">pinned to history</span>{{end}}
     <div class="counter"><span class="lbl">next offset</span><span class="mono">{{printf "%07d" .Latest}}</span></div>
   </div>
   <div class="tape-strip">
