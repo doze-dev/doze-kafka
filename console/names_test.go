@@ -96,10 +96,15 @@ func TestHostileGroupIDsCannotReachScriptContext(t *testing.T) {
 	if len(exprs) < len(ids) {
 		t.Fatalf("expected an x-show per group row, found %d", len(exprs))
 	}
-	const fixed = `!$store.filter.q || $el.dataset.name.toLowerCase().includes($store.filter.q.toLowerCase())`
+	// The only x-show expressions are these fixed ones: none may ever be built
+	// from a resource name.
+	fixed := map[string]bool{
+		`!$store.filter.q || $el.dataset.name.toLowerCase().includes($store.filter.q.toLowerCase())`: true,
+		`$store.filter.none($el.parentElement)`:                                                      true,
+	}
 	for _, m := range exprs {
-		if html.UnescapeString(m[1]) != fixed {
-			t.Errorf("x-show carries something other than the fixed expression: %q", m[1])
+		if !fixed[html.UnescapeString(m[1])] {
+			t.Errorf("x-show carries something other than a fixed expression: %q", m[1])
 		}
 	}
 	if strings.Contains(body, "x'+(window") {

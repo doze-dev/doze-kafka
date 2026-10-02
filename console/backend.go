@@ -256,7 +256,7 @@ func (b *backend) PartitionCount(ctx context.Context, name string) (int32, error
 		return 0, err
 	}
 	if len(resp.Topics) == 0 {
-		return 0, fmt.Errorf("topic %q not found", name)
+		return 0, fmt.Errorf("%w: topic %q", errNotFound, name)
 	}
 	if resp.Topics[0].ErrorCode != 0 {
 		return 0, kerr.ErrorForCode(resp.Topics[0].ErrorCode)
@@ -345,7 +345,7 @@ func (b *backend) DescribeTopic(ctx context.Context, name string) (*TopicDetail,
 		return nil, err
 	}
 	if len(mresp.Topics) == 0 {
-		return nil, fmt.Errorf("topic %q not found", name)
+		return nil, fmt.Errorf("%w: topic %q", errNotFound, name)
 	}
 	mt0 := mresp.Topics[0]
 	if mt0.ErrorCode != 0 {

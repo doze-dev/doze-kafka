@@ -9,7 +9,20 @@
   <div class="lp-scroll">
 {{end}}
 {{define "lp_foot"}}
+    <div class="lp-nomatch" style="display:none" x-data x-show="$store.filter.none($el.parentElement)">
+      <span x-text="'No matches for “' + $store.filter.q + '”'"></span>
+      <button type="button" class="linklike" @click="$store.filter.q = ''">Clear filter</button>
+    </div>
   </div>
-  <div class="lp-f"><span class="kbd">j</span><span class="kbd">k</span> move · <span class="kbd">c</span> new · <span class="kbd">/</span> filter</div>
+  <div class="lp-f"><span class="kbd">j</span><span class="kbd">k</span> move · {{if .CanCreate}}<span class="kbd">c</span> new · {{end}}<span class="kbd">/</span> filter</div>
 </aside>
+{{end}}
+
+{{/* lp_empty: the list pane when nothing exists at all. */}}
+{{define "lp_empty"}}
+<div class="lp-empty">
+  {{icon .Glyph}}
+  <b>{{.Title}}</b>
+  <p>{{.Hint}}</p>
+</div>
 {{end}}

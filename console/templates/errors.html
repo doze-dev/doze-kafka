@@ -1,0 +1,19 @@
+{{define "error_page"}}{{template "shell_top" .}}
+  <section class="detail"><div class="detail-inner errorwrap">
+    <div class="errorpanel {{.Kind}}" role="alert">
+      <div class="err-ic">{{if eq .Kind "notfound"}}{{icon "search"}}{{else}}{{icon "info"}}{{end}}</div>
+      <h1>{{.Heading}}</h1>
+      <p>{{.Message}}</p>
+      {{if .Suggestions}}
+      <div class="didyoumean">
+        <span class="dim">Did you mean</span>
+        {{range .Suggestions}}<a class="btn btn-outline mono" href="{{.URL}}">{{.Name}}</a>{{end}}
+      </div>
+      {{end}}
+      <div class="err-acts">
+        {{if .Back}}<a class="btn btn-outline" href="{{.Back}}">← Back to the list</a>{{end}}
+        {{if .Retry}}<button type="button" class="btn primary" onclick="location.reload()">Try again</button>{{end}}
+      </div>
+    </div>
+  </div></section>
+{{template "shell_bottom" .}}{{end}}

@@ -12,7 +12,6 @@ import (
 	"crypto/tls"
 	"embed"
 	"html/template"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -226,12 +225,6 @@ func toast(w http.ResponseWriter, msg string) {
 	w.Header().Set("HX-Trigger", `{"toast":`+strconv.QuoteToASCII(msg)+`}`)
 }
 
-func (c *Console) fail(w http.ResponseWriter, err error) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusBadRequest)
-	io.WriteString(w, `<div class="err">`+template.HTMLEscapeString(err.Error())+`</div>`)
-}
-
 func templateFuncs(prefix string) template.FuncMap {
 	return template.FuncMap{
 		"prefix": func() string { return prefix },
@@ -242,6 +235,7 @@ func templateFuncs(prefix string) template.FuncMap {
 		"groupURL":    func(id string) string { return groupPath(prefix, id) },
 		"newTopicURL": func() string { return newTopicPath(prefix) },
 		"urlseg":      url.PathEscape,
+		"t":           uiText,
 		"dict": func(kv ...any) map[string]any {
 			m := make(map[string]any, len(kv)/2)
 			for i := 0; i+1 < len(kv); i += 2 {

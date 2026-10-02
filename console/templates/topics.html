@@ -1,5 +1,6 @@
 {{define "topic_lp"}}
 {{template "lp_head" dict "Glyph" "layers" "Label" "Topics" "NewURL" newTopicURL}}
+{{if not .List}}{{template "lp_empty" dict "Glyph" "layers" "Title" (t "topics.none.title") "Hint" (t "topics.none.hint")}}{{end}}
 {{range .List}}
 <a class="li {{if eq .Name $.Sel}}on{{end}}" href="{{topicURL .Name}}" data-name="{{.Name}}"
    x-data x-show="!$store.filter.q || $el.dataset.name.toLowerCase().includes($store.filter.q.toLowerCase())">
@@ -7,23 +8,24 @@
   <span class="meta"><span class="mono">{{.Msgs}} msg{{if ne .Msgs 1}}s{{end}}</span> · <span class="mono">{{.Partitions}} partition{{if ne .Partitions 1}}s{{end}}</span></span>
 </a>
 {{end}}
-{{template "lp_foot" .}}
+{{template "lp_foot" dict "CanCreate" true}}
 {{end}}
 
 {{define "topics_home"}}{{template "shell_top" .}}
   {{template "topic_lp" (dict "Prefix" .Prefix "List" .List "Sel" "")}}
-  {{template "empty_detail" dict "Glyph" "layers" "Hint" "Select a topic, or create one to start producing." "CTA" "New topic" "CTAURL" newTopicURL}}
+  {{template "empty_detail" dict "Glyph" "layers" "Hint" (t "topics.pick") "CTA" "New topic" "CTAURL" newTopicURL}}
 {{template "shell_bottom" .}}{{end}}
 
 {{define "topic_create"}}{{template "shell_top" .}}
   {{template "topic_lp" (dict "Prefix" .Prefix "List" .List "Sel" "")}}
   <section class="detail"><div class="detail-inner">
     <div class="idband"><div><h1 style="font-family:var(--ui);font-size:18px">Create topic</h1></div></div>
-    <form hx-post="{{newTopicURL}}">
+    <form hx-post="{{newTopicURL}}" hx-disabled-elt="find button[type=submit]">
       <div class="panel form-sec"><div class="panel-h"><h2>General</h2></div><div class="form-b">
         <div class="field"><label>Topic name</label><input class="input mono" name="name" placeholder="orders.created" required autocomplete="off" autofocus></div>
         <div class="field" style="margin-top:10px;max-width:180px"><label>Partitions</label><input class="input mono" name="partitions" type="number" min="1" max="1000" value="1" required></div>
       </div></div>
+      <div class="err form-err" data-err-slot hidden role="alert"></div>
       <div class="det-foot">
         <a class="btn btn-outline" href="{{.Prefix}}/topics">Cancel</a>
         <button class="btn primary" type="submit">Create topic</button>
@@ -44,8 +46,8 @@
         </div>
       </div>
       <div class="idband-acts">
-        <button class="btn btn-outline" hx-post="{{topicURL .Topic.Name}}/purge" hx-confirm="Purge &quot;{{.Topic.Name}}&quot;? Deletes and recreates the topic with the same partition count. Every message is gone, the topic gets a new ID, and consumers restart from their auto.offset.reset policy.">{{icon "eraser"}} Purge</button>
-        <button class="btn danger" hx-post="{{topicURL .Topic.Name}}/delete" hx-confirm="Delete topic &quot;{{.Topic.Name}}&quot;? This removes every partition's data.">{{icon "trash"}} Delete</button>
+        <button class="btn btn-outline" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/purge" hx-confirm="Purge &quot;{{.Topic.Name}}&quot;? Deletes and recreates the topic with the same partition count. Every message is gone, the topic gets a new ID, and consumers restart from their auto.offset.reset policy.">{{icon "eraser"}} Purge</button>
+        <button class="btn danger" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/delete" hx-confirm="Delete topic &quot;{{.Topic.Name}}&quot;? This removes every partition's data.">{{icon "trash"}} Delete</button>
       </div>
     </div>
 
@@ -72,7 +74,7 @@
         <span class="twist">{{icon "chevron"}}</span>
       </div>
       <div class="dock-form">
-        <form hx-post="{{topicURL .Topic.Name}}/produce" hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML" x-data="{hdrs:[], acks:'1'}" @htmx:after-request="if($event.detail.successful){window.dozeEditor?dozeEditor.set($refs.value,''):$refs.value.value='';$refs.key.value='';hdrs=[]}">
+        <form hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML" x-data="{hdrs:[], acks:'1'}" @htmx:after-request="if($event.detail.successful){window.dozeEditor?dozeEditor.set($refs.value,''):$refs.value.value='';$refs.key.value='';hdrs=[]}">
           <input type="hidden" name="partition_ctx" value="{{.Partition}}">
           <div class="crow">
             <div class="field" style="flex:0 0 140px">
@@ -118,6 +120,7 @@
               <textarea class="input mono" name="value" x-ref="value" data-editor="json" rows="4" placeholder='{"orderId": "ord_8901"}'></textarea>
             </div>
           </div>
+          <div class="err form-err" data-err-slot hidden role="alert"></div>
           <div class="dock-foot">
             <span class="ackscaption" x-text="acks==='0' ? 'Fire-and-forget — the broker sends no response at all.' : acks==='all' ? 'Fsynced to disk before acknowledging. Slower, durable.' : 'Written to the page cache before acknowledging.'"></span>
             <button class="btn primary" type="submit">{{icon "send"}} Send message</button>
@@ -171,7 +174,7 @@
           <td>{{if .Headers}}<span class="hdrct">{{len .Headers}}</span>{{else}}<span class="dim">—</span>{{end}}</td>
         </tr>
         {{end}}{{else}}
-        <tr><td colspan="5" style="padding:20px 12px" class="dim">Nothing here yet. Send a message below and it'll show up here and on the tape.</td></tr>
+        <tr><td colspan="5" style="padding:20px 12px" class="dim">{{if gt .Earliest 0}}{{t "messages.retention" .Earliest}}{{else}}{{t "messages.none"}}{{end}}</td></tr>
         {{end}}
       </tbody>
     </table>

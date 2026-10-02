@@ -96,18 +96,102 @@
   }
   window.addEventListener("toast", function (e) { toast(e.detail.value !== undefined ? e.detail.value : e.detail, "ok"); });
   window.addEventListener("toast-error", function (e) { toast(e.detail.value !== undefined ? e.detail.value : e.detail, "err"); });
-  document.addEventListener("htmx:responseError", function (e) {
-    var raw = (e.detail.xhr.responseText || "Request failed");
-    // The server HTML-escapes error bodies; decode entities first so the message
-    // regex matches and the toast shows real quotes/brackets, not "&#34;".
+  // The text of an error response. The server HTML-escapes error bodies, so decode
+  // the entities to show real quotes and brackets rather than "&#34;".
+  function errorText(xhr) {
+    var raw = (xhr && xhr.responseText) || "Request failed";
     var ta = document.createElement("textarea");
     ta.innerHTML = raw;
-    raw = ta.value;
-    var m = raw.match(/<Message>([^<]+)|"message"\s*:\s*"([^"]+)"/i);
-    var msg = (m && (m[1] || m[2])) || raw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-    if (msg.length > 140) msg = msg.slice(0, 140) + "…";
-    toast(msg, "err");
+    var msg = ta.value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    return msg || "Request failed";
+  }
+  // Is this event about the live tail's own poll? A failing poll must not toast
+  // every few seconds; it gets one persistent state on the live control instead.
+  function isLivePoll(e) {
+    var path = (e.detail && e.detail.requestConfig && e.detail.requestConfig.path) || "";
+    var el = document.querySelector("[data-live]");
+    var base = el && el.getAttribute("data-live");
+    return !!base && path.indexOf(base) === 0;
+  }
+  function setDisconnected(on, why) {
+    document.querySelectorAll("[data-live]").forEach(function (el) {
+      el.classList.toggle("disconnected", on);
+      var b = el.querySelector("[data-live-toggle]");
+      if (b) b.title = on ? "Not updating: " + (why || "can't reach the broker") : (livePaused ? "Resume live updates" : "Pause live updates");
+    });
+  }
+  // An error response is shown where the person is looking: in the failed form's
+  // error slot if it has one, in the drawer if the drawer asked, else a toast.
+  document.addEventListener("htmx:responseError", function (e) {
+    var msg = errorText(e.detail.xhr);
+    if (isLivePoll(e)) { setDisconnected(true, msg); return; }
+    var target = e.detail.target;
+    if (target && target.id === "drawer") {
+      target.textContent = "";
+      var box = document.createElement("div");
+      box.className = "drawer-err";
+      box.setAttribute("role", "alert");
+      box.textContent = msg;
+      target.appendChild(box);
+      return;
+    }
+    var elt = e.detail.elt;
+    var form = elt && elt.closest ? elt.closest("form") : null;
+    var slot = form && form.querySelector("[data-err-slot]");
+    if (slot) { slot.textContent = msg; slot.hidden = false; return; }
+    toast(msg.length > 140 ? msg.slice(0, 140) + "…" : msg, "err");
   });
+  // Nothing came back at all (the console server itself is gone).
+  function networkFailure(e) {
+    if (isLivePoll(e)) { setDisconnected(true, "the console server did not answer"); return; }
+    toast("No answer from the console — is doze-kafka still running?", "err");
+  }
+  document.addEventListener("htmx:sendError", networkFailure);
+  document.addEventListener("htmx:timeout", networkFailure);
+
+  // htmx does not swap a 4xx/5xx response. A page the server rendered for a
+  // navigation (not found, broker unreachable) is a page to show, and says so.
+  document.addEventListener("htmx:beforeSwap", function (e) {
+    var xhr = e.detail.xhr;
+    if (xhr && xhr.getResponseHeader("X-Doze-Page") === "error") {
+      e.detail.shouldSwap = true;
+      e.detail.isError = false;
+    }
+  });
+
+  // ---------- request feedback ----------
+  // Controls lock while their request is in flight (hx-disabled-elt), a slow
+  // request shows a thin progress bar after half a second, a drawer opens on a
+  // loading state rather than yesterday's message, and a form's old error clears
+  // when it is resubmitted.
+  var slowTimer = null, inflight = 0;
+  var bar = document.getElementById("reqbar");
+  document.addEventListener("htmx:beforeRequest", function (e) {
+    if (isLivePoll(e)) return;
+    var elt = e.detail.elt;
+    var form = elt && elt.closest ? elt.closest("form") : null;
+    var slot = form && form.querySelector("[data-err-slot]");
+    if (slot) { slot.hidden = true; slot.textContent = ""; }
+    var t = e.detail.target;
+    if (t && t.id === "drawer") {
+      t.textContent = "";
+      var l = document.createElement("div");
+      l.className = "drawer-loading";
+      l.innerHTML = '<span class="spinner" aria-hidden="true"></span> Loading…';
+      t.appendChild(l);
+    }
+    inflight++;
+    if (!slowTimer && bar) slowTimer = setTimeout(function () { bar.hidden = false; }, 500);
+  });
+  function requestDone(e) {
+    if (isLivePoll(e)) return;
+    inflight = Math.max(0, inflight - 1);
+    if (inflight === 0) {
+      clearTimeout(slowTimer); slowTimer = null;
+      if (bar) bar.hidden = true;
+    }
+  }
+  document.addEventListener("htmx:afterRequest", requestDone);
 
   // ---------- copy ----------
   document.addEventListener("click", function (e) {
@@ -258,7 +342,7 @@
         .map(function (r) { r.k = KIND[r.s] || r.s; return r; });
       palItems = pruned.concat(fresh).concat(fixed);
       renderPal();
-    });
+    }).catch(function () {}); // offline: the fixed entries are still there.
   }
   function palFiltered() {
     var q = palQ.value.toLowerCase().trim();
@@ -415,9 +499,13 @@
         if (!url) return;
         var swap = cur.getAttribute("data-live-swap") || "outerHTML";
         var hash = cur.getAttribute("data-hash") || "";
-        htmx.ajax("GET", url + (url.indexOf("?") >= 0 ? "&" : "?") + "h=" + hash, {
+        // htmx.ajax returns a promise that rejects when the request fails. A failed
+        // poll is reported by the htmx:responseError / sendError handlers (as the
+        // "not updating" state); left uncaught it is also an unhandled rejection.
+        var p = htmx.ajax("GET", url + (url.indexOf("?") >= 0 ? "&" : "?") + "h=" + hash, {
           target: "#" + id, swap: swap,
         });
+        if (p && p.catch) p.catch(function () {});
       }, every);
       liveTimers.push(t);
     });
@@ -480,6 +568,7 @@
   document.addEventListener("htmx:afterRequest", function (e) {
     var xhr = e.detail.xhr;
     if (!xhr) return;
+    if (e.detail.successful && isLivePoll(e)) setDisconnected(false);
     var h = xhr.getResponseHeader("HX-Live-Hash");
     if (!h) return;
     var path = (e.detail.requestConfig && e.detail.requestConfig.path) || "";

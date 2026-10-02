@@ -20,7 +20,13 @@
 <link rel="stylesheet" href="{{.Prefix}}/static/app.css">
 <script>(function(){try{var t=localStorage.getItem("theme");if(t)document.documentElement.setAttribute("data-theme",t);
 var r=localStorage.getItem("rail");if(r==="slim")document.documentElement.setAttribute("data-rail","slim");}catch(e){}})();</script>
-<script>document.addEventListener("alpine:init",function(){window.Alpine.store("filter",{q:""});});</script>
+<script>document.addEventListener("alpine:init",function(){window.Alpine.store("filter",{
+  q:"",
+  // True when a filter is set and no row in root matches it, so the list can say
+  // "no matches" instead of just going blank. Rows carry their name in data-name.
+  none:function(root){var q=this.q.toLowerCase();if(!q||!root)return false;var rows=root.querySelectorAll(".li");
+    if(!rows.length)return false;return !Array.prototype.some.call(rows,function(r){return (r.getAttribute("data-name")||"").toLowerCase().indexOf(q)>=0;});}
+});});</script>
 <script src="{{.Prefix}}/static/htmx.min.js"></script>
 <script defer src="{{.Prefix}}/static/alpine.min.js"></script>
 <script src="{{.Prefix}}/static/cm/codemirror.min.js"></script>
@@ -31,6 +37,7 @@ var r=localStorage.getItem("rail");if(r==="slim")document.documentElement.setAtt
 <script src="{{.Prefix}}/static/shell.js" defer></script>
 </head>
 <body>
+<div class="reqbar" id="reqbar" hidden role="progressbar" aria-label="Working"></div>
 <div class="app">
   <header class="topbar">
     <div class="brand"><img src="{{.Prefix}}/static/favicon.svg" alt="" style="width:15px;height:15px"> doze-kafka <span class="sub">console</span></div>

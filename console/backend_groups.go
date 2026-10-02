@@ -139,7 +139,7 @@ func (b *backend) DescribeGroup(ctx context.Context, id string) (*GroupDetail, e
 		}
 	}
 	if protocol == "" {
-		return nil, fmt.Errorf("group %q not found", id)
+		return nil, fmt.Errorf("%w: group %q", errNotFound, id)
 	}
 	if protocol == "848" {
 		return b.describeGroup848(ctx, id)
@@ -155,7 +155,7 @@ func (b *backend) describeGroupClassic(ctx context.Context, id string) (*GroupDe
 		return nil, err
 	}
 	if len(resp.Groups) == 0 {
-		return nil, fmt.Errorf("group %q not found", id)
+		return nil, fmt.Errorf("%w: group %q", errNotFound, id)
 	}
 	g := resp.Groups[0]
 	if g.ErrorCode != 0 {
@@ -183,7 +183,7 @@ func (b *backend) describeGroup848(ctx context.Context, id string) (*GroupDetail
 		return nil, err
 	}
 	if len(resp.Groups) == 0 {
-		return nil, fmt.Errorf("group %q not found", id)
+		return nil, fmt.Errorf("%w: group %q", errNotFound, id)
 	}
 	g := resp.Groups[0]
 	if g.ErrorCode != 0 {

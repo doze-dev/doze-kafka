@@ -5,7 +5,7 @@ import "net/http"
 func (c *Console) groups(w http.ResponseWriter, r *http.Request) {
 	list, err := c.be.ListGroups(r.Context())
 	if err != nil {
-		c.fail(w, err)
+		c.fail(w, r, err)
 		return
 	}
 	c.render(w, r, "groups_home", map[string]any{"List": list, "Page": "groups"})
@@ -30,12 +30,12 @@ func (c *Console) groupDetail(w http.ResponseWriter, r *http.Request) {
 	list, _ := c.be.ListGroups(ctx)
 	detail, err := c.be.DescribeGroup(ctx, id)
 	if err != nil {
-		c.fail(w, err)
+		c.failResource(w, r, err, "group", id)
 		return
 	}
 	offsets, err := c.be.GroupOffsets(ctx, id)
 	if err != nil {
-		c.fail(w, err)
+		c.fail(w, r, err)
 		return
 	}
 

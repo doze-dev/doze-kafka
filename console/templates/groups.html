@@ -1,5 +1,6 @@
 {{define "group_lp"}}
 {{template "lp_head" dict "Glyph" "users" "Label" "Consumer groups"}}
+{{if not .List}}{{template "lp_empty" dict "Glyph" "users" "Title" (t "groups.none.title") "Hint" (t "groups.none.hint")}}{{end}}
 {{range .List}}
 <a class="li {{if eq .ID $.Sel}}on{{end}}" href="{{groupURL .ID}}" data-name="{{.ID}}"
    x-data x-show="!$store.filter.q || $el.dataset.name.toLowerCase().includes($store.filter.q.toLowerCase())">
@@ -11,12 +12,12 @@
   </span>
 </a>
 {{end}}
-{{template "lp_foot" .}}
+{{template "lp_foot" dict}}
 {{end}}
 
 {{define "groups_home"}}{{template "shell_top" .}}
   {{template "group_lp" (dict "Prefix" .Prefix "List" .List "Sel" "")}}
-  {{template "empty_detail" dict "Glyph" "users" "Hint" "Select a consumer group to see its members and lag."}}
+  {{template "empty_detail" dict "Glyph" "users" "Hint" (t "groups.pick")}}
 {{template "shell_bottom" .}}{{end}}
 
 {{define "group_detail"}}{{template "shell_top" .}}

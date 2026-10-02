@@ -98,7 +98,7 @@ func TestTopicLifecycle(t *testing.T) {
 		t.Fatalf("detail: status %d: %s", rec.Code, rec.Body)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"orders.created", "3 partition", "Effective config", "Nothing here yet"} {
+	for _, want := range []string{"orders.created", "3 partition", "Effective config", "No messages on this partition yet"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("detail missing %q", want)
 		}
@@ -111,8 +111,8 @@ func TestTopicLifecycle(t *testing.T) {
 		t.Fatalf("delete: status %d location %q", rec.Code, loc)
 	}
 	rec = req(t, c, "GET", "/_console/topics/orders.created", nil)
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("detail after delete: status %d, want 400 (topic not found)", rec.Code)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("detail after delete: status %d, want 404 (topic not found)", rec.Code)
 	}
 }
 
@@ -188,7 +188,7 @@ func TestPurgeTopic(t *testing.T) {
 		t.Fatalf("detail after purge: status %d: %s", rec.Code, rec.Body)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"2 partitions", "Nothing here yet"} {
+	for _, want := range []string{"2 partitions", "No messages on this partition yet"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("detail after purge missing %q", want)
 		}

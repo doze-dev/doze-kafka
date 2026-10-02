@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"maps"
 	"net/http"
 	"strconv"
@@ -19,7 +20,7 @@ type topicRef struct{ Name string }
 func (c *Console) topics(w http.ResponseWriter, r *http.Request) {
 	list, err := c.be.ListTopics(r.Context())
 	if err != nil {
-		c.fail(w, err)
+		c.fail(w, r, err)
 		return
 	}
 	c.render(w, r, "topics_home", map[string]any{"List": list, "Page": "topics"})
@@ -37,7 +38,7 @@ func (c *Console) topicCreate(w http.ResponseWriter, r *http.Request) {
 		partitions = 1
 	}
 	if err := c.be.CreateTopic(r.Context(), name, int32(partitions)); err != nil {
-		c.fail(w, err)
+		c.fail(w, r, err)
 		return
 	}
 	c.redirect(w, r, c.topicURL(name), "Topic created")
@@ -46,7 +47,7 @@ func (c *Console) topicCreate(w http.ResponseWriter, r *http.Request) {
 func (c *Console) topicDelete(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	if err := c.be.DeleteTopic(r.Context(), name); err != nil {
-		c.fail(w, err)
+		c.fail(w, r, err)
 		return
 	}
 	c.redirect(w, r, c.prefix+"/topics", "Topic deleted")
@@ -55,7 +56,7 @@ func (c *Console) topicDelete(w http.ResponseWriter, r *http.Request) {
 func (c *Console) topicPurge(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	if err := c.be.PurgeTopic(r.Context(), name); err != nil {
-		c.fail(w, err)
+		c.fail(w, r, err)
 		return
 	}
 	c.redirect(w, r, c.topicURL(name), "Topic purged — all messages deleted")
@@ -68,14 +69,14 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 	list, _ := c.be.ListTopics(ctx)
 	detail, err := c.be.DescribeTopic(ctx, name)
 	if err != nil {
-		c.fail(w, err)
+		c.failResource(w, r, err, "topic", name)
 		return
 	}
 	partition := partitionParam(r, detail.Partitions)
 
 	tape, err := c.tapeData(ctx, name, partition, detail.Partitions, fromParam(r), hlParam(r))
 	if err != nil {
-		c.fail(w, err)
+		c.fail(w, r, err)
 		return
 	}
 
@@ -94,14 +95,14 @@ func (c *Console) topicTape(w http.ResponseWriter, r *http.Request) {
 
 	count, err := c.be.PartitionCount(ctx, name)
 	if err != nil {
-		c.fail(w, err)
+		c.fail(w, r, err)
 		return
 	}
 	partition := partitionParam(r, count)
 
 	_, latest, err := c.be.PartitionOffsets(ctx, name, partition)
 	if err != nil {
-		c.fail(w, err)
+		c.fail(w, r, err)
 		return
 	}
 	hash := strconv.FormatInt(latest, 10)
@@ -111,7 +112,7 @@ func (c *Console) topicTape(w http.ResponseWriter, r *http.Request) {
 
 	tape, err := c.tapeData(ctx, name, partition, count, -1, -1)
 	if err != nil {
-		c.fail(w, err)
+		c.fail(w, r, err)
 		return
 	}
 	data := map[string]any{"Topic": topicRef{Name: name}, "Partition": partition}
@@ -125,7 +126,7 @@ func (c *Console) topicProduce(w http.ResponseWriter, r *http.Request) {
 
 	count, err := c.be.PartitionCount(ctx, name)
 	if err != nil {
-		c.fail(w, err)
+		c.fail(w, r, err)
 		return
 	}
 
@@ -157,7 +158,7 @@ func (c *Console) topicProduce(w http.ResponseWriter, r *http.Request) {
 
 	result, err := c.be.Produce(ctx, name, partition, key, value, headers, r.FormValue("acks"))
 	if err != nil {
-		c.fail(w, err)
+		c.fail(w, r, err)
 		return
 	}
 	if result.Confirmed {
@@ -171,7 +172,7 @@ func (c *Console) topicProduce(w http.ResponseWriter, r *http.Request) {
 	// still honestly reflected (not silently shown against the wrong tape).
 	tape, err := c.tapeData(ctx, name, result.Partition, count, -1, -1)
 	if err != nil {
-		c.fail(w, err)
+		c.fail(w, r, err)
 		return
 	}
 	data := map[string]any{"Topic": topicRef{Name: name}, "Partition": result.Partition}
@@ -187,12 +188,18 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	offset, err := strconv.ParseInt(r.URL.Query().Get("offset"), 10, 64)
 	if err != nil {
-		c.fail(w, err)
+		c.fail(w, r, err)
 		return
 	}
 	msgs, err := c.be.FetchWindow(r.Context(), name, partition, offset, 1)
-	if err != nil || len(msgs) == 0 {
-		c.fail(w, err)
+	if err == nil && len(msgs) == 0 {
+		// Nothing there is not an error to the broker, but it is to the person who
+		// clicked: the record is gone (retention, a purge) or never existed. This
+		// used to pass a nil error on and panic reading its message.
+		err = fmt.Errorf("%w: no record at offset %d of partition %d — it may have been deleted by retention or a purge", errNotFound, offset, partition)
+	}
+	if err != nil {
+		c.fail(w, r, err)
 		return
 	}
 	m := msgs[0]
