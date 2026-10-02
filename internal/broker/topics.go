@@ -80,6 +80,8 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 		return rt
 	}
 
+	b.cg848.topicChanged(created.Name)
+
 	rt.TopicID = created.ID
 	rt.NumPartitions = created.Partitions
 	rt.ReplicationFactor = 1
@@ -118,6 +120,7 @@ func (b *Broker) maybeAutoCreate(name string, requested bool) (meta.Topic, bool)
 		b.log.Warn("auto-create topic failed", "topic", name, "err", err)
 		return meta.Topic{}, false
 	}
+	b.cg848.topicChanged(created.Name)
 	return created, true
 }
 
@@ -192,6 +195,7 @@ func (b *Broker) handleDeleteTopics(ctx context.Context, req *protocol.Request) 
 				b.log.Warn("delete topic: partition cleanup failed", "topic", name, "err", err)
 			}
 			b.idem.dropPartitions(name, topic.Partitions)
+			b.cg848.topicChanged(name)
 		}
 		resp.Topics = append(resp.Topics, rt)
 	}

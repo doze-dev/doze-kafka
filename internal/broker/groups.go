@@ -57,9 +57,14 @@ func (b *Broker) handleJoinGroup(ctx context.Context, req *protocol.Request) ([]
 	}
 	jr := kreq.(*kmsg.JoinGroupRequest)
 
-	res, err := b.groups.join(ctx, jr)
-	if err != nil {
-		return nil, err
+	// One group id, one protocol: a group already running under KIP-848 cannot
+	// also be a classic group, or every partition would go to both.
+	res := joinResult{errorCode: int16(protocol.ErrInconsistentGroupProtocol), memberID: jr.MemberID}
+	if !b.cg848.hasMembers(jr.Group) {
+		res, err = b.groups.join(ctx, jr)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	resp := kmsg.NewPtrJoinGroupResponse()

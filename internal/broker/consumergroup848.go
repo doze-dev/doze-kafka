@@ -76,6 +76,7 @@ type cg848Member struct {
 	target       map[string][]int32 // topic -> partitions the assignor wants it to own.
 	lastSent     map[string][]int32 // last assignment we returned (to decide keepalive vs send).
 	sessionTimer *time.Timer
+	sessionGen   uint64 // bumped on every reset; a timer callback from an older one is stale.
 }
 
 // cg848Result is what heartbeat returns for the handler to encode.
@@ -91,6 +92,13 @@ type cg848Result struct {
 func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest) cg848Result {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	// A joining member is expected to name itself; one that does not would share
+	// the id "" with every other such member and be handed the same partitions
+	// as them. Mint one (the v0 preview clients send none and expect the broker to).
+	if r.MemberID == "" && r.MemberEpoch == 0 {
+		r.MemberID = generateMemberID(r.InstanceID)
+	}
 
 	// Leave: remove the member and rebalance the rest. The negative epoch is echoed;
 	// the client ignores negative-epoch responses (it never re-stores them).
@@ -185,9 +193,16 @@ func (m *cg848Manager) deliverable(g *cg848Group, mem *cg848Member) map[string][
 }
 
 // free reports whether no member other than self currently owns (topic, partition).
+//
+// "Owns" is what a member reported owning OR what it was last told it owns. The
+// report alone is not enough: a member only reports its partitions on a later
+// heartbeat, so right after it is handed a partition it believes it owns it
+// while the report still says it does not. Judging by the report alone gave the
+// same partition to a second member in that window — two consumers reading and
+// committing it at once.
 func (m *cg848Manager) free(g *cg848Group, self, topic string, p int32) bool {
 	for id, other := range g.members {
-		if id != self && owns(other.owned, topic, p) {
+		if id != self && (owns(other.owned, topic, p) || owns(other.lastSent, topic, p)) {
 			return false
 		}
 	}
@@ -255,11 +270,14 @@ func (m *cg848Manager) resetSession(g *cg848Group, mem *cg848Member) {
 	if mem.sessionTimer != nil {
 		mem.sessionTimer.Stop()
 	}
-	id := mem.id
+	mem.sessionGen++
+	id, gen := mem.id, mem.sessionGen
 	mem.sessionTimer = time.AfterFunc(m.sessionTimeout, func() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
-		if g.members[id] != mem { // superseded by a rejoin.
+		// Stale if superseded by a rejoin, or if the member heartbeated while
+		// this was waiting for the lock (Timer.Stop cannot recall a fired timer).
+		if g.members[id] != mem || mem.sessionGen != gen {
 			return
 		}
 		m.removeMember(g, id)
@@ -269,13 +287,51 @@ func (m *cg848Manager) resetSession(g *cg848Group, mem *cg848Member) {
 }
 
 func (m *cg848Manager) removeMember(g *cg848Group, id string) {
-	if mem := g.members[id]; mem != nil && mem.sessionTimer != nil {
-		mem.sessionTimer.Stop()
+	if mem := g.members[id]; mem != nil {
+		if mem.sessionTimer != nil {
+			mem.sessionTimer.Stop()
+		}
+		mem.sessionGen++
 	}
 	delete(g.members, id)
 	if len(g.members) == 0 {
 		delete(m.groups, g.id)
 	}
+}
+
+// topicChanged re-runs the assignor for every group subscribed to topic, after
+// the topic was created, deleted or grown. Assignments are otherwise computed
+// only when membership or subscriptions change, so a consumer that subscribed
+// before its topic existed (start the app, then create the topic — the common
+// order in local development) would otherwise idle forever.
+func (m *cg848Manager) topicChanged(topic string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, g := range m.groups {
+		if !slices.Contains(subscribedTopics(g), topic) {
+			continue
+		}
+		before := make(map[string]map[string][]int32, len(g.members))
+		for id, mem := range g.members {
+			before[id] = mem.target
+		}
+		m.assign(g)
+		for id, mem := range g.members {
+			if !assignmentsEqual(before[id], mem.target) {
+				g.epoch++ // members learn of new targets through the epoch.
+				break
+			}
+		}
+	}
+}
+
+// hasMembers reports whether the group id is in use here, so the classic
+// coordinator can refuse to share it (a group is one protocol or the other).
+func (m *cg848Manager) hasMembers(group string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	g := m.groups[group]
+	return g != nil && len(g.members) > 0
 }
 
 // --- metadata helpers ---
@@ -407,6 +463,14 @@ func (b *Broker) handleConsumerGroupHeartbeat(ctx context.Context, req *protocol
 	}
 	hr := kreq.(*kmsg.ConsumerGroupHeartbeatRequest)
 
+	// One group id, one protocol. A live classic group is not a consumer group, and
+	// joining it here would give every partition to both sets of members.
+	if hr.MemberEpoch >= 0 && b.groups.hasMembers(hr.Group) {
+		resp := kmsg.NewPtrConsumerGroupHeartbeatResponse()
+		resp.SetVersion(req.Header.APIVersion)
+		resp.ErrorCode = int16(protocol.ErrGroupIDNotFound)
+		return protocol.EncodeResponse(req.Header, resp), nil
+	}
 	res := b.cg848.heartbeat(hr)
 
 	resp := kmsg.NewPtrConsumerGroupHeartbeatResponse()

@@ -152,10 +152,30 @@ func TestGroupKIP848_NewProtocolTwoConsumersSplit(t *testing.T) {
 		mu          sync.Mutex
 		seen        = map[string]int{}
 		perConsumer = make([]int, 2)
-		assignedN   = make([]int, 2)
+		// owned[i] is what consumer i currently holds: everything it was assigned
+		// minus everything it has since revoked. The callback only reports what is
+		// NEWLY assigned, so a member that keeps its partitions can later be handed
+		// an empty set; counting the last callback instead of the running total
+		// mistakes that for "owns nothing".
+		owned [2]map[int32]bool
 	)
+	owned[0], owned[1] = map[int32]bool{}, map[int32]bool{}
 	stable := make(chan struct{})
 	var stableOnce sync.Once
+
+	// checkOwnership runs after every ownership change. The safety property of the
+	// broker-driven protocol is that no partition is ever held by two members at
+	// once; the split is stable when each holds something.
+	checkOwnership := func(what string) {
+		for p := range owned[0] {
+			if owned[1][p] {
+				t.Errorf("partition %d is owned by both consumers at once (%s): the broker handed it out while another member still held it", p, what)
+			}
+		}
+		if len(owned[0]) > 0 && len(owned[1]) > 0 {
+			stableOnce.Do(func() { close(stable) })
+		}
+	}
 
 	consume := func(idx int) {
 		cl, err := kgo.NewClient(append([]kgo.Opt{
@@ -164,16 +184,22 @@ func TestGroupKIP848_NewProtocolTwoConsumersSplit(t *testing.T) {
 			kgo.ConsumeTopics("work848"),
 			kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
 			kgo.OnPartitionsAssigned(func(_ context.Context, _ *kgo.Client, a map[string][]int32) {
-				n := 0
-				for _, ps := range a {
-					n += len(ps)
-				}
 				mu.Lock()
-				assignedN[idx] = n
-				both := assignedN[0] > 0 && assignedN[1] > 0
-				mu.Unlock()
-				if both {
-					stableOnce.Do(func() { close(stable) })
+				defer mu.Unlock()
+				for _, ps := range a {
+					for _, p := range ps {
+						owned[idx][p] = true
+					}
+				}
+				checkOwnership(fmt.Sprintf("consumer %d assigned %v", idx, a))
+			}),
+			kgo.OnPartitionsRevoked(func(_ context.Context, _ *kgo.Client, r map[string][]int32) {
+				mu.Lock()
+				defer mu.Unlock()
+				for _, ps := range r {
+					for _, p := range ps {
+						delete(owned[idx], p)
+					}
 				}
 			}),
 			kgo.DialTimeout(2 * time.Second),

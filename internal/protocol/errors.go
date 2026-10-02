@@ -6,20 +6,21 @@ package protocol
 type ErrorCode int16
 
 const (
-	ErrNone                ErrorCode = 0
-	ErrOffsetOutOfRange    ErrorCode = 1
-	ErrUnknownTopicOrPart  ErrorCode = 3
-	ErrRebalanceInProgress ErrorCode = 27
-	ErrUnsupportedVersion  ErrorCode = 35
-	ErrUnknownMemberID     ErrorCode = 25
-	ErrIllegalGeneration   ErrorCode = 22
-	ErrMemberIDRequired    ErrorCode = 79
-	ErrInvalidTopic        ErrorCode = 17 // INVALID_TOPIC_EXCEPTION: the name breaks Kafka's rules.
-	ErrInvalidPartitions   ErrorCode = 37
-	ErrTopicAlreadyExists  ErrorCode = 36
-	ErrUnknownServer       ErrorCode = -1
-	ErrUnknownTopicID      ErrorCode = 100
-	ErrInvalidRequest      ErrorCode = 42
+	ErrNone                      ErrorCode = 0
+	ErrOffsetOutOfRange          ErrorCode = 1
+	ErrUnknownTopicOrPart        ErrorCode = 3
+	ErrRebalanceInProgress       ErrorCode = 27
+	ErrUnsupportedVersion        ErrorCode = 35
+	ErrInconsistentGroupProtocol ErrorCode = 23 // the group already runs under another protocol.
+	ErrUnknownMemberID           ErrorCode = 25
+	ErrIllegalGeneration         ErrorCode = 22
+	ErrMemberIDRequired          ErrorCode = 79
+	ErrInvalidTopic              ErrorCode = 17 // INVALID_TOPIC_EXCEPTION: the name breaks Kafka's rules.
+	ErrInvalidPartitions         ErrorCode = 37
+	ErrTopicAlreadyExists        ErrorCode = 36
+	ErrUnknownServer             ErrorCode = -1
+	ErrUnknownTopicID            ErrorCode = 100
+	ErrInvalidRequest            ErrorCode = 42
 
 	// Idempotent producer (sequence-number deduplication).
 	ErrOutOfOrderSequence   ErrorCode = 45 // a gap in the producer's sequence numbers.

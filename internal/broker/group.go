@@ -126,6 +126,15 @@ type leaveResult struct {
 	errorCode int16
 }
 
+// hasMembers reports whether the group id is in use here, so the KIP-848
+// coordinator can refuse to share it (a group is one protocol or the other).
+func (gm *groupManager) hasMembers(group string) bool {
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
+	g := gm.groups[group]
+	return g != nil && len(g.members) > 0
+}
+
 // join runs the classic JoinGroup relay. It blocks until the rebalance completes
 // (all known members rejoined, or the collect timeout), returning this member's
 // slice of the result. A first-contact member (empty id) gets MEMBER_ID_REQUIRED
