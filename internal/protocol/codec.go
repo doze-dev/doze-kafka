@@ -16,6 +16,13 @@ func DecodeRequest(header RequestHeader, body []byte) (kmsg.Request, error) {
 	if req == nil {
 		return nil, fmt.Errorf("protocol: unknown api key %d", int16(header.APIKey))
 	}
+	// A version the message type has no definition for is not a request we can
+	// decode meaningfully (the fuzzer found a header claiming version 12336).
+	// Refuse it before parsing any of the body.
+	if header.APIVersion < 0 || header.APIVersion > req.MaxVersion() {
+		return nil, fmt.Errorf("protocol: %s v%d is outside the known range 0-%d",
+			header.APIKey.Name(), header.APIVersion, req.MaxVersion())
+	}
 	req.SetVersion(header.APIVersion)
 	if req.IsFlexible() {
 		body = skipTaggedFields(body)

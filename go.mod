@@ -152,3 +152,5 @@ require (
 )
 
 tool github.com/go-task/task/v3/cmd/task
+
+replace github.com/twmb/franz-go/pkg/kmsg => ./third_party/kmsg

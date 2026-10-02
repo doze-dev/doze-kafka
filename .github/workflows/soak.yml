@@ -35,3 +35,26 @@ jobs:
           SOAK_CHAOS: ${{ matrix.mode.chaos }}
           SOAK_DURATION: ${{ github.event.inputs.duration || '10m' }}
         run: go test -tags soak -run TestSoak -timeout 35m -v ./internal/broker/
+
+  # A scheduled run nobody is watching fails silently: the fuzz job was red for
+  # eleven consecutive weeks before anyone looked. Open (or comment on) one issue
+  # per workflow so a failure shows up where people already look.
+  notify:
+    needs: soak
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Scheduled soak run is failing"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$TITLE in:title" --json number -q '.[0].number')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "Failed again: $RUN_URL"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body "The scheduled run failed: $RUN_URL"$'\n\n'"This issue is updated on each failure and can be closed once the workflow is green."
+          fi
