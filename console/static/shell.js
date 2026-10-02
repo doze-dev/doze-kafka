@@ -49,6 +49,16 @@
 
   // ---------- collapsible rail ----------
   function railSlim() { return document.documentElement.getAttribute("data-rail") === "slim"; }
+  // The rail folds to icons on narrow windows unless you have chosen "wide".
+  var narrowMQ = window.matchMedia ? window.matchMedia("(max-width:1180px)") : null;
+  function railPref() { try { return localStorage.getItem("rail"); } catch (e) { return null; } }
+  function applyRailAuto() {
+    var pref = railPref();
+    var slim = pref === "slim" || (pref !== "wide" && !!narrowMQ && narrowMQ.matches);
+    if (slim) document.documentElement.setAttribute("data-rail", "slim");
+    else document.documentElement.removeAttribute("data-rail");
+  }
+  if (narrowMQ && narrowMQ.addEventListener) narrowMQ.addEventListener("change", applyRailAuto);
   function setRail(slim) {
     if (slim) document.documentElement.setAttribute("data-rail", "slim");
     else document.documentElement.removeAttribute("data-rail");
@@ -293,9 +303,6 @@
   // ---------- command palette ----------
   var pal = document.getElementById("palette"), palQ = document.getElementById("pal-q"), palList = document.getElementById("pal-list");
   var palItems = [], palSel = 0;
-  var NAV = [["topics","Topics","/topics"],["groups","Consumer groups","/groups"],["cluster","Cluster","/cluster"]];
-  var ACTS = [["topics","Create topic","/new/topic"]];
-  var KIND = { topics:"topic", groups:"group" };
 
   // ---------- recently visited resources ----------
   // The palette pins your last few resource pages on top: the queue you just
@@ -337,6 +344,7 @@
   }
   var currentSection = sectionFor(location.pathname);
   function syncRail() {
+    if (window.dozeView) window.dozeView();
     var section = sectionFor(location.pathname);
     document.querySelectorAll(".rail .ri").forEach(function (a) {
       var ip = new URL(a.href, location.origin).pathname;
@@ -364,32 +372,31 @@
         .filter(function (x) { return x.u !== here; }).slice(0, 5)
         .map(function (x) { return { s: x.s, n: x.n, u: x.u, k: "recent" }; });
     } catch (e) {}
-    var fixed = NAV.map(function (n) { return { s:n[0], n:n[1], u:PREFIX+n[2], k:"view" }; })
-      .concat(ACTS.map(function (a) { return { s:a[0], n:a[1], u:PREFIX+a[2], k:"action" }; }));
-    palItems = recents.concat(fixed);
+    palItems = recents;
     renderPal();
     palQ.focus();
-    fetch(PREFIX + "/api/resources").then(function (r) { return r.json(); }).then(function (rs) {
-      // Recents that no longer exist on the broker (deleted topics, dead
-      // groups) would be dead links — drop them from the list AND from
-      // localStorage so they stop resurfacing.
-      var live = {};
-      (rs || []).forEach(function (r) { live[r.u] = 1; });
+    // The catalogue (views, actions, every topic and group) comes from the server,
+    // so the palette cannot drift from the console's real routes.
+    fetch(PREFIX + "/api/palette").then(function (r) { return r.json(); }).then(function (all) {
+      var live = {}, fixed = [], resources = [];
+      (all || []).forEach(function (x) {
+        live[x.u] = 1;
+        (x.k === "view" || x.k === "action" ? fixed : resources).push(x);
+      });
+      // Recents that no longer exist (deleted topics, dead groups) would be dead
+      // links: drop them here and from localStorage so they stop resurfacing.
       var pruned = recents.filter(function (x) { return live[x.u]; });
       if (pruned.length !== recents.length) {
         try {
-          var stored = JSON.parse(localStorage.getItem("recents") || "[]")
-            .filter(function (x) { return live[x.u]; });
+          var stored = JSON.parse(localStorage.getItem("recents") || "[]").filter(function (x) { return live[x.u]; });
           localStorage.setItem("recents", JSON.stringify(stored));
         } catch (e) {}
       }
       var seen = {};
       pruned.forEach(function (x) { seen[x.u] = 1; });
-      var fresh = (rs || []).filter(function (r) { return !seen[r.u]; })
-        .map(function (r) { r.k = KIND[r.s] || r.s; return r; });
-      palItems = pruned.concat(fresh).concat(fixed);
+      palItems = pruned.concat(resources.filter(function (r) { return !seen[r.u]; })).concat(fixed);
       renderPal();
-    }).catch(function () {}); // offline: the fixed entries are still there.
+    }).catch(function () {}); // the console is unreachable: recents still work.
   }
   function palFiltered() {
     var q = palQ.value.toLowerCase().trim();

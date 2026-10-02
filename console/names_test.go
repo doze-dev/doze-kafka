@@ -132,7 +132,7 @@ func TestHostileGroupIDsCannotReachScriptContext(t *testing.T) {
 	}
 
 	// And the palette's resource index points at the same working URLs.
-	rec := req(t, c, "GET", "/_console/api/resources", nil)
+	rec := req(t, c, "GET", "/_console/api/palette", nil)
 	var resources []struct{ S, N, U string }
 	if err := json.Unmarshal(rec.Body.Bytes(), &resources); err != nil {
 		t.Fatal(err)

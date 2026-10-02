@@ -1,6 +1,7 @@
 package console
 
 import (
+	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
@@ -110,5 +111,36 @@ func TestConfirmFocusesCancel(t *testing.T) {
 	}
 	if !strings.Contains(string(js), "no.focus();") || strings.Contains(string(js), "yes.focus();") {
 		t.Error("the confirm dialog should focus Cancel, not the destructive button")
+	}
+}
+
+// The palette's catalogue comes from the server, views and actions included.
+func TestPaletteCatalogueIsServedWithViewsAndActions(t *testing.T) {
+	c := newTestConsole(t)
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"a"}, "partitions": {"1"}})
+	body := req(t, c, "GET", "/_console/api/palette", nil).Body.String()
+	for _, want := range []string{`"n":"Topics","u":"/_console/topics","k":"view"`, `"n":"Consumer groups"`, `"n":"Cluster"`,
+		`"n":"Create topic","u":"/_console/new/topic","k":"action"`, `"n":"a","u":"/_console/topics/a","k":"topic"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the palette catalogue is missing %s in %s", want, body)
+		}
+	}
+	js, _ := staticFS.ReadFile("static/shell.js")
+	if strings.Contains(string(js), `"Create topic"`) {
+		t.Error("shell.js still carries its own copy of the palette's actions")
+	}
+}
+
+// Static files revalidate: an ETag on the first request, a 304 on the second.
+func TestStaticFilesRevalidate(t *testing.T) {
+	c := newTestConsole(t)
+	first := req(t, c, "GET", "/_console/static/app.css", nil)
+	tag := first.Header().Get("ETag")
+	if first.Code != 200 || tag == "" || first.Header().Get("Cache-Control") != "no-cache" {
+		t.Fatalf("first fetch: %d etag %q cache-control %q", first.Code, tag, first.Header().Get("Cache-Control"))
+	}
+	again := doReq(t, c, "GET", "/_console/static/app.css", map[string]string{"If-None-Match": tag})
+	if again.Code != http.StatusNotModified || again.Body.Len() != 0 {
+		t.Errorf("revalidation: %d with %d body bytes, want 304 and none", again.Code, again.Body.Len())
 	}
 }

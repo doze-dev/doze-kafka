@@ -63,7 +63,7 @@ func TestRebindingRequestsAreRefused(t *testing.T) {
 	}
 
 	// Reads: the page, the JSON index of every topic and group, a static file.
-	for _, path := range []string{"/_console/", "/_console/topics", "/_console/api/resources", "/_console/static/app.css"} {
+	for _, path := range []string{"/_console/", "/_console/topics", "/_console/api/palette", "/_console/static/app.css"} {
 		if rec := do("GET", path, "evil.example:9093", "", nil); rec.Code != http.StatusForbidden {
 			t.Errorf("GET %s with a foreign Host = %d, want 403", path, rec.Code)
 		}

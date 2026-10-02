@@ -24,4 +24,5 @@ func groupPath(prefix, id string) string { return prefix + "/groups/" + url.Path
 func newTopicPath(prefix string) string { return prefix + "/new/topic" }
 
 func (c *Console) topicURL(name string) string { return topicPath(c.prefix, name) }
+func (c *Console) newTopicURL() string         { return newTopicPath(c.prefix) }
 func (c *Console) groupURL(id string) string   { return groupPath(c.prefix, id) }

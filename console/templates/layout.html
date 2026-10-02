@@ -19,7 +19,8 @@
 <link rel="stylesheet" href="{{.Prefix}}/static/cm/codemirror.min.css">
 <link rel="stylesheet" href="{{.Prefix}}/static/app.css">
 <script>(function(){try{var t=localStorage.getItem("theme");if(t)document.documentElement.setAttribute("data-theme",t);
-var r=localStorage.getItem("rail");if(r==="slim")document.documentElement.setAttribute("data-rail","slim");}catch(e){}})();</script>
+var r=localStorage.getItem("rail");if(r==="slim"||(r!=="wide"&&matchMedia("(max-width:1180px)").matches))document.documentElement.setAttribute("data-rail","slim");}catch(e){}
+window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").replace(/^\/+|\/+$/g,"").split("/");var v=(p[0]===""||((p[0]==="topics"||p[0]==="groups")&&!p[1]))?"list":"detail";document.documentElement.setAttribute("data-view",v);};window.dozeView();})();</script>
 <script>document.addEventListener("alpine:init",function(){window.Alpine.store("filter",{
   q:"",
   // True when a filter is set and no row in root matches it, so the list can say
@@ -75,6 +76,7 @@ var r=localStorage.getItem("rail");if(r==="slim")document.documentElement.setAtt
         <button class="icon-btn sm" style="margin-left:auto" onclick="this.closest('.flash').remove()">{{icon "x"}}</button>
       </div>
       {{end}}
+      {{if or (hasPrefix .Page "topics") (hasPrefix .Page "groups")}}<a class="backbar" href="{{.Prefix}}/{{if hasPrefix .Page "topics"}}topics{{else}}groups{{end}}">‹ {{if hasPrefix .Page "topics"}}Topics{{else}}Consumer groups{{end}}</a>{{end}}
       <div class="panes">
 {{end}}
 

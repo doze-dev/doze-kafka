@@ -289,11 +289,11 @@ func TestClusterInfo(t *testing.T) {
 	}
 }
 
-func TestAPIResourcesAndCounts(t *testing.T) {
+func TestAPIPaletteAndCounts(t *testing.T) {
 	c := newTestConsole(t)
 	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"a"}, "partitions": {"1"}})
 
-	rec := req(t, c, "GET", "/_console/api/resources", nil)
+	rec := req(t, c, "GET", "/_console/api/palette", nil)
 	var resources []struct {
 		S, N, U string
 	}

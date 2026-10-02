@@ -18,23 +18,33 @@ func liveUnchanged(w http.ResponseWriter, r *http.Request, hash string) bool {
 	return false
 }
 
-// apiResources feeds the command palette.
-func (c *Console) apiResources(w http.ResponseWriter, r *http.Request) {
+// paletteEntry is one row of the command palette: S is the section (topics,
+// groups, views), N the label, U the link, K what to call it.
+type paletteEntry struct {
+	S string `json:"s"`
+	N string `json:"n"`
+	U string `json:"u"`
+	K string `json:"k"`
+}
+
+// apiPalette is the whole palette catalogue: the console's own views and actions
+// (defined here, once) followed by every topic and group on the broker.
+func (c *Console) apiPalette(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	type res struct {
-		S string `json:"s"`
-		N string `json:"n"`
-		U string `json:"u"`
+	out := []paletteEntry{
+		{"views", "Topics", c.prefix + "/topics", "view"},
+		{"views", "Consumer groups", c.prefix + "/groups", "view"},
+		{"views", "Cluster", c.prefix + "/cluster", "view"},
+		{"topics", "Create topic", c.newTopicURL(), "action"},
 	}
-	var out []res
 	if topics, err := c.be.ListTopics(ctx); err == nil {
 		for _, t := range topics {
-			out = append(out, res{S: "topics", N: t.Name, U: c.topicURL(t.Name)})
+			out = append(out, paletteEntry{"topics", t.Name, c.topicURL(t.Name), "topic"})
 		}
 	}
 	if groups, err := c.be.ListGroups(ctx); err == nil {
 		for _, g := range groups {
-			out = append(out, res{S: "groups", N: g.ID, U: c.groupURL(g.ID)})
+			out = append(out, paletteEntry{"groups", g.ID, c.groupURL(g.ID), "group"})
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")

@@ -128,7 +128,7 @@ func (c *Console) routes() {
 	m := http.NewServeMux()
 	p := c.prefix
 
-	m.Handle("GET "+p+"/static/", http.StripPrefix(p+"/", http.FileServerFS(staticFS)))
+	m.Handle("GET "+p+"/static/", http.StripPrefix(p+"/", staticHandler()))
 
 	// The bare root points at the console, so http://host:port works as a URL.
 	if p != "" && p != "/" {
@@ -163,7 +163,7 @@ func (c *Console) routes() {
 	m.HandleFunc("GET "+p+"/cluster", c.cluster)
 
 	// Resource index for the command palette.
-	m.HandleFunc("GET "+p+"/api/resources", c.apiResources)
+	m.HandleFunc("GET "+p+"/api/palette", c.apiPalette)
 	m.HandleFunc("GET "+p+"/api/counts", c.apiCounts)
 
 	c.mux = m
@@ -239,7 +239,6 @@ func templateFuncs(prefix string) template.FuncMap {
 		"topicURL":    func(name string) string { return topicPath(prefix, name) },
 		"groupURL":    func(id string) string { return groupPath(prefix, id) },
 		"newTopicURL": func() string { return newTopicPath(prefix) },
-		"urlseg":      url.PathEscape,
 		"t":           uiText,
 		"dict": func(kv ...any) map[string]any {
 			m := make(map[string]any, len(kv)/2)
@@ -251,7 +250,6 @@ func templateFuncs(prefix string) template.FuncMap {
 			return m
 		},
 		"list":      func(items ...any) []any { return items },
-		"add":       func(a, b int) int { return a + b },
 		"sub":       func(a, b int) int { return a - b },
 		"ago":       ago,
 		"hasPrefix": strings.HasPrefix,
@@ -280,7 +278,6 @@ func templateFuncs(prefix string) template.FuncMap {
 			}
 			return "classic"
 		},
-		"humanBytes": humanBytes,
 	}
 }
 
