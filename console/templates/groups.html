@@ -45,13 +45,13 @@
       <div class="idband-acts">
         <div class="menu">
           <button type="button" class="btn btn-outline" {{if not (and .CanAct .Offsets)}}disabled title="{{if .Members}}Stop the group's {{len .Members}} consumer{{if ne (len .Members) 1}}s{{end}} first{{else}}No committed offsets to reset{{end}}"{{end}}
-            hx-post="{{groupURL .Group.ID}}/reset" hx-vals='{"to":"earliest"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
+            hx-post="{{groupURL .Group.ID}}/reset" data-confirm-title="Reset to earliest" data-confirm-verb="Reset offsets" hx-vals='{"to":"earliest"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
             hx-confirm="Reset every committed offset of &quot;{{.Group.ID}}&quot; to the earliest retained offset? Its consumers will re-read from the start.">⏮ Reset to earliest</button>
           <button type="button" class="btn btn-outline" {{if not (and .CanAct .Offsets)}}disabled{{end}}
-            hx-post="{{groupURL .Group.ID}}/reset" hx-vals='{"to":"latest"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
+            hx-post="{{groupURL .Group.ID}}/reset" data-confirm-title="Reset to latest" data-confirm-verb="Reset offsets" hx-vals='{"to":"latest"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
             hx-confirm="Reset every committed offset of &quot;{{.Group.ID}}&quot; to the latest offset? Its consumers will skip everything currently in the topics.">⏭ Reset to latest</button>
           <button type="button" class="btn danger" {{if not .CanAct}}disabled title="Stop the group's consumers first"{{end}}
-            hx-post="{{groupURL .Group.ID}}/delete" hx-disabled-elt="this"
+            hx-post="{{groupURL .Group.ID}}/delete" hx-disabled-elt="this" data-confirm-title="Delete group" data-confirm-verb="Delete group"
             hx-confirm="Delete group &quot;{{.Group.ID}}&quot; and its committed offsets?">{{icon "trash"}} Delete</button>
         </div>
       </div>

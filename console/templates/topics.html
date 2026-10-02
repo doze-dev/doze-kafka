@@ -46,8 +46,8 @@
         </div>
       </div>
       <div class="idband-acts">
-        <button class="btn btn-outline" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/purge" hx-confirm="Purge &quot;{{.Topic.Name}}&quot;? Deletes and recreates the topic with the same partition count. Every message is gone, the topic gets a new ID, and consumers restart from their auto.offset.reset policy.">{{icon "eraser"}} Purge</button>
-        <button class="btn danger" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/delete" hx-confirm="Delete topic &quot;{{.Topic.Name}}&quot;? This removes every partition's data.">{{icon "trash"}} Delete</button>
+        <button class="btn btn-outline" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/purge" data-confirm-title="Purge topic" data-confirm-verb="Purge" hx-confirm="Purge &quot;{{.Topic.Name}}&quot;? Deletes and recreates the topic with the same partition count. Every message is gone, the topic gets a new ID, and consumers restart from their auto.offset.reset policy.">{{icon "eraser"}} Purge</button>
+        <button class="btn danger" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/delete" data-confirm-title="Delete topic" data-confirm-verb="Delete topic" hx-confirm="Delete topic &quot;{{.Topic.Name}}&quot;? This removes every partition's data.">{{icon "trash"}} Delete</button>
       </div>
     </div>
 
@@ -161,7 +161,7 @@
     <div class="counter" title="The log-end offset: where the next message will be written"><span class="lbl">log end</span><span class="mono">{{printf "%07d" .Latest}}</span></div>
   </div>
   <div class="tape-strip">
-    {{if .Messages}}{{range .Messages}}<div class="tick {{if .Hot}}hot{{end}}" style="height:{{.TickHeight}}px" title="offset {{.Offset}}{{if not .Key.Null}} · {{.Key.Preview}}{{end}} · {{.Value.SizeText}}" onclick="document.getElementById('msg-{{.Offset}}')?.scrollIntoView({block:'center',behavior:'smooth'})"></div>{{end}}
+    {{if .Messages}}{{range .Messages}}<button type="button" tabindex="-1" class="tick {{if .Hot}}hot{{end}}" style="height:{{.TickHeight}}px" aria-label="Scroll to offset {{.Offset}}" title="offset {{.Offset}}{{if not .Key.Null}} · {{.Key.Preview}}{{end}} · {{.Value.SizeText}}" onclick="document.getElementById('msg-{{.Offset}}')?.scrollIntoView({block:'center',behavior:'smooth'})"></button>{{end}}
     {{else}}<div class="dim" style="padding:8px 2px;font-size:11.5px">No messages on this partition yet.</div>{{end}}
   </div>
   <div class="tape-foot">

@@ -10,7 +10,7 @@ import (
 // litRailItem returns the label of the rail item the server rendered as active.
 func litRailItem(t *testing.T, body string) string {
 	t.Helper()
-	m := regexp.MustCompile(`(?s)<a href="[^"]*" class="ri on">.*?<span class="ri-nm">([^<]*)</span>`).FindStringSubmatch(body)
+	m := regexp.MustCompile(`(?s)<a href="[^"]*" class="ri on"[^>]*>.*?<span class="ri-nm">([^<]*)</span>`).FindStringSubmatch(body)
 	if m == nil {
 		return ""
 	}
@@ -76,5 +76,39 @@ func TestTapeHasAPauseControl(t *testing.T) {
 	body := req(t, c, "GET", "/_console/topics/t", nil).Body.String()
 	if !strings.Contains(body, `data-live-toggle`) || !strings.Contains(body, `aria-pressed="false"`) {
 		t.Error("the live tape should offer a pause toggle, unpressed by default")
+	}
+}
+
+// The dialogs and controls a keyboard or screen-reader user depends on are named in
+// the markup the server sends, so they hold without any script running.
+func TestShellMarkupIsLabelled(t *testing.T) {
+	c := newTestConsole(t)
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"t"}, "partitions": {"1"}})
+	page := req(t, c, "GET", "/_console/topics/t", nil).Body.String()
+	for _, want := range []string{
+		`role="dialog" aria-modal="true" aria-label="Command palette"`,
+		`role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-msg"`,
+		`id="toasts" aria-live="polite"`,
+		`class="ri on" aria-label="Topics"`, // the slim rail hides the text; the name must remain.
+		`data-confirm-title="Delete topic"`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the topic page is missing %q", want)
+		}
+	}
+	if strings.Contains(page, `<div class="tick`) {
+		t.Error("tape ticks should be buttons, not clickable divs")
+	}
+}
+
+// The confirm dialog's default answer is Cancel; Enter on a destructive dialog
+// must not be the dangerous one.
+func TestConfirmFocusesCancel(t *testing.T) {
+	js, err := staticFS.ReadFile("static/shell.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(js), "no.focus();") || strings.Contains(string(js), "yes.focus();") {
+		t.Error("the confirm dialog should focus Cancel, not the destructive button")
 	}
 }

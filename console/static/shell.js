@@ -34,7 +34,9 @@
       try { localStorage.setItem("theme", mode); } catch (e) {}
     }
     if (themeSeg) themeSeg.querySelectorAll("button").forEach(function (b) {
-      b.classList.toggle("on", b.getAttribute("data-mode") === mode);
+      var on = b.getAttribute("data-mode") === mode;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
     });
   }
   if (themeSeg) {
@@ -87,7 +89,9 @@
     if (!box) return;
     var el = document.createElement("div");
     el.className = "toast anim" + (kind === "err" ? " err" : "");
-    el.innerHTML = '<span class="t-ic">' + (kind === "err" ? "⚠" : "✓") + '</span><span></span><span class="tclose">✕</span>';
+    // Errors interrupt a screen reader (alert); confirmations wait their turn (status).
+    el.setAttribute("role", kind === "err" ? "alert" : "status");
+    el.innerHTML = '<span class="t-ic" aria-hidden="true">' + (kind === "err" ? "⚠" : "✓") + '</span><span></span><button type="button" class="tclose" aria-label="Dismiss">✕</button>';
     el.children[1].textContent = msg;
     el.querySelector(".tclose").onclick = function () { el.remove(); };
     box.appendChild(el);
@@ -240,22 +244,50 @@
     panel.scrollIntoView({ behavior: "smooth", block: "center" });
   });
 
+  // ---------- dialog helpers ----------
+  // Tab stays inside an open dialog; shared by confirm and the palette.
+  function trapTab(root, ev) {
+    if (ev.key !== "Tab") return;
+    var f = Array.prototype.filter.call(root.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+      function (el) { return el.offsetParent !== null; });
+    if (!f.length) { ev.preventDefault(); return; }
+    var first = f[0], last = f[f.length - 1];
+    if (!root.contains(document.activeElement)) { first.focus(); ev.preventDefault(); }
+    else if (ev.shiftKey && document.activeElement === first) { last.focus(); ev.preventDefault(); }
+    else if (!ev.shiftKey && document.activeElement === last) { first.focus(); ev.preventDefault(); }
+  }
+
   // ---------- styled confirm (intercepts hx-confirm) ----------
-  var confirmBox = document.getElementById("confirm");
+  // The title and the confirming verb come from the button that asked
+  // (data-confirm-title / data-confirm-verb), so the dialog says "Delete topic",
+  // not "Are you sure? / Confirm". Focus starts on Cancel: Enter on a destructive
+  // dialog must not be the dangerous answer.
   document.addEventListener("htmx:confirm", function (e) {
+    var confirmBox = document.getElementById("confirm");
     var q = e.detail.question;
     if (!q || !confirmBox) return;
     e.preventDefault();
+    var elt = e.detail.elt || {}, data = elt.dataset || {};
+    var opener = document.activeElement;
+    document.getElementById("confirm-title").textContent = data.confirmTitle || "Are you sure?";
     document.getElementById("confirm-msg").textContent = q;
-    confirmBox.hidden = false;
     var yes = document.getElementById("confirm-yes"), no = document.getElementById("confirm-no");
-    function close() { confirmBox.hidden = true; yes.onclick = no.onclick = confirmBox.onclick = null; document.removeEventListener("keydown", onKey); }
-    function onKey(ev) { if (ev.key === "Escape") close(); }
-    yes.onclick = function () { close(); e.detail.issueRequest(true); };
-    no.onclick = close;
-    confirmBox.onclick = function (ev) { if (ev.target === confirmBox) close(); };
-    document.addEventListener("keydown", onKey);
-    yes.focus();
+    yes.textContent = data.confirmVerb || "Confirm";
+    confirmBox.hidden = false;
+    function close(restore) {
+      confirmBox.hidden = true; yes.onclick = no.onclick = confirmBox.onclick = null;
+      document.removeEventListener("keydown", onKey, true);
+      if (restore && opener && document.contains(opener) && opener.focus) opener.focus();
+    }
+    function onKey(ev) {
+      if (ev.key === "Escape") { close(true); ev.preventDefault(); ev.stopPropagation(); return; }
+      trapTab(confirmBox, ev);
+    }
+    yes.onclick = function () { close(false); e.detail.issueRequest(true); };
+    no.onclick = function () { close(true); };
+    confirmBox.onclick = function (ev) { if (ev.target === confirmBox) close(true); };
+    document.addEventListener("keydown", onKey, true);
+    no.focus();
   });
 
   // ---------- command palette ----------
@@ -323,6 +355,7 @@
 
   function openPalette() {
     if (!pal) return;
+    palOpener = document.activeElement;
     pal.hidden = false; palQ.value = ""; palSel = 0;
     var here = location.pathname + location.search;
     var recents = [];
@@ -372,6 +405,7 @@
       var a = document.createElement("a");
       a.className = "pal-item" + (i === palSel ? " sel" : "");
       a.href = it.u;
+      a.id = "pal-opt-" + i; a.setAttribute("role", "option"); a.setAttribute("aria-selected", i === palSel ? "true" : "false"); a.tabIndex = -1;
       a.innerHTML = '<span class="pal-dot"></span><span class="pal-name"></span><span class="pal-kind"></span>';
       // The dot encodes what the row IS (topic/group/view), not how it got
       // into the list — a "recent" topic still gets the topic hue.
@@ -384,29 +418,43 @@
     });
     // Keyboard selection can walk past the fold — keep it in view.
     var sel = palList.querySelector(".pal-item.sel");
-    if (sel) sel.scrollIntoView({ block: "nearest" });
+    if (sel) { sel.scrollIntoView({ block: "nearest" }); palQ.setAttribute("aria-activedescendant", sel.id); }
+    else palQ.removeAttribute("aria-activedescendant");
   }
-  function closePalette() { if (pal) pal.hidden = true; }
+  var palOpener = null;
+  function closePalette() {
+    if (!pal || pal.hidden) return;
+    pal.hidden = true;
+    if (palOpener && document.contains(palOpener) && palOpener.focus) palOpener.focus();
+  }
   var opener = document.getElementById("palette-open");
   if (opener) opener.addEventListener("click", openPalette);
   if (palQ) palQ.addEventListener("input", function () { palSel = 0; renderPal(); });
   if (pal) pal.addEventListener("click", function (e) { if (e.target === pal) closePalette(); });
 
   // ---------- keyboard ----------
-  var cursor = -1;
-  function listRows() { return Array.prototype.slice.call(document.querySelectorAll(".listpane .li[href]")); }
-  function resetListCursor() { cursor = -1; }
+  // The cursor is a row, not an index: filtering changes which rows are visible,
+  // and an index into the old list pointed at the wrong (or a hidden) one.
+  var cursorEl = null;
+  function listRows() {
+    return Array.prototype.filter.call(document.querySelectorAll(".listpane .li[href]"), function (r) { return r.offsetParent !== null; });
+  }
+  function resetListCursor() { cursorEl = null; }
   function moveCursor(d) {
     var rows = listRows();
     if (!rows.length) return;
-    cursor = Math.min(rows.length - 1, Math.max(0, cursor + d));
-    rows.forEach(function (r, i) { r.classList.toggle("cursor", i === cursor); });
-    rows[cursor].scrollIntoView({ block: "nearest" });
+    var at = rows.indexOf(cursorEl);
+    var next = at < 0 ? (d > 0 ? 0 : rows.length - 1) : Math.min(rows.length - 1, Math.max(0, at + d));
+    document.querySelectorAll(".listpane .li.cursor").forEach(function (r) { r.classList.remove("cursor"); });
+    cursorEl = rows[next];
+    cursorEl.classList.add("cursor");
+    cursorEl.scrollIntoView({ block: "nearest" });
   }
   document.addEventListener("keydown", function (e) {
     var inPal = !pal.hidden;
     if (inPal) {
       var items = palFiltered();
+      if (e.key === "Tab") { e.preventDefault(); return; } // one control; focus stays on the search box.
       if (e.key === "Escape") { closePalette(); e.preventDefault(); }
       else if (e.key === "ArrowDown") { palSel = Math.min(palSel + 1, items.length - 1); renderPal(); e.preventDefault(); }
       else if (e.key === "ArrowUp") { palSel = Math.max(palSel - 1, 0); renderPal(); e.preventDefault(); }
@@ -427,7 +475,7 @@
       if (f) { f.focus(); e.preventDefault(); } else openPalette();
     } else if (e.key === "j") moveCursor(1);
     else if (e.key === "k") moveCursor(-1);
-    else if (e.key === "Enter" && cursor >= 0) { var r = listRows()[cursor]; if (r) r.click(); }
+    else if (e.key === "Enter" && cursorEl && document.contains(cursorEl) && cursorEl.offsetParent !== null) cursorEl.click();
     else if (e.key === "c") { var nb = document.querySelector(".listpane .new-link"); if (nb) nb.click(); }
     else if (e.key === "m") {
       // Open the docked composer and put the caret in the value editor.

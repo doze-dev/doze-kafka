@@ -12,15 +12,15 @@
   --chassis-2: #262931;
   --line: #2b2e33;
   --paper: #ece7da;
-  --dim: #8d8a80;
-  --dim-2: #605d54;
+  --dim: #a09d92;
+  --dim-2: #9a978c;
   --brass: #cc9a4a;
   --brass-ink: #241b0d;
   --verdigris: #4fa69a;
   --verdigris-ink: #0c1f1c;
   --ok: #6fa97a;
   --warn: #cc9a4a;
-  --bad: #c36249;
+  --bad: #e0765b;
   --radius: 6px;
   --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
   --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
@@ -31,10 +31,10 @@
 }
 :root[data-theme="light"] {
   --ink: #f7f4ea; --chassis: #ffffff; --chassis-2: #f0ecdc; --line: #e1dac2;
-  --paper: #211d15; --dim: #6b6759; --dim-2: #8f8a77;
-  --brass: #9c6c1c; --brass-ink: #fbefd9;
+  --paper: #211d15; --dim: #6b6759; --dim-2: #6f6b5c;
+  --brass: #86580f; --brass-ink: #fbefd9;
   --verdigris: #2c766c; --verdigris-ink: #e4f3f0;
-  --ok: #3f7a4e; --warn: #9c6c1c; --bad: #a83f2c;
+  --ok: #37704a; --warn: #86580f; --bad: #a83f2c;
   --sh: 0 1px 2px rgba(30,25,10,.06), 0 6px 20px -10px rgba(30,25,10,.18);
   --sh-lg: 0 20px 50px -16px rgba(30,25,10,.28);
   --counter-sh: rgba(30,25,10,.14);
@@ -43,10 +43,10 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     --ink: #f7f4ea; --chassis: #ffffff; --chassis-2: #f0ecdc; --line: #e1dac2;
-    --paper: #211d15; --dim: #6b6759; --dim-2: #8f8a77;
-    --brass: #9c6c1c; --brass-ink: #fbefd9;
+    --paper: #211d15; --dim: #6b6759; --dim-2: #6f6b5c;
+    --brass: #86580f; --brass-ink: #fbefd9;
     --verdigris: #2c766c; --verdigris-ink: #e4f3f0;
-    --ok: #3f7a4e; --warn: #9c6c1c; --bad: #a83f2c;
+    --ok: #37704a; --warn: #86580f; --bad: #a83f2c;
     --sh: 0 1px 2px rgba(30,25,10,.06), 0 6px 20px -10px rgba(30,25,10,.18);
     --sh-lg: 0 20px 50px -16px rgba(30,25,10,.28);
     --counter-sh: rgba(30,25,10,.14);
@@ -182,6 +182,7 @@ button { font: inherit; color: inherit; }
 .lp-h .l { font-weight: 650; font-size: 12.5px; letter-spacing: .01em; }
 .new-link { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--brass); cursor: pointer; font-weight: 600; }
 .filter { display: flex; align-items: center; gap: 7px; margin: 0 10px 8px; padding: 6px 9px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--chassis); }
+.filter:focus-within { border-color: var(--brass); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brass) 18%, transparent); }
 .filter svg { width: 13px; height: 13px; color: var(--dim-2); flex: none; }
 .filter input { border: none; background: transparent; outline: none; color: var(--paper); font-size: 12.5px; width: 100%; font-family: var(--ui); }
 .filter input::placeholder { color: var(--dim-2); }
@@ -315,7 +316,7 @@ details.cfg { border: 1px solid var(--line); border-radius: var(--radius); backg
 }
 .tick {
   width: 8px; min-width: 4px; border-radius: 2px 2px 0 0; background: var(--dim-2);
-  opacity: .6; flex: none; cursor: pointer; position: relative; z-index: 1;
+  opacity: .6; flex: none; cursor: pointer; position: relative; z-index: 1; border: 0; padding: 0;
   transition: transform .12s ease, opacity .12s ease;
 }
 .tick:hover { transform: scaleY(1.12); opacity: 1; background: var(--verdigris); }
@@ -499,7 +500,7 @@ table.tbl tbody tr:hover td { background: var(--chassis-2); }
 .toast .t-ic { flex: none; color: var(--ok); }
 .toast.err { border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
 .toast.err .t-ic { color: var(--bad); }
-.toast .tclose { margin-left: auto; cursor: pointer; color: var(--dim-2); }
+.toast .tclose { margin-left: auto; cursor: pointer; color: var(--dim-2); background: none; border: none; font: inherit; padding: 2px 4px; }
 
 /* scrollbars, quiet */
 ::-webkit-scrollbar { width: 9px; height: 9px; }

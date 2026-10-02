@@ -85,19 +85,19 @@ var r=localStorage.getItem("rail");if(r==="slim")document.documentElement.setAtt
 
   <!-- command palette (vanilla — survives every swap since it's outside #workspace) -->
   <div class="overlay palette-overlay" id="palette" hidden>
-    <div class="palette anim">
+    <div class="palette anim" role="dialog" aria-modal="true" aria-label="Command palette">
       <div class="pal-input">
         {{icon "search"}}
-        <input id="pal-q" placeholder="Search topics, groups, actions…" spellcheck="false" autocomplete="off">
+        <input id="pal-q" role="combobox" aria-expanded="true" aria-controls="pal-list" aria-autocomplete="list" aria-label="Search topics, groups and actions" placeholder="Search topics, groups, actions…" spellcheck="false" autocomplete="off">
         <span class="kbd">esc</span>
       </div>
-      <div class="pal-list" id="pal-list"></div>
+      <div class="pal-list" id="pal-list" role="listbox" aria-label="Results"></div>
     </div>
   </div>
 
   <!-- styled confirm (replaces native hx-confirm dialogs) -->
   <div class="overlay" id="confirm" hidden>
-    <div class="dialog anim" role="alertdialog" aria-modal="true">
+    <div class="dialog anim" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-msg">
       <div class="dialog-h"><h3 id="confirm-title">Are you sure?</h3><p id="confirm-msg"></p></div>
       <div class="dialog-f">
         <button type="button" class="btn btn-outline" id="confirm-no">Cancel</button>
@@ -111,7 +111,7 @@ var r=localStorage.getItem("rail");if(r==="slim")document.documentElement.setAtt
     <div class="drawer anim" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title"></div>
   </div>
 
-  <div class="toasts" id="toasts"></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
 </div>
 </body>
 </html>
@@ -119,7 +119,7 @@ var r=localStorage.getItem("rail");if(r==="slim")document.documentElement.setAtt
 
 {{/* ri = one rail item. Ct, if set, gets a live count via shell.js's refreshCounts. */}}
 {{define "ri"}}
-<a href="{{.P}}{{.URL}}" class="ri {{if .On}}on{{end}}">
+<a href="{{.P}}{{.URL}}" class="ri {{if .On}}on{{end}}" aria-label="{{.Name}}">
   <span class="ri-ic">{{icon .Glyph}}</span>
   <span class="ri-nm">{{.Name}}</span>
   {{if .Ct}}<span class="ri-ct" data-ct="{{.Ct}}"></span>{{end}}
