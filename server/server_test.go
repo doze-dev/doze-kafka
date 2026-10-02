@@ -3,6 +3,7 @@ package server_test
 import (
 	"bytes"
 	"context"
+	"io"
 	"log/slog"
 	"net"
 	"os"
@@ -277,4 +278,73 @@ func TestMetadataDefaultsToInsideTheDataDir(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "meta.db")); err != nil {
 		t.Errorf("no meta.db inside the data dir: %v", err)
 	}
+}
+
+// A second listener serves the same broker. The zone uses it to answer on
+// kafka.doze's address when the main listener is loopback.
+func TestAlsoListenServesTheSameBroker(t *testing.T) {
+	srv, err := server.New(server.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	main, err := srv.Bind(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := srv.AlsoListen(ctx, "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if other.String() == main.String() {
+		t.Fatalf("both listeners are %s", main)
+	}
+	done := make(chan error, 1)
+	go func() { done <- srv.Serve(ctx) }()
+
+	for _, addr := range []net.Addr{main, other} {
+		c, err := net.DialTimeout("tcp", addr.String(), 2*time.Second)
+		if err != nil {
+			t.Fatalf("dial %s: %v", addr, err)
+		}
+		// ApiVersions v0: length, api key 18, version 0, correlation 7, null client id.
+		req := []byte{0, 0, 0, 10, 0, 18, 0, 0, 0, 0, 0, 7, 0xff, 0xff}
+		c.SetDeadline(time.Now().Add(3 * time.Second))
+		if _, err := c.Write(req); err != nil {
+			t.Fatal(err)
+		}
+		resp := make([]byte, 8)
+		if _, err := io.ReadFull(c, resp); err != nil {
+			t.Fatalf("%s did not answer ApiVersions: %v", addr, err)
+		}
+		if resp[4] != 0 || resp[7] != 7 {
+			t.Errorf("%s: response header %v, want correlation id 7", addr, resp)
+		}
+		c.Close()
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Errorf("Serve: %v", err)
+	}
+}
+
+// Close frees a server that never served, twice over, without error.
+func TestCloseWithoutServeIsSafeAndIdempotent(t *testing.T) {
+	dir := t.TempDir()
+	srv, err := server.New(server.Options{DataDir: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.Close(); err != nil {
+		t.Fatalf("second Close: %v", err)
+	}
+	// The metadata lock is released: the same directory opens again.
+	again, err := server.New(server.Options{DataDir: dir})
+	if err != nil {
+		t.Fatalf("reopening after Close: %v", err)
+	}
+	again.Close()
 }

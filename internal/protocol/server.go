@@ -16,6 +16,7 @@ type Server struct {
 	router *Router
 	log    *slog.Logger
 	ln     net.Listener
+	extra  []net.Listener // more addresses answering as the same broker (see AlsoListen).
 
 	tlsConfig    *tls.Config // when set, the listener terminates TLS.
 	authRequired bool        // when true, connections must complete SASL before other APIs.
@@ -25,6 +26,7 @@ type Server struct {
 	mu    sync.Mutex
 	conns map[*Conn]struct{} // in-flight connections, for shutdown drain.
 	wg    sync.WaitGroup     // tracks conn.serve goroutines.
+	loops sync.WaitGroup     // tracks the accept loops of extra listeners.
 }
 
 // NewServer returns a Server that will listen on addr.
@@ -66,6 +68,22 @@ func (s *Server) Bind(ctx context.Context) (net.Addr, error) {
 	return ln.Addr(), nil
 }
 
+// AlsoListen opens one more listener, on another address, that serves the same
+// broker. The zone uses it to answer on kafka.doze's address when the main
+// listener is narrower than the wildcard. Call after Bind and before Serve.
+func (s *Server) AlsoListen(ctx context.Context, addr string) (net.Addr, error) {
+	var lc net.ListenConfig
+	ln, err := lc.Listen(ctx, "tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	if s.tlsConfig != nil {
+		ln = tls.NewListener(ln, s.tlsConfig)
+	}
+	s.extra = append(s.extra, ln)
+	return ln.Addr(), nil
+}
+
 // Serve accepts connections until ctx is cancelled, then stops accepting and
 // returns. In-flight connections observe cancellation on their next read.
 func (s *Server) Serve(ctx context.Context) error {
@@ -82,16 +100,38 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
 		_ = ln.Close()
+		for _, x := range s.extra {
+			_ = x.Close()
+		}
 		s.closeConns()
 	}()
 
+	for _, x := range s.extra {
+		s.log.Info("listening", "addr", x.Addr().String())
+		s.loops.Add(1)
+		go func(x net.Listener) {
+			defer s.loops.Done()
+			_ = s.acceptLoop(ctx, x)
+		}(x)
+	}
+
+	err := s.acceptLoop(ctx, ln)
+	s.loops.Wait() // no accept loop may add a connection once we start waiting for them.
+	if ctx.Err() != nil {
+		s.wg.Wait() // let in-flight connections drain before returning.
+		return nil  // clean shutdown
+	}
+	return err
+}
+
+// acceptLoop serves one listener until it is closed or ctx is cancelled.
+func (s *Server) acceptLoop(ctx context.Context, ln net.Listener) error {
 	var backoff time.Duration
 	for {
 		raw, err := ln.Accept()
 		if err != nil {
 			if ctx.Err() != nil {
-				s.wg.Wait() // let in-flight connections drain before returning.
-				return nil  // clean shutdown
+				return nil
 			}
 			if errors.Is(err, net.ErrClosed) {
 				return err

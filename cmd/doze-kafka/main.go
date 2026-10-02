@@ -21,8 +21,10 @@ import (
 	_ "net/http/pprof" // registers /debug/pprof on the default mux; only served if --pprof-addr is set.
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/doze-dev/doze-kafka/console"
 	"github.com/doze-dev/doze-kafka/internal/config"
@@ -106,7 +108,10 @@ func realMain(args []string, stdout, stderr io.Writer) int {
 		}()
 	}
 
-	if err := run(st, logger); err != nil {
+	// Stop accepting, then let in-flight work drain, on SIGINT/SIGTERM.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	if err := run(ctx, st, logger, stderr); err != nil {
 		logger.Error("fatal", "err", err)
 		return exitRuntime
 	}
@@ -173,15 +178,22 @@ func newLogger(cfg config.Config, w io.Writer) *slog.Logger {
 }
 
 // run builds the broker via the shared server package and serves until
-// interrupted, so the CLI and the embed API can't drift.
-func run(st startup, logger *slog.Logger) error {
+// interrupted, so the CLI and the embed API can't drift. out is where the
+// start-up summary goes.
+//
+// Everything that can fail to start (the broker's bind, the console's bind) is
+// done before anything is announced, so the summary is printed only once it is
+// true, and a port clash is an error line rather than a "listening" that was a lie.
+func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) error {
 	cfg := st.cfg
 
 	// The console has no trusted-caller bypass to reach for (doze-kafka gates
 	// every connection, loopback included, behind the same RequireAuth check
 	// once SASL is configured) — so if auth is on, it needs a real credential
 	// of its own. Provisioned here, before the server is built, so it lands
-	// in cfg.Credentials before SASL verifiers are set up.
+	// in cfg.Credentials before SASL verifiers are set up. The configuration was
+	// validated before this point, so the user's own credentials were checked
+	// first.
 	var consoleUser, consolePass, consoleMech string
 	if cfg.Console && cfg.AuthEnabled() {
 		var err error
@@ -195,48 +207,47 @@ func run(st startup, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	if cfg.TLSEnabled() {
-		logger.Info("TLS enabled on listener", "cert", cfg.TLSCertFile)
-	}
-	if cfg.AuthEnabled() {
-		logger.Info("SASL required", "mechanisms", cfg.SASLMechanisms)
-	}
-
-	// Stop accepting, then let in-flight work drain, on SIGINT/SIGTERM.
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
+	// Until Serve takes over (and closes storage on its way out), a failure below
+	// must release what NewFromConfig opened.
+	serving := false
+	defer func() {
+		if !serving {
+			srv.Close()
+		}
+	}()
 
 	// Bind before anything advertises an address. With a ":0" listen address the
 	// real port is not known until now, and both the zone and the console need
 	// it; Serve picks up the listener Bind opened.
 	bound, err := srv.Bind(ctx)
 	if err != nil {
-		return fmt.Errorf("bind: %w", err)
+		return fmt.Errorf("listen on %s: %w (is another broker running there? choose another with --listen)", cfg.ListenAddr, err)
 	}
 
 	// Join the shared .doze zone. Additive: the configured address above is the
 	// contract, and every failure in here is a log line rather than a refusal
 	// to start.
 	var z *zone
+	ready := readyInfo{version: version, kafka: cfg.Version, bootstrap: bound.String(), dataDir: absPath(cfg.DataDir),
+		auth: authSummary(cfg), configFile: st.configFile}
 	if cfg.Zone {
 		z = joinZone(ctx, logger)
 		defer z.close()
-	}
-	if addr := z.brokerURL(logger, bound); addr != "" {
-		logger.Info("broker also reachable by name", "addr", addr)
+		ready.bootstrapName = z.reachBroker(ctx, logger, srv, bound)
 	}
 
 	if cfg.Console {
-		closeConsole, err := startConsole(ctx, st, cfg, bound, logger, consoleUser, consolePass, consoleMech)
+		closeConsole, consoleAddr, err := startConsole(ctx, cfg, bound, logger, consoleUser, consolePass, consoleMech)
 		if err != nil {
-			return fmt.Errorf("console: %w", err)
+			return err
 		}
 		defer closeConsole()
-		if u := z.routeConsole(logger, cfg.ConsoleAddr); u != "" {
-			logger.Info("console also reachable by name", "url", u)
-		}
+		ready.consoleURL = "http://" + consoleAddr
+		ready.consoleName = z.routeConsole(logger, consoleAddr)
 	}
 
+	announce(out, logger, cfg, ready)
+	serving = true
 	if err := srv.Serve(ctx); err != nil {
 		return err
 	}
@@ -244,6 +255,83 @@ func run(st startup, logger *slog.Logger) error {
 	// flushed and closed on the way out.
 	logger.Info("shutting down: flushing logs to disk")
 	return nil
+}
+
+// readyInfo is what the start-up summary reports.
+type readyInfo struct {
+	version, bootstrap, bootstrapName string
+	kafka                             int
+	consoleURL, consoleName           string
+	dataDir, auth, configFile         string
+}
+
+// authSummary is one phrase for how the listener is protected.
+func authSummary(cfg config.Config) string {
+	var parts []string
+	if cfg.AuthEnabled() {
+		parts = append(parts, "SASL "+strings.Join(cfg.SASLMechanisms, ", "))
+	} else {
+		parts = append(parts, "no auth")
+	}
+	if cfg.TLSEnabled() {
+		parts = append(parts, "TLS")
+	} else {
+		parts = append(parts, "plaintext")
+	}
+	return strings.Join(parts, " · ")
+}
+
+// announce prints the one block a developer reads to learn how to connect: what to
+// point a client at, where the console is, where the data lives. As text it is a
+// few aligned lines; as JSON it is a single "ready" record; it stays quiet when
+// the log level asked for quiet.
+func announce(out io.Writer, logger *slog.Logger, cfg config.Config, r readyInfo) {
+	if cfg.LogLevel == "warn" || cfg.LogLevel == "error" {
+		return
+	}
+	if cfg.LogFormat == "json" {
+		logger.Info("ready", "bootstrap", r.bootstrap, "bootstrap_name", r.bootstrapName, "console", r.consoleURL,
+			"console_name", r.consoleName, "data_dir", r.dataDir, "auth", r.auth, "kafka_compat", r.kafka)
+		return
+	}
+	line := func(label, value, alt string) {
+		if value == "" {
+			return
+		}
+		if alt != "" {
+			value += "   (also " + alt + ")"
+		}
+		fmt.Fprintf(out, "  %-10s %s\n", label, value)
+	}
+	fmt.Fprintf(out, "\ndoze-kafka %s ready — emulating Kafka %d\n", r.version, r.kafka)
+	line("Kafka", r.bootstrap, r.bootstrapName)
+	line("Console", r.consoleURL, r.consoleName)
+	line("Data", r.dataDir, "")
+	line("Security", r.auth, "")
+	if r.configFile != "" {
+		line("Config", r.configFile, "")
+	}
+	fmt.Fprintln(out)
+}
+
+// absPath is p made absolute for display, or p itself if that fails.
+func absPath(p string) string {
+	if a, err := filepath.Abs(p); err == nil {
+		return a
+	}
+	return p
+}
+
+// reachable reports whether something accepts a TCP connection at hostport. It is
+// how a by-name address earns its place in the start-up summary: a name that does
+// not resolve, or does not answer, is not worth advertising.
+func reachable(hostport string) bool {
+	c, err := net.DialTimeout("tcp", hostport, 400*time.Millisecond)
+	if err != nil {
+		return false
+	}
+	c.Close()
+	return true
 }
 
 // provisionConsoleCredential generates a random password for a reserved
@@ -273,20 +361,28 @@ func provisionConsoleCredential(cfg *config.Config) (user, pass, mech string, er
 	return user, pass, mech, nil
 }
 
-// startConsole binds a console HTTP listener on st.consoleAddr and dials the
-// broker as a real Kafka client at its already-bound address. Returns a func
-// that shuts the console down; the caller defers it.
-func startConsole(ctx context.Context, st startup, cfg config.Config, bound net.Addr, logger *slog.Logger, user, pass, mech string) (func(), error) {
+// startConsole binds the console's HTTP listener and dials the broker as a real
+// Kafka client at its already-bound address. The bind happens here, before it
+// returns, so a port that is already taken is reported as the error it is. It
+// returns a func that shuts the console down (the caller defers it) and the
+// address the listener actually got.
+func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger *slog.Logger, user, pass, mech string) (func(), string, error) {
 	dialAddr, err := consoleDialAddr(cfg, bound)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	var tlsCfg *tls.Config
 	if cfg.TLSEnabled() {
 		if tlsCfg, err = cfg.TLSConfig(); err != nil {
-			return nil, err
+			return nil, "", err
 		}
+	}
+
+	var lc net.ListenConfig
+	ln, err := lc.Listen(ctx, "tcp", cfg.ConsoleAddr)
+	if err != nil {
+		return nil, "", fmt.Errorf("console: listen on %s: %w (choose another with --console-addr, or turn the console off with --console=false)", cfg.ConsoleAddr, err)
 	}
 
 	con, err := console.New(console.Options{
@@ -294,13 +390,22 @@ func startConsole(ctx context.Context, st startup, cfg config.Config, bound net.
 		AllowedHosts: consoleHosts(cfg),
 	})
 	if err != nil {
-		return nil, err
+		ln.Close()
+		return nil, "", err
 	}
 
-	httpSrv := &http.Server{Addr: cfg.ConsoleAddr, Handler: con}
+	// /healthz answers 200 whenever the process is up, for scripts and compose
+	// healthchecks that wait on the broker before starting an app. It sits outside
+	// the console's Host check on purpose: it reveals nothing.
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		fmt.Fprintln(w, "ok")
+	})
+	mux.Handle("/", con)
+	httpSrv := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	go func() {
-		logger.Info("console listening", "addr", cfg.ConsoleAddr)
-		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := httpSrv.Serve(ln); err != nil && err != http.ErrServerClosed {
 			logger.Warn("console server stopped", "err", err)
 		}
 	}()
@@ -309,7 +414,7 @@ func startConsole(ctx context.Context, st startup, cfg config.Config, bound net.
 		httpSrv.Close()
 	}()
 
-	return func() { con.Close() }, nil
+	return func() { con.Close() }, ln.Addr().String(), nil
 }
 
 // consoleHosts is every extra host name the console should answer to: whatever

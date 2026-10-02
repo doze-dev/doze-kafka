@@ -37,11 +37,14 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
 
 	names "github.com/doze-dev/doze-names"
+
+	"github.com/doze-dev/doze-kafka/server"
 )
 
 // zone is doze-kafka's participation in .doze.
@@ -86,10 +89,17 @@ func joinZone(ctx context.Context, logger *slog.Logger) *zone {
 	return z
 }
 
-// brokerURL is the address to tell clients to use for the broker, or "" if the
-// name will not reach it. bound is the broker's real listening address, which
-// is the only reliable source of the port once ":0" is in play.
-func (z *zone) brokerURL(logger *slog.Logger, bound net.Addr) string {
+// reachBroker makes the broker answer on kafka.doze and returns the address to
+// advertise ("kafka.doze:9092"), or "" if the name will not reach it. bound is the
+// broker's real listening address, the only reliable source of the port once ":0"
+// is in play.
+//
+// The name resolves to the apex address (127.0.0.3). A wildcard listener already
+// answers there; a loopback listener does not, so it gets a second listener on the
+// apex address, same port, same broker. That is what lets the default
+// 127.0.0.1:9092 and kafka.doze:9092 both work. Anything narrower than that (a
+// specific LAN address, a host name) is the user's choice, and warns instead.
+func (z *zone) reachBroker(ctx context.Context, logger *slog.Logger, srv *server.Server, bound net.Addr) string {
 	if z == nil || z.lease == nil || bound == nil {
 		return ""
 	}
@@ -100,18 +110,30 @@ func (z *zone) brokerURL(logger *slog.Logger, bound net.Addr) string {
 	}
 	name := z.lease.Name.Host
 
-	// The name resolves to the apex address whether or not anything answers
-	// there. Advertising kafka.doze:9092 while the broker listens only on
-	// 127.0.0.1 would hand out an address that refuses every connection.
 	if !servesIP(host, z.lease.IP) {
-		logger.Warn("zone: the name resolves but the broker does not listen there",
-			"name", name, "apex_addr", net.JoinHostPort(z.lease.IP.String(), port),
-			"listening_on", bound.String(),
-			"still_works", bound.String(),
-			"hint", "listen on the wildcard (--listen :"+port+") for "+name+" to reach the broker")
+		ip := net.ParseIP(host)
+		if ip == nil || !ip.IsLoopback() {
+			logger.Warn("zone: the name resolves but the broker does not listen there",
+				"name", name, "apex_addr", net.JoinHostPort(z.lease.IP.String(), port),
+				"listening_on", bound.String(),
+				"still_works", bound.String(),
+				"hint", "listen on the wildcard (--listen :"+port+") or on loopback for "+name+" to reach the broker")
+			return ""
+		}
+		apex := net.JoinHostPort(z.lease.IP.String(), port)
+		if _, err := srv.AlsoListen(ctx, apex); err != nil {
+			// Usually the loopback alias dns-setup creates is not there yet.
+			logger.Debug("zone: could not also listen on the apex address", "addr", apex, "err", err)
+			return ""
+		}
+	}
+
+	addr := net.JoinHostPort(name, port)
+	if !reachable(addr) {
+		logger.Debug("zone: the name does not reach the broker yet", "addr", addr)
 		return ""
 	}
-	return net.JoinHostPort(name, port)
+	return addr
 }
 
 // servesIP reports whether a listening host answers on ip. An empty or
@@ -163,13 +185,27 @@ func (z *zone) routeConsole(logger *slog.Logger, consoleAddr string) string {
 	// common case — already fronted — costs nothing.
 	name := z.lease.Name.Host
 	deadline := time.Now().Add(500 * time.Millisecond)
+	var u string
 	for {
-		u := z.reg.URLFor(name)
+		u = z.reg.URLFor(name)
 		if u == "http://"+name || time.Now().After(deadline) {
-			return u
+			break
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
+	// Print a by-name URL only if it answers: a name that does not resolve (no
+	// dns-setup) or a front door that is not up is worth saying nothing about.
+	if pu, err := url.Parse(u); err == nil && pu.Host != "" {
+		hostport := pu.Host
+		if pu.Port() == "" {
+			hostport = net.JoinHostPort(pu.Hostname(), "80")
+		}
+		if !reachable(hostport) {
+			logger.Debug("zone: the console name does not answer", "url", u)
+			return ""
+		}
+	}
+	return u
 }
 
 // close releases the name and stops serving the zone. The registry would prune

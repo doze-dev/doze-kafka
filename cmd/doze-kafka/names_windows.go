@@ -17,6 +17,8 @@ import (
 	"log/slog"
 	"net"
 	"os"
+
+	"github.com/doze-dev/doze-kafka/server"
 )
 
 // zone is doze-kafka's participation in .doze. On Windows there is none.
@@ -24,7 +26,9 @@ type zone struct{}
 
 func joinZone(context.Context, *slog.Logger) *zone { return nil }
 
-func (z *zone) brokerURL(*slog.Logger, net.Addr) string { return "" }
+func (z *zone) reachBroker(context.Context, *slog.Logger, *server.Server, net.Addr) string {
+	return ""
+}
 
 func (z *zone) routeConsole(*slog.Logger, string) string { return "" }
 

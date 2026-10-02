@@ -84,6 +84,9 @@ type Server struct {
 
 	mu    sync.Mutex
 	bound net.Addr // set by Bind.
+
+	closeOnce sync.Once
+	closeErr  error
 }
 
 // New validates the options and opens storage + broker + router. It does not
@@ -217,6 +220,14 @@ func (s *Server) Bind(ctx context.Context) (net.Addr, error) {
 	return addr, nil
 }
 
+// AlsoListen opens another TCP listener, on addr, that serves this same broker —
+// for a second address the broker should answer on (the shared .doze zone's
+// kafka.doze, say) when the main one is narrower than the wildcard. Call it after
+// Bind and before Serve. Clients are still told the main listener's port.
+func (s *Server) AlsoListen(ctx context.Context, addr string) (net.Addr, error) {
+	return s.srv.AlsoListen(ctx, addr)
+}
+
 // Addr is the address the listener is bound to, or nil before Bind (or Serve)
 // has run. Metadata advertises this port, so a client dialling it is told to
 // stay on it.
@@ -254,14 +265,29 @@ func (s *Server) ServeListener(ctx context.Context, ln net.Listener) (err error)
 // closeStorage flushes and closes the partition logs and the metadata store, and
 // folds a failure into the Serve result. A shutdown whose final fsync failed has
 // not made the data durable, and exiting 0 over that hid it from every script
-// that checks the exit status.
+// that checks the exit status. It runs once, whoever gets there first.
 func (s *Server) closeStorage(err *error) {
-	if cerr := s.meta.Close(); cerr != nil && *err == nil {
-		*err = fmt.Errorf("close metadata store: %w", cerr)
+	s.closeOnce.Do(func() {
+		if cerr := s.meta.Close(); cerr != nil {
+			s.closeErr = fmt.Errorf("close metadata store: %w", cerr)
+		}
+		if cerr := s.logs.Close(); cerr != nil && s.closeErr == nil {
+			s.closeErr = fmt.Errorf("flush partition logs on shutdown: %w", cerr)
+		}
+	})
+	if *err == nil {
+		*err = s.closeErr
 	}
-	if cerr := s.logs.Close(); cerr != nil && *err == nil {
-		*err = fmt.Errorf("flush partition logs on shutdown: %w", cerr)
-	}
+}
+
+// Close releases the storage of a server that was built but never served — a
+// start-up step failed after New succeeded, say. It is safe to call more than
+// once and after Serve (which closes storage itself). To stop a server that is
+// serving, cancel the context passed to Serve instead.
+func (s *Server) Close() error {
+	var err error
+	s.closeStorage(&err)
+	return err
 }
 
 // Config returns the effective configuration (read-only view).
