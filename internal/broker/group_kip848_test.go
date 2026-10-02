@@ -67,12 +67,12 @@ func newProtocolConsume(t *testing.T, ctx context.Context, addr, group, topic st
 	return got
 }
 
-// TestPhase6_NewProtocolConsumeCommitResume is the Phase 6 acceptance gate: a
+// TestGroupKIP848_NewProtocolConsumeCommitResume is the Phase 6 acceptance gate: a
 // franz-go client using the KIP-848 broker-driven protocol (group.protocol=consumer,
 // no classic override) joins, gets a broker-computed assignment, consumes, and
 // commits; after a broker restart a fresh member of the same group resumes from the
 // committed offset — no replay.
-func TestPhase6_NewProtocolConsumeCommitResume(t *testing.T) {
+func TestGroupKIP848_NewProtocolConsumeCommitResume(t *testing.T) {
 	dir := t.TempDir()
 	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
 
@@ -122,11 +122,11 @@ func TestPhase6_NewProtocolConsumeCommitResume(t *testing.T) {
 	}
 }
 
-// TestPhase6_NewProtocolTwoConsumersSplit checks the broker-side assignor and
+// TestGroupKIP848_NewProtocolTwoConsumersSplit checks the broker-side assignor and
 // incremental reconciliation: two members of one group each get a partition of a
 // two-partition topic, and together they consume every record with both doing real
 // work.
-func TestPhase6_NewProtocolTwoConsumersSplit(t *testing.T) {
+func TestGroupKIP848_NewProtocolTwoConsumersSplit(t *testing.T) {
 	dir := t.TempDir()
 	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
 	defer runBrokerAt(t, addr, dir, 4)()

@@ -8,65 +8,16 @@ import (
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
-	"github.com/twmb/franz-go/pkg/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
 )
 
-// listOffset queries a partition's earliest (-2) or latest (-1) offset via
-// ListOffsets, driving the same path a real consumer uses to resolve AtStart/AtEnd.
-func listOffset(t *testing.T, ctx context.Context, cl *kgo.Client, topic string, partition int32, timestamp int64) int64 {
-	t.Helper()
-	req := kmsg.NewPtrListOffsetsRequest()
-	req.ReplicaID = -1
-	rt := kmsg.NewListOffsetsRequestTopic()
-	rt.Topic = topic
-	rp := kmsg.NewListOffsetsRequestTopicPartition()
-	rp.Partition = partition
-	rp.Timestamp = timestamp
-	rt.Partitions = append(rt.Partitions, rp)
-	req.Topics = append(req.Topics, rt)
-
-	resp, err := req.RequestWith(ctx, cl)
-	if err != nil {
-		t.Fatalf("ListOffsets: %v", err)
-	}
-	if len(resp.Topics) != 1 || len(resp.Topics[0].Partitions) != 1 {
-		t.Fatalf("ListOffsets: malformed response %+v", resp.Topics)
-	}
-	pr := resp.Topics[0].Partitions[0]
-	if pr.ErrorCode != 0 {
-		t.Fatalf("ListOffsets: error code %d", pr.ErrorCode)
-	}
-	return pr.Offset
-}
-
-// waitStableEarliest polls the earliest offset until it stops advancing (two equal
-// readings ~150ms apart) or the deadline passes, then returns it. Once production
-// stops, background retention reaches a fixed point quickly, so this pins down a
-// stable log-start offset without racing the reaper.
-func waitStableEarliest(t *testing.T, ctx context.Context, cl *kgo.Client, topic string) int64 {
-	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	prev := int64(-1)
-	for time.Now().Before(deadline) {
-		cur := listOffset(t, ctx, cl, topic, 0, -2)
-		if cur == prev && cur > 0 {
-			return cur
-		}
-		prev = cur
-		time.Sleep(150 * time.Millisecond)
-	}
-	t.Fatalf("earliest offset never stabilised above 0 (retention did not trim)")
-	return 0
-}
-
-// TestPhase5_RetentionTrimsUnderLoadAndSurvivesRestart is the Phase 5 acceptance
+// TestRetention_RetentionTrimsUnderLoadAndSurvivesRestart is the Phase 5 acceptance
 // gate: under sustained produce with a size bound configured, old segments are
 // deleted (the log-start offset advances past 0); the retained tail is contiguous
 // and correctly offset; and it survives a graceful restart — nothing acked and
 // still within retention is lost.
-func TestPhase5_RetentionTrimsUnderLoadAndSurvivesRestart(t *testing.T) {
+func TestRetention_RetentionTrimsUnderLoadAndSurvivesRestart(t *testing.T) {
 	dir := t.TempDir()
 	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
 

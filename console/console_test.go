@@ -17,33 +17,13 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
-// freePort mirrors internal/broker/integration_test.go's own helper: pick a
-// real ephemeral port up front rather than binding ":0" and reading it back
-// afterward. That matters here specifically because the broker's Metadata
-// response advertises AdvertisedHost:AdvertisedPort, and franz-go redirects
-// every request after the first to whatever that response says — so
-// AdvertisedPort has to be the real, final port before the broker ever
-// starts answering Metadata requests, not discovered after the fact.
-func freePort(t *testing.T) int {
-	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("free port: %v", err)
-	}
-	defer ln.Close()
-	return ln.Addr().(*net.TCPAddr).Port
-}
-
 // newTestConsole boots a real broker (server.New, same as cmd/doze-kafka)
 // and a console dialed at it — a genuine Kafka client talking real wire
 // protocol, exactly like production.
 func newTestConsole(t *testing.T) *Console {
 	t.Helper()
-	port := freePort(t)
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	srv, err := server.New(server.Options{
-		DataDir: t.TempDir(), ListenAddr: addr,
-		AdvertisedHost: "127.0.0.1", AdvertisedPort: port,
+		DataDir: t.TempDir(), ListenAddr: "127.0.0.1:0", AdvertisedHost: "127.0.0.1",
 	})
 	if err != nil {
 		t.Fatalf("server.New: %v", err)
@@ -52,9 +32,11 @@ func newTestConsole(t *testing.T) *Console {
 	// Bind synchronously before returning: the console's client dials
 	// immediately (see api tests below), and Serve's implicit bind-if-needed
 	// would otherwise race the first request against actual listener setup.
-	if _, err := srv.Bind(ctx); err != nil {
+	bound, err := srv.Bind(ctx)
+	if err != nil {
 		t.Fatalf("Bind: %v", err)
 	}
+	addr := bound.String()
 	done := make(chan struct{})
 	go func() { defer close(done); srv.Serve(ctx) }()
 	t.Cleanup(func() { cancel(); <-done })

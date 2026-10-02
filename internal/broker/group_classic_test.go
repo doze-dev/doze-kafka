@@ -54,11 +54,11 @@ func groupConsume(t *testing.T, ctx context.Context, addr, group, topic string, 
 	return got
 }
 
-// TestPhase4_GroupConsumeCommitAndResume is the core Phase 4 acceptance gate: a
+// TestGroupClassic_GroupConsumeCommitAndResume is the core Phase 4 acceptance gate: a
 // franz-go group consumer joins, gets an assignment, consumes, and commits; then
 // after a broker restart a fresh consumer in the same group resumes from the
 // committed offset — it sees only records produced after the commit, not a replay.
-func TestPhase4_GroupConsumeCommitAndResume(t *testing.T) {
+func TestGroupClassic_GroupConsumeCommitAndResume(t *testing.T) {
 	dir := t.TempDir()
 	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
 
@@ -111,12 +111,12 @@ func TestPhase4_GroupConsumeCommitAndResume(t *testing.T) {
 	}
 }
 
-// TestPhase4_TwoConsumersSplitPartitions checks that two members of one group split
+// TestGroupClassic_TwoConsumersSplitPartitions checks that two members of one group split
 // a two-partition topic: each is assigned a partition, and together they consume
 // every record. It waits for a stable two-member assignment (both partitions
 // covered) before producing, so neither member drains the topic before the other
 // joins.
-func TestPhase4_TwoConsumersSplitPartitions(t *testing.T) {
+func TestGroupClassic_TwoConsumersSplitPartitions(t *testing.T) {
 	dir := t.TempDir()
 	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
 	defer runBrokerAt(t, addr, dir, 4)()

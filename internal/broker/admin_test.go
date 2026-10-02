@@ -39,7 +39,7 @@ func startGroupMember(t *testing.T, ctx context.Context, addr, group, topic, pro
 		kgo.DialTimeout(2 * time.Second),
 	}
 	if proto == "consumer" {
-		opts = append(opts, kip848Opts()...) // the real KIP-848 opt-in (see phase6_test.go).
+		opts = append(opts, kip848Opts()...) // the real KIP-848 opt-in (see group_kip848_test.go).
 	} else {
 		opts = append(opts, kgo.GroupProtocol("classic"))
 	}
