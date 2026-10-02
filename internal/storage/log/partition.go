@@ -112,8 +112,13 @@ func (p *Partition) Append(records []byte) (int64, error) {
 
 // Read returns raw record batches beginning at the batch that contains
 // fetchOffset, up to maxBytes (whole batches; at least one when data exists). An
-// offset at or past the LEO yields an empty slice; below the log-start offset it
-// is ErrOffsetOutOfRange.
+// offset equal to the LEO yields an empty slice (the consumer is caught up); an
+// offset below the log-start offset or above the LEO is ErrOffsetOutOfRange.
+//
+// Above the LEO matters: a consumer holding an offset the log never reached (a
+// committed offset from a topic that was deleted and recreated, say) must be
+// told so it can reset, as it would on real Kafka. Answering "no data" instead
+// makes it wait, then silently skip every record up to that offset.
 func (p *Partition) Read(fetchOffset, maxBytes int64) ([]byte, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -121,7 +126,10 @@ func (p *Partition) Read(fetchOffset, maxBytes int64) ([]byte, error) {
 	if fetchOffset < p.logStartOffset {
 		return nil, ErrOffsetOutOfRange
 	}
-	if fetchOffset >= p.logEndOffset {
+	if fetchOffset > p.logEndOffset {
+		return nil, ErrOffsetOutOfRange
+	}
+	if fetchOffset == p.logEndOffset {
 		return []byte{}, nil
 	}
 	seg := p.segmentFor(fetchOffset)

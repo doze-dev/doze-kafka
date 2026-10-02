@@ -196,8 +196,40 @@ func (s *boltStore) DeleteTopic(name string) error {
 		if err := topics.Delete([]byte(name)); err != nil {
 			return err
 		}
-		return tx.Bucket(bucketTopicsByID).Delete(rec.ID[:])
+		if err := tx.Bucket(bucketTopicsByID).Delete(rec.ID[:]); err != nil {
+			return err
+		}
+		// Committed offsets belong to the topic's life, not the name's. Left behind,
+		// they point into a log that no longer exists: after delete-and-recreate (a
+		// test teardown, or the console's Purge) a consumer resumes from an offset
+		// the new topic has not reached, and silently skips everything below it.
+		// Same transaction, so a topic is never gone with its offsets still there.
+		offsets := tx.Bucket(bucketOffsets)
+		var stale [][]byte
+		c := offsets.Cursor()
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			if offsetKeyTopic(k) == name {
+				stale = append(stale, append([]byte(nil), k...))
+			}
+		}
+		for _, k := range stale {
+			if err := offsets.Delete(k); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
+}
+
+// offsetKeyTopic extracts the topic from a bucketOffsets key
+// (group \0 topic \0 partition). Topic names contain no NUL, so the topic is
+// whatever follows the last NUL before the 4-byte partition.
+func offsetKeyTopic(k []byte) string {
+	if len(k) < 6 {
+		return ""
+	}
+	rest := k[:len(k)-5] // drop \0 + partition.
+	return string(rest[bytes.LastIndexByte(rest, 0)+1:])
 }
 
 func (s *boltStore) CommitOffset(group, topic string, partition int32, offset int64, metadata string) error {

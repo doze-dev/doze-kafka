@@ -307,8 +307,8 @@ func (b *backend) DeleteTopic(ctx context.Context, name string) error {
 // PurgeTopic deletes and recreates a topic with the same partition count —
 // the only way to clear a topic's data over doze-kafka's wire protocol
 // (DeleteRecords isn't implemented, and retention can't be altered per-topic).
-// The recreated topic gets a fresh topic ID, and any committed consumer
-// offsets now point past the (empty) log — consumers restart from their
+// The recreated topic gets a fresh topic ID, and the broker drops the topic's
+// committed consumer offsets with it — consumers restart from their
 // auto.offset.reset policy, exactly as the confirm dialog warns.
 func (b *backend) PurgeTopic(ctx context.Context, name string) error {
 	partitions, err := b.PartitionCount(ctx, name)
