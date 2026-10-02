@@ -18,6 +18,7 @@ import (
 	"log/slog"
 	"net"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/doze-dev/doze-kafka/internal/broker"
@@ -40,7 +41,7 @@ type Options struct {
 	MetaDB string
 
 	// ListenAddr is the host:port to bind when ServeListener is not used;
-	// empty uses the default (:9092).
+	// empty binds 127.0.0.1 on a free port (see Addr).
 	ListenAddr string
 	// AdvertisedHost/Port are what clients are told to dial in Metadata —
 	// set AdvertisedHost when the broker sits behind a proxy so clients reach
@@ -76,7 +77,11 @@ type Server struct {
 	meta  meta.Store
 	logs  *log.Manager
 	srv   *protocol.Server
+	b     *broker.Broker
 	extLn net.Listener
+
+	mu    sync.Mutex
+	bound net.Addr // set by Bind.
 }
 
 // New validates the options and opens storage + broker + router. It does not
@@ -93,6 +98,11 @@ func New(opts Options) (*Server, error) {
 	if cfg.MetaDB == "" {
 		cfg.MetaDB = filepath.Join(cfg.DataDir, "meta.db")
 	}
+	// An embedder asked for no particular address; the CLI default (the :9092
+	// wildcard) is the wrong answer for a library, which would fight over a fixed
+	// port with every other test run and listen on every interface. Loopback on
+	// an ephemeral port is always free and never exposed — Addr reports it.
+	cfg.ListenAddr = "127.0.0.1:0"
 	if opts.ListenAddr != "" {
 		cfg.ListenAddr = opts.ListenAddr
 	}
@@ -177,13 +187,30 @@ func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	if cfg.AuthEnabled() {
 		srv.RequireAuth()
 	}
-	return &Server{cfg: cfg, log: logger, meta: metaStore, logs: logs, srv: srv}, nil
+	return &Server{cfg: cfg, log: logger, meta: metaStore, logs: logs, srv: srv, b: b}, nil
 }
 
 // Bind opens the TCP listener without accepting and returns the bound address
 // (useful with a ":0" ListenAddr). Ignored when ServeListener is used.
 func (s *Server) Bind(ctx context.Context) (net.Addr, error) {
-	return s.srv.Bind(ctx)
+	addr, err := s.srv.Bind(ctx)
+	if err != nil {
+		return nil, err
+	}
+	s.b.SetBoundAddr(addr)
+	s.mu.Lock()
+	s.bound = addr
+	s.mu.Unlock()
+	return addr, nil
+}
+
+// Addr is the address the listener is bound to, or nil before Bind (or Serve)
+// has run. Metadata advertises this port, so a client dialling it is told to
+// stay on it.
+func (s *Server) Addr() net.Addr {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.bound
 }
 
 // Serve accepts connections until ctx is cancelled, drains in-flight
@@ -191,6 +218,14 @@ func (s *Server) Bind(ctx context.Context) (net.Addr, error) {
 func (s *Server) Serve(ctx context.Context) error {
 	if s.extLn != nil {
 		s.srv.UseListener(s.extLn)
+	} else if s.Addr() == nil {
+		// Bind here rather than letting protocol.Server do it, so the broker
+		// learns the real port before the first client connects.
+		if _, err := s.Bind(ctx); err != nil {
+			s.logs.Close()
+			s.meta.Close()
+			return err
+		}
 	}
 	defer s.logs.Close()
 	defer s.meta.Close()

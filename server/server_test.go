@@ -107,3 +107,75 @@ func TestServeListener(t *testing.T) {
 		t.Fatalf("produce over unix: %v", err)
 	}
 }
+
+// TestEphemeralPortIsAdvertised is the regression for ":0": the broker bound a
+// free port but Metadata still told clients the configured string's port
+// (falling back to 9092), so every client was sent somewhere nothing listened.
+// The client here connects to the bound address, is handed the advertised one
+// by Metadata, and must be able to use it.
+func TestEphemeralPortIsAdvertised(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping broker integration test in -short mode")
+	}
+	srv, err := server.New(server.Options{DataDir: t.TempDir(), ListenAddr: "127.0.0.1:0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- srv.Serve(ctx) }() // Serve binds: Addr must be set by it.
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+
+	var addr net.Addr
+	for i := 0; i < 100 && addr == nil; i++ {
+		if addr = srv.Addr(); addr == nil {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	if addr == nil {
+		t.Fatal("Addr() still nil after Serve started")
+	}
+
+	cl, err := kgo.NewClient(kgo.SeedBrokers(addr.String()), kgo.AllowAutoTopicCreation())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cl.Close()
+	pctx, pcancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer pcancel()
+	// Metadata tells the client where to produce; with the wrong advertised
+	// port this times out instead of returning.
+	if err := cl.ProduceSync(pctx, &kgo.Record{Topic: "eph", Value: []byte("v")}).FirstErr(); err != nil {
+		t.Fatalf("produce via advertised address: %v", err)
+	}
+}
+
+// TestNoListenAddrIsLoopbackEphemeral pins the embedder default: no address
+// asked for means a free loopback port, never the :9092 wildcard.
+func TestNoListenAddrIsLoopbackEphemeral(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping broker integration test in -short mode")
+	}
+	srv, err := server.New(server.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	addr, err := srv.Bind(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ta := addr.(*net.TCPAddr)
+	if !ta.IP.IsLoopback() || ta.Port == 9092 {
+		t.Fatalf("default bind = %v, want loopback on a free port", addr)
+	}
+	if srv.Addr() == nil {
+		t.Fatal("Addr() nil after Bind")
+	}
+	cancel()
+	_ = srv.Serve(ctx)
+}

@@ -9,6 +9,7 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"sync/atomic"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/internal/protocol"
@@ -28,6 +29,12 @@ type Broker struct {
 	idem    *idempotency     // idempotent-producer sequence dedup.
 	profile protocol.Profile // version profile selected by cfg.Version.
 	produce *notifier        // wakes long-polling fetchers when data is produced.
+
+	// boundPort is the port the TCP listener actually bound, learned after Bind.
+	// It is what Metadata must advertise when the configured address names no
+	// fixed port (":0"), and 0 until a listener is bound (or when serving on a
+	// caller-provided non-TCP listener, where the configured address stands).
+	boundPort atomic.Int32
 }
 
 // New constructs a Broker over an open log manager and metadata store. The
@@ -107,11 +114,25 @@ func (b *Broker) nodeID() int32 { return 1 }
 // clusterID is the (stable, cosmetic) cluster id reported in Metadata.
 func (b *Broker) clusterID() string { return "doze-kafka" }
 
+// SetBoundAddr tells the broker which address its listener actually bound, so
+// Metadata advertises the real port rather than the configured one. A listen
+// address of ":0" is the case this exists for: the configured string says
+// nothing, and without this clients are told 9092 and never connect.
+func (b *Broker) SetBoundAddr(a net.Addr) {
+	if t, ok := a.(*net.TCPAddr); ok && t.Port > 0 {
+		b.boundPort.Store(int32(t.Port))
+	}
+}
+
 // advertisedPort is the port returned to clients in Metadata: the configured
-// override if set, else the port from the listen address, else 9092.
+// override if set, else the port the listener bound, else the port from the
+// listen address, else 9092.
 func (b *Broker) advertisedPort() int32 {
 	if b.cfg.AdvertisedPort > 0 {
 		return int32(b.cfg.AdvertisedPort)
+	}
+	if p := b.boundPort.Load(); p > 0 {
+		return p
 	}
 	if _, portStr, err := net.SplitHostPort(b.cfg.ListenAddr); err == nil {
 		if p, err := strconv.Atoi(portStr); err == nil && p > 0 {
