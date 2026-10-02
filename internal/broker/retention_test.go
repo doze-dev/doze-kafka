@@ -12,12 +12,11 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/config"
 )
 
-// TestRetention_RetentionTrimsUnderLoadAndSurvivesRestart is the Phase 5 acceptance
-// gate: under sustained produce with a size bound configured, old segments are
+// TestRetention_TrimsUnderLoadAndSurvivesRestart: under sustained produce with a size bound configured, old segments are
 // deleted (the log-start offset advances past 0); the retained tail is contiguous
 // and correctly offset; and it survives a graceful restart — nothing acked and
 // still within retention is lost.
-func TestRetention_RetentionTrimsUnderLoadAndSurvivesRestart(t *testing.T) {
+func TestRetention_TrimsUnderLoadAndSurvivesRestart(t *testing.T) {
 	dir := t.TempDir()
 	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
 
@@ -39,9 +38,11 @@ func TestRetention_RetentionTrimsUnderLoadAndSurvivesRestart(t *testing.T) {
 	mustCreateTopic(t, ctx, producer, "logs", 1)
 
 	// One record per offset (synchronous produce → one batch each), value "m{offset}".
-	// The total on disk (thousands of small batches) dwarfs the 16 KiB bound, so
-	// retention must delete old segments.
-	const n = 4000
+	// The total on disk (~45 KiB of small batches) is nearly three times the 16 KiB
+	// bound, so retention must delete old segments. Every produce here is acks=all
+	// and so fsyncs; a few hundred keeps the run to seconds, where thousands made
+	// it fsync-bound and flaky against its deadline on a slow disk.
+	const n = 600
 	for i := range n {
 		rec := &kgo.Record{Topic: "logs", Value: fmt.Appendf(nil, "m%d", i)}
 		if err := producer.ProduceSync(ctx, rec).FirstErr(); err != nil {

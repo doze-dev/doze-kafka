@@ -136,6 +136,9 @@ func TestTornTailTruncatedOnRecovery(t *testing.T) {
 // batches are written straight to disk and never retained (the log is served by
 // pread, not buffered).
 func TestAppendKeepsHeapFlat(t *testing.T) {
+	if testing.Short() {
+		t.Skip("writes ~128 MiB to disk; omit -short to run it")
+	}
 	p, err := openPartition(t.TempDir(), ManagerOptions{SegmentBytes: 8 << 20, IndexIntervalBytes: 4096})
 	if err != nil {
 		t.Fatal(err)

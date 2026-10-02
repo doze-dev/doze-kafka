@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -17,8 +18,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
+	"github.com/twmb/franz-go/pkg/sasl"
 	"github.com/twmb/franz-go/pkg/sasl/plain"
 	"github.com/twmb/franz-go/pkg/sasl/scram"
 
@@ -106,6 +109,20 @@ func TestAuth_ScramSHA512RoundTrip(t *testing.T) {
 	authRoundTrip(t, addr, "scram512-topic", kgo.SASL(mech))
 }
 
+// requireRejected asserts the broker actively refused the client: the request
+// failed AND it failed before the test's deadline. "Any error" is too weak — a
+// broker that hung or crashed would also satisfy it — so a timeout is a failure
+// here, the refusal has to be prompt.
+func requireRejected(t *testing.T, ctx context.Context, err error) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected the broker to reject the request, got success")
+	}
+	if ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("request timed out instead of being rejected: %v", err)
+	}
+}
+
 func TestAuth_WrongPasswordRejected(t *testing.T) {
 	addr := startAuthBroker(t, []string{config.SASLScramSHA256}, map[string]string{"bob": "hunter2"}, "", "")
 	mech := scram.Auth{User: "bob", Pass: "wrong"}.AsSha256Mechanism()
@@ -118,9 +135,48 @@ func TestAuth_WrongPasswordRejected(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
-	if _, err := kmsg.NewPtrMetadataRequest().RequestWith(ctx, cl); err == nil {
-		t.Fatal("expected authentication failure with a wrong password, got success")
+	_, err = kmsg.NewPtrMetadataRequest().RequestWith(ctx, cl)
+	t.Logf("wrong-password error: %v", err)
+	requireRejected(t, ctx, err)
+	if !errors.Is(err, kerr.SaslAuthenticationFailed) {
+		t.Fatalf("wrong password: err = %v, want SASL_AUTHENTICATION_FAILED", err)
 	}
+}
+
+func TestAuth_PlainWrongPasswordRejected(t *testing.T) {
+	addr := startAuthBroker(t, []string{config.SASLPlain}, map[string]string{"alice": "s3cret"}, "", "")
+	mech := plain.Auth{User: "alice", Pass: "nope"}.AsMechanism()
+	assertSASLRefused(t, addr, mech)
+}
+
+func TestAuth_UnknownUserRejected(t *testing.T) {
+	addr := startAuthBroker(t, []string{config.SASLScramSHA256}, map[string]string{"bob": "hunter2"}, "", "")
+	mech := scram.Auth{User: "mallory", Pass: "hunter2"}.AsSha256Mechanism()
+	assertSASLRefused(t, addr, mech)
+}
+
+func TestAuth_UnsupportedMechanismRejected(t *testing.T) {
+	// Only PLAIN is enabled; a client offering SCRAM must be refused at the
+	// handshake, not allowed to proceed or hung.
+	addr := startAuthBroker(t, []string{config.SASLPlain}, map[string]string{"alice": "s3cret"}, "", "")
+	mech := scram.Auth{User: "alice", Pass: "s3cret"}.AsSha256Mechanism()
+	assertSASLRefused(t, addr, mech)
+}
+
+// assertSASLRefused connects with the given mechanism and requires a prompt
+// refusal of the very first request.
+func assertSASLRefused(t *testing.T, addr string, mech sasl.Mechanism) {
+	t.Helper()
+	cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.DialTimeout(3*time.Second), kgo.SASL(mech))
+	if err != nil {
+		t.Fatalf("client: %v", err)
+	}
+	defer cl.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	_, err = kmsg.NewPtrMetadataRequest().RequestWith(ctx, cl)
+	t.Logf("refusal: %v", err)
+	requireRejected(t, ctx, err)
 }
 
 func TestAuth_UnauthenticatedRejected(t *testing.T) {
@@ -136,9 +192,9 @@ func TestAuth_UnauthenticatedRejected(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
-	if _, err := kmsg.NewPtrMetadataRequest().RequestWith(ctx, cl); err == nil {
-		t.Fatal("expected an unauthenticated request to be rejected, got success")
-	}
+	_, err = kmsg.NewPtrMetadataRequest().RequestWith(ctx, cl)
+	t.Logf("unauthenticated error: %v", err)
+	requireRejected(t, ctx, err)
 }
 
 func TestAuth_TLSWithPlain(t *testing.T) {
@@ -164,9 +220,9 @@ func TestAuth_TLSRejectsPlaintextClient(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
-	if _, err := kmsg.NewPtrMetadataRequest().RequestWith(ctx, cl); err == nil {
-		t.Fatal("expected a plaintext client to fail against a TLS listener")
-	}
+	_, err = kmsg.NewPtrMetadataRequest().RequestWith(ctx, cl)
+	t.Logf("plaintext-to-TLS error: %v", err)
+	requireRejected(t, ctx, err)
 }
 
 func TestAuth_DisabledDoesNotAdvertiseSASL(t *testing.T) {

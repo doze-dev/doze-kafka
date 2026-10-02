@@ -22,6 +22,9 @@ import (
 // protocol, exactly like production.
 func newTestConsole(t *testing.T) *Console {
 	t.Helper()
+	if testing.Short() {
+		t.Skip("boots a real broker; omit -short (or run `go tool task test:integration`)")
+	}
 	srv, err := server.New(server.Options{
 		DataDir: t.TempDir(), ListenAddr: "127.0.0.1:0", AdvertisedHost: "127.0.0.1",
 	})
