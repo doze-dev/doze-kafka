@@ -29,12 +29,12 @@ func (c *Console) apiResources(w http.ResponseWriter, r *http.Request) {
 	var out []res
 	if topics, err := c.be.ListTopics(ctx); err == nil {
 		for _, t := range topics {
-			out = append(out, res{S: "topics", N: t.Name, U: c.prefix + "/topics/" + t.Name})
+			out = append(out, res{S: "topics", N: t.Name, U: c.topicURL(t.Name)})
 		}
 	}
 	if groups, err := c.be.ListGroups(ctx); err == nil {
 		for _, g := range groups {
-			out = append(out, res{S: "groups", N: g.ID, U: c.prefix + "/groups/" + g.ID})
+			out = append(out, res{S: "groups", N: g.ID, U: c.groupURL(g.ID)})
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")

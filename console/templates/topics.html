@@ -1,8 +1,8 @@
 {{define "topic_lp"}}
-{{template "lp_head" dict "Glyph" "layers" "Label" "Topics" "NewURL" (printf "%s/topics/create" .Prefix)}}
+{{template "lp_head" dict "Glyph" "layers" "Label" "Topics" "NewURL" newTopicURL}}
 {{range .List}}
-<a class="li {{if eq .Name $.Sel}}on{{end}}" href="{{$.Prefix}}/topics/{{.Name}}"
-   x-data x-show="!$store.filter.q || '{{.Name}}'.toLowerCase().includes($store.filter.q.toLowerCase())">
+<a class="li {{if eq .Name $.Sel}}on{{end}}" href="{{topicURL .Name}}" data-name="{{.Name}}"
+   x-data x-show="!$store.filter.q || $el.dataset.name.toLowerCase().includes($store.filter.q.toLowerCase())">
   <span class="nm mono">{{.Name}}</span>
   <span class="meta"><span class="mono">{{.Msgs}} msg{{if ne .Msgs 1}}s{{end}}</span> · <span class="mono">{{.Partitions}} partition{{if ne .Partitions 1}}s{{end}}</span></span>
 </a>
@@ -12,14 +12,14 @@
 
 {{define "topics_home"}}{{template "shell_top" .}}
   {{template "topic_lp" (dict "Prefix" .Prefix "List" .List "Sel" "")}}
-  {{template "empty_detail" dict "Glyph" "layers" "Hint" "Select a topic, or create one to start producing." "CTA" "New topic" "CTAURL" (printf "%s/topics/create" .Prefix)}}
+  {{template "empty_detail" dict "Glyph" "layers" "Hint" "Select a topic, or create one to start producing." "CTA" "New topic" "CTAURL" newTopicURL}}
 {{template "shell_bottom" .}}{{end}}
 
 {{define "topic_create"}}{{template "shell_top" .}}
   {{template "topic_lp" (dict "Prefix" .Prefix "List" .List "Sel" "")}}
   <section class="detail"><div class="detail-inner">
     <div class="idband"><div><h1 style="font-family:var(--ui);font-size:18px">Create topic</h1></div></div>
-    <form hx-post="{{.Prefix}}/topics/create">
+    <form hx-post="{{newTopicURL}}">
       <div class="panel form-sec"><div class="panel-h"><h2>General</h2></div><div class="form-b">
         <div class="field"><label>Topic name</label><input class="input mono" name="name" placeholder="orders.created" required autocomplete="off" autofocus></div>
         <div class="field" style="margin-top:10px;max-width:180px"><label>Partitions</label><input class="input mono" name="partitions" type="number" min="1" max="1000" value="1" required></div>
@@ -44,8 +44,8 @@
         </div>
       </div>
       <div class="idband-acts">
-        <button class="btn btn-outline" hx-post="{{.Prefix}}/topics/{{.Topic.Name}}/purge" hx-confirm="Purge &quot;{{.Topic.Name}}&quot;? Deletes and recreates the topic with the same partition count. Every message is gone, the topic gets a new ID, and consumers restart from their auto.offset.reset policy.">{{icon "eraser"}} Purge</button>
-        <button class="btn danger" hx-post="{{.Prefix}}/topics/{{.Topic.Name}}/delete" hx-confirm="Delete topic &quot;{{.Topic.Name}}&quot;? This removes every partition's data.">{{icon "trash"}} Delete</button>
+        <button class="btn btn-outline" hx-post="{{topicURL .Topic.Name}}/purge" hx-confirm="Purge &quot;{{.Topic.Name}}&quot;? Deletes and recreates the topic with the same partition count. Every message is gone, the topic gets a new ID, and consumers restart from their auto.offset.reset policy.">{{icon "eraser"}} Purge</button>
+        <button class="btn danger" hx-post="{{topicURL .Topic.Name}}/delete" hx-confirm="Delete topic &quot;{{.Topic.Name}}&quot;? This removes every partition's data.">{{icon "trash"}} Delete</button>
       </div>
     </div>
 
@@ -72,7 +72,7 @@
         <span class="twist">{{icon "chevron"}}</span>
       </div>
       <div class="dock-form">
-        <form hx-post="{{.Prefix}}/topics/{{.Topic.Name}}/produce" hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML" x-data="{hdrs:[], acks:'1'}" @htmx:after-request="if($event.detail.successful){window.dozeEditor?dozeEditor.set($refs.value,''):$refs.value.value='';$refs.key.value='';hdrs=[]}">
+        <form hx-post="{{topicURL .Topic.Name}}/produce" hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML" x-data="{hdrs:[], acks:'1'}" @htmx:after-request="if($event.detail.successful){window.dozeEditor?dozeEditor.set($refs.value,''):$refs.value.value='';$refs.key.value='';hdrs=[]}">
           <input type="hidden" name="partition_ctx" value="{{.Partition}}">
           <div class="crow">
             <div class="field" style="flex:0 0 140px">
@@ -132,11 +132,11 @@
 {{/* tape_and_table is the live-polled unit: the tick strip + message table
      together, so a new message appearing updates both from one partial. */}}
 {{define "tape_and_table"}}
-<div class="tapetable" id="tape-and-table" {{if .AtTail}}data-live="{{.Prefix}}/topics/{{.Topic.Name}}/tape?partition={{.Partition}}" data-hash="{{.Hash}}" data-live-ms="2500"{{end}}>
+<div class="tapetable" id="tape-and-table" {{if .AtTail}}data-live="{{topicURL .Topic.Name}}/tape?partition={{.Partition}}" data-hash="{{.Hash}}" data-live-ms="2500"{{end}}>
   <div class="tape-panel">
   <div class="tape-head">
     <div class="ptabs">
-      {{range $i := .PartitionRange}}<a class="ptab {{if eq $i $.Partition}}on{{end}}" href="{{$.Prefix}}/topics/{{$.Topic.Name}}?partition={{$i}}">P{{$i}}</a>{{end}}
+      {{range $i := .PartitionRange}}<a class="ptab {{if eq $i $.Partition}}on{{end}}" href="{{topicURL $.Topic.Name}}?partition={{$i}}">P{{$i}}</a>{{end}}
     </div>
     <div class="tape-head-spacer"></div>
     {{if .AtTail}}<span class="livedot" title="Following the log tail — refreshes every 2.5s"></span>{{else}}<span class="pinned mono">pinned to history</span>{{end}}
@@ -156,14 +156,14 @@
     <span class="sec-title">Messages · partition {{.Partition}}</span>
     <span class="jump">go to offset
       <input class="input mono" aria-label="Go to offset" placeholder="e.g. 4183"
-        onkeydown="if(event.key==='Enter'){var n=parseInt(this.value,10); if(!isNaN(n)&&n>=0) location='{{.Prefix}}/topics/{{.Topic.Name}}?partition={{.Partition}}&from='+Math.max(0,n-20)+'&hl='+n;}"></span>
+        onkeydown="if(event.key==='Enter'){var n=parseInt(this.value,10); if(!isNaN(n)&&n>=0) location='{{topicURL .Topic.Name}}?partition={{.Partition}}&from='+Math.max(0,n-20)+'&hl='+n;}"></span>
   </div>
   <div class="tbl-wrap">
     <table class="tbl">
       <thead><tr><th class="num">Offset</th><th>Time</th><th>Key</th><th>Value</th><th>Headers</th></tr></thead>
       <tbody>
         {{if .Messages}}{{range .MessagesDesc}}
-        <tr id="msg-{{.Offset}}" {{if eq .Offset $.HL}}class="hl" data-hl{{end}} hx-get="{{$.Prefix}}/topics/{{$.Topic.Name}}/message?partition={{$.Partition}}&offset={{.Offset}}" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML" onclick="document.getElementById('drawer-overlay').hidden=false">
+        <tr id="msg-{{.Offset}}" {{if eq .Offset $.HL}}class="hl" data-hl{{end}} hx-get="{{topicURL $.Topic.Name}}/message?partition={{$.Partition}}&offset={{.Offset}}" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML" onclick="document.getElementById('drawer-overlay').hidden=false">
           <td class="cell-offset num">{{.Offset}}</td>
           <td class="cell-time mono">{{.TimeStr}} <span class="dim">· {{ago .Timestamp}}</span></td>
           <td class="{{if .KeyStr}}cell-key{{else}}cell-key none{{end}}">{{if .KeyStr}}{{.KeyStr}}{{else}}no key{{end}}</td>
@@ -178,8 +178,8 @@
     <div class="tbl-foot">
       <span>{{if .Messages}}{{len .Messages}} shown{{else}}No messages{{end}}</span>
       <span class="pager">
-        {{if .HasOlder}}<a class="pagelink" href="{{.Prefix}}/topics/{{.Topic.Name}}?partition={{.Partition}}&from={{.OlderFrom}}">← Older</a>{{end}}
-        {{if .HasNewer}}<a class="pagelink" href="{{.Prefix}}/topics/{{.Topic.Name}}?partition={{.Partition}}&from={{.NewerFrom}}">Newer</a><a class="pagelink" href="{{.Prefix}}/topics/{{.Topic.Name}}?partition={{.Partition}}">Latest →</a>{{end}}
+        {{if .HasOlder}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.OlderFrom}}">← Older</a>{{end}}
+        {{if .HasNewer}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.NewerFrom}}">Newer</a><a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}">Latest →</a>{{end}}
         <span>earliest {{.Earliest}} · latest {{.Latest}}</span>
       </span>
     </div>

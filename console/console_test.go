@@ -22,6 +22,14 @@ import (
 // protocol, exactly like production.
 func newTestConsole(t *testing.T) *Console {
 	t.Helper()
+	c, _ := newTestConsoleAddr(t)
+	return c
+}
+
+// newTestConsoleAddr is newTestConsole that also returns the broker's address,
+// for tests that need to act as another Kafka client (join a group, say).
+func newTestConsoleAddr(t *testing.T) (*Console, string) {
+	t.Helper()
 	if testing.Short() {
 		t.Skip("boots a real broker; omit -short (or run `go tool task test:integration`)")
 	}
@@ -49,7 +57,7 @@ func newTestConsole(t *testing.T) *Console {
 		t.Fatalf("console.New: %v", err)
 	}
 	t.Cleanup(con.Close)
-	return con
+	return con, addr
 }
 
 func req(t *testing.T, c *Console, method, path string, form url.Values) *httptest.ResponseRecorder {
@@ -75,7 +83,7 @@ func TestTopicLifecycle(t *testing.T) {
 	}
 
 	// Create.
-	rec := req(t, c, "POST", "/_console/topics/create", url.Values{"name": {"orders.created"}, "partitions": {"3"}})
+	rec := req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"orders.created"}, "partitions": {"3"}})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("create: status %d: %s", rec.Code, rec.Body)
 	}
@@ -109,7 +117,7 @@ func TestTopicLifecycle(t *testing.T) {
 
 func TestProduceAndTape(t *testing.T) {
 	c := newTestConsole(t)
-	req(t, c, "POST", "/_console/topics/create", url.Values{"name": {"demo"}, "partitions": {"1"}})
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"demo"}, "partitions": {"1"}})
 
 	rec := req(t, c, "POST", "/_console/topics/demo/produce", url.Values{
 		"partition": {"0"}, "key": {"k1"}, "value": {`{"a":1}`},
@@ -164,7 +172,7 @@ func TestProduceAndTape(t *testing.T) {
 
 func TestPurgeTopic(t *testing.T) {
 	c := newTestConsole(t)
-	req(t, c, "POST", "/_console/topics/create", url.Values{"name": {"junk"}, "partitions": {"2"}})
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"junk"}, "partitions": {"2"}})
 	req(t, c, "POST", "/_console/topics/junk/produce", url.Values{"partition": {"0"}, "value": {"m1"}, "acks": {"1"}})
 	req(t, c, "POST", "/_console/topics/junk/produce", url.Values{"partition": {"1"}, "value": {"m2"}, "acks": {"1"}})
 
@@ -188,7 +196,7 @@ func TestPurgeTopic(t *testing.T) {
 
 func TestMessageWindowPaging(t *testing.T) {
 	c := newTestConsole(t)
-	req(t, c, "POST", "/_console/topics/create", url.Values{"name": {"big"}, "partitions": {"1"}})
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"big"}, "partitions": {"1"}})
 	for i := range 70 { // more than one tapeWindow (60)
 		req(t, c, "POST", "/_console/topics/big/produce", url.Values{
 			"partition": {"0"}, "value": {fmt.Sprintf("m%d", i)}, "acks": {"1"},
@@ -220,7 +228,7 @@ func TestMessageWindowPaging(t *testing.T) {
 
 func TestConsumerGroup(t *testing.T) {
 	c := newTestConsole(t)
-	req(t, c, "POST", "/_console/topics/create", url.Values{"name": {"events"}, "partitions": {"1"}})
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"events"}, "partitions": {"1"}})
 	req(t, c, "POST", "/_console/topics/events/produce", url.Values{"partition": {"0"}, "value": {"hi"}, "acks": {"1"}})
 
 	// A real classic consumer group joins, consumes, commits, leaves —
@@ -282,7 +290,7 @@ func TestClusterInfo(t *testing.T) {
 
 func TestAPIResourcesAndCounts(t *testing.T) {
 	c := newTestConsole(t)
-	req(t, c, "POST", "/_console/topics/create", url.Values{"name": {"a"}, "partitions": {"1"}})
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"a"}, "partitions": {"1"}})
 
 	rec := req(t, c, "GET", "/_console/api/resources", nil)
 	var resources []struct {
@@ -343,7 +351,7 @@ func TestUnixSocketConsole(t *testing.T) {
 	}
 	t.Cleanup(c.Close)
 
-	req(t, c, "POST", "/_console/topics/create", url.Values{"name": {"demo"}, "partitions": {"1"}})
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"demo"}, "partitions": {"1"}})
 	if rec := req(t, c, "POST", "/_console/topics/demo/produce", url.Values{
 		"partition": {"0"}, "key": {"k1"}, "value": {"over-unix"}, "acks": {"1"},
 	}); rec.Code != 200 {

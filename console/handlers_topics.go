@@ -40,7 +40,7 @@ func (c *Console) topicCreate(w http.ResponseWriter, r *http.Request) {
 		c.fail(w, err)
 		return
 	}
-	c.redirect(w, r, c.prefix+"/topics/"+name, "Topic created")
+	c.redirect(w, r, c.topicURL(name), "Topic created")
 }
 
 func (c *Console) topicDelete(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +58,7 @@ func (c *Console) topicPurge(w http.ResponseWriter, r *http.Request) {
 		c.fail(w, err)
 		return
 	}
-	c.redirect(w, r, c.prefix+"/topics/"+name, "Topic purged — all messages deleted")
+	c.redirect(w, r, c.topicURL(name), "Topic purged — all messages deleted")
 }
 
 func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {

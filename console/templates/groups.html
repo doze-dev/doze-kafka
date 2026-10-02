@@ -1,8 +1,8 @@
 {{define "group_lp"}}
 {{template "lp_head" dict "Glyph" "users" "Label" "Consumer groups"}}
 {{range .List}}
-<a class="li {{if eq .ID $.Sel}}on{{end}}" href="{{$.Prefix}}/groups/{{.ID}}"
-   x-data x-show="!$store.filter.q || '{{.ID}}'.toLowerCase().includes($store.filter.q.toLowerCase())">
+<a class="li {{if eq .ID $.Sel}}on{{end}}" href="{{groupURL .ID}}" data-name="{{.ID}}"
+   x-data x-show="!$store.filter.q || $el.dataset.name.toLowerCase().includes($store.filter.q.toLowerCase())">
   <span class="nm mono">{{.ID}}</span>
   <span class="meta">
     <span class="badge {{protoBadge .Protocol}}">{{protoLabel .Protocol}}</span>

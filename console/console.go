@@ -116,8 +116,8 @@ func (c *Console) routes() {
 	m.HandleFunc("GET "+p+"/", c.topics)
 	m.HandleFunc("GET "+p, c.topics)
 	m.HandleFunc("GET "+p+"/topics", c.topics)
-	m.HandleFunc("GET "+p+"/topics/create", c.topicCreatePage)
-	m.HandleFunc("POST "+p+"/topics/create", c.topicCreate)
+	m.HandleFunc("GET "+newTopicPath(p), c.topicCreatePage)
+	m.HandleFunc("POST "+newTopicPath(p), c.topicCreate)
 	m.HandleFunc("GET "+p+"/topics/{name}", c.topicDetail)
 	m.HandleFunc("POST "+p+"/topics/{name}/delete", c.topicDelete)
 	m.HandleFunc("POST "+p+"/topics/{name}/purge", c.topicPurge)
@@ -205,6 +205,12 @@ func templateFuncs(prefix string) template.FuncMap {
 	return template.FuncMap{
 		"prefix": func() string { return prefix },
 		"icon":   icon,
+		// Links to resources. Names are data: never concatenate them into a URL
+		// in a template, use these (see resourceurl.go).
+		"topicURL":    func(name string) string { return topicPath(prefix, name) },
+		"groupURL":    func(id string) string { return groupPath(prefix, id) },
+		"newTopicURL": func() string { return newTopicPath(prefix) },
+		"urlseg":      url.PathEscape,
 		"dict": func(kv ...any) map[string]any {
 			m := make(map[string]any, len(kv)/2)
 			for i := 0; i+1 < len(kv); i += 2 {

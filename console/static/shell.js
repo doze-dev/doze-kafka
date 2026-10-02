@@ -164,7 +164,7 @@
   var pal = document.getElementById("palette"), palQ = document.getElementById("pal-q"), palList = document.getElementById("pal-list");
   var palItems = [], palSel = 0;
   var NAV = [["topics","Topics","/topics"],["groups","Consumer groups","/groups"],["cluster","Cluster","/cluster"]];
-  var ACTS = [["topics","Create topic","/topics/create"]];
+  var ACTS = [["topics","Create topic","/new/topic"]];
   var KIND = { topics:"topic", groups:"group" };
 
   // ---------- recently visited resources ----------
@@ -180,7 +180,7 @@
       if (!SVCSET[svc]) return;
       var name = "";
       var u = path;
-      if (rest.length >= 2 && rest[1] && rest[1].indexOf("create") < 0) {
+      if (rest.length >= 2 && rest[1]) {
         name = decodeURIComponent(rest[1]);
       }
       if (!name) return;
