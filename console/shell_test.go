@@ -3,6 +3,8 @@ package console
 import (
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -142,5 +144,40 @@ func TestStaticFilesRevalidate(t *testing.T) {
 	again := doReq(t, c, "GET", "/_console/static/app.css", map[string]string{"If-None-Match": tag})
 	if again.Code != http.StatusNotModified || again.Body.Len() != 0 {
 		t.Errorf("revalidation: %d with %d body bytes, want 304 and none", again.Code, again.Body.Len())
+	}
+}
+
+// Dev mode reads templates and static files from disk, live, so editing the console
+// does not need a rebuild.
+func TestDevModeServesFromDisk(t *testing.T) {
+	dir := t.TempDir()
+	for _, sub := range []string{"templates", "static"} {
+		if err := os.MkdirAll(filepath.Join(dir, sub), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A copy of the real templates, then one edited after the console started.
+	entries, _ := templateFS.ReadDir("templates")
+	for _, e := range entries {
+		b, _ := templateFS.ReadFile("templates/" + e.Name())
+		os.WriteFile(filepath.Join(dir, "templates", e.Name()), b, 0o644)
+	}
+	os.WriteFile(filepath.Join(dir, "static", "app.css"), []byte("/* v1 */"), 0o644)
+
+	t.Setenv("DOZE_KAFKA_CONSOLE_DEV", dir)
+	c := newTestConsole(t)
+	if body := req(t, c, "GET", "/_console/static/app.css", nil).Body.String(); body != "/* v1 */" {
+		t.Fatalf("static file not read from disk: %q", body)
+	}
+	os.WriteFile(filepath.Join(dir, "static", "app.css"), []byte("/* v2 */"), 0o644)
+	rec := req(t, c, "GET", "/_console/static/app.css", nil)
+	if rec.Body.String() != "/* v2 */" || rec.Header().Get("Cache-Control") != "no-store" {
+		t.Errorf("an edit did not show: %q, cache-control %q", rec.Body.String(), rec.Header().Get("Cache-Control"))
+	}
+	p := filepath.Join(dir, "templates", "cluster.html")
+	b, _ := os.ReadFile(p)
+	os.WriteFile(p, []byte(strings.Replace(string(b), "One broker.", "One DEV broker.", 1)), 0o644)
+	if !strings.Contains(req(t, c, "GET", "/_console/cluster", nil).Body.String(), "One DEV broker.") {
+		t.Error("an edited template did not show without a restart")
 	}
 }

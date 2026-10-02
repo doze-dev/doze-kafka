@@ -133,7 +133,7 @@ func (c *Console) renderError(w http.ResponseWriter, r *http.Request, f failure,
 	data["Prefix"] = c.prefix
 	data["Endpoint"] = c.be.displayAddr()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := c.tmpl.ExecuteTemplate(w, "error_page", data); err != nil {
+	if err := c.templates().ExecuteTemplate(w, "error_page", data); err != nil {
 		io.WriteString(w, template.HTMLEscapeString(f.message))
 	}
 }

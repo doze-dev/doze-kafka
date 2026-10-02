@@ -12,8 +12,10 @@ import (
 	"crypto/tls"
 	"embed"
 	"html/template"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +33,7 @@ type Console struct {
 	be     *backend
 	mux    *http.ServeMux
 	tmpl   *template.Template
+	dev    string // DOZE_KAFKA_CONSOLE_DEV: read templates and static files from this directory, live.
 	prefix string
 	hosts  []string // extra Host names to answer to (see hostguard.go).
 }
@@ -68,7 +71,12 @@ func New(opts Options) (*Console, error) {
 	}
 	prefix = "/" + strings.Trim(prefix, "/")
 
-	tmpl, err := template.New("").Funcs(templateFuncs(prefix)).ParseFS(templateFS, "templates/*.html")
+	// Developing the console itself: DOZE_KAFKA_CONSOLE_DEV=./console reads the
+	// templates and static files from disk on every request, so an edit shows on
+	// reload without rebuilding the binary (`task dev` sets it).
+	dev := os.Getenv("DOZE_KAFKA_CONSOLE_DEV")
+	c := &Console{prefix: prefix, hosts: opts.AllowedHosts, dev: dev}
+	tmpl, err := c.parseTemplates()
 	if err != nil {
 		return nil, err
 	}
@@ -76,9 +84,33 @@ func New(opts Options) (*Console, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &Console{be: be, tmpl: tmpl, prefix: prefix, hosts: opts.AllowedHosts}
+	c.be, c.tmpl = be, tmpl
 	c.routes()
 	return c, nil
+}
+
+// parseTemplates loads the page templates: embedded in the binary, or from disk in
+// dev mode.
+func (c *Console) parseTemplates() (*template.Template, error) {
+	t := template.New("").Funcs(templateFuncs(c.prefix))
+	if c.dev != "" {
+		return t.ParseFS(os.DirFS(c.dev), "templates/*.html")
+	}
+	return t.ParseFS(templateFS, "templates/*.html")
+}
+
+// templates is the template set to render with. In dev mode it is re-read each
+// time (a template that does not parse is reported on the page, not swallowed).
+func (c *Console) templates() *template.Template {
+	if c.dev == "" {
+		return c.tmpl
+	}
+	t, err := c.parseTemplates()
+	if err != nil {
+		log.Printf("console dev mode: %v", err)
+		return c.tmpl
+	}
+	return t
 }
 
 // Close releases the console's Kafka client.
@@ -128,7 +160,7 @@ func (c *Console) routes() {
 	m := http.NewServeMux()
 	p := c.prefix
 
-	m.Handle("GET "+p+"/static/", http.StripPrefix(p+"/", staticHandler()))
+	m.Handle("GET "+p+"/static/", http.StripPrefix(p+"/", c.staticHandler()))
 
 	// The bare root points at the console, so http://host:port works as a URL.
 	if p != "" && p != "/" {
@@ -186,7 +218,7 @@ func (c *Console) render(w http.ResponseWriter, r *http.Request, page string, da
 		data["Flash"] = f
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := c.tmpl.ExecuteTemplate(w, page, data); err != nil {
+	if err := c.templates().ExecuteTemplate(w, page, data); err != nil {
 		http.Error(w, err.Error(), 500)
 	}
 }
@@ -198,7 +230,7 @@ func (c *Console) partial(w http.ResponseWriter, name string, data map[string]an
 	}
 	data["Prefix"] = c.prefix
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := c.tmpl.ExecuteTemplate(w, name, data); err != nil {
+	if err := c.templates().ExecuteTemplate(w, name, data); err != nil {
 		http.Error(w, err.Error(), 500)
 	}
 }

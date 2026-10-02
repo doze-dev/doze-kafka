@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"io/fs"
 	"net/http"
+	"os"
 	"path"
 	"strings"
 	"sync"
@@ -36,7 +37,15 @@ func staticETags() map[string]string {
 	return etags
 }
 
-func staticHandler() http.Handler {
+func (c *Console) staticHandler() http.Handler {
+	if c.dev != "" {
+		// Dev mode: straight from disk, never cached.
+		files := http.FileServerFS(os.DirFS(c.dev))
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "no-store")
+			files.ServeHTTP(w, r)
+		})
+	}
 	files := http.FileServerFS(staticFS)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// The mux strips the console prefix, leaving "static/…".
