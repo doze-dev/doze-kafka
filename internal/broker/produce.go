@@ -30,7 +30,7 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 	resp := kmsg.NewPtrProduceResponse()
 	resp.SetVersion(req.Header.APIVersion)
 
-	var produced bool
+	producedTopics := map[string]struct{}{}
 	// Partitions written by this request, with where their response entries sit,
 	// so an fsync failure can be reported against exactly those entries.
 	type slot struct{ topic, part int }
@@ -51,7 +51,7 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 				rp.ErrorCode = int16(protocol.ErrUnknownTopicOrPart)
 			default:
 				if b.appendRecords(name, part, &rp) {
-					produced = true
+					producedTopics[name] = struct{}{}
 					tp := topicPartition{name, part.Partition}
 					written[tp] = append(written[tp], slot{len(resp.Topics), len(rt.Partitions)})
 				}
@@ -61,8 +61,8 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 		resp.Topics = append(resp.Topics, rt)
 	}
 
-	if produced {
-		b.produce.signal() // wake long-polling fetchers.
+	for topic := range producedTopics {
+		b.produce.signal(topic) // wake the fetchers reading this topic.
 	}
 	if pr.Acks == 0 {
 		return nil, nil // fire-and-forget: the client expects no response.

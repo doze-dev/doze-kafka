@@ -143,6 +143,52 @@ func (m *Manager) dirFor(tp topicPartition) (string, error) {
 	return filepath.Join(m.dir, base), nil
 }
 
+// EnsurePartitionDirs creates the directories of a topic's partitions without
+// opening them. Opening a partition costs two file descriptors per segment and a
+// recovery scan, and creating a topic used to open every one of its partitions —
+// a 5,000-partition topic held about 10,000 descriptors from the moment it was
+// created. Partitions are opened when first produced to or fetched from; the
+// registry, not an empty directory, is what makes a topic exist.
+func (m *Manager) EnsurePartitionDirs(topic string, partitions int32) error {
+	for p := int32(0); p < partitions; p++ {
+		dir, err := m.dirFor(topicPartition{topic, p})
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
+	syncDir(m.dir) // one flush for all the new entries.
+	return nil
+}
+
+// OpenPartitions reports how many partitions are currently open (each holds file
+// descriptors). For tests and diagnostics.
+func (m *Manager) OpenPartitions() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.partitions)
+}
+
+// Bounds returns a partition's log-start and log-end offsets. An open partition
+// answers from memory; one that is not open is read from its files without being
+// opened, so asking about every partition of a large topic (what a topic listing
+// does, repeatedly) does not open them all.
+func (m *Manager) Bounds(topic string, partition int32) (start, end int64, err error) {
+	tp := topicPartition{topic, partition}
+	m.mu.Lock()
+	defer m.mu.Unlock() // held across the file reads so the partition cannot be opened mid-way.
+	if p, ok := m.partitions[tp]; ok {
+		return p.LogStartOffset(), p.LogEndOffset(), nil
+	}
+	dir, err := m.dirFor(tp)
+	if err != nil {
+		return 0, 0, err
+	}
+	return boundsFromDisk(dir)
+}
+
 // RemoveTopic closes and deletes every partition of a topic from disk (used by
 // DeleteTopics). It removes partitions [0, partitions) — the count the caller read
 // from the registry before deleting the topic there. Best-effort: it returns the

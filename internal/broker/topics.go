@@ -128,16 +128,16 @@ func (b *Broker) maybeAutoCreate(name string, requested bool) (meta.Topic, bool)
 // On failure it rolls the registration back and removes whatever was created, so
 // a topic is either fully there or not there at all.
 func (b *Broker) materialize(t meta.Topic) error {
-	for p := range t.Partitions {
-		if _, err := b.logs.Partition(t.Name, p); err != nil {
-			if derr := b.meta.DeleteTopic(t.Name); derr != nil {
-				b.log.Warn("create topic: rollback of registration failed", "topic", t.Name, "err", derr)
-			}
-			if rerr := b.logs.RemoveTopic(t.Name, t.Partitions); rerr != nil {
-				b.log.Warn("create topic: rollback of partition data failed", "topic", t.Name, "err", rerr)
-			}
-			return err
+	// Create the directories only; partitions open on first use. Opening them all
+	// here held two descriptors per partition for as long as the broker ran.
+	if err := b.logs.EnsurePartitionDirs(t.Name, t.Partitions); err != nil {
+		if derr := b.meta.DeleteTopic(t.Name); derr != nil {
+			b.log.Warn("create topic: rollback of registration failed", "topic", t.Name, "err", derr)
 		}
+		if rerr := b.logs.RemoveTopic(t.Name, t.Partitions); rerr != nil {
+			b.log.Warn("create topic: rollback of partition data failed", "topic", t.Name, "err", rerr)
+		}
+		return err
 	}
 	return nil
 }

@@ -28,23 +28,55 @@ func (b *Broker) handleFetch(ctx context.Context, req *protocol.Request) ([]byte
 	minBytes := max(int(fr.MinBytes), 1)
 	deadline := time.Now().Add(time.Duration(fr.MaxWaitMillis) * time.Millisecond)
 
+	var sub *subscription
 	for {
-		// Take the wakeup channel BEFORE reading. A produce that lands between the
+		// Subscribe BEFORE reading. A produce that lands between the
 		// read and the wait would otherwise close a channel nobody holds yet, and
 		// this fetch would sleep the full MaxWait with data already there.
-		wake := b.produce.wait()
+		if sub == nil {
+			sub = b.produce.subscribe(b.fetchTopics(fr))
+			defer sub.Close()
+		}
 		resp, total := b.buildFetchResponse(fr, req.Header.APIVersion)
 		if total >= minBytes || fr.MaxWaitMillis <= 0 || !time.Now().Before(deadline) {
-			return protocol.EncodeResponse(req.Header, resp), nil
+			return encodeFetchResponse(req.Header, resp, total), nil
 		}
-		// Wait for a produce or the deadline, then re-read.
+		// Wait for a produce to one of these topics or the deadline, then re-read.
 		select {
-		case <-wake:
+		case <-sub.C:
 		case <-time.After(time.Until(deadline)):
 		case <-ctx.Done():
-			return protocol.EncodeResponse(req.Header, resp), nil
+			return encodeFetchResponse(req.Header, resp, total), nil
 		}
 	}
+}
+
+// fetchTopics is the set of topic names a fetch reads, for subscribing to wakeups.
+func (b *Broker) fetchTopics(fr *kmsg.FetchRequest) []string {
+	seen := map[string]struct{}{}
+	var out []string
+	for _, t := range fr.Topics {
+		name, _, ok := b.resolveTopic(t.Topic, t.TopicID)
+		if !ok {
+			continue
+		}
+		if _, dup := seen[name]; !dup {
+			seen[name] = struct{}{}
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// encodeFetchResponse frames a fetch response into a buffer sized for it. The
+// default starts at 128 bytes and grows by doubling, copying a multi-megabyte
+// record payload several times over on its way to the socket.
+func encodeFetchResponse(header protocol.RequestHeader, resp *kmsg.FetchResponse, recordBytes int) []byte {
+	parts := 0
+	for _, t := range resp.Topics {
+		parts += len(t.Partitions)
+	}
+	return protocol.EncodeResponseSized(header, resp, recordBytes+256+96*parts)
 }
 
 // buildFetchResponse reads every requested partition once and returns the response

@@ -180,22 +180,59 @@ func (b *Broker) resolveTopic(name string, id [16]byte) (string, meta.Topic, boo
 // notifier is a broadcast wakeup: signal() wakes everyone currently waiting on
 // wait(). It backs Fetch long-polling — any Produce wakes blocked fetchers, which
 // then re-check their partitions.
+// notifier wakes long-polling fetchers when data arrives. It is per topic: a
+// single global signal woke every waiting fetch on every produce, and each woke
+// to re-read all its partitions only to find nothing new. A fetch subscribes to
+// the topics it reads BEFORE reading them, so a produce landing between the read
+// and the wait is not missed — the signal is buffered in the subscription.
 type notifier struct {
-	mu sync.Mutex
-	ch chan struct{}
+	mu   sync.Mutex
+	subs map[string]map[*subscription]struct{}
 }
 
-func newNotifier() *notifier { return &notifier{ch: make(chan struct{})} }
-
-func (n *notifier) wait() <-chan struct{} {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	return n.ch
+type subscription struct {
+	// C receives at most one pending signal; a signal while one is already pending
+	// is dropped, since one wakeup means "re-read".
+	C      chan struct{}
+	n      *notifier
+	topics []string
 }
 
-func (n *notifier) signal() {
+func newNotifier() *notifier { return &notifier{subs: map[string]map[*subscription]struct{}{}} }
+
+// subscribe registers interest in the given topics. Close it when done.
+func (n *notifier) subscribe(topics []string) *subscription {
+	s := &subscription{C: make(chan struct{}, 1), n: n, topics: topics}
 	n.mu.Lock()
-	defer n.mu.Unlock()
-	close(n.ch)
-	n.ch = make(chan struct{})
+	for _, t := range topics {
+		if n.subs[t] == nil {
+			n.subs[t] = map[*subscription]struct{}{}
+		}
+		n.subs[t][s] = struct{}{}
+	}
+	n.mu.Unlock()
+	return s
+}
+
+func (s *subscription) Close() {
+	s.n.mu.Lock()
+	for _, t := range s.topics {
+		delete(s.n.subs[t], s)
+		if len(s.n.subs[t]) == 0 {
+			delete(s.n.subs, t)
+		}
+	}
+	s.n.mu.Unlock()
+}
+
+// signal wakes every fetch subscribed to topic.
+func (n *notifier) signal(topic string) {
+	n.mu.Lock()
+	for s := range n.subs[topic] {
+		select {
+		case s.C <- struct{}{}:
+		default:
+		}
+	}
+	n.mu.Unlock()
 }

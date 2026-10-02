@@ -43,17 +43,20 @@ func (b *Broker) handleListOffsets(ctx context.Context, req *protocol.Request) (
 				rt.Partitions = append(rt.Partitions, rp)
 				continue
 			}
-			plog, err := b.logs.Partition(name, part.Partition)
+			// Bounds reads an unopened partition's files without opening it: a topic
+			// listing asks about every partition, and opening them all for that held
+			// two file descriptors per partition for the life of the broker.
+			start, end, err := b.logs.Bounds(name, part.Partition)
 			if err != nil {
-				rp.ErrorCode = b.storageFault("list offsets: open partition", err, "topic", name, "partition", part.Partition)
+				rp.ErrorCode = b.storageFault("list offsets: read bounds", err, "topic", name, "partition", part.Partition)
 				rt.Partitions = append(rt.Partitions, rp)
 				continue
 			}
 			switch part.Timestamp {
 			case listOffsetsLatest:
-				rp.Offset = plog.LogEndOffset()
+				rp.Offset = end
 			default: // earliest, or a real timestamp (coarse: earliest).
-				rp.Offset = plog.LogStartOffset()
+				rp.Offset = start
 			}
 			rt.Partitions = append(rt.Partitions, rp)
 		}

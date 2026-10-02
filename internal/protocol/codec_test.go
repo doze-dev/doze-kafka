@@ -1,9 +1,12 @@
 package protocol
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
 // TestDecodeRequestRejectsOutOfRangeVersions: a version outside what kmsg
@@ -78,4 +81,30 @@ func TestProfilesDoNotAdvertiseLegacyMessageSetVersions(t *testing.T) {
 			t.Errorf("Kafka %d profile advertises Fetch from v%d; record batches start at v4", major, r.Min)
 		}
 	}
+}
+
+func TestEncodeResponseSizedMatchesEncodeResponse(t *testing.T) {
+	resp := kmsg.NewPtrApiVersionsResponse()
+	resp.SetVersion(3)
+	hdr := RequestHeader{APIKey: APIFetch, APIVersion: 12, CorrelationID: 99}
+	fr := kmsg.NewPtrFetchResponse()
+	fr.SetVersion(12)
+	rt := kmsg.NewFetchResponseTopic()
+	rt.Topic = "t"
+	rp := kmsg.NewFetchResponseTopicPartition()
+	rp.RecordBatches = make([]byte, 100_000)
+	rt.Partitions = append(rt.Partitions, rp)
+	fr.Topics = append(fr.Topics, rt)
+
+	plain := EncodeResponse(hdr, fr)
+	for _, hint := range []int{0, 10, len(plain), len(plain) * 3} {
+		if got := EncodeResponseSized(hdr, fr, hint); !bytes.Equal(got, plain) {
+			t.Fatalf("hint %d changed the encoded bytes", hint)
+		}
+	}
+	// A right-sized hint means the buffer is not regrown while encoding.
+	if got := EncodeResponseSized(hdr, fr, len(plain)); cap(got) > len(plain)+len(plain)/4 {
+		t.Errorf("capacity %d for %d encoded bytes: the buffer was regrown", cap(got), len(plain))
+	}
+	_ = resp
 }

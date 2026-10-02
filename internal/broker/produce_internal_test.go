@@ -230,3 +230,59 @@ func TestProduceRefusesCorruptBatches(t *testing.T) {
 		t.Fatalf("a valid batch after the refusals: code %d offset %d, want 0 at 0", p.ErrorCode, p.BaseOffset)
 	}
 }
+
+// Creating a topic, and asking for the offsets of all its partitions, must not
+// open them: each open partition holds descriptors for the life of the broker.
+func TestTopicCreationAndOffsetListingDoNotOpenPartitions(t *testing.T) {
+	var failSync bool
+	b, logs := newTestBroker(t, &failSync)
+
+	ct := kmsg.NewCreateTopicsRequestTopic()
+	ct.Topic, ct.NumPartitions, ct.ReplicationFactor = "wide", 40, 1
+	if got := b.createTopic(ct, false); got.ErrorCode != 0 {
+		t.Fatalf("createTopic: %d", got.ErrorCode)
+	}
+	if n := logs.OpenPartitions(); n != 0 {
+		t.Fatalf("creating a 40-partition topic opened %d partitions", n)
+	}
+
+	lo := kmsg.NewPtrListOffsetsRequest()
+	lo.SetVersion(5)
+	lo.ReplicaID = -1
+	for _, ts := range []int64{-1, -2} {
+		rt := kmsg.NewListOffsetsRequestTopic()
+		rt.Topic = "wide"
+		for p := int32(0); p < 40; p++ {
+			rp := kmsg.NewListOffsetsRequestTopicPartition()
+			rp.Partition, rp.Timestamp = p, ts
+			rt.Partitions = append(rt.Partitions, rp)
+		}
+		lo.Topics = []kmsg.ListOffsetsRequestTopic{rt}
+		out, err := b.handleListOffsets(context.Background(), &protocol.Request{
+			Header: protocol.RequestHeader{APIKey: protocol.APIListOffsets, APIVersion: 5, CorrelationID: 1},
+			Body:   lo.AppendTo(nil),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp := kmsg.NewPtrListOffsetsResponse()
+		resp.SetVersion(5)
+		if err := resp.ReadFrom(out[4:]); err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range resp.Topics[0].Partitions {
+			if p.ErrorCode != 0 || p.Offset != 0 {
+				t.Fatalf("partition %d: code %d offset %d, want an empty partition", p.Partition, p.ErrorCode, p.Offset)
+			}
+		}
+	}
+	if n := logs.OpenPartitions(); n != 0 {
+		t.Fatalf("listing offsets opened %d partitions", n)
+	}
+
+	// Producing is what opens one.
+	produceOnce(t, b, 1, plainBatch())
+	if n := logs.OpenPartitions(); n != 1 {
+		t.Fatalf("after one produce %d partitions are open, want exactly 1", n)
+	}
+}

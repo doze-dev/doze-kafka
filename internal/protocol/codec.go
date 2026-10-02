@@ -41,7 +41,14 @@ func DecodeRequest(header RequestHeader, body []byte) (kmsg.Request, error) {
 //
 // The caller sets resp's version (via SetVersion) before calling.
 func EncodeResponse(header RequestHeader, resp kmsg.Response) []byte {
-	buf := make([]byte, 0, 128)
+	return EncodeResponseSized(header, resp, 128)
+}
+
+// EncodeResponseSized is EncodeResponse with a capacity hint for the encoded
+// response, so a large one (a fetch of megabytes of records) is written into one
+// right-sized buffer instead of growing by doubling and copying.
+func EncodeResponseSized(header RequestHeader, resp kmsg.Response, sizeHint int) []byte {
+	buf := make([]byte, 0, max(sizeHint, 128))
 	buf = binary.BigEndian.AppendUint32(buf, uint32(header.CorrelationID))
 	if header.APIKey != APIApiVersions && flexibleResponse(header.APIKey, resp.GetVersion()) {
 		buf = append(buf, 0) // empty tagged-fields section (unsigned varint 0).
