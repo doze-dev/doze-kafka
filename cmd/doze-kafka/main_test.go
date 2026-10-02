@@ -98,3 +98,31 @@ func TestLoadConfig_NoFileIsJustDefaultsAndFlags(t *testing.T) {
 		t.Errorf("DataDir = %q, want default", st.cfg.DataDir)
 	}
 }
+
+func TestConsoleAllowHostFlagAndImpliedHosts(t *testing.T) {
+	st, err := loadConfig([]string{"--console-allow-host", "dev.example.com,box.lan", "--console-allow-host", "x.test",
+		"--console-addr", "devbox.local:9093"})
+	if err != nil {
+		t.Fatalf("loadConfig: %v", err)
+	}
+	got := consoleHosts(st)
+	want := []string{"dev.example.com", "box.lan", "x.test", "devbox.local"}
+	if len(got) != len(want) {
+		t.Fatalf("consoleHosts = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("consoleHosts = %v, want %v", got, want)
+		}
+	}
+
+	// An address is not a name: binding to an IP implies nothing to allow (IP
+	// literals are always accepted).
+	st, err = loadConfig([]string{"--console-addr", "0.0.0.0:9093"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h := consoleHosts(st); len(h) != 0 {
+		t.Errorf("consoleHosts for an IP bind = %v, want none", h)
+	}
+}

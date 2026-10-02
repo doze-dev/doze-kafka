@@ -32,6 +32,7 @@ type Console struct {
 	mux    *http.ServeMux
 	tmpl   *template.Template
 	prefix string
+	hosts  []string // extra Host names to answer to (see hostguard.go).
 }
 
 // Options configures the console.
@@ -52,6 +53,11 @@ type Options struct {
 	// dials a unix socket, but apps connect via the supervisor's host:port.
 	// Empty = show Addr.
 	DisplayAddr string
+	// AllowedHosts are hostnames, beyond the always-allowed set (IP literals,
+	// localhost, and *.doze names), that the console answers to. "*" turns the
+	// DNS-rebinding guard off, for an embedder that mounts the console under
+	// names it does not control.
+	AllowedHosts []string
 }
 
 // New builds a console with a real Kafka client dialed at opts.Addr.
@@ -70,7 +76,7 @@ func New(opts Options) (*Console, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &Console{be: be, tmpl: tmpl, prefix: prefix}
+	c := &Console{be: be, tmpl: tmpl, prefix: prefix, hosts: opts.AllowedHosts}
 	c.routes()
 	return c, nil
 }
@@ -79,9 +85,16 @@ func New(opts Options) (*Console, error) {
 func (c *Console) Close() { c.be.close() }
 
 func (c *Console) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// CSRF / DNS-rebinding defense: a state-changing request must originate
-	// from the console itself — blocks a malicious page from driving
-	// destructive actions against a developer's localhost console.
+	// DNS rebinding: refuse any Host name we were not expecting, for every
+	// method — a rebound GET reads the whole console too (hostguard.go).
+	if !hostAllowed(r.Host, c.hosts) {
+		refuseHost(w, r.Host)
+		return
+	}
+	// CSRF: a state-changing request must originate from the console itself,
+	// which stops a page on another site from submitting to it. This checks
+	// Origin against Host; it does NOT stop DNS rebinding (both would name the
+	// attacker) — that is the Host guard above.
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		if origin := r.Header.Get("Origin"); origin != "" && !originMatchesHost(origin, r.Host) {
 			http.Error(w, "cross-origin request refused", http.StatusForbidden)

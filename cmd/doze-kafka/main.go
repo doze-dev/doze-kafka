@@ -103,6 +103,7 @@ type startup struct {
 	configFile  string // the config file actually loaded, or "" if none.
 	console     bool
 	consoleAddr string
+	allowHosts  []string // extra console Host names (--console-allow-host).
 }
 
 // loadConfig resolves the effective configuration with flags > file > defaults
@@ -131,7 +132,7 @@ func loadConfig(args []string) (startup, error) {
 	}
 	return startup{
 		cfg: c, pprofAddr: fl.pprofAddr, configFile: configPath,
-		console: fl.console, consoleAddr: fl.consoleAddr,
+		console: fl.console, consoleAddr: fl.consoleAddr, allowHosts: fl.allowHosts,
 	}, nil
 }
 
@@ -141,6 +142,7 @@ type cliFlags struct {
 	pprofAddr   string
 	console     bool
 	consoleAddr string
+	allowHosts  []string
 }
 
 // parseFlags binds the broker flags onto dst and parses args.
@@ -154,6 +156,7 @@ func parseFlags(args []string, dst *config.Config) (cliFlags, error) {
 	fs.StringVar(&fl.pprofAddr, "pprof-addr", "", "if set, serve net/http/pprof here (goroutine/heap profiling for soak/debug)")
 	fs.BoolVar(&fl.console, "console", true, "serve the web console (topics, messages, consumer groups)")
 	fs.StringVar(&fl.consoleAddr, "console-addr", "127.0.0.1:9093", "host:port for the web console — distinct from --listen, since Kafka's wire protocol can't share a port with HTTP")
+	fs.Var(stringSliceFlag{&fl.allowHosts}, "console-allow-host", "extra host name the console answers to, besides localhost, IP addresses and *.doze (comma-separated or repeated); guards against DNS rebinding")
 	registerFlags(fs, dst)
 	if err := fs.Parse(args); err != nil {
 		return cliFlags{}, err
@@ -277,6 +280,7 @@ func startConsole(ctx context.Context, st startup, cfg config.Config, bound net.
 
 	con, err := console.New(console.Options{
 		Addr: dialAddr, SASLUser: user, SASLPass: pass, SASLMechanism: mech, TLSConfig: tlsCfg,
+		AllowedHosts: consoleHosts(st),
 	})
 	if err != nil {
 		return nil, err
@@ -295,6 +299,18 @@ func startConsole(ctx context.Context, st startup, cfg config.Config, bound net.
 	}()
 
 	return func() { con.Close() }, nil
+}
+
+// consoleHosts is every extra host name the console should answer to: whatever
+// the operator listed, plus the name in --console-addr when it is a name rather
+// than an address (choosing to bind to "devbox.local" means expecting to be
+// reached as it).
+func consoleHosts(st startup) []string {
+	hosts := append([]string(nil), st.allowHosts...)
+	if h, _, err := net.SplitHostPort(st.consoleAddr); err == nil && h != "" && net.ParseIP(h) == nil {
+		hosts = append(hosts, h)
+	}
+	return hosts
 }
 
 // consoleDialAddr is the address the console's own Kafka client dials — the

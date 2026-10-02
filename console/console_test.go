@@ -69,6 +69,7 @@ func req(t *testing.T, c *Console, method, path string, form url.Values) *httpte
 	} else {
 		r = httptest.NewRequest(method, path, nil)
 	}
+	r.Host = "127.0.0.1:9093" // httptest defaults to example.com, which the Host guard refuses.
 	rec := httptest.NewRecorder()
 	c.ServeHTTP(rec, r)
 	return rec
