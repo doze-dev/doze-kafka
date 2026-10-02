@@ -20,7 +20,7 @@ import (
 // newTestConsole boots a real broker (server.New, same as cmd/doze-kafka)
 // and a console dialed at it — a genuine Kafka client talking real wire
 // protocol, exactly like production.
-func newTestConsole(t *testing.T) *Console {
+func newTestConsole(t testing.TB) *Console {
 	t.Helper()
 	c, _ := newTestConsoleAddr(t)
 	return c
@@ -28,7 +28,7 @@ func newTestConsole(t *testing.T) *Console {
 
 // newTestConsoleAddr is newTestConsole that also returns the broker's address,
 // for tests that need to act as another Kafka client (join a group, say).
-func newTestConsoleAddr(t *testing.T) (*Console, string) {
+func newTestConsoleAddr(t testing.TB) (*Console, string) {
 	t.Helper()
 	if testing.Short() {
 		t.Skip("boots a real broker; omit -short (or run `go tool task test:integration`)")

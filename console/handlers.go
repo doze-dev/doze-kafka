@@ -43,13 +43,9 @@ func (c *Console) apiResources(w http.ResponseWriter, r *http.Request) {
 
 // apiCounts feeds the rail's live counts.
 func (c *Console) apiCounts(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	counts := map[string]int{}
-	if v, err := c.be.ListTopics(ctx); err == nil {
-		counts["topics"] = len(v)
-	}
-	if v, err := c.be.ListGroups(ctx); err == nil {
-		counts["groups"] = len(v)
+	if topics, groups, err := c.be.Counts(r.Context()); err == nil {
+		counts["topics"], counts["groups"] = topics, groups
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(counts)

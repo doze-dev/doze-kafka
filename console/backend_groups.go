@@ -61,14 +61,66 @@ func (b *backend) ListGroups(ctx context.Context) ([]GroupSummary, error) {
 		out = append(out, GroupSummary{ID: g.Group, Protocol: normalizeProtocol(g.GroupType), State: g.GroupState})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	// Member counts need a per-group describe; ListGroups doesn't carry them.
-	// Fine for a dev console's list pane — group counts are small.
-	for i := range out {
-		if d, err := b.DescribeGroup(ctx, out[i].ID); err == nil {
-			out[i].Members = len(d.Members)
+
+	// Member counts need a describe, which ListGroups does not carry. One batched
+	// request per protocol covers every group. This used to describe each group on
+	// its own, and each of those describes first re-listed all groups to learn the
+	// protocol: 1 + 2N round trips for N groups, which grew with every group a
+	// test suite ever created and ran on every poll of the rail.
+	var classic, consumer []string
+	for _, g := range out {
+		if g.Protocol == "classic" {
+			classic = append(classic, g.ID)
+		} else {
+			consumer = append(consumer, g.ID)
 		}
 	}
+	members := map[string]int{}
+	if len(classic) > 0 {
+		dreq := kmsg.NewPtrDescribeGroupsRequest()
+		dreq.Groups = classic
+		if dresp, err := dreq.RequestWith(ctx, b.cl); err == nil {
+			for _, g := range dresp.Groups {
+				members[g.Group] = len(g.Members)
+			}
+		}
+	}
+	if len(consumer) > 0 {
+		creq := kmsg.NewPtrConsumerGroupDescribeRequest()
+		creq.Groups = consumer
+		if cresp, err := creq.RequestWith(ctx, b.cl); err == nil {
+			for _, g := range cresp.Groups {
+				members[g.Group] = len(g.Members)
+			}
+		}
+	}
+	for i := range out {
+		out[i].Members = members[out[i].ID]
+	}
 	return out, nil
+}
+
+// Counts returns how many topics and groups exist, for the rail's live counts.
+// It asks for names only: the rail polls this every few seconds from every open
+// tab, and it used to run the full topic listing (offsets for every partition)
+// and the full group listing (a describe per group) just to take len().
+func (b *backend) Counts(ctx context.Context) (topics, groups int, err error) {
+	mreq := kmsg.NewPtrMetadataRequest()
+	mreq.Topics = nil // all topics: names only, no ListOffsets, no DescribeConfigs.
+	mresp, err := mreq.RequestWith(ctx, b.cl)
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, t := range mresp.Topics {
+		if !t.IsInternal && t.Topic != nil {
+			topics++
+		}
+	}
+	lresp, err := kmsg.NewPtrListGroupsRequest().RequestWith(ctx, b.cl)
+	if err != nil {
+		return topics, 0, err
+	}
+	return topics, len(lresp.Groups), nil
 }
 
 // DescribeGroup returns a group's members and their assigned partitions,

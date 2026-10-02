@@ -8,6 +8,7 @@
 package console
 
 import (
+	"context"
 	"crypto/tls"
 	"embed"
 	"html/template"
@@ -101,8 +102,20 @@ func (c *Console) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Every request gets a deadline. The console talks to the broker through a
+	// Kafka client that retries a dead connection for a long time, and with no
+	// bound a page, a poll or a button hangs for as long as that takes.
+	if !strings.HasPrefix(r.URL.Path, c.prefix+"/static/") {
+		ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
+		defer cancel()
+		r = r.WithContext(ctx)
+	}
 	c.mux.ServeHTTP(w, r)
 }
+
+// requestTimeout bounds one console request, including every broker call it makes
+// (a variable only so a test need not wait it out).
+var requestTimeout = 15 * time.Second
 
 func originMatchesHost(origin, host string) bool {
 	u, err := url.Parse(origin)
