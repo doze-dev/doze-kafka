@@ -10,18 +10,18 @@
 # file + flags) as TOML, so you can see exactly what the broker will run with.
 
 # Kafka major version to emulate (1-4). 4 enables KIP-848 consumer groups.
-version = 4
+kafka-version = 4
 
 # --- network -------------------------------------------------------------------
 
-listen = ":9092"          # host:port the broker listens on.
+listen = "127.0.0.1:9092" # host:port the broker listens on. ":9092" accepts other machines and containers.
 advertised-host = "localhost" # host returned to clients in Metadata responses.
 advertised-port = 0       # port advertised to clients; 0 = derive from `listen`.
 
 # --- storage -------------------------------------------------------------------
 
 data-dir = "./data"       # directory holding per-partition log segments.
-meta-db = "./meta.db"     # metadata database (topics, offsets, producer IDs).
+# meta-db = "./data/meta.db" # metadata database (topics, offsets, producer IDs); defaults to <data-dir>/meta.db.
 segment-bytes = 134217728 # roll the active segment past this size (128 MiB).
 index-interval-bytes = 4096 # one sparse index entry per this many bytes of log.
 
@@ -64,3 +64,16 @@ max-partitions = 1000     # most partitions one topic may have; each is a direct
 # [tls]
 # cert = "./certs/server.pem"
 # key  = "./certs/server-key.pem"
+
+# --- console -------------------------------------------------------------------
+
+console = true                   # serve the web console.
+console-addr = "127.0.0.1:9093"  # host:port for the console's HTTP listener.
+# console-allow-host = ["devbox.lan"] # extra Host names the console answers to.
+
+# --- process -------------------------------------------------------------------
+
+zone = true                      # join the shared .doze name zone (kafka.doze).
+log-level = "info"               # debug (logs every request), info, warn or error.
+log-format = "text"              # text or json.
+# pprof-addr = "127.0.0.1:6060"  # serve net/http/pprof here.

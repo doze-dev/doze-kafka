@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,7 +20,8 @@ const DefaultConfigFile = "doze-kafka.toml"
 // that is what makes the flags > file > defaults precedence work: the file overlays
 // only what it names. Durations are written as human strings ("500ms", "45s").
 type fileConfig struct {
-	Version                *int              `toml:"version"`
+	KafkaVersion           *int              `toml:"kafka-version"`
+	Version                *int              `toml:"version"` // the earlier spelling of kafka-version; still read.
 	Listen                 *string           `toml:"listen"`
 	AdvertisedHost         *string           `toml:"advertised-host"`
 	AdvertisedPort         *int              `toml:"advertised-port"`
@@ -37,6 +39,13 @@ type fileConfig struct {
 	SASLMechanisms         []string          `toml:"sasl-mechanisms"`
 	Credentials            map[string]string `toml:"credentials"`
 	TLS                    *tlsFile          `toml:"tls"`
+	Console                *bool             `toml:"console"`
+	ConsoleAddr            *string           `toml:"console-addr"`
+	ConsoleAllowHost       []string          `toml:"console-allow-host"`
+	PprofAddr              *string           `toml:"pprof-addr"`
+	Zone                   *bool             `toml:"zone"`
+	LogLevel               *string           `toml:"log-level"`
+	LogFormat              *string           `toml:"log-format"`
 }
 
 type tlsFile struct {
@@ -66,6 +75,9 @@ func LoadFile(path string, cfg *Config) error {
 func (fc fileConfig) applyTo(cfg *Config) error {
 	if fc.Version != nil {
 		cfg.Version = *fc.Version
+	}
+	if fc.KafkaVersion != nil {
+		cfg.Version = *fc.KafkaVersion
 	}
 	if fc.Listen != nil {
 		cfg.ListenAddr = *fc.Listen
@@ -128,6 +140,27 @@ func (fc fileConfig) applyTo(cfg *Config) error {
 			cfg.Credentials[user] = pass
 		}
 	}
+	if fc.Console != nil {
+		cfg.Console = *fc.Console
+	}
+	if fc.ConsoleAddr != nil {
+		cfg.ConsoleAddr = *fc.ConsoleAddr
+	}
+	if fc.ConsoleAllowHost != nil {
+		cfg.ConsoleAllowHosts = fc.ConsoleAllowHost
+	}
+	if fc.PprofAddr != nil {
+		cfg.PprofAddr = *fc.PprofAddr
+	}
+	if fc.Zone != nil {
+		cfg.Zone = *fc.Zone
+	}
+	if fc.LogLevel != nil {
+		cfg.LogLevel = *fc.LogLevel
+	}
+	if fc.LogFormat != nil {
+		cfg.LogFormat = *fc.LogFormat
+	}
 	if fc.TLS != nil {
 		if fc.TLS.Cert != nil {
 			cfg.TLSCertFile = *fc.TLS.Cert
@@ -144,7 +177,7 @@ func (fc fileConfig) applyTo(cfg *Config) error {
 // `doze-kafka config print`.
 func WriteTOML(w io.Writer, cfg Config) error {
 	fc := fileConfig{
-		Version:                &cfg.Version,
+		KafkaVersion:           &cfg.Version,
 		Listen:                 &cfg.ListenAddr,
 		AdvertisedHost:         &cfg.AdvertisedHost,
 		AdvertisedPort:         &cfg.AdvertisedPort,
@@ -159,6 +192,22 @@ func WriteTOML(w io.Writer, cfg Config) error {
 		AutoCreateTopics:       &cfg.AutoCreateTopics,
 		DefaultPartitions:      &cfg.DefaultPartitions,
 		MaxPartitions:          &cfg.MaxPartitions,
+		Console:                &cfg.Console,
+		ConsoleAddr:            &cfg.ConsoleAddr,
+		Zone:                   &cfg.Zone,
+		LogLevel:               &cfg.LogLevel,
+		LogFormat:              &cfg.LogFormat,
+	}
+	// MetaDB is only written when it differs from the default, so a printed file
+	// stays valid after the data directory moves.
+	if cfg.MetaDB == filepath.Join(cfg.DataDir, MetaDBFile) {
+		fc.MetaDB = nil
+	}
+	if len(cfg.ConsoleAllowHosts) > 0 {
+		fc.ConsoleAllowHost = cfg.ConsoleAllowHosts
+	}
+	if cfg.PprofAddr != "" {
+		fc.PprofAddr = &cfg.PprofAddr
 	}
 	if len(cfg.SASLMechanisms) > 0 {
 		fc.SASLMechanisms = cfg.SASLMechanisms

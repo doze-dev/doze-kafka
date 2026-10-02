@@ -3,8 +3,8 @@
 // It is a local-development fixture: it speaks enough of the real Kafka wire
 // protocol that unmodified clients (franz-go, kcat, Sarama, the Java client)
 // connect and work, stores data on disk, and survives restarts — while
-// deliberately omitting every distributed-systems concern (replication, KRaft,
-// transactions). See docs/limitations.md for the boundary.
+// deliberately omitting every distributed-systems concern (replication, KRaft).
+// See docs/limitations.md for the boundary.
 package main
 
 import (
@@ -12,8 +12,9 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/hex"
-	"flag"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -32,59 +33,74 @@ import (
 // (-ldflags "-X main.version=..."). It defaults to "dev" for local builds.
 var version = "dev"
 
-func main() {
-	// `doze-kafka version` prints doze-kafka's own version — deliberately prefixed
-	// with the name (and the Kafka range it speaks) so it isn't mistaken for a Kafka
-	// version. It's a subcommand rather than a flag because --version already selects
-	// the emulated Kafka major.
-	if len(os.Args) > 1 && os.Args[1] == "version" {
-		fmt.Printf("doze-kafka %s — speaks Kafka 1–4 (select with --version)\n", version)
-		return
-	}
+func main() { os.Exit(realMain(os.Args[1:], os.Stdout, os.Stderr)) }
 
-	// `doze-kafka dns-setup` is the one-time machine setup for the shared .doze
-	// zone. It lives in every doze binary because the setup belongs to the zone
-	// rather than to any one of them — whichever you installed first can do it.
-	if len(os.Args) > 1 && os.Args[1] == "dns-setup" {
-		os.Exit(runDNSSetup(os.Args[2:]))
-	}
+// Exit codes: 0 success, 1 the broker failed while running, 2 it was started wrong
+// (a bad flag, a bad config file, an invalid setting).
+const (
+	exitRuntime = 1
+	exitUsage   = 2
+)
 
-	// `doze-kafka config print` writes the effective configuration (defaults, then
-	// the config file, then flags) as TOML — a ready-to-edit starting point.
-	if len(os.Args) > 1 && os.Args[1] == "config" {
-		if len(os.Args) < 3 || os.Args[2] != "print" {
-			fmt.Fprintln(os.Stderr, "usage: doze-kafka config print [flags]")
-			os.Exit(2)
+// realMain is main with its inputs and outputs passed in, so the command line can
+// be tested without a process.
+func realMain(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		switch args[0] {
+		case "version":
+			printVersion(stdout)
+			return 0
+		case "help":
+			fs, _ := newFlagSet(&config.Config{})
+			printHelp(stdout, fs)
+			return 0
+		case "dns-setup":
+			// The one-time machine setup for the shared .doze zone. It lives in
+			// every doze binary because the setup belongs to the zone rather than
+			// to any one of them: whichever you installed first can do it.
+			return runDNSSetup(args[1:])
+		case "config":
+			return runConfig(args[1:], stdout, stderr)
+		default:
+			// A flag typed without its dashes is the likeliest mistake.
+			d := config.Default()
+			if fs, _ := newFlagSet(&d); fs.Lookup(strings.SplitN(args[0], "=", 2)[0]) != nil {
+				fmt.Fprintf(stderr, "doze-kafka: unexpected argument %q — did you mean --%s?\n", args[0], args[0])
+				return exitUsage
+			}
+			fmt.Fprintf(stderr, "doze-kafka: unknown command %q — the commands are version, config, dns-setup and help (doze-kafka --help)\n", args[0])
+			return exitUsage
 		}
-		st, err := loadConfig(os.Args[3:])
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		if err := config.WriteTOML(os.Stdout, st.cfg); err != nil {
-			fmt.Fprintln(os.Stderr, "config print:", err)
-			os.Exit(1)
-		}
-		return
 	}
 
-	st, err := loadConfig(os.Args[1:])
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+	st, err := loadConfig(args)
+	switch {
+	case errors.Is(err, errHelp):
+		d := config.Default()
+		fs, _ := newFlagSet(&d)
+		printHelp(stdout, fs)
+		return 0
+	case errors.Is(err, errShowVersion):
+		printVersion(stdout)
+		return 0
+	case err != nil:
+		return usageError(stderr, err)
 	}
 
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	logger := newLogger(st.cfg, stderr)
+	for _, n := range st.notices {
+		logger.Warn(n)
+	}
 	// version is doze-kafka's own; kafka_compat is the emulated Kafka major.
 	logger.Info("doze-kafka", "version", version, "kafka_compat", st.cfg.Version)
 	if st.configFile != "" {
 		logger.Info("loaded config file", "path", st.configFile)
 	}
 
-	if st.pprofAddr != "" {
+	if st.cfg.PprofAddr != "" {
 		go func() {
-			logger.Info("pprof listening", "addr", st.pprofAddr)
-			if err := http.ListenAndServe(st.pprofAddr, nil); err != nil { //nolint:gosec // debug-only, local
+			logger.Info("pprof listening", "addr", st.cfg.PprofAddr)
+			if err := http.ListenAndServe(st.cfg.PprofAddr, nil); err != nil { //nolint:gosec // debug-only, local
 				logger.Warn("pprof server stopped", "err", err)
 			}
 		}()
@@ -92,76 +108,68 @@ func main() {
 
 	if err := run(st, logger); err != nil {
 		logger.Error("fatal", "err", err)
-		os.Exit(1)
+		return exitRuntime
 	}
+	return 0
 }
 
-// startup holds everything resolved from the command line before the broker runs.
-type startup struct {
-	cfg         config.Config
-	pprofAddr   string
-	configFile  string // the config file actually loaded, or "" if none.
-	console     bool
-	consoleAddr string
-	allowHosts  []string // extra console Host names (--console-allow-host).
+// printVersion prints doze-kafka's own version, deliberately prefixed with the
+// name (and the Kafka range it speaks) so it isn't mistaken for a Kafka version.
+func printVersion(w io.Writer) {
+	fmt.Fprintf(w, "doze-kafka %s — speaks Kafka 1–4 (select with --kafka-version)\n", version)
 }
 
-// loadConfig resolves the effective configuration with flags > file > defaults
-// precedence. It parses once to discover --config (falling back to
-// ./doze-kafka.toml if present), overlays that file onto the defaults, then parses
-// the flags again on top so any flag still wins for a one-off override.
-func loadConfig(args []string) (startup, error) {
-	probe := config.Default()
-	fl, _ := parseFlags(args, &probe)
-	configPath := fl.config
-	if configPath == "" {
-		if _, err := os.Stat(config.DefaultConfigFile); err == nil {
-			configPath = config.DefaultConfigFile
-		}
+// usageError reports a configuration mistake: one line, always the same shape,
+// always the same exit code, before anything has started.
+func usageError(w io.Writer, err error) int {
+	fmt.Fprintf(w, "doze-kafka: %s\n", strings.TrimPrefix(err.Error(), "config: "))
+	if !strings.HasPrefix(err.Error(), "config:") {
+		fmt.Fprintln(w, "run doze-kafka --help for the flags")
 	}
+	return exitUsage
+}
 
-	c := config.Default()
-	if configPath != "" {
-		if err := config.LoadFile(configPath, &c); err != nil {
-			return startup{}, err
-		}
+// runConfig is `doze-kafka config print`: the effective configuration (defaults,
+// then the config file, then flags) as TOML, a ready-to-edit starting point. It
+// validates first, so what it prints is something the broker would accept.
+func runConfig(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 || args[0] != "print" {
+		fmt.Fprintln(stderr, "usage: doze-kafka config print [flags]")
+		return exitUsage
 	}
-	fl, err := parseFlags(args, &c)
+	st, err := loadConfig(args[1:])
 	if err != nil {
-		return startup{}, err
+		if errors.Is(err, errHelp) {
+			d := config.Default()
+			fs, _ := newFlagSet(&d)
+			printHelp(stdout, fs)
+			return 0
+		}
+		return usageError(stderr, err)
 	}
-	return startup{
-		cfg: c, pprofAddr: fl.pprofAddr, configFile: configPath,
-		console: fl.console, consoleAddr: fl.consoleAddr, allowHosts: fl.allowHosts,
-	}, nil
+	if err := config.WriteTOML(stdout, st.cfg); err != nil {
+		fmt.Fprintln(stderr, "doze-kafka: config print:", err)
+		return exitRuntime
+	}
+	return 0
 }
 
-// cliFlags holds the flags that aren't part of config.Config itself.
-type cliFlags struct {
-	config      string
-	pprofAddr   string
-	console     bool
-	consoleAddr string
-	allowHosts  []string
-}
-
-// parseFlags binds the broker flags onto dst and parses args.
-// Because the flags' defaults are dst's current field values, keys already
-// set from a config file survive unless the corresponding flag is explicitly
-// passed.
-func parseFlags(args []string, dst *config.Config) (cliFlags, error) {
-	fs := flag.NewFlagSet("doze-kafka", flag.ExitOnError)
-	var fl cliFlags
-	fs.StringVar(&fl.config, "config", "", "path to a TOML config file (default: ./doze-kafka.toml if present)")
-	fs.StringVar(&fl.pprofAddr, "pprof-addr", "", "if set, serve net/http/pprof here (goroutine/heap profiling for soak/debug)")
-	fs.BoolVar(&fl.console, "console", true, "serve the web console (topics, messages, consumer groups)")
-	fs.StringVar(&fl.consoleAddr, "console-addr", "127.0.0.1:9093", "host:port for the web console — distinct from --listen, since Kafka's wire protocol can't share a port with HTTP")
-	fs.Var(&stringSliceFlag{vals: &fl.allowHosts}, "console-allow-host", "extra host name the console answers to, besides localhost, IP addresses and *.doze (comma-separated or repeated); guards against DNS rebinding")
-	registerFlags(fs, dst)
-	if err := fs.Parse(args); err != nil {
-		return cliFlags{}, err
+// newLogger builds the process logger from --log-level and --log-format.
+func newLogger(cfg config.Config, w io.Writer) *slog.Logger {
+	level := slog.LevelInfo
+	switch cfg.LogLevel {
+	case "debug":
+		level = slog.LevelDebug
+	case "warn":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
 	}
-	return fl, nil
+	opts := &slog.HandlerOptions{Level: level}
+	if cfg.LogFormat == "json" {
+		return slog.New(slog.NewJSONHandler(w, opts))
+	}
+	return slog.New(slog.NewTextHandler(w, opts))
 }
 
 // run builds the broker via the shared server package and serves until
@@ -175,7 +183,7 @@ func run(st startup, logger *slog.Logger) error {
 	// of its own. Provisioned here, before the server is built, so it lands
 	// in cfg.Credentials before SASL verifiers are set up.
 	var consoleUser, consolePass, consoleMech string
-	if st.console && cfg.AuthEnabled() {
+	if cfg.Console && cfg.AuthEnabled() {
 		var err error
 		consoleUser, consolePass, consoleMech, err = provisionConsoleCredential(&cfg)
 		if err != nil {
@@ -209,19 +217,22 @@ func run(st startup, logger *slog.Logger) error {
 	// Join the shared .doze zone. Additive: the configured address above is the
 	// contract, and every failure in here is a log line rather than a refusal
 	// to start.
-	z := joinZone(ctx, logger)
-	defer z.close()
+	var z *zone
+	if cfg.Zone {
+		z = joinZone(ctx, logger)
+		defer z.close()
+	}
 	if addr := z.brokerURL(logger, bound); addr != "" {
 		logger.Info("broker also reachable by name", "addr", addr)
 	}
 
-	if st.console {
+	if cfg.Console {
 		closeConsole, err := startConsole(ctx, st, cfg, bound, logger, consoleUser, consolePass, consoleMech)
 		if err != nil {
 			return fmt.Errorf("console: %w", err)
 		}
 		defer closeConsole()
-		if u := z.routeConsole(logger, st.consoleAddr); u != "" {
+		if u := z.routeConsole(logger, cfg.ConsoleAddr); u != "" {
 			logger.Info("console also reachable by name", "url", u)
 		}
 	}
@@ -280,15 +291,15 @@ func startConsole(ctx context.Context, st startup, cfg config.Config, bound net.
 
 	con, err := console.New(console.Options{
 		Addr: dialAddr, SASLUser: user, SASLPass: pass, SASLMechanism: mech, TLSConfig: tlsCfg,
-		AllowedHosts: consoleHosts(st),
+		AllowedHosts: consoleHosts(cfg),
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	httpSrv := &http.Server{Addr: st.consoleAddr, Handler: con}
+	httpSrv := &http.Server{Addr: cfg.ConsoleAddr, Handler: con}
 	go func() {
-		logger.Info("console listening", "addr", st.consoleAddr)
+		logger.Info("console listening", "addr", cfg.ConsoleAddr)
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Warn("console server stopped", "err", err)
 		}
@@ -305,9 +316,9 @@ func startConsole(ctx context.Context, st startup, cfg config.Config, bound net.
 // the operator listed, plus the name in --console-addr when it is a name rather
 // than an address (choosing to bind to "devbox.local" means expecting to be
 // reached as it).
-func consoleHosts(st startup) []string {
-	hosts := append([]string(nil), st.allowHosts...)
-	if h, _, err := net.SplitHostPort(st.consoleAddr); err == nil && h != "" && net.ParseIP(h) == nil {
+func consoleHosts(cfg config.Config) []string {
+	hosts := append([]string(nil), cfg.ConsoleAllowHosts...)
+	if h, _, err := net.SplitHostPort(cfg.ConsoleAddr); err == nil && h != "" && net.ParseIP(h) == nil {
 		hosts = append(hosts, h)
 	}
 	return hosts
@@ -327,77 +338,4 @@ func consoleDialAddr(cfg config.Config, bound net.Addr) (string, error) {
 		host = "127.0.0.1"
 	}
 	return net.JoinHostPort(host, port), nil
-}
-
-// registerFlags binds command-line flags onto cfg, using its current values as
-// defaults. See config.Default for the meaning of each field.
-func registerFlags(fs *flag.FlagSet, cfg *config.Config) {
-	fs.IntVar(&cfg.Version, "version", cfg.Version, "Kafka major version to emulate (1-4)")
-	fs.StringVar(&cfg.ListenAddr, "listen", cfg.ListenAddr, "host:port to listen on")
-	fs.StringVar(&cfg.AdvertisedHost, "advertised-host", cfg.AdvertisedHost, "host advertised to clients in Metadata")
-	fs.IntVar(&cfg.AdvertisedPort, "advertised-port", cfg.AdvertisedPort, "port advertised to clients (0 = derive from --listen)")
-	fs.StringVar(&cfg.DataDir, "data-dir", cfg.DataDir, "directory for partition logs")
-	fs.StringVar(&cfg.MetaDB, "meta-db", cfg.MetaDB, "path to the metadata database file")
-	fs.Int64Var(&cfg.SegmentBytes, "segment-bytes", cfg.SegmentBytes, "roll a segment once it exceeds this size")
-	fs.Int64Var(&cfg.IndexIntervalBytes, "index-interval-bytes", cfg.IndexIntervalBytes, "add one sparse index entry per this many bytes of log")
-	fs.Int64Var(&cfg.RetentionBytes, "retention-bytes", cfg.RetentionBytes, "delete old segments once a partition exceeds this size (0 = unbounded)")
-	fs.Int64Var(&cfg.RetentionMs, "retention-ms", cfg.RetentionMs, "delete segments older than this many ms (0 = unbounded)")
-	fs.DurationVar(&cfg.FsyncInterval, "fsync-interval", cfg.FsyncInterval, "coarse fsync cadence for active segments (0 = disable)")
-	fs.DurationVar(&cfg.ConsumerSessionTimeout, "consumer-session-timeout", cfg.ConsumerSessionTimeout, "KIP-848 group session timeout before evicting a silent member")
-	fs.BoolVar(&cfg.AutoCreateTopics, "auto-create-topics", cfg.AutoCreateTopics, "create unknown topics on first reference")
-	fs.IntVar(&cfg.DefaultPartitions, "default-partitions", cfg.DefaultPartitions, "partition count for auto-created topics")
-	fs.IntVar(&cfg.MaxPartitions, "max-partitions", cfg.MaxPartitions, "most partitions one topic may have (each is a directory and open files)")
-
-	// Auth.
-	if cfg.Credentials == nil {
-		cfg.Credentials = map[string]string{}
-	}
-	fs.Var(&stringSliceFlag{vals: &cfg.SASLMechanisms}, "sasl-mechanisms", "comma-separated SASL mechanisms to enable (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512)")
-	fs.Var(credsFlag{cfg.Credentials}, "sasl-user", "SASL credential as user:password (repeatable)")
-	fs.StringVar(&cfg.TLSCertFile, "tls-cert", cfg.TLSCertFile, "PEM certificate file (enables TLS together with --tls-key)")
-	fs.StringVar(&cfg.TLSKeyFile, "tls-key", cfg.TLSKeyFile, "PEM private key file")
-}
-
-// stringSliceFlag collects a comma-separated (and/or repeated) flag into a slice.
-// The first use replaces whatever the slice held (a value from the config file),
-// as every other flag does; only repeats within the command line accumulate.
-// Appending to the file's value meant --sasl-mechanisms PLAIN could never turn
-// off a mechanism the file had enabled.
-type stringSliceFlag struct {
-	vals    *[]string
-	touched bool
-}
-
-func (f *stringSliceFlag) String() string {
-	if f == nil || f.vals == nil {
-		return ""
-	}
-	return strings.Join(*f.vals, ",")
-}
-
-func (f *stringSliceFlag) Set(s string) error {
-	if !f.touched {
-		*f.vals = nil
-		f.touched = true
-	}
-	for _, part := range strings.Split(s, ",") {
-		if part = strings.TrimSpace(part); part != "" {
-			*f.vals = append(*f.vals, part)
-		}
-	}
-	return nil
-}
-
-// credsFlag collects repeated user:password pairs into a map.
-type credsFlag struct{ m map[string]string }
-
-func (f credsFlag) String() string { return "" }
-
-func (f credsFlag) Set(s string) error {
-	user, pass, ok := strings.Cut(s, ":")
-	if !ok || user == "" {
-		return fmt.Errorf("expected user:password, got %q", s)
-	}
-	f.m[user] = pass
-	return nil
 }

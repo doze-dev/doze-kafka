@@ -96,10 +96,7 @@ func New(opts Options) (*Server, error) {
 	if opts.DataDir != "" {
 		cfg.DataDir = opts.DataDir
 	}
-	cfg.MetaDB = opts.MetaDB
-	if cfg.MetaDB == "" {
-		cfg.MetaDB = filepath.Join(cfg.DataDir, "meta.db")
-	}
+	cfg.MetaDB = opts.MetaDB // empty is resolved to <DataDir>/meta.db by NewFromConfig.
 	// An embedder asked for no particular address; the CLI default (the :9092
 	// wildcard) is the wrong answer for a library, which would fight over a fixed
 	// port with every other test run and listen on every interface. Loopback on
@@ -148,6 +145,11 @@ func New(opts Options) (*Server, error) {
 func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	// A config built without a metadata path keeps it with the data: the same
+	// default the CLI resolves, so a data directory is self-contained.
+	if cfg.MetaDB == "" {
+		cfg.MetaDB = filepath.Join(cfg.DataDir, config.MetaDBFile)
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err

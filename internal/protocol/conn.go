@@ -126,7 +126,9 @@ func (c *Conn) serve(ctx context.Context) {
 			c.log.Warn("bad request header", "err", err)
 			return
 		}
-		c.log.Info("request",
+		// Debug: one line per request is a firehose at info (a consumer polls many
+		// times a second), and drowned the lines that mattered.
+		c.log.Debug("request",
 			"api", header.APIKey.Name(),
 			"version", header.APIVersion,
 			"correlation_id", header.CorrelationID,

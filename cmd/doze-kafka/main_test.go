@@ -105,7 +105,7 @@ func TestConsoleAllowHostFlagAndImpliedHosts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadConfig: %v", err)
 	}
-	got := consoleHosts(st)
+	got := consoleHosts(st.cfg)
 	want := []string{"dev.example.com", "box.lan", "x.test", "devbox.local"}
 	if len(got) != len(want) {
 		t.Fatalf("consoleHosts = %v, want %v", got, want)
@@ -122,7 +122,7 @@ func TestConsoleAllowHostFlagAndImpliedHosts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if h := consoleHosts(st); len(h) != 0 {
+	if h := consoleHosts(st.cfg); len(h) != 0 {
 		t.Errorf("consoleHosts for an IP bind = %v, want none", h)
 	}
 }

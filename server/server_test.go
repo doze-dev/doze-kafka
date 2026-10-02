@@ -1,8 +1,14 @@
 package server_test
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
 	"net"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -197,5 +203,78 @@ func TestNewCreatesMissingDirectories(t *testing.T) {
 	cancel()
 	if err := srv.Serve(ctx); err != nil {
 		t.Fatalf("Serve: %v", err)
+	}
+}
+
+// syncBuffer is a bytes.Buffer safe to write from the broker's goroutines.
+type syncBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (s *syncBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+func (s *syncBuffer) String() string { s.mu.Lock(); defer s.mu.Unlock(); return s.b.String() }
+
+// One log line per request is a firehose at the default level (a consumer polls
+// several times a second) and used to drown everything else. It is a debug line.
+func TestRequestsAreLoggedAtDebugNotInfo(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping broker integration test in -short mode")
+	}
+	for _, tc := range []struct {
+		level slog.Level
+		want  bool
+	}{{slog.LevelInfo, false}, {slog.LevelDebug, true}} {
+		var logs syncBuffer
+		srv, err := server.New(server.Options{DataDir: t.TempDir(),
+			Logger: slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: tc.level}))})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		addr, err := srv.Bind(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		done := make(chan error, 1)
+		go func() { done <- srv.Serve(ctx) }()
+		cl, err := kgo.NewClient(kgo.SeedBrokers(addr.String()), kgo.AllowAutoTopicCreation())
+		if err != nil {
+			t.Fatal(err)
+		}
+		pctx, pcancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := cl.ProduceSync(pctx, &kgo.Record{Topic: "t", Value: []byte("x")}).FirstErr(); err != nil {
+			t.Fatal(err)
+		}
+		pcancel()
+		cl.Close()
+		cancel()
+		<-done
+		if got := strings.Contains(logs.String(), "msg=request"); got != tc.want {
+			t.Errorf("level %v: request lines present = %v, want %v\n%s", tc.level, got, tc.want, logs.String())
+		}
+	}
+}
+
+// A config with no metadata path keeps it with the data, so a data directory is
+// self-contained: delete it and the topics and committed offsets go with it.
+func TestMetadataDefaultsToInsideTheDataDir(t *testing.T) {
+	dir := t.TempDir()
+	srv, err := server.New(server.Options{DataDir: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := srv.Config().MetaDB, filepath.Join(dir, "meta.db"); got != want {
+		t.Fatalf("MetaDB = %q, want %q", got, want)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	srv.Serve(ctx) // closes storage on the way out.
+	if _, err := os.Stat(filepath.Join(dir, "meta.db")); err != nil {
+		t.Errorf("no meta.db inside the data dir: %v", err)
 	}
 }

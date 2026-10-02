@@ -4,6 +4,9 @@ package config
 import (
 	"crypto/tls"
 	"fmt"
+	"net"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
@@ -63,10 +66,26 @@ type Config struct {
 	Credentials    map[string]string // username -> password.
 	TLSCertFile    string            // PEM cert; with TLSKeyFile, enables TLS.
 	TLSKeyFile     string            // PEM private key.
+
+	// Console: the web UI, served over HTTP beside the broker.
+	Console           bool     // serve the console.
+	ConsoleAddr       string   // host:port for the console's HTTP listener.
+	ConsoleAllowHosts []string // extra Host names the console answers to (DNS-rebinding guard).
+
+	// Process.
+	Zone      bool   // join the shared .doze name zone (kafka.doze).
+	PprofAddr string // if set, serve net/http/pprof here.
+	LogLevel  string // debug, info, warn or error.
+	LogFormat string // text or json.
 }
 
 const (
-	defaultListenAddr   = ":9092"
+	// The default listener is loopback: a development broker with no auth should
+	// not be reachable from the network it happens to be plugged into. Listening
+	// beyond this machine is a choice (--listen :9092) and docs/configuration.md
+	// says what else to set when making it.
+	defaultListenAddr   = "127.0.0.1:9092"
+	defaultConsoleAddr  = "127.0.0.1:9093"
 	defaultSegmentBytes = 128 << 20 // 128 MiB
 	defaultIndexStride  = 4 << 10   // 4 KiB
 
@@ -84,8 +103,8 @@ func Default() Config {
 		Version:                protocol.DefaultKafkaMajor,
 		ListenAddr:             defaultListenAddr,
 		AdvertisedHost:         "localhost",
-		DataDir:                "./data",
-		MetaDB:                 "./meta.db",
+		DataDir:                DefaultDataDir,
+		MetaDB:                 "", // empty = <data-dir>/meta.db; see ResolveMetaDB.
 		SegmentBytes:           defaultSegmentBytes,
 		IndexIntervalBytes:     defaultIndexStride,
 		FsyncInterval:          500 * time.Millisecond,
@@ -93,7 +112,44 @@ func Default() Config {
 		AutoCreateTopics:       true,
 		DefaultPartitions:      1,
 		MaxPartitions:          defaultMaxPartitions,
+		Console:                true,
+		ConsoleAddr:            defaultConsoleAddr,
+		Zone:                   true,
+		LogLevel:               "info",
+		LogFormat:              "text",
 	}
+}
+
+// DefaultDataDir is where a bare `doze-kafka` keeps its data.
+const DefaultDataDir = "./data"
+
+// MetaDBFile is the metadata database's file name inside the data directory.
+const MetaDBFile = "meta.db"
+
+// ResolveMetaDB fills in MetaDB when it was not given: <data-dir>/meta.db, so a
+// data directory is self-contained and moving or deleting it takes the topic
+// registry and committed offsets with it (they used to live in ./meta.db, which
+// outlived a deleted ./data and left offsets pointing at topics that were gone).
+//
+// A directory that was set up the old way keeps working: when the data dir is the
+// default one, has no metadata database yet, and ./meta.db exists, that file is
+// used and the returned notice says so. The notice is empty otherwise.
+func (c *Config) ResolveMetaDB() (notice string) {
+	if c.MetaDB != "" {
+		return ""
+	}
+	c.MetaDB = filepath.Join(c.DataDir, MetaDBFile)
+	if c.DataDir != DefaultDataDir {
+		return ""
+	}
+	if _, err := os.Stat(c.MetaDB); err == nil {
+		return ""
+	}
+	if _, err := os.Stat("meta.db"); err == nil {
+		c.MetaDB = "meta.db"
+		return "using ./meta.db from an earlier version; move it to " + filepath.Join(DefaultDataDir, MetaDBFile) + " to keep the data directory self-contained"
+	}
+	return ""
 }
 
 // Validate reports the first problem that would prevent the broker from starting.
@@ -104,10 +160,16 @@ func (c Config) Validate() error {
 	switch {
 	case c.ListenAddr == "":
 		return fmt.Errorf("config: listen address is empty")
+	case !validHostPort(c.ListenAddr):
+		return fmt.Errorf("config: listen address %q is not host:port (for example 127.0.0.1:9092 or :9092)", c.ListenAddr)
+	case c.Console && !validHostPort(c.ConsoleAddr):
+		return fmt.Errorf("config: console address %q is not host:port (for example 127.0.0.1:9093)", c.ConsoleAddr)
+	case c.LogLevel != "debug" && c.LogLevel != "info" && c.LogLevel != "warn" && c.LogLevel != "error":
+		return fmt.Errorf("config: log level %q is not one of debug, info, warn, error", c.LogLevel)
+	case c.LogFormat != "text" && c.LogFormat != "json":
+		return fmt.Errorf("config: log format %q is not text or json", c.LogFormat)
 	case c.DataDir == "":
 		return fmt.Errorf("config: data dir is empty")
-	case c.MetaDB == "":
-		return fmt.Errorf("config: meta db path is empty")
 	case c.SegmentBytes <= 0:
 		return fmt.Errorf("config: segment-bytes must be positive, got %d", c.SegmentBytes)
 	case c.IndexIntervalBytes <= 0:
@@ -126,6 +188,9 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: fsync-interval must be non-negative (0 disables), got %s", c.FsyncInterval)
 	}
 
+	if !c.AuthEnabled() && len(c.Credentials) > 0 {
+		return fmt.Errorf("config: SASL users are configured but no mechanism is enabled; add --sasl-mechanisms (PLAIN, SCRAM-SHA-256 or SCRAM-SHA-512), or drop the users")
+	}
 	if c.AuthEnabled() {
 		for _, m := range c.SASLMechanisms {
 			if !knownSASLMechanisms[m] {
@@ -172,4 +237,18 @@ func (c Config) Retention() log.RetentionPolicy {
 		MaxBytes: c.RetentionBytes,
 		MaxAge:   time.Duration(c.RetentionMs) * time.Millisecond,
 	}
+}
+
+// validHostPort reports whether addr is host:port, with an empty host (":9092")
+// and port 0 allowed.
+func validHostPort(addr string) bool {
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	if port == "" {
+		return false
+	}
+	_, err = net.LookupPort("tcp", port)
+	return err == nil
 }
