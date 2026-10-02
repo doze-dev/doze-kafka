@@ -6,6 +6,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
+	"github.com/doze-dev/doze-kafka/internal/storage/meta"
 )
 
 // handleOffsetCommit persists a group's committed offsets for topic-partitions to
@@ -25,6 +26,14 @@ func (b *Broker) handleOffsetCommit(ctx context.Context, req *protocol.Request) 
 	resp := kmsg.NewPtrOffsetCommitResponse()
 	resp.SetVersion(req.Header.APIVersion)
 
+	// Validate every partition first and write the valid ones in ONE transaction:
+	// a bolt transaction is an fsync, so committing a 20-partition poll one
+	// partition at a time cost 20 of them (about 140 ms); this costs one.
+	type slot struct{ topic, part int }
+	var (
+		commits []meta.OffsetCommit
+		slots   []slot
+	)
 	for _, t := range oc.Topics {
 		rt := kmsg.NewOffsetCommitResponseTopic()
 		rt.Topic = t.Topic
@@ -44,13 +53,18 @@ func (b *Broker) handleOffsetCommit(ctx context.Context, req *protocol.Request) 
 				if p.Metadata != nil {
 					md = *p.Metadata
 				}
-				if err := b.meta.CommitOffset(oc.Group, name, p.Partition, p.Offset, md); err != nil {
-					rp.ErrorCode = b.storageFault("offset commit", err, "group", oc.Group, "topic", name, "partition", p.Partition)
-				}
+				commits = append(commits, meta.OffsetCommit{Topic: name, Partition: p.Partition, Offset: p.Offset, Metadata: md})
+				slots = append(slots, slot{len(resp.Topics), len(rt.Partitions)})
 			}
 			rt.Partitions = append(rt.Partitions, rp)
 		}
 		resp.Topics = append(resp.Topics, rt)
+	}
+	if err := b.meta.CommitOffsets(oc.Group, commits); err != nil {
+		code := b.storageFault("offset commit", err, "group", oc.Group, "partitions", len(commits))
+		for _, s := range slots {
+			resp.Topics[s.topic].Partitions[s.part].ErrorCode = code
+		}
 	}
 	return protocol.EncodeResponse(req.Header, resp), nil
 }

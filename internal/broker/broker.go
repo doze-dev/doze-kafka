@@ -35,6 +35,10 @@ type Broker struct {
 	// fixed port (":0"), and 0 until a listener is bound (or when serving on a
 	// caller-provided non-TCP listener, where the configured address stands).
 	boundPort atomic.Int32
+
+	pidMu   sync.Mutex
+	pidNext int64 // next producer id to hand out from the reserved block.
+	pidEnd  int64 // one past the last id in the block.
 }
 
 // New constructs a Broker over an open log manager and metadata store. The

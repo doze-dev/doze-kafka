@@ -12,6 +12,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
+	"strings"
+	"sync"
 	"time"
 
 	"go.etcd.io/bbolt"
@@ -62,7 +66,16 @@ type Store interface {
 	// DeleteOffset removes one committed offset (a no-op if there is none).
 	DeleteOffset(group, topic string, partition int32) error
 
+	// CommitOffsets stores several offsets of one group in a single transaction.
+	// Each bolt transaction is an fsync, so committing 20 partitions one at a time
+	// was 20 fsyncs; this is one.
+	CommitOffsets(group string, offsets []OffsetCommit) error
+
 	NextProducerID() (int64, error)
+	// ReserveProducerIDs hands out a block of n consecutive producer ids in one
+	// transaction and returns the first. The block is durable before it is used,
+	// so ids are never reissued after a crash (a few may be skipped).
+	ReserveProducerIDs(n int64) (first int64, err error)
 
 	Close() error
 }
@@ -92,10 +105,56 @@ func Open(path string) (Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("meta: init buckets: %w", err)
 	}
-	return &boltStore{db: db}, nil
+	s := &boltStore{db: db, byName: map[string]Topic{}, byID: map[TopicID]string{}}
+	if err := s.loadCache(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("meta: load topic registry: %w", err)
+	}
+	return s, nil
 }
 
-type boltStore struct{ db *bbolt.DB }
+func (s *boltStore) loadCache() error {
+	return s.db.View(func(tx *bbolt.Tx) error {
+		return tx.Bucket(bucketTopics).ForEach(func(k, v []byte) error {
+			var rec topicRecord
+			if err := json.Unmarshal(v, &rec); err != nil {
+				return err
+			}
+			t := Topic{Name: string(k), ID: rec.ID, Partitions: rec.Partitions, Config: rec.Config}
+			s.byName[t.Name] = t
+			s.byID[t.ID] = t.Name
+			return nil
+		})
+	})
+}
+
+// cloneTopic copies the one mutable field so a caller cannot change the cache.
+func cloneTopic(t Topic) Topic {
+	if t.Config != nil {
+		t.Config = maps.Clone(t.Config)
+	}
+	return t
+}
+
+// OffsetCommit is one committed offset, for CommitOffsets.
+type OffsetCommit struct {
+	Topic     string
+	Partition int32
+	Offset    int64
+	Metadata  string
+}
+
+// boltStore is the bbolt-backed Store. The topic registry is also held in memory:
+// this process is the only writer of the file (bbolt enforces that with its lock),
+// so a write-through cache is always coherent, and it takes a produce, fetch or
+// commit from a read transaction plus a JSON decode (~3 µs) to a map lookup.
+type boltStore struct {
+	db *bbolt.DB
+
+	mu     sync.RWMutex
+	byName map[string]Topic
+	byID   map[TopicID]string
+}
 
 type topicRecord struct {
 	ID         TopicID           `json:"id"`
@@ -146,61 +205,42 @@ func (s *boltStore) CreateTopic(name string, partitions int32, config map[string
 	if err != nil {
 		return Topic{}, err
 	}
-	return Topic{Name: name, ID: id, Partitions: partitions, Config: config}, nil
+	t := Topic{Name: name, ID: id, Partitions: partitions, Config: config}
+	s.mu.Lock()
+	s.byName[name] = cloneTopic(t)
+	s.byID[id] = name
+	s.mu.Unlock()
+	return t, nil
 }
 
 func (s *boltStore) Topic(name string) (Topic, bool, error) {
-	var (
-		topic Topic
-		found bool
-	)
-	err := s.db.View(func(tx *bbolt.Tx) error {
-		v := tx.Bucket(bucketTopics).Get([]byte(name))
-		if v == nil {
-			return nil
-		}
-		var rec topicRecord
-		if err := json.Unmarshal(v, &rec); err != nil {
-			return err
-		}
-		topic = Topic{Name: name, ID: rec.ID, Partitions: rec.Partitions, Config: rec.Config}
-		found = true
-		return nil
-	})
-	return topic, found, err
+	s.mu.RLock()
+	t, ok := s.byName[name]
+	s.mu.RUnlock()
+	return cloneTopic(t), ok, nil
 }
 
 func (s *boltStore) TopicByID(id TopicID) (Topic, bool, error) {
-	var name string
-	err := s.db.View(func(tx *bbolt.Tx) error {
-		if v := tx.Bucket(bucketTopicsByID).Get(id[:]); v != nil {
-			name = string(v)
-		}
-		return nil
-	})
-	if err != nil || name == "" {
-		return Topic{}, false, err
-	}
-	return s.Topic(name)
+	s.mu.RLock()
+	name, ok := s.byID[id]
+	t := s.byName[name]
+	s.mu.RUnlock()
+	return cloneTopic(t), ok, nil
 }
 
 func (s *boltStore) ListTopics() ([]Topic, error) {
-	var topics []Topic
-	err := s.db.View(func(tx *bbolt.Tx) error {
-		return tx.Bucket(bucketTopics).ForEach(func(k, v []byte) error {
-			var rec topicRecord
-			if err := json.Unmarshal(v, &rec); err != nil {
-				return err
-			}
-			topics = append(topics, Topic{Name: string(k), ID: rec.ID, Partitions: rec.Partitions, Config: rec.Config})
-			return nil
-		})
-	})
-	return topics, err
+	s.mu.RLock()
+	topics := make([]Topic, 0, len(s.byName))
+	for _, t := range s.byName {
+		topics = append(topics, cloneTopic(t))
+	}
+	s.mu.RUnlock()
+	slices.SortFunc(topics, func(a, b Topic) int { return strings.Compare(a.Name, b.Name) })
+	return topics, nil
 }
 
 func (s *boltStore) DeleteTopic(name string) error {
-	return s.db.Update(func(tx *bbolt.Tx) error {
+	err := s.db.Update(func(tx *bbolt.Tx) error {
 		topics := tx.Bucket(bucketTopics)
 		v := topics.Get([]byte(name))
 		if v == nil {
@@ -236,6 +276,16 @@ func (s *boltStore) DeleteTopic(name string) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	if t, ok := s.byName[name]; ok {
+		delete(s.byID, t.ID)
+		delete(s.byName, name)
+	}
+	s.mu.Unlock()
+	return nil
 }
 
 // offsetKeyTopic extracts the topic from a bucketOffsets key
@@ -247,6 +297,25 @@ func offsetKeyTopic(k []byte) string {
 	}
 	rest := k[:len(k)-5] // drop \0 + partition.
 	return string(rest[bytes.LastIndexByte(rest, 0)+1:])
+}
+
+func (s *boltStore) CommitOffsets(group string, offsets []OffsetCommit) error {
+	if len(offsets) == 0 {
+		return nil
+	}
+	return s.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(bucketOffsets)
+		for _, o := range offsets {
+			val, err := json.Marshal(offsetRecord{Offset: o.Offset, Metadata: o.Metadata})
+			if err != nil {
+				return err
+			}
+			if err := b.Put(offsetKey(group, o.Topic, o.Partition), val); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (s *boltStore) CommitOffset(group, topic string, partition int32, offset int64, metadata string) error {
@@ -354,20 +423,25 @@ func (s *boltStore) ListOffsets(group string) ([]OffsetEntry, error) {
 	return out, err
 }
 
-func (s *boltStore) NextProducerID() (int64, error) {
-	var id int64
+func (s *boltStore) NextProducerID() (int64, error) { return s.ReserveProducerIDs(1) }
+
+func (s *boltStore) ReserveProducerIDs(n int64) (int64, error) {
+	if n < 1 {
+		n = 1
+	}
+	var first int64
 	err := s.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucketMeta)
 		var next int64
 		if v := b.Get(keyProducerID); len(v) == 8 {
 			next = int64(binary.BigEndian.Uint64(v))
 		}
-		id = next
+		first = next
 		var buf [8]byte
-		binary.BigEndian.PutUint64(buf[:], uint64(next+1))
+		binary.BigEndian.PutUint64(buf[:], uint64(next+n))
 		return b.Put(keyProducerID, buf[:])
 	})
-	return id, err
+	return first, err
 }
 
 func (s *boltStore) Close() error { return s.db.Close() }
