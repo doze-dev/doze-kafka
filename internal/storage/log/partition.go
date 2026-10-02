@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // ErrOffsetOutOfRange is returned by Read when the requested offset is below the
@@ -28,6 +29,15 @@ type Partition struct {
 	segments       []*Segment // sorted by base offset; last == active.
 	logEndOffset   int64
 	logStartOffset int64
+
+	// Group commit. Every Append bumps appendSeq; syncedSeq is how far a completed
+	// fsync is known to cover. A caller that needs its write durable waits its turn
+	// at syncMu and, if a concurrent caller's fsync already covered its write, is
+	// done without issuing one — N concurrent acks=all producers on a partition
+	// share fsyncs instead of paying N in series.
+	appendSeq atomic.Uint64
+	syncMu    sync.Mutex
+	syncedSeq atomic.Uint64
 }
 
 // openPartition opens (creating if needed) a partition directory, loading its
@@ -114,6 +124,7 @@ func (p *Partition) Append(records []byte) (int64, error) {
 		if err := p.active().append(offset, batch); err != nil {
 			return 0, err
 		}
+		p.appendSeq.Add(1)
 		p.logEndOffset = offset + int64(info.recordCount)
 		pos += int(info.totalBytes)
 	}
@@ -224,9 +235,33 @@ func (p *Partition) LogStartOffset() int64 {
 // were synced when they rolled, so the active one is all that can hold unsynced
 // writes.
 func (p *Partition) Sync() error {
+	want := p.appendSeq.Load()
+	if p.syncedSeq.Load() >= want {
+		return nil // nothing written since the last fsync: no lock, no syscall.
+	}
+	p.syncMu.Lock()
+	defer p.syncMu.Unlock()
+	if p.syncedSeq.Load() >= want {
+		return nil // a concurrent caller's fsync covered this write while we waited.
+	}
+
+	// Note how far the log has got BEFORE flushing: the fsync below covers at
+	// least that much (it may cover more), so it is safe to record as durable.
 	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.active().sync()
+	upto := p.appendSeq.Load()
+	seg := p.active()
+	p.mu.Unlock()
+
+	// The fsync itself runs without p.mu: holding it blocked every produce and
+	// fetch on the partition for the duration of a disk flush. File operations are
+	// safe to run concurrently with appends. A segment that rolled and was dropped
+	// by retention in the meantime reports ErrClosed; it was sealed with an fsync
+	// at the roll, so there is nothing left to flush.
+	if err := seg.sync(); err != nil && !errors.Is(err, os.ErrClosed) {
+		return err
+	}
+	p.syncedSeq.Store(upto)
+	return nil
 }
 
 // dropOldestLocked deletes the oldest segment's files and advances the log-start
@@ -250,7 +285,7 @@ func (p *Partition) dropOldestLocked() error {
 func (p *Partition) close() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	firstErr := p.active().sync()
+	firstErr := p.active().sync() // a no-op if nothing is unflushed.
 	for _, seg := range p.segments {
 		if err := seg.close(); err != nil && firstErr == nil {
 			firstErr = err

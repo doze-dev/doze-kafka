@@ -293,11 +293,33 @@ func (m *Manager) Close() error {
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	var firstErr error
+	// Close in parallel: each close is an fsync (when there is unflushed data) and
+	// several file closes, and doing 5,000 of them one after another took half a
+	// minute at shutdown. The pool is bounded so it cannot exhaust descriptors
+	// or threads itself.
+	var (
+		wg       sync.WaitGroup
+		errMu    sync.Mutex
+		firstErr error
+		sem      = make(chan struct{}, closeConcurrency)
+	)
 	for _, p := range m.partitions {
-		if err := p.close(); err != nil && firstErr == nil {
-			firstErr = err
-		}
+		sem <- struct{}{}
+		wg.Add(1)
+		go func() {
+			defer func() { <-sem; wg.Done() }()
+			if err := p.close(); err != nil {
+				errMu.Lock()
+				if firstErr == nil {
+					firstErr = err
+				}
+				errMu.Unlock()
+			}
+		}()
 	}
+	wg.Wait()
 	return firstErr
 }
+
+// closeConcurrency bounds the parallel partition closes at shutdown.
+const closeConcurrency = 32

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 )
 
@@ -20,6 +21,7 @@ type Segment struct {
 	sinceIndex    int64     // bytes appended since the last index entry.
 	lastModified  time.Time // wall-clock time of the most recent append (for age-based retention).
 	beforeSync    func() error
+	logDirty      atomic.Bool // bytes written since the last fsync of the log.
 }
 
 // segmentName is the 20-digit zero-padded base offset used for a segment's files.
@@ -69,6 +71,7 @@ func (s *Segment) append(offset int64, batch []byte) error {
 	if _, err := s.log.WriteAt(batch, pos); err != nil {
 		return err
 	}
+	s.logDirty.Store(true)
 	s.sizeBytes += int64(len(batch))
 	s.sinceIndex += int64(len(batch))
 	s.lastModified = time.Now()
@@ -85,13 +88,21 @@ func (s *Segment) append(offset int64, batch []byte) error {
 // durability: the coarse fsync timer syncs the active segment, a roll syncs the
 // segment being sealed, and graceful shutdown syncs everything before close.
 func (s *Segment) sync() error {
-	if s.beforeSync != nil {
-		if err := s.beforeSync(); err != nil {
-			return err
+	if s.logDirty.Load() || s.index.dirty.Load() {
+		if s.beforeSync != nil {
+			if err := s.beforeSync(); err != nil {
+				return err
+			}
 		}
 	}
-	if err := s.log.Sync(); err != nil {
-		return err
+	// Only flush what changed. The periodic timer used to fsync every open
+	// partition's log and index whether or not anything had been written, which on
+	// an idle broker is pure waste.
+	if s.logDirty.Swap(false) {
+		if err := s.log.Sync(); err != nil {
+			s.logDirty.Store(true)
+			return err
+		}
 	}
 	return s.index.sync()
 }

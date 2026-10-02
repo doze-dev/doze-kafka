@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"os"
 	"sort"
+	"sync/atomic"
 )
 
 // indexEntryBytes is the fixed on-disk size of one sparse index entry:
@@ -20,6 +21,7 @@ const indexEntryBytes = 16
 type Index struct {
 	file    *os.File
 	entries []indexEntry
+	dirty   atomic.Bool // entries written since the last fsync.
 }
 
 type indexEntry struct {
@@ -48,14 +50,17 @@ func (ix *Index) load() error {
 	}
 	count := info.Size() / indexEntryBytes // a trailing partial entry is ignored.
 	ix.entries = make([]indexEntry, 0, count)
-	var buf [indexEntryBytes]byte
-	for i := range count {
-		if _, err := ix.file.ReadAt(buf[:], i*indexEntryBytes); err != nil {
-			return err
-		}
+	// One read for the whole file: a syscall per 16-byte entry made opening a
+	// partition with a large index cost thousands of them.
+	raw := make([]byte, count*indexEntryBytes)
+	if _, err := ix.file.ReadAt(raw, 0); err != nil && count > 0 {
+		return err
+	}
+	for i := int64(0); i < count; i++ {
+		b := raw[i*indexEntryBytes:]
 		ix.entries = append(ix.entries, indexEntry{
-			offset:   int64(binary.BigEndian.Uint64(buf[0:])),
-			position: int64(binary.BigEndian.Uint64(buf[8:])),
+			offset:   int64(binary.BigEndian.Uint64(b[0:])),
+			position: int64(binary.BigEndian.Uint64(b[8:])),
 		})
 	}
 	return nil
@@ -70,6 +75,7 @@ func (ix *Index) append(offset, position int64) error {
 		return err
 	}
 	ix.entries = append(ix.entries, indexEntry{offset, position})
+	ix.dirty.Store(true)
 	return nil
 }
 
@@ -99,10 +105,22 @@ func (ix *Index) rewrite(entries []indexEntry) error {
 		}
 	}
 	ix.entries = append(ix.entries[:0], entries...)
+	ix.dirty.Store(true)
 	return nil
 }
 
-// sync flushes appended index entries to stable storage.
-func (ix *Index) sync() error { return ix.file.Sync() }
+// sync flushes appended index entries to stable storage, if there are any new
+// ones. Most appends add no entry (one per index interval), so most syncs of the
+// index would be an fsync that persists nothing.
+func (ix *Index) sync() error {
+	if !ix.dirty.Swap(false) {
+		return nil
+	}
+	if err := ix.file.Sync(); err != nil {
+		ix.dirty.Store(true) // not flushed: the next sync must try again.
+		return err
+	}
+	return nil
+}
 
 func (ix *Index) close() error { return ix.file.Close() }
