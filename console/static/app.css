@@ -116,7 +116,7 @@ button { font: inherit; color: inherit; }
 
 .kbd {
   display: inline-flex; align-items: center; gap: 1px; height: 18px; padding: 0 5px;
-  font: 11px var(--mono); color: var(--dim); background: var(--chassis-2);
+  font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim); background: var(--chassis-2);
   border: 1px solid var(--line); border-radius: var(--radius-sm);
 }
 
@@ -149,7 +149,7 @@ button { font: inherit; color: inherit; }
 .ri.on .ri-ic { color: var(--paper); }
 .ri .ri-nm { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .ri .ri-ct {
-  font: 10.5px var(--mono); color: var(--dim); background: var(--ink);
+  font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim); background: var(--ink);
   border: 1px solid var(--line); border-radius: var(--radius-pill); padding: 1px 7px; flex: none;
 }
 .ri .ri-ct:empty { display: none; }
@@ -512,7 +512,7 @@ table.tbl tbody tr:hover td { background: var(--chassis-2); }
 /* ---------- CodeMirror, themed with the console tokens ---------- */
 .CodeMirror {
   height: auto; min-height: 96px; max-height: 420px;
-  font: 12px/1.6 var(--mono); border: 1px solid var(--line);
+  font-family: var(--mono); font-size: var(--fs-md); line-height: 1.6; border: 1px solid var(--line);
   border-radius: var(--radius); background: var(--ink); color: var(--paper);
   transition: border-color .12s, box-shadow .12s;
 }
@@ -541,10 +541,10 @@ table.tbl tbody tr:hover td { background: var(--chassis-2); }
   border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; background: var(--chassis-2);
 }
 .cm-jsonbar + .CodeMirror { border-top-left-radius: 0; border-top-right-radius: 0; }
-.cm-valid { flex: 1; min-width: 0; font: 11px var(--mono); color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cm-valid { flex: 1; min-width: 0; font-family: var(--mono); font-size: var(--fs-sm); color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cm-valid.ok { color: var(--ok); }
 .cm-valid.bad { color: var(--bad); }
-.cm-fmt { flex: none; font: 11px var(--mono); padding: 3px 10px; border-radius: var(--radius); cursor: pointer; border: 1px solid var(--line); background: var(--chassis); color: var(--paper); }
+.cm-fmt { flex: none; font-family: var(--mono); font-size: var(--fs-sm); padding: 3px 10px; border-radius: var(--radius); cursor: pointer; border: 1px solid var(--line); background: var(--chassis); color: var(--paper); }
 .cm-fmt:hover { border-color: var(--brass); }
 .cm-json-gutter { width: 14px; }
 .cm-gutter-err { color: var(--bad); font-size: var(--fs-sm); padding-left: 3px; }
@@ -562,7 +562,7 @@ table.tbl tbody tr:hover td { background: var(--chassis-2); }
 .errorpanel .err-ic { color: var(--dim); margin-bottom: 10px; }
 .errorpanel .err-ic svg { width: 32px; height: 32px; }
 .errorpanel.unreachable .err-ic, .errorpanel.internal .err-ic { color: var(--bad); }
-.errorpanel h1 { font: 600 18px var(--ui); margin: 0 0 8px; }
+.errorpanel h1 { font-family: var(--ui); font-weight: 600; font-size: var(--fs-xl); margin: 0 0 8px; }
 .errorpanel p { color: var(--dim); font-size: var(--fs-base); line-height: 1.55; margin: 0 0 16px; overflow-wrap: anywhere; }
 .errorpanel .didyoumean { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; font-size: var(--fs-md); }
 .errorpanel .err-acts { display: flex; justify-content: center; gap: 10px; }
@@ -599,7 +599,7 @@ button[disabled], .btn[disabled] { opacity: .55; cursor: not-allowed; }
 .seg.fmt button { padding: 2px 8px; font-size: var(--fs-sm); }
 .hexbox { font-size: var(--fs-sm); white-space: pre; overflow-x: auto; word-break: normal; }
 .drawer-dl { margin-top: 8px; }
-.b64tog { margin-left: 6px; padding: 0 5px; font: 600 9.5px var(--mono); line-height: 15px; color: var(--dim-2); background: transparent; border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; vertical-align: 1px; }
+.b64tog { margin-left: 6px; padding: 0 5px; font-family: var(--mono); font-weight: 600; font-size: var(--fs-xs); line-height: 15px; color: var(--dim-2); background: transparent; border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; vertical-align: 1px; }
 .b64tog.on { color: var(--ink); background: var(--brass); border-color: var(--brass); }
 .chk { margin-left: 10px; font-weight: 400; font-size: var(--fs-sm); color: var(--dim); cursor: pointer; }
 .chk input { margin-right: 4px; }
@@ -666,3 +666,11 @@ tr[data-drawer-open]:focus-visible { outline: 2px solid var(--brass); outline-of
   .detail .mono, .detail b { overflow-wrap: anywhere; }
   .dock { max-width: 100%; }
 }
+
+/* A copyable value that truncates; the full text is its title. */
+.kv-copy { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-width: 0; }
+.trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* A lag figure outside a chip (the consumers strip, the lag column). */
+.lag-zero { color: var(--ok); }
+.lag-some { color: var(--warn); }
+.psel-wrap { display: inline-flex; align-items: center; }

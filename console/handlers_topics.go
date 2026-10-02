@@ -167,12 +167,17 @@ func (c *Console) topicProduce(w http.ResponseWriter, r *http.Request) {
 func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	partition := int32(0)
-	if n, err := strconv.Atoi(r.URL.Query().Get("partition")); err == nil {
+	if raw := r.URL.Query().Get("partition"); raw != "" {
+		n, err := strconv.ParseInt(raw, 10, 32)
+		if err != nil || n < 0 {
+			c.fail(w, r, fmt.Errorf("%w: partition %q is not a partition number", errBadInput, raw))
+			return
+		}
 		partition = int32(n)
 	}
 	offset, err := strconv.ParseInt(r.URL.Query().Get("offset"), 10, 64)
-	if err != nil {
-		c.fail(w, r, err)
+	if err != nil || offset < 0 {
+		c.fail(w, r, fmt.Errorf("%w: offset %q is not an offset", errBadInput, r.URL.Query().Get("offset")))
 		return
 	}
 	msgs, err := c.be.FetchWindow(r.Context(), name, partition, offset, 1)
