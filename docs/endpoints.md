@@ -10,6 +10,7 @@ summary prints the first two for the run you are in.
 | Kafka wire protocol | `127.0.0.1:9092` | `--listen` | Loopback only. `--listen :9092` accepts other machines and containers. |
 | Web console and `/healthz` | `127.0.0.1:9093` | `--console-addr`, `--console=false` | HTTP. Kafka's protocol cannot share a port with HTTP, so this is separate. |
 | Profiling (off) | — | `--pprof-addr` | `net/http/pprof`, only if you set it. |
+| The broker again, on `127.0.0.3` | same port as `--listen` | `--zone=false` | Only when the `.doze` zone is on and set up (below). |
 
 Both defaults are loopback: a development broker has no auth by default, and nothing
 on the network you happen to be plugged into should be able to reach it. Listening
@@ -48,8 +49,9 @@ What joining the zone does, concretely:
   holds the name, the log says which, and yours keeps using its configured address.
 - **Listens on `127.0.0.3:<your port>`** as well as your listen address when that is
   loopback, so `kafka.doze:9092` and `127.0.0.1:9092` reach the same broker.
-- **Serves the zone's DNS** on port 5323 (`127.0.0.1` on macOS, `127.0.0.54` on
-  Linux) if no other doze process is already doing so, answering for every doze tool's names, not only its own.
+- **Serves the zone's DNS** on port 5323 (`127.0.0.1` on macOS; `192.0.2.53`, an
+  address on a `doze0` interface that `dns-setup` creates, on Linux) if no other doze
+  process is already doing so, answering for every doze tool's names, not only its own.
 - **Binds `:80`** (the shared front door) if free, to give console names their
   port-less URLs. It only forwards requests whose `Host` is a registered `.doze`
   name.
@@ -64,9 +66,17 @@ doze-kafka dns-setup             # runs it (asks for sudo)
 doze-kafka dns-setup --uninstall # takes it all back out
 ```
 
-On macOS this adds loopback aliases and a `/etc/resolver/doze` entry; on Linux it
-edits `/etc/hosts` and one sysctl. Without it everything still works through the
-configured addresses.
+On macOS this adds loopback aliases and a `/etc/resolver/doze` entry. On Linux it
+installs a small systemd unit that creates the `doze0` interface and points the
+machine's resolver at the zone (systemd-resolved, or a dnsmasq drop-in), and a sysctl
+that lets an unprivileged process bind port 80 for the front door. A Linux machine with
+a plain `/etc/resolv.conf` cannot route one domain to another resolver; there the
+well-known names (`kafka.doze`, `aws.doze`) are written to `/etc/hosts` instead.
+`--print` shows exactly what will run on your machine. Without any of it everything
+still works through the configured addresses.
+
+`dns-setup` takes only the flags above; anything else is an error rather than a reason
+to run the installer.
 
 **Opting out.** `--zone=false` (or `zone = false` in the file) skips all of the
 above: no registry entry, no `:80`, no DNS, no second listener.

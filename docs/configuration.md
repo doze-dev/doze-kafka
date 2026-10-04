@@ -1,15 +1,19 @@
 # Configuration
 
 doze-kafka is configured with command-line flags **or** a TOML config file — every
-setting is available either way, under the same name. Every setting has a sensible
+setting is available either way, under the same name (with two exceptions, the
+`[credentials]` and `[tls]` tables, shown below). Every setting has a sensible
 default, so `./doze-kafka` with no arguments is a complete, working broker. Run
 `./doze-kafka --help` to see the flags, grouped, at any time.
 
 ## Config file
 
 Drop a `doze-kafka.toml` in your working directory and doze-kafka loads it
-automatically; point elsewhere with `--config path/to/file.toml`. The keys match the
-flags one-to-one:
+automatically; point elsewhere with `--config path/to/file.toml`, or run without any
+file with `--config ""`. A key is its flag's name without the dashes in front. The two
+that differ are tables: SASL users (`--sasl-user alice:s3cret`) are a `[credentials]`
+table, and `--tls-cert` / `--tls-key` are `cert` and `key` under `[tls]`. Put tables
+last: in TOML, every key after a `[table]` line belongs to that table.
 
 ```toml
 listen = "127.0.0.1:9092"
@@ -51,24 +55,29 @@ doze-kafka config print > doze-kafka.toml
 ```
 
 A bad setting is reported once, before anything starts, as a single line, with exit
-code 2 (a broker that fails *while running* exits 1):
+code 2 (a broker that fails *while running* exits 1). That covers a mistyped flag, a
+value out of range, and a TLS certificate that is missing or does not match its key:
 
 ```console
 $ doze-kafka --listen nonsense
 doze-kafka: listen address "nonsense" is not host:port (for example 127.0.0.1:9092 or :9092)
+$ doze-kafka --listn :9092
+doze-kafka: unknown flag --listn — did you mean --listen?
 ```
 
 ## All flags
 
-Every flag below has the same name as its config-file key (durations like
-`--fsync-interval` are written as strings, e.g. `fsync-interval = "500ms"`).
+Every flag below has the same name as its config-file key, apart from the two tables
+above (durations like `--fsync-interval` are written as strings, e.g.
+`fsync-interval = "500ms"`). A file written for an earlier version may say `version`
+where this one says `kafka-version`; that spelling is still read.
 
 ### Network
 
 | Flag | Default | Meaning |
 |---|---|---|
 | `--listen` | `127.0.0.1:9092` | `host:port` to accept connections on. The default is **loopback only**: nothing on your network can reach an unauthenticated development broker. Use `:9092` to accept connections from other machines or containers (and read the note on `--advertised-host` below). Use `127.0.0.1:0` for a free port. |
-| `--advertised-host` | `localhost` | Host returned to clients in Metadata. **This is the address clients actually reconnect to** — see the note below. |
+| `--advertised-host` | `localhost` | Host returned to clients in Metadata: a host name or an IP address, without a port. **This is the address clients actually reconnect to** — see the note below. |
 | `--advertised-port` | `0` | Port advertised to clients. `0` means the port actually bound, which is right even with `:0`. |
 
 ### Storage
@@ -76,7 +85,7 @@ Every flag below has the same name as its config-file key (durations like
 | Flag | Default | Meaning |
 |---|---|---|
 | `--data-dir` | `./data` | Directory holding per-partition log segments. |
-| `--meta-db` | `<data-dir>/meta.db` | File holding the topic registry, committed offsets, and producer-id counter. It lives *inside* the data directory by default, so the directory is self-contained: move it or delete it and the topics and offsets go with it. An existing `./meta.db` from an earlier version, beside the default `./data`, is still used (with a notice) until you move it. |
+| `--meta-db` | `<data-dir>/meta.db` | File holding the topic registry, committed offsets, and producer-id counter. It lives *inside* the data directory by default, so the directory is self-contained: move it or delete it and the topics and offsets go with it. Earlier versions kept it at `./meta.db` in the working directory. That file is still used (with a notice) when the data directory has partition data but no database of its own, however the data directory is spelled; run from a different working directory and it is not found, so move it into the data directory when you can. |
 | `--segment-bytes` | `134217728` (128 MiB) | Roll to a new log segment once the active one exceeds this. |
 | `--index-interval-bytes` | `4096` | Add one sparse index entry per this many bytes of log. |
 
@@ -85,13 +94,13 @@ Every flag below has the same name as its config-file key (durations like
 | Flag | Default | Meaning |
 |---|---|---|
 | `--retention-bytes` | `0` | Delete oldest segments once a partition exceeds this size. `0` = keep everything. |
-| `--retention-ms` | `0` | Delete segments older than this many milliseconds. `0` = keep everything. |
+| `--retention-ms` | `0` | Delete segments older than this many milliseconds. `0` = keep everything. (The most is about 292 years; for "for ever", use 0.) |
 
 ### Durability
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--fsync-interval` | `500ms` | How often active segments are flushed to disk. `0` disables the timer (the OS still flushes eventually; a clean shutdown always syncs). `acks=all` always fsyncs before it is acknowledged. |
+| `--fsync-interval` | `500ms` | How often active segments are flushed to disk, at least `1ms`. `0` disables the timer (the OS still flushes eventually; a clean shutdown always syncs). `acks=all` always fsyncs before it is acknowledged. |
 
 ### Topics and groups
 
@@ -124,7 +133,7 @@ Every flag below has the same name as its config-file key (durations like
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--config` | `./doze-kafka.toml` if present | Path to a TOML config file. |
+| `--config` | `./doze-kafka.toml` if present | Path to a TOML config file. `--config ""` uses none, ignoring a `doze-kafka.toml` in the working directory. |
 | `--zone` | `true` | Join the shared `.doze` name zone (`kafka.doze`). `--zone=false` opts out. See [Endpoints](endpoints.md). |
 | `--log-level` | `info` | `debug`, `info`, `warn` or `error`. `debug` logs every request (client id, API, version). |
 | `--log-format` | `text` | `text` or `json`. |
@@ -196,14 +205,18 @@ consumer groups only):
 Once everything is bound — and only then — doze-kafka prints where it is:
 
 ```text
-doze-kafka v1.2.0 ready — emulating Kafka 4
+doze-kafka 1.2.0 ready — emulating Kafka 4
   Kafka      127.0.0.1:9092   (also kafka.doze:9092)
   Console    http://127.0.0.1:9093   (also http://kafka.doze)
   Data       /home/you/project/data
   Security   no auth · plaintext
 ```
 
-The "also" addresses appear only when they actually answer. With
+The "also" addresses appear only when they actually answer. With `--listen :9092`
+the Kafka line gives the advertised address (`localhost:9092`) and notes that the
+broker is listening on every interface, since `[::]:9092` is not something to paste
+into a client. Ctrl-C, `SIGTERM` and closing the terminal (`SIGHUP`) all stop the
+broker cleanly: it stops accepting, flushes the logs and exits 0. With
 `--log-format json` it is a single `ready` record instead, and with
 `--log-level warn` or `error` it is not printed.
 

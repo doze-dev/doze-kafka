@@ -40,7 +40,7 @@ tasks:
       - go test ./...
 
   test:unit:
-    desc: Unit tests only — no broker, no sockets (integration is gated by -short)
+    desc: The quick pass (-short) — skips most tests that boot a broker
     cmds:
       - go test -short ./...
 

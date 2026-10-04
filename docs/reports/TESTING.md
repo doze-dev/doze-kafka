@@ -2,7 +2,7 @@
 
 The suite is integration-first: almost every test boots a broker on a real loopback
 socket and drives it with a real Kafka client, exercising the true
-`frame → codec → handler → storage` path. About 210 test functions across the
+`frame → codec → handler → storage` path. About 330 test functions across the
 packages; the gate (`go tool task check`) runs them all under `-race`, plus `gofmt`,
 `go vet`, and a Windows cross-vet.
 
@@ -19,13 +19,15 @@ handling), answering "does it work when someone actually runs it."
 - The storage engine also has white-box unit tests (`internal/storage/log`) for
   behaviour not observable through a client (fsync, segment rolls, torn-tail
   recovery). The wire codec has fuzz targets (`internal/protocol`).
-- **Unit vs integration is a precise `-short` split.** Every integration test (a real
-  broker driven over a socket) skips under `go test -short`, so `go tool task
-  test:unit` (~1.5s) runs exactly the unit tests — the storage engine, the wire codec,
-  and the white-box handler tests — wherever they live, and `go tool task
-  test:integration` runs the socket-level suite. `go tool task test` runs both.
+- **`-short` skips most of the socket-level tests, not all.** The broker package's and
+  the console's tests that boot a broker skip under `go test -short`; the command's and
+  the embed API's (`cmd/doze-kafka`, `server`) do not, because starting a broker is
+  what they test. `go tool task test:unit` is therefore the quick pass (well under ten
+  seconds), not a strict "no sockets" run. `go tool task test:integration` runs the
+  broker package in full, and `go tool task test` everything.
 - `go tool task check` is the one gate: format, vet (Linux and Windows), then the whole
-  suite with the race detector. `go tool task hooks:install` runs it before each commit.
+  suite with the race detector. `go tool task hooks:install` runs it before each push
+  (a `pre-push` hook, not `pre-commit`).
 
 ## What's covered
 
@@ -42,8 +44,13 @@ handling), answering "does it work when someone actually runs it."
 - **Cross-client**: **Sarama** (a second, independent Go client) — produce/consume +
   classic group consume→commit→resume, exercising older non-flexible wire versions
   franz never sends.
-- **Robustness**: an unhandled/unadvertised API closes the connection (fail fast)
-  instead of hanging the client — `TestUnhandledAPI_ClosesConnectionNotHang`.
+- **Robustness**: a request for an API or a version the broker does not advertise
+  closes the connection (fail fast) instead of hanging the client, and is never
+  decoded or served: `TestUnhandledAPI_ClosesConnectionNotHang` and
+  `TestOnlyAdvertisedAPIsAndVersionsAreServed`.
+- **The console in a browser**: `console/testdata/browser-audit.cjs` drives a real
+  browser through the shortcuts, the drawer, live updates and narrow widths. It is run
+  by hand against a running broker; it is not in the gate.
 - **Codec fuzzing**: `FuzzParseAndDecodeRequest`, `FuzzSkipTaggedFields`,
   `FuzzReadFrame` — arbitrary bytes through the request decoder must never panic;
   the seeds (including a once-found crasher, a tagged-field loop in the upstream

@@ -40,24 +40,31 @@ first and watch it fail.
 
 - Almost every broker test boots a real broker on a loopback socket and drives it with
   a real client (`internal/broker/harness_test.go`: `boot`). Prefer that to mocking.
-- Tests that need a broker skip under `-short`; the gate runs them all.
+- Most tests that need a broker skip under `-short` (those of the command and the
+  embed API do not); the gate runs them all.
 - Name test files after behaviour (`group_classic_test.go`), not after the phase that
   added them.
 - Fuzz targets live next to the codec; a crasher goes in `testdata/fuzz/` so it stays
-  fixed. `go tool task fuzz` runs them; `soak` and `chaos` run the long harnesses.
+  fixed. `go tool task fuzz` runs all three for 30s each (`FUZZ_TIME=5m` for longer);
+  `soak` and `chaos` run the long harnesses.
+- The console's behaviour in a browser is checked by
+  `console/testdata/browser-audit.cjs` (Playwright, against a running broker). It is
+  not in the gate yet.
 
 ## Adding a Kafka API
 
-An API is advertised only once something serves it. Today that is four places, and a
-test fails if they disagree:
+An API is advertised only once something serves it. Today that is four places. The
+router refuses a request the profile does not advertise, so a handler alone exposes
+nothing; but nothing yet checks that every advertised API has a handler, or that the
+document matches the code. One table that all four read from is planned.
 
 1. **`internal/protocol/versions.go`**: add its key and `[min,max]` to each profile
    that should offer it. (Check franz-go's `kversion` for the real ranges.)
 2. **`internal/broker/<api>.go`**: write the handler; decode with `kmsg`, answer with
    `kmsg`.
 3. **`internal/broker/broker.go`**: register it in `Register`.
-4. **`docs/api-support.md`**: add its row (the version table is printed from the
-   profiles; regenerate it rather than editing by hand).
+4. **`docs/api-support.md`**: add its row to both tables, by hand, from the
+   profiles. There is no generator.
 
 Then test it with a raw `kmsg` request at the minimum, a middle and the maximum
 version, and with a real client if one exercises it.
@@ -68,9 +75,10 @@ version, and with a real client if one exercises it.
 `templates/` and `static/` from disk on every request. There is no build step: the
 front-end libraries are vendored (`console/static/VERSIONS`).
 
-Three guards keep it consistent, and they fail with instructions: every template class
+Guards keep it consistent, and they fail with instructions: every template class
 must be styled, every `var(--x)` defined, font sizes come from the `--fs-*` tokens, and
-inline styles are on a ratchet (`console/cssguard_test.go`). Every GET route must render
+inline styles are on a ratchet (`console/cssguard_test.go`); every text colour holds
+4.5:1 on every surface in both themes (`TestThemeContrast`). Every GET route must render
 (also with the broker down) and every POST must refuse a foreign origin and fail with a
 4xx (`console/surfaces_test.go`); both read the route table from `console.go`, so a new
 route is covered automatically.

@@ -33,7 +33,8 @@ SASL is on (doze-kafka provisions it a private one at start-up).
 - **Send a message** from the dock at the bottom: key, value, headers, partition
   (or "auto", which partitions by key exactly as a real client does), acks. Values
   can be sent as text, JSON, base64, or a tombstone. **Send again** on any record
-  carries its headers and its exact bytes.
+  produces an exact copy (the same key, value and headers, byte for byte), and
+  **Edit a copy** opens the composer filled in with it, to change first.
 - **Consumed by** lists the groups reading the topic, with their lag.
 - **Purge** empties a topic (it is deleted and recreated, so it gets a new id) and
   **Delete** removes it. Both ask first, naming the action.
@@ -53,10 +54,12 @@ SASL is on (doze-kafka provisions it a private one at start-up).
 ## Cluster
 
 The single broker: its node id and advertised address, the cluster id, how *this*
-connection is secured, the **Kafka API versions it advertises** (read from the same
-table the broker uses), and its **effective configuration** (retention, segment
-size, fsync interval, data directory, emulated version, auth). It links to
-[what is not implemented](limitations.md).
+connection is secured, and the **Kafka APIs it advertises** with their version ranges
+(asked of the broker, with `ApiVersions`). Below that are the broker settings that
+Kafka's `DescribeConfigs` reports: topic auto-creation, default partitions, retention,
+segment and index sizes. Settings Kafka has no name for (the data directory, the fsync
+interval, the emulated version) are not there; `doze-kafka config print` shows those.
+It links to [what is not implemented](limitations.md).
 
 ## Keyboard
 
@@ -68,7 +71,18 @@ size, fsync interval, data directory, emulated version, auth). It links to
 | `c` | New topic |
 | `m` | Open the composer |
 | `[` | Collapse or expand the rail |
+| `⌘Enter` / `Ctrl+Enter` | Send, from the composer |
 | `Esc` | Close a dialog or the drawer |
+
+Single keys act only when you are not typing in a field, with no modifier held, and
+no dialog open.
+
+## Appearance
+
+Light and dark themes, or follow the system (the switch is at the top right). The
+fonts (IBM Plex Sans and Mono) are part of the binary, so the console looks the same
+offline. It works down to phone widths: below about 640px the list and the detail
+become two screens.
 
 ## Safety
 

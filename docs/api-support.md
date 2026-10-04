@@ -40,11 +40,15 @@ specifically testing an older client's paths.
 
 Each emulated major advertises the ranges below (min–max); a client uses the highest
 version you both support. This table is the broker's own, printed from the code.
-The maxima follow what a real broker of that major offers, so clients negotiate as
-they would against Apache Kafka. The minima are **ours**: Produce starts at v3 and
-Fetch at v4, the first versions that carry record batch format v2, the only format
-the log stores. A client that insists on older versions is told so by `ApiVersions`
-rather than being allowed to write data the broker would store as garbage.
+
+The ranges are **ours**, not a copy of Apache Kafka's. Each profile is close to what a
+real broker of that major offers, but not the same: several maxima are lower, because
+the newer versions carry features doze-kafka does not have (Kafka 4.x brokers go well
+past Produce v9 and Fetch v13, for example), and a few are a version higher than that
+release shipped. The minima are raised: Produce starts at v3 and Fetch at v4, the
+first versions that carry record batch format v2, the only format the log stores.
+None of this needs configuring. A client reads the ranges from `ApiVersions` and uses
+the highest version both sides support; a request outside them is not served.
 
 | API | Key | v1 | v2 | v3 | v4 |
 |---|---|---|---|---|---|
@@ -82,5 +86,8 @@ sequence-number deduplication), but there's no transactional produce/commit
 (`AddPartitionsToTxn`/`EndTxn`). `AlterConfigs` (config is read-only — the size/time
 knobs are broker-global here, so a per-topic write wouldn't take effect),
 `CreatePartitions`, `OffsetForLeaderEpoch`, `DescribeLogDirs`, ACL and quota APIs, and
-the client-metrics/telemetry APIs. A client that calls an unadvertised API has its
-connection closed rather than left hanging. See [Limitations](limitations.md).
+the client-metrics/telemetry APIs. The broker serves exactly what it advertises: a
+request for an API it does not have, or at a version outside the advertised range,
+gets no response and its connection is closed, rather than being left to hang (the one
+exception is `ApiVersions` itself, where an unknown version is answered with the
+supported range, as Kafka does). See [Limitations](limitations.md).

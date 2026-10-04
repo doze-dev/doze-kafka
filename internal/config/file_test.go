@@ -163,3 +163,54 @@ func TestWriteTOML_RoundTrips(t *testing.T) {
 		t.Errorf("round-trip mismatch:\n got  %+v\n want %+v\n toml:\n%s", got, orig, buf.String())
 	}
 }
+
+// exampleWithAuth is the shipped example file with its commented-out auth
+// settings switched on, as someone enabling SASL and TLS would edit it.
+func exampleWithAuth(t *testing.T, example string) string {
+	t.Helper()
+	var out []string
+	for _, line := range strings.Split(example, "\n") {
+		for _, key := range []string{"sasl-mechanisms =", "[credentials]", "alice", "bob", "[tls]", "cert", "key "} {
+			if strings.HasPrefix(line, "# "+key) {
+				line = strings.TrimPrefix(line, "# ")
+			}
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
+}
+
+// In TOML every key after a [table] header belongs to that table. The example
+// file had [credentials] and [tls] in the middle, so uncommenting them, as its
+// own comments invite, turned "console = true" into a SASL user or an unknown
+// key under [tls], and the broker refused to start.
+func TestExampleFileSurvivesUncommentingItsTables(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "doze-kafka.example.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// As shipped, it is the defaults.
+	cfg := Default()
+	if err := LoadFile(writeFile(t, string(raw)), &cfg); err != nil {
+		t.Fatalf("the example file as shipped: %v", err)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("the example file as shipped does not validate: %v", err)
+	}
+
+	cfg = Default()
+	if err := LoadFile(writeFile(t, exampleWithAuth(t, string(raw))), &cfg); err != nil {
+		t.Fatalf("the example file with its auth sections uncommented: %v", err)
+	}
+	if len(cfg.Credentials) != 2 || cfg.Credentials["alice"] != "s3cret" {
+		t.Errorf("credentials = %v, want exactly alice and bob", cfg.Credentials)
+	}
+	if cfg.TLSCertFile == "" || cfg.TLSKeyFile == "" || len(cfg.SASLMechanisms) != 1 {
+		t.Errorf("auth settings were not read: cert %q key %q mechanisms %v", cfg.TLSCertFile, cfg.TLSKeyFile, cfg.SASLMechanisms)
+	}
+	// And nothing else was swallowed by a table.
+	d := Default()
+	if cfg.Console != d.Console || cfg.ConsoleAddr != d.ConsoleAddr || cfg.Zone != d.Zone || cfg.LogLevel != d.LogLevel || cfg.LogFormat != d.LogFormat {
+		t.Errorf("settings after the tables changed: console %v %q, zone %v, log %q %q", cfg.Console, cfg.ConsoleAddr, cfg.Zone, cfg.LogLevel, cfg.LogFormat)
+	}
+}

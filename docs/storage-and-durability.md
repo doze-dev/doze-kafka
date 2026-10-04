@@ -51,7 +51,9 @@ both of:
 
 Retention is **delete-only** — there's no log compaction. The active segment is never
 deleted, so a partition always keeps its most recent data. A background sweep enforces
-the bounds roughly once a second; because it only ever removes whole non-active
+the bounds roughly once a second for partitions in use, and once a minute for those
+nothing has read or written since the broker started; because it only ever removes
+whole non-active
 segments, a partition can briefly sit a little above its byte bound (by up to one
 segment) before the next roll. Deleted data becomes unreadable and the partition's
 earliest offset advances.

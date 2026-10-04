@@ -25,10 +25,11 @@ is a `user:password` pair.
 
 ### Mechanisms
 
-- `PLAIN` — username and password sent (base64) after the handshake. Pair it with TLS
-  if the wire matters.
+- `PLAIN` — the username and password are sent as they are, unencrypted. Pair it with
+  TLS if the wire matters.
 - `SCRAM-SHA-256` and `SCRAM-SHA-512` — challenge-response; the password never crosses
-  the wire. doze-kafka stores only a derived verifier per user, not the plaintext.
+  the wire. (The broker itself still has it: credentials are configured in plain text,
+  in the file or on the command line.)
 
 Enable several at once and let the client pick:
 
@@ -77,10 +78,16 @@ For local use you'll typically want a self-signed certificate valid for the addr
 clients connect to:
 
 ```sh
-openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
-  -keyout key.pem -out cert.pem -days 365 \
+openssl ecparam -name prime256v1 -genkey -noout -out key.pem
+openssl req -x509 -new -key key.pem -out cert.pem -days 365 \
   -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
 ```
+
+(Two steps on purpose. The one-line `openssl req -newkey ec …` form writes a key the
+broker cannot read when `openssl` is LibreSSL, which is what macOS ships as
+`/usr/bin/openssl`: it spells out the curve's parameters instead of naming it. The
+commands above work with both. A certificate or key that cannot be loaded is reported
+at start-up, before anything else happens.)
 
 Clients then connect over TLS. They must either trust your certificate or skip
 verification:

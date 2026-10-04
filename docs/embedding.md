@@ -39,28 +39,29 @@ complete, runnable version that produces and consumes a record.
 |---|---|
 | `New(opts)` | Validates, opens storage. Does not listen. |
 | `Bind(ctx)` | Opens the listener and returns its address. Optional: `Serve` binds if you did not. |
-| `Serve(ctx)` | Accepts until `ctx` is cancelled, drains connections, flushes the logs and closes storage. Returns the first error from that, including a failed final fsync. |
+| `AlsoListen(ctx, addr)` | Opens a second address serving the same broker. Before `Serve` only; afterwards it returns an error. Clients are still told the main listener's port. |
+| `Serve(ctx)` | Accepts until `ctx` is cancelled, drains connections, flushes the logs and closes storage. Returns the first error from that, including a failed final fsync. A server is served once: a second `Serve` returns an error. |
 | `Ready()` | A channel closed once the listener is bound (or `Serve` has returned), so waiting on it never hangs. Check `Addr() != nil`. |
 | `Addr()` | The bound address, or nil before `Bind`/`Serve`. |
-| `Close()` | Releases the storage of a server that was built but never served. Idempotent, and safe after `Serve`. To stop a running server, cancel its context. |
-| `ServeListener(ctx, ln)` | `Serve` on a listener you provide, such as a unix socket. Kafka framing does not care what carries it. |
+| `Close()` | For a server that was built but never served: closes any listener `Bind` or `AlsoListen` opened and releases storage and the lock on the data directory. Idempotent, and safe after `Serve`. To stop a running server, cancel its context. |
+| `ServeListener(ctx, ln)` | `Serve` on a listener you provide, such as a unix socket. Kafka framing does not care what carries it. Given a TCP listener, clients are told its port. |
 | `Config()` | The effective configuration as a plain `server.Config`. |
 
 ## Options
 
 | Option | Meaning |
 |---|---|
-| `DataDir` | Required. Partition logs. |
+| `DataDir` | Required: `New` returns an error without it. Partition logs. One broker per directory; a second `New` on the same one fails. |
 | `MetaDB` | Defaults to `<DataDir>/meta.db`. |
 | `Version` | Kafka major to emulate, 1–4. 0 = default (4). |
 | `ListenAddr` | Default `127.0.0.1:0`. |
-| `AdvertisedHost`, `AdvertisedPort` | What clients are told to dial. Set when the broker sits behind a proxy. |
+| `AdvertisedHost`, `AdvertisedPort` | What clients are told to dial. Set when the broker sits behind a proxy. The host is a name or an IP address, without a port. |
 | `AutoCreateTopics`, `DefaultPartitions` | Topic behaviour. |
 | `RetentionBytes`, `RetentionMs` | Delete-only retention. 0 = unbounded. |
 | `SegmentBytes`, `IndexIntervalBytes` | Storage tuning. Set `SegmentBytes` small to test retention or rolling. |
 | `FsyncInterval` | Periodic fsync of active segments. **Zero means the default (500ms), not "off"**: an options struct's zero value is the default. Use a negative value to disable. `acks=all` always fsyncs. |
 | `ConsumerSessionTimeout` | How long a silent group member lives. Set low to test failure handling. |
-| `SASLMechanisms`, `Credentials`, `TLSConfig` | Authentication and TLS; independent and composable. |
+| `SASLMechanisms`, `Credentials`, `TLSConfig` | Authentication and TLS; independent and composable. `Config().TLS` reports whether the listener is TLS. |
 | `Logger` | nil discards. Request lines are Debug. |
 
 The CLI differs from this in one place: `--fsync-interval 0` disables periodic

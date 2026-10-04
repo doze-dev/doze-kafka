@@ -1,10 +1,11 @@
 # doze-kafka configuration — copy this to `doze-kafka.toml` in your working
 # directory and it is picked up automatically (or point at it with --config).
 #
-# Every key mirrors a command-line flag one-to-one. Precedence is
-# flags > file > defaults: this file overlays only the keys it names, and any
-# flag still wins for a one-off override. All keys below are optional and shown
-# with their defaults — delete the ones you don't need.
+# Every key has the same name as its command-line flag, except the two tables at
+# the end: [credentials] is --sasl-user and [tls] is --tls-cert / --tls-key.
+# Precedence is flags > file > defaults: this file overlays only the keys it
+# names, and any flag still wins for a one-off override. All keys below are
+# optional and shown with their defaults — delete the ones you don't need.
 #
 # Tip: `doze-kafka config print` writes your *effective* config (defaults + this
 # file + flags) as TOML, so you can see exactly what the broker will run with.
@@ -16,7 +17,7 @@ kafka-version = 4
 
 listen = "127.0.0.1:9092" # host:port the broker listens on. ":9092" accepts other machines and containers.
 advertised-host = "localhost" # host returned to clients in Metadata responses.
-advertised-port = 0       # port advertised to clients; 0 = derive from `listen`.
+advertised-port = 0       # port advertised to clients; 0 = the port actually bound.
 
 # --- storage -------------------------------------------------------------------
 
@@ -47,24 +48,6 @@ auto-create-topics = true # create unknown topics on first reference.
 default-partitions = 1    # partition count for auto-created topics.
 max-partitions = 1000     # most partitions one topic may have; each is a directory and open files.
 
-# --- auth (all optional; omit these sections to disable) -----------------------
-
-# Enable SASL by listing mechanisms; supported: PLAIN, SCRAM-SHA-256, SCRAM-SHA-512.
-# sasl-mechanisms = ["SCRAM-SHA-256"]
-
-# SASL users as username = "password". Required when sasl-mechanisms is set.
-# Keeping credentials here (rather than on the command line) keeps them out of
-# your shell history and the process's argument list.
-# [credentials]
-# alice = "s3cret"
-# bob   = "hunter2"
-
-# TLS encrypts the listener. Both cert and key are required together. TLS and
-# SASL are independent — use either, both, or neither.
-# [tls]
-# cert = "./certs/server.pem"
-# key  = "./certs/server-key.pem"
-
 # --- console -------------------------------------------------------------------
 
 console = true                   # serve the web console.
@@ -77,3 +60,25 @@ zone = true                      # join the shared .doze name zone (kafka.doze).
 log-level = "info"               # debug (logs every request), info, warn or error.
 log-format = "text"              # text or json.
 # pprof-addr = "127.0.0.1:6060"  # serve net/http/pprof here.
+
+# --- auth (all optional) -------------------------------------------------------
+#
+# These come last on purpose. In TOML every key after a [table] header belongs to
+# that table, so a table uncommented in the middle of the file would swallow the
+# settings below it ("credentials.console = true" is not a setting).
+
+# Enable SASL by listing mechanisms; supported: PLAIN, SCRAM-SHA-256, SCRAM-SHA-512.
+# sasl-mechanisms = ["SCRAM-SHA-256"]
+
+# SASL users as username = "password". Required when sasl-mechanisms is set.
+# Keeping credentials here (rather than on the command line) keeps them out of
+# your shell history and the process's argument list.
+# [credentials]
+# alice = "s3cret"
+# bob   = "hunter2"
+
+# TLS encrypts the listener. Both cert and key are required together, and the
+# files must exist. TLS and SASL are independent — use either, both, or neither.
+# [tls]
+# cert = "./certs/server.pem"
+# key  = "./certs/server-key.pem"
