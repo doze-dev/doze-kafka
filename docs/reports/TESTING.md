@@ -2,7 +2,7 @@
 
 The suite is integration-first: almost every test boots a broker on a real loopback
 socket and drives it with a real Kafka client, exercising the true
-`frame → codec → handler → storage` path. About 330 test functions across the
+`frame → codec → handler → storage` path. About 370 Go test functions across the
 packages; the gate (`go tool task check`) runs them all under `-race`, plus `gofmt`,
 `go vet`, and a Windows cross-vet.
 
@@ -75,7 +75,7 @@ handling), answering "does it work when someone actually runs it."
 
 ## Soak & chaos
 
-A separate harness (behind the `soak` build tag) drives the **real compiled binary**
+A separate harness drives the **real compiled binary**
 under sustained, correctness-checked load — idempotent `acks=all` producers writing a
 per-producer sequence, a live consumer group, plus RSS/goroutine sampling via the
 binary's `--pprof-addr`. Two modes:
@@ -86,7 +86,19 @@ binary's `--pprof-addr`. Two modes:
   restarted *under* the load; the harness then reads the whole log back and asserts
   no acknowledged record was ever lost and the log has no gaps.
 
-Both are parameterized by `SOAK_DURATION` (e.g. `go tool task chaos SOAK_DURATION=1h`).
+Both are parameterized by `SOAK_DURATION` (e.g. `go tool task chaos SOAK_DURATION=1h`),
+and `SOAK_RACE=1` builds the binary with the race detector and fails the run if it
+reports a data race (the scheduled leak run sets it). The same chaos runs for six
+seconds in the ordinary suite as `TestChaosSlice`, so a change that breaks crash
+recovery fails the pull request rather than a run next week.
+
+Alongside it, `TestStress_ProducersConsumersAndAdminAtOnce` runs producers, a group
+whose members come and go, and admins creating, altering and deleting topics, all at
+once in one process under `-race`, and asserts every acknowledged record is read.
+`TestPersistence_EverythingTheBrokerKeepsSurvivesARestart` lists everything the broker
+persists and checks each across a restart; a new persisted field belongs in it.
+`TestVersionMatrix_*` sends a default request for every API at its lowest, middle and
+highest version, for every Kafka major, and checks the answer decodes.
 
 Observed (run longer for more confidence — the harness scales via `SOAK_DURATION`):
 
@@ -102,20 +114,26 @@ These are minutes, not multi-hour; a longer soak would raise the confidence furt
 
 ## Console
 
-The web console is covered without a browser by guards that read the source: every
-template class is styled, every CSS variable is defined, the type scale is closed,
-inline styles are on a ratchet, every GET route renders (with data, with none, and
-with the broker down), and every POST is refused from a foreign origin and fails with
-a 4xx rather than a 5xx. Behaviour that needs a real browser (live tail, history,
-focus handling) has been checked by hand with Playwright; automated browser tests are
-not in the suite yet.
+The web console is covered in Go by guards that read the source: every template class
+is styled, every CSS variable is defined, the type scale is closed, inline styles are
+on a ratchet, every text colour holds 4.5:1 in both themes, every GET route renders
+(with data, with none, and with the broker down), and every POST is refused from a
+foreign origin and fails with a 4xx rather than a 5xx. What needs a real browser (live
+updates, history, focus, the keyboard, layout) is in the Playwright suite above.
+Known limit: it runs Chromium only, and has no check that every console route is
+reached from a page (doze-aws's route gate), so a form posting to the wrong path is
+caught only if a spec exercises it.
 
 ## Known gaps (honest)
 
-- **No Java / kcat / kafkajs client** in CI (they need a JVM / native / Node install);
-  franz + Sarama are the automated cross-check, the rest is manual smoke.
-- The soak/chaos runs above are short (seconds/minutes), not multi-hour — the harness
-  scales via `SOAK_DURATION`, but long-run results aren't recorded here yet.
-- Many-connection churn and network-partition faults aren't injected.
-- Static membership is not directly tested. Idempotent-producer dedup state is in
-  memory and starts empty after a restart.
+- **No Java, Spring, Streams or kafkajs client** in CI (a JVM or a Node install); franz,
+  Sarama and librdkafka (through kcat) are the automated cross-check. The client matrix
+  is Phase 13 of the plan.
+- The soak/chaos runs above are minutes, not multi-hour; the scheduled workflow runs
+  ten minutes a week, and long-run results are not recorded here.
+- Network-partition and slow-disk faults are not injected. SIGKILL does not lose the OS's
+  page cache, so the crash tests cannot show whether an fsync was skipped; the fsync
+  discipline is checked by fault injection in the storage tests instead.
+- Idempotent-producer dedup state is in memory and starts empty after a restart (Phase 11
+  rebuilds it from the log).
+- The Playwright suite is not part of `task check`: it needs `bun` and a browser.

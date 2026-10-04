@@ -25,7 +25,11 @@ func buildBinary(t *testing.T) string {
 	t.Helper()
 	skipShort(t)
 	bin := filepath.Join(t.TempDir(), "doze-kafka")
-	cmd := exec.Command("go", "build", "-o", bin, "github.com/doze-dev/doze-kafka/cmd/doze-kafka")
+	args := []string{"build", "-o", bin}
+	if os.Getenv("SOAK_RACE") == "1" {
+		args = append(args, "-race") // the soak's binary under the race detector: see runSoak.
+	}
+	cmd := exec.Command("go", append(args, "github.com/doze-dev/doze-kafka/cmd/doze-kafka")...)
 	cmd.Env = append(os.Environ(), "GOWORK=off")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build binary: %v\n%s", err, out)

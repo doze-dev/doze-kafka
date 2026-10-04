@@ -86,6 +86,12 @@ func runSoak(t *testing.T, duration time.Duration, chaos bool, every time.Durati
 		metaDB:    filepath.Join(dir, "meta.db"),
 		pprofAddr: fmt.Sprintf("127.0.0.1:%d", freePort(t)),
 	}
+	// SOAK_RACE=1 builds the binary with the race detector (see buildBinary). The
+	// soak never looked at what the binary printed, and a race report is printed, not
+	// fatal: keep stderr, and fail the run if it holds one.
+	if os.Getenv("SOAK_RACE") == "1" {
+		sup.stderrLog = filepath.Join(dir, "broker.stderr")
+	}
 	sup.launch()
 	defer sup.shutdown()
 
@@ -162,6 +168,16 @@ func runSoak(t *testing.T, duration time.Duration, chaos bool, every time.Durati
 	// Health verdict.
 	health.report(t, chaos)
 
+	if sup.stderrLog != "" {
+		sup.shutdown()
+		out, _ := os.ReadFile(sup.stderrLog)
+		if i := strings.Index(string(out), "WARNING: DATA RACE"); i >= 0 {
+			end := min(len(out), i+3000)
+			t.Fatalf("the race detector reported a data race in the broker binary:\n%s", out[i:end])
+		}
+		t.Logf("no data race reported in %d bytes of the binary's stderr", len(out))
+	}
+
 	t.Logf("soak complete: %d restarts (%d ungraceful), %d records on disk",
 		restarts, kills, countAll(perPartition))
 }
@@ -172,6 +188,7 @@ type supervisor struct {
 	t                          *testing.T
 	bin, addr, dataDir, metaDB string
 	pprofAddr                  string
+	stderrLog                  string // where the binary's stderr goes, when it is kept.
 	mu                         sync.Mutex
 	cmd                        *exec.Cmd
 	gen                        int
@@ -186,6 +203,14 @@ func (s *supervisor) launch() {
 		"-console=false", "-zone=false")
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
+	if s.stderrLog != "" { // a race-detector run keeps what the binary says, across every restart.
+		f, err := os.OpenFile(s.stderrLog, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			s.t.Fatalf("open %s: %v", s.stderrLog, err)
+		}
+		defer f.Close() // the child holds its own descriptor.
+		cmd.Stderr = f
+	}
 	if err := cmd.Start(); err != nil {
 		s.t.Fatalf("launch broker: %v", err)
 	}

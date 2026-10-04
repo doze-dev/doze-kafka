@@ -40,8 +40,10 @@ func TestHandshake_MetadataViaFranzGo(t *testing.T) {
 		t.Fatalf("expected 1 broker, got %d", len(resp.Brokers))
 	}
 	got := resp.Brokers[0]
-	if got.Host != "localhost" {
-		t.Errorf("broker host = %q, want localhost", got.Host)
+	// startBroker listens on 127.0.0.1, so that is what clients are told to use
+	// (see config.ResolveAdvertisedHost).
+	if got.Host != "127.0.0.1" {
+		t.Errorf("broker host = %q, want 127.0.0.1", got.Host)
 	}
 	_, portStr, _ := net.SplitHostPort(addr)
 	if fmt.Sprintf("%d", got.Port) != portStr {

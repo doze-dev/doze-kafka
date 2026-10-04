@@ -46,5 +46,26 @@ jobs:
           go-version-file: go.mod
       - name: Unit tests
         run: go test -short ./...
-      - name: Integration tests (race)
-        run: go test -race ./...
+      - name: Integration tests (race, with coverage)
+        run: |
+          # The vendored protocol library is generated and mostly unreachable from here:
+          # counting it would bury the number that matters.
+          go test -race -coverprofile=cover.out -coverpkg="$(go list ./... | grep -v /kmsg | paste -sd, -)" ./...
+      - name: Coverage
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          {
+            echo "### Coverage"
+            echo '```'
+            go tool cover -func=cover.out | tail -1
+            echo
+            # Per package (the mean of its functions), so a package that stopped being covered stands out.
+            go tool cover -func=cover.out | awk '$1 !~ /^total/ { split($1, a, "/"); n=split($1, p, "/"); pkg=""; for (i=1;i<n;i++) pkg=pkg (i>1?"/":"") p[i]; sub(/:[0-9]+:.*/, "", pkg); pct=$NF; sub("%","",pct); sum[pkg]+=pct; cnt[pkg]++ } END { for (k in sum) printf "%-60s %5.1f%%\n", k, sum[k]/cnt[k] }' | sort
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload coverage
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: cover.out

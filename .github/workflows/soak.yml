@@ -33,6 +33,9 @@ jobs:
       - name: ${{ matrix.mode.name }} soak
         env:
           SOAK_CHAOS: ${{ matrix.mode.chaos }}
+          # The binary under the race detector: a leak run is the longest sustained
+          # load the suite has, and the best chance of the interleaving that finds one.
+          SOAK_RACE: "1"
           SOAK_DURATION: ${{ github.event.inputs.duration || '10m' }}
         run: go test -run TestSoak -timeout 35m -v ./internal/broker/
 
