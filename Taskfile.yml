@@ -103,7 +103,7 @@ tasks:
       SOAK_CHAOS: '0'
       SOAK_DURATION: '{{.SOAK_DURATION | default "2m"}}'
     cmds:
-      - go test -tags soak -run TestSoak -timeout 24h -v ./internal/broker/
+      - go test -run TestSoak -timeout 24h -v ./internal/broker/
 
   chaos:
     desc: 'Chaos soak: kill/restart the broker under load (SOAK_DURATION, default 2m)'
@@ -111,7 +111,7 @@ tasks:
       SOAK_CHAOS: '1'
       SOAK_DURATION: '{{.SOAK_DURATION | default "2m"}}'
     cmds:
-      - go test -tags soak -run TestSoak -timeout 24h -v ./internal/broker/
+      - go test -run TestSoak -timeout 24h -v ./internal/broker/
 
   clean:
     desc: Remove build output and local broker data

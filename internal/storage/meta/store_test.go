@@ -365,3 +365,52 @@ func TestDeleteTopicRemovesTheIDMapping(t *testing.T) {
 		t.Error("the topic id is still mapped after the topic was deleted")
 	}
 }
+
+// A topic's configuration is replaced as a whole, is what the cache serves at
+// once, is what a reopened store reads, and cannot be written for a topic that is
+// not there.
+func TestSetTopicConfigReplacesPersistsAndRefusesUnknownTopics(t *testing.T) {
+	path := t.TempDir() + "/meta.db"
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := s.CreateTopic("t", 3, map[string]string{"retention.ms": "1000", "segment.bytes": "4096"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := s.SetTopicConfig("t", map[string]string{"retention.bytes": "2048"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(updated.Config) != 1 || updated.Config["retention.bytes"] != "2048" || updated.ID != created.ID || updated.Partitions != 3 {
+		t.Errorf("after replacing the config: %+v (id and partitions must be untouched)", updated)
+	}
+	if got, _, _ := s.Topic("t"); len(got.Config) != 1 || got.Config["retention.ms"] != "" {
+		t.Errorf("the cache serves %v, want only retention.bytes", got.Config)
+	}
+	// The topic owns its map: changing the caller's copy changes nothing.
+	updated.Config["retention.bytes"] = "mutated"
+	if got, _, _ := s.Topic("t"); got.Config["retention.bytes"] != "2048" {
+		t.Error("a returned topic shares its config map with the store")
+	}
+	if cleared, err := s.SetTopicConfig("t", nil); err != nil || len(cleared.Config) != 0 {
+		t.Errorf("clearing the config: %+v %v", cleared, err)
+	}
+	if _, err := s.SetTopicConfig("t", map[string]string{"flush.ms": "7"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetTopicConfig("missing", map[string]string{"a": "b"}); !errors.Is(err, ErrNoSuchTopic) {
+		t.Errorf("config for a topic that does not exist: %v, want ErrNoSuchTopic", err)
+	}
+	s.Close()
+
+	s, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if got, ok, _ := s.Topic("t"); !ok || len(got.Config) != 1 || got.Config["flush.ms"] != "7" || got.ID != created.ID {
+		t.Errorf("after reopening: %+v", got)
+	}
+}

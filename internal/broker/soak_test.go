@@ -1,5 +1,3 @@
-//go:build soak
-
 package broker_test
 
 import (
@@ -24,7 +22,10 @@ import (
 // Soak + chaos harness. It drives the REAL compiled binary under sustained,
 // correctness-checked load and — depending on mode — either injects faults
 // (SIGKILL/SIGTERM restarts under load) or watches for leaks over a long, stable
-// run. It is behind the `soak` build tag so it never runs in the normal suite.
+// run. The long runs (TestSoak) happen only when SOAK_DURATION is set, by the
+// tasks below and the scheduled workflow; the normal suite runs a few seconds of
+// the same chaos as TestChaosSlice, so a change that breaks crash recovery fails
+// the pull request and not a run next week.
 //
 //   go tool task soak                       # leak mode: no restarts, checks RSS/goroutine stability + zero dups
 //   go tool task chaos                      # chaos mode: kill/restart under load, checks no acked record is ever lost
@@ -44,12 +45,32 @@ func envDefault(key, def string) string {
 	return def
 }
 
+// TestSoak is the long run: SOAK_DURATION says how long, SOAK_CHAOS=0 turns the
+// restarts off (leak mode). Without SOAK_DURATION it does nothing.
 func TestSoak(t *testing.T) {
-	duration, err := time.ParseDuration(envDefault("SOAK_DURATION", "30s"))
+	raw := os.Getenv("SOAK_DURATION")
+	if raw == "" {
+		t.Skip("set SOAK_DURATION (go tool task soak, go tool task chaos) to run the long soak")
+	}
+	duration, err := time.ParseDuration(raw)
 	if err != nil {
 		t.Fatalf("SOAK_DURATION: %v", err)
 	}
-	chaos := envDefault("SOAK_CHAOS", "1") != "0"
+	runSoak(t, duration, envDefault("SOAK_CHAOS", "1") != "0", 0)
+}
+
+// TestChaosSlice is a few seconds of the chaos run: the real binary under
+// idempotent acks=all load, killed (SIGKILL) and stopped (SIGTERM) and started
+// again three times, after which every acknowledged record must be on disk, in
+// order. It is the crash-recovery guarantee, in the suite that every change runs.
+func TestChaosSlice(t *testing.T) {
+	skipShort(t)
+	runSoak(t, 6*time.Second, true, 1500*time.Millisecond)
+}
+
+// runSoak runs the load for duration; with chaos, restarts the broker every
+// `every` (default: a quarter of the run, at least 8s), alternating kill and stop.
+func runSoak(t *testing.T, duration time.Duration, chaos bool, every time.Duration) {
 	producers := atoiDefault(envDefault("SOAK_PRODUCERS", "4"))
 	partitions := int32(atoiDefault(envDefault("SOAK_PARTITIONS", "4")))
 
@@ -100,7 +121,10 @@ func TestSoak(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			tick := time.NewTicker(maxDuration(duration/4, 8*time.Second))
+			if every <= 0 {
+				every = maxDuration(duration/4, 8*time.Second)
+			}
+			tick := time.NewTicker(every)
 			defer tick.Stop()
 			for {
 				select {

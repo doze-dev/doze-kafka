@@ -34,7 +34,7 @@ jobs:
         env:
           SOAK_CHAOS: ${{ matrix.mode.chaos }}
           SOAK_DURATION: ${{ github.event.inputs.duration || '10m' }}
-        run: go test -tags soak -run TestSoak -timeout 35m -v ./internal/broker/
+        run: go test -run TestSoak -timeout 35m -v ./internal/broker/
 
   # A scheduled run nobody is watching fails silently: the fuzz job was red for
   # eleven consecutive weeks before anyone looked. Open (or comment on) one issue
