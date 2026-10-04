@@ -2,10 +2,14 @@ package broker
 
 import (
 	"context"
+	"io"
+	"log/slog"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
+	"github.com/doze-dev/doze-kafka/internal/storage/meta"
 )
 
 // time.Timer.Stop cannot recall a timer that has already fired and is waiting for
@@ -184,5 +188,70 @@ func TestSessionRestartsWhenARebalanceCompletes(t *testing.T) {
 	defer gm.mu.Unlock()
 	if b.sessionGen == atJoin {
 		t.Fatal("B's session timer is still the one armed when it sent its JoinGroup; it was not restarted when the rebalance completed")
+	}
+}
+
+// ---- KIP-848 coordinator timers ----
+
+func join848(t *testing.T, m *cg848Manager, group, member string) cg848Result {
+	t.Helper()
+	r := kmsg.NewPtrConsumerGroupHeartbeatRequest()
+	r.Group, r.MemberID, r.RebalanceTimeoutMillis = group, member, 60_000
+	r.SubscribedTopicNames = []string{"t"}
+	res := m.heartbeat(r, clientRef{})
+	if res.errorCode != 0 {
+		t.Fatalf("join: %+v", res)
+	}
+	return res
+}
+
+func new848Manager(t *testing.T) *cg848Manager {
+	t.Helper()
+	store, err := meta.Open(filepath.Join(t.TempDir(), "meta.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { store.Close() })
+	return newCG848Manager(store, slog.New(slog.NewTextHandler(io.Discard, nil)), time.Hour, nil)
+}
+
+func TestKIP848StaleSessionTimerDoesNotEvictALiveMember(t *testing.T) {
+	m := new848Manager(t)
+	res := join848(t, m, "g", "a")
+	g := m.groups["g"]
+	mem := g.members["a"]
+	stale := mem.sessionGen
+
+	hb := kmsg.NewPtrConsumerGroupHeartbeatRequest()
+	hb.Group, hb.MemberID, hb.MemberEpoch = "g", "a", res.memberEpoch
+	if r := m.heartbeat(hb, clientRef{}); r.errorCode != 0 {
+		t.Fatalf("heartbeat: %+v", r)
+	}
+	m.sessionExpired(g, mem, stale)
+	if g.members["a"] == nil {
+		t.Fatal("a session timer overtaken by a heartbeat evicted the member anyway")
+	}
+	m.sessionExpired(g, mem, mem.sessionGen)
+	if g.members["a"] != nil {
+		t.Fatal("the current session timer did not evict a silent member")
+	}
+}
+
+// After the broker stops, a timer that fires does nothing: the metadata store it
+// would consult to reassign is closed.
+func TestKIP848TimersDoNothingAfterStop(t *testing.T) {
+	m := new848Manager(t)
+	join848(t, m, "g", "a")
+	g := m.groups["g"]
+	mem := g.members["a"]
+	gen := mem.sessionGen
+	m.stop()
+	m.sessionExpired(g, mem, gen)
+	m.sessionExpired(g, mem, mem.sessionGen)
+	if g.members["a"] == nil {
+		t.Fatal("a session timer ran after the coordinator was stopped")
+	}
+	if mem.sessionTimer != nil {
+		t.Error("stop left a session timer armed")
 	}
 }

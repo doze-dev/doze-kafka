@@ -103,16 +103,29 @@ func overlap(a, b []int32) []int32 {
 // A member that does not name itself would share the id "" with every other such
 // member and be handed the same partitions. The broker mints one.
 func TestGroupKIP848_BrokerMintsAMemberIDWhenNoneIsGiven(t *testing.T) {
-	addr := startBroker(t, 4)
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-	a, b := newCGMember(t, addr, "mint", ""), newCGMember(t, addr, "mint", "")
-	ra, rb := a.heartbeat(t, ctx, []string{"t"}, false), b.heartbeat(t, ctx, []string{"t"}, false)
+	c := openRaw(t, startBroker(t, 4))
+	join := func(version int16) *kmsg.ConsumerGroupHeartbeatResponse {
+		r := kmsg.NewPtrConsumerGroupHeartbeatRequest()
+		r.SetVersion(version)
+		r.Group, r.RebalanceTimeoutMillis = "mint", 60_000
+		r.SubscribedTopicNames = []string{"t"}
+		var resp kmsg.ConsumerGroupHeartbeatResponse
+		if !c.do(r, &resp) {
+			t.Fatal("connection closed")
+		}
+		return &resp
+	}
+	// v0: the broker assigns the id.
+	ra, rb := join(0), join(0)
 	if ra.ErrorCode != 0 || rb.ErrorCode != 0 {
 		t.Fatalf("join errors: %d %d", ra.ErrorCode, rb.ErrorCode)
 	}
-	if a.id == "" || b.id == "" || a.id == b.id {
-		t.Fatalf("minted ids = %q and %q; want two distinct non-empty ids", a.id, b.id)
+	if ra.MemberID == nil || rb.MemberID == nil || *ra.MemberID == "" || *ra.MemberID == *rb.MemberID {
+		t.Fatalf("minted ids = %v and %v; want two distinct non-empty ids", ra.MemberID, rb.MemberID)
+	}
+	// v1: the client generates it; an empty one is a malformed request.
+	if r := join(1); r.ErrorCode != 42 {
+		t.Errorf("a v1 join with no member id: code %d, want INVALID_REQUEST (42)", r.ErrorCode)
 	}
 }
 
@@ -155,8 +168,12 @@ func TestGroupKIP848_NoPartitionIsHeldByTwoMembers(t *testing.T) {
 		b.heartbeat(t, ctx, nil, true)
 		check("B heartbeat")
 	}
-	if !slices.Equal(a.holds(tid), []int32{0, 2}) || !slices.Equal(b.holds(tid), []int32{1, 3}) {
-		t.Fatalf("the split never converged: A=%v B=%v, want A=[0 2] B=[1 3]", a.holds(tid), b.holds(tid))
+	// Two each, all four covered. Which two is the assignor's business (it keeps
+	// what A already had where it can).
+	all := append(slices.Clone(a.holds(tid)), b.holds(tid)...)
+	slices.Sort(all)
+	if len(a.holds(tid)) != 2 || len(b.holds(tid)) != 2 || !slices.Equal(all, []int32{0, 1, 2, 3}) {
+		t.Fatalf("the split never converged: A=%v B=%v, want two each covering 0-3", a.holds(tid), b.holds(tid))
 	}
 }
 

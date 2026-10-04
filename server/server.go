@@ -367,6 +367,7 @@ func (s *Server) ServeListener(ctx context.Context, ln net.Listener) (err error)
 // that checks the exit status. It runs once, whoever gets there first.
 func (s *Server) closeStorage(err *error) {
 	s.closeOnce.Do(func() {
+		s.b.Stop()
 		if cerr := s.meta.Close(); cerr != nil {
 			s.closeErr = fmt.Errorf("close metadata store: %w", cerr)
 		}

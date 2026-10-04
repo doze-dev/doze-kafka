@@ -75,9 +75,11 @@ func TestGroupAdmin_ConsumerGroupStateIsReal(t *testing.T) {
 	mustCreateTopic(t, ctx, admin, "t", 4)
 
 	a, b := newCGMember(t, addr, "states", "member-a"), newCGMember(t, addr, "states", "member-b")
+	// A lone member is given its whole target in the answer to its join; there
+	// is nothing left to move, so the group is Stable at once.
 	a.heartbeat(t, ctx, []string{"t"}, false)
-	if s := consumerGroupState(t, ctx, a); s != "Reconciling" {
-		t.Errorf("right after joining, before the member has reported what it holds: state %q, want Reconciling", s)
+	if s := consumerGroupState(t, ctx, a); s != "Stable" {
+		t.Errorf("a lone member that has been given its whole target: state %q, want Stable", s)
 	}
 	a.heartbeat(t, ctx, nil, true)
 	if s := consumerGroupState(t, ctx, a); s != "Stable" {

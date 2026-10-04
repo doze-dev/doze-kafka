@@ -45,22 +45,9 @@ func (m *cg848Manager) list() []adminGroupListing {
 	defer m.mu.Unlock()
 	out := make([]adminGroupListing, 0, len(m.groups))
 	for id, g := range m.groups {
-		out = append(out, adminGroupListing{id: id, state: g.stateName(), groupType: "consumer"})
+		out = append(out, adminGroupListing{id: id, state: g.stateName(), groupType: "consumer", protocolType: "consumer", members: len(g.members)})
 	}
 	return out
-}
-
-// stateName is the group's state as ConsumerGroupDescribe / ListGroups report it.
-// A group is Stable once every member has been told, and reports it holds, exactly
-// its target assignment; until then partitions are still moving between members
-// and the honest state is Reconciling. (Empty groups are removed, so none is Empty.)
-func (g *cg848Group) stateName() string {
-	for _, mem := range g.members {
-		if mem.lastSent == nil || !assignmentsEqual(mem.lastSent, mem.target) || !assignmentsEqual(mem.owned, mem.target) {
-			return "Reconciling"
-		}
-	}
-	return "Stable"
 }
 
 // listAllGroups is every group a client could ask about: the live ones from both
@@ -76,6 +63,10 @@ func (b *Broker) listAllGroups() []adminGroupListing {
 	var groups []adminGroupListing
 	known := map[string]bool{}
 	for _, g := range b.cg848.list() {
+		// An emptied KIP-848 group gives way to a classic group now using its id.
+		if g.members == 0 && b.claims.ownerOf(g.id) == protoClassic {
+			continue
+		}
 		groups = append(groups, g)
 		known[g.id] = true
 	}

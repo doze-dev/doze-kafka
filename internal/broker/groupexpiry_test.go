@@ -118,24 +118,27 @@ func TestGroupSessionExpiry_KIP848(t *testing.T) {
 		t.Fatalf("join heartbeat errored: %d", resp.ErrorCode)
 	}
 
-	describe := func() int16 {
+	members := func() int {
 		dreq := kmsg.NewPtrConsumerGroupDescribeRequest()
 		dreq.Groups = []string{"expiry-848"}
 		dresp, err := dreq.RequestWith(ctx, cl)
 		if err != nil {
 			t.Fatalf("consumer group describe: %v", err)
 		}
-		return dresp.Groups[0].ErrorCode
+		if dresp.Groups[0].ErrorCode != 0 {
+			t.Fatalf("describe: code %d", dresp.Groups[0].ErrorCode)
+		}
+		return len(dresp.Groups[0].Members)
 	}
-	if describe() != 0 {
-		t.Fatal("group should exist right after join heartbeat")
+	if members() != 1 {
+		t.Fatal("the group should have its member right after the join heartbeat")
 	}
 
-	// Go silent; the member must be evicted and the group removed.
+	// Go silent; the member must be evicted, leaving an Empty group.
 	deadline := time.Now().Add(8 * time.Second)
 	for {
-		if describe() == 69 { // GROUP_ID_NOT_FOUND
-			return // evicted, group gone.
+		if members() == 0 {
+			return // evicted.
 		}
 		if time.Now().After(deadline) {
 			t.Fatal("KIP-848 member was never evicted after its session timeout")

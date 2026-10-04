@@ -259,3 +259,11 @@ func (b *Broker) advertised() []protocol.AdvertisedAPI {
 	}
 	return out
 }
+
+// Stop ends the coordinators' timers. The server calls it before closing storage:
+// a member's session timer firing afterwards would run an assignment against a
+// closed metadata store.
+func (b *Broker) Stop() {
+	b.groups.stop()
+	b.cg848.stop()
+}

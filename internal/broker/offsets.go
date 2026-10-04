@@ -87,6 +87,16 @@ func (b *Broker) handleOffsetFetch(ctx context.Context, req *protocol.Request) (
 		for _, g := range of.Groups {
 			rg := kmsg.NewOffsetFetchResponseGroup()
 			rg.Group = g.Group
+			// A KIP-848 member names itself and its epoch: one the coordinator no
+			// longer knows, or knows at another epoch, must not be handed offsets
+			// to resume from as if it still held the partitions.
+			if g.MemberID != nil && *g.MemberID != "" && b.claims.ownerOf(g.Group) == protoConsumer {
+				if code := b.cg848.validateCommit(g.Group, *g.MemberID, g.MemberEpoch); code != 0 {
+					rg.ErrorCode = code
+					resp.Groups = append(resp.Groups, rg)
+					continue
+				}
+			}
 			partitions, err := b.groupOffsets(g.Group, groupTopicNames(g.Topics), g.Topics == nil)
 			if err != nil {
 				return nil, err

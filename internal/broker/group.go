@@ -98,6 +98,22 @@ type groupManager struct {
 	// used: group -> member id -> when issued. The join that follows must bring
 	// one of these (or the id of an existing member); any other id is unknown.
 	pending map[string]map[string]time.Time
+
+	stopped bool // the broker is shutting down: timers do nothing.
+}
+
+// stop makes every timer a no-op. After shutdown a session timer would otherwise
+// fire into a closed metadata store.
+func (gm *groupManager) stop() {
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
+	gm.stopped = true
+	for _, g := range gm.groups {
+		g.stopJoinTimer()
+		for _, m := range g.members {
+			m.stopSession()
+		}
+	}
 }
 
 func newGroupManager(hasOffsets func(string) bool, claims *groupClaims) *groupManager {
@@ -880,7 +896,7 @@ func (gm *groupManager) armJoinTimer(g *group) {
 func (gm *groupManager) joinExpired(g *group, gen uint64) {
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
-	if g.joinGen != gen || g.state != statePreparingRebalance {
+	if gm.stopped || g.joinGen != gen || g.state != statePreparingRebalance {
 		return
 	}
 	gm.completeJoin(g)
@@ -904,7 +920,7 @@ func (gm *groupManager) sessionExpired(g *group, m *groupMember, gen uint64) {
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
 	id := m.id
-	if g.members[id] != m || m.sessionGen != gen {
+	if gm.stopped || g.members[id] != m || m.sessionGen != gen {
 		return
 	}
 	// A member parked in JoinGroup or SyncGroup is waiting on the group, not

@@ -52,6 +52,9 @@ func (b *Broker) deleteGroup(id string) int16 {
 	}
 	defer b.claims.release(id, deleting)
 	existed := b.groups.forget(id)
+	if b.cg848.forget(id) {
+		existed = true
+	}
 	n, err := b.meta.DeleteGroupOffsets(id)
 	if err != nil {
 		b.log.Warn("delete group: could not remove committed offsets", "group", id, "err", err)

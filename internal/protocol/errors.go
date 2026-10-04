@@ -43,8 +43,9 @@ const (
 	ErrSASLAuthenticationFailed ErrorCode = 58 // credentials rejected.
 
 	// KIP-848 consumer group protocol.
-	ErrGroupIDNotFound     ErrorCode = 69  // ConsumerGroupDescribe of an unknown group.
-	ErrFencedMemberEpoch   ErrorCode = 110 // member's epoch is fenced; it must abandon partitions and rejoin.
-	ErrUnsupportedAssignor ErrorCode = 112 // the requested server assignor is not offered.
-	ErrStaleMemberEpoch    ErrorCode = 113 // member's epoch is stale; retry after the coordinator updates it.
+	ErrGroupIDNotFound          ErrorCode = 69  // ConsumerGroupDescribe of an unknown group.
+	ErrFencedMemberEpoch        ErrorCode = 110 // member's epoch is fenced; it must abandon partitions and rejoin.
+	ErrInvalidRegularExpression ErrorCode = 117 // the subscription pattern does not compile.
+	ErrUnsupportedAssignor      ErrorCode = 112 // the requested server assignor is not offered.
+	ErrStaleMemberEpoch         ErrorCode = 113 // member's epoch is stale; retry after the coordinator updates it.
 )
