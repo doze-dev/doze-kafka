@@ -1,7 +1,6 @@
 package broker
 
 import (
-	"context"
 	"log/slog"
 	"regexp"
 	"slices"
@@ -11,7 +10,6 @@ import (
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
-	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/storage/meta"
 
 	"github.com/twmb/franz-go/pkg/kerr"
@@ -184,27 +182,13 @@ type cg848Member struct {
 	rebalanceTimeout time.Duration
 	left             bool // a static member that left (epoch -2): its place is held until its session expires.
 
-	sessionTimer *time.Timer
-	sessionGen   uint64 // bumped on every reset; a timer callback from an older one is stale.
-	revokeTimer  *time.Timer
-	revokeGen    uint64
+	session expiry // evicts the member if it stops heartbeating.
+	revoke  expiry // fences it if it does not give up revoked partitions in time.
 }
 
 func (mem *cg848Member) stopTimers() {
-	if mem.sessionTimer != nil {
-		mem.sessionTimer.Stop()
-		mem.sessionTimer = nil
-	}
-	mem.sessionGen++
-	mem.stopRevokeTimer()
-}
-
-func (mem *cg848Member) stopRevokeTimer() {
-	if mem.revokeTimer != nil {
-		mem.revokeTimer.Stop()
-		mem.revokeTimer = nil
-	}
-	mem.revokeGen++
+	mem.session.stop()
+	mem.revoke.stop()
 }
 
 // subscribes reports whether the member wants topic.
@@ -254,7 +238,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 			// partitions are held until its session runs out, so coming back does
 			// not move anything.
 			mem.left = true
-			mem.stopRevokeTimer()
+			mem.revoke.stop()
 			m.resetSession(g, mem)
 			return cg848Result{memberID: r.MemberID, memberEpoch: r.MemberEpoch}
 		}
@@ -344,7 +328,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 		case mem.sent != nil && !mem.left:
 			// A known member rejoining at epoch 0 has dropped everything it held.
 			mem.assigned, mem.revoking = tpSet{}, nil
-			mem.stopRevokeTimer()
+			mem.revoke.stop()
 			changed = true
 		}
 		mem.left = false
@@ -413,7 +397,7 @@ func (m *cg848Manager) reconcile(g *cg848Group, mem *cg848Member, reported tpSet
 			return
 		}
 		mem.revoking = nil
-		mem.stopRevokeTimer()
+		mem.revoke.stop()
 	}
 	if mem.epoch == g.epoch && mem.assigned.equal(mem.target) {
 		return
@@ -461,13 +445,11 @@ func (m *cg848Manager) free(g *cg848Group, self string, p tp) bool {
 // armRevokeTimer starts the member's rebalance timeout: how long it has to
 // acknowledge a revocation before it is removed and its partitions freed.
 func (m *cg848Manager) armRevokeTimer(g *cg848Group, mem *cg848Member) {
-	mem.stopRevokeTimer()
 	timeout := mem.rebalanceTimeout
 	if timeout <= 0 {
 		timeout = m.sessionTimeout
 	}
-	gen := mem.revokeGen
-	mem.revokeTimer = time.AfterFunc(timeout, func() { m.revokeExpired(g, mem, gen) })
+	mem.revoke.arm(timeout, func(gen uint64) { m.revokeExpired(g, mem, gen) })
 }
 
 // revokeExpired fences a member that did not acknowledge a revocation in time.
@@ -476,7 +458,7 @@ func (m *cg848Manager) armRevokeTimer(g *cg848Group, mem *cg848Member) {
 func (m *cg848Manager) revokeExpired(g *cg848Group, mem *cg848Member, gen uint64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.stopped || g.members[mem.id] != mem || mem.revokeGen != gen || len(mem.revoking) == 0 {
+	if m.stopped || g.members[mem.id] != mem || !mem.revoke.current(gen) || len(mem.revoking) == 0 {
 		return
 	}
 	m.log.Info("KIP-848 member did not give up revoked partitions within its rebalance timeout; removing it",
@@ -494,213 +476,16 @@ func (m *cg848Manager) bumpAndReassign(g *cg848Group) {
 	m.assign(g)
 }
 
-// topicInfo is a subscribed topic as the assignor sees it.
-type topicInfo struct {
-	name        string
-	id          meta.TopicID
-	partitions  int32
-	subscribers []string // member ids, sorted.
-}
-
-// subscribedTopics resolves every topic the group's members want that exists.
-func (m *cg848Manager) subscribedTopics(g *cg848Group) []topicInfo {
-	names := map[string]struct{}{}
-	anyRegex := false
-	for _, mem := range g.members {
-		for _, t := range mem.subscribed {
-			names[t] = struct{}{}
-		}
-		anyRegex = anyRegex || mem.regex != nil
-	}
-	if anyRegex {
-		if all, err := m.meta.ListTopics(); err == nil {
-			for _, t := range all {
-				for _, mem := range g.members {
-					if mem.regex != nil && mem.regex.MatchString(t.Name) {
-						names[t.Name] = struct{}{}
-					}
-				}
-			}
-		}
-	}
-	out := make([]topicInfo, 0, len(names))
-	for name := range names {
-		t, ok, err := m.meta.Topic(name)
-		if err != nil || !ok || t.Partitions <= 0 {
-			continue
-		}
-		info := topicInfo{name: name, id: t.ID, partitions: t.Partitions}
-		for id, mem := range g.members {
-			if mem.subscribes(name) {
-				info.subscribers = append(info.subscribers, id)
-			}
-		}
-		if len(info.subscribers) == 0 {
-			continue
-		}
-		slices.Sort(info.subscribers)
-		out = append(out, info)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].name < out[j].name })
-	return out
-}
-
-// assign runs the server-side assignor, filling each member's target.
-func (m *cg848Manager) assign(g *cg848Group) {
-	// The assignor is the one most members asked for; with no preference, uniform.
-	votes := map[string]int{}
-	for _, mem := range g.members {
-		if mem.assignor != "" {
-			votes[mem.assignor]++
-		}
-	}
-	g.assignor = assignorUniform
-	if votes[assignorRange] > votes[assignorUniform] {
-		g.assignor = assignorRange
-	}
-
-	topics := m.subscribedTopics(g)
-	previous := make(map[string]tpSet, len(g.members))
-	for id, mem := range g.members {
-		previous[id] = mem.target
-		mem.target = tpSet{}
-	}
-	if g.assignor == assignorRange {
-		for _, t := range topics {
-			assignRange(g, t)
-		}
-		return
-	}
-	assignUniform(g, topics, previous)
-}
-
-// assignRange gives each subscriber a contiguous slice of the topic's partitions;
-// the first (n mod k) members get one extra. Applied topic by topic, so topics with
-// the same partition count line up (co-partitioning), as Kafka's range does.
-func assignRange(g *cg848Group, t topicInfo) {
-	k := int32(len(t.subscribers))
-	base, extra := t.partitions/k, t.partitions%k
-	var start int32
-	for i, id := range t.subscribers {
-		count := base
-		if int32(i) < extra {
-			count++
-		}
-		for p := start; p < start+count; p++ {
-			g.members[id].target[tp{t.id, p}] = struct{}{}
-		}
-		start += count
-	}
-}
-
-// assignUniform spreads all partitions of all topics evenly over the members
-// subscribed to them, and keeps a member's partitions where it can (sticky).
-//
-// It used to deal each topic round-robin on its own: six single-partition topics
-// and one of three partitions gave three members 7, 1 and 1 partitions, and adding
-// a member moved partitions between members that had no reason to change.
-func assignUniform(g *cg848Group, topics []topicInfo, previous map[string]tpSet) {
-	eligible := map[tp][]string{} // partition -> members subscribed to its topic.
-	var all []tp
-	for _, t := range topics {
-		for p := int32(0); p < t.partitions; p++ {
-			part := tp{t.id, p}
-			eligible[part] = t.subscribers
-			all = append(all, part)
-		}
-	}
-	owner := map[tp]string{}
-	count := map[string]int{}
-	for id := range g.members {
-		count[id] = 0
-	}
-
-	// Sticky: keep what each member had, in a stable order, as long as the
-	// partition still exists and the member still wants its topic.
-	ids := make([]string, 0, len(g.members))
-	for id := range g.members {
-		ids = append(ids, id)
-	}
-	slices.Sort(ids)
-	for _, id := range ids {
-		for _, part := range sortedParts(previous[id]) {
-			if _, taken := owner[part]; taken {
-				continue
-			}
-			if subs, ok := eligible[part]; ok && slices.Contains(subs, id) {
-				owner[part] = id
-				count[id]++
-			}
-		}
-	}
-	// Unowned partitions go to the eligible member with the fewest.
-	least := func(subs []string) string {
-		best := subs[0]
-		for _, id := range subs[1:] {
-			if count[id] < count[best] {
-				best = id
-			}
-		}
-		return best
-	}
-	for _, part := range all {
-		if _, taken := owner[part]; !taken {
-			id := least(eligible[part])
-			owner[part] = id
-			count[id]++
-		}
-	}
-	// Even out: move a partition from a member to an eligible member that has at
-	// least two fewer, until no such move exists.
-	for moved := true; moved; {
-		moved = false
-		for i := len(all) - 1; i >= 0; i-- {
-			part := all[i]
-			from := owner[part]
-			to := least(eligible[part])
-			if count[from]-count[to] >= 2 {
-				owner[part] = to
-				count[from]--
-				count[to]++
-				moved = true
-			}
-		}
-	}
-	for part, id := range owner {
-		g.members[id].target[part] = struct{}{}
-	}
-}
-
-func sortedParts(s tpSet) []tp {
-	out := make([]tp, 0, len(s))
-	for p := range s {
-		out = append(out, p)
-	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].topic != out[j].topic {
-			return string(out[i].topic[:]) < string(out[j].topic[:])
-		}
-		return out[i].part < out[j].part
-	})
-	return out
-}
-
 func (m *cg848Manager) resetSession(g *cg848Group, mem *cg848Member) {
-	if mem.sessionTimer != nil {
-		mem.sessionTimer.Stop()
-	}
-	mem.sessionGen++
-	gen := mem.sessionGen
-	mem.sessionTimer = time.AfterFunc(m.sessionTimeout, func() { m.sessionExpired(g, mem, gen) })
+	mem.session.arm(m.sessionTimeout, func(gen uint64) { m.sessionExpired(g, mem, gen) })
 }
 
-// sessionExpired is a member's session timer firing. gen is the timer's identity:
-// a firing overtaken by a heartbeat (Timer.Stop cannot recall a timer that has
-// already fired) carries an old one and must do nothing.
+// sessionExpired is a member's session timer firing. A firing overtaken by a
+// heartbeat carries an old gen and does nothing (see expiry).
 func (m *cg848Manager) sessionExpired(g *cg848Group, mem *cg848Member, gen uint64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.stopped || g.members[mem.id] != mem || mem.sessionGen != gen {
+	if m.stopped || g.members[mem.id] != mem || !mem.session.current(gen) {
 		return
 	}
 	m.removeMember(g, mem.id)
@@ -813,17 +598,6 @@ func (g *cg848Group) stateName() string {
 	return "Stable"
 }
 
-func encodeAssignment(a tpSet) *kmsg.ConsumerGroupHeartbeatResponseAssignment {
-	out := kmsg.NewConsumerGroupHeartbeatResponseAssignment()
-	for _, t := range a.byTopic() {
-		at := kmsg.NewConsumerGroupHeartbeatResponseAssignmentTopic()
-		at.TopicID = t.topic
-		at.Partitions = t.parts
-		out.Topics = append(out.Topics, at)
-	}
-	return &out
-}
-
 // cg848MemberDesc is one member as ConsumerGroupDescribe shows it.
 type cg848MemberDesc struct {
 	client     clientRef
@@ -859,80 +633,4 @@ func (m *cg848Manager) describe(group string) (state string, epoch int32, assign
 		})
 	}
 	return g.stateName(), g.epoch, g.assignor, members, true
-}
-
-// --- handlers ---
-
-// handleConsumerGroupHeartbeat is the single KIP-848 API that carries join, poll,
-// and leave. The broker computes and drives the assignment (see cg848Manager).
-func (b *Broker) handleConsumerGroupHeartbeat(ctx context.Context, req *protocol.Request, hr *kmsg.ConsumerGroupHeartbeatRequest, resp *kmsg.ConsumerGroupHeartbeatResponse) error {
-	res := b.cg848.heartbeat(hr, clientRef{req.Header.ClientID, req.Conn.RemoteHost()})
-
-	resp.ErrorCode = res.errorCode
-	if res.errorMsg != "" {
-		resp.ErrorMessage = &res.errorMsg
-	}
-	if res.errorCode == errNone {
-		mid := res.memberID
-		resp.MemberID = &mid
-		resp.MemberEpoch = res.memberEpoch
-		resp.HeartbeatIntervalMillis = cg848HeartbeatMs
-		resp.Assignment = res.assignment
-	}
-	return nil
-}
-
-// handleConsumerGroupDescribe reports the broker-driven group's state, epoch, and
-// members with their current assignments — the data `kafka-consumer-groups
-// --describe` shows. Unknown groups get GROUP_ID_NOT_FOUND.
-func (b *Broker) handleConsumerGroupDescribe(ctx context.Context, req *protocol.Request, dr *kmsg.ConsumerGroupDescribeRequest, resp *kmsg.ConsumerGroupDescribeResponse) error {
-	for _, group := range dr.Groups {
-		rg := kmsg.NewConsumerGroupDescribeResponseGroup()
-		rg.Group = group
-		state, epoch, assignor, members, ok := b.cg848.describe(group)
-		if !ok || (len(members) == 0 && b.claims.ownerOf(group) == protoClassic) {
-			rg.ErrorCode = kerr.GroupIDNotFound.Code
-			resp.Groups = append(resp.Groups, rg)
-			continue
-		}
-		rg.State = state
-		rg.Epoch = epoch
-		rg.AssignmentEpoch = epoch
-		rg.AssignorName = assignor
-		for _, mem := range members {
-			rm := kmsg.NewConsumerGroupDescribeResponseGroupMember()
-			rm.MemberID = mem.id
-			rm.ClientID = mem.client.clientID
-			rm.ClientHost = mem.client.host
-			rm.InstanceID = mem.instanceID
-			rm.RackID = mem.rack
-			rm.MemberEpoch = mem.epoch
-			rm.SubscribedTopics = mem.subscribed
-			if mem.regex != "" {
-				rm.SubscribedTopicRegex = &mem.regex
-			}
-			rm.Assignment = b.describeAssignment(mem.assigned)
-			rm.TargetAssignment = b.describeAssignment(mem.target)
-			rg.Members = append(rg.Members, rm)
-		}
-		resp.Groups = append(resp.Groups, rg)
-	}
-	return nil
-}
-
-// describeAssignment renders a set of partitions as a ConsumerGroupDescribe
-// assignment (topic name, id and partitions). A topic that no longer exists is
-// shown by id alone.
-func (b *Broker) describeAssignment(a tpSet) kmsg.Assignment {
-	out := kmsg.NewAssignment()
-	for _, t := range a.byTopic() {
-		at := kmsg.NewAssignmentTopicPartition()
-		at.TopicID = t.topic
-		if topic, ok, err := b.meta.TopicByID(t.topic); err == nil && ok {
-			at.Topic = topic.Name
-		}
-		at.Partitions = t.parts
-		out.TopicPartitions = append(out.TopicPartitions, at)
-	}
-	return out
 }

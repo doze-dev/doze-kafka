@@ -56,7 +56,7 @@ coordinators, encode the response. The interesting logic lives in a few places:
   client's max wait) on a notifier that any produce wakes.
 - **Consumer groups** have two coordinators. The classic one
   (`group.go`/`groups.go`) is a rendezvous point that relays a client leader's
-  assignment. The KIP-848 one (`consumergroup848.go`) computes assignments itself and
+  assignment. The KIP-848 one (`group848.go`, with its assignors in `group848_assign.go`) computes assignments itself and
   drives an incremental, safe rebalance keyed on member epochs. Both keep membership
   in memory and rebuild it when clients reconnect; only offsets are durable.
 - **Auth** (`auth.go`, `scram.go`) implements the SASL handshakes and per-connection

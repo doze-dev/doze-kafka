@@ -45,7 +45,7 @@ func TestStaleSessionTimerDoesNotEvictALiveMember(t *testing.T) {
 	}
 	g := gm.groups["g"]
 	m := g.members[res.memberID]
-	stale := m.sessionGen
+	stale := m.session.gen
 
 	// The member heartbeats (a new timer, a new identity) just as the old timer
 	// fires and reaches the lock second.
@@ -59,7 +59,7 @@ func TestStaleSessionTimerDoesNotEvictALiveMember(t *testing.T) {
 		t.Fatal("a session timer that was overtaken by a heartbeat evicted the member anyway")
 	}
 	// The current one does evict.
-	gm.sessionExpired(g, m, m.sessionGen)
+	gm.sessionExpired(g, m, m.session.gen)
 	if grp := gm.groups["g"]; grp != nil && grp.members[res.memberID] != nil {
 		t.Fatal("the current session timer did not evict a silent member")
 	}
@@ -80,8 +80,8 @@ func TestStaleJoinTimerDoesNotEndALaterRebalance(t *testing.T) {
 	deadline := time.Now().Add(2 * time.Second)
 	for {
 		gm.mu.Lock()
-		armed := g.state == statePreparingRebalance && g.joinTimer != nil
-		gen := g.joinGen
+		armed := g.state == statePreparingRebalance && g.join.armed()
+		gen := g.join.gen
 		gm.mu.Unlock()
 		if armed {
 			// A firing from an earlier arming must not complete this rebalance
@@ -118,7 +118,7 @@ func TestJoinTimerIsClearedWhenTheGroupEmpties(t *testing.T) {
 	deadline := time.Now().Add(2 * time.Second)
 	for {
 		gm.mu.Lock()
-		armed := g.joinTimer != nil
+		armed := g.join.armed()
 		var ids []string
 		for id := range g.members {
 			ids = append(ids, id)
@@ -142,8 +142,8 @@ func TestJoinTimerIsClearedWhenTheGroupEmpties(t *testing.T) {
 	}
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
-	if g.joinTimer != nil || g.state != stateEmpty {
-		t.Fatalf("after everyone left: join timer armed=%v, state %v; want it cleared and Empty", g.joinTimer != nil, g.state)
+	if g.join.armed() || g.state != stateEmpty {
+		t.Fatalf("after everyone left: join timer armed=%v, state %v; want it cleared and Empty", g.join.armed(), g.state)
 	}
 	_ = a
 }
@@ -177,7 +177,7 @@ func TestSessionRestartsWhenARebalanceCompletes(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	gm.mu.Lock()
-	atJoin := b.sessionGen
+	atJoin := b.session.gen
 	gm.mu.Unlock()
 
 	if r, err := gm.join(context.Background(), joinReq("g", a.memberID), clientRef{}); err != nil || r.errorCode != 0 {
@@ -186,7 +186,7 @@ func TestSessionRestartsWhenARebalanceCompletes(t *testing.T) {
 	<-done
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
-	if b.sessionGen == atJoin {
+	if b.session.gen == atJoin {
 		t.Fatal("B's session timer is still the one armed when it sent its JoinGroup; it was not restarted when the rebalance completed")
 	}
 }
@@ -220,7 +220,7 @@ func TestKIP848StaleSessionTimerDoesNotEvictALiveMember(t *testing.T) {
 	res := join848(t, m, "g", "a")
 	g := m.groups["g"]
 	mem := g.members["a"]
-	stale := mem.sessionGen
+	stale := mem.session.gen
 
 	hb := kmsg.NewPtrConsumerGroupHeartbeatRequest()
 	hb.Group, hb.MemberID, hb.MemberEpoch = "g", "a", res.memberEpoch
@@ -231,7 +231,7 @@ func TestKIP848StaleSessionTimerDoesNotEvictALiveMember(t *testing.T) {
 	if g.members["a"] == nil {
 		t.Fatal("a session timer overtaken by a heartbeat evicted the member anyway")
 	}
-	m.sessionExpired(g, mem, mem.sessionGen)
+	m.sessionExpired(g, mem, mem.session.gen)
 	if g.members["a"] != nil {
 		t.Fatal("the current session timer did not evict a silent member")
 	}
@@ -244,14 +244,52 @@ func TestKIP848TimersDoNothingAfterStop(t *testing.T) {
 	join848(t, m, "g", "a")
 	g := m.groups["g"]
 	mem := g.members["a"]
-	gen := mem.sessionGen
+	gen := mem.session.gen
 	m.stop()
 	m.sessionExpired(g, mem, gen)
-	m.sessionExpired(g, mem, mem.sessionGen)
+	m.sessionExpired(g, mem, mem.session.gen)
 	if g.members["a"] == nil {
 		t.Fatal("a session timer ran after the coordinator was stopped")
 	}
-	if mem.sessionTimer != nil {
+	if mem.session.armed() {
 		t.Error("stop left a session timer armed")
 	}
+}
+
+// expiry is the one timer both coordinators use. A callback carries the identity
+// it was armed with, and only the current arming's may act.
+func TestExpiryOnlyTheCurrentArmingActs(t *testing.T) {
+	var e expiry
+	if e.armed() || e.current(e.gen) {
+		t.Fatal("a zero expiry is neither armed nor current")
+	}
+	fired := make(chan uint64, 4)
+	e.arm(time.Hour, func(gen uint64) { fired <- gen })
+	first := e.gen
+	if !e.armed() || !e.current(first) {
+		t.Fatal("after arm, the timer is armed and its own gen is current")
+	}
+	// Re-arming (a heartbeat) makes the first arming stale, even though its
+	// callback may already be on its way.
+	e.arm(time.Hour, func(gen uint64) { fired <- gen })
+	if e.current(first) || !e.current(e.gen) || e.gen == first {
+		t.Errorf("after re-arming, gen %d should be stale and %d current", first, e.gen)
+	}
+	second := e.gen
+	e.stop()
+	if e.armed() || e.current(second) {
+		t.Error("after stop, nothing is current: a late callback must do nothing")
+	}
+	// A real firing is handed the gen it was armed with.
+	e.arm(time.Millisecond, func(gen uint64) { fired <- gen })
+	want := e.gen
+	select {
+	case got := <-fired:
+		if got != want || !e.current(got) {
+			t.Errorf("fired with gen %d, armed with %d", got, want)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the timer did not fire")
+	}
+	e.stop()
 }

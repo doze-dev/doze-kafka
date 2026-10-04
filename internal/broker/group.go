@@ -109,9 +109,9 @@ func (gm *groupManager) stop() {
 	defer gm.mu.Unlock()
 	gm.stopped = true
 	for _, g := range gm.groups {
-		g.stopJoinTimer()
+		g.join.stop()
 		for _, m := range g.members {
-			m.stopSession()
+			m.session.stop()
 		}
 	}
 }
@@ -196,8 +196,7 @@ type group struct {
 	static       map[string]string // group.instance.id -> member id, for static members.
 	holding      bool              // the initial rebalance delay is running: wait for it even if everyone has joined.
 	pendingSync  map[string]chan syncResult
-	joinTimer    *time.Timer
-	joinGen      uint64 // bumped whenever the join timer is stopped or re-armed; see armJoinTimer.
+	join         expiry // how long the rebalance waits for members to rejoin.
 }
 
 // clientRef says who a member is: the client.id it connected with and the host it
@@ -213,8 +212,7 @@ type groupMember struct {
 	assignment     []byte               // from the leader's SyncGroup.
 	rejoined       bool
 	sessionTimeout time.Duration
-	sessionTimer   *time.Timer
-	sessionGen     uint64 // bumped on every reset; a timer callback from an older one is stale.
+	session        expiry // evicts the member if it stops heartbeating.
 	joinResult     chan joinResult
 	awaitingJoin   bool // a JoinGroup is parked on joinResult.
 
@@ -273,7 +271,7 @@ func (gm *groupManager) forget(group string) bool {
 	if g == nil || len(g.members) > 0 {
 		return false
 	}
-	g.stopJoinTimer()
+	g.join.stop()
 	delete(gm.groups, group)
 	gm.claims.release(group, protoClassic)
 	return true
@@ -440,7 +438,7 @@ func (gm *groupManager) replaceStatic(g *group, oldID string, r *kmsg.JoinGroupR
 		ch <- syncResult{errorCode: kerr.FencedInstanceID.Code}
 		delete(g.pendingSync, oldID)
 	}
-	old.stopSession()
+	old.session.stop()
 	delete(g.members, oldID)
 
 	m := &groupMember{
@@ -735,30 +733,6 @@ func (m *groupMember) failPendingJoin() {
 	m.awaitingJoin = false
 }
 
-// stopSession cancels the member's session timer and invalidates any callback
-// already past Stop() and waiting on the manager lock — time.Timer.Stop cannot
-// recall one that has fired, and without the generation it would evict a member
-// that heartbeated an instant earlier.
-func (m *groupMember) stopSession() {
-	if m.sessionTimer != nil {
-		m.sessionTimer.Stop()
-		m.sessionTimer = nil
-	}
-	m.sessionGen++
-}
-
-// stopJoinTimer cancels the rebalance collect timer, invalidating a callback
-// that has already fired. It must run whenever a rebalance ends by any route;
-// a timer left behind makes armJoinTimer think one is running, so no later
-// rebalance of the group would ever time out.
-func (g *group) stopJoinTimer() {
-	if g.joinTimer != nil {
-		g.joinTimer.Stop()
-		g.joinTimer = nil
-	}
-	g.joinGen++
-}
-
 // rebalanceTimeout is how long a rebalance may wait for members to rejoin: the
 // longest any member asked for (Kafka's rule), each falling back to its session
 // timeout. This is the client's max.poll.interval.ms, so a consumer busy in a
@@ -797,11 +771,11 @@ func (g *group) allRejoined() bool {
 // generation, elect a leader, pick a common protocol, and deliver every waiting
 // JoinGroup response.
 func (g *group) completeJoin() {
-	g.stopJoinTimer()
+	g.join.stop()
 	g.holding = false
 	for id, m := range g.members {
 		if !m.rejoined {
-			m.stopSession()
+			m.session.stop()
 			delete(g.members, id)
 		}
 	}
@@ -875,52 +849,47 @@ func (gm *groupManager) dropIfUnused(g *group) {
 	delete(gm.groups, g.id)
 }
 
+// armJoinTimer starts the rebalance's wait, unless it is already running: a
+// rebalance has one deadline, set when it begins, however many members join it.
 func (gm *groupManager) armJoinTimer(g *group) {
-	if g.joinTimer != nil {
+	if g.join.armed() {
 		return
 	}
-	g.joinGen++
-	gen := g.joinGen
 	wait := g.rebalanceTimeout()
 	if g.holding {
 		wait = min(wait, initialRebalanceDelay)
 	}
-	g.joinTimer = time.AfterFunc(wait, func() { gm.joinExpired(g, gen) })
+	g.join.arm(wait, func(gen uint64) { gm.joinExpired(g, gen) })
 }
 
 // joinExpired is the join timer firing: the rebalance stops waiting for members
-// that have not rejoined. gen is the timer's identity. time.Timer.Stop cannot
-// recall a timer that has already fired and is waiting for the lock, so a firing
-// whose gen is no longer current belongs to a rebalance that already ended (or
-// restarted) and must do nothing.
+// that have not rejoined. A firing whose gen is no longer current belongs to a
+// rebalance that already ended or restarted, and does nothing (see expiry).
 func (gm *groupManager) joinExpired(g *group, gen uint64) {
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
-	if gm.stopped || g.joinGen != gen || g.state != statePreparingRebalance {
+	if gm.stopped || !g.join.current(gen) || g.state != statePreparingRebalance {
 		return
 	}
 	gm.completeJoin(g)
 }
 
 func (gm *groupManager) resetSession(g *group, m *groupMember) {
-	m.stopSession()
 	timeout := m.sessionTimeout
 	if timeout <= 0 {
 		timeout = defaultSessionTimeout
 	}
-	gen := m.sessionGen
-	m.sessionTimer = time.AfterFunc(timeout, func() { gm.sessionExpired(g, m, gen) })
+	m.session.arm(timeout, func(gen uint64) { gm.sessionExpired(g, m, gen) })
 }
 
-// sessionExpired is a member's session timer firing. gen is the timer's identity:
-// a firing whose gen is not the member's current one was overtaken by a heartbeat
-// (or the member was replaced) while it waited for the lock, and evicting on it
-// would remove a member that had just proved it was alive.
+// sessionExpired is a member's session timer firing. A firing whose gen is not
+// current was overtaken by a heartbeat (or the member was replaced) while it
+// waited for the lock (see expiry).
 func (gm *groupManager) sessionExpired(g *group, m *groupMember, gen uint64) {
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
 	id := m.id
-	if gm.stopped || g.members[id] != m || m.sessionGen != gen {
+	if gm.stopped || g.members[id] != m || !m.session.current(gen) {
 		return
 	}
 	// A member parked in JoinGroup or SyncGroup is waiting on the group, not
@@ -938,7 +907,7 @@ func (gm *groupManager) sessionExpired(g *group, m *groupMember, gen uint64) {
 
 func (gm *groupManager) removeMember(g *group, id string) {
 	if m := g.members[id]; m != nil {
-		m.stopSession()
+		m.session.stop()
 		m.failPendingJoin()
 		if m.instanceID != nil && g.static[*m.instanceID] == id {
 			delete(g.static, *m.instanceID)
@@ -956,7 +925,7 @@ func (gm *groupManager) removeMember(g *group, id string) {
 // in-flight one if the departure made everyone-left rejoined.
 func (gm *groupManager) rebalanceAfterChange(g *group) {
 	if len(g.members) == 0 {
-		g.stopJoinTimer()
+		g.join.stop()
 		g.state = stateEmpty
 		g.leader = ""
 		gm.dropIfUnused(g)
