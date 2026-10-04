@@ -97,7 +97,7 @@ the broker and the console, claims the instance name in the `.doze` zone (or, un
 instead; the two are exclusive, see [Endpoints](endpoints.md)), and prints the start-up
 summary on stdout. `names.go` is the zone, `dnsready.go` the first-run setup, `listen.go`
 where the broker binds and what it advertises, `doctor.go`/`env.go` the two commands; on
-Windows a stub stands in.
+Windows the zone builds but has no machine setup yet, so the default there is an address.
 
 ## Why this stays small
 

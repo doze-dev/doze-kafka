@@ -23,7 +23,7 @@ first and watch it fail.
 
 | Path | What |
 |---|---|
-| `cmd/doze-kafka` | The CLI: flags, config, start-up, the `.doze` instance name (`names.go`, `listen.go`, `dnsready.go`; a stub on Windows). |
+| `cmd/doze-kafka` | The CLI: flags, config, start-up, the `.doze` instance name (`names.go`, `listen.go`, `dnsready.go`; no setup on Windows yet). |
 | `server/` | The public embed API; the CLI is built on it. See [docs/embedding.md](docs/embedding.md). |
 | `internal/protocol` | Framing, request/response codec, the version profiles, the connection loop. |
 | `internal/broker` | One handler per Kafka API, the two group coordinators, auth. |
