@@ -33,6 +33,12 @@ type Server struct {
 	maxConns       int           // connections served at once; more are refused.
 	refused        atomic.Int64  // connections refused at the cap (for the log line and tests).
 
+	// lnMu guards the listeners and whether Serve has started. Bind, AlsoListen,
+	// Serve and Close may be called from different goroutines by an embedder.
+	lnMu    sync.Mutex
+	serving bool
+	closed  bool
+
 	mu    sync.Mutex
 	conns map[*Conn]struct{} // in-flight connections, for shutdown drain.
 	wg    sync.WaitGroup     // tracks conn.serve goroutines.
@@ -56,7 +62,9 @@ func (s *Server) UseListener(ln net.Listener) {
 	if s.tlsConfig != nil {
 		ln = tls.NewListener(ln, s.tlsConfig)
 	}
+	s.lnMu.Lock()
 	s.ln = ln
+	s.lnMu.Unlock()
 }
 
 // RequireAuth gates every non-SASL API behind a completed SASL handshake. Call
@@ -75,8 +83,50 @@ func (s *Server) Bind(ctx context.Context) (net.Addr, error) {
 	if s.tlsConfig != nil {
 		ln = tls.NewListener(ln, s.tlsConfig)
 	}
+	s.lnMu.Lock()
+	defer s.lnMu.Unlock()
+	if s.closed || s.ln != nil {
+		_ = ln.Close()
+		if s.closed {
+			return nil, ErrServerClosed
+		}
+		return nil, errors.New("protocol: the server already has a listener")
+	}
 	s.ln = ln
 	return ln.Addr(), nil
+}
+
+// ErrServerClosed is returned by Bind, AlsoListen and Serve once Close has run.
+var ErrServerClosed = errors.New("protocol: the server is closed")
+
+// ErrAlreadyServing is returned by a second Serve, and by AlsoListen once Serve
+// has started: the accept loops are started by Serve, so a listener added after
+// it would be bound and never served.
+var ErrAlreadyServing = errors.New("protocol: the server is already serving")
+
+// Close closes every listener. It is for a server that was bound but will not be
+// served (start-up failed after Bind); a serving one is stopped by cancelling the
+// context given to Serve. Safe to call more than once.
+func (s *Server) Close() error {
+	s.lnMu.Lock()
+	defer s.lnMu.Unlock()
+	s.closed = true
+	var first error
+	for _, ln := range s.listeners() {
+		if err := ln.Close(); err != nil && first == nil && !errors.Is(err, net.ErrClosed) {
+			first = err
+		}
+	}
+	return first
+}
+
+// listeners is every listener the server holds. The caller holds lnMu.
+func (s *Server) listeners() []net.Listener {
+	var out []net.Listener
+	if s.ln != nil {
+		out = append(out, s.ln)
+	}
+	return append(out, s.extra...)
 }
 
 // AlsoListen opens one more listener, on another address, that serves the same
@@ -91,6 +141,16 @@ func (s *Server) AlsoListen(ctx context.Context, addr string) (net.Addr, error) 
 	if s.tlsConfig != nil {
 		ln = tls.NewListener(ln, s.tlsConfig)
 	}
+	s.lnMu.Lock()
+	defer s.lnMu.Unlock()
+	switch {
+	case s.closed:
+		_ = ln.Close()
+		return nil, ErrServerClosed
+	case s.serving:
+		_ = ln.Close()
+		return nil, ErrAlreadyServing
+	}
 	s.extra = append(s.extra, ln)
 	return ln.Addr(), nil
 }
@@ -98,26 +158,50 @@ func (s *Server) AlsoListen(ctx context.Context, addr string) (net.Addr, error) 
 // Serve accepts connections until ctx is cancelled, then stops accepting and
 // returns. In-flight connections observe cancellation on their next read.
 func (s *Server) Serve(ctx context.Context) error {
-	if s.ln == nil {
+	s.lnMu.Lock()
+	unbound := s.ln == nil && !s.closed && !s.serving
+	s.lnMu.Unlock()
+	if unbound {
 		if _, err := s.Bind(ctx); err != nil {
 			return err
 		}
 	}
-	ln := s.ln
+	s.lnMu.Lock()
+	switch {
+	case s.closed:
+		s.lnMu.Unlock()
+		return ErrServerClosed
+	case s.serving:
+		s.lnMu.Unlock()
+		return ErrAlreadyServing
+	}
+	s.serving = true
+	ln, extra := s.ln, append([]net.Listener(nil), s.extra...)
+	s.lnMu.Unlock()
 	s.log.Info("listening", "addr", ln.Addr().String())
 
-	// On cancellation, stop accepting and close in-flight connections so any parked
-	// in a blocking read unblock and their serve loops exit promptly.
-	go func() {
-		<-ctx.Done()
+	// When serving ends, for whatever reason, stop accepting everywhere and close
+	// in-flight connections so any parked in a blocking read unblock and their
+	// serve loops exit promptly. (An accept error on the main listener used to
+	// leave the extra ones bound and accepting.)
+	stop := make(chan struct{})
+	defer close(stop)
+	shut := func() {
 		_ = ln.Close()
-		for _, x := range s.extra {
+		for _, x := range extra {
 			_ = x.Close()
 		}
 		s.closeConns()
+	}
+	go func() {
+		select {
+		case <-ctx.Done():
+			shut()
+		case <-stop:
+		}
 	}()
 
-	for _, x := range s.extra {
+	for _, x := range extra {
 		s.log.Info("listening", "addr", x.Addr().String())
 		s.loops.Add(1)
 		go func(x net.Listener) {
@@ -127,10 +211,19 @@ func (s *Server) Serve(ctx context.Context) error {
 	}
 
 	err := s.acceptLoop(ctx, ln)
+	if ctx.Err() == nil {
+		shut() // the main listener failed: take the others down with it.
+	}
 	s.loops.Wait() // no accept loop may add a connection once we start waiting for them.
+	s.wg.Wait()    // let in-flight connections drain before returning.
 	if ctx.Err() != nil {
-		s.wg.Wait() // let in-flight connections drain before returning.
-		return nil  // clean shutdown
+		return nil // clean shutdown
+	}
+	s.lnMu.Lock()
+	closed := s.closed
+	s.lnMu.Unlock()
+	if closed {
+		return ErrServerClosed
 	}
 	return err
 }

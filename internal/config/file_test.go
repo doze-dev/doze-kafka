@@ -92,7 +92,13 @@ key = "./certs/server-key.pem"
 	if cfg.TLSCertFile != "./certs/server.pem" || cfg.TLSKeyFile != "./certs/server-key.pem" {
 		t.Errorf("TLS files = %q / %q", cfg.TLSCertFile, cfg.TLSKeyFile)
 	}
-	// A file that overlays clean defaults should validate.
+	// The certificate named here does not exist, and validation says so now
+	// rather than leaving it to fail once the broker is half started.
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "cannot load the TLS certificate") {
+		t.Errorf("Validate with a missing certificate: %v", err)
+	}
+	// Everything else a file overlays onto clean defaults validates.
+	cfg.TLSCertFile, cfg.TLSKeyFile = "", ""
 	if err := cfg.Validate(); err != nil {
 		t.Errorf("Validate: %v", err)
 	}

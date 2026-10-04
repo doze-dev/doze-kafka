@@ -46,6 +46,9 @@ const (
 	exitUsage   = 2
 )
 
+// shutdownSignals are the signals that stop the broker cleanly.
+var shutdownSignals = []os.Signal{syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP}
+
 // realMain is main with its inputs and outputs passed in, so the command line can
 // be tested without a process.
 func realMain(args []string, stdout, stderr io.Writer) int {
@@ -110,8 +113,10 @@ func realMain(args []string, stdout, stderr io.Writer) int {
 		}()
 	}
 
-	// Stop accepting, then let in-flight work drain, on SIGINT/SIGTERM.
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	// Stop accepting, then let in-flight work drain, on SIGINT/SIGTERM — and on
+	// SIGHUP, which is what closing the terminal sends. Unhandled, it killed the
+	// broker with no flush and no clean close of its storage.
+	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
 	defer stop()
 	if err := run(ctx, st, logger, stderr); err != nil {
 		logger.Error("fatal", "err", err)
@@ -130,9 +135,6 @@ func printVersion(w io.Writer) {
 // always the same exit code, before anything has started.
 func usageError(w io.Writer, err error) int {
 	fmt.Fprintf(w, "doze-kafka: %s\n", strings.TrimPrefix(err.Error(), "config: "))
-	if !strings.HasPrefix(err.Error(), "config:") {
-		fmt.Fprintln(w, "run doze-kafka --help for the flags")
-	}
 	return exitUsage
 }
 
@@ -145,13 +147,17 @@ func runConfig(args []string, stdout, stderr io.Writer) int {
 		return exitUsage
 	}
 	st, err := loadConfig(args[1:])
-	if err != nil {
-		if errors.Is(err, errHelp) {
-			d := config.Default()
-			fs, _ := newFlagSet(&d)
-			printHelp(stdout, fs)
-			return 0
-		}
+	switch {
+	case errors.Is(err, errHelp):
+		d := config.Default()
+		fs, _ := newFlagSet(&d)
+		printHelp(stdout, fs)
+		return 0
+	case errors.Is(err, errShowVersion):
+		// It used to print the sentinel itself: "doze-kafka: show version".
+		printVersion(stdout)
+		return 0
+	case err != nil:
 		return usageError(stderr, err)
 	}
 	if err := config.WriteTOML(stdout, st.cfg); err != nil {
@@ -230,7 +236,7 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 	// contract, and every failure in here is a log line rather than a refusal
 	// to start.
 	var z *zone
-	ready := readyInfo{version: version, kafka: cfg.Version, bootstrap: bound.String(), dataDir: absPath(cfg.DataDir),
+	ready := readyInfo{version: version, kafka: cfg.Version, bootstrap: dialable(bound, cfg.AdvertisedHost), dataDir: absPath(cfg.DataDir),
 		auth: authSummary(cfg), configFile: st.configFile}
 	if cfg.Zone {
 		z = joinZone(ctx, logger)
@@ -314,6 +320,22 @@ func announce(out io.Writer, logger *slog.Logger, cfg config.Config, r readyInfo
 		line("Config", r.configFile, "")
 	}
 	fmt.Fprintln(out)
+}
+
+// dialable is the bound address as something to paste into a client. A wildcard
+// listener's own address ("[::]:9092", "0.0.0.0:9092") is where it listens, not
+// somewhere to connect to; for that the summary gives the advertised host, which
+// is where clients are sent after bootstrapping anyway, and says it is listening
+// on every interface.
+func dialable(bound net.Addr, advertisedHost string) string {
+	host, port, err := net.SplitHostPort(bound.String())
+	if err != nil {
+		return bound.String()
+	}
+	if ip := net.ParseIP(host); host == "" || (ip != nil && ip.IsUnspecified()) {
+		return net.JoinHostPort(advertisedHost, port) + "   (listening on every interface)"
+	}
+	return bound.String()
 }
 
 // absPath is p made absolute for display, or p itself if that fails.

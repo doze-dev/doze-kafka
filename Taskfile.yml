@@ -88,9 +88,14 @@ tasks:
       - go mod tidy
 
   fuzz:
-    desc: Fuzz the wire-protocol decoder for 30s
+    desc: 'Fuzz the wire-protocol decoder: each target for FUZZ_TIME (default 30s)'
+    vars:
+      FUZZ_TIME: '{{.FUZZ_TIME | default "30s"}}'
     cmds:
-      - go test ./internal/protocol/ -run '^$' -fuzz FuzzParseAndDecodeRequest -fuzztime 30s
+      # One target per run: go test refuses -fuzz when it matches more than one.
+      - go test ./internal/protocol/ -run '^$' -fuzz '^FuzzParseAndDecodeRequest$' -fuzztime {{.FUZZ_TIME}}
+      - go test ./internal/protocol/ -run '^$' -fuzz '^FuzzSkipTaggedFields$' -fuzztime {{.FUZZ_TIME}}
+      - go test ./internal/protocol/ -run '^$' -fuzz '^FuzzReadFrame$' -fuzztime {{.FUZZ_TIME}}
 
   soak:
     desc: 'Leak-detection soak: sustained load, no faults (SOAK_DURATION, default 2m)'
@@ -111,4 +116,6 @@ tasks:
   clean:
     desc: Remove build output and local broker data
     cmds:
+      # The metadata database lives inside the data directory. (A ./meta.db is
+      # from before that, and is removed too.)
       - rm -rf bin data meta.db

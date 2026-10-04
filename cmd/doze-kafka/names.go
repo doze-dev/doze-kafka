@@ -13,17 +13,13 @@ package main
 // Names are additive. The configured listen address is the contract and never
 // moves; everything here degrades to a log line.
 //
-// # Why this is shorter than doze-aws's version
+// # Reaching the broker by name
 //
-// doze-aws binds one specific address, so a name it claims needs a second
-// listener on the apex address. The broker's listen address defaults to the
-// WILDCARD (:9092), which already answers on 127.0.0.3 — so kafka.doze:9092
-// works from the claim alone, with no extra listener and no second port. What
-// takes that away is narrowing --listen to a single address, and that case
-// warns rather than fails, because the remedy is the user's to choose.
-//
-// The broker also cannot use a second listener the way doze-aws can: Kafka's
-// protocol.Server accepts exactly one, whereas an http.Server serves many.
+// kafka.doze resolves to the zone's apex address (127.0.0.3). A broker listening
+// on the wildcard (--listen :9092) already answers there. The default listener is
+// loopback (127.0.0.1:9092), which does not, so it gets a second listener on the
+// apex address: same port, same broker (see reachBroker). Anything narrower — a
+// specific LAN address — is the user's choice, and warns rather than fails.
 //
 // # The console is a different transport
 //
@@ -33,8 +29,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/url"
@@ -228,16 +226,17 @@ func (z *zone) close() {
 // doze-aws and does the same work, because the machine setup belongs to the
 // zone rather than to any one binary.
 func runDNSSetup(args []string) int {
-	fs := flag.NewFlagSet("dns-setup", flag.ExitOnError)
-	check := fs.Bool("check", false, "report what is set up, without sudo")
-	uninstall := fs.Bool("uninstall", false, "remove everything dns-setup installed")
-	print := fs.Bool("print", false, "print the privileged script instead of running it")
-	if err := fs.Parse(args); err != nil {
+	mode, print, err := parseDNSSetup(args)
+	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			fmt.Println(dnsSetupUsage)
+			return 0
+		}
+		fmt.Fprintf(os.Stderr, "doze-kafka dns-setup: %v\n%s\n", err, dnsSetupUsage)
 		return 2
 	}
-
-	switch {
-	case *check:
+	switch mode {
+	case "check":
 		st := names.Check()
 		fmt.Printf("%s\n%s", st.Platform, st)
 		if !st.OK() {
@@ -246,18 +245,52 @@ func runDNSSetup(args []string) int {
 			return 1
 		}
 		return 0
-	case *uninstall:
-		if err := names.Uninstall(names.Options{Print: *print}); err != nil {
+	case "uninstall":
+		if err := names.Uninstall(names.Options{Print: print}); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
 	default:
-		if err := names.Install(names.Options{Print: *print}); err != nil {
+		if err := names.Install(names.Options{Print: print}); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
 	}
 	return 0
+}
+
+const dnsSetupUsage = `usage: doze-kafka dns-setup [--check | --uninstall] [--print]
+  (no flag)     install: the resolver entry and loopback aliases for .doze (asks for sudo)
+  --check       report what is set up, changing nothing
+  --uninstall   remove everything dns-setup installed
+  --print       with install or uninstall: print the privileged script instead of running it`
+
+// parseDNSSetup decides what `dns-setup` was asked to do: "install", "check" or
+// "uninstall". It refuses anything it does not understand, because the default
+// action changes the machine and asks for sudo: `dns-setup extra --check` used to
+// stop reading at "extra", never see --check, and run the installer.
+func parseDNSSetup(args []string) (mode string, print bool, err error) {
+	fs := flag.NewFlagSet("dns-setup", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	check := fs.Bool("check", false, "")
+	uninstall := fs.Bool("uninstall", false, "")
+	fs.BoolVar(&print, "print", false, "")
+	if err := fs.Parse(args); err != nil {
+		return "", false, flagError(fs, err)
+	}
+	switch {
+	case fs.NArg() > 0:
+		return "", false, fmt.Errorf("unexpected argument %q", fs.Arg(0))
+	case *check && *uninstall:
+		return "", false, errors.New("--check and --uninstall cannot be combined")
+	case *check && print:
+		return "", false, errors.New("--check runs nothing privileged, so there is no script for --print to show")
+	case *check:
+		return "check", false, nil
+	case *uninstall:
+		return "uninstall", print, nil
+	}
+	return "install", print, nil
 }
 
 // defaultBrokerAddr is the address the docs promise, for the one message that

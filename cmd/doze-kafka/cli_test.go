@@ -134,7 +134,7 @@ func TestConfigErrorsShareOneShapeAndExitCode(t *testing.T) {
 		{[]string{"--kafka-version", "9"}, "unsupported Kafka version"},
 		{[]string{"--sasl-user", "alice:pw"}, "no mechanism is enabled"},
 		{[]string{"--sasl-mechanisms", "PLAIN"}, "no credentials"},
-		{[]string{"--no-such-flag"}, "not defined"},
+		{[]string{"--no-such-flag"}, "unknown flag --no-such-flag"},
 		{[]string{"--tls-cert", "x.pem"}, "TLS needs both"},
 		{[]string{"--console-addr", "nope"}, "console address"},
 	} {

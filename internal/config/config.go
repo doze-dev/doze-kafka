@@ -4,6 +4,7 @@ package config
 import (
 	"crypto/tls"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -210,8 +211,23 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: retention-bytes must be non-negative (0 disables), got %d", c.RetentionBytes)
 	case c.RetentionMs < 0:
 		return fmt.Errorf("config: retention-ms must be non-negative (0 disables), got %d", c.RetentionMs)
+	case c.RetentionMs > maxRetentionMs:
+		// As a time.Duration this overflows to a negative age, which read as
+		// "retention off": a number meant to keep everything for ever kept nothing
+		// bounded, and a typo'd one did the same without a word.
+		return fmt.Errorf("config: retention-ms %d is too large (the most is %d, about 292 years); use 0 to keep records for ever", c.RetentionMs, maxRetentionMs)
 	case c.FsyncInterval < 0:
 		return fmt.Errorf("config: fsync-interval must be non-negative (0 disables), got %s", c.FsyncInterval)
+	case c.FsyncInterval > 0 && c.FsyncInterval < time.Millisecond:
+		return fmt.Errorf("config: fsync-interval %s is below 1ms; a bare number is nanoseconds, so write a unit (500ms, 2s), or 0 to disable", c.FsyncInterval)
+	case c.AdvertisedPort < 0 || c.AdvertisedPort > 65535:
+		return fmt.Errorf("config: advertised-port %d is not a port (1–65535, or 0 for the port actually bound)", c.AdvertisedPort)
+	case !validAdvertisedHost(c.AdvertisedHost):
+		return fmt.Errorf("config: advertised-host %q is not a host name or an IP address (no scheme, port or spaces; the port is --advertised-port)", c.AdvertisedHost)
+	case c.ConsumerSessionTimeout <= 0:
+		return fmt.Errorf("config: consumer-session-timeout must be positive, got %s (a member would be evicted the moment it joined)", c.ConsumerSessionTimeout)
+	case c.PprofAddr != "" && !validHostPort(c.PprofAddr):
+		return fmt.Errorf("config: pprof address %q is not host:port (for example 127.0.0.1:6060)", c.PprofAddr)
 	}
 
 	if !c.AuthEnabled() && len(c.Credentials) > 0 {
@@ -238,7 +254,29 @@ func (c Config) Validate() error {
 	if (c.TLSCertFile == "") != (c.TLSKeyFile == "") {
 		return fmt.Errorf("config: TLS needs both --tls-cert and --tls-key, or neither")
 	}
+	// Loaded here, with everything else that can be wrong, so a missing or
+	// mismatched certificate is reported before anything starts (and by `config
+	// print`) rather than as a failure after the data directory has been opened.
+	if _, err := c.TLSConfig(); err != nil {
+		return err
+	}
 	return nil
+}
+
+// maxRetentionMs is the longest retention that fits in a time.Duration.
+const maxRetentionMs = math.MaxInt64 / int64(time.Millisecond)
+
+// validAdvertisedHost reports whether h can be handed to clients as the host to
+// dial: a host name or an IP address, with nothing else attached. "localhost:9092"
+// and "http://host" were accepted, and every client then failed to resolve them.
+func validAdvertisedHost(h string) bool {
+	if h == "" || strings.ContainsAny(h, " \t/@") || strings.Contains(h, "://") {
+		return false
+	}
+	if net.ParseIP(h) != nil {
+		return true
+	}
+	return !strings.Contains(h, ":") // a colon that is not an IPv6 address is a port.
 }
 
 // AuthEnabled reports whether SASL authentication is configured.
@@ -255,7 +293,7 @@ func (c Config) TLSConfig() (*tls.Config, error) {
 	}
 	cert, err := tls.LoadX509KeyPair(c.TLSCertFile, c.TLSKeyFile)
 	if err != nil {
-		return nil, fmt.Errorf("config: load TLS keypair: %w", err)
+		return nil, fmt.Errorf("config: cannot load the TLS certificate and key (--tls-cert %s, --tls-key %s): %w", c.TLSCertFile, c.TLSKeyFile, err)
 	}
 	return &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}, nil
 }

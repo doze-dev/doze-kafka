@@ -55,8 +55,8 @@ EOF
 }
 
 # uninstall removes the installed binary and the PATH entry the installer added. It
-# deliberately does NOT touch broker data (data-dir/meta-db live in your working
-# directories, not here).
+# deliberately does NOT touch broker data (a data directory lives wherever you
+# ran the broker, not here).
 uninstall() {
 	removed=0
 	if [ -d "$INSTALL_DIR" ]; then
@@ -85,7 +85,7 @@ uninstall() {
 		echo "Nothing to uninstall (looked in $INSTALL_DIR and your shell profiles)."
 	else
 		echo "Uninstalled. Open a new shell to refresh your PATH."
-		echo "Your data (data-dir/meta-db, by default ./data and ./meta.db) was left untouched."
+		echo "Your data (by default ./data, wherever you ran the broker) was left untouched."
 	fi
 }
 

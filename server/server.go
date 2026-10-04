@@ -22,6 +22,7 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -42,12 +43,14 @@ import (
 )
 
 // Options configures an embedded broker. Zero values pick doze-kafka's
-// defaults (see config.Default); only DataDir is effectively required.
+// defaults; only DataDir must be set.
 type Options struct {
 	// Version is the Kafka major to emulate (1–4); 0 uses the default.
 	Version int
 
-	// DataDir holds partition logs. Required.
+	// DataDir holds partition logs, and by default the metadata database.
+	// Required: New fails without it rather than writing to ./data in whatever
+	// directory the calling program happens to be started from.
 	DataDir string
 	// MetaDB is the metadata database path; empty defaults to
 	// <DataDir>/meta.db so a single DataDir is self-contained.
@@ -98,16 +101,18 @@ type Options struct {
 
 // Server is an embedded broker. Construct with New, then Serve.
 type Server struct {
-	cfg   config.Config
-	log   *slog.Logger
-	meta  meta.Store
-	logs  *log.Manager
-	srv   *protocol.Server
-	b     *broker.Broker
-	extLn net.Listener
+	cfg  config.Config
+	log  *slog.Logger
+	meta meta.Store
+	logs *log.Manager
+	srv  *protocol.Server
+	b    *broker.Broker
+	tls  bool // the listener terminates TLS, from cert files or Options.TLSConfig.
 
-	mu    sync.Mutex
-	bound net.Addr // set by Bind.
+	mu      sync.Mutex
+	bound   net.Addr // set by Bind.
+	claimed bool     // Serve or ServeListener has been called.
+	closed  bool     // Close has been called.
 
 	dirLock io.Closer // held for the life of the server: one broker per data directory.
 
@@ -121,18 +126,19 @@ type Server struct {
 // New validates the options and opens storage + broker + router. It does not
 // bind a listener yet — call Serve (or Bind) to start accepting.
 func New(opts Options) (*Server, error) {
+	if opts.DataDir == "" {
+		return nil, errors.New("server: Options.DataDir is required (a test can use t.TempDir())")
+	}
 	cfg := config.Default()
 	if opts.Version != 0 {
 		cfg.Version = opts.Version
 	}
-	if opts.DataDir != "" {
-		cfg.DataDir = opts.DataDir
-	}
+	cfg.DataDir = opts.DataDir
 	cfg.MetaDB = opts.MetaDB // empty is resolved to <DataDir>/meta.db by NewFromConfig.
-	// An embedder asked for no particular address; the CLI default (the :9092
-	// wildcard) is the wrong answer for a library, which would fight over a fixed
-	// port with every other test run and listen on every interface. Loopback on
-	// an ephemeral port is always free and never exposed — Addr reports it.
+	// An embedder asked for no particular address; the CLI default (port 9092) is
+	// the wrong answer for a library, which would fight over a fixed port with
+	// every other test run. Loopback on an ephemeral port is always free and
+	// never exposed — Addr reports it.
 	cfg.ListenAddr = "127.0.0.1:0"
 	if opts.ListenAddr != "" {
 		cfg.ListenAddr = opts.ListenAddr
@@ -175,6 +181,7 @@ func New(opts Options) (*Server, error) {
 	// thing NewFromConfig can't see, so apply it here.
 	if opts.TLSConfig != nil {
 		s.srv.UseTLS(opts.TLSConfig)
+		s.tls = true
 	}
 	return s, nil
 }
@@ -255,7 +262,7 @@ func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	if cfg.AuthEnabled() {
 		srv.RequireAuth()
 	}
-	return &Server{cfg: cfg, log: logger, meta: metaStore, logs: logs, srv: srv, b: b, dirLock: dirLock, ready: make(chan struct{})}, nil
+	return &Server{cfg: cfg, log: logger, meta: metaStore, logs: logs, srv: srv, b: b, tls: cfg.TLSEnabled(), dirLock: dirLock, ready: make(chan struct{})}, nil
 }
 
 // reconcileDisk makes the data directory and the registry agree at start-up.
@@ -292,7 +299,8 @@ func reconcileDisk(cfg config.Config, logger *slog.Logger, logs *log.Manager, st
 }
 
 // Bind opens the TCP listener without accepting and returns the bound address
-// (useful with a ":0" ListenAddr). Ignored when ServeListener is used.
+// (useful with a ":0" ListenAddr). Serve does this itself if it was not called;
+// it is not used with ServeListener.
 func (s *Server) Bind(ctx context.Context) (net.Addr, error) {
 	addr, err := s.srv.Bind(ctx)
 	if err != nil {
@@ -316,8 +324,10 @@ func (s *Server) Ready() <-chan struct{} { return s.ready }
 
 // AlsoListen opens another TCP listener, on addr, that serves this same broker —
 // for a second address the broker should answer on (the shared .doze zone's
-// kafka.doze, say) when the main one is narrower than the wildcard. Call it after
-// Bind and before Serve. Clients are still told the main listener's port.
+// kafka.doze, say) when the main one is narrower than the wildcard. Call it
+// before Serve: once Serve has started it returns an error, because Serve is what
+// starts accepting on each listener. Clients are still told the main listener's
+// port.
 func (s *Server) AlsoListen(ctx context.Context, addr string) (net.Addr, error) {
 	return s.srv.AlsoListen(ctx, addr)
 }
@@ -332,13 +342,16 @@ func (s *Server) Addr() net.Addr {
 }
 
 // Serve accepts connections until ctx is cancelled, drains in-flight
-// connections, then flushes partition logs and closes the metadata store.
+// connections, then flushes partition logs and closes the metadata store. A
+// Server is served once: a second call (or a call after Close) returns an error
+// and leaves the first undisturbed.
 func (s *Server) Serve(ctx context.Context) (err error) {
+	if err := s.claim(); err != nil {
+		return err
+	}
 	defer s.closeStorage(&err)
 	defer s.markReady()
-	if s.extLn != nil {
-		s.srv.UseListener(s.extLn)
-	} else if s.Addr() == nil {
+	if s.Addr() == nil {
 		// Bind here rather than letting protocol.Server do it, so the broker
 		// learns the real port before the first client connects.
 		if _, err := s.Bind(ctx); err != nil {
@@ -350,15 +363,40 @@ func (s *Server) Serve(ctx context.Context) (err error) {
 
 // ServeListener is Serve on a caller-provided listener — the doze module passes
 // a unix-socket listener the proxy splices TCP clients onto. Kafka framing is
-// transport-agnostic, so this works unmodified.
+// transport-agnostic, so this works unmodified. With a TCP listener, clients are
+// told its port (unless AdvertisedPort says otherwise), as with Serve.
 func (s *Server) ServeListener(ctx context.Context, ln net.Listener) (err error) {
+	if err := s.claim(); err != nil {
+		return err
+	}
+	defer s.closeStorage(&err)
+	defer s.markReady()
 	s.srv.UseListener(ln)
+	if _, ok := ln.Addr().(*net.TCPAddr); ok {
+		// Metadata used to advertise the default port (9092) for a listener the
+		// broker did not bind itself, so a client that bootstrapped fine was then
+		// sent to a port nothing was listening on.
+		s.b.SetBoundAddr(ln.Addr())
+	}
 	s.mu.Lock()
 	s.bound = ln.Addr()
 	s.mu.Unlock()
 	s.markReady()
-	defer s.closeStorage(&err)
 	return s.srv.Serve(ctx)
+}
+
+// claim marks the server as being served, once.
+func (s *Server) claim() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	switch {
+	case s.closed:
+		return errors.New("server: Serve called after Close")
+	case s.claimed:
+		return errors.New("server: already serving; a Server is served once")
+	}
+	s.claimed = true
+	return nil
 }
 
 // closeStorage flushes and closes the partition logs and the metadata store, and
@@ -383,13 +421,23 @@ func (s *Server) closeStorage(err *error) {
 	}
 }
 
-// Close releases the storage of a server that was built but never served — a
-// start-up step failed after New succeeded, say. It is safe to call more than
+// Close releases everything a server holds that was built but never served — a
+// start-up step failed after New or Bind succeeded, say: the listeners it bound,
+// its storage and the lock on its data directory. It is safe to call more than
 // once and after Serve (which closes storage itself). To stop a server that is
 // serving, cancel the context passed to Serve instead.
 func (s *Server) Close() error {
+	s.mu.Lock()
+	s.closed = true
+	s.mu.Unlock()
+	// The listeners first: Bind opens one, and it used to stay bound (and
+	// accepting into a backlog nobody served) for the life of the process.
+	lerr := s.srv.Close()
 	var err error
 	s.closeStorage(&err)
+	if err == nil {
+		err = lerr
+	}
 	return err
 }
 
@@ -412,7 +460,7 @@ func (s *Server) Config() Config {
 		KafkaVersion: s.cfg.Version, ListenAddr: s.cfg.ListenAddr,
 		AdvertisedHost: s.cfg.AdvertisedHost, AdvertisedPort: s.cfg.AdvertisedPort,
 		DataDir: s.cfg.DataDir, MetaDB: s.cfg.MetaDB,
-		SASL: s.cfg.AuthEnabled(), TLS: s.cfg.TLSEnabled(),
+		SASL: s.cfg.AuthEnabled(), TLS: s.tls,
 	}
 }
 

@@ -33,17 +33,37 @@ var (
 // convention of printing the program's version; the old use is --kafka-version.
 // A --version with a number is still understood and rewritten, with a notice, so
 // existing scripts keep working while they are updated.
+//
+// Only flags are looked at. The word after a flag that takes a value is that
+// value, whatever it looks like: `--data-dir -v` names a directory called "-v",
+// and used to print the version instead.
 func normalizeArgs(args []string) (out []string, showVersion bool, notices []string) {
 	isNumber := func(s string) bool { _, err := strconv.Atoi(s); return err == nil }
+	d := config.Default()
+	fs, _ := newFlagSet(&d)
+	takesValue := func(name string) bool {
+		f := fs.Lookup(name)
+		if f == nil {
+			return false
+		}
+		b, isBool := f.Value.(interface{ IsBoolFlag() bool })
+		return !isBool || !b.IsBoolFlag()
+	}
 	for i := 0; i < len(args); i++ {
 		a := args[i]
-		if a == "--" {
+		if a == "--" || !strings.HasPrefix(a, "-") || a == "-" {
+			// "--" ends the flags, and so does the first bare word: the flag
+			// package stops there too.
 			out = append(out, args[i:]...)
 			break
 		}
 		name, val, hasVal := strings.Cut(strings.TrimLeft(a, "-"), "=")
-		if !strings.HasPrefix(a, "-") || (name != "version" && name != "v") {
+		if name != "version" && name != "v" {
 			out = append(out, a)
+			if !hasVal && takesValue(name) && i+1 < len(args) {
+				i++
+				out = append(out, args[i])
+			}
 			continue
 		}
 		switch {
@@ -138,11 +158,13 @@ func loadConfig(args []string) (startup, error) {
 	}
 
 	probe := config.Default()
-	configPath, err := parseFlags(args, &probe)
+	configPath, configSet, err := parseFlags(args, &probe)
 	if err != nil {
 		return startup{}, err
 	}
-	if configPath == "" {
+	// Without --config, a doze-kafka.toml in the working directory is used. An
+	// explicit --config "" means "no file", and is how to ignore that one.
+	if !configSet {
 		if _, err := os.Stat(config.DefaultConfigFile); err == nil {
 			configPath = config.DefaultConfigFile
 		}
@@ -154,7 +176,7 @@ func loadConfig(args []string) (startup, error) {
 			return startup{}, err
 		}
 	}
-	if _, err = parseFlags(args, &c); err != nil {
+	if _, _, err = parseFlags(args, &c); err != nil {
 		return startup{}, err
 	}
 	if n := c.ResolveMetaDB(); n != "" {
@@ -167,18 +189,94 @@ func loadConfig(args []string) (startup, error) {
 }
 
 // parseFlags binds the flags onto dst and parses args, returning the --config
-// path (if any). The flags' defaults are dst's current field values, so keys
-// already set from a config file survive unless the corresponding flag is
-// explicitly passed.
-func parseFlags(args []string, dst *config.Config) (configPath string, err error) {
+// path and whether --config was given at all. The flags' defaults are dst's
+// current field values, so keys already set from a config file survive unless the
+// corresponding flag is explicitly passed.
+func parseFlags(args []string, dst *config.Config) (configPath string, configSet bool, err error) {
 	fs, path := newFlagSet(dst)
 	if err := fs.Parse(args); err != nil {
-		return "", err
+		return "", false, flagError(fs, err)
 	}
 	if fs.NArg() > 0 {
-		return "", unexpectedArgument(fs, fs.Arg(0))
+		return "", false, unexpectedArgument(fs, fs.Arg(0))
 	}
-	return *path, nil
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "config" {
+			configSet = true
+		}
+	})
+	return *path, configSet, nil
+}
+
+// flagError rewords the flag package's errors. Its own name flags with one dash
+// ("flag provided but not defined: -listn"), which is not how they are written
+// here or in --help, and it has nothing to say about a near miss.
+func flagError(fs *flag.FlagSet, err error) error {
+	if errors.Is(err, flag.ErrHelp) {
+		return err
+	}
+	msg := err.Error()
+	if name, ok := strings.CutPrefix(msg, "flag provided but not defined: -"); ok {
+		name = strings.TrimLeft(name, "-")
+		if near := nearestFlag(fs, name); near != "" {
+			return fmt.Errorf("unknown flag --%s — did you mean --%s?", name, near)
+		}
+		return fmt.Errorf("unknown flag --%s", name)
+	}
+	if name, ok := strings.CutPrefix(msg, "flag needs an argument: -"); ok {
+		return fmt.Errorf("--%s needs a value", strings.TrimLeft(name, "-"))
+	}
+	if rest, ok := strings.CutPrefix(msg, "invalid value "); ok {
+		// invalid value "x" for flag -name: reason
+		if val, tail, ok := strings.Cut(rest, " for flag -"); ok {
+			name, reason, _ := strings.Cut(tail, ": ")
+			return fmt.Errorf("--%s: %s is not a valid value (%s)", strings.TrimLeft(name, "-"), val, reason)
+		}
+	}
+	if rest, ok := strings.CutPrefix(msg, "invalid boolean value "); ok {
+		if val, name, ok := strings.Cut(rest, " for -"); ok {
+			name, _, _ = strings.Cut(name, ":")
+			return fmt.Errorf("--%s: %s is not true or false", strings.TrimLeft(name, "-"), val)
+		}
+	}
+	return err
+}
+
+// nearestFlag is the flag closest to name, if any is close: a shared prefix of
+// three or more letters, or a letter or two different.
+func nearestFlag(fs *flag.FlagSet, name string) string {
+	best, bestDist := "", 3
+	fs.VisitAll(func(f *flag.Flag) {
+		if len(name) >= 3 && strings.HasPrefix(f.Name, name) && best == "" {
+			best, bestDist = f.Name, 0
+			return
+		}
+		if d := editDistance(name, f.Name); d < bestDist {
+			best, bestDist = f.Name, d
+		}
+	})
+	return best
+}
+
+// editDistance is the Levenshtein distance between a and b.
+func editDistance(a, b string) int {
+	prev := make([]int, len(b)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		cur := make([]int, len(b)+1)
+		cur[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := 1
+			if a[i-1] == b[j-1] {
+				cost = 0
+			}
+			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
+		}
+		prev = cur
+	}
+	return prev[len(b)]
 }
 
 // newFlagSet registers every flag onto dst. Errors and usage are not printed by
@@ -186,7 +284,7 @@ func parseFlags(args []string, dst *config.Config) (configPath string, err error
 func newFlagSet(dst *config.Config) (*flag.FlagSet, *string) {
 	fs := flag.NewFlagSet("doze-kafka", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	path := fs.String("config", "", "path to a TOML config file (default: ./doze-kafka.toml if present)")
+	path := fs.String("config", "", "path to a TOML config file (default: ./doze-kafka.toml if present; \"\" to use none)")
 	registerFlags(fs, dst)
 	return fs, path
 }
