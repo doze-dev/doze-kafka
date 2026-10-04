@@ -16,7 +16,7 @@ kafka-version = 4
 # --- network -------------------------------------------------------------------
 
 listen = "127.0.0.1:9092" # host:port the broker listens on. ":9092" accepts other machines and containers.
-advertised-host = "localhost" # host returned to clients in Metadata responses.
+# advertised-host = "localhost" # host returned to clients in Metadata. Unset, it is the listen address itself ("127.0.0.1"), or "localhost" when listening on every interface.
 advertised-port = 0       # port advertised to clients; 0 = the port actually bound.
 
 # --- storage -------------------------------------------------------------------

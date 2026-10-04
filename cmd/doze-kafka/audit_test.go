@@ -73,7 +73,6 @@ func TestSettingsAreValidatedBeforeAnythingStarts(t *testing.T) {
 		{[]string{"--advertised-port", "-1"}, "advertised-port"},
 		{[]string{"--advertised-host", "localhost:9092"}, "advertised-host"},
 		{[]string{"--advertised-host", "http://broker"}, "advertised-host"},
-		{[]string{"--advertised-host", ""}, "advertised-host"},
 		{[]string{"--consumer-session-timeout", "0"}, "consumer-session-timeout"},
 		{[]string{"--consumer-session-timeout", "-5s"}, "consumer-session-timeout"},
 		{[]string{"--retention-ms", "9223372036854775807"}, "retention-ms"},

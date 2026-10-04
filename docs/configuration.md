@@ -77,7 +77,7 @@ where this one says `kafka-version`; that spelling is still read.
 | Flag | Default | Meaning |
 |---|---|---|
 | `--listen` | `127.0.0.1:9092` | `host:port` to accept connections on. The default is **loopback only**: nothing on your network can reach an unauthenticated development broker. Use `:9092` to accept connections from other machines or containers (and read the note on `--advertised-host` below). Use `127.0.0.1:0` for a free port. |
-| `--advertised-host` | `localhost` | Host returned to clients in Metadata: a host name or an IP address, without a port. **This is the address clients actually reconnect to** — see the note below. |
+| `--advertised-host` | *derived* | Host returned to clients in Metadata: a host name or an IP address, without a port. **This is the address clients actually reconnect to** — see the note below. Unset, it follows `--listen`: a specific address is advertised as itself (`127.0.0.1` by default), and a wildcard (`:9092`) as `localhost`. |
 | `--advertised-port` | `0` | Port advertised to clients. `0` means the port actually bound, which is right even with `:0`. |
 
 ### Storage
@@ -223,8 +223,12 @@ broker cleanly: it stops accepting, flushes the logs and exits 0. With
 ## A note on `--advertised-host`
 
 Kafka clients connect to a bootstrap address, ask the broker for Metadata, and then
-**reconnect to whatever host and port the broker advertises**. By default that's
-`localhost:<bound-port>`, which is right for a client on the same machine.
+**reconnect to whatever host and port the broker advertises**. By default that follows
+`--listen`: `127.0.0.1:<bound-port>` for the default loopback listener, which is right
+for a client on the same machine, and `localhost:<port>` when listening on every
+interface. (It is the address and not the name `localhost` for a loopback listener
+because that name can resolve to `::1` first, where nothing is listening, and not every
+client goes on to try the other address: kcat stops at the first refusal.)
 
 If a client connects from elsewhere — another container, another host, a VM — it must
 be able to reach the *advertised* address, not just the bootstrap one. Listen beyond

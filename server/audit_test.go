@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/kmsg"
 
 	"github.com/doze-dev/doze-kafka/server"
 )
@@ -292,4 +293,39 @@ func TestChurn_ServersComeAndGoOverOneDirectoryAndMany(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+// Metadata tells a client where to reconnect. For a broker on 127.0.0.1 that is
+// 127.0.0.1, not the name "localhost", which can resolve to ::1 first.
+func TestMetadataAdvertisesTheAddressTheBrokerListensOn(t *testing.T) {
+	srv := mustNew(t, server.Options{})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- srv.Serve(ctx) }()
+	t.Cleanup(func() { cancel(); <-done })
+	<-srv.Ready()
+
+	cl, err := kgo.NewClient(kgo.SeedBrokers(srv.Addr().String()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cl.Close()
+	rctx, rcancel := context.WithTimeout(ctx, 5*time.Second)
+	defer rcancel()
+	resp, err := kmsg.NewPtrMetadataRequest().RequestWith(rctx, cl)
+	if err != nil || len(resp.Brokers) != 1 {
+		t.Fatalf("Metadata: %v %+v", err, resp)
+	}
+	if got := resp.Brokers[0].Host; got != "127.0.0.1" {
+		t.Errorf("a broker listening on 127.0.0.1 advertises %q", got)
+	}
+	if got := srv.Config().AdvertisedHost; got != "127.0.0.1" {
+		t.Errorf("Config().AdvertisedHost = %q", got)
+	}
+
+	set := mustNew(t, server.Options{AdvertisedHost: "kafka.test"})
+	defer set.Close()
+	if got := set.Config().AdvertisedHost; got != "kafka.test" {
+		t.Errorf("an advertised host that was set became %q", got)
+	}
 }

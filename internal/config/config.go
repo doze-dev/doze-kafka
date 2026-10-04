@@ -41,7 +41,7 @@ type Config struct {
 
 	// Network.
 	ListenAddr     string // host:port the broker listens on.
-	AdvertisedHost string // host returned to clients in Metadata responses.
+	AdvertisedHost string // host returned to clients in Metadata responses; "" means derive it from ListenAddr (see ResolveAdvertisedHost).
 	AdvertisedPort int    // port returned to clients; 0 means "derive from ListenAddr".
 
 	// Storage.
@@ -108,7 +108,7 @@ func Default() Config {
 	return Config{
 		Version:                MaxKafkaMajor,
 		ListenAddr:             defaultListenAddr,
-		AdvertisedHost:         "localhost",
+		AdvertisedHost:         "", // derived from the listen address: see ResolveAdvertisedHost.
 		DataDir:                DefaultDataDir,
 		MetaDB:                 "", // empty = <data-dir>/meta.db; see ResolveMetaDB.
 		SegmentBytes:           defaultSegmentBytes,
@@ -128,6 +128,36 @@ func Default() Config {
 
 // DefaultDataDir is where a bare `doze-kafka` keeps its data.
 const DefaultDataDir = "./data"
+
+// ResolveAdvertisedHost fills in AdvertisedHost when it was not given, from where
+// the broker listens: a client is told to reconnect to an address that actually
+// reaches the listener.
+//
+//   - a loopback address is advertised as itself ("127.0.0.1", "::1"). It used to be
+//     "localhost" whatever the listener was, and on a machine where that name
+//     resolves to ::1 before 127.0.0.1, a client of a 127.0.0.1 listener was sent
+//     to a port nothing listened on, and tools built on librdkafka (kcat among them)
+//     gave up at the first refusal instead of trying the other address.
+//   - another specific address is advertised as itself: "localhost" would not reach it.
+//   - the wildcard (":9092") listens on every address, loopback included, so
+//     "localhost" is right.
+//
+// An advertised host that was set is never changed.
+func (c *Config) ResolveAdvertisedHost() {
+	if c.AdvertisedHost != "" {
+		return
+	}
+	c.AdvertisedHost = "localhost"
+	host, _, err := net.SplitHostPort(c.ListenAddr)
+	if err != nil {
+		return
+	}
+	if ip := net.ParseIP(host); ip != nil && !ip.IsUnspecified() {
+		c.AdvertisedHost = ip.String()
+	} else if host == "localhost" {
+		c.AdvertisedHost = "127.0.0.1" // that is what the listener binds to.
+	}
+}
 
 // MetaDBFile is the metadata database's file name inside the data directory.
 const MetaDBFile = "meta.db"
@@ -225,7 +255,7 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: fsync-interval %s is below 1ms; a bare number is nanoseconds, so write a unit (500ms, 2s), or 0 to disable", c.FsyncInterval)
 	case c.AdvertisedPort < 0 || c.AdvertisedPort > 65535:
 		return fmt.Errorf("config: advertised-port %d is not a port (1–65535, or 0 for the port actually bound)", c.AdvertisedPort)
-	case !validAdvertisedHost(c.AdvertisedHost):
+	case c.AdvertisedHost != "" && !validAdvertisedHost(c.AdvertisedHost): // "" is "derive it": see ResolveAdvertisedHost.
 		return fmt.Errorf("config: advertised-host %q is not a host name or an IP address (no scheme, port or spaces; the port is --advertised-port)", c.AdvertisedHost)
 	case c.ConsumerSessionTimeout <= 0:
 		return fmt.Errorf("config: consumer-session-timeout must be positive, got %s (a member would be evicted the moment it joined)", c.ConsumerSessionTimeout)

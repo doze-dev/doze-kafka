@@ -48,6 +48,12 @@ handling), answering "does it work when someone actually runs it."
   closes the connection (fail fast) instead of hanging the client, and is never
   decoded or served: `TestUnhandledAPI_ClosesConnectionNotHang` and
   `TestOnlyAdvertisedAPIsAndVersionsAreServed`.
+- **librdkafka**: `scripts/kcat-check.sh` runs kcat against the built binary (plain and
+  SASL/PLAIN): metadata, produce with keys and headers, consume, a group that commits
+  and resumes, 500 records in order, and a wrong password refused. CI runs it
+  (`kcat.yml`); locally it is `go tool task test:kcat`. It found that a broker on
+  127.0.0.1 advertised "localhost", which kcat could not follow on a machine where that
+  name resolves to ::1 first.
 - **The console in a browser**: 50 Playwright tests in `e2e/` drive a real Chromium
   against the real binary (a fresh data directory, a seeded broker): navigation and
   Back, the theme, the palette, the drawer, live updates and Pause, the composer, search,

@@ -1,0 +1,29 @@
+name: kcat
+
+# librdkafka, through kcat, against the real binary. It shares no code with the Go
+# clients the other tests use, and it is what scripts and CI jobs reach for: metadata,
+# produce with keys and headers, consume, a group that commits and resumes, and SASL.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  kcat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Install kcat
+        run: sudo apt-get update && sudo apt-get install -y kcat
+      - name: Build
+        run: go build -o doze-kafka ./cmd/doze-kafka
+      - name: kcat checks
+        run: scripts/kcat-check.sh ./doze-kafka

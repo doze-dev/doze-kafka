@@ -182,6 +182,7 @@ func loadConfig(args []string) (startup, error) {
 	if n := c.ResolveMetaDB(); n != "" {
 		notices = append(notices, n)
 	}
+	c.ResolveAdvertisedHost()
 	if err := c.Validate(); err != nil {
 		return startup{}, err
 	}
@@ -314,7 +315,7 @@ func unexpectedArgument(fs *flag.FlagSet, arg string) error {
 func registerFlags(fs *flag.FlagSet, cfg *config.Config) {
 	// Network.
 	fs.StringVar(&cfg.ListenAddr, "listen", cfg.ListenAddr, "host:port to listen on; use :9092 to accept connections from other machines or containers")
-	fs.StringVar(&cfg.AdvertisedHost, "advertised-host", cfg.AdvertisedHost, "host advertised to clients in Metadata")
+	fs.StringVar(&cfg.AdvertisedHost, "advertised-host", cfg.AdvertisedHost, "host advertised to clients in Metadata (default: derived from --listen: the address itself, or localhost for a wildcard)")
 	fs.IntVar(&cfg.AdvertisedPort, "advertised-port", cfg.AdvertisedPort, "port advertised to clients (0 = the port actually bound)")
 
 	// Storage.

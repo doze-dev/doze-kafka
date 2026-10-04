@@ -95,6 +95,12 @@ tasks:
       - bunx playwright install chromium
       - bunx playwright test
 
+  test:kcat:
+    desc: 'kcat (librdkafka) against the real binary; needs kcat installed'
+    cmds:
+      - go build -o bin/doze-kafka ./cmd/doze-kafka
+      - scripts/kcat-check.sh bin/doze-kafka
+
   fuzz:
     desc: 'Fuzz the wire-protocol decoder: each target for FUZZ_TIME (default 30s)'
     vars:

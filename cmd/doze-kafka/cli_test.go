@@ -265,3 +265,17 @@ kafka-version = 3
 		t.Error("errHelp should be flag.ErrHelp")
 	}
 }
+
+// The effective configuration shows the advertised host that will be used, not a blank.
+func TestConfigPrintShowsTheDerivedAdvertisedHost(t *testing.T) {
+	t.Chdir(t.TempDir())
+	for args, want := range map[string]string{"": `advertised-host = "127.0.0.1"`, ":9092": `advertised-host = "localhost"`} {
+		argv := []string{"config", "print"}
+		if args != "" {
+			argv = append(argv, "--listen", args)
+		}
+		if code, out, errOut := run3(argv...); code != 0 || !strings.Contains(out, want) {
+			t.Errorf("config print %v: code %d, %q; want it to contain %q (%s)", argv, code, out, want, errOut)
+		}
+	}
+}

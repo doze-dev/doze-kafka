@@ -7,7 +7,7 @@ broker. Here are the common ones and their fixes.
 
 Almost always an **advertised address** problem. A client bootstraps to the address
 you gave it, asks for Metadata, then reconnects to the host/port the broker
-*advertises*. By default that's `localhost:<port>` — perfect for a client on the same
+*advertises*. By default that's `127.0.0.1:<port>` (or `localhost:<port>` when listening on every interface) — perfect for a client on the same
 machine, wrong for one somewhere else.
 
 If your client runs in another container, VM, or host, set `--advertised-host` (and

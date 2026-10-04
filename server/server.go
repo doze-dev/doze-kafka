@@ -199,6 +199,7 @@ func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	if cfg.MetaDB == "" {
 		cfg.MetaDB = filepath.Join(cfg.DataDir, config.MetaDBFile)
 	}
+	cfg.ResolveAdvertisedHost()
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
