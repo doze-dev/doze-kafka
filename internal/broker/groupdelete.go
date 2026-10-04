@@ -98,9 +98,14 @@ func (b *Broker) handleOffsetDelete(ctx context.Context, req *protocol.Request) 
 			switch {
 			case active:
 				rp.ErrorCode = int16(protocol.ErrGroupSubscribedToTopic)
-			case !topicOK || p.Partition < 0 || p.Partition >= topic.Partitions:
+			case (!topicOK || p.Partition < 0 || p.Partition >= topic.Partitions) && !b.hasOffset(odr.Group, t.Topic, p.Partition):
 				rp.ErrorCode = int16(protocol.ErrUnknownTopicOrPart)
 			default:
+				// Including an offset whose topic is gone. Kafka answers
+				// UNKNOWN_TOPIC_OR_PARTITION there, but it also never keeps such an
+				// offset; a data directory from an earlier version of this broker
+				// can hold one, and refusing left no way to remove it short of
+				// deleting the whole group.
 				if err := b.meta.DeleteOffset(odr.Group, t.Topic, p.Partition); err != nil {
 					rp.ErrorCode = int16(protocol.ErrUnknownServer)
 				}
@@ -110,4 +115,10 @@ func (b *Broker) handleOffsetDelete(ctx context.Context, req *protocol.Request) 
 		resp.Topics = append(resp.Topics, rt)
 	}
 	return protocol.EncodeResponse(req.Header, resp), nil
+}
+
+// hasOffset reports whether the group has a committed offset stored for the partition.
+func (b *Broker) hasOffset(group, topic string, partition int32) bool {
+	_, ok, err := b.meta.FetchOffset(group, topic, partition)
+	return err == nil && ok
 }

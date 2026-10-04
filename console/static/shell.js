@@ -232,7 +232,7 @@
     closeDrawer(false);
     var panel = document.getElementById("compose-panel");
     if (!panel) return;
-    setDock(true, true);
+    setDock(true);
     var form = panel.querySelector("form");
     var st = window.Alpine ? Alpine.$data(form) : null;
     var key = form.querySelector('input[name="key"]');
@@ -425,11 +425,19 @@
       currentSection = section;
       if (window.Alpine && Alpine.store("filter")) Alpine.store("filter").q = "";
     }
-    // Pausing is about the page you paused. It used to follow you to the next
-    // one, where a group page (which has no pause control) sat frozen.
+    // A click in the list replaces only the detail pane, so the list itself (its
+    // scroll position, the row under the pointer) stays put; its highlight is
+    // moved here.
+    document.querySelectorAll(".listpane .li[href]").forEach(function (a) {
+      a.classList.toggle("on", new URL(a.href, location.origin).pathname === location.pathname);
+    });
+    // Pausing, and an open composer, belong to the page they were on. A pause used
+    // to follow you to a group page (which has no pause control) and freeze it;
+    // an open composer followed you to the next topic and covered its messages.
     if (location.pathname !== currentPath) {
       currentPath = location.pathname;
       setPaused(false);
+      setDock(false);
     }
   }
   document.addEventListener("DOMContentLoaded", afterNavigation);
@@ -504,7 +512,7 @@
     }
     else if (e.key === "c") { var nb = document.querySelector(".listpane .new-link"); if (nb) nb.click(); }
     else if (e.key === "m") {
-      if (document.getElementById("compose-panel")) { e.preventDefault(); setDock(true, true); focusComposer(); }
+      if (document.getElementById("compose-panel")) { e.preventDefault(); setDock(true); focusComposer(); }
     }
     else if (e.key === "[") setRail(!railSlim());
   });
@@ -605,7 +613,10 @@
     if (!t || t.id !== "drawer") return;
     if (!drawerIsOpen()) { t.textContent = ""; return; }
     var title = t.querySelector("#drawer-title[data-offset]");
-    if (title) setOpenParam(title.getAttribute("data-offset"));
+    // Only on the partition's own table: ?open= names an offset on the partition
+    // in view, which a search across partitions does not have.
+    var region = document.getElementById("tape-and-table");
+    if (title && region && region.hasAttribute("data-msg-base")) setOpenParam(title.getAttribute("data-offset"));
     var again = drawerRefocus && t.querySelector('button[aria-label="' + drawerRefocus + '"]:not([disabled])');
     var btn = again || t.querySelector("[data-drawer-close]");
     if (btn) btn.focus();
@@ -614,7 +625,7 @@
   function reopenFromURL() {
     var open = new URLSearchParams(location.search).get("open");
     var region = document.getElementById("tape-and-table");
-    if (open == null || !region || !window.htmx) return;
+    if (open == null || !region || !region.hasAttribute("data-msg-base") || !window.htmx) return;
     openDrawer(document.getElementById("msg-" + open));
     htmx.ajax("GET", region.getAttribute("data-msg-base") + "&offset=" + encodeURIComponent(open), {
       target: "#drawer", swap: "innerHTML",
@@ -629,23 +640,23 @@
   });
 
   // ---------- docked composer ----------
-  // Whether it is open is an attribute on <html>, set before first paint from
-  // storage. It is not a class on the dock itself: the dock is replaced on every
-  // navigation, and a remembered-open composer used to come back closed.
+  // Whether it is open is an attribute on <html>, not a class on the dock: the
+  // dock is replaced when the partition changes or a record is sent, and the
+  // composer must stay as it was through that. Moving to another topic closes it
+  // (see afterNavigation).
   function dockOpen() { return root.getAttribute("data-dock") === "open"; }
   function syncDock() {
     var bar = document.getElementById("compose-head");
     if (bar) bar.setAttribute("aria-expanded", dockOpen() ? "true" : "false");
   }
-  function setDock(open, remember) {
+  function setDock(open) {
     if (open) root.setAttribute("data-dock", "open"); else root.removeAttribute("data-dock");
-    if (remember) store("dock", open ? "open" : "closed");
     syncDock();
     var panel = document.getElementById("compose-panel");
     if (open && panel && window.dozeEditor) requestAnimationFrame(function () { dozeEditor.refresh(panel); });
   }
   document.addEventListener("click", function (e) {
-    if (e.target.closest("[data-dock-toggle]")) setDock(!dockOpen(), true);
+    if (e.target.closest("[data-dock-toggle]")) setDock(!dockOpen());
   });
   document.addEventListener("DOMContentLoaded", syncDock);
   document.addEventListener("htmx:afterSettle", syncDock);
@@ -690,7 +701,18 @@
   document.addEventListener("DOMContentLoaded", revealHL);
   document.addEventListener("htmx:afterSettle", function (e) {
     var t = e.detail.target;
-    if (t && t.id === "workspace") revealHL();
+    if (t && (t.id === "workspace" || t.id === "detail")) revealHL();
+  });
+
+  // ---------- arriving content ----------
+  // A different topic or group fades in over a moment instead of snapping.
+  document.addEventListener("htmx:afterSwap", function (e) {
+    var t = e.detail.target;
+    if (!t || t.id !== "detail") return;
+    var pane = document.getElementById("detail");
+    if (!pane) return;
+    pane.classList.add("arriving");
+    setTimeout(function () { pane.classList.remove("arriving"); }, 220);
   });
 
   // ---------- live polling with change detection ----------
@@ -727,7 +749,9 @@
         if (livePaused && cur.querySelector("[data-live-toggle]")) return;
         // A confirm dialog is asking about a button in this region. Replacing the
         // region would detach that button, and "Confirm" would then do nothing.
-        if (confirmOpen()) return;
+        // The same goes for a row whose offset is being edited (data-hold-live):
+        // a refresh would throw away what is being typed.
+        if (confirmOpen() || cur.querySelector("[data-hold-live]")) return;
         var url = cur.getAttribute("data-live");
         if (!url) return;
         busy = true;
@@ -744,7 +768,7 @@
   document.addEventListener("htmx:afterSwap", function (e) {
     // Re-arm after a navigation, or after any swap that lands or contains a live region.
     var t = e.detail.target;
-    if (t && (t.id === "workspace" || (t.matches && t.matches("[data-live]")) || (t.querySelector && t.querySelector("[data-live]")))) {
+    if (t && (t.id === "workspace" || t.id === "detail" || (t.matches && t.matches("[data-live]")) || (t.querySelector && t.querySelector("[data-live]")))) {
       setupLive();
       setPaused(livePaused); // a replaced region comes back looking unpaused.
     }
@@ -755,13 +779,17 @@
     var t = e.detail.target;
     if (!t || !t.matches || !t.matches("[data-live]")) return;
     // A poll that was already on its way when a confirm dialog opened.
-    if (confirmOpen() && isLivePoll(e)) { e.detail.shouldSwap = false; if (e.detail.xhr) e.detail.xhr.dozeHeld = true; return; }
+    if ((confirmOpen() || t.querySelector("[data-hold-live]")) && isLivePoll(e)) { e.detail.shouldSwap = false; if (e.detail.xhr) e.detail.xhr.dozeHeld = true; return; }
     // Fires for a 204 too, where nothing will be swapped. Saving state then left
     // it lying around for the next unrelated swap (opening the drawer) to
     // "restore", which threw the table back to wherever it had been.
     if (!e.detail.shouldSwap) return;
     var jump = t.querySelector("#jump-to");
     var wrap = t.querySelector(".tbl-wrap");
+    // What has been typed into the region's own fields (the jump box, the search
+    // box) and not yet sent.
+    var typed = {};
+    t.querySelectorAll("input[id]").forEach(function (i) { typed[i.id] = i.type === "checkbox" ? i.checked : i.value; });
     var active = document.activeElement, focus = null;
     if (active && t.contains(active)) {
       // By id where there is one (rows, the jump field); otherwise by position
@@ -769,8 +797,7 @@
       focus = active.id ? { id: active.id } : { at: Array.prototype.indexOf.call(t.querySelectorAll(FOCUSABLE), active), tag: active.tagName };
     }
     liveState = {
-      id: t.id, focus: focus,
-      jumpValue: jump ? jump.value : "",
+      id: t.id, focus: focus, typed: typed, poll: isLivePoll(e),
       selStart: jump ? jump.selectionStart : null, selEnd: jump ? jump.selectionEnd : null,
       scrollTop: wrap ? wrap.scrollTop : 0, scrollLeft: wrap ? wrap.scrollLeft : 0,
       atTop: !wrap || wrap.scrollTop < 4,
@@ -785,7 +812,13 @@
     var region = document.getElementById(st.id);
     if (!region) return;
     var jump = region.querySelector("#jump-to");
-    if (jump && st.jumpValue) jump.value = st.jumpValue;
+    Object.keys(st.typed).forEach(function (id) {
+      var i = document.getElementById(id);
+      if (!i || !region.contains(i)) return;
+      if (i.type === "checkbox") i.checked = st.typed[id]; else if (st.typed[id]) i.value = st.typed[id];
+    });
+    // A record that arrived while you were watching lands with a small motion.
+    if (st.poll) region.classList.add("landed");
     var wrap = region.querySelector(".tbl-wrap");
     // Someone reading down the table keeps their place; someone parked at the top
     // (the newest rows) just sees the new ones arrive.

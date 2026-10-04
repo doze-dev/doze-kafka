@@ -32,7 +32,7 @@ specifically testing an older client's paths.
 | DescribeGroups | 15 | Describe classic consumer groups. |
 | DescribeConfigs | 32 | Read topic and broker configuration (read-only). |
 | DeleteGroups | 42 | Delete empty consumer groups and their committed offsets. |
-| OffsetDelete | 47 | Delete a group's committed offsets for a topic. |
+| OffsetDelete | 47 | Delete a group's committed offsets for a topic, including an offset left over from a topic that no longer exists. |
 | DescribeCluster | 60 | Describe the cluster (this single node). |
 | SaslHandshake / SaslAuthenticate | 17 / 36 | SASL, advertised only when auth is enabled (handshake 0–1, authenticate 0–2, in every profile). |
 

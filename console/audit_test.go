@@ -620,3 +620,248 @@ func TestThemeContrast(t *testing.T) {
 		check("--ring", "--background", 3)
 	}
 }
+
+// ---- changing a group's offsets, one partition at a time ----
+
+func committed(t *testing.T, c *Console, group string) map[string]int64 {
+	t.Helper()
+	offs, err := c.be.GroupOffsets(context.Background(), group)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]int64{}
+	for _, o := range offs {
+		out[fmt.Sprintf("%s/%d", o.Topic, o.Partition)] = o.Committed
+	}
+	return out
+}
+
+func TestOneOffsetCanBeSetOrRemoved(t *testing.T) {
+	c, addr := newTestConsoleAddr(t)
+	topicWith(t, c, "a", 2, 10) // partition 0 holds offsets 0–9.
+	topicWith(t, c, "b", 1, 5)
+	commitFor(t, addr, "g", "a", map[int32]int64{0: 4, 1: 0})
+	commitFor(t, addr, "g", "b", map[int32]int64{0: 2})
+	post := func(path string, form url.Values) *httptest.ResponseRecorder {
+		return req(t, c, "POST", "/_console/groups/g"+path, form)
+	}
+
+	// The page offers it, per row, and names the range.
+	page := req(t, c, "GET", "/_console/groups/g", nil).Body.String()
+	for _, want := range []string{`hx-post="/_console/groups/g/offset"`, `hx-post="/_console/groups/g/offset/delete"`, `aria-label="New offset, from 0 to 10"`, `<option value="b">b</option>`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the group page is missing %q", want)
+		}
+	}
+
+	// A specific offset.
+	if rec := post("/offset", url.Values{"topic": {"a"}, "partition": {"0"}, "offset": {"7"}}); rec.Code != 200 {
+		t.Fatalf("set: %d %s", rec.Code, rec.Body)
+	}
+	if got := committed(t, c, "g"); got["a/0"] != 7 || got["a/1"] != 0 || got["b/0"] != 2 {
+		t.Errorf("after setting a/0 to 7: %v", got)
+	}
+	// The end of the log is a position (nothing left to read); past it is not.
+	if rec := post("/offset", url.Values{"topic": {"a"}, "partition": {"0"}, "offset": {"10"}}); rec.Code != 200 {
+		t.Errorf("setting the offset to the log end: %d %s", rec.Code, rec.Body)
+	}
+	for _, bad := range []string{"11", "-1", "abc", "", "7.5"} {
+		rec := post("/offset", url.Values{"topic": {"a"}, "partition": {"0"}, "offset": {bad}})
+		if rec.Code != 400 {
+			t.Errorf("offset %q: %d, want 400", bad, rec.Code)
+		}
+	}
+	if rec := post("/offset", url.Values{"topic": {"a"}, "partition": {"9"}, "offset": {"1"}}); rec.Code != 400 {
+		t.Errorf("a partition the topic does not have: %d", rec.Code)
+	}
+	if got := committed(t, c, "g"); got["a/0"] != 10 {
+		t.Errorf("a refused change moved the offset: %v", got)
+	}
+	// By name.
+	post("/offset", url.Values{"topic": {"a"}, "partition": {"0"}, "to": {"earliest"}})
+	if got := committed(t, c, "g"); got["a/0"] != 0 {
+		t.Errorf("to earliest: %v", got)
+	}
+
+	// Reset only one topic.
+	if rec := post("/reset", url.Values{"to": {"latest"}, "topic": {"b"}}); rec.Code != 200 || !strings.Contains(rec.Header().Get("HX-Trigger"), "on b") {
+		t.Fatalf("reset of one topic: %d %s", rec.Code, rec.Header().Get("HX-Trigger"))
+	}
+	if got := committed(t, c, "g"); got["b/0"] != 5 || got["a/0"] != 0 || got["a/1"] != 0 {
+		t.Errorf("resetting topic b to latest touched other topics: %v", got)
+	}
+	if rec := post("/reset", url.Values{"to": {"latest"}, "topic": {"nope"}}); rec.Code != 400 {
+		t.Errorf("reset of a topic the group has no offsets on: %d", rec.Code)
+	}
+
+	// Remove one; the others stay.
+	if rec := post("/offset/delete", url.Values{"topic": {"a"}, "partition": {"1"}}); rec.Code != 200 {
+		t.Fatalf("remove: %d %s", rec.Code, rec.Body)
+	}
+	if got := committed(t, c, "g"); len(got) != 2 || got["b/0"] != 5 {
+		t.Errorf("after removing a/1: %v", got)
+	}
+	// Removing the last one leaves no group to show: back to the list.
+	post("/offset/delete", url.Values{"topic": {"a"}, "partition": {"0"}})
+	if rec := post("/offset/delete", url.Values{"topic": {"b"}, "partition": {"0"}}); rec.Code != http.StatusSeeOther {
+		t.Errorf("removing a group's last offset: %d, want a redirect to the list", rec.Code)
+	}
+}
+
+// A group with members commits its own offsets; changing them under it is refused.
+func TestOffsetsOfARunningGroupAreNotChanged(t *testing.T) {
+	c, addr := newTestConsoleAddr(t)
+	topicWith(t, c, "t", 1, 5)
+	cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.ConsumerGroup("live"), kgo.ConsumeTopics("t"),
+		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()), kgo.AutoCommitInterval(100*time.Millisecond))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cl.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	cl.PollRecords(ctx, 5)
+	cancel()
+	cl.CommitUncommittedOffsets(context.Background())
+
+	before := committed(t, c, "live")
+	for path, form := range map[string]url.Values{
+		"/offset":        {"topic": {"t"}, "partition": {"0"}, "offset": {"1"}},
+		"/offset/delete": {"topic": {"t"}, "partition": {"0"}},
+	} {
+		rec := req(t, c, "POST", "/_console/groups/live"+path, form)
+		if rec.Code != 400 || !strings.Contains(rec.Body.String(), "active member") {
+			t.Errorf("%s on a running group: %d %s", path, rec.Code, rec.Body)
+		}
+	}
+	if after := committed(t, c, "live"); fmt.Sprint(after) != fmt.Sprint(before) {
+		t.Errorf("a running group's offsets changed: %v -> %v", before, after)
+	}
+	if page := req(t, c, "GET", "/_console/groups/live", nil).Body.String(); strings.Contains(page, "/offset/delete") {
+		t.Error("a running group's page should not offer to change its offsets")
+	}
+}
+
+// ---- searching records ----
+
+func TestSearchFindsRecordsAndSaysHowFarItLooked(t *testing.T) {
+	c, addr := newTestConsoleAddr(t)
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"s"}, "partitions": {"2"}})
+	cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.RecordPartitioner(kgo.ManualPartitioner()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cl.Close()
+	p := func(part int32, key, value string, h ...kgo.RecordHeader) {
+		if err := cl.ProduceSync(context.Background(), &kgo.Record{Topic: "s", Partition: part, Key: []byte(key), Value: []byte(value), Headers: h}).FirstErr(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 30; i++ {
+		p(0, fmt.Sprintf("k%d", i), fmt.Sprintf(`{"n":%d}`, i))
+	}
+	p(0, "needle-in-key", "x")                                                          // offset 30
+	p(0, "k", `{"note":"a NEEDLE in a value"}`)                                         // 31
+	p(0, "k", "x", kgo.RecordHeader{Key: "trace", Value: []byte("needle in a header")}) // 32
+	p(0, "k", string([]byte{0xff, 0x00, 'n', 'e', 'e', 'd', 'l', 'e', 0xfe}))           // 33: binary.
+	p(1, "other", "the needle on partition 1")                                          // p1 offset 0
+	get := func(q string) string { return req(t, c, "GET", "/_console/topics/s?"+q, nil).Body.String() }
+
+	one := get("partition=0&q=Needle")
+	for _, id := range []string{"hit-0-30", "hit-0-31", "hit-0-32", "hit-0-33"} {
+		if !strings.Contains(one, `id="`+id+`"`) {
+			t.Errorf("searching partition 0 for Needle did not find %s", id)
+		}
+	}
+	if strings.Contains(one, `id="hit-1-0"`) || strings.Contains(one, `id="hit-0-5"`) {
+		t.Error("the search returned a record from another partition, or one that does not match")
+	}
+	if !strings.Contains(one, "Read offsets 0–33 of partition 0 (34 records): 4 matches.") {
+		t.Error("the search should say exactly what it read and how many matched")
+	}
+	if strings.Contains(one, "data-live=") || strings.Contains(one, `class="tape-strip"`) {
+		t.Error("search results are not the live tape")
+	}
+	// Rows open the record on the partition they are from.
+	if !strings.Contains(one, `hx-get="/_console/topics/s/message?partition=0&offset=31"`) {
+		t.Error("a result row should open its own record")
+	}
+
+	all := get("partition=0&q=needle&all=1")
+	if !strings.Contains(all, `id="hit-1-0"`) || !strings.Contains(all, `id="hit-0-30"`) || !strings.Contains(all, "<th class=\"num\">Partition</th>") {
+		t.Error("searching all partitions should find matches on each, and say which")
+	}
+	if !strings.Contains(all, "across 2 partitions: 5 matches") {
+		t.Error("the all-partitions search should report what it read")
+	}
+
+	if none := get("partition=0&q=absent-word"); !strings.Contains(none, "0 matches") || !strings.Contains(none, "Nothing in the records that were read contains") {
+		t.Error("a search with no matches should say so, and that it is about what was read")
+	}
+	// No text and "all partitions" is the latest records of every partition together.
+	if latest := get("partition=0&all=1"); !strings.Contains(latest, `id="hit-1-0"`) || !strings.Contains(latest, "35 records, newest first") {
+		t.Error("all partitions with no search text should show the latest records of each")
+	}
+	// The ordinary page still offers the search.
+	if plain := get("partition=0"); !strings.Contains(plain, `id="find-q"`) || !strings.Contains(plain, "data-live=") {
+		t.Error("the topic page should offer search and stay live")
+	}
+}
+
+// A search reads a bounded number of records and offers to continue further back.
+func TestSearchIsBoundedAndCanContinue(t *testing.T) {
+	c := newTestConsole(t)
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"big"}, "partitions": {"1"}})
+	if _, err := c.scanForTest(t, "big", 250); err != nil {
+		t.Fatal(err)
+	}
+	hits, from, to, earliest, err := c.scanPartition(context.Background(), "big", 0, []byte("v24"), -1, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The newest 100 records are offsets 150–249; "v24" matches v24 and v240–v249.
+	if from != 150 || to != 250 || earliest != 0 || len(hits) != 10 || hits[0].Offset != 249 {
+		t.Errorf("scan read [%d,%d) of a log starting at %d and found %d (newest %d); want [150,250), 10, 249", from, to, earliest, len(hits), hits[0].Offset)
+	}
+	// Continuing from where it stopped reaches the older match.
+	hits, from, to, _, err = c.scanPartition(context.Background(), "big", 0, []byte("v24"), 150, 1000)
+	if err != nil || from != 0 || to != 150 || len(hits) != 1 || hits[0].Offset != 24 {
+		t.Errorf("continued scan read [%d,%d) and found %d: %v", from, to, len(hits), err)
+	}
+}
+
+// scanForTest fills a topic with n records "v0".."v<n-1>" quickly.
+func (c *Console) scanForTest(t *testing.T, topic string, n int) (int, error) {
+	t.Helper()
+	for i := 0; i < n; i++ {
+		if _, err := c.be.Produce(context.Background(), topic, 0, nil, []byte("v"+itoa(i)), nil, "1"); err != nil {
+			return i, err
+		}
+	}
+	return n, nil
+}
+
+// ---- moving between topics ----
+
+// A click in the list replaces the detail pane only, and nothing on the page
+// arrives after it. Replacing the whole workspace redrew the list under the
+// pointer and put its scroll position back to the top.
+func TestListLinksReplaceOnlyTheDetailPane(t *testing.T) {
+	c, addr := newTestConsoleAddr(t)
+	topicWith(t, c, "t", 1, 1)
+	commitFor(t, addr, "g", "t", map[int32]int64{0: 1})
+	for _, path := range []string{"/_console/topics", "/_console/topics/t", "/_console/groups", "/_console/groups/g", "/_console/cluster", "/_console/new/topic", "/_console/topics/missing"} {
+		page := req(t, c, "GET", path, nil).Body.String()
+		if n := strings.Count(page, `id="detail"`); n != 1 {
+			t.Errorf("%s has %d elements with id=\"detail\", want 1", path, n)
+		}
+		for _, m := range regexp.MustCompile(`<a class="li[^>]*>`).FindAllString(page, -1) {
+			if !strings.Contains(m, `hx-target="#detail"`) || !strings.Contains(m, `hx-select="#detail"`) {
+				t.Errorf("%s: a list link replaces more than the detail pane: %s", path, m)
+			}
+		}
+	}
+	// The composer's state is not remembered across pages.
+	if js := readAll(t, "static/shell.js"); strings.Contains(js, `store("dock"`) || !strings.Contains(js, "setDock(false);") {
+		t.Error("the composer should close when you move to another page, and not be restored from storage")
+	}
+}

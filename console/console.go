@@ -206,7 +206,6 @@ func (c *Console) routes() {
 	m.HandleFunc("GET "+p+"/topics/{name}/tape", c.topicTape) // HTMX partial (polled)
 	m.HandleFunc("POST "+p+"/topics/{name}/produce", c.topicProduce)
 	m.HandleFunc("POST "+p+"/topics/{name}/resend", c.topicResend)  // an exact copy of a stored record
-	m.HandleFunc("GET "+p+"/topics/{name}/groups", c.topicGroups)   // "who consumes this" strip
 	m.HandleFunc("GET "+p+"/topics/{name}/message", c.topicMessage) // drawer partial
 	m.HandleFunc("GET "+p+"/topics/{name}/message/raw", c.topicMessageRaw)
 
@@ -215,6 +214,8 @@ func (c *Console) routes() {
 	m.HandleFunc("GET "+p+"/groups/{id}", c.groupDetail)
 	m.HandleFunc("GET "+p+"/groups/{id}/live", c.groupLive) // HTMX partial (polled)
 	m.HandleFunc("POST "+p+"/groups/{id}/reset", c.groupReset)
+	m.HandleFunc("POST "+p+"/groups/{id}/offset", c.groupOffsetSet)           // one partition's committed offset
+	m.HandleFunc("POST "+p+"/groups/{id}/offset/delete", c.groupOffsetDelete) // remove one
 	m.HandleFunc("POST "+p+"/groups/{id}/delete", c.groupDelete)
 
 	// Cluster.

@@ -2,7 +2,7 @@
 {{template "lp_head" dict "Glyph" "users" "Label" "Consumer groups"}}
 {{if not .List}}{{template "lp_empty" dict "Glyph" "users" "Title" (t "groups.none.title") "Hint" (t "groups.none.hint")}}{{end}}
 {{range .List}}
-<a class="li {{if eq .ID $.Sel}}on{{end}}" href="{{groupURL .ID}}" data-name="{{.ID}}"
+<a class="li {{if eq .ID $.Sel}}on{{end}}" href="{{groupURL .ID}}" data-name="{{.ID}}" hx-target="#detail" hx-select="#detail"
    x-data x-show="!$store.filter.q || $el.dataset.name.toLowerCase().includes($store.filter.q.toLowerCase())">
   <span class="nm mono">{{.ID}}</span>
   <span class="meta">
@@ -22,7 +22,7 @@
 
 {{define "group_detail"}}{{template "shell_top" .}}
   {{template "group_lp" (dict "Prefix" .Prefix "List" .List "Sel" .Group.ID)}}
-  <main class="detail"><div class="detail-inner">
+  <main class="detail" id="detail"><div class="detail-inner">
     {{template "group_live" .}}
   </div></main>
 {{template "shell_bottom" .}}{{end}}
@@ -44,12 +44,19 @@
       </div>
       <div class="idband-acts">
         <div class="menu">
+          {{if gt (len .Topics) 1}}
+          <label class="scope"><span class="sr-only">Which offsets to reset</span>
+            <select class="input" id="reset-scope" name="topic" {{if not .CanAct}}disabled{{end}}>
+              <option value="">all topics</option>
+              {{range .Topics}}<option value="{{.}}">{{.}}</option>{{end}}
+            </select></label>
+          {{end}}
           <button type="button" class="btn btn-outline" {{if not (and .CanAct .Offsets)}}disabled title="{{if .Members}}Stop the group's {{len .Members}} consumer{{if ne (len .Members) 1}}s{{end}} first{{else}}No committed offsets to reset{{end}}"{{end}}
-            hx-post="{{groupURL .Group.ID}}/reset" data-confirm-title="Reset to earliest" data-confirm-verb="Reset offsets" hx-vals='{"to":"earliest"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
-            hx-confirm="Reset every committed offset of &quot;{{.Group.ID}}&quot; to the earliest retained offset? Its consumers will re-read from the start.">{{icon "skip-back"}} Reset to earliest</button>
+            hx-post="{{groupURL .Group.ID}}/reset" hx-include="#reset-scope" data-confirm-title="Reset to earliest" data-confirm-verb="Reset offsets" hx-vals='{"to":"earliest"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
+            hx-confirm="Reset the committed offsets of &quot;{{.Group.ID}}&quot;{{if gt (len .Topics) 1}} (for the topics chosen){{end}} to the earliest retained offset? Its consumers will re-read from the start.">{{icon "skip-back"}} Reset to earliest</button>
           <button type="button" class="btn btn-outline" {{if not (and .CanAct .Offsets)}}disabled{{end}}
-            hx-post="{{groupURL .Group.ID}}/reset" data-confirm-title="Reset to latest" data-confirm-verb="Reset offsets" hx-vals='{"to":"latest"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
-            hx-confirm="Reset every committed offset of &quot;{{.Group.ID}}&quot; to the latest offset? Its consumers will skip everything currently in the topics.">{{icon "skip-forward"}} Reset to latest</button>
+            hx-post="{{groupURL .Group.ID}}/reset" hx-include="#reset-scope" data-confirm-title="Reset to latest" data-confirm-verb="Reset offsets" hx-vals='{"to":"latest"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
+            hx-confirm="Reset the committed offsets of &quot;{{.Group.ID}}&quot;{{if gt (len .Topics) 1}} (for the topics chosen){{end}} to the latest offset? Its consumers will skip everything currently in the topics.">{{icon "skip-forward"}} Reset to latest</button>
           <button type="button" class="btn danger" {{if not .CanAct}}disabled title="Stop the group's consumers first"{{end}}
             hx-post="{{groupURL .Group.ID}}/delete" hx-disabled-elt="this" data-confirm-title="Delete group" data-confirm-verb="Delete group"
             hx-confirm="Delete group &quot;{{.Group.ID}}&quot; and its committed offsets?">{{icon "trash"}} Delete</button>
@@ -79,7 +86,7 @@
     {{if .Offsets}}
     <div class="sec-title">Offsets &amp; lag</div>
     <div class="tbl-wrap">
-      <table class="tbl"><thead><tr><th>Topic</th><th class="num">Partition</th><th>Owner</th><th class="num">Committed</th><th class="num">Latest</th><th>Lag</th></tr></thead>
+      <table class="tbl"><thead><tr><th>Topic</th><th class="num">Partition</th><th>Owner</th><th class="num">Committed</th><th class="num">Latest</th><th>Lag</th>{{if .CanAct}}<th><span class="sr-only">Change</span></th>{{end}}</tr></thead>
         <tbody>{{range .Offsets}}<tr>
           <td class="mono">{{if .Deleted}}{{.Topic}}{{else}}<a href="{{.TopicURL}}">{{.Topic}}</a>{{end}}</td>
           <td class="num mono">{{.Partition}}</td>
@@ -89,6 +96,30 @@
           <td>{{if .Deleted}}<span class="chip lagwarn" title="The topic no longer exists; this offset is a leftover">topic deleted</span>
             {{else if .Ahead}}<span class="chip lagwarn" title="The committed offset is beyond the end of the log, usually because the topic was purged or recreated. The consumer will see an out-of-range error and reset.">ahead of log end by {{.AheadBy}}</span>
             {{else}}<div class="lagcell"><div class="lagbar {{if eq .Lag 0}}caught{{end}}"><span style="width:{{if eq .Lag 0}}100{{else}}{{.LagPercent}}{{end}}%"></span></div><span class="lagnum {{if eq .Lag 0}}zero{{end}}">{{.Lag}}</span>{{if .Trimmed}} <span class="chip lagwarn" title="Records between this offset and the start of the log were deleted by retention before the group read them">lost to retention</span>{{end}}</div>{{end}}</td>
+          {{if $.CanAct}}
+          {{/* One partition's offset: set it to a number (or the ends), or remove it.
+               While the editor is open the region is not refreshed (data-hold-live). */}}
+          <td class="rowacts" x-data="{e:false}" :data-hold-live="e ? '' : null">
+            <div class="rowbtns" x-show="!e">
+              {{if not .Deleted}}<button type="button" class="btn sm" @click="e=true; $nextTick(() => $refs.o.select())" aria-label="Set the offset for {{.Topic}} partition {{.Partition}}">Set…</button>{{end}}
+              <button type="button" class="btn sm danger" aria-label="Remove the offset for {{.Topic}} partition {{.Partition}}"
+                hx-post="{{groupURL $.Group.ID}}/offset/delete" hx-vals='{"topic":"{{.Topic}}","partition":"{{.Partition}}"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
+                data-confirm-title="Remove offset" data-confirm-verb="Remove"
+                hx-confirm="Remove the committed offset of &quot;{{$.Group.ID}}&quot; for {{.Topic}} partition {{.Partition}}? A consumer will start there from its auto.offset.reset policy.">Remove</button>
+            </div>
+            {{if not .Deleted}}
+            <form class="rowset" x-show="e" x-cloak @keydown.escape.stop="e=false" hx-post="{{groupURL $.Group.ID}}/offset" hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]">
+              <input type="hidden" name="topic" value="{{.Topic}}"><input type="hidden" name="partition" value="{{.Partition}}">
+              <input class="input mono" name="offset" x-ref="o" inputmode="numeric" value="{{.Committed}}" aria-label="New offset, from {{.Earliest}} to {{.Latest}}" title="From {{.Earliest}} (the oldest record) to {{.Latest}} (the end)">
+              <button type="button" class="btn sm" @click="$refs.o.value='{{.Earliest}}'" title="Offset {{.Earliest}}: the oldest retained record">Earliest</button>
+              <button type="button" class="btn sm" @click="$refs.o.value='{{.Latest}}'" title="Offset {{.Latest}}: the end of the log">Latest</button>
+              <button type="submit" class="btn sm primary">Set</button>
+              <button type="button" class="btn sm" @click="e=false">Cancel</button>
+              <div class="err form-err" data-err-slot hidden role="alert"></div>
+            </form>
+            {{end}}
+          </td>
+          {{end}}
         </tr>{{end}}</tbody>
       </table>
     </div>
@@ -105,12 +136,11 @@
 </div>
 {{end}}
 
-{{/* topic_groups: the lazily loaded "who consumes this topic" strip on a topic page. */}}
+{{/* topic_groups: the "who consumes this topic" strip on a topic page. It always
+     takes its line, so the page is the same height whichever topic is shown. */}}
 {{define "topic_groups"}}
-{{if .Consumers}}
 <div class="topic-groups-in">
   <span class="dim">Consumed by</span>
-  {{range .Consumers}}<a class="tg" href="{{.URL}}"><span class="mono">{{.Group}}</span> <span class="badge {{stateBadge .State}}">{{.State}}</span> <span class="mono {{if eq .Lag 0}}lag-zero{{else}}lag-some{{end}}">{{if eq .Lag 0}}caught up{{else}}lag {{.Lag}}{{end}}</span></a>{{end}}
+  {{range .Consumers}}<a class="tg" href="{{.URL}}"><span class="mono">{{.Group}}</span> <span class="badge {{stateBadge .State}}">{{.State}}</span> <span class="mono {{if eq .Lag 0}}lag-zero{{else}}lag-some{{end}}">{{if eq .Lag 0}}caught up{{else}}lag {{.Lag}}{{end}}</span></a>{{else}}<span class="tg none">no consumer group has committed an offset here</span>{{end}}
 </div>
-{{end}}
 {{end}}

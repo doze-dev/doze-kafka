@@ -238,21 +238,35 @@ func (b *backend) GroupOffsets(ctx context.Context, id string) ([]GroupOffset, e
 // cleanHost drops the leading slash Kafka puts on a client host ("/127.0.0.1").
 func cleanHost(h string) string { return strings.TrimPrefix(h, "/") }
 
-// ResetGroupOffsets moves every committed offset of an inactive group to the
-// earliest or latest offset of its partition, the way `kafka-consumer-groups
-// --reset-offsets` does. A group with live members is refused: its consumers would
-// overwrite the change on their next commit, and moving a position under a running
-// consumer is exactly what the broker's fencing exists to prevent.
-func (b *backend) ResetGroupOffsets(ctx context.Context, id, to string) (int, error) {
+// OffsetTarget is one committed offset to write.
+type OffsetTarget struct {
+	Topic     string
+	Partition int32
+	Offset    int64
+}
+
+// requireIdle refuses to change the offsets of a group that has members: they
+// would commit over the change, or be fenced by it.
+func (b *backend) requireIdle(ctx context.Context, id string) error {
+	d, err := b.DescribeGroup(ctx, id)
+	if err != nil {
+		return err
+	}
+	if len(d.Members) > 0 {
+		return badInput("the group has %d active member%s; stop its consumers before changing its offsets", len(d.Members), plural(len(d.Members)))
+	}
+	return nil
+}
+
+// ResetGroupOffsets moves an inactive group's committed offsets to the earliest or
+// the latest position: all of them, or only those on one topic when topic is set.
+// It reports how many were moved.
+func (b *backend) ResetGroupOffsets(ctx context.Context, id, to, topic string) (int, error) {
 	if to != "earliest" && to != "latest" {
 		return 0, fmt.Errorf("%w: reset to earliest or latest, not %q", errBadInput, to)
 	}
-	d, err := b.DescribeGroup(ctx, id)
-	if err != nil {
+	if err := b.requireIdle(ctx, id); err != nil {
 		return 0, err
-	}
-	if len(d.Members) > 0 {
-		return 0, badInput("the group has %d active member%s; stop its consumers before resetting offsets", len(d.Members), plural(len(d.Members)))
 	}
 	offsets, err := b.GroupOffsets(ctx, id)
 	if err != nil {
@@ -263,8 +277,13 @@ func (b *backend) ResetGroupOffsets(ctx context.Context, id, to string) (int, er
 	}
 
 	bounds := map[string][]PartitionBound{}
-	targets := map[string][]kmsg.OffsetCommitRequestTopicPartition{}
+	var targets []OffsetTarget
+	onTopic := 0
 	for _, o := range offsets {
+		if topic != "" && o.Topic != topic {
+			continue
+		}
+		onTopic++
 		if _, ok := bounds[o.Topic]; !ok {
 			parts, err := b.PartitionCount(ctx, o.Topic)
 			if err != nil {
@@ -282,27 +301,74 @@ func (b *backend) ResetGroupOffsets(ctx context.Context, id, to string) (int, er
 		if to == "earliest" {
 			target = bounds[o.Topic][o.Partition].Earliest
 		}
-		rp := kmsg.NewOffsetCommitRequestTopicPartition()
-		rp.Partition, rp.Offset = o.Partition, target
-		targets[o.Topic] = append(targets[o.Topic], rp)
+		targets = append(targets, OffsetTarget{o.Topic, o.Partition, target})
 	}
+	switch {
+	case topic != "" && onTopic == 0:
+		return 0, badInput("the group has no committed offsets on topic %q", topic)
+	case len(targets) == 0:
+		return 0, badInput("none of those offsets are on topics that still exist")
+	}
+	return b.commitOffsets(ctx, id, targets)
+}
 
-	req := kmsg.NewPtrOffsetCommitRequest()
-	req.Group, req.Generation = id, -1
-	n := 0
-	topics := make([]string, 0, len(targets))
-	for t := range targets {
-		topics = append(topics, t)
+// SetGroupOffset writes one committed offset of an inactive group. to is
+// "earliest", "latest", or empty for the given offset, which must be a position
+// the partition has: from its first retained record to its end.
+func (b *backend) SetGroupOffset(ctx context.Context, id, topic string, partition int32, to string, offset int64) (int64, error) {
+	if err := b.requireIdle(ctx, id); err != nil {
+		return 0, err
+	}
+	parts, err := b.PartitionCount(ctx, topic)
+	if err != nil {
+		return 0, err
+	}
+	if partition < 0 || partition >= parts {
+		return 0, badInput("topic %q has no partition %d", topic, partition)
+	}
+	earliest, latest, err := b.PartitionOffsets(ctx, topic, partition)
+	if err != nil {
+		return 0, err
+	}
+	switch to {
+	case "earliest":
+		offset = earliest
+	case "latest":
+		offset = latest
+	case "":
+		if offset < earliest || offset > latest {
+			return 0, badInput("offset %d is outside partition %d of %q, which holds %d to %d (%d is the end: nothing left to read)",
+				offset, partition, topic, earliest, latest, latest)
+		}
+	default:
+		return 0, badInput("set an offset to earliest, latest or a number, not %q", to)
+	}
+	if _, err := b.commitOffsets(ctx, id, []OffsetTarget{{topic, partition, offset}}); err != nil {
+		return 0, err
+	}
+	return offset, nil
+}
+
+// commitOffsets writes offsets for a group as no member (generation -1), and
+// reports how many the broker accepted.
+func (b *backend) commitOffsets(ctx context.Context, id string, targets []OffsetTarget) (int, error) {
+	byTopic := map[string][]kmsg.OffsetCommitRequestTopicPartition{}
+	var topics []string
+	for _, t := range targets {
+		if _, ok := byTopic[t.Topic]; !ok {
+			topics = append(topics, t.Topic)
+		}
+		rp := kmsg.NewOffsetCommitRequestTopicPartition()
+		rp.Partition, rp.Offset = t.Partition, t.Offset
+		byTopic[t.Topic] = append(byTopic[t.Topic], rp)
 	}
 	sort.Strings(topics)
+	req := kmsg.NewPtrOffsetCommitRequest()
+	req.Group, req.Generation = id, -1
 	for _, t := range topics {
 		rt := kmsg.NewOffsetCommitRequestTopic()
-		rt.Topic, rt.Partitions = t, targets[t]
+		rt.Topic, rt.Partitions = t, byTopic[t]
 		req.Topics = append(req.Topics, rt)
-		n += len(rt.Partitions)
-	}
-	if n == 0 {
-		return 0, badInput("none of the group's offsets are on topics that still exist")
 	}
 	resp, err := req.RequestWith(ctx, b.cl)
 	if err != nil {
@@ -329,12 +395,45 @@ func (b *backend) ResetGroupOffsets(ctx context.Context, id, to string) (int, er
 	case failed == 0:
 		return moved, nil
 	case errors.Is(firstErr, kerr.UnknownMemberID), errors.Is(firstErr, kerr.IllegalGeneration), errors.Is(firstErr, kerr.RebalanceInProgress):
-		return moved, badInput("a consumer joined the group while its offsets were being reset; stop its consumers and try again")
+		return moved, badInput("a consumer joined the group while its offsets were being changed; stop its consumers and try again")
 	case moved > 0:
-		return moved, fmt.Errorf("%d of %d offsets were reset; the rest failed: %w", moved, moved+failed, firstErr)
+		return moved, fmt.Errorf("%d of %d offsets were written; the rest failed: %w", moved, moved+failed, firstErr)
 	default:
 		return 0, firstErr
 	}
+}
+
+// DeleteGroupOffset removes one committed offset of an inactive group. The group
+// then has no position on that partition, and a consumer starts there from its
+// auto.offset.reset policy.
+func (b *backend) DeleteGroupOffset(ctx context.Context, id, topic string, partition int32) error {
+	req := kmsg.NewPtrOffsetDeleteRequest()
+	req.Group = id
+	rt := kmsg.NewOffsetDeleteRequestTopic()
+	rt.Topic = topic
+	rp := kmsg.NewOffsetDeleteRequestTopicPartition()
+	rp.Partition = partition
+	rt.Partitions = append(rt.Partitions, rp)
+	req.Topics = append(req.Topics, rt)
+	resp, err := req.RequestWith(ctx, b.cl)
+	if err != nil {
+		return err
+	}
+	if resp.ErrorCode != 0 {
+		return kerr.ErrorForCode(resp.ErrorCode)
+	}
+	for _, t := range resp.Topics {
+		for _, p := range t.Partitions {
+			switch err := kerr.ErrorForCode(p.ErrorCode); {
+			case err == nil:
+			case errors.Is(err, kerr.GroupSubscribedToTopic):
+				return badInput("the group has active members; stop its consumers before removing its offsets")
+			default:
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // DeleteGroup removes an inactive group and its committed offsets.

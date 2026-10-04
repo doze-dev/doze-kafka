@@ -212,16 +212,23 @@ func doPost(t *testing.T, c *Console, path string, form url.Values) *httptest.Re
 	return req(t, c, "POST", path, form)
 }
 
+// Who consumes a topic is part of its page. It used to be fetched after the page
+// had been shown, and arriving a moment later it pushed everything below it down.
 func TestTopicPageListsItsConsumers(t *testing.T) {
 	c, addr := newTestConsoleAddr(t)
 	topicWith(t, c, "t", 1, 4)
+	topicWith(t, c, "unread", 1, 1)
 	commitFor(t, addr, "reader", "t", map[int32]int64{0: 1})
-	if page := req(t, c, "GET", "/_console/topics/t", nil).Body.String(); !strings.Contains(page, `hx-get="/_console/topics/t/groups"`) {
-		t.Error("the topic page should lazily load its consumers")
+	page := req(t, c, "GET", "/_console/topics/t", nil).Body.String()
+	if !strings.Contains(page, "Consumed by") || !strings.Contains(page, `href="/_console/groups/reader"`) || !strings.Contains(page, "lag 3") {
+		t.Error("the topic page should name its consumer and its lag")
 	}
-	strip := req(t, c, "GET", "/_console/topics/t/groups", nil).Body.String()
-	if !strings.Contains(strip, "Consumed by") || !strings.Contains(strip, `href="/_console/groups/reader"`) || !strings.Contains(strip, "lag 3") {
-		t.Errorf("the consumers strip: %s", strip)
+	if strings.Contains(page, `hx-trigger="load"`) {
+		t.Error("something on the topic page is still loaded after it is shown")
+	}
+	// A topic nobody reads keeps the line, so every topic's page has the same shape.
+	if other := req(t, c, "GET", "/_console/topics/unread", nil).Body.String(); !strings.Contains(other, "Consumed by") || !strings.Contains(other, "no consumer group") {
+		t.Error("a topic with no consumers should say so in the same place")
 	}
 }
 

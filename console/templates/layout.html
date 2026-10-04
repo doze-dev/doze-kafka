@@ -16,14 +16,17 @@
 <link rel="icon" type="image/svg+xml" href="{{.Prefix}}/static/favicon.svg">
 <!-- Vendor CSS before app.css: app.css re-themes CodeMirror (background, syntax
      colors) at equal specificity, so it must come later to win the cascade. -->
+{{/* The two faces every page uses, fetched with the stylesheet rather than after it
+     has been parsed, so text is not drawn in a fallback font and then redrawn. */}}
+<link rel="preload" as="font" type="font/woff2" crossorigin href="{{.Prefix}}/static/fonts/ibm-plex-sans-latin-wght-normal.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="{{.Prefix}}/static/fonts/ibm-plex-mono-latin-400-normal.woff2">
 <link rel="stylesheet" href="{{.Prefix}}/static/cm/codemirror.min.css">
 <link rel="stylesheet" href="{{.Prefix}}/static/app.css">
 {{/* Before first paint: the theme ("system" is resolved here, so the stylesheet
-     defines each theme once), the rail's width, and whether the composer is open. */}}
+     defines each theme once) and the rail's width. */}}
 <script>(function(){var d=document.documentElement,g=function(k){try{return localStorage.getItem(k);}catch(e){return null;}};
 var t=g("theme");d.setAttribute("data-theme",t==="light"||t==="dark"?t:(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
 var r=g("rail");if(r==="slim"||(r!=="wide"&&matchMedia("(max-width:1180px)").matches))d.setAttribute("data-rail","slim");
-if(g("dock")==="open")d.setAttribute("data-dock","open");
 window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").replace(/^\/+|\/+$/g,"").split("/");var v=(p[0]===""||((p[0]==="topics"||p[0]==="groups")&&!p[1]))?"list":"detail";d.setAttribute("data-view",v);};window.dozeView();})();</script>
 <script>document.addEventListener("alpine:init",function(){window.Alpine.store("filter",{
   q:"",
@@ -138,7 +141,7 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
 {{define "kvcopy"}}<span class="kv-copy"><span class="kv">{{.}}</span><button type="button" class="copy-btn" data-copy="{{.}}" title="Copy" aria-label="Copy">{{icon "copy"}}</button></span>{{end}}
 
 {{define "empty_detail"}}
-<main class="detail">
+<main class="detail" id="detail">
   <div class="empty-detail">
     {{icon .Glyph}}
     <p>{{.Hint}}</p>

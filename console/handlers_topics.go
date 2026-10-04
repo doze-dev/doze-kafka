@@ -81,15 +81,26 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	partition := partitionParam(r, detail.Partitions)
 
+	data := map[string]any{
+		"List": list, "Topic": detail, "Page": "topics",
+		"Partition": partition, "Title": name,
+		"Consumers": c.topicConsumers(ctx, name),
+	}
+	if q, all, before, asked := searchParams(r); asked {
+		// A search replaces the tape and the live table with what it found.
+		found, err := c.searchTopic(ctx, name, partition, detail.Partitions, q, all, before)
+		if err != nil {
+			c.fail(w, r, err)
+			return
+		}
+		data["Search"], data["PartitionRange"], data["Rows"] = found, partitionRange(detail.Partitions), found.Rows
+		c.render(w, r, "topic_detail", data)
+		return
+	}
 	tape, err := c.tapeData(ctx, name, detail.ID, partition, detail.Partitions, fromParam(r), hlParam(r), jumpParam(r))
 	if err != nil {
 		c.fail(w, r, err)
 		return
-	}
-
-	data := map[string]any{
-		"List": list, "Topic": detail, "Page": "topics",
-		"Partition": partition, "Title": name,
 	}
 	maps.Copy(data, tape)
 	c.render(w, r, "topic_detail", data)
@@ -375,6 +386,7 @@ func hlParam(r *http.Request) int64 {
 // template itself.
 type msgView struct {
 	Offset     int64
+	Partition  int32
 	Timestamp  time.Time
 	TimeStr    string
 	TimeFull   string // full RFC 3339 timestamp, for the hover title.
@@ -458,15 +470,8 @@ func (c *Console) tapeData(ctx context.Context, topic, topicID string, partition
 
 	asc := make([]msgView, len(msgs))
 	for i, m := range msgs {
-		asc[i] = msgView{
-			Offset: m.Offset, Timestamp: m.Timestamp, TimeStr: m.Timestamp.Format("15:04:05"),
-			TimeFull:   m.Timestamp.Format(time.RFC3339),
-			Key:        previewOnly(m.Key), // the table shows one line; the drawer does the rest.
-			Value:      previewOnly(m.Value),
-			Headers:    m.Headers,
-			Hot:        atTail && i >= len(msgs)-3,
-			TickHeight: tickHeight(len(m.Value)),
-		}
+		asc[i] = newMsgView(m)
+		asc[i].Hot = atTail && i >= len(msgs)-3
 	}
 	desc := make([]msgView, len(asc))
 	for i, v := range asc {
@@ -479,7 +484,7 @@ func (c *Console) tapeData(ctx context.Context, topic, topicID string, partition
 		"PartSelect":     partitionCount > maxPartitionTabs,
 		"JumpNote":       jumpNote,
 		"Messages":       asc,
-		"MessagesDesc":   desc,
+		"Rows":           desc,
 		"Earliest":       earliest,
 		"Latest":         latest,
 		"Count":          latest - earliest,

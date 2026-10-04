@@ -29,10 +29,15 @@ function report(id, ok, detail) {
     page.on('pageerror', e => errors.push(`${path}: ${e.message}`));
     if (opts.init) await page.addInitScript(opts.init);
     await page.goto(base + path, { waitUntil: 'networkidle' });
+    if (opts.dock) await page.click('#compose-head'); // open the composer.
     return page;
   }
   const produce = (page, topic, partition, value) =>
     page.request.post(`${base}/topics/${topic}/produce`, { form: { partition: String(partition), value, partition_ctx: String(partition) } });
+  // The offset of the nth row in the table (0 = newest shown). The checks use rows
+  // that are on screen rather than fixed offsets, so they do not depend on how
+  // many records the topic happens to hold.
+  const rowOffset = (page, n) => page.evaluate(n => Number(document.querySelectorAll('tr[id^="msg-"]')[n].id.slice(4)), n);
   async function check(id, fn) {
     if (only && !only.includes(id)) return;
     try { await fn(); } catch (e) { report(id, false, 'threw: ' + String(e.message).split('\n')[0]); }
@@ -49,7 +54,7 @@ function report(id, ok, detail) {
   await check('U2', async () => {
     let worst = null;
     for (const h of [900, 700, 560]) {
-      const page = await open('/topics/orders', { h, init: () => localStorage.setItem('dock', 'open') });
+      const page = await open('/topics/orders', { h, dock: true });
       const r = await page.evaluate(() => {
         const wb = document.querySelector('.detail.workbench');
         wb.scrollTop = wb.scrollHeight;
@@ -77,10 +82,11 @@ function report(id, ok, detail) {
   await check('U4', async () => {
     const page = await open('/topics/orders');
     await page.route('**/message?*', async r => { await new Promise(x => setTimeout(x, 900)); r.continue(); });
-    await page.click('#msg-10');
-    await page.waitForSelector('#drawer-title[data-offset="10"]');
+    const at = await rowOffset(page, 5);
+    await page.click('#msg-' + at);
+    await page.waitForSelector(`#drawer-title[data-offset="${at}"]`);
     await page.click('#drawer button[aria-label="Older record"]');
-    await page.waitForSelector('#drawer-title[data-offset="9"]');
+    await page.waitForSelector(`#drawer-title[data-offset="${at - 1}"]`);
     await page.waitForTimeout(200);
     const barHidden = await page.evaluate(() => document.getElementById('reqbar').hidden);
     await page.unroute('**/message?*');
@@ -94,8 +100,9 @@ function report(id, ok, detail) {
 
   await check('U6', async () => {
     const page = await open('/topics/orders');
-    await page.click('#msg-10');
-    await page.waitForSelector('#drawer-title[data-offset="10"]');
+    const at = await rowOffset(page, 5);
+    await page.click('#msg-' + at);
+    await page.waitForSelector(`#drawer-title[data-offset="${at}"]`);
     await page.keyboard.press('c'); await page.keyboard.press('m'); await page.keyboard.press('j');
     await page.waitForTimeout(300);
     const a = await page.evaluate(() => ({ url: location.pathname, dock: document.documentElement.getAttribute('data-dock'), cursor: !!document.querySelector('.li.cursor') }));
@@ -149,7 +156,7 @@ function report(id, ok, detail) {
   });
 
   await check('U10', async () => {
-    const page = await open('/topics/orders', { init: () => localStorage.setItem('dock', 'open') });
+    const page = await open('/topics/orders', { dock: true });
     let posts = 0;
     page.on('request', r => { if (r.method() === 'POST' && r.url().includes('/produce')) posts++; });
     await page.click('.dock .CodeMirror');
@@ -162,14 +169,21 @@ function report(id, ok, detail) {
     await page.context().close();
   });
 
+  // The composer belongs to the page it was opened on: it stays through a change of
+  // partition, and closes when you move to another topic. (The audit's U11 asked for
+  // it to be remembered across topics; in use that covered the next topic's messages.)
   await check('U11', async () => {
     const page = await open('/topics/orders');
     await page.click('#compose-head');
+    await page.click('.ptab >> nth=1');
+    await page.waitForFunction(() => /partition=1/.test(location.search));
+    await page.waitForTimeout(300);
+    const same = await page.evaluate(() => ({ shown: document.querySelector('.dock-form').offsetParent !== null, aria: document.getElementById('compose-head').getAttribute('aria-expanded') }));
     await page.click('.listpane .li[data-name="payments.events.v1"]');
     await page.waitForFunction(() => location.pathname.endsWith('payments.events.v1'));
     await page.waitForTimeout(300);
-    const st = await page.evaluate(() => ({ shown: document.querySelector('.dock-form').offsetParent !== null, aria: document.getElementById('compose-head').getAttribute('aria-expanded') }));
-    report('U11', st.shown && st.aria === 'true', JSON.stringify(st));
+    const other = await page.evaluate(() => ({ shown: document.querySelector('.dock-form').offsetParent !== null, aria: document.getElementById('compose-head').getAttribute('aria-expanded') }));
+    report('U11', same.shown && same.aria === 'true' && !other.shown && other.aria === 'false', JSON.stringify({ samePartitionChange: same, otherTopic: other }));
     await page.context().close();
   });
 
@@ -179,8 +193,9 @@ function report(id, ok, detail) {
     await set(60);
     await page.waitForTimeout(3200); // an unchanged poll goes by.
     await set(160);
-    await page.evaluate(() => document.getElementById('msg-5').click());
-    await page.waitForSelector('#drawer-title[data-offset="5"]');
+    const at = await rowOffset(page, 12);
+    await page.evaluate(at => document.getElementById('msg-' + at).click(), at);
+    await page.waitForSelector(`#drawer-title[data-offset="${at}"]`);
     await page.waitForTimeout(200);
     const y = await page.evaluate(() => document.querySelector('.tbl-wrap').scrollTop);
     report('U12', y === 160, `scrolled to 160, opened a record, now at ${y}`);
@@ -190,7 +205,7 @@ function report(id, ok, detail) {
   await check('U13', async () => {
     const page = await open('/topics/orders');
     await page.route('**/message?*', async r => { await new Promise(x => setTimeout(x, 1200)); r.continue().catch(() => {}); });
-    await page.click('#msg-10');
+    await page.click('#msg-' + await rowOffset(page, 5));
     await page.waitForTimeout(150);
     await page.keyboard.press('Escape');
     await page.waitForTimeout(2000);
@@ -214,7 +229,7 @@ function report(id, ok, detail) {
     const long = await (await open('/topics')).evaluate(() => Array.from(document.querySelectorAll('.li')).map(l => l.dataset.name).sort((a, b) => b.length - a.length)[0]);
     for (const w of [420, 360]) {
       for (const [path, dock] of [['/topics', 0], ['/topics/orders', 0], ['/topics/orders', 1], ['/topics/' + long, 0], ['/groups/analytics', 0], ['/groups/' + encodeURIComponent(GROUP), 0], ['/cluster', 0], ['/new/topic', 0], ['/topics/orders?open=5', 0]]) {
-        const page = await open(path, { w, h: 760, init: dock ? () => localStorage.setItem('dock', 'open') : undefined });
+        const page = await open(path, { w, h: 760, dock: !!dock });
         await page.waitForTimeout(250);
         const over = await page.evaluate(() => {
           const vw = window.innerWidth;
@@ -239,7 +254,7 @@ function report(id, ok, detail) {
   await check('U16', async () => {
     const page = await open('/topics/orders', { h: 600 });
     await page.fill('#jump-to', '3');
-    await page.click('.jump-go');
+    await page.click('.jump .jump-go');
     await page.waitForSelector('tr[data-hl]');
     await page.waitForTimeout(400);
     const st = await page.evaluate(() => { const r = document.querySelector('tr[data-hl]').getBoundingClientRect(), w = document.querySelector('.tbl-wrap').getBoundingClientRect(); return { id: document.querySelector('tr[data-hl]').id, inView: r.top >= w.top && r.bottom <= w.bottom }; });
@@ -250,13 +265,14 @@ function report(id, ok, detail) {
   await check('U17', async () => {
     const page = await open('/topics/orders');
     await page.route('**/message?*', async r => { await new Promise(x => setTimeout(x, 1000)); r.fulfill({ status: 502, body: 'The console could not get an answer from the broker.' }); });
-    await page.click('#msg-10');
+    const at = await rowOffset(page, 5);
+    await page.click('#msg-' + at);
     await page.waitForTimeout(300);
     const loading = await page.evaluate(() => ({ title: !!document.querySelector('#drawer #drawer-title'), close: !!document.querySelector('#drawer [data-drawer-close]'), focusIn: document.getElementById('drawer').contains(document.activeElement) }));
     await page.waitForTimeout(1200);
     const err = await page.evaluate(() => ({ title: !!document.querySelector('#drawer #drawer-title'), alert: (document.querySelector('#drawer [role=alert]') || {}).textContent, focusIn: document.getElementById('drawer').contains(document.activeElement) }));
     await page.keyboard.press('Escape');
-    const closed = await page.evaluate(() => document.getElementById('drawer-overlay').hidden && document.activeElement.id === 'msg-10');
+    const closed = await page.evaluate(at => document.getElementById('drawer-overlay').hidden && document.activeElement.id === 'msg-' + at, at);
     const ok = loading.title && loading.close && loading.focusIn && err.title && /could not get an answer/.test(err.alert || '') && err.focusIn && closed;
     report('U17', ok, JSON.stringify({ loading, err, closed }));
     await page.context().close();
@@ -287,8 +303,8 @@ function report(id, ok, detail) {
   await check('U21', async () => {
     const bad = [];
     for (const scheme of ['light', 'dark']) {
-      for (const [path, dock] of [['/topics/orders?open=5', 1], ['/groups/analytics', 0], ['/cluster', 0], ['/new/topic', 0]]) {
-        const page = await open(path, { scheme, init: dock ? () => localStorage.setItem('dock', 'open') : undefined });
+      for (const [path, dock] of [['/topics/orders', 1], ['/topics/orders?open=5', 0], ['/topics/orders?q=ord&all=1', 0], ['/groups/analytics', 0], ['/groups/' + encodeURIComponent(GROUP), 0], ['/cluster', 0], ['/new/topic', 0]]) {
+        const page = await open(path, { scheme, dock: !!dock });
         await page.waitForTimeout(300);
         const r = await page.evaluate(() => {
           const named = el => {
@@ -323,7 +339,7 @@ function report(id, ok, detail) {
   });
 
   await check('U23', async () => {
-    const page = await open('/topics/orders', { init: () => localStorage.setItem('dock', 'open') });
+    const page = await open('/topics/orders', { dock: true });
     await page.selectOption('#f-partition', '2');
     await page.click('.dock .CodeMirror');
     await page.keyboard.type('to another partition');
@@ -348,6 +364,68 @@ function report(id, ok, detail) {
     await page.evaluate(() => document.fonts.ready);
     const fonts = await page.evaluate(() => [document.fonts.check('14px "IBM Plex Sans Variable"'), document.fonts.check('500 13px "IBM Plex Mono"')].join(','));
     report('theme', sys === 'dark' && light === 'light rgb(255, 255, 255)' && kept === 'light' && follows === 'light' && fonts === 'true,true', JSON.stringify({ sys, light, kept, follows, fonts }));
+    await page.context().close();
+  });
+
+  // Moving between topics: nothing on the page moves after it is shown, and the
+  // list is not redrawn (it keeps its scroll position and its elements).
+  await check('switch', async () => {
+    const page = await open('/topics/orders', { h: 420 });
+    await page.evaluate(() => {
+      window.__shifts = [];
+      new PerformanceObserver(l => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__shifts.push(+e.value.toFixed(4)); }).observe({ type: 'layout-shift' });
+      document.querySelector('.listpane').setAttribute('data-same', '1');
+      document.querySelector('.lp-scroll').scrollTop = 40;
+    });
+    const seen = [];
+    for (const name of ['payments.events.v1', 'orders', 'binary-blobs', 'empty-topic', 'orders']) {
+      await page.evaluate(n => document.querySelector(`.listpane .li[data-name="${n}"]`).click(), name);
+      await page.waitForFunction(n => location.pathname.endsWith('/' + n) && document.querySelector('.idband h1').textContent === n, name);
+      await page.waitForTimeout(500);
+      seen.push(await page.evaluate(() => document.querySelector('.listpane .li.on').dataset.name));
+    }
+    const st = await page.evaluate(() => ({ shifts: window.__shifts, sameList: document.querySelector('.listpane').hasAttribute('data-same'), listScroll: document.querySelector('.lp-scroll').scrollTop, late: document.querySelectorAll('[hx-trigger="load"]').length }));
+    report('switch', st.shifts.length === 0 && st.sameList && st.listScroll === 40 && st.late === 0 && seen.join() === 'payments.events.v1,orders,binary-blobs,empty-topic,orders', JSON.stringify({ ...st, highlighted: seen.join() }));
+    await page.context().close();
+  });
+
+  await check('offsets', async () => {
+    const page = await open('/groups/' + encodeURIComponent(GROUP));
+    const row = '#group-live tbody tr >> nth=0';
+    await page.click(`${row} >> text=Set…`);
+    await page.fill(`${row} >> input[name=offset]`, '1');
+    await produce(page, 'payments.events.v1', 0, 'offsets'); // the lag changes: a refresh is due.
+    await page.waitForTimeout(3500);
+    const kept = await page.inputValue(`${row} >> input[name=offset]`).catch(() => 'GONE');
+    await page.click(`${row} >> button[type=submit]`);
+    await page.waitForSelector('.toast');
+    const toast = (await page.innerText('.toast')).replace(/\s+/g, ' ');
+    const committed = await page.innerText(`${row} >> td >> nth=3`);
+    await page.click(`${row} >> text=Set…`);
+    await page.fill(`${row} >> input[name=offset]`, '99999');
+    await page.click(`${row} >> button[type=submit]`);
+    await page.waitForSelector(`${row} >> [data-err-slot]:not([hidden])`);
+    const err = await page.innerText(`${row} >> [data-err-slot]`);
+    report('offsets', kept === '1' && /now at offset 1/.test(toast) && committed.trim() === '1' && /outside partition/.test(err), JSON.stringify({ keptWhileRefreshing: kept, toast, committed: committed.trim(), err: err.slice(0, 60) }));
+    await page.context().close();
+  });
+
+  await check('search', async () => {
+    const page = await open('/topics/orders');
+    await page.fill('#find-q', 'ord_89');
+    await page.evaluate(() => document.getElementById('tape-and-table').setAttribute('data-mark', '1'));
+    await produce(page, 'orders', 0, 'search');
+    await page.waitForFunction(() => !document.getElementById('tape-and-table').hasAttribute('data-mark'), null, { timeout: 8000 });
+    await page.waitForTimeout(300);
+    const typed = await page.inputValue('#find-q');
+    await page.check('#find-all');
+    await page.click('.find button[type=submit]');
+    await page.waitForSelector('tr[id^="hit-"]');
+    const st = await page.evaluate(() => ({ rows: document.querySelectorAll('tr[id^="hit-"]').length, parts: new Set(Array.from(document.querySelectorAll('tr[id^="hit-"]')).map(r => r.id.split('-')[1])).size, note: document.querySelector('.jumpnote').innerText.slice(0, 50), live: document.getElementById('tape-and-table').hasAttribute('data-live'), url: location.search }));
+    await page.click('tr[id^="hit-"] >> nth=0');
+    await page.waitForSelector('#drawer-title[data-offset]');
+    const opened = await page.evaluate(() => ({ title: document.getElementById('drawer-title').textContent, url: location.search }));
+    report('search', typed === 'ord_89' && st.rows > 3 && st.parts === 3 && !st.live && /q=ord_89/.test(st.url) && !/open=/.test(opened.url), JSON.stringify({ typedSurvivedRefresh: typed, ...st, opened }));
     await page.context().close();
   });
 

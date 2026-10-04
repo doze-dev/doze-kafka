@@ -3,12 +3,15 @@ package broker_test
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
+
+	"go.etcd.io/bbolt"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 )
@@ -250,5 +253,93 @@ func TestGroupAdmin_MembersCarryClientIDAndHost(t *testing.T) {
 	cm := cresp.Groups[0].Members[0]
 	if cm.ClientID != "analytics-7" || !strings.HasPrefix(cm.ClientHost, "/127.0.0.1") {
 		t.Errorf("KIP-848 member client = %q host = %q, want analytics-7 from /127.0.0.1", cm.ClientID, cm.ClientHost)
+	}
+}
+
+// An offset can outlive its topic in a data directory written by an earlier
+// version (deleting a topic did not clear its offsets then). OffsetDelete refused
+// to touch it — UNKNOWN_TOPIC_OR_PARTITION — which left deleting the whole group
+// as the only way to be rid of it.
+func TestGroupAdmin_OffsetDeleteRemovesAnOffsetWhoseTopicIsGone(t *testing.T) {
+	dir := t.TempDir()
+	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
+	stop := runBrokerAt(t, addr, dir, 4)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cl := newClient(t, addr)
+	mustCreateTopic(t, ctx, cl, "kept", 1)
+	mustCreateTopic(t, ctx, cl, "gone", 1)
+	commitOffset(t, ctx, cl, "g", "kept", 3)
+	commitOffset(t, ctx, cl, "g", "gone", 9)
+	cl.Close()
+	stop()
+
+	// Take the topic out of the registry and leave its offset behind, which is
+	// what deleting a topic used to do. (The store's own API no longer can.)
+	db, err := bbolt.Open(filepath.Join(dir, "meta.db"), 0o600, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Update(func(tx *bbolt.Tx) error { return tx.Bucket([]byte("topics")).Delete([]byte("gone")) }); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+
+	stop = runBrokerAt(t, addr, dir, 4)
+	defer stop()
+	cl = newClient(t, addr)
+	defer cl.Close()
+	del := func(topic string, partition int32) int16 {
+		r := kmsg.NewPtrOffsetDeleteRequest()
+		r.Group = "g"
+		rt := kmsg.NewOffsetDeleteRequestTopic()
+		rt.Topic = topic
+		rp := kmsg.NewOffsetDeleteRequestTopicPartition()
+		rp.Partition = partition
+		rt.Partitions = append(rt.Partitions, rp)
+		r.Topics = append(r.Topics, rt)
+		resp, err := r.RequestWith(ctx, cl)
+		if err != nil || resp.ErrorCode != 0 {
+			t.Fatalf("OffsetDelete: %v %+v", err, resp)
+		}
+		return resp.Topics[0].Partitions[0].ErrorCode
+	}
+	// Every offset the group holds, as a tool lists them (no topics named).
+	held := func() map[string]int64 {
+		r := kmsg.NewPtrOffsetFetchRequest()
+		r.Version = 7
+		r.Group, r.Topics = "g", nil
+		resp, err := r.RequestWith(ctx, cl)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := map[string]int64{}
+		for _, rt := range resp.Topics {
+			for _, rp := range rt.Partitions {
+				if rp.Offset >= 0 {
+					out[rt.Topic] = rp.Offset
+				}
+			}
+		}
+		return out
+	}
+	if got := held(); got["gone"] != 9 || got["kept"] != 3 {
+		t.Fatalf("the planted offset is not listed: %v", got)
+	}
+	if code := del("gone", 0); code != 0 {
+		t.Errorf("removing an offset whose topic is gone: code %d, want 0", code)
+	}
+	if got := held(); len(got) != 1 || got["kept"] != 3 {
+		t.Errorf("after removing it the group holds %v, want only kept: 3", got)
+	}
+	// Where there is nothing stored, an unknown topic is still an unknown topic.
+	if code := del("gone", 0); code != int16(protocol.ErrUnknownTopicOrPart) {
+		t.Errorf("a topic that does not exist and has no offset: code %d, want UNKNOWN_TOPIC_OR_PARTITION", code)
+	}
+	if code := del("never", 0); code != int16(protocol.ErrUnknownTopicOrPart) {
+		t.Errorf("an unknown topic: code %d", code)
+	}
+	if off := fetchCommitted(t, ctx, cl, "g", "kept"); off != 3 {
+		t.Errorf("another topic's offset was disturbed: %d", off)
 	}
 }

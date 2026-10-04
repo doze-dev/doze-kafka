@@ -1,10 +1,12 @@
 package console
 
 import (
+	"context"
 	"fmt"
 	"hash/fnv"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -26,6 +28,7 @@ type groupLagRow struct {
 	Partition  int32
 	Owner      string // which member holds the partition now, if any.
 	Committed  int64
+	Earliest   int64
 	Latest     int64
 	Lag        int64
 	LagPercent int
@@ -142,7 +145,7 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 			rows = append(rows, row)
 			continue
 		}
-		row.Latest = b[o.Partition].Latest
+		row.Earliest, row.Latest = b[o.Partition].Earliest, b[o.Partition].Latest
 		switch {
 		case o.Committed > row.Latest:
 			row.Ahead, row.AheadBy = true, o.Committed-row.Latest
@@ -174,6 +177,7 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 
 	return map[string]any{
 		"Group": detail, "Members": members, "Offsets": rows, "TotalLag": totalLag, "AnyAhead": anyAhead,
+		"Topics":    offsetTopics(rows),
 		"CanAct":    detail.State == "Empty" && len(detail.Members) == 0,
 		"NoCommits": len(offsets) == 0,
 		"Hash":      fmt.Sprintf("%x", h.Sum64()),
@@ -207,21 +211,102 @@ func (c *Console) groupLive(w http.ResponseWriter, r *http.Request) {
 }
 
 // groupReset moves an inactive group's committed offsets to the earliest or latest
-// position and re-renders the page's live region.
+// position (all of them, or those on one topic) and re-renders the live region.
 func (c *Console) groupReset(w http.ResponseWriter, r *http.Request) {
-	id, to := groupFromSegment(r.PathValue("id")), r.FormValue("to")
-	n, err := c.be.ResetGroupOffsets(r.Context(), id, to)
+	id, to, topic := groupFromSegment(r.PathValue("id")), r.FormValue("to"), r.FormValue("topic")
+	n, err := c.be.ResetGroupOffsets(r.Context(), id, to, topic)
 	if err != nil {
 		c.fail(w, r, err)
 		return
 	}
-	toast(w, fmt.Sprintf("Reset %d offset%s to %s", n, plural(n), to))
+	msg := fmt.Sprintf("Reset %d offset%s to %s", n, plural(n), to)
+	if topic != "" {
+		msg += " on " + topic
+	}
+	c.groupChanged(w, r, id, msg)
+}
+
+// groupChanged answers a change to a group's offsets: a toast, and the live region.
+func (c *Console) groupChanged(w http.ResponseWriter, r *http.Request, id, msg string) {
+	toast(w, msg)
 	data, err := c.groupData(r, id)
 	if err != nil {
 		c.fail(w, r, err)
 		return
 	}
 	c.partial(w, "group_live", data)
+}
+
+// groupOffsetSet writes one partition's committed offset: to a number, or to the
+// partition's earliest or latest position.
+func (c *Console) groupOffsetSet(w http.ResponseWriter, r *http.Request) {
+	id, topic, to := groupFromSegment(r.PathValue("id")), r.FormValue("topic"), r.FormValue("to")
+	partition, offset, err := offsetCoordinates(r, to == "")
+	if err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	got, err := c.be.SetGroupOffset(r.Context(), id, topic, partition, to, offset)
+	if err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	c.groupChanged(w, r, id, fmt.Sprintf("%s · partition %d is now at offset %d", topic, partition, got))
+}
+
+// groupOffsetDelete removes one partition's committed offset.
+func (c *Console) groupOffsetDelete(w http.ResponseWriter, r *http.Request) {
+	id, topic := groupFromSegment(r.PathValue("id")), r.FormValue("topic")
+	partition, _, err := offsetCoordinates(r, false)
+	if err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	if err := c.be.DeleteGroupOffset(r.Context(), id, topic, partition); err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	// The group's last offset may have been the only thing keeping it listed.
+	if !c.groupListed(r, id) {
+		c.redirect(w, r, c.prefix+"/groups", "Removed the group's last committed offset")
+		return
+	}
+	c.groupChanged(w, r, id, fmt.Sprintf("Removed the committed offset for %s · partition %d", topic, partition))
+}
+
+// groupListed reports whether the group still appears in the broker's list.
+func (c *Console) groupListed(r *http.Request, id string) bool {
+	list, err := c.be.ListGroups(r.Context())
+	if err != nil {
+		return true // cannot tell; stay on the page.
+	}
+	for _, g := range list {
+		if g.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+// offsetCoordinates reads the topic partition (and, when wanted, the offset) a
+// form names. Both must be whole numbers, 0 or more: nothing is coerced.
+func offsetCoordinates(r *http.Request, wantOffset bool) (int32, int64, error) {
+	if r.FormValue("topic") == "" {
+		return 0, 0, badInput("no topic was named")
+	}
+	p, err := strconv.ParseInt(strings.TrimSpace(r.FormValue("partition")), 10, 32)
+	if err != nil || p < 0 {
+		return 0, 0, badInput("%q is not a partition number", r.FormValue("partition"))
+	}
+	if !wantOffset {
+		return int32(p), 0, nil
+	}
+	raw := strings.TrimSpace(r.FormValue("offset"))
+	o, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || o < 0 {
+		return 0, 0, badInput("%q is not an offset; type a whole number, 0 or more", raw)
+	}
+	return int32(p), o, nil
 }
 
 func (c *Console) groupDelete(w http.ResponseWriter, r *http.Request) {
@@ -233,21 +318,35 @@ func (c *Console) groupDelete(w http.ResponseWriter, r *http.Request) {
 	c.redirect(w, r, c.prefix+"/groups", "Group deleted")
 }
 
-// topicGroups is the lazily loaded "who consumes this topic" strip on a topic page.
-func (c *Console) topicGroups(w http.ResponseWriter, r *http.Request) {
-	name := r.PathValue("name")
-	consumers, err := c.be.TopicConsumers(r.Context(), name)
+// consumerRow is one group reading a topic, with the link to it.
+type consumerRow struct {
+	TopicConsumer
+	URL string
+}
+
+// topicConsumers is who consumes a topic, for the strip on its page. It is part of
+// the page rather than fetched after it: arriving late, it pushed everything below
+// it down a line on every visit. A failure here costs the strip, not the page.
+func (c *Console) topicConsumers(ctx context.Context, topic string) []consumerRow {
+	consumers, err := c.be.TopicConsumers(ctx, topic)
 	if err != nil {
-		c.fail(w, r, err)
-		return
+		return nil
 	}
-	type row struct {
-		TopicConsumer
-		URL string
-	}
-	rows := make([]row, len(consumers))
+	rows := make([]consumerRow, len(consumers))
 	for i, tc := range consumers {
-		rows[i] = row{tc, c.groupURL(tc.Group)}
+		rows[i] = consumerRow{tc, c.groupURL(tc.Group)}
 	}
-	c.partial(w, "topic_groups", map[string]any{"Consumers": rows})
+	return rows
+}
+
+// offsetTopics is the topics a group has offsets on that still exist, in order:
+// the choices for "reset only this topic".
+func offsetTopics(rows []groupLagRow) []string {
+	var out []string
+	for _, r := range rows {
+		if !r.Deleted && (len(out) == 0 || out[len(out)-1] != r.Topic) {
+			out = append(out, r.Topic)
+		}
+	}
+	return out
 }

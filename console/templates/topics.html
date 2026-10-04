@@ -2,7 +2,7 @@
 {{template "lp_head" dict "Glyph" "layers" "Label" "Topics" "NewURL" newTopicURL}}
 {{if not .List}}{{template "lp_empty" dict "Glyph" "layers" "Title" (t "topics.none.title") "Hint" (t "topics.none.hint")}}{{end}}
 {{range .List}}
-<a class="li {{if eq .Name $.Sel}}on{{end}}" href="{{topicURL .Name}}" data-name="{{.Name}}"
+<a class="li {{if eq .Name $.Sel}}on{{end}}" href="{{topicURL .Name}}" data-name="{{.Name}}" hx-target="#detail" hx-select="#detail"
    x-data x-show="!$store.filter.q || $el.dataset.name.toLowerCase().includes($store.filter.q.toLowerCase())">
   <span class="nm mono">{{.Name}}</span>
   <span class="meta"><span class="mono">{{.Msgs}} msg{{if ne .Msgs 1}}s{{end}}</span> · <span class="mono">{{.Partitions}} partition{{if ne .Partitions 1}}s{{end}}</span></span>
@@ -18,7 +18,7 @@
 
 {{define "topic_create"}}{{template "shell_top" .}}
   {{template "topic_lp" (dict "Prefix" .Prefix "List" .List "Sel" "")}}
-  <main class="detail"><div class="detail-inner">
+  <main class="detail" id="detail"><div class="detail-inner">
     <div class="idband"><div><h1 class="page-title">Create topic</h1></div></div>
     <form hx-post="{{newTopicURL}}" hx-disabled-elt="find button[type=submit]">
       <div class="panel form-sec"><div class="panel-h"><h2>General</h2></div><div class="form-b">
@@ -36,7 +36,7 @@
 
 {{define "topic_detail"}}{{template "shell_top" .}}
   {{template "topic_lp" (dict "Prefix" .Prefix "List" .List "Sel" .Topic.Name)}}
-  <main class="detail workbench"><div class="detail-inner topicwork">
+  <main class="detail workbench" id="detail"><div class="detail-inner topicwork">
     <div class="idband">
       <div>
         <h1>{{.Topic.Name}}</h1>
@@ -63,7 +63,7 @@
       </div>
     </details>
 
-    <div class="topic-groups" id="topic-groups" hx-get="{{topicURL .Topic.Name}}/groups" hx-trigger="load" hx-target="this" hx-select="unset" hx-swap="innerHTML"></div>
+    {{template "topic_groups" .}}
 
     {{template "tape_and_table" .}}
 
@@ -139,9 +139,11 @@
 {{template "shell_bottom" .}}{{end}}
 
 {{/* tape_and_table is the live-polled unit: the tick strip + message table
-     together, so a new message appearing updates both from one partial. */}}
+     together, so a new message appearing updates both from one partial. With
+     .Search set it shows what a search found instead, and does not poll. */}}
 {{define "tape_and_table"}}
-<div class="tapetable" id="tape-and-table" data-msg-base="{{topicURL .Topic.Name}}/message?partition={{.Partition}}" {{if .AtTail}}data-live="{{topicURL .Topic.Name}}/tape?partition={{.Partition}}" data-hash="{{.Hash}}" data-live-ms="2500"{{end}}>
+<div class="tapetable" id="tape-and-table" {{if not .Search}}data-msg-base="{{topicURL .Topic.Name}}/message?partition={{.Partition}}" {{if .AtTail}}data-live="{{topicURL .Topic.Name}}/tape?partition={{.Partition}}" data-hash="{{.Hash}}" data-live-ms="2500"{{end}}{{end}}>
+  {{if not .Search}}
   <div class="tape-panel">
   <div class="tape-head">
     {{if .PartSelect}}
@@ -167,41 +169,55 @@
     <span class="mono" title="Records currently retained on this partition">{{.Count}} record{{if ne .Count 1}}s{{end}}</span>
   </div>
   </div>
+  {{end}}
 
   <div class="secrow">
-    <span class="sec-title">Messages · partition {{.Partition}}</span>
+    <span class="sec-title">{{if .Search}}{{if .Search.Query}}Search{{else}}Latest{{end}} · {{if .Search.All}}all partitions{{else}}partition {{.Partition}}{{end}}{{else}}Messages · partition {{.Partition}}{{end}}</span>
+    <form class="find" method="get" action="{{topicURL .Topic.Name}}" role="search">
+      <input type="hidden" name="partition" value="{{.Partition}}">
+      <input class="input" id="find-q" name="q" type="search" placeholder="Search keys, values, headers" aria-label="Search this topic's records" autocomplete="off" {{if .Search}}value="{{.Search.Query}}"{{end}}>
+      <label class="chk" title="Search every partition's newest records, and show them together"><input type="checkbox" id="find-all" name="all" value="1" {{if and .Search .Search.All}}checked{{end}}> all partitions</label>
+      <button type="submit" class="btn btn-outline jump-go">Search</button>
+      {{if .Search}}<a class="btn btn-outline jump-go" href="{{.Search.ClearURL}}">Clear</a>{{end}}
+    </form>
+    {{if not .Search}}
     <form class="jump" method="get" action="{{topicURL .Topic.Name}}">
       <input type="hidden" name="partition" value="{{.Partition}}">
       <label for="jump-to">go to offset</label>
       <input class="input mono" id="jump-to" name="jump" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. {{if gt .Latest 0}}{{.Latest}}{{else}}0{{end}}" autocomplete="off">
       <button type="submit" class="btn btn-outline jump-go">Go</button>
     </form>
+    {{end}}
   </div>
+  {{if .Search}}<div class="jumpnote" role="status">{{icon "info"}} <span>{{.Search.Note}}{{if .Search.OlderURL}} <a class="pagelink" href="{{.Search.OlderURL}}">Search older records</a>{{end}}</span></div>{{end}}
   {{if .JumpNote}}<div class="jumpnote" role="status">{{icon "info"}} {{.JumpNote}}</div>{{end}}
   <div class="tbl-wrap">
     <table class="tbl">
-      <thead><tr><th class="num">Offset</th><th class="col-time">Time</th><th>Key</th><th>Value</th><th class="col-hdrs">Headers</th></tr></thead>
+      <thead><tr>{{if .Search}}<th class="num">Partition</th>{{end}}<th class="num">Offset</th><th class="col-time">Time</th><th>Key</th><th>Value</th><th class="col-hdrs">Headers</th></tr></thead>
       <tbody>
-        {{if .Messages}}{{range .MessagesDesc}}
-        <tr id="msg-{{.Offset}}" {{if eq .Offset $.HL}}class="hl" data-hl{{end}} tabindex="0" role="button" aria-label="Open offset {{.Offset}}" data-drawer-open hx-get="{{topicURL $.Topic.Name}}/message?partition={{$.Partition}}&offset={{.Offset}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML">
+        {{range .Rows}}
+        <tr id="{{if $.Search}}hit-{{.Partition}}-{{.Offset}}{{else}}msg-{{.Offset}}{{end}}" {{if and (not $.Search) (eq .Offset $.HL)}}class="hl" data-hl{{end}} tabindex="0" role="button" aria-label="Open {{if $.Search}}partition {{.Partition}} {{end}}offset {{.Offset}}" data-drawer-open hx-get="{{topicURL $.Topic.Name}}/message?partition={{.Partition}}&offset={{.Offset}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML">
+          {{if $.Search}}<td class="num mono">{{.Partition}}</td>{{end}}
           <td class="cell-offset num">{{.Offset}}</td>
           <td class="cell-time col-time" title="{{.TimeFull}}">{{.TimeStr}} <span class="dim ago" data-ts="{{.Timestamp.UnixMilli}}">· {{ago .Timestamp}}</span></td>
           <td class="cell-key {{if or .Key.Null .Key.Empty}}none{{end}}" title="{{if .Key.Null}}null key{{else}}{{.Key.Preview}} · {{.Key.SizeText}}{{end}}">{{if .Key.Null}}no key{{else}}{{.Key.Preview}}{{end}}</td>
           <td class="cell-val {{if .Value.Binary}}binary{{end}} {{if .Value.Null}}tomb{{end}}" title="{{.Value.SizeText}}">{{if or .Value.Binary .Value.Null .Value.Empty}}<span class="vspecial">{{.Value.Preview}}</span>{{else}}{{jsonTint .Value.Preview}}{{end}}</td>
           <td class="col-hdrs">{{if .Headers}}<span class="hdrct">{{len .Headers}}</span>{{else}}<span class="dim">—</span>{{end}}</td>
         </tr>
-        {{end}}{{else}}
-        <tr><td colspan="5" class="empty">{{if gt .Earliest 0}}{{t "messages.retention" .Earliest}}{{else}}{{t "messages.none"}}{{end}}</td></tr>
+        {{else}}
+        <tr><td colspan="6" class="empty">{{if .Search}}{{if .Search.Query}}Nothing in the records that were read contains “{{.Search.Query}}”.{{else}}No records.{{end}}{{else if gt .Earliest 0}}{{t "messages.retention" .Earliest}}{{else}}{{t "messages.none"}}{{end}}</td></tr>
         {{end}}
       </tbody>
     </table>
     <div class="tbl-foot">
-      <span>{{if .Messages}}{{len .Messages}} shown{{else}}No messages{{end}}</span>
+      <span>{{if .Rows}}{{len .Rows}} shown{{else}}No messages{{end}}</span>
+      {{if not .Search}}
       <span class="pager">
         {{if .HasOlder}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.OlderFrom}}">← Older</a>{{end}}
         {{if .HasNewer}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.NewerFrom}}">Newer</a><a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}">Latest →</a>{{end}}
         <span title="The oldest retained offset, and the log-end offset (where the next message goes)">log start {{.Earliest}} · log end {{.Latest}}</span>
       </span>
+      {{end}}
     </div>
   </div>
 </div>

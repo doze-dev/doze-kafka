@@ -30,8 +30,17 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   distinguished from an empty one, and a tombstone is labelled as one. **Download value** gives the exact bytes.
 - **Jump to offset** ("go to offset 120") lands on that record, or tells you the
   partition ends at N.
+- **Search** looks for text in keys, values and headers, ignoring case. Kafka keeps no
+  index of what records contain, so this is a scan: it reads the newest 5,000 records
+  of the partition, says exactly which offsets it read and how many matched, and
+  offers **Search older records** to carry on further back. Tick **all partitions**
+  to search every partition's newest records and see the matches together, newest
+  first; with no search text that is simply the latest records across the whole
+  topic.
 - **Send a message** from the dock at the bottom: key, value, headers, partition
-  (or "auto", which partitions by key exactly as a real client does), acks. Values
+  (or "auto", which partitions by key exactly as a real client does), acks. The
+  composer stays open while you change partition and closes when you move to another
+  topic. Values
   can be sent as text, JSON, base64, or a tombstone. **Send again** on any record
   produces an exact copy (the same key, value and headers, byte for byte), and
   **Edit a copy** opens the composer filled in with it, to change first.
@@ -48,8 +57,14 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   are explained rather than hidden: *no commits yet*, *ahead of the log end by N*
   (the topic was purged or recreated), *trimmed* (the committed offset has been
   deleted by retention), and offsets whose topic no longer exists.
-- **Reset offsets** (to earliest or latest) and **delete group**, for groups with no
-  active members. A group that is running is refused, with the reason.
+- **Reset offsets** to earliest or latest, for the whole group or for one topic, and
+  **delete group**.
+- **One partition's offset**: each row has **Set…** (a number between the partition's
+  oldest record and its end, or either end) and **Remove** (the group then has no
+  position there, and a consumer starts from its `auto.offset.reset`). Remove also
+  clears an offset left behind by a topic that no longer exists.
+- All of these are for groups with no active members. A group that is running commits
+  its own offsets, so changing them is refused, with the reason.
 
 ## Cluster
 
