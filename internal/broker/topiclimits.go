@@ -12,12 +12,15 @@ import (
 // accepted, stored and reported, and changes nothing; docs/limitations.md says
 // which is which.
 //
-//	retention.ms     delete segments older than this (-1: keep for ever)
-//	retention.bytes  delete the oldest segments once the partition exceeds this (-1: no limit)
-//	segment.bytes    roll to a new segment at this size
+//	retention.ms            delete segments older than this (-1: keep for ever)
+//	retention.bytes         delete the oldest segments once the partition exceeds this (-1: no limit)
+//	segment.bytes           roll to a new segment at this size
+//	max.message.bytes       refuse a record batch larger than this (produce.go)
+//	message.timestamp.type  LogAppendTime: records take the broker's clock (produce.go)
 //
-// A topic that sets none of them follows the broker's own settings.
-var enforcedTopicConfigs = []string{"retention.ms", "retention.bytes", "segment.bytes"}
+// A topic that sets none of the first three follows the broker's own settings;
+// the last two have no broker-wide counterpart and apply only where a topic sets
+// them.
 
 // TopicLimits resolves a topic's own configuration against the broker's into the
 // limits the log should apply. own is false when the topic overrides nothing that

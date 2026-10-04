@@ -9,6 +9,8 @@ import (
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/storage/log"
+	"strconv"
+	"time"
 )
 
 // handleProduce appends each partition's record batches to its log: stamp the base
@@ -70,8 +72,8 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 			case !ok || part.Partition < 0 || part.Partition >= topic.Partitions:
 				rp.ErrorCode = int16(protocol.ErrUnknownTopicOrPart)
 			default:
-				wrote := b.appendRecords(name, part, &rp)
-				refused = refused || rp.ErrorCode == int16(protocol.ErrCorruptMessage)
+				wrote := b.appendRecords(name, topic.Config, part, &rp)
+				refused = refused || rp.ErrorCode == int16(protocol.ErrCorruptMessage) || rp.ErrorCode == int16(protocol.ErrMessageTooLarge)
 				if wrote {
 					producedTopics[name] = struct{}{}
 					tp := topicPartition{name, part.Partition}
@@ -91,7 +93,7 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 			// acks=0 has no response to carry the error, so the only way to tell
 			// the producer its data was not taken is to drop the connection, as a
 			// real broker does. Staying silent lost the records unnoticed.
-			return nil, fmt.Errorf("produce with acks=0 carried an invalid record batch")
+			return nil, fmt.Errorf("produce with acks=0 carried a record batch the broker refused")
 		}
 		return nil, nil // fire-and-forget: the client expects no response.
 	}
@@ -121,7 +123,7 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 // appendRecords appends one partition's records and fills rp. A non-idempotent
 // payload (producer id -1) takes the plain fast path; an idempotent one goes through
 // sequence dedup. It reports whether any new data was written.
-func (b *Broker) appendRecords(topic string, part kmsg.ProduceRequestTopicPartition, rp *kmsg.ProduceResponseTopicPartition) bool {
+func (b *Broker) appendRecords(topic string, topicConfig map[string]string, part kmsg.ProduceRequestTopicPartition, rp *kmsg.ProduceResponseTopicPartition) bool {
 	plog, err := b.logs.ExistingPartition(topic, part.Partition)
 	if errors.Is(err, log.ErrNoSuchPartition) {
 		// The topic was deleted between resolving it and opening its log.
@@ -144,11 +146,45 @@ func (b *Broker) appendRecords(topic string, part kmsg.ProduceRequestTopicPartit
 		return false
 	}
 
-	hdr, ok := log.ParseBatch(part.Records)
-	if !ok || hdr.ProducerID < 0 {
-		return b.appendPlain(plog, part.Records, rp)
+	// The topic's own limit on one record batch, if it has set one. (There is no
+	// broker-wide default: a development broker that refused every batch over
+	// Kafka's 1 MB would surprise more people than it helped.)
+	if limit, ok := topicInt(topicConfig, "max.message.bytes"); ok {
+		if largest := log.LargestBatch(part.Records); largest > limit {
+			rp.ErrorCode = int16(protocol.ErrMessageTooLarge)
+			msg := fmt.Sprintf("a record batch of %d bytes is larger than this topic's max.message.bytes (%d)", largest, limit)
+			rp.ErrorMessage = &msg
+			rp.BaseOffset = -1
+			return false
+		}
 	}
-	return b.appendIdempotent(topic, part.Partition, plog, part.Records, rp)
+	// message.timestamp.type=LogAppendTime: the records take the broker's clock.
+	appendTime := int64(-1)
+	if topicConfig["message.timestamp.type"] == "LogAppendTime" {
+		appendTime = time.Now().UnixMilli()
+		log.StampLogAppendTime(part.Records, appendTime)
+	}
+
+	var wrote bool
+	if hdr, ok := log.ParseBatch(part.Records); !ok || hdr.ProducerID < 0 {
+		wrote = b.appendPlain(plog, part.Records, rp)
+	} else {
+		wrote = b.appendIdempotent(topic, part.Partition, plog, part.Records, rp)
+	}
+	if rp.ErrorCode == 0 {
+		rp.LogAppendTime = appendTime // -1 under CreateTime: the record's own timestamp stands.
+	}
+	return wrote
+}
+
+// topicInt reads a numeric topic config, if the topic has set it.
+func topicInt(topicConfig map[string]string, key string) (int64, bool) {
+	v, ok := topicConfig[key]
+	if !ok {
+		return 0, false
+	}
+	n, err := strconv.ParseInt(v, 10, 64)
+	return n, err == nil
 }
 
 // appendPlain appends the payload verbatim (no dedup) — the path for

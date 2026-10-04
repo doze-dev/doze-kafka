@@ -344,3 +344,98 @@ func TestTopicConfig_AlterAPIsAreAdvertisedByProfile(t *testing.T) {
 		}
 	}
 }
+
+// max.message.bytes on a topic refuses a larger record batch, by name, and leaves
+// other topics alone. It used to be stored and to refuse nothing.
+func TestTopicConfig_MaxMessageBytesRefusesLargerBatches(t *testing.T) {
+	addr := startBroker(t, 4)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	// Uncompressed: the limit is on the batch as it arrives, and 5000 repeated
+	// letters compress to almost nothing.
+	cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.ProducerBatchMaxBytes(1<<20), kgo.RecordRetries(1), kgo.ProducerBatchCompression(kgo.NoCompression()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cl.Close()
+	if code := createTopicWith(t, ctx, cl, "capped", map[string]string{"max.message.bytes": "2000"}); code != 0 {
+		t.Fatalf("create: %d", code)
+	}
+	mustCreateTopic(t, ctx, cl, "open", 1)
+
+	small, big := []byte(strings.Repeat("s", 500)), []byte(strings.Repeat("b", 5000))
+	if err := cl.ProduceSync(ctx, &kgo.Record{Topic: "capped", Value: small}).FirstErr(); err != nil {
+		t.Fatalf("a batch under the limit: %v", err)
+	}
+	err = cl.ProduceSync(ctx, &kgo.Record{Topic: "capped", Value: big}).FirstErr()
+	if err == nil || !strings.Contains(err.Error(), "MESSAGE_TOO_LARGE") {
+		t.Errorf("a 5000-byte record on a topic with max.message.bytes=2000: %v, want MESSAGE_TOO_LARGE", err)
+	}
+	if err := cl.ProduceSync(ctx, &kgo.Record{Topic: "open", Value: big}).FirstErr(); err != nil {
+		t.Errorf("a topic with no limit refused the same record: %v", err)
+	}
+	if latest := listOffset(t, ctx, cl, "capped", 0, -1); latest != 1 {
+		t.Errorf("the refused batch was stored anyway: log end %d, want 1", latest)
+	}
+	// Raising the limit lets it through.
+	if code, msg := incrementalAlter(t, ctx, cl, kmsg.ConfigResourceTypeTopic, "capped", false, alterOp{"max.message.bytes", opSet, "100000"}); code != 0 {
+		t.Fatalf("alter: %d %s", code, msg)
+	}
+	if err := cl.ProduceSync(ctx, &kgo.Record{Topic: "capped", Value: big}).FirstErr(); err != nil {
+		t.Errorf("after raising the limit: %v", err)
+	}
+}
+
+// message.timestamp.type=LogAppendTime: a consumer sees the broker's clock, not
+// whatever the producer wrote, and the batch is still one a client accepts (its
+// checksum covers the fields that were changed).
+func TestTopicConfig_LogAppendTimeReplacesTheProducersTimestamp(t *testing.T) {
+	addr := startBroker(t, 4)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cl := newClient(t, addr)
+	defer cl.Close()
+	if code := createTopicWith(t, ctx, cl, "stamped", map[string]string{"message.timestamp.type": "LogAppendTime"}); code != 0 {
+		t.Fatalf("create: %d", code)
+	}
+	mustCreateTopic(t, ctx, cl, "asis", 1)
+
+	old := time.Date(2001, 2, 3, 4, 5, 6, 0, time.UTC)
+	before := time.Now().Add(-time.Second)
+	for _, topic := range []string{"stamped", "asis"} {
+		// Idempotent (the client's default) and compressed: the paths with most to get wrong.
+		res := cl.ProduceSync(ctx, &kgo.Record{Topic: topic, Timestamp: old, Value: []byte("v1")}, &kgo.Record{Topic: topic, Timestamp: old, Value: []byte("v2")})
+		if err := res.FirstErr(); err != nil {
+			t.Fatalf("produce to %s: %v", topic, err)
+		}
+	}
+	read := func(topic string) []*kgo.Record {
+		c, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.ConsumeTopics(topic), kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer c.Close()
+		var out []*kgo.Record
+		for len(out) < 2 && ctx.Err() == nil {
+			fs := c.PollFetches(ctx)
+			if errs := fs.Errors(); len(errs) > 0 {
+				t.Fatalf("consume %s: %v", topic, errs)
+			}
+			out = append(out, fs.Records()...)
+		}
+		return out
+	}
+	for _, r := range read("stamped") {
+		if r.Timestamp.Before(before) || r.Timestamp.After(time.Now().Add(time.Second)) {
+			t.Errorf("LogAppendTime topic: record %q has timestamp %v, want the broker's clock (about now)", r.Value, r.Timestamp)
+		}
+		if r.Attrs.TimestampType() != 1 {
+			t.Errorf("record %q is not marked as LogAppendTime", r.Value)
+		}
+	}
+	for _, r := range read("asis") {
+		if !r.Timestamp.Equal(old) {
+			t.Errorf("CreateTime topic: record %q has timestamp %v, want the producer's %v", r.Value, r.Timestamp, old)
+		}
+	}
+}

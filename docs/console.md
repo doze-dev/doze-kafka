@@ -48,7 +48,9 @@ SASL is on (doze-kafka provisions it a private one at start-up).
 - **Settings** shows what is in force for the topic (how long records are kept, how
   much, and the segment size), marks the ones that are the topic's own, and lets you
   change them: type `7d`, `1GB`, `forever`, or leave a field blank to follow the
-  broker. The same three fields are on the create-topic form. Other Kafka topic
+  broker. The largest record batch the topic accepts, and whether records take the
+  producer's time or the broker's, are set there too. The same fields are on the
+  create-topic form. Other Kafka topic
   settings are listed for reading; a topic that asks for compaction is told it is not
   compacted.
 - **Purge** empties a topic (it is deleted and recreated, so it gets a new id) and

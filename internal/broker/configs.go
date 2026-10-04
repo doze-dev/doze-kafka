@@ -78,6 +78,9 @@ func (b *Broker) topicConfigEntries(t meta.Topic, names []string) []kmsg.Describ
 		"retention.bytes":      {retentionValue(b.cfg.RetentionBytes), kmsg.ConfigSourceDefaultConfig},
 		"segment.bytes":        {strconv.FormatInt(b.cfg.SegmentBytes, 10), kmsg.ConfigSourceDefaultConfig},
 		"index.interval.bytes": {strconv.FormatInt(b.cfg.IndexIntervalBytes, 10), kmsg.ConfigSourceDefaultConfig},
+		// CreateTime is what applies unless a topic says otherwise. max.message.bytes
+		// has no entry: unset, there is no per-batch limit to report.
+		"message.timestamp.type": {"CreateTime", kmsg.ConfigSourceDefaultConfig},
 	}
 	// ...overlaid with per-topic overrides from CreateTopics (dynamic topic config).
 	for k, v := range t.Config {

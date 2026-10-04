@@ -345,6 +345,8 @@ details.cfg { border: 1px solid var(--border); border-radius: var(--radius); bac
 .cfgsum .own { font-size: var(--fs-xs); color: var(--foreground); background: var(--accent); border-radius: var(--radius-sm); padding: 0 5px; }
 .cfgform { padding: 2px 12px 12px; border-top: 1px solid var(--border); color: var(--foreground); }
 .cfgfoot { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 12px; }
+.crow.settings { flex-wrap: wrap; }
+.crow.settings .field { flex: 1 1 200px; max-width: 340px; }
 .crow.settings .hint { font-size: var(--fs-xs); }
 .crow.settings label .hint { margin-left: 4px; }
 .panel-h h2 .sz { margin-left: 6px; }

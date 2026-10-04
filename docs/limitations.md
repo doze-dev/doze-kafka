@@ -35,12 +35,15 @@ implement it.
   removes it. A consumer reading a "compacted" topic from the start sees every value a
   key ever had, not only the latest. (Committed offsets are stored in the metadata
   database, not in a compacted `__consumer_offsets` topic.)
-- **Topic configuration: three settings act, the rest are kept.** A topic's own
+- **Topic configuration: five settings act, the rest are kept.** A topic's own
   `retention.ms`, `retention.bytes` and `segment.bytes`, given at `CreateTopics` or
   changed later with `AlterConfigs` / `IncrementalAlterConfigs`, are in force for that
-  topic and override the broker's. Every other Kafka topic config is validated, stored
-  and reported by `DescribeConfigs`, and changes nothing. `segment.bytes` must be at
-  least 1024. The broker's own configuration cannot be altered over the wire: it comes
+  topic and override the broker's. `max.message.bytes` refuses a larger record batch
+  (`MESSAGE_TOO_LARGE`), and `message.timestamp.type=LogAppendTime` stamps records
+  with the broker's clock; these two apply only where a topic sets them, and there is
+  no broker-wide batch limit below the 100 MiB request cap. Every other Kafka topic
+  config is validated, stored and reported by `DescribeConfigs`, and changes nothing.
+  `segment.bytes` must be at least 1024. The broker's own configuration cannot be altered over the wire: it comes
   from flags and the config file, and a request to change it is refused.
 - **ACLs and quotas.** Authentication exists (SASL/TLS), but there is no
   authorization: an authenticated client can do anything. No throttling either.

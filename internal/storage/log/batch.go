@@ -28,8 +28,10 @@ const (
 )
 
 const (
-	batchCompressionMask = 0x07 // attributes bits 0-2: the codec.
-	batchControlBit      = 0x20 // attributes bit 5: a control batch (transaction markers).
+	batchCompressionMask  = 0x07 // attributes bits 0-2: the codec.
+	batchLogAppendTimeBit = 0x08 // attributes bit 3: timestamps are the broker's (LogAppendTime).
+	batchMaxTimestampOff  = 35   // int64: the newest timestamp in the batch.
+	batchControlBit       = 0x20 // attributes bit 5: a control batch (transaction markers).
 
 	// maxCompressedRecords bounds the records one compressed batch may claim.
 	maxCompressedRecords = 16 << 20
@@ -137,6 +139,42 @@ func parseHeader(b []byte) (batchInfo, bool) {
 		recordCount: int32(binary.BigEndian.Uint32(b[batchLastOffsetDeltaOff:])) + 1,
 		totalBytes:  int64(batchOverhead) + int64(length),
 	}, true
+}
+
+// LargestBatch is the size in bytes of the largest record batch in a Produce
+// payload that has already passed ValidateBatches.
+func LargestBatch(records []byte) int64 {
+	var most int64
+	for pos := 0; pos < len(records); {
+		info, ok := parseHeader(records[pos:])
+		if !ok || info.totalBytes <= 0 {
+			break
+		}
+		most = max(most, info.totalBytes)
+		pos += int(info.totalBytes)
+	}
+	return most
+}
+
+// StampLogAppendTime marks every batch in a validated Produce payload as carrying
+// the broker's time rather than the producer's: the timestamp-type bit is set and
+// the batch's maximum timestamp becomes nowMs, which is what a reader then takes
+// as the time of each record in it. Both fields are covered by the batch's
+// checksum, so that is recomputed. This is the only thing the broker ever changes
+// inside a batch besides its base offset.
+func StampLogAppendTime(records []byte, nowMs int64) {
+	for pos := 0; pos < len(records); {
+		info, ok := parseHeader(records[pos:])
+		if !ok || info.totalBytes < batchFullHeaderBytes || pos+int(info.totalBytes) > len(records) {
+			return
+		}
+		b := records[pos : pos+int(info.totalBytes)]
+		attrs := binary.BigEndian.Uint16(b[batchAttributesOff:]) | batchLogAppendTimeBit
+		binary.BigEndian.PutUint16(b[batchAttributesOff:], attrs)
+		binary.BigEndian.PutUint64(b[batchMaxTimestampOff:], uint64(nowMs))
+		binary.BigEndian.PutUint32(b[batchCRCOff:], crc32.Checksum(b[batchAttributesOff:], crcTable))
+		pos += int(info.totalBytes)
+	}
 }
 
 // stampBaseOffset overwrites the batch's base offset in place. Producers send a

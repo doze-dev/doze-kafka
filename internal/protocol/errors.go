@@ -9,6 +9,7 @@ const (
 	ErrNone                      ErrorCode = 0
 	ErrOffsetOutOfRange          ErrorCode = 1
 	ErrCorruptMessage            ErrorCode = 2  // a record batch failed validation (CRC, format, counts).
+	ErrMessageTooLarge           ErrorCode = 10 // a record batch is larger than the topic allows.
 	ErrKafkaStorageError         ErrorCode = 56 // the disk failed us; the data may not be durable.
 	ErrUnknownTopicOrPart        ErrorCode = 3
 	ErrRebalanceInProgress       ErrorCode = 27

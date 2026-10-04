@@ -944,6 +944,23 @@ func TestATopicCanBeCreatedWithItsOwnRetentionAndChangedLater(t *testing.T) {
 		t.Errorf("the topic's own config after the change: %v", own)
 	}
 
+	// The two that have no broker-wide counterpart: a size and a choice.
+	rec = req(t, c, "POST", "/_console/topics/t/config", url.Values{"retention.ms": {"12h"}, "retention.bytes": {"1GB"}, "max.message.bytes": {"1MB"}, "message.timestamp.type": {"LogAppendTime"}})
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `<option value="LogAppendTime" selected>`) || !strings.Contains(rec.Body.String(), "largest batch") {
+		t.Fatalf("save of the batch limit and timestamp type: %d %.300s", rec.Code, rec.Body)
+	}
+	if got, _ := c.be.topicOverrides(context.Background(), "t"); got["max.message.bytes"] != "1048576" || got["message.timestamp.type"] != "LogAppendTime" {
+		t.Errorf("after setting them: %v", got)
+	}
+	if rec := req(t, c, "POST", "/_console/topics/t/config", url.Values{"message.timestamp.type": {"Sometime"}}); rec.Code != 400 {
+		t.Errorf("a timestamp type that does not exist: %d", rec.Code)
+	}
+	req(t, c, "POST", "/_console/topics/t/config", url.Values{"retention.ms": {"12h"}, "retention.bytes": {"1GB"}})
+	own, _ = c.be.topicOverrides(context.Background(), "t")
+	if len(own) != 2 {
+		t.Fatalf("clearing the two again left %v", own)
+	}
+
 	// Refusals: what was typed, and what the broker will not have.
 	for _, bad := range []url.Values{
 		{"retention.ms": {"soon"}},

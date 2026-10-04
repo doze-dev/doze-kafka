@@ -11,7 +11,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
-// The topic settings the console lets you set: the three the broker acts on.
+// The topic settings the console lets you set: the ones the broker acts on.
 // Kafka writes them as bare numbers (milliseconds, bytes); here they are typed
 // and shown as a person would say them ("7d", "512 MB"), and sent as Kafka's
 // numbers. Every other Kafka topic config is stored and reported by the broker
@@ -24,12 +24,32 @@ type topicSetting struct {
 	Hint  string
 	parse func(string) (string, error) // what was typed -> Kafka's value.
 	show  func(string) string          // Kafka's value -> how to show it.
+	// Options, when set, are the only values: the field is a choice, not text.
+	Options []string
+	// Always puts the setting in the one-line summary even when the topic has not
+	// set it; the others appear there only when they are the topic's own.
+	Always bool
 }
 
 var topicSettings = []topicSetting{
-	{"retention.ms", "Keep records for", "7d, 12h, 30m, 90s, or forever", parseDuration, showDuration},
-	{"retention.bytes", "Keep at most", "per partition: 1GB, 500MB, or unlimited", parseSize, showSize},
-	{"segment.bytes", "Segment size", "64MB, 1GB; retention removes whole segments", parseSegment, showSize},
+	{Key: "retention.ms", Label: "Keep records for", Hint: "7d, 12h, 30m, 90s, or forever", parse: parseDuration, show: showDuration, Always: true},
+	{Key: "retention.bytes", Label: "Keep at most", Hint: "per partition: 1GB, 500MB, or unlimited", parse: parseSize, show: showSize, Always: true},
+	{Key: "segment.bytes", Label: "Segment size", Hint: "64MB, 1GB; retention removes whole segments", parse: parseSegment, show: showSize, Always: true},
+	{Key: "max.message.bytes", Label: "Largest batch", Hint: "refuse a record batch bigger than this: 1MB, 64KB", parse: parseSegment, show: showSize},
+	{Key: "message.timestamp.type", Label: "Record time", Hint: "LogAppendTime stamps records with the broker's clock", parse: parseChoice("CreateTime", "LogAppendTime"), show: func(v string) string { return v },
+		Options: []string{"CreateTime", "LogAppendTime"}},
+}
+
+// parseChoice accepts exactly one of the given values.
+func parseChoice(options ...string) func(string) (string, error) {
+	return func(raw string) (string, error) {
+		for _, o := range options {
+			if raw == o {
+				return o, nil
+			}
+		}
+		return "", badInput("%q is not one of %s", raw, strings.Join(options, ", "))
+	}
 }
 
 // durationUnits and sizeUnits are the suffixes understood, largest first so that
@@ -116,7 +136,7 @@ func showSize(v string) string {
 	return "0 B"
 }
 
-// settingsFromForm reads the three settings from a form. A blank field means "the
+// settingsFromForm reads the settings from a form. A blank field means "the
 // broker's default": it is absent from set, and listed in unset.
 func settingsFromForm(r *http.Request) (set map[string]string, unset []string, err error) {
 	set = map[string]string{}
@@ -138,8 +158,10 @@ func settingsFromForm(r *http.Request) (set map[string]string, unset []string, e
 // settingView is one editable setting as the topic page shows it.
 type settingView struct {
 	Key, Label, Hint string
-	Own              string // the topic's own value as typed ("7d"), or "" when it follows the broker.
-	Effective        string // what is in force, shown: the topic's own or the broker's.
+	Own              string   // the topic's own value as typed ("7d"), or "" when it follows the broker.
+	Effective        string   // what is in force, shown: the topic's own or the broker's.
+	Options          []string // a choice rather than text.
+	Summary          bool     // shown in the panel's one-line summary.
 }
 
 // configView is a topic's configuration for its page.
@@ -159,13 +181,14 @@ func newConfigView(entries []ConfigEntry) configView {
 	for _, ts := range topicSettings {
 		editable[ts.Key] = true
 		e, ok := byKey[ts.Key]
-		sv := settingView{Key: ts.Key, Label: ts.Label, Hint: ts.Hint}
+		sv := settingView{Key: ts.Key, Label: ts.Label, Hint: ts.Hint, Options: ts.Options}
 		if ok {
 			sv.Effective = ts.show(e.Value)
 			if e.Own {
 				sv.Own = strings.ReplaceAll(sv.Effective, " ", "")
 			}
 		}
+		sv.Summary = ok && (ts.Always || e.Own)
 		v.Settings = append(v.Settings, sv)
 	}
 	for _, e := range entries {
