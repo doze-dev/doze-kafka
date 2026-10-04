@@ -27,6 +27,19 @@ const (
 	batchOverhead           = 12 // baseOffset(8) + batchLength(4), excluded from batchLength
 )
 
+const (
+	batchCompressionMask = 0x07 // attributes bits 0-2: the codec.
+	batchControlBit      = 0x20 // attributes bit 5: a control batch (transaction markers).
+
+	// maxCompressedRecords bounds the records one compressed batch may claim.
+	maxCompressedRecords = 16 << 20
+)
+
+// ErrControlBatch is returned for a control batch sent by a client. Control
+// batches are written by the broker (transaction markers); a client that could
+// write them could end other producers' transactions.
+var ErrControlBatch = errors.New("log: clients may not write control batches")
+
 // ErrCorruptBatch is returned for a record batch that fails validation: wrong
 // format version, inconsistent lengths or counts, or a CRC that does not match.
 var ErrCorruptBatch = errors.New("log: corrupt record batch")
@@ -53,6 +66,20 @@ func checkBatchShape(b []byte) (batchInfo, error) {
 	if info.recordCount <= 0 || count != info.recordCount {
 		return batchInfo{}, fmt.Errorf("%w: record count %d disagrees with lastOffsetDelta (%d records)", ErrCorruptBatch, count, info.recordCount)
 	}
+	// The log-end offset advances by the record count, so the count has to be
+	// believable for the bytes that carry it: the two header fields agreeing with
+	// each other is not enough (a 69-byte batch claiming two billion records moved
+	// the next offset to 2147483647). An uncompressed record is at least a byte;
+	// a compressed batch can be dense, but not without limit.
+	attrs := binary.BigEndian.Uint16(b[batchAttributesOff:])
+	body := int64(len(b) - batchFullHeaderBytes)
+	if attrs&batchCompressionMask == 0 {
+		if int64(count) > body {
+			return batchInfo{}, fmt.Errorf("%w: %d records cannot fit in %d bytes", ErrCorruptBatch, count, body)
+		}
+	} else if int64(count) > maxCompressedRecords {
+		return batchInfo{}, fmt.Errorf("%w: %d records in one batch", ErrCorruptBatch, count)
+	}
 	return info, nil
 }
 
@@ -78,6 +105,9 @@ func ValidateBatches(records []byte) error {
 		}
 		if !crcOK(batch) {
 			return fmt.Errorf("%w: CRC mismatch in the batch at byte %d", ErrCorruptBatch, pos)
+		}
+		if binary.BigEndian.Uint16(batch[batchAttributesOff:])&batchControlBit != 0 {
+			return fmt.Errorf("%w (batch at byte %d)", ErrControlBatch, pos)
 		}
 		pos += int(info.totalBytes)
 	}

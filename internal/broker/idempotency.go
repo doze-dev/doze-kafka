@@ -1,6 +1,11 @@
 package broker
 
-import "sync"
+import (
+	"math"
+	"sort"
+	"sync"
+	"time"
+)
 
 // The idempotency tracker deduplicates an idempotent producer's retried batches.
 // A producer stamps each record batch with (producerID, producerEpoch, baseSequence);
@@ -61,22 +66,26 @@ func (i *idempotency) dropPartitions(topic string, partitions int32) {
 type partitionProducers struct {
 	mu        sync.Mutex
 	producers map[int64]*producerSequence
-	tick      int64 // advances on every accepted batch; orders producers by recency.
+	sweepAt   int // producer count after the last idle sweep.
 }
 
 type producerSequence struct {
 	epoch    int16
 	recent   []batchSeq // ascending by sequence; most recent last.
-	lastUsed int64
+	lastUsed time.Time
 }
 
-// maxProducersPerPartition bounds the sequence state kept per partition. Every
-// idempotent producer session gets a fresh producer id, so a long-running
-// broker driven by short-lived clients (a test suite, say) otherwise accrues one
-// entry per session forever. Evicting the least recently used is safe: that
-// producer's next batch is taken as a new baseline, which is what Kafka itself
-// does once a producer id expires.
-const maxProducersPerPartition = 1000
+// Producer state is dropped by idle time, as Kafka does, not by count. A producer
+// retries a batch within its delivery timeout (two minutes by default); state
+// that has been idle far longer than that can go. Evicting by count instead meant
+// that after a thousand other producers had written, an early producer's retry
+// was taken for a new batch and appended a second time. The hard ceiling exists
+// only so memory stays bounded if a great many producers are active at once.
+const (
+	producerIdleExpiry       = 15 * time.Minute
+	producerSweepEvery       = 1000  // sweep the idle out after this many producers accumulate.
+	maxProducersPerPartition = 50000 // hard ceiling per partition.
+)
 
 type batchSeq struct {
 	firstSeq, lastSeq int32
@@ -92,44 +101,65 @@ type verdict struct {
 type verdictKind int
 
 const (
-	seqAccept     verdictKind = iota // in order; append it.
-	seqDuplicate                     // already applied; return offset, don't append.
-	seqOutOfOrder                    // a gap; reject.
-	seqFenced                        // an older producer epoch; reject.
+	seqAccept       verdictKind = iota // in order; append it.
+	seqDuplicate                       // already applied; return offset, don't append.
+	seqDuplicateOld                    // already applied, but too long ago to say where.
+	seqOutOfOrder                      // a gap or an overlap; reject.
+	seqFenced                          // an older producer epoch; reject.
 )
+
+// nextSeq is the sequence that follows last. Sequences are 31-bit and wrap to 0.
+func nextSeq(last int32) int32 {
+	if last == math.MaxInt32 {
+		return 0
+	}
+	return last + 1
+}
+
+// lastSeqOf is the sequence of the last record in a batch of count records
+// starting at first, wrapping as nextSeq does.
+func lastSeqOf(first, count int32) int32 {
+	return int32((int64(first) + int64(count) - 1) & math.MaxInt32)
+}
 
 // check evaluates a batch (caller holds pp.mu). It does not mutate state; on
 // seqAccept the caller appends and then calls record.
 func (pp *partitionProducers) check(pid int64, epoch int16, firstSeq, lastSeq int32) verdict {
 	st := pp.producers[pid]
-	if st == nil || epoch > st.epoch {
-		// A producer we've never seen, or one that bumped its epoch (a new session):
-		// accept this batch as the new baseline.
+	if st == nil {
+		// A producer this broker has no memory of (new, or from before a restart):
+		// accept the batch as its baseline.
 		return verdict{kind: seqAccept}
 	}
 	if epoch < st.epoch {
 		return verdict{kind: seqFenced}
 	}
-	// Same epoch: compare against the last accepted sequence.
-	expected := int32(0)
-	if n := len(st.recent); n > 0 {
-		expected = st.recent[n-1].lastSeq + 1
-	}
-	switch {
-	case firstSeq == expected:
-		return verdict{kind: seqAccept}
-	case firstSeq < expected:
-		// A retry of an already-applied batch. Return its original offset if we
-		// still remember it; otherwise it's too old to place.
-		for _, b := range st.recent {
-			if b.firstSeq == firstSeq && b.lastSeq == lastSeq {
-				return verdict{kind: seqDuplicate, offset: b.baseOffset}
-			}
+	if epoch > st.epoch {
+		// A new epoch is a new session, and a session starts at sequence 0.
+		if firstSeq != 0 {
+			return verdict{kind: seqOutOfOrder}
 		}
-		return verdict{kind: seqDuplicate, offset: -1}
-	default: // firstSeq > expected
-		return verdict{kind: seqOutOfOrder}
+		return verdict{kind: seqAccept}
 	}
+	n := len(st.recent)
+	if n == 0 || firstSeq == nextSeq(st.recent[n-1].lastSeq) {
+		return verdict{kind: seqAccept}
+	}
+	// Not the next batch. An exact repeat of a remembered batch is a retry: answer
+	// with the offset it was given. Something older than everything remembered was
+	// applied long ago, but where is no longer known. Anything else — a gap, or a
+	// batch that overlaps what is already there — is out of order. It used to be
+	// answered as a successful duplicate, silently dropping records the producer
+	// believed were written.
+	for _, b := range st.recent {
+		if b.firstSeq == firstSeq && b.lastSeq == lastSeq {
+			return verdict{kind: seqDuplicate, offset: b.baseOffset}
+		}
+	}
+	if lastSeq < st.recent[0].firstSeq && firstSeq <= lastSeq {
+		return verdict{kind: seqDuplicateOld}
+	}
+	return verdict{kind: seqOutOfOrder}
 }
 
 // record remembers an accepted batch's sequence range and assigned offset (caller
@@ -144,26 +174,49 @@ func (pp *partitionProducers) record(pid int64, epoch int16, firstSeq, lastSeq i
 	if len(st.recent) > maxTrackedBatches {
 		st.recent = st.recent[len(st.recent)-maxTrackedBatches:]
 	}
-	pp.tick++
-	st.lastUsed = pp.tick
-	if len(pp.producers) > maxProducersPerPartition {
-		pp.evictOldest(pid)
+	st.lastUsed = now()
+	if len(pp.producers) >= pp.sweepAt+producerSweepEvery || len(pp.producers) > maxProducersPerPartition {
+		pp.expireIdle(pid)
+		pp.sweepAt = len(pp.producers)
 	}
 }
 
-// evictOldest drops the least recently used producer other than keep.
-func (pp *partitionProducers) evictOldest(keep int64) {
-	var oldest int64
-	var oldestUsed int64 = -1
+// now is the clock for producer expiry (a variable so tests can move it).
+var now = time.Now
+
+// expireIdle drops producers idle longer than producerIdleExpiry and, if the
+// partition is still over its ceiling, the least recently used beyond it.
+func (pp *partitionProducers) expireIdle(keep int64) {
+	cutoff := now().Add(-producerIdleExpiry)
 	for id, st := range pp.producers {
-		if id == keep {
-			continue
-		}
-		if oldestUsed < 0 || st.lastUsed < oldestUsed {
-			oldest, oldestUsed = id, st.lastUsed
+		if id != keep && st.lastUsed.Before(cutoff) {
+			delete(pp.producers, id)
 		}
 	}
-	if oldestUsed >= 0 {
-		delete(pp.producers, oldest)
+	if over := len(pp.producers) - maxProducersPerPartition; over > 0 {
+		// Still over the ceiling with everyone recently active: drop the least
+		// recently used, a tenth of the ceiling at a time so this pass is rare.
+		pp.evictOldest(keep, over+maxProducersPerPartition/10)
+	}
+}
+
+// evictOldest drops the n least recently used producers other than keep.
+func (pp *partitionProducers) evictOldest(keep int64, n int) {
+	type entry struct {
+		id int64
+		at time.Time
+	}
+	all := make([]entry, 0, len(pp.producers))
+	for id, st := range pp.producers {
+		if id != keep {
+			all = append(all, entry{id, st.lastUsed})
+		}
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].at.Before(all[j].at) })
+	if n > len(all) {
+		n = len(all)
+	}
+	for _, e := range all[:n] {
+		delete(pp.producers, e.id)
 	}
 }

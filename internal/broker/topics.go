@@ -23,7 +23,21 @@ func (b *Broker) handleCreateTopics(ctx context.Context, req *protocol.Request) 
 	resp := kmsg.NewPtrCreateTopicsResponse()
 	resp.SetVersion(req.Header.APIVersion)
 
+	// A name listed twice is a malformed request: neither entry is acted on.
+	count := map[string]int{}
 	for _, t := range cr.Topics {
+		count[t.Topic]++
+	}
+	for _, t := range cr.Topics {
+		if count[t.Topic] > 1 {
+			rt := kmsg.NewCreateTopicsResponseTopic()
+			rt.Topic = t.Topic
+			rt.ErrorCode = int16(protocol.ErrInvalidRequest)
+			msg := "the topic is named more than once in this request"
+			rt.ErrorMessage = &msg
+			resp.Topics = append(resp.Topics, rt)
+			continue
+		}
 		resp.Topics = append(resp.Topics, b.createTopic(t, cr.ValidateOnly))
 	}
 	return protocol.EncodeResponse(req.Header, resp), nil
@@ -34,12 +48,26 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 	rt := kmsg.NewCreateTopicsResponseTopic()
 	rt.Topic = t.Topic
 
+	// -1 asks for the broker's default. Zero or any other negative count is not a
+	// request for the default; it used to be quietly turned into one.
 	partitions := t.NumPartitions
-	if partitions <= 0 {
+	if partitions == -1 {
 		partitions = int32(b.cfg.DefaultPartitions)
 	}
 	if err := meta.ValidateTopicName(t.Topic); err != nil {
 		rt.ErrorCode = int16(protocol.ErrInvalidTopic)
+		msg := err.Error()
+		rt.ErrorMessage = &msg
+		return rt
+	}
+	if partitions <= 0 {
+		rt.ErrorCode = int16(protocol.ErrInvalidPartitions)
+		msg := fmt.Sprintf("%d is not a partition count (use -1 for the broker default)", t.NumPartitions)
+		rt.ErrorMessage = &msg
+		return rt
+	}
+	if err := validateTopicConfig(configMap(t.Configs)); err != nil {
+		rt.ErrorCode = int16(protocol.ErrInvalidConfig)
 		msg := err.Error()
 		rt.ErrorMessage = &msg
 		return rt

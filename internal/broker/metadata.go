@@ -78,7 +78,10 @@ func (b *Broker) handleMetadata(ctx context.Context, req *protocol.Request) ([]b
 			return nil, err
 		}
 		if !found {
-			if created, ok := b.maybeAutoCreate(name, mr.AllowAutoTopicCreation); ok {
+			// AllowAutoTopicCreation arrived in v4; before that a metadata request
+			// for an unknown topic always meant "create it if the broker allows".
+			allow := mr.AllowAutoTopicCreation || req.Header.APIVersion < 4
+			if created, ok := b.maybeAutoCreate(name, allow); ok {
 				resp.Topics = append(resp.Topics, b.topicMetadata(created.Name, created.ID, created.Partitions, protocol.ErrNone))
 				continue
 			}

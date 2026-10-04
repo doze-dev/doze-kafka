@@ -58,6 +58,12 @@ func (b *Broker) handleListOffsets(ctx context.Context, req *protocol.Request) (
 			default: // earliest, or a real timestamp (coarse: earliest).
 				rp.Offset = start
 			}
+			// v0 answers with a list of offsets ("up to MaxNumOffsets before the
+			// timestamp") instead of a single field; leaving it empty told a v0
+			// client the partition had no offsets at all.
+			if req.Header.APIVersion == 0 {
+				rp.OldStyleOffsets = []int64{rp.Offset}
+			}
 			rt.Partitions = append(rt.Partitions, rp)
 		}
 		resp.Topics = append(resp.Topics, rt)

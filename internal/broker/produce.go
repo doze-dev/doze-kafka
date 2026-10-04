@@ -3,6 +3,7 @@ package broker
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
@@ -31,7 +32,25 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 	resp := kmsg.NewPtrProduceResponse()
 	resp.SetVersion(req.Header.APIVersion)
 
+	// acks is -1 (all), 0 (none) or 1 (leader). Anything else is a client bug that
+	// used to be treated as acks=1 without a word.
+	if pr.Acks < -1 || pr.Acks > 1 {
+		for _, t := range pr.Topics {
+			rt := kmsg.NewProduceResponseTopic()
+			rt.Topic, rt.TopicID = t.Topic, t.TopicID
+			for _, part := range t.Partitions {
+				rp := kmsg.NewProduceResponseTopicPartition()
+				rp.Partition, rp.BaseOffset = part.Partition, -1
+				rp.ErrorCode = int16(protocol.ErrInvalidRequiredAcks)
+				rt.Partitions = append(rt.Partitions, rp)
+			}
+			resp.Topics = append(resp.Topics, rt)
+		}
+		return protocol.EncodeResponse(req.Header, resp), nil
+	}
+
 	producedTopics := map[string]struct{}{}
+	refused := false // a partition's payload was rejected as invalid.
 	// Partitions written by this request, with where their response entries sit,
 	// so an fsync failure can be reported against exactly those entries.
 	type slot struct{ topic, part int }
@@ -51,7 +70,9 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 			case !ok || part.Partition < 0 || part.Partition >= topic.Partitions:
 				rp.ErrorCode = int16(protocol.ErrUnknownTopicOrPart)
 			default:
-				if b.appendRecords(name, part, &rp) {
+				wrote := b.appendRecords(name, part, &rp)
+				refused = refused || rp.ErrorCode == int16(protocol.ErrCorruptMessage)
+				if wrote {
 					producedTopics[name] = struct{}{}
 					tp := topicPartition{name, part.Partition}
 					written[tp] = append(written[tp], slot{len(resp.Topics), len(rt.Partitions)})
@@ -66,6 +87,12 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 		b.produce.signal(topic) // wake the fetchers reading this topic.
 	}
 	if pr.Acks == 0 {
+		if refused {
+			// acks=0 has no response to carry the error, so the only way to tell
+			// the producer its data was not taken is to drop the connection, as a
+			// real broker does. Staying silent lost the records unnoticed.
+			return nil, fmt.Errorf("produce with acks=0 carried an invalid record batch")
+		}
 		return nil, nil // fire-and-forget: the client expects no response.
 	}
 	if pr.Acks == -1 { // acks=all: make the acknowledgement durable.
@@ -161,7 +188,7 @@ func (b *Broker) appendIdempotent(topic string, partition int32, plog *log.Parti
 		}
 		batch := records[pos : pos+hdr.TotalBytes]
 		firstSeq := hdr.BaseSequence
-		lastSeq := hdr.BaseSequence + hdr.RecordCount - 1
+		lastSeq := lastSeqOf(hdr.BaseSequence, hdr.RecordCount)
 
 		v := pp.check(hdr.ProducerID, hdr.ProducerEpoch, firstSeq, lastSeq)
 		switch v.kind {
@@ -182,6 +209,9 @@ func (b *Broker) appendIdempotent(topic string, partition int32, plog *log.Parti
 			if firstOffset < 0 {
 				firstOffset = v.offset
 			}
+		case seqDuplicateOld:
+			rp.ErrorCode = int16(protocol.ErrDuplicateSequence)
+			return wrote
 		case seqOutOfOrder:
 			rp.ErrorCode = int16(protocol.ErrOutOfOrderSequence)
 			return wrote

@@ -292,3 +292,166 @@ func TestTopicCreationAndOffsetListingDoNotOpenPartitions(t *testing.T) {
 		t.Fatalf("after one produce %d partitions are open, want exactly 1", n)
 	}
 }
+
+// idemBatch is plainBatch for an idempotent producer: n records' worth of body
+// from producer pid at the given epoch and base sequence, with attributes attrs.
+func idemBatch(pid int64, epoch int16, seq, n int32, attrs uint16) []byte {
+	b := make([]byte, 61+int(n)*8)
+	binary.BigEndian.PutUint32(b[8:], uint32(len(b)-12))
+	b[16] = 2
+	binary.BigEndian.PutUint16(b[21:], attrs)
+	binary.BigEndian.PutUint32(b[23:], uint32(n-1)) // lastOffsetDelta
+	binary.BigEndian.PutUint64(b[43:], uint64(pid))
+	binary.BigEndian.PutUint16(b[51:], uint16(epoch))
+	binary.BigEndian.PutUint32(b[53:], uint32(seq))
+	binary.BigEndian.PutUint32(b[57:], uint32(n))
+	binary.BigEndian.PutUint32(b[17:], crc32.Checksum(b[21:], crc32.MakeTable(crc32.Castagnoli)))
+	return b
+}
+
+func TestIdempotentProduceRefusesWhatItCannotPlace(t *testing.T) {
+	var failSync bool
+	b, logs := newTestBroker(t, &failSync)
+	part, _ := logs.Partition("t", 0)
+	code := func(records []byte) (int16, int64) {
+		p := produceOnce(t, b, 1, records).Topics[0].Partitions[0]
+		return p.ErrorCode, p.BaseOffset
+	}
+	if c, off := code(idemBatch(9, 0, 0, 5, 0)); c != 0 || off != 0 {
+		t.Fatalf("seq 0-4: code %d offset %d", c, off)
+	}
+	if c, off := code(idemBatch(9, 0, 0, 5, 0)); c != 0 || off != 0 {
+		t.Errorf("an exact retry: code %d offset %d, want success at the original offset 0", c, off)
+	}
+	end := part.LogEndOffset()
+	// Sequences 3-6: two new records behind two old ones.
+	if c, _ := code(idemBatch(9, 0, 3, 4, 0)); c != int16(protocol.ErrOutOfOrderSequence) {
+		t.Errorf("an overlapping batch: code %d, want OUT_OF_ORDER_SEQUENCE_NUMBER (45)", c)
+	}
+	if c, _ := code(idemBatch(9, 0, 9, 1, 0)); c != int16(protocol.ErrOutOfOrderSequence) {
+		t.Errorf("a gap: code %d, want 45", c)
+	}
+	if got := part.LogEndOffset(); got != end {
+		t.Errorf("refused batches moved the log end from %d to %d", end, got)
+	}
+}
+
+func TestProduceValidatesAcksControlBatchesAndRecordCounts(t *testing.T) {
+	var failSync bool
+	b, logs := newTestBroker(t, &failSync)
+	part, _ := logs.Partition("t", 0)
+
+	for _, acks := range []int16{2, -2, 100} {
+		if c := produceOnce(t, b, acks, plainBatch()).Topics[0].Partitions[0].ErrorCode; c != int16(protocol.ErrInvalidRequiredAcks) {
+			t.Errorf("acks=%d: code %d, want INVALID_REQUIRED_ACKS (21)", acks, c)
+		}
+	}
+	// A control batch (attributes bit 5) is the broker's to write, not a client's.
+	if c := produceOnce(t, b, 1, idemBatch(-1, 0, 0, 1, 0x20)).Topics[0].Partitions[0].ErrorCode; c != int16(protocol.ErrCorruptMessage) {
+		t.Errorf("a client-sent control batch: code %d, want it refused (2)", c)
+	}
+	// A header that claims two billion records over an 8-byte body.
+	huge := plainBatch()
+	binary.BigEndian.PutUint32(huge[23:], uint32(1<<31-2))
+	binary.BigEndian.PutUint32(huge[57:], uint32(1<<31-1))
+	binary.BigEndian.PutUint32(huge[17:], crc32.Checksum(huge[21:], crc32.MakeTable(crc32.Castagnoli)))
+	if c := produceOnce(t, b, 1, huge).Topics[0].Partitions[0].ErrorCode; c != int16(protocol.ErrCorruptMessage) {
+		t.Errorf("a batch claiming 2^31-1 records in 8 bytes: code %d, want it refused (2)", c)
+	}
+	if end := part.LogEndOffset(); end != 0 {
+		t.Errorf("the log end is %d after only refused produces", end)
+	}
+}
+
+// acks=0 has no response to carry an error, so an invalid batch ends the
+// connection: that is how the producer finds out.
+func TestAcksZeroWithAnInvalidBatchFailsTheRequest(t *testing.T) {
+	var failSync bool
+	b, _ := newTestBroker(t, &failSync)
+	bad := plainBatch()
+	bad[len(bad)-1] ^= 0xff
+	req := kmsg.NewPtrProduceRequest()
+	req.SetVersion(8)
+	req.Acks = 0
+	pt := kmsg.NewProduceRequestTopic()
+	pt.Topic = "t"
+	pp := kmsg.NewProduceRequestTopicPartition()
+	pp.Records = bad
+	pt.Partitions = append(pt.Partitions, pp)
+	req.Topics = append(req.Topics, pt)
+	out, err := b.handleProduce(context.Background(), &protocol.Request{
+		Header: protocol.RequestHeader{APIKey: protocol.APIProduce, APIVersion: 8}, Body: req.AppendTo(nil)})
+	if err == nil || out != nil {
+		t.Fatalf("acks=0 with a corrupt batch returned (%v, %v); want an error so the connection closes", out, err)
+	}
+	pp.Records = plainBatch()
+	req.Topics[0].Partitions[0] = pp
+	if out, err := b.handleProduce(context.Background(), &protocol.Request{
+		Header: protocol.RequestHeader{APIKey: protocol.APIProduce, APIVersion: 8}, Body: req.AppendTo(nil)}); err != nil || out != nil {
+		t.Fatalf("acks=0 with a valid batch returned (%v, %v); want silence", out, err)
+	}
+}
+
+// Deleting a topic forgets its producers. Otherwise the same producer writing
+// sequence 0 to the re-created topic is taken for a retry and nothing is appended.
+func TestDeletingATopicForgetsItsProducerState(t *testing.T) {
+	var failSync bool
+	b, logs := newTestBroker(t, &failSync)
+	if p := produceOnce(t, b, 1, idemBatch(5, 0, 0, 3, 0)).Topics[0].Partitions[0]; p.ErrorCode != 0 {
+		t.Fatal(p.ErrorCode)
+	}
+	del := kmsg.NewPtrDeleteTopicsRequest()
+	del.SetVersion(3)
+	del.TopicNames = []string{"t"}
+	if _, err := b.handleDeleteTopics(context.Background(), &protocol.Request{
+		Header: protocol.RequestHeader{APIKey: protocol.APIDeleteTopics, APIVersion: 3}, Body: del.AppendTo(nil)}); err != nil {
+		t.Fatal(err)
+	}
+	ct := kmsg.NewCreateTopicsRequestTopic()
+	ct.Topic, ct.NumPartitions, ct.ReplicationFactor = "t", 1, 1
+	if got := b.createTopic(ct, false); got.ErrorCode != 0 {
+		t.Fatal(got.ErrorCode)
+	}
+	p := produceOnce(t, b, 1, idemBatch(5, 0, 0, 3, 0)).Topics[0].Partitions[0]
+	part, _ := logs.Partition("t", 0)
+	if p.ErrorCode != 0 || p.BaseOffset != 0 || part.LogEndOffset() != 3 {
+		t.Errorf("the same producer on the re-created topic: code %d offset %d, log end %d; want its 3 records appended at 0",
+			p.ErrorCode, p.BaseOffset, part.LogEndOffset())
+	}
+}
+
+// Producer ids handed out before a restart are never handed out again, including
+// the ones served from memory out of a reserved block.
+func TestProducerIDsAreNotReusedAfterARestart(t *testing.T) {
+	dir := t.TempDir()
+	open := func() (*Broker, func()) {
+		metaStore, err := meta.Open(filepath.Join(dir, "meta.db"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		logs, err := log.OpenManager(filepath.Join(dir, "data"), log.ManagerOptions{SegmentBytes: 1 << 20, IndexIntervalBytes: 4096})
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := New(config.Default(), slog.New(slog.NewTextHandler(io.Discard, nil)), logs, metaStore)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b, func() { logs.Close(); metaStore.Close() }
+	}
+	seen := map[int64]bool{}
+	for run := 0; run < 3; run++ {
+		b, closeAll := open()
+		for i := 0; i < 5; i++ {
+			id, err := b.nextProducerID()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if seen[id] {
+				t.Fatalf("producer id %d was issued twice (second time in run %d)", id, run)
+			}
+			seen[id] = true
+		}
+		closeAll()
+	}
+}
