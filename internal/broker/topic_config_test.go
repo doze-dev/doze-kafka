@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -438,6 +439,43 @@ func TestTopicConfig_LogAppendTimeReplacesTheProducersTimestamp(t *testing.T) {
 	for _, r := range read("asis") {
 		if !r.Timestamp.Equal(old) {
 			t.Errorf("CreateTime topic: record %q has timestamp %v, want the producer's %v", r.Value, r.Timestamp, old)
+		}
+	}
+}
+
+// Two admins changing different configs of one topic at the same time must both
+// succeed: each change reads the topic's configuration, edits it and writes it
+// back, and without one at a time the later write erases the earlier.
+func TestTopicConfig_ConcurrentAltersDoNotLoseEachOther(t *testing.T) {
+	addr := startBroker(t, 4)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cl := newClient(t, addr)
+	defer cl.Close()
+	mustCreateTopic(t, ctx, cl, "t", 1)
+
+	keys := map[string]string{
+		"retention.ms": "60000", "retention.bytes": "1048576", "segment.bytes": "65536", "max.message.bytes": "100000",
+		"message.timestamp.type": "LogAppendTime", "min.insync.replicas": "1", "flush.ms": "1000", "flush.messages": "10",
+		"segment.ms": "3600000", "delete.retention.ms": "86400000", "min.compaction.lag.ms": "0", "segment.jitter.ms": "5",
+	}
+	var wg sync.WaitGroup
+	for k, v := range keys {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c := newClient(t, addr)
+			defer c.Close()
+			if code, msg := incrementalAlter(t, ctx, c, kmsg.ConfigResourceTypeTopic, "t", false, alterOp{k, opSet, v}); code != 0 {
+				t.Errorf("set %s: %d %s", k, code, msg)
+			}
+		}()
+	}
+	wg.Wait()
+	values, own := describe(t, ctx, cl, "t")
+	for k, v := range keys {
+		if values[k] != v || !own[k] {
+			t.Errorf("%s = %q (own=%v) after %d concurrent alters, want %q: another alter erased it", k, values[k], own[k], len(keys), v)
 		}
 	}
 }

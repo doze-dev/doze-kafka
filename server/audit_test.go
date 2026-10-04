@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"os"
 	"strings"
@@ -205,4 +206,90 @@ func TestInvalidOptionsAreRefused(t *testing.T) {
 			t.Errorf("%s: New accepted %+v", name, opts)
 		}
 	}
+}
+
+// Building, serving, using and stopping a broker over and over, on one data
+// directory and on many at once: nothing leaks, nothing deadlocks, the directory's
+// lock is released each time, and what was written in one round is there in the
+// next.
+func TestChurn_ServersComeAndGoOverOneDirectoryAndMany(t *testing.T) {
+	dir := t.TempDir()
+	for round := 0; round < 12; round++ {
+		srv := mustNew(t, server.Options{DataDir: dir})
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan error, 1)
+		go func() { done <- srv.Serve(ctx) }()
+		<-srv.Ready()
+		cl, err := kgo.NewClient(kgo.SeedBrokers(srv.Addr().String()), kgo.AllowAutoTopicCreation())
+		if err != nil {
+			t.Fatal(err)
+		}
+		pctx, pcancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := cl.ProduceSync(pctx, &kgo.Record{Topic: "t", Value: []byte(fmt.Sprint(round))}).FirstErr(); err != nil {
+			t.Fatalf("round %d: produce: %v", round, err)
+		}
+		pcancel()
+		cl.Close()
+		cancel()
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Fatalf("round %d: Serve returned %v", round, err)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatalf("round %d: Serve did not return after its context was cancelled", round)
+		}
+	}
+	// Everything written across the rounds is still there, in order.
+	srv := mustNew(t, server.Options{DataDir: dir})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- srv.Serve(ctx) }()
+	<-srv.Ready()
+	cl, err := kgo.NewClient(kgo.SeedBrokers(srv.Addr().String()), kgo.ConsumeTopics("t"), kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rctx, rcancel := context.WithTimeout(context.Background(), 10*time.Second)
+	var got []string
+	for len(got) < 12 && rctx.Err() == nil {
+		cl.PollFetches(rctx).EachRecord(func(r *kgo.Record) { got = append(got, string(r.Value)) })
+	}
+	rcancel()
+	cl.Close()
+	cancel()
+	<-done
+	for i, v := range got {
+		if v != fmt.Sprint(i) {
+			t.Errorf("record %d is %q, want %q", i, v, fmt.Sprint(i))
+		}
+	}
+	if len(got) != 12 {
+		t.Errorf("read %d records back after 12 rounds, want 12", len(got))
+	}
+
+	// Many at once, each on its own directory.
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 3; j++ {
+				s, err := server.New(server.Options{DataDir: t.TempDir()})
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				ctx, cancel := context.WithCancel(context.Background())
+				done := make(chan error, 1)
+				go func() { done <- s.Serve(ctx) }()
+				<-s.Ready()
+				cancel()
+				if err := <-done; err != nil {
+					t.Error(err)
+				}
+			}
+		}()
+	}
+	wg.Wait()
 }
