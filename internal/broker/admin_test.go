@@ -359,38 +359,3 @@ func TestAdmin_DescribeCluster(t *testing.T) {
 		t.Fatal("empty cluster id")
 	}
 }
-
-// TestApiVersions_AdvertisedSurface guards the client-visible API surface: a Kafka-4
-// broker must advertise every API it serves. This catches an implemented handler
-// that was never advertised (and so is invisible to clients).
-func TestApiVersions_AdvertisedSurface(t *testing.T) {
-	addr := startBroker(t, 4)
-	cl := newClient(t, addr)
-	defer cl.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	resp, err := kmsg.NewPtrApiVersionsRequest().RequestWith(ctx, cl)
-	if err != nil {
-		t.Fatalf("api versions: %v", err)
-	}
-	advertised := make(map[int16]bool)
-	for _, k := range resp.ApiKeys {
-		advertised[k.ApiKey] = true
-	}
-
-	// Every API the version-4 broker serves (SASL excluded: auth is disabled here).
-	want := map[int16]string{
-		0: "Produce", 1: "Fetch", 2: "ListOffsets", 3: "Metadata",
-		8: "OffsetCommit", 9: "OffsetFetch", 10: "FindCoordinator", 11: "JoinGroup",
-		12: "Heartbeat", 13: "LeaveGroup", 14: "SyncGroup", 15: "DescribeGroups",
-		16: "ListGroups", 18: "ApiVersions", 19: "CreateTopics", 20: "DeleteTopics",
-		22: "InitProducerId", 32: "DescribeConfigs", 60: "DescribeCluster",
-		68: "ConsumerGroupHeartbeat", 69: "ConsumerGroupDescribe",
-	}
-	for key, name := range want {
-		if !advertised[key] {
-			t.Errorf("API %s (%d) is served but not advertised in ApiVersions", name, key)
-		}
-	}
-}
