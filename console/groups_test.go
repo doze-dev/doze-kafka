@@ -96,8 +96,9 @@ func TestGroupPageShowsMembersOwnersAndLinks(t *testing.T) {
 	if strings.Contains(body, "[0 1]") {
 		t.Error("the assignment is printed as a Go slice")
 	}
-	// Owner column: both partitions are held by the one member.
-	if strings.Count(body, "<td class=\"mono\">billing-service</td>") < 2 {
+	// The member's client id is in the Client column, and again as the owner of
+	// each partition it holds.
+	if strings.Count(body, ">billing-service</td>") < 2 {
 		t.Error("each partition's owner should be shown")
 	}
 }

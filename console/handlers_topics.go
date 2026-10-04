@@ -152,21 +152,29 @@ func (c *Console) topicProduce(w http.ResponseWriter, r *http.Request) {
 		c.fail(w, r, err)
 		return
 	}
-	if result.Confirmed {
-		toast(w, "Sent to partition "+strconv.Itoa(int(result.Partition))+" · offset "+strconv.FormatInt(result.Offset, 10))
-	} else {
+	// The view stays on the partition being looked at. It used to switch to the
+	// partition the record landed on, with the address bar, the composer and the
+	// page's links all still naming the old one. The toast says where the record
+	// went, and the partition tabs' counts show it arriving.
+	viewing := result.Partition
+	if n, err := strconv.ParseInt(r.FormValue("partition_ctx"), 10, 32); err == nil && n >= 0 && n < int64(count) {
+		viewing = int32(n)
+	}
+	switch {
+	case !result.Confirmed:
 		toast(w, "Sent — no confirmation requested (acks=0)")
+	case result.Partition != viewing:
+		toast(w, "Sent to partition "+strconv.Itoa(int(result.Partition))+" · offset "+strconv.FormatInt(result.Offset, 10)+" (you are viewing partition "+strconv.Itoa(int(viewing))+")")
+	default:
+		toast(w, "Sent to partition "+strconv.Itoa(int(result.Partition))+" · offset "+strconv.FormatInt(result.Offset, 10))
 	}
 
-	// Re-render the tape/table for the partition the message actually landed
-	// on, so a produce to a different partition than the one being viewed is
-	// still honestly reflected (not silently shown against the wrong tape).
-	tape, err := c.tapeData(ctx, name, id, result.Partition, count, -1, -1, -1)
+	tape, err := c.tapeData(ctx, name, id, viewing, count, -1, -1, -1)
 	if err != nil {
 		c.fail(w, r, err)
 		return
 	}
-	data := map[string]any{"Topic": topicRef{Name: name}, "Partition": result.Partition}
+	data := map[string]any{"Topic": topicRef{Name: name}, "Partition": viewing}
 	maps.Copy(data, tape)
 	c.partial(w, "tape_and_table", data)
 }

@@ -50,6 +50,7 @@ func (c *Console) staticHandler() http.Handler {
 				return
 			}
 			w.Header().Set("Cache-Control", "no-store")
+			setFontType(w, r.URL.Path)
 			r2 := r.Clone(r.Context())
 			r2.URL.Path = path.Clean("/" + r.URL.Path)
 			files.ServeHTTP(w, r2)
@@ -63,6 +64,7 @@ func (c *Console) staticHandler() http.Handler {
 			http.NotFound(w, r) // no directory listings.
 			return
 		}
+		setFontType(w, name)
 		if tag, ok := staticETags()[name]; ok {
 			w.Header().Set("ETag", tag)
 			w.Header().Set("Cache-Control", "no-cache")
@@ -73,4 +75,14 @@ func (c *Console) staticHandler() http.Handler {
 		}
 		files.ServeHTTP(w, r)
 	})
+}
+
+// setFontType names the type of a font file. Go otherwise takes it from the
+// operating system's table, which a minimal container or a Windows machine may
+// not have an entry in; the pages are served with "nosniff", and a browser will
+// not use a font whose type it has to guess.
+func setFontType(w http.ResponseWriter, name string) {
+	if strings.HasSuffix(name, ".woff2") {
+		w.Header().Set("Content-Type", "font/woff2")
+	}
 }

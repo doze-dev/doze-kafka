@@ -155,17 +155,20 @@ func TestTypeScaleIsClosed(t *testing.T) {
 		if strings.HasPrefix(v, "var(--fs-") || v == "inherit" {
 			continue
 		}
-		t.Errorf("font-size: %s is not a --fs-* token (xs 10, sm 11, md 12, base 13, lg 15, xl 20)", v)
+		t.Errorf("font-size: %s is not a --fs-* token (xs 11, sm 12, md 13, base 14, lg 16, xl 20)", v)
 	}
 
-	weights := map[string]bool{"400": true, "500": true, "550": true, "600": true, "650": true, "700": true}
+	// The four weights the vendored fonts actually have: Plex Mono ships 400, 500
+	// and 600 here, and anything between would be drawn as its neighbour. ("100
+	// 700" is the variable sans face declaring its range in @font-face.)
+	weights := map[string]bool{"400": true, "500": true, "600": true, "700": true, "100 700": true}
 	for _, m := range regexp.MustCompile(`font-weight:\s*([^;}]+)`).FindAllStringSubmatch(css, -1) {
 		v := strings.TrimSpace(m[1])
 		if strings.HasPrefix(v, "var(") || v == "inherit" || v == "bold" || v == "normal" {
 			continue
 		}
 		if !weights[v] {
-			t.Errorf("font-weight: %s is off the scale (400/500/550/600/650/700)", v)
+			t.Errorf("font-weight: %s is off the scale (400/500/600/700)", v)
 		}
 	}
 }
@@ -182,7 +185,7 @@ func TestTypeScaleIsClosed(t *testing.T) {
 // that table stated in the most local place available, and converting eighty of
 // those to classes would make the markup worse and the stylesheet longer.
 var inlineBudget = map[string]int{
-	"cluster.html": 4, "groups.html": 5, "layout.html": 2, "panes.html": 1, "topics.html": 15,
+	"groups.html": 1, "panes.html": 1, "topics.html": 4,
 }
 
 func TestInlineStyleBudget(t *testing.T) {

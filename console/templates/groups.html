@@ -22,9 +22,9 @@
 
 {{define "group_detail"}}{{template "shell_top" .}}
   {{template "group_lp" (dict "Prefix" .Prefix "List" .List "Sel" .Group.ID)}}
-  <section class="detail"><div class="detail-inner">
+  <main class="detail"><div class="detail-inner">
     {{template "group_live" .}}
-  </div></section>
+  </div></main>
 {{template "shell_bottom" .}}{{end}}
 
 {{/* group_live is the polled unit: the identity band, members, and offsets & lag. */}}
@@ -39,17 +39,17 @@
           {{if .Group.Assignor}}<span class="chip mono">assignor: {{.Group.Assignor}}</span>{{end}}
           <span class="chip mono">{{len .Members}} member{{if ne (len .Members) 1}}s{{end}}</span>
           {{if .Offsets}}<span class="chip mono {{if and (eq .TotalLag 0) (not .AnyAhead)}}lag-zero{{else}}lag-some{{end}}">{{if .AnyAhead}}ahead of log end{{if gt .TotalLag 0}} · lag {{.TotalLag}}{{end}}{{else if eq .TotalLag 0}}caught up{{else}}lag {{.TotalLag}}{{end}}</span>{{end}}
-          <span class="livedot" title="Updates every 3s" aria-hidden="true" style="margin-left:4px"></span>
+          <span class="livedot inline" title="Updates every 3s" aria-hidden="true"></span>
         </div>
       </div>
       <div class="idband-acts">
         <div class="menu">
           <button type="button" class="btn btn-outline" {{if not (and .CanAct .Offsets)}}disabled title="{{if .Members}}Stop the group's {{len .Members}} consumer{{if ne (len .Members) 1}}s{{end}} first{{else}}No committed offsets to reset{{end}}"{{end}}
             hx-post="{{groupURL .Group.ID}}/reset" data-confirm-title="Reset to earliest" data-confirm-verb="Reset offsets" hx-vals='{"to":"earliest"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
-            hx-confirm="Reset every committed offset of &quot;{{.Group.ID}}&quot; to the earliest retained offset? Its consumers will re-read from the start.">⏮ Reset to earliest</button>
+            hx-confirm="Reset every committed offset of &quot;{{.Group.ID}}&quot; to the earliest retained offset? Its consumers will re-read from the start.">{{icon "skip-back"}} Reset to earliest</button>
           <button type="button" class="btn btn-outline" {{if not (and .CanAct .Offsets)}}disabled{{end}}
             hx-post="{{groupURL .Group.ID}}/reset" data-confirm-title="Reset to latest" data-confirm-verb="Reset offsets" hx-vals='{"to":"latest"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
-            hx-confirm="Reset every committed offset of &quot;{{.Group.ID}}&quot; to the latest offset? Its consumers will skip everything currently in the topics.">⏭ Reset to latest</button>
+            hx-confirm="Reset every committed offset of &quot;{{.Group.ID}}&quot; to the latest offset? Its consumers will skip everything currently in the topics.">{{icon "skip-forward"}} Reset to latest</button>
           <button type="button" class="btn danger" {{if not .CanAct}}disabled title="Stop the group's consumers first"{{end}}
             hx-post="{{groupURL .Group.ID}}/delete" hx-disabled-elt="this" data-confirm-title="Delete group" data-confirm-verb="Delete group"
             hx-confirm="Delete group &quot;{{.Group.ID}}&quot; and its committed offsets?">{{icon "trash"}} Delete</button>
@@ -59,12 +59,12 @@
 
     {{if .Members}}
     <div class="sec-title">Members</div>
-    <div class="tbl-wrap" style="margin-bottom:8px">
+    <div class="tbl-wrap gap">
       <table class="tbl"><thead><tr><th>Member</th><th>Client</th><th>Host</th><th>Assigned partitions</th></tr></thead>
-        <tbody>{{range .Members}}<tr style="cursor:default">
+        <tbody>{{range .Members}}<tr>
           <td class="mono" title="{{.ID}}">{{.Label}}{{if and .ClientID (ne .Label .ID)}} <span class="dim">· {{.ID}}</span>{{end}}</td>
-          <td class="mono">{{if .ClientID}}{{.ClientID}}{{else}}<span class="dim">—</span>{{end}}</td>
-          <td class="mono">{{if .Host}}{{.Host}}{{else}}<span class="dim">—</span>{{end}}</td>
+          <td class="mono nw">{{if .ClientID}}{{.ClientID}}{{else}}<span class="dim">—</span>{{end}}</td>
+          <td class="mono nw">{{if .Host}}{{.Host}}{{else}}<span class="dim">—</span>{{end}}</td>
           <td class="mono">{{range $i, $a := .Assigned}}{{if $i}} · {{end}}<a href="{{$a.TopicURL}}">{{$a.Topic}}</a> {{$a.Parts}}{{end}}{{if not .Assigned}}<span class="dim">none yet</span>{{end}}</td>
         </tr>{{end}}</tbody>
       </table>
@@ -80,7 +80,7 @@
     <div class="sec-title">Offsets &amp; lag</div>
     <div class="tbl-wrap">
       <table class="tbl"><thead><tr><th>Topic</th><th class="num">Partition</th><th>Owner</th><th class="num">Committed</th><th class="num">Latest</th><th>Lag</th></tr></thead>
-        <tbody>{{range .Offsets}}<tr style="cursor:default">
+        <tbody>{{range .Offsets}}<tr>
           <td class="mono">{{if .Deleted}}{{.Topic}}{{else}}<a href="{{.TopicURL}}">{{.Topic}}</a>{{end}}</td>
           <td class="num mono">{{.Partition}}</td>
           <td class="mono">{{if .Owner}}{{.Owner}}{{else}}<span class="dim">—</span>{{end}}</td>

@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -473,5 +475,148 @@ func TestDevModeServesOnlyStaticFiles(t *testing.T) {
 		if rec := req(t, c, "GET", p, nil); rec.Code == 200 {
 			t.Errorf("GET %s = 200: %.60q", p, rec.Body.String())
 		}
+	}
+}
+
+// ---- the browser side ----
+
+// Producing to a partition other than the one on screen leaves the view where it
+// was and says where the record went. It used to switch the tape to the other
+// partition while the address bar and the composer still named the first.
+func TestProduceToAnotherPartitionKeepsTheView(t *testing.T) {
+	c := newTestConsole(t)
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"t"}, "partitions": {"3"}})
+	rec := req(t, c, "POST", "/_console/topics/t/produce", url.Values{"partition": {"2"}, "partition_ctx": {"0"}, "value": {"x"}})
+	body := rec.Body.String()
+	if rec.Code != 200 || !strings.Contains(body, "Messages · partition 0") || !strings.Contains(body, `partition=0"`) {
+		t.Errorf("after producing to partition 2 while viewing 0, the view is not partition 0: %d", rec.Code)
+	}
+	if tr := rec.Header().Get("HX-Trigger"); !strings.Contains(tr, "partition 2") || !strings.Contains(tr, "viewing partition 0") {
+		t.Errorf("the toast should say where the record went and what is on screen: %s", tr)
+	}
+	// Viewing the partition produced to, there is nothing extra to say.
+	same := req(t, c, "POST", "/_console/topics/t/produce", url.Values{"partition": {"1"}, "partition_ctx": {"1"}, "value": {"x"}})
+	if tr := same.Header().Get("HX-Trigger"); strings.Contains(tr, "viewing") {
+		t.Errorf("toast for the partition on screen: %s", tr)
+	}
+}
+
+// The fonts are part of the binary and are served as fonts: the pages carry
+// "nosniff", so a browser will not use one whose type it has to guess.
+func TestFontsAreVendoredAndServedAsFonts(t *testing.T) {
+	c := newTestConsole(t)
+	css := readAll(t, "static/app.css")
+	urls := regexp.MustCompile(`url\(([^)]+\.woff2)\)`).FindAllStringSubmatch(css, -1)
+	if len(urls) != 4 {
+		t.Fatalf("app.css names %d font files, want 4 (Plex Sans variable; Plex Mono 400, 500, 600)", len(urls))
+	}
+	versions := readAll(t, "static/VERSIONS")
+	for _, m := range urls {
+		rec := req(t, c, "GET", "/_console/static/"+m[1], nil)
+		if rec.Code != 200 || rec.Header().Get("Content-Type") != "font/woff2" || rec.Body.Len() < 10_000 {
+			t.Errorf("%s: %d %q, %d bytes", m[1], rec.Code, rec.Header().Get("Content-Type"), rec.Body.Len())
+		}
+		if !strings.Contains(versions, filepath.Base(m[1])) {
+			t.Errorf("%s is not recorded in static/VERSIONS", m[1])
+		}
+	}
+	if strings.Contains(css, "fonts.googleapis") || strings.Contains(css, "@import") {
+		t.Error("the stylesheet must not fetch anything from another origin")
+	}
+	if _, err := os.Stat("static/fonts/OFL.txt"); err != nil {
+		t.Error("the fonts' licence (SIL OFL) must ship beside them")
+	}
+}
+
+// Each theme is written once. "System" is resolved to light or dark before first
+// paint by the script in <head>; a second copy of a theme under a media query is
+// how the two light themes drifted apart before.
+func TestEachThemeIsDefinedOnce(t *testing.T) {
+	css := readAll(t, "static/app.css")
+	if strings.Contains(css, "prefers-color-scheme") {
+		t.Error("app.css has a prefers-color-scheme block: a theme is being defined twice")
+	}
+	if n := strings.Count(css, `:root[data-theme="dark"] {`); n != 1 {
+		t.Errorf("the dark theme is defined %d times, want once", n)
+	}
+	c := newTestConsole(t)
+	page := req(t, c, "GET", "/_console/topics", nil).Body.String()
+	head := page[:strings.Index(page, "</head>")]
+	if !strings.Contains(head, `prefers-color-scheme: dark`) || !strings.Contains(head, `setAttribute("data-theme"`) {
+		t.Error("the page must choose its theme in <head>, before first paint")
+	}
+}
+
+// themeTokens reads the custom properties of one rule in app.css.
+func themeTokens(t *testing.T, css, selector string) map[string]string {
+	t.Helper()
+	i := strings.Index(css, selector+" {")
+	if i < 0 {
+		t.Fatalf("app.css has no %q rule", selector)
+	}
+	block := css[i : i+strings.Index(css[i:], "\n}")]
+	out := map[string]string{}
+	for _, m := range regexp.MustCompile(`(--[a-z-]+):\s*(#[0-9a-fA-F]{6})\b`).FindAllStringSubmatch(block, -1) {
+		out[m[1]] = m[2]
+	}
+	return out
+}
+
+func luminance(hex string) float64 {
+	var r, g, b int
+	fmt.Sscanf(hex, "#%02x%02x%02x", &r, &g, &b)
+	f := func(v int) float64 {
+		c := float64(v) / 255
+		if c <= 0.03928 {
+			return c / 12.92
+		}
+		return math.Pow((c+0.055)/1.055, 2.4)
+	}
+	return 0.2126*f(r) + 0.7152*f(g) + 0.0722*f(b)
+}
+
+func contrast(a, b string) float64 {
+	la, lb := luminance(a), luminance(b)
+	if la < lb {
+		la, lb = lb, la
+	}
+	return (la + 0.05) / (lb + 0.05)
+}
+
+// Text holds 4.5:1 on every surface it is set on, and the edge of a control holds
+// 3:1, in both themes. A palette is easy to make pretty and unreadable; the last
+// one had status colours at 3.6:1.
+func TestThemeContrast(t *testing.T) {
+	css := readAll(t, "static/app.css")
+	light := themeTokens(t, css, ":root")
+	dark := themeTokens(t, css, `:root[data-theme="dark"]`)
+	for k, v := range light { // dark overrides; what it does not name is shared.
+		if _, ok := dark[k]; !ok {
+			dark[k] = v
+		}
+	}
+	surfaces := []string{"--background", "--card", "--popover", "--muted", "--sidebar"}
+	text := []string{"--foreground", "--muted-foreground", "--ok-foreground", "--bad-foreground", "--warn-foreground", "--info-foreground", "--violet-foreground"}
+	for name, th := range map[string]map[string]string{"light": light, "dark": dark} {
+		check := func(fg, bg string, min float64) {
+			if th[fg] == "" || th[bg] == "" {
+				t.Errorf("%s: %s or %s is not defined", name, fg, bg)
+				return
+			}
+			if r := contrast(th[fg], th[bg]); r < min {
+				t.Errorf("%s: %s (%s) on %s (%s) is %.2f:1, want %.1f:1", name, fg, th[fg], bg, th[bg], r, min)
+			}
+		}
+		for _, bg := range surfaces {
+			for _, fg := range text {
+				check(fg, bg, 4.5)
+			}
+			check("--input", bg, 3)
+		}
+		check("--foreground", "--accent", 4.5)
+		check("--muted-foreground", "--accent", 4.5)
+		check("--brand-foreground", "--brand", 4.5)
+		check("--destructive-foreground", "--destructive", 4.5)
+		check("--ring", "--background", 3)
 	}
 }

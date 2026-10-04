@@ -1,22 +1,22 @@
 {{define "cluster_detail"}}{{template "shell_top" .}}
-  <section class="detail"><div class="detail-inner clusterwrap">
+  <main class="detail"><div class="detail-inner clusterwrap">
     <div class="idband">
       <div>
-        <h1 style="font-family:var(--ui);font-size:18px">Cluster</h1>
-        <p class="dim" style="margin:4px 0 0;font-size:12px">One broker. No replication, no controller quorum — that's the whole point.</p>
+        <h1 class="page-title">Cluster</h1>
+        <p class="lede">One broker. No replication, no controller quorum — that's the whole point.</p>
       </div>
     </div>
     <div class="cpanel">
       <div class="crow2"><span class="k">Broker</span><span class="v">node {{.Cluster.NodeID}} · {{.Cluster.Host}}:{{.Cluster.Port}}</span></div>
       <div class="crow2"><span class="k">Cluster ID</span><span class="v">{{.Cluster.ClusterID}}</span></div>
       <div class="crow2"><span class="k">This connection</span><span class="v">{{if .Cluster.AuthMech}}SASL {{.Cluster.AuthMech}}{{else}}no authentication{{end}} · {{if .Cluster.TLS}}TLS{{else}}plaintext{{end}}</span></div>
-      <div class="crow2" style="border-bottom:none;flex-direction:column;align-items:flex-start;gap:8px">
+      <div class="crow2 stack">
         <span class="k">Supported APIs · {{len .Cluster.SupportedAPIs}}</span>
         <div class="apilist">{{range .Cluster.SupportedAPIs}}<span class="apichip" title="{{.Name}}: versions {{.Min}} to {{.Max}}">{{.Name}} <span class="apiv">v{{.Min}}–{{.Max}}</span></span>{{end}}</div>
       </div>
     </div>
     {{if .Cluster.BrokerConfig}}
-    <div class="sec-title" style="margin-top:20px">Broker configuration <span class="dim sz">read-only — set with flags or the config file</span></div>
+    <div class="sec-title">Broker configuration <span class="sz">read-only — set with flags or the config file</span></div>
     <div class="cpanel">
       {{range .Cluster.BrokerConfig}}<div class="crow2"><span class="k mono">{{.Name}}</span><span class="v mono">{{.Value}}</span></div>{{end}}
     </div>
@@ -25,5 +25,5 @@
       {{icon "info"}}
       <div>Transactions, log compaction, ACLs, and adding partitions to an existing topic aren't implemented. If a client asks for one of these, the connection closes cleanly on that call — everything else keeps working. See <a href="https://github.com/doze-dev/doze-kafka/blob/main/docs/limitations.md" target="_blank" rel="noopener">limitations</a>.</div>
     </div>
-  </div></section>
+  </div></main>
 {{template "shell_bottom" .}}{{end}}

@@ -1,85 +1,84 @@
-// shell.js — workbench chrome: theme, toasts, copy, styled confirms, command
-// palette, keyboard navigation, and live-region polling helpers. Everything
-// here lives OUTSIDE #workspace so it survives every content swap.
+// shell.js — the console's chrome: theme, toasts, copy, confirm dialog, command
+// palette, keyboard shortcuts, the message drawer, the docked composer and live
+// polling. Chrome elements live outside #workspace, so they survive every
+// content swap; anything inside it is looked up when it is needed, never held.
 (function () {
   "use strict";
+  var root = document.documentElement;
   var PREFIX = (document.querySelector('link[rel="icon"]') || {}).href
     ? new URL(document.querySelector('link[rel="icon"]').href).pathname.replace(/\/static\/favicon\.svg$/, "")
     : "/_console";
+  function stored(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+  function store(key, value) {
+    try { if (value == null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch (e) {}
+  }
 
-  // ---------- Alpine glue ----------
+  // ---------- Alpine and editors after a swap ----------
   document.addEventListener("htmx:afterSwap", function () {
-    // e.detail.target is the OLD detached node for outerHTML swaps; upgrade
-    // document-wide instead (both calls are idempotent). Alpine also inits new
-    // nodes via its own MutationObserver, but initTree on the live tree is safe.
+    // For an outerHTML swap e.detail.target is the old, detached node, so both
+    // upgrades run document-wide; both skip what is already set up.
     if (window.Alpine) window.Alpine.initTree(document.body);
     if (window.dozeEditor) window.dozeEditor.upgradeAll();
     resetListCursor();
   });
 
   // ---------- theme: light / system / dark ----------
-  // "system" is the absence of an override: no data-theme attribute, no
-  // localStorage entry — the prefers-color-scheme media query does the rest,
-  // and tracks OS changes live for free.
+  // The stylesheet knows two themes. "System" is this script choosing between
+  // them from the OS setting, and following it when it changes; it is stored as
+  // the absence of a choice. (The same resolution runs inline in <head>, before
+  // first paint.)
   var themeSeg = document.getElementById("theme-seg");
+  var darkMQ = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
   function themeMode() {
-    try { return localStorage.getItem("theme") || "system"; } catch (e) { return "system"; }
+    var t = stored("theme");
+    return t === "light" || t === "dark" ? t : "system";
   }
   function applyTheme(mode) {
-    if (mode === "system") {
-      document.documentElement.removeAttribute("data-theme");
-      try { localStorage.removeItem("theme"); } catch (e) {}
-    } else {
-      document.documentElement.setAttribute("data-theme", mode);
-      try { localStorage.setItem("theme", mode); } catch (e) {}
-    }
+    root.setAttribute("data-theme", mode === "system" ? (darkMQ && darkMQ.matches ? "dark" : "light") : mode);
+    store("theme", mode === "system" ? null : mode);
     if (themeSeg) themeSeg.querySelectorAll("button").forEach(function (b) {
       var on = b.getAttribute("data-mode") === mode;
       b.classList.toggle("on", on);
       b.setAttribute("aria-pressed", on ? "true" : "false");
     });
   }
-  if (themeSeg) {
-    applyTheme(themeMode()); // paint the active segment on load
-    themeSeg.addEventListener("click", function (e) {
-      var b = e.target.closest("button[data-mode]");
-      if (b) applyTheme(b.getAttribute("data-mode"));
-    });
-  }
+  applyTheme(themeMode());
+  if (themeSeg) themeSeg.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-mode]");
+    if (b) applyTheme(b.getAttribute("data-mode"));
+  });
+  if (darkMQ && darkMQ.addEventListener) darkMQ.addEventListener("change", function () {
+    if (themeMode() === "system") applyTheme("system");
+  });
 
   // ---------- collapsible rail ----------
-  function railSlim() { return document.documentElement.getAttribute("data-rail") === "slim"; }
+  function railSlim() { return root.getAttribute("data-rail") === "slim"; }
   // The rail folds to icons on narrow windows unless you have chosen "wide".
   var narrowMQ = window.matchMedia ? window.matchMedia("(max-width:1180px)") : null;
-  function railPref() { try { return localStorage.getItem("rail"); } catch (e) { return null; } }
   function applyRailAuto() {
-    var pref = railPref();
+    var pref = stored("rail");
     var slim = pref === "slim" || (pref !== "wide" && !!narrowMQ && narrowMQ.matches);
-    if (slim) document.documentElement.setAttribute("data-rail", "slim");
-    else document.documentElement.removeAttribute("data-rail");
+    if (slim) root.setAttribute("data-rail", "slim"); else root.removeAttribute("data-rail");
   }
   if (narrowMQ && narrowMQ.addEventListener) narrowMQ.addEventListener("change", applyRailAuto);
   function setRail(slim) {
-    if (slim) document.documentElement.setAttribute("data-rail", "slim");
-    else document.documentElement.removeAttribute("data-rail");
-    try { localStorage.setItem("rail", slim ? "slim" : "wide"); } catch (e) {}
+    if (slim) root.setAttribute("data-rail", "slim"); else root.removeAttribute("data-rail");
+    store("rail", slim ? "slim" : "wide");
   }
   var railToggle = document.getElementById("rail-toggle");
   if (railToggle) railToggle.addEventListener("click", function () { setRail(!railSlim()); });
-  // Flyout labels in slim mode: position fixed on hover so the rail's own
-  // scroll/overflow can never clip them.
+  // Flyout labels in slim mode: positioned on hover so the rail's own overflow
+  // can never clip them.
   document.addEventListener("mouseover", function (e) {
     if (!railSlim()) return;
     var ri = e.target.closest(".rail .ri");
-    if (!ri) return;
-    var fly = ri.querySelector(".ri-fly");
+    var fly = ri && ri.querySelector(".ri-fly");
     if (!fly) return;
     var r = ri.getBoundingClientRect();
     fly.style.left = (r.right + 8) + "px";
     fly.style.top = (r.top + r.height / 2) + "px";
   });
-  // Live per-service counts, refreshed gently. textContent writes are no-ops
-  // visually when the number hasn't changed, so there's nothing to de-jitter.
+  // The counts beside Topics and Consumer groups, refreshed gently.
   function refreshCounts() {
     if (document.hidden) return;
     fetch(PREFIX + "/api/counts").then(function (r) { return r.json(); }).then(function (counts) {
@@ -93,19 +92,17 @@
   setInterval(refreshCounts, 5000);
 
   // ---------- toasts ----------
-  var seq = 0;
   function toast(msg, kind) {
     var box = document.getElementById("toasts");
     if (!box) return;
     var el = document.createElement("div");
-    el.className = "toast anim" + (kind === "err" ? " err" : "");
+    el.className = "toast" + (kind === "err" ? " err" : "");
     // Errors interrupt a screen reader (alert); confirmations wait their turn (status).
     el.setAttribute("role", kind === "err" ? "alert" : "status");
     el.innerHTML = '<span class="t-ic" aria-hidden="true">' + (kind === "err" ? "⚠" : "✓") + '</span><span></span><button type="button" class="tclose" aria-label="Dismiss">✕</button>';
     el.children[1].textContent = msg;
     el.querySelector(".tclose").onclick = function () { el.remove(); };
     box.appendChild(el);
-    var id = ++seq;
     setTimeout(function () { el.remove(); }, kind === "err" ? 6000 : 3200);
   }
   window.addEventListener("toast", function (e) { toast(e.detail.value !== undefined ? e.detail.value : e.detail, "ok"); });
@@ -119,7 +116,7 @@
     var msg = ta.value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
     return msg || "Request failed";
   }
-  // Is this event about the live tail's own poll? A failing poll must not toast
+  // Is this event about a live region's own poll? A failing poll must not toast
   // every few seconds; it gets one persistent state on the live control instead.
   function isLivePoll(e) {
     var path = (e.detail && e.detail.requestConfig && e.detail.requestConfig.path) || "";
@@ -127,6 +124,7 @@
     var base = el && el.getAttribute("data-live");
     return !!base && path.indexOf(base) === 0;
   }
+  function isDrawerRequest(e) { return !!(e.detail && e.detail.target && e.detail.target.id === "drawer"); }
   function setDisconnected(on, why) {
     document.querySelectorAll("[data-live]").forEach(function (el) {
       el.classList.toggle("disconnected", on);
@@ -135,20 +133,11 @@
     });
   }
   // An error response is shown where the person is looking: in the failed form's
-  // error slot if it has one, in the drawer if the drawer asked, else a toast.
+  // error slot if it has one, else a toast. (The drawer reports its own; see below.)
   document.addEventListener("htmx:responseError", function (e) {
     var msg = errorText(e.detail.xhr);
     if (isLivePoll(e)) { setDisconnected(true, msg); return; }
-    var target = e.detail.target;
-    if (target && target.id === "drawer") {
-      target.textContent = "";
-      var box = document.createElement("div");
-      box.className = "drawer-err";
-      box.setAttribute("role", "alert");
-      box.textContent = msg;
-      target.appendChild(box);
-      return;
-    }
+    if (isDrawerRequest(e)) return;
     var elt = e.detail.elt;
     var form = elt && elt.closest ? elt.closest("form") : null;
     var slot = form && form.querySelector("[data-err-slot]");
@@ -158,6 +147,7 @@
   // Nothing came back at all (the console server itself is gone).
   function networkFailure(e) {
     if (isLivePoll(e)) { setDisconnected(true, "the console server did not answer"); return; }
+    if (isDrawerRequest(e)) return;
     toast("No answer from the console — is doze-kafka still running?", "err");
   }
   document.addEventListener("htmx:sendError", networkFailure);
@@ -175,55 +165,71 @@
 
   // ---------- request feedback ----------
   // Controls lock while their request is in flight (hx-disabled-elt), a slow
-  // request shows a thin progress bar after half a second, a drawer opens on a
-  // loading state rather than yesterday's message, and a form's old error clears
-  // when it is resubmitted.
+  // request shows a thin progress bar after half a second, and a form's old error
+  // clears when it is resubmitted.
+  //
+  // The end of a request is taken from the XMLHttpRequest itself, not from
+  // htmx:afterRequest: htmx raises that on the element that asked, and when the
+  // response replaces that element (the drawer's Older and Newer buttons replace
+  // themselves) the event has nowhere to bubble from, and the bar stayed on.
   var slowTimer = null, inflight = 0;
-  var bar = document.getElementById("reqbar");
   document.addEventListener("htmx:beforeRequest", function (e) {
     if (isLivePoll(e)) return;
     var elt = e.detail.elt;
     var form = elt && elt.closest ? elt.closest("form") : null;
     var slot = form && form.querySelector("[data-err-slot]");
     if (slot) { slot.hidden = true; slot.textContent = ""; }
-    var t = e.detail.target;
-    if (t && t.id === "drawer") {
-      t.textContent = "";
-      var l = document.createElement("div");
-      l.className = "drawer-loading";
-      l.innerHTML = '<span class="spinner" aria-hidden="true"></span> Loading…';
-      t.appendChild(l);
-    }
+    var bar = document.getElementById("reqbar");
     inflight++;
     if (!slowTimer && bar) slowTimer = setTimeout(function () { bar.hidden = false; }, 500);
+    var xhr = e.detail.xhr;
+    if (isDrawerRequest(e)) drawerRequestStarted(xhr, elt);
+    xhr.addEventListener("loadend", function () {
+      inflight = Math.max(0, inflight - 1);
+      if (inflight === 0) {
+        clearTimeout(slowTimer); slowTimer = null;
+        if (bar) bar.hidden = true;
+      }
+    });
   });
-  function requestDone(e) {
-    if (isLivePoll(e)) return;
-    inflight = Math.max(0, inflight - 1);
-    if (inflight === 0) {
-      clearTimeout(slowTimer); slowTimer = null;
-      if (bar) bar.hidden = true;
-    }
-  }
-  document.addEventListener("htmx:afterRequest", requestDone);
 
   // ---------- copy ----------
+  // navigator.clipboard exists only on a secure origin. http://127.0.0.1 is one;
+  // http://kafka.doze is not, and there the old way still works.
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+    return new Promise(function (resolve, reject) {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.className = "sr-only";
+      document.body.appendChild(ta);
+      var back = document.activeElement;
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) {}
+      ta.remove();
+      if (back && back.focus) back.focus();
+      if (ok) resolve(); else reject(new Error("copy refused"));
+    });
+  }
   document.addEventListener("click", function (e) {
     var el = e.target.closest("[data-copy]");
     if (!el) return;
-    navigator.clipboard.writeText(el.getAttribute("data-copy")).then(function () { toast("Copied"); });
+    copyText(el.getAttribute("data-copy")).then(
+      function () { toast("Copied"); },
+      function () { toast("This browser would not copy that; select the text and copy it by hand.", "err"); });
   });
 
-  // ---------- "Edit a copy" (drawer → compose) ----------
-  // Prefills the compose panel from a record in the drawer: key, value, headers,
+  // ---------- "Edit a copy" (drawer → composer) ----------
+  // Prefills the composer from a record in the drawer: key, value, headers,
   // partition, and how each is encoded, for changing before sending. ("Send
   // again" is a different thing: the server re-produces the stored record
   // exactly, which a form cannot promise.)
-  // Delegated, because the drawer's content is swapped in per record by htmx.
   document.addEventListener("click", function (e) {
     var b = e.target.closest("#drawer-edit");
     if (!b) return;
-    if (window.dozeCloseDrawer) dozeCloseDrawer();
+    closeDrawer(false);
     var panel = document.getElementById("compose-panel");
     if (!panel) return;
     setDock(true, true);
@@ -235,12 +241,7 @@
     if (sel) sel.value = b.getAttribute("data-partition");
     var ta = form.querySelector('textarea[name="value"]');
     var val = b.getAttribute("data-value") || "";
-    if (ta && window.dozeEditor) {
-      dozeEditor.set(ta, val);
-      requestAnimationFrame(function () { dozeEditor.refresh(panel); });
-    } else if (ta) {
-      ta.value = val;
-    }
+    if (ta && window.dozeEditor) dozeEditor.set(ta, val); else if (ta) ta.value = val;
     if (st) {
       st.keyB64 = b.getAttribute("data-key-enc") === "base64";
       st.valB64 = b.getAttribute("data-value-enc") === "base64";
@@ -251,18 +252,25 @@
         });
       } catch (err) { st.hdrs = []; }
     }
-    panel.scrollIntoView({ behavior: "smooth", block: "center" });
+    focusComposer();
   });
 
-  // ---------- dialog helpers ----------
-  // Tab stays inside an open dialog; shared by confirm and the palette.
-  function trapTab(root, ev) {
+  // ---------- dialogs ----------
+  // Three things open over the page: the confirm dialog, the command palette and
+  // the message drawer. Only one is open at a time, and while one is, the page's
+  // single-key shortcuts are off.
+  var FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  function isOpen(id) { var el = document.getElementById(id); return !!el && !el.hidden; }
+  function confirmOpen() { return isOpen("confirm"); }
+  function paletteOpen() { return isOpen("palette"); }
+  function drawerIsOpen() { return isOpen("drawer-overlay"); }
+  // Tab stays inside an open dialog.
+  function trapTab(box, ev) {
     if (ev.key !== "Tab") return;
-    var f = Array.prototype.filter.call(root.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'),
-      function (el) { return el.offsetParent !== null; });
+    var f = Array.prototype.filter.call(box.querySelectorAll(FOCUSABLE), function (el) { return el.offsetParent !== null; });
     if (!f.length) { ev.preventDefault(); return; }
     var first = f[0], last = f[f.length - 1];
-    if (!root.contains(document.activeElement)) { first.focus(); ev.preventDefault(); }
+    if (!box.contains(document.activeElement)) { first.focus(); ev.preventDefault(); }
     else if (ev.shiftKey && document.activeElement === first) { last.focus(); ev.preventDefault(); }
     else if (!ev.shiftKey && document.activeElement === last) { first.focus(); ev.preventDefault(); }
   }
@@ -273,102 +281,63 @@
   // not "Are you sure? / Confirm". Focus starts on Cancel: Enter on a destructive
   // dialog must not be the dangerous answer.
   document.addEventListener("htmx:confirm", function (e) {
-    var confirmBox = document.getElementById("confirm");
+    var box = document.getElementById("confirm");
     var q = e.detail.question;
-    if (!q || !confirmBox) return;
+    if (!q || !box) return;
     e.preventDefault();
+    if (confirmOpen()) return; // one question at a time.
     var elt = e.detail.elt || {}, data = elt.dataset || {};
     var opener = document.activeElement;
     document.getElementById("confirm-title").textContent = data.confirmTitle || "Are you sure?";
     document.getElementById("confirm-msg").textContent = q;
     var yes = document.getElementById("confirm-yes"), no = document.getElementById("confirm-no");
     yes.textContent = data.confirmVerb || "Confirm";
-    confirmBox.hidden = false;
+    box.hidden = false;
     function close(restore) {
-      confirmBox.hidden = true; yes.onclick = no.onclick = confirmBox.onclick = null;
+      box.hidden = true; yes.onclick = no.onclick = box.onclick = null;
       document.removeEventListener("keydown", onKey, true);
       if (restore && opener && document.contains(opener) && opener.focus) opener.focus();
     }
     function onKey(ev) {
       if (ev.key === "Escape") { close(true); ev.preventDefault(); ev.stopPropagation(); return; }
-      trapTab(confirmBox, ev);
+      trapTab(box, ev);
     }
     yes.onclick = function () { close(false); e.detail.issueRequest(true); };
     no.onclick = function () { close(true); };
-    confirmBox.onclick = function (ev) { if (ev.target === confirmBox) close(true); };
+    box.onclick = function (ev) { if (ev.target === box) close(true); };
     document.addEventListener("keydown", onKey, true);
     no.focus();
   });
 
   // ---------- command palette ----------
   var pal = document.getElementById("palette"), palQ = document.getElementById("pal-q"), palList = document.getElementById("pal-list");
-  var palItems = [], palSel = 0;
+  var palItems = [], palSel = 0, palOpener = null;
 
-  // ---------- recently visited resources ----------
-  // The palette pins your last few resource pages on top: the queue you just
-  // left costs ⌘K ⏎ instead of retyping its name.
-  var SVCSET = { topics:1, groups:1 };
+  // The palette lists the last few topics and groups you opened first: the one
+  // you just left costs ⌘K ⏎ instead of retyping its name.
   function trackVisit() {
     try {
       var path = location.pathname;
       if (path.indexOf(PREFIX + "/") !== 0) return;
       var rest = path.slice(PREFIX.length + 1).split("/");
-      var svc = rest[0];
-      if (!SVCSET[svc]) return;
-      var name = "";
-      var u = path;
-      if (rest.length >= 2 && rest[1]) {
-        name = decodeURIComponent(rest[1]);
-      }
-      if (!name) return;
-      var rec = JSON.parse(localStorage.getItem("recents") || "[]").filter(function (x) { return x.u !== u; });
-      rec.unshift({ s: svc, n: name, u: u });
-      localStorage.setItem("recents", JSON.stringify(rec.slice(0, 6)));
+      if ((rest[0] !== "topics" && rest[0] !== "groups") || !rest[1]) return;
+      var rec = JSON.parse(stored("recents") || "[]").filter(function (x) { return x.u !== path; });
+      rec.unshift({ s: rest[0], n: decodeURIComponent(rest[1]), u: path });
+      store("recents", JSON.stringify(rec.slice(0, 6)));
     } catch (e) {}
   }
   document.addEventListener("DOMContentLoaded", trackVisit);
   document.addEventListener("htmx:pushedIntoHistory", trackVisit);
 
-  // ---------- rail active state ----------
-  // The rail lives outside #workspace, so boosted navigation swaps the page
-  // without repainting the server-rendered `.on` class. Recompute the active
-  // item from the URL after every navigation (and on back/forward).
-  // The section a URL belongs to: the console's home (and the create-topic form)
-  // is the Topics section, which the old "starts with the rail link's path" test
-  // missed — it left no rail item lit on the landing page.
-  function sectionFor(path) {
-    if (path.indexOf(PREFIX) !== 0) return "";
-    var seg = path.slice(PREFIX.length).replace(/^\/+/, "").split("/")[0];
-    if (seg === "" || seg === "topics" || seg === "new") return "topics";
-    return seg;
-  }
-  var currentSection = sectionFor(location.pathname);
-  function syncRail() {
-    if (window.dozeView) window.dozeView();
-    var section = sectionFor(location.pathname);
-    document.querySelectorAll(".rail .ri").forEach(function (a) {
-      var ip = new URL(a.href, location.origin).pathname;
-      a.classList.toggle("on", sectionFor(ip) === section);
-    });
-    // A filter typed in one section means nothing in the next (topic names do
-    // not filter groups), and used to carry over and hide everything.
-    if (section !== currentSection) {
-      currentSection = section;
-      if (window.Alpine && Alpine.store("filter")) Alpine.store("filter").q = "";
-    }
-  }
-  document.addEventListener("DOMContentLoaded", syncRail);
-  document.addEventListener("htmx:pushedIntoHistory", syncRail);
-  window.addEventListener("popstate", syncRail);
-
   function openPalette() {
-    if (!pal) return;
-    palOpener = document.activeElement;
+    if (!pal || confirmOpen()) return;
+    if (drawerIsOpen()) closeDrawer(false);
+    if (!paletteOpen()) palOpener = document.activeElement;
     pal.hidden = false; palQ.value = ""; palSel = 0;
-    var here = location.pathname + location.search;
+    var here = location.pathname;
     var recents = [];
     try {
-      recents = JSON.parse(localStorage.getItem("recents") || "[]")
+      recents = JSON.parse(stored("recents") || "[]")
         .filter(function (x) { return x.u !== here; }).slice(0, 5)
         .map(function (x) { return { s: x.s, n: x.n, u: x.u, k: "recent" }; });
     } catch (e) {}
@@ -383,14 +352,11 @@
         live[x.u] = 1;
         (x.k === "view" || x.k === "action" ? fixed : resources).push(x);
       });
-      // Recents that no longer exist (deleted topics, dead groups) would be dead
-      // links: drop them here and from localStorage so they stop resurfacing.
+      // A recent that no longer exists (a deleted topic) would be a dead link:
+      // drop it here and from storage.
       var pruned = recents.filter(function (x) { return live[x.u]; });
       if (pruned.length !== recents.length) {
-        try {
-          var stored = JSON.parse(localStorage.getItem("recents") || "[]").filter(function (x) { return live[x.u]; });
-          localStorage.setItem("recents", JSON.stringify(stored));
-        } catch (e) {}
+        try { store("recents", JSON.stringify(JSON.parse(stored("recents") || "[]").filter(function (x) { return live[x.u]; }))); } catch (e) {}
       }
       var seen = {};
       pruned.forEach(function (x) { seen[x.u] = 1; });
@@ -407,37 +373,68 @@
     var items = palFiltered();
     if (palSel >= items.length) palSel = Math.max(0, items.length - 1);
     palList.innerHTML = "";
-    if (!items.length) { palList.innerHTML = '<div class="pal-empty">Nothing matches</div>'; return; }
+    if (!items.length) { palList.innerHTML = '<div class="pal-empty">Nothing matches</div>'; palQ.removeAttribute("aria-activedescendant"); return; }
     items.forEach(function (it, i) {
       var a = document.createElement("a");
       a.className = "pal-item" + (i === palSel ? " sel" : "");
       a.href = it.u;
       a.id = "pal-opt-" + i; a.setAttribute("role", "option"); a.setAttribute("aria-selected", i === palSel ? "true" : "false"); a.tabIndex = -1;
       a.innerHTML = '<span class="pal-dot"></span><span class="pal-name"></span><span class="pal-kind"></span>';
-      // The dot encodes what the row IS (topic/group/view), not how it got
-      // into the list — a "recent" topic still gets the topic hue.
-      a.querySelector(".pal-dot").classList.add(
-        it.s === "topics" ? "d-topic" : it.s === "groups" ? "d-group" : "d-view");
+      // The dot is what the row is (topic, group, view), not how it got into the list.
+      a.querySelector(".pal-dot").classList.add(it.s === "topics" ? "d-topic" : it.s === "groups" ? "d-group" : "d-view");
       a.querySelector(".pal-name").textContent = it.n;
       a.querySelector(".pal-kind").textContent = it.k;
-      a.onmouseenter = function () { if (palSel !== i) { palSel = i; renderPal(); } };
+      a.onmousemove = function () { if (palSel !== i) { palSel = i; renderPal(); } };
       palList.appendChild(a);
     });
-    // Keyboard selection can walk past the fold — keep it in view.
     var sel = palList.querySelector(".pal-item.sel");
     if (sel) { sel.scrollIntoView({ block: "nearest" }); palQ.setAttribute("aria-activedescendant", sel.id); }
-    else palQ.removeAttribute("aria-activedescendant");
   }
-  var palOpener = null;
   function closePalette() {
-    if (!pal || pal.hidden) return;
+    if (!paletteOpen()) return;
     pal.hidden = true;
     if (palOpener && document.contains(palOpener) && palOpener.focus) palOpener.focus();
   }
-  var opener = document.getElementById("palette-open");
-  if (opener) opener.addEventListener("click", openPalette);
+  var palButton = document.getElementById("palette-open");
+  if (palButton) palButton.addEventListener("click", openPalette);
   if (palQ) palQ.addEventListener("input", function () { palSel = 0; renderPal(); });
   if (pal) pal.addEventListener("click", function (e) { if (e.target === pal) closePalette(); });
+
+  // ---------- rail active state ----------
+  // The rail is outside #workspace, so a boosted navigation does not repaint its
+  // server-rendered `.on`. Recompute it from the URL after every navigation. The
+  // console's home and the create-topic form belong to Topics.
+  function sectionFor(path) {
+    if (path.indexOf(PREFIX) !== 0) return "";
+    var seg = path.slice(PREFIX.length).replace(/^\/+/, "").split("/")[0];
+    if (seg === "" || seg === "topics" || seg === "new") return "topics";
+    return seg;
+  }
+  var currentSection = sectionFor(location.pathname), currentPath = location.pathname;
+  function afterNavigation() {
+    if (window.dozeView) window.dozeView();
+    var section = sectionFor(location.pathname);
+    document.querySelectorAll(".rail .ri").forEach(function (a) {
+      var on = sectionFor(new URL(a.href, location.origin).pathname) === section;
+      a.classList.toggle("on", on);
+      if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    });
+    // A filter typed in one section means nothing in the next (topic names do
+    // not filter groups), and used to carry over and hide everything.
+    if (section !== currentSection) {
+      currentSection = section;
+      if (window.Alpine && Alpine.store("filter")) Alpine.store("filter").q = "";
+    }
+    // Pausing is about the page you paused. It used to follow you to the next
+    // one, where a group page (which has no pause control) sat frozen.
+    if (location.pathname !== currentPath) {
+      currentPath = location.pathname;
+      setPaused(false);
+    }
+  }
+  document.addEventListener("DOMContentLoaded", afterNavigation);
+  document.addEventListener("htmx:pushedIntoHistory", afterNavigation);
+  window.addEventListener("popstate", afterNavigation);
 
   // ---------- keyboard ----------
   // The cursor is a row, not an index: filtering changes which rows are visible,
@@ -457,9 +454,18 @@
     cursorEl.classList.add("cursor");
     cursorEl.scrollIntoView({ block: "nearest" });
   }
+  function focusComposer() {
+    var panel = document.getElementById("compose-panel");
+    var ta = panel && panel.querySelector('textarea[name="value"]');
+    requestAnimationFrame(function () {
+      if (window.dozeEditor) dozeEditor.refresh(panel);
+      if (ta && ta.__cm) ta.__cm.focus(); else if (ta) ta.focus();
+    });
+  }
   document.addEventListener("keydown", function (e) {
-    var inPal = !pal.hidden;
-    if (inPal) {
+    if (confirmOpen()) return; // the dialog has its own keys, and nothing else gets any.
+    var mod = e.metaKey || e.ctrlKey;
+    if (paletteOpen()) {
       var items = palFiltered();
       if (e.key === "Tab") { e.preventDefault(); return; } // one control; focus stays on the search box.
       if (e.key === "Escape") { closePalette(); e.preventDefault(); }
@@ -468,43 +474,49 @@
       else if (e.key === "Enter") { var it = items[palSel]; if (it) location.href = it.u; e.preventDefault(); }
       return;
     }
-    if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); openPalette(); return; }
-    // ⌘⏎ submits the composer you're typing in — send, publish, invoke, put.
-    // Works from plain textareas and from inside CodeMirror editors alike.
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-      var form = document.activeElement.closest ? document.activeElement.closest("form") : null;
-      if (form && form.querySelector("textarea, .CodeMirror")) { e.preventDefault(); form.requestSubmit(); return; }
+    if (mod && !e.altKey && !e.shiftKey && e.key === "k") { e.preventDefault(); openPalette(); return; }
+    if (drawerIsOpen()) return; // the drawer's keys are handled where the drawer is.
+    var active = document.activeElement || document.body;
+    // ⌘⏎ sends from the composer, from a plain field or from inside the editor.
+    // Once per press: a held key repeats, and each repeat used to send a record.
+    if (mod && e.key === "Enter") {
+      var form = active.closest ? active.closest("form") : null;
+      if (form && form.querySelector("textarea, .CodeMirror")) {
+        e.preventDefault();
+        if (!e.repeat && !form.classList.contains("htmx-request")) form.requestSubmit();
+      }
+      return;
     }
-    var tag = document.activeElement.tagName;
-    if (/(INPUT|TEXTAREA|SELECT)/.test(tag) || document.activeElement.closest(".CodeMirror")) return;
+    // Single-key shortcuts are single keys. With a modifier held the key belongs
+    // to the browser or the OS: ⌘C is copy, not "new topic".
+    if (mod || e.altKey) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || active.isContentEditable || (active.closest && active.closest(".CodeMirror"))) return;
     if (e.key === "/") {
       var f = document.querySelector(".listpane .filter input");
-      if (f) { f.focus(); e.preventDefault(); } else openPalette();
+      if (f && f.offsetParent !== null) { f.focus(); e.preventDefault(); } else { openPalette(); e.preventDefault(); }
     } else if (e.key === "j") moveCursor(1);
     else if (e.key === "k") moveCursor(-1);
-    else if (e.key === "Enter" && cursorEl && document.contains(cursorEl) && cursorEl.offsetParent !== null) cursorEl.click();
+    else if (e.key === "Enter") {
+      // Enter on a focused button or link is that control's own. The list cursor
+      // is opened only when nothing else has the keyboard.
+      if (active !== document.body && active.matches && active.matches(FOCUSABLE + ", summary")) return;
+      if (cursorEl && document.contains(cursorEl) && cursorEl.offsetParent !== null) cursorEl.click();
+    }
     else if (e.key === "c") { var nb = document.querySelector(".listpane .new-link"); if (nb) nb.click(); }
     else if (e.key === "m") {
-      // Open the docked composer and put the caret in the value editor.
-      var dk = document.getElementById("compose-panel");
-      if (dk) {
-        e.preventDefault();
-        if (!dk.classList.contains("open")) setDock(true, true);
-        var ta = dk.querySelector('textarea[name="value"]');
-        requestAnimationFrame(function () { if (ta && ta.__cm) ta.__cm.focus(); else if (ta) ta.focus(); });
-      }
+      if (document.getElementById("compose-panel")) { e.preventDefault(); setDock(true, true); focusComposer(); }
     }
-    else if (e.key === "[") { setRail(!railSlim()); }
-    else if (e.key === "Escape") { var back = document.querySelector("[data-esc-back]"); if (back) history.back(); }
+    else if (e.key === "[") setRail(!railSlim());
   });
 
   // ---------- the message drawer ----------
-  // A real dialog: it takes focus when it opens, keeps Tab inside, closes on Esc or
-  // a click outside, and hands focus back to what opened it. Its record is in the
-  // URL (?open=OFFSET), so a refresh or a shared link reopens it.
+  // A real dialog in every state (loading, a record, an error): it has a title
+  // and a close button, takes focus when it opens, keeps Tab inside, closes on
+  // Esc or a click outside, and hands focus back to the row that opened it. Its
+  // record is in the URL (?open=OFFSET), so a refresh or a shared link reopens it.
   var drawerOverlay = document.getElementById("drawer-overlay");
-  var drawerOpener = null;
-  function drawerIsOpen() { return !!drawerOverlay && !drawerOverlay.hidden; }
+  var drawer = document.getElementById("drawer");
+  var drawerOpener = null, drawerXhr = null, drawerRefocus = null;
   function setOpenParam(offset) {
     try {
       var u = new URL(location.href);
@@ -513,16 +525,64 @@
     } catch (e) {}
   }
   function openDrawer(from) {
-    if (!drawerOverlay) return;
+    if (!drawerOverlay || confirmOpen()) return;
     if (!drawerIsOpen()) drawerOpener = from || document.activeElement;
     drawerOverlay.hidden = false;
   }
   function closeDrawer(restoreFocus) {
     if (!drawerIsOpen()) return;
     drawerOverlay.hidden = true;
+    // A request still on its way is for a drawer that is no longer open. Left
+    // alone, its answer filled the closed drawer and put ?open= back in the URL.
+    if (drawerXhr) { drawerXhr.dozeDropped = true; drawerXhr.abort(); drawerXhr = null; }
+    drawer.textContent = "";
+    drawer.classList.remove("busy");
+    drawer.removeAttribute("aria-busy");
     setOpenParam(null);
-    if (restoreFocus !== false && drawerOpener && document.contains(drawerOpener) && drawerOpener.focus) drawerOpener.focus();
+    var back = drawerOpener;
     drawerOpener = null;
+    if (restoreFocus === false || !back) return;
+    // A live update may have replaced the row since; the new one has the same id.
+    if (!document.contains(back) && back.id) back = document.getElementById(back.id);
+    if (back && back.focus) back.focus();
+  }
+  // message fills the drawer with a titled state that is not a record: loading,
+  // or what went wrong.
+  function drawerMessage(title, text, isError) {
+    drawer.textContent = "";
+    var h = document.createElement("div");
+    h.className = "drawer-h";
+    h.innerHTML = '<div><span class="t" id="drawer-title"></span></div><div class="drawer-nav"><button type="button" class="icon-btn" aria-label="Close" data-drawer-close>✕</button></div>';
+    h.querySelector("#drawer-title").textContent = title;
+    var b = document.createElement("div");
+    if (isError) { b.className = "err drawer-err"; b.setAttribute("role", "alert"); b.textContent = text; }
+    else { b.className = "drawer-loading"; b.innerHTML = '<span class="spinner" aria-hidden="true"></span> '; b.appendChild(document.createTextNode(text)); }
+    drawer.appendChild(h);
+    drawer.appendChild(b);
+    h.querySelector("[data-drawer-close]").focus();
+  }
+  function drawerRequestStarted(xhr, from) {
+    if (!drawer) return;
+    // htmx hears the click on a row before the document does, so the request can
+    // start while the drawer is still hidden, and a hidden dialog cannot take focus.
+    openDrawer(from);
+    if (drawerXhr) { drawerXhr.dozeDropped = true; drawerXhr.abort(); } // the newer click wins.
+    drawerXhr = xhr;
+    var a = document.activeElement;
+    drawerRefocus = a && drawer.contains(a) ? a.getAttribute("aria-label") : null;
+    // Stepping to the next record keeps the current one on screen, dimmed, until
+    // the new one arrives. A first open has nothing to keep, and says so.
+    if (drawer.querySelector(".drawer-b")) { drawer.classList.add("busy"); drawer.setAttribute("aria-busy", "true"); }
+    else drawerMessage("Opening record", "Loading…", false);
+    xhr.addEventListener("loadend", function () {
+      if (xhr.dozeDropped) return;
+      if (drawerXhr === xhr) drawerXhr = null;
+      drawer.classList.remove("busy");
+      drawer.removeAttribute("aria-busy");
+      if (!drawerIsOpen()) return;
+      if (xhr.status === 0) drawerMessage("Could not open the record", "No answer from the console — is doze-kafka still running?", true);
+      else if (xhr.status >= 400) drawerMessage("Could not open the record", errorText(xhr), true);
+    });
   }
   document.addEventListener("click", function (e) {
     var row = e.target.closest("[data-drawer-open]");
@@ -531,26 +591,23 @@
     if (e.target === drawerOverlay) closeDrawer();
   });
   document.addEventListener("keydown", function (e) {
+    if (confirmOpen() || paletteOpen()) return;
     var row = e.target.closest && e.target.closest("[data-drawer-open]");
     if (row && (e.key === "Enter" || e.key === " ")) { openDrawer(row); return; } // htmx fires the request.
     if (!drawerIsOpen()) return;
     if (e.key === "Escape") { closeDrawer(); e.preventDefault(); e.stopPropagation(); return; }
-    if (e.key === "Tab") {
-      var focusable = drawerOverlay.querySelectorAll('button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])');
-      if (!focusable.length) return;
-      var first = focusable[0], last = focusable[focusable.length - 1];
-      if (e.shiftKey && document.activeElement === first) { last.focus(); e.preventDefault(); }
-      else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); }
-    }
+    trapTab(drawerOverlay, e);
   }, true);
-  // New content landed in the drawer: record it in the URL and move focus in.
+  // A record landed in the drawer: put it in the URL and move focus in — to the
+  // button that asked, when it was Older or Newer, so stepping keeps its place.
   document.addEventListener("htmx:afterSwap", function (e) {
     var t = e.detail.target;
     if (!t || t.id !== "drawer") return;
-    var title = document.getElementById("drawer-title");
-    var m = title && /offset (\d+)/.exec(title.textContent);
-    if (m) setOpenParam(m[1]);
-    var btn = t.querySelector("[data-drawer-close]");
+    if (!drawerIsOpen()) { t.textContent = ""; return; }
+    var title = t.querySelector("#drawer-title[data-offset]");
+    if (title) setOpenParam(title.getAttribute("data-offset"));
+    var again = drawerRefocus && t.querySelector('button[aria-label="' + drawerRefocus + '"]:not([disabled])');
+    var btn = again || t.querySelector("[data-drawer-close]");
     if (btn) btn.focus();
   });
   // A link or refresh with ?open=N reopens that record.
@@ -558,47 +615,40 @@
     var open = new URLSearchParams(location.search).get("open");
     var region = document.getElementById("tape-and-table");
     if (open == null || !region || !window.htmx) return;
-    openDrawer(null);
-    // No `select` here: "unset" is an attribute-only value (it cancels an inherited
-    // hx-select), and #drawer is outside #workspace so there is none to cancel.
+    openDrawer(document.getElementById("msg-" + open));
     htmx.ajax("GET", region.getAttribute("data-msg-base") + "&offset=" + encodeURIComponent(open), {
       target: "#drawer", swap: "innerHTML",
     }).catch(function () {});
   }
   document.addEventListener("DOMContentLoaded", reopenFromURL);
-  // Sending a record again dismisses the drawer without stealing focus back.
-  window.dozeCloseDrawer = function () { closeDrawer(false); };
   // "Send again" closes the drawer once the broker has taken the copy; on a
-  // failure it stays open, with the error beside the button.
+  // failure it stays open, and the error is a toast.
   document.addEventListener("htmx:afterRequest", function (e) {
     var el = e.detail.elt;
     if (el && el.hasAttribute && el.hasAttribute("data-close-drawer-on-success") && e.detail.successful) closeDrawer(false);
   });
 
   // ---------- docked composer ----------
-  // Open or closed is remembered, and the toggle is a real button that says so.
-  function setDock(open, remember) {
-    var panel = document.getElementById("compose-panel");
-    if (!panel) return;
-    panel.classList.toggle("open", open);
+  // Whether it is open is an attribute on <html>, set before first paint from
+  // storage. It is not a class on the dock itself: the dock is replaced on every
+  // navigation, and a remembered-open composer used to come back closed.
+  function dockOpen() { return root.getAttribute("data-dock") === "open"; }
+  function syncDock() {
     var bar = document.getElementById("compose-head");
-    if (bar) bar.setAttribute("aria-expanded", open ? "true" : "false");
-    if (remember) { try { localStorage.setItem("dock", open ? "open" : "closed"); } catch (e) {} }
-    if (open && window.dozeEditor) requestAnimationFrame(function () { dozeEditor.refresh(panel); });
+    if (bar) bar.setAttribute("aria-expanded", dockOpen() ? "true" : "false");
+  }
+  function setDock(open, remember) {
+    if (open) root.setAttribute("data-dock", "open"); else root.removeAttribute("data-dock");
+    if (remember) store("dock", open ? "open" : "closed");
+    syncDock();
+    var panel = document.getElementById("compose-panel");
+    if (open && panel && window.dozeEditor) requestAnimationFrame(function () { dozeEditor.refresh(panel); });
   }
   document.addEventListener("click", function (e) {
-    var t = e.target.closest("[data-dock-toggle]");
-    if (!t) return;
-    var panel = document.getElementById("compose-panel");
-    if (panel) setDock(!panel.classList.contains("open"), true);
+    if (e.target.closest("[data-dock-toggle]")) setDock(!dockOpen(), true);
   });
-  function restoreDock() {
-    var panel = document.getElementById("compose-panel");
-    if (!panel) return;
-    try { if (localStorage.getItem("dock") === "open") setDock(true, false); } catch (e) {}
-  }
-  document.addEventListener("DOMContentLoaded", restoreDock);
-  document.addEventListener("htmx:afterSwap", function (e) { if (e.detail.target && e.detail.target.id === "workspace") restoreDock(); });
+  document.addEventListener("DOMContentLoaded", syncDock);
+  document.addEventListener("htmx:afterSettle", syncDock);
 
   // ---------- relative times ----------
   // The server renders "3m ago" once; on a quiet or paused view it would freeze
@@ -631,27 +681,24 @@
   document.addEventListener("DOMContentLoaded", stripFlash);
 
   // ---------- jump-to-offset landing ----------
-  // The ?hl= row gets .hl server-side; scroll it into view once the page
-  // (or a swap that carries it) lands.
+  // The row a jump lands on is marked by the server; bring it into view when the
+  // page arrives, whether by a full load or by a swap (the jump form is boosted).
   function revealHL() {
     var row = document.querySelector(".tbl tr[data-hl]");
     if (row) row.scrollIntoView({ block: "center" });
   }
   document.addEventListener("DOMContentLoaded", revealHL);
+  document.addEventListener("htmx:afterSettle", function (e) {
+    var t = e.detail.target;
+    if (t && t.id === "workspace") revealHL();
+  });
 
   // ---------- live polling with change detection ----------
-  // Elements with data-live="URL" poll every data-live-ms (default 3000); the
-  // server echoes a content hash, and when nothing changed it replies 204 and
-  // nothing moves. Changed content REPLACES the element (outerHTML).
-  //
-  // Not a morph, deliberately. This used to say morph:outerHTML, but no element
-  // carried hx-ext="morph", so htmx fell back to its default innerHTML swap and
-  // inserted the response (itself a #tape-and-table) INSIDE the existing one on
-  // the first change: two regions, two pollers, double the requests. Fixing it
-  // by enabling morph on <body> broke unrelated swaps; a plain replace is the
-  // boring thing that works. What a replace costs — the jump field's text and
-  // focus, the table's scroll position — is saved and restored around the swap
-  // (see preserveLiveState).
+  // An element with data-live="URL" polls every data-live-ms (default 3000). The
+  // server echoes a content hash; when nothing changed it answers 204 and nothing
+  // moves. Changed content replaces the element (outerHTML). What a replace would
+  // lose (the jump field's text, keyboard focus, the table's scroll position) is
+  // saved before the swap and put back after it.
   var livePaused = false;
   function setPaused(p) {
     livePaused = p;
@@ -660,7 +707,6 @@
       b.classList.toggle("on", p);
       b.title = p ? "Resume live updates" : "Pause live updates";
     });
-    document.querySelectorAll("[data-live]").forEach(function (el) { el.classList.toggle("paused", p); });
   }
   document.addEventListener("click", function (e) {
     if (e.target.closest("[data-live-toggle]")) setPaused(!livePaused);
@@ -670,97 +716,101 @@
     liveTimers.forEach(clearInterval);
     liveTimers = [];
     document.querySelectorAll("[data-live]").forEach(function (el) {
-      var id = el.id;
+      var id = el.id, busy = false;
       var every = parseInt(el.getAttribute("data-live-ms") || "3000", 10);
-      var t = setInterval(function () {
-        // Re-query by id every tick: a plain outerHTML swap (composer send,
-        // purge, redrive, delete) REPLACES the element, so a captured reference
-        // would go stale and the poll would silently die. The morph poll itself
-        // re-includes data-live, so a morphed element keeps the same id too.
+      liveTimers.push(setInterval(function () {
+        // Looked up by id every tick: a swap replaces the element, and a held
+        // reference would go stale and the poll would silently die.
         var cur = document.getElementById(id);
-        if (document.hidden || livePaused || !cur) return;
+        if (!cur || busy || document.hidden) return;
+        // Only a region with a pause control can be paused.
+        if (livePaused && cur.querySelector("[data-live-toggle]")) return;
+        // A confirm dialog is asking about a button in this region. Replacing the
+        // region would detach that button, and "Confirm" would then do nothing.
+        if (confirmOpen()) return;
         var url = cur.getAttribute("data-live");
         if (!url) return;
-        var swap = cur.getAttribute("data-live-swap") || "outerHTML";
-        var hash = cur.getAttribute("data-hash") || "";
-        // htmx.ajax returns a promise that rejects when the request fails. A failed
-        // poll is reported by the htmx:responseError / sendError handlers (as the
-        // "not updating" state); left uncaught it is also an unhandled rejection.
-        var p = htmx.ajax("GET", url + (url.indexOf("?") >= 0 ? "&" : "?") + "h=" + hash, {
-          target: "#" + id, swap: swap,
-        });
-        if (p && p.catch) p.catch(function () {});
-      }, every);
-      liveTimers.push(t);
+        busy = true;
+        var done = function () { busy = false; };
+        // A failed poll is reported by the responseError / sendError handlers (as
+        // the "not updating" state); the rejection itself is not news.
+        htmx.ajax("GET", url + (url.indexOf("?") >= 0 ? "&" : "?") + "h=" + encodeURIComponent(cur.getAttribute("data-hash") || ""), {
+          target: "#" + id, swap: "outerHTML",
+        }).then(done, done);
+      }, every));
     });
   }
   document.addEventListener("DOMContentLoaded", setupLive);
   document.addEventListener("htmx:afterSwap", function (e) {
-    // Re-arm after a navigation OR after a swap that lands (or contains) a live
-    // region — including one whose target IS the data-live element itself, which
-    // a descendant-only querySelector check would miss.
+    // Re-arm after a navigation, or after any swap that lands or contains a live region.
     var t = e.detail.target;
-    if (t && (t.id === "workspace" ||
-              (t.matches && t.matches("[data-live]")) ||
-              (t.querySelector && t.querySelector("[data-live]")))) {
+    if (t && (t.id === "workspace" || (t.matches && t.matches("[data-live]")) || (t.querySelector && t.querySelector("[data-live]")))) {
       setupLive();
-      setPaused(livePaused); // a replaced region comes back unpaused-looking.
+      setPaused(livePaused); // a replaced region comes back looking unpaused.
     }
   });
 
-  // What a replace would otherwise destroy: the "go to offset" text and focus, and
-  // the message table's scroll position. Saved just before a live swap, put back
-  // just after it.
   var liveState = null;
   document.addEventListener("htmx:beforeSwap", function (e) {
     var t = e.detail.target;
     if (!t || !t.matches || !t.matches("[data-live]")) return;
-    var jump = t.querySelector(".jump input");
+    // A poll that was already on its way when a confirm dialog opened.
+    if (confirmOpen() && isLivePoll(e)) { e.detail.shouldSwap = false; if (e.detail.xhr) e.detail.xhr.dozeHeld = true; return; }
+    // Fires for a 204 too, where nothing will be swapped. Saving state then left
+    // it lying around for the next unrelated swap (opening the drawer) to
+    // "restore", which threw the table back to wherever it had been.
+    if (!e.detail.shouldSwap) return;
+    var jump = t.querySelector("#jump-to");
     var wrap = t.querySelector(".tbl-wrap");
+    var active = document.activeElement, focus = null;
+    if (active && t.contains(active)) {
+      // By id where there is one (rows, the jump field); otherwise by position
+      // among the region's focusable elements, which a refresh rarely changes.
+      focus = active.id ? { id: active.id } : { at: Array.prototype.indexOf.call(t.querySelectorAll(FOCUSABLE), active), tag: active.tagName };
+    }
     liveState = {
+      id: t.id, focus: focus,
       jumpValue: jump ? jump.value : "",
-      jumpFocused: !!jump && document.activeElement === jump,
-      selStart: jump ? jump.selectionStart : null,
-      selEnd: jump ? jump.selectionEnd : null,
-      scrollTop: wrap ? wrap.scrollTop : 0,
+      selStart: jump ? jump.selectionStart : null, selEnd: jump ? jump.selectionEnd : null,
+      scrollTop: wrap ? wrap.scrollTop : 0, scrollLeft: wrap ? wrap.scrollLeft : 0,
       atTop: !wrap || wrap.scrollTop < 4,
     };
   });
   document.addEventListener("htmx:afterSettle", function (e) {
     var st = liveState;
-    liveState = null;
-    var t = e.detail.target;
     if (!st) return;
-    var region = document.querySelector("[data-live]");
+    var landed = (e.detail.elt && e.detail.elt.id === st.id) || (e.detail.target && e.detail.target.id === st.id);
+    if (!landed) return;
+    liveState = null;
+    var region = document.getElementById(st.id);
     if (!region) return;
-    var jump = region.querySelector(".jump input");
-    if (jump && st.jumpValue) {
-      jump.value = st.jumpValue;
-      if (st.jumpFocused) {
-        jump.focus();
-        try { jump.setSelectionRange(st.selStart, st.selEnd); } catch (err) {}
-      }
-    }
+    var jump = region.querySelector("#jump-to");
+    if (jump && st.jumpValue) jump.value = st.jumpValue;
     var wrap = region.querySelector(".tbl-wrap");
     // Someone reading down the table keeps their place; someone parked at the top
     // (the newest rows) just sees the new ones arrive.
-    if (wrap && !st.atTop) wrap.scrollTop = st.scrollTop;
+    if (wrap) { wrap.scrollLeft = st.scrollLeft; if (!st.atTop) wrap.scrollTop = st.scrollTop; }
+    if (st.focus && !drawerIsOpen() && !paletteOpen()) {
+      var el = st.focus.id ? document.getElementById(st.focus.id) : region.querySelectorAll(FOCUSABLE)[st.focus.at];
+      if (el && region.contains(el) && (st.focus.id || el.tagName === st.focus.tag)) {
+        el.focus({ preventScroll: true });
+        if (el === jump) { try { jump.setSelectionRange(st.selStart, st.selEnd); } catch (err) {} }
+      }
+    }
   });
-  // After each poll, stamp the element's data-hash from the response header — a
-  // morph swap doesn't reliably update the root's attributes, so without this the
-  // poll would keep re-fetching the same change every tick.
+  // After each poll, record the hash the server sent, so the next poll asks
+  // "anything since this?". Not for a response that was held back above: its
+  // content was not shown, and the next poll must fetch it again.
   document.addEventListener("htmx:afterRequest", function (e) {
     var xhr = e.detail.xhr;
     if (!xhr) return;
     if (e.detail.successful && isLivePoll(e)) setDisconnected(false);
     var h = xhr.getResponseHeader("HX-Live-Hash");
-    if (!h) return;
+    if (!h || xhr.dozeHeld) return;
     var path = (e.detail.requestConfig && e.detail.requestConfig.path) || "";
     document.querySelectorAll("[data-live]").forEach(function (el) {
       var base = el.getAttribute("data-live");
       if (base && path.indexOf(base) === 0) el.setAttribute("data-hash", h);
     });
   });
-
-  window.dozeShell = { toast: toast, openPalette: openPalette };
 })();

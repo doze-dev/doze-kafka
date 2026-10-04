@@ -1,11 +1,11 @@
 {{/* lp_head / lp_foot bracket a list pane; the page fills the rows between. */}}
 {{define "lp_head"}}
-<aside class="listpane">
+<aside class="listpane" aria-label="{{.Label}}">
   <div class="lp-h">
     <span class="l">{{icon .Glyph}} {{.Label}}</span>
     {{if .NewURL}}<a class="new-link" href="{{.NewURL}}">{{icon "plus"}} New</a>{{end}}
   </div>
-  <label class="filter">{{icon "search"}}<input type="text" placeholder="Filter…" x-data x-model="$store.filter.q" spellcheck="false"></label>
+  <label class="filter">{{icon "search"}}<input type="text" placeholder="Filter…" aria-label="Filter {{.Label}}" x-data x-model="$store.filter.q" spellcheck="false"></label>
   <div class="lp-scroll">
 {{end}}
 {{define "lp_foot"}}

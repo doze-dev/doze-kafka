@@ -18,12 +18,12 @@
 
 {{define "topic_create"}}{{template "shell_top" .}}
   {{template "topic_lp" (dict "Prefix" .Prefix "List" .List "Sel" "")}}
-  <section class="detail"><div class="detail-inner">
-    <div class="idband"><div><h1 style="font-family:var(--ui);font-size:18px">Create topic</h1></div></div>
+  <main class="detail"><div class="detail-inner">
+    <div class="idband"><div><h1 class="page-title">Create topic</h1></div></div>
     <form hx-post="{{newTopicURL}}" hx-disabled-elt="find button[type=submit]">
       <div class="panel form-sec"><div class="panel-h"><h2>General</h2></div><div class="form-b">
-        <div class="field"><label>Topic name</label><input class="input mono" name="name" placeholder="orders.created" required autocomplete="off" autofocus></div>
-        <div class="field" style="margin-top:10px;max-width:180px"><label>Partitions</label><input class="input mono" name="partitions" type="number" min="1" max="1000" value="1" required></div>
+        <div class="field"><label for="f-name">Topic name <span class="hint">letters, digits, <span class="mono">.</span> <span class="mono">_</span> <span class="mono">-</span></span></label><input class="input mono" id="f-name" name="name" placeholder="orders.created" required autocomplete="off" autofocus></div>
+        <div class="field narrow"><label for="f-partitions">Partitions</label><input class="input mono" id="f-partitions" name="partitions" type="number" min="1" max="1000" value="1" required></div>
       </div></div>
       <div class="err form-err" data-err-slot hidden role="alert"></div>
       <div class="det-foot">
@@ -31,12 +31,12 @@
         <button class="btn primary" type="submit">Create topic</button>
       </div>
     </form>
-  </div></section>
+  </div></main>
 {{template "shell_bottom" .}}{{end}}
 
 {{define "topic_detail"}}{{template "shell_top" .}}
   {{template "topic_lp" (dict "Prefix" .Prefix "List" .List "Sel" .Topic.Name)}}
-  <section class="detail workbench"><div class="detail-inner topicwork">
+  <main class="detail workbench"><div class="detail-inner topicwork">
     <div class="idband">
       <div>
         <h1>{{.Topic.Name}}</h1>
@@ -79,53 +79,51 @@
         <form hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML" x-data="{hdrs:[], acks:'1', keyB64:false, valB64:false, tomb:false}" x-effect="window.dozeEditor && dozeEditor.setValidate($refs.value, !(valB64 || tomb), tomb ? 'null value — nothing is sent' : (valB64 ? 'base64 — sent as raw bytes' : ''))" @htmx:after-request="if($event.detail.successful){window.dozeEditor?dozeEditor.set($refs.value,''):$refs.value.value='';$refs.key.value='';hdrs=[];keyB64=false;valB64=false;tomb=false}">
           <input type="hidden" name="partition_ctx" value="{{.Partition}}">
           <div class="crow">
-            <div class="field" style="flex:0 0 140px">
-              <label>Partition</label>
-              <select class="input" name="partition">
+            <div class="field w-part">
+              <label for="f-partition">Partition</label>
+              <select class="input" id="f-partition" name="partition">
                 <option value="auto">Auto (by key)</option>
                 {{range $i := .PartitionRange}}<option value="{{$i}}" {{if eq $i $.Partition}}selected{{end}}>P{{$i}}</option>{{end}}
               </select>
             </div>
             <div class="field">
-              <label for="f-key">Key <span class="hint">optional</span>
-                <button type="button" class="b64tog" :class="keyB64&&'on'" :aria-pressed="keyB64" @click="keyB64=!keyB64" title="The key is base64 for binary bytes">b64</button></label>
+              <span class="lbl"><label for="f-key">Key</label> <span class="hint">optional</span>
+                <button type="button" class="b64tog" :class="keyB64&&'on'" :aria-pressed="keyB64" @click="keyB64=!keyB64" aria-label="Key is base64" title="The key is base64 for binary bytes">b64</button></span>
               <input class="input mono" id="f-key" name="key" x-ref="key" placeholder="e.g. ord_8901" autocomplete="off">
               <input type="hidden" name="key_enc" :value="keyB64 ? 'base64' : 'text'">
             </div>
-            <div class="field" style="flex:0 0 210px">
-              <label>Acknowledgment</label>
-              <div class="seg">
-                <button type="button" :class="acks==='1'&&'on'" @click="acks='1'">1</button>
-                <button type="button" :class="acks==='0'&&'on'" @click="acks='0'">0</button>
-                <button type="button" :class="acks==='all'&&'on'" @click="acks='all'">all</button>
+            <div class="field w-acks">
+              <span class="lbl" id="l-acks">Acknowledgment</span>
+              <div class="seg" role="group" aria-labelledby="l-acks">
+                <button type="button" :class="acks==='1'&&'on'" :aria-pressed="acks==='1'" @click="acks='1'" aria-label="acks 1: the broker confirms the write">1</button>
+                <button type="button" :class="acks==='0'&&'on'" :aria-pressed="acks==='0'" @click="acks='0'" aria-label="acks 0: no confirmation">0</button>
+                <button type="button" :class="acks==='all'&&'on'" :aria-pressed="acks==='all'" @click="acks='all'" aria-label="acks all: confirmed after it is on disk">all</button>
                 <input type="hidden" name="acks" :value="acks">
               </div>
             </div>
           </div>
-          <div class="crow">
-            <div class="field">
-              <label>Headers <span class="hint">optional</span></label>
-              <div class="hdr-rows">
+          <div class="crow body">
+            <div class="field w-value" :class="tomb && 'dimmed'">
+              <span class="lbl"><label for="f-value">Value</label>
+                <button type="button" class="b64tog" :class="valB64&&'on'" :aria-pressed="valB64" @click="valB64=!valB64" aria-label="Value is base64" title="The value is base64 for binary bytes">b64</button>
+                <label class="chk"><input type="checkbox" name="tombstone" value="1" x-model="tomb"> null value (tombstone)</label></span>
+              <textarea class="input mono" id="f-value" name="value" x-ref="value" data-editor="json" rows="4" placeholder='{"orderId": "ord_8901"}'></textarea>
+              <input type="hidden" name="value_enc" :value="valB64 ? 'base64' : 'text'">
+            </div>
+            <div class="field w-hdrs">
+              <span class="lbl" id="l-hdrs">Headers <span class="hint">optional</span></span>
+              <div class="hdr-rows" role="group" aria-labelledby="l-hdrs">
                 <template x-for="(h,i) in hdrs" :key="i">
                   <div class="hdr-row">
-                    <input class="input mono" placeholder="key" x-model="h.k" style="flex:0 0 40%">
-                    <input class="input mono" placeholder="value" x-model="h.v">
-                    <button type="button" class="b64tog" :class="h.b64&&'on'" :aria-pressed="!!h.b64" @click="h.b64=!h.b64" title="The value is base64 for binary bytes">b64</button>
+                    <input class="input mono hk" placeholder="key" aria-label="Header key" x-model="h.k">
+                    <input class="input mono" placeholder="value" aria-label="Header value" x-model="h.v">
+                    <button type="button" class="b64tog" :class="h.b64&&'on'" :aria-pressed="!!h.b64" @click="h.b64=!h.b64" aria-label="Header value is base64" title="The value is base64 for binary bytes">b64</button>
                     <button type="button" class="icon-btn" title="Remove" aria-label="Remove header" @click="hdrs.splice(i,1)">{{icon "x"}}</button>
                   </div>
                 </template>
               </div>
-              <button type="button" class="btn" style="align-self:flex-start;margin-top:6px;padding:5px 10px;font-size:11px" @click="hdrs.push({k:'',v:'',b64:false})">+ Add header</button>
+              <button type="button" class="btn sm" @click="hdrs.push({k:'',v:'',b64:false})">+ Add header</button>
               <input type="hidden" name="headers" :value="JSON.stringify(hdrs)">
-            </div>
-          </div>
-          <div class="crow">
-            <div class="field" :class="tomb && 'dimmed'">
-              <label for="f-value">Value
-                <button type="button" class="b64tog" :class="valB64&&'on'" :aria-pressed="valB64" @click="valB64=!valB64" title="The value is base64 for binary bytes">b64</button>
-                <label class="chk"><input type="checkbox" name="tombstone" value="1" x-model="tomb"> null value (tombstone)</label></label>
-              <textarea class="input mono" id="f-value" name="value" x-ref="value" data-editor="json" rows="4" placeholder='{"orderId": "ord_8901"}'></textarea>
-              <input type="hidden" name="value_enc" :value="valB64 ? 'base64' : 'text'">
             </div>
           </div>
           <div class="err form-err" data-err-slot hidden role="alert"></div>
@@ -137,7 +135,7 @@
       </div>
     </div>
 
-  </div></section>
+  </div></main>
 {{template "shell_bottom" .}}{{end}}
 
 {{/* tape_and_table is the live-polled unit: the tick strip + message table
@@ -148,7 +146,7 @@
   <div class="tape-head">
     {{if .PartSelect}}
     <label class="psel-wrap"><span class="sr-only">Partition</span>
-      <select class="input psel" aria-label="Partition" onchange="location.href=this.value">
+      <select class="input psel" onchange="location.href=this.value">
         {{range .Bounds}}<option value="{{topicURL $.Topic.Name}}?partition={{.Partition}}" {{if eq .Partition $.Partition}}selected{{end}}>P{{.Partition}} · {{.Count}} record{{if ne .Count 1}}s{{end}}</option>{{end}}
       </select></label>
     {{else}}
@@ -162,7 +160,7 @@
   </div>
   <div class="tape-strip">
     {{if .Messages}}{{range .Messages}}<button type="button" tabindex="-1" class="tick {{if .Hot}}hot{{end}}" style="height:{{.TickHeight}}px" aria-label="Scroll to offset {{.Offset}}" title="offset {{.Offset}}{{if not .Key.Null}} · {{.Key.Preview}}{{end}} · {{.Value.SizeText}}" onclick="document.getElementById('msg-{{.Offset}}')?.scrollIntoView({block:'center',behavior:'smooth'})"></button>{{end}}
-    {{else}}<div class="dim" style="padding:8px 2px;font-size:11.5px">No messages on this partition yet.</div>{{end}}
+    {{else}}<div class="tape-empty">No messages on this partition yet.</div>{{end}}
   </div>
   <div class="tape-foot">
     <span>{{if .Messages}}offsets <b class="mono">{{.WindowFrom}}</b> – <b class="mono">{{.WindowLast}}</b> · {{end}}each mark is one record on disk, newest on the right</span>
@@ -182,18 +180,18 @@
   {{if .JumpNote}}<div class="jumpnote" role="status">{{icon "info"}} {{.JumpNote}}</div>{{end}}
   <div class="tbl-wrap">
     <table class="tbl">
-      <thead><tr><th class="num">Offset</th><th>Time</th><th>Key</th><th>Value</th><th>Headers</th></tr></thead>
+      <thead><tr><th class="num">Offset</th><th class="col-time">Time</th><th>Key</th><th>Value</th><th class="col-hdrs">Headers</th></tr></thead>
       <tbody>
         {{if .Messages}}{{range .MessagesDesc}}
         <tr id="msg-{{.Offset}}" {{if eq .Offset $.HL}}class="hl" data-hl{{end}} tabindex="0" role="button" aria-label="Open offset {{.Offset}}" data-drawer-open hx-get="{{topicURL $.Topic.Name}}/message?partition={{$.Partition}}&offset={{.Offset}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML">
           <td class="cell-offset num">{{.Offset}}</td>
-          <td class="cell-time mono" title="{{.TimeFull}}">{{.TimeStr}} <span class="dim ago" data-ts="{{.Timestamp.UnixMilli}}">· {{ago .Timestamp}}</span></td>
+          <td class="cell-time col-time" title="{{.TimeFull}}">{{.TimeStr}} <span class="dim ago" data-ts="{{.Timestamp.UnixMilli}}">· {{ago .Timestamp}}</span></td>
           <td class="cell-key {{if or .Key.Null .Key.Empty}}none{{end}}" title="{{if .Key.Null}}null key{{else}}{{.Key.Preview}} · {{.Key.SizeText}}{{end}}">{{if .Key.Null}}no key{{else}}{{.Key.Preview}}{{end}}</td>
           <td class="cell-val {{if .Value.Binary}}binary{{end}} {{if .Value.Null}}tomb{{end}}" title="{{.Value.SizeText}}">{{if or .Value.Binary .Value.Null .Value.Empty}}<span class="vspecial">{{.Value.Preview}}</span>{{else}}{{jsonTint .Value.Preview}}{{end}}</td>
-          <td>{{if .Headers}}<span class="hdrct">{{len .Headers}}</span>{{else}}<span class="dim">—</span>{{end}}</td>
+          <td class="col-hdrs">{{if .Headers}}<span class="hdrct">{{len .Headers}}</span>{{else}}<span class="dim">—</span>{{end}}</td>
         </tr>
         {{end}}{{else}}
-        <tr><td colspan="5" style="padding:20px 12px" class="dim">{{if gt .Earliest 0}}{{t "messages.retention" .Earliest}}{{else}}{{t "messages.none"}}{{end}}</td></tr>
+        <tr><td colspan="5" class="empty">{{if gt .Earliest 0}}{{t "messages.retention" .Earliest}}{{else}}{{t "messages.none"}}{{end}}</td></tr>
         {{end}}
       </tbody>
     </table>
@@ -211,7 +209,7 @@
 
 {{define "message_drawer"}}
 <div class="drawer-h">
-  <div><span class="t" id="drawer-title">P{{.Partition}} · offset {{.Msg.Offset}}</span><span class="drawer-sub mono">{{.Topic}}</span></div>
+  <div><span class="t" id="drawer-title" data-offset="{{.Msg.Offset}}">P{{.Partition}} · offset {{.Msg.Offset}}</span><span class="drawer-sub mono">{{.Topic}}</span></div>
   <div class="drawer-nav">
     <button type="button" class="icon-btn" aria-label="Older record" title="Older (offset {{if ge .Older 0}}{{.Older}}{{end}})" {{if lt .Older 0}}disabled{{else}}hx-get="{{topicURL .Topic}}/message?partition={{.Partition}}&offset={{.Older}}" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML"{{end}}>{{icon "chevron-up"}}</button>
     <button type="button" class="icon-btn" aria-label="Newer record" title="Newer (offset {{if ge .Newer 0}}{{.Newer}}{{end}})" {{if lt .Newer 0}}disabled{{else}}hx-get="{{topicURL .Topic}}/message?partition={{.Partition}}&offset={{.Newer}}" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML"{{end}}>{{icon "chevron-down"}}</button>
@@ -221,24 +219,24 @@
   <div class="meta-row"><span class="k">Timestamp</span><span class="v">{{.TimeStr}}</span></div>
   <div class="meta-row"><span class="k">Key</span><span class="v">
     {{if .Key.Null}}<span class="dim">null</span>{{else if .Key.Empty}}<span class="dim">"" (empty)</span>
-    {{else if .Key.Binary}}<span class="mono">{{.Key.Preview}}</span> <button type="button" class="copy-btn" data-copy="{{.Key.B64}}" title="Copy as base64">{{icon "copy"}}</button>
+    {{else if .Key.Binary}}<span class="mono">{{.Key.Preview}}</span> <button type="button" class="copy-btn" data-copy="{{.Key.B64}}" title="Copy as base64" aria-label="Copy as base64">{{icon "copy"}}</button>
     {{else}}{{template "kvcopy" .Key.Text}}{{end}}
-    {{if and (not .Key.Null) (not .Key.Empty)}}<span class="dim sz">{{.Key.SizeText}}</span>{{end}}</span></div>
+    {{if and (not .Key.Null) (not .Key.Empty)}}<span class="sz">{{.Key.SizeText}}</span>{{end}}</span></div>
 
-  <div class="sec-title" style="margin-top:18px">Headers{{if .Headers}} · {{len .Headers}}{{end}}</div>
+  <div class="sec-title flush">Headers{{if .Headers}} · {{len .Headers}}{{end}}</div>
   {{if .Headers}}<div class="hdrlist">{{range .Headers}}<div class="hdrpair"><span class="hk">{{.Key}}</span><span class="dim">=</span><span class="hv">{{if .V.Null}}<span class="dim">null</span>{{else if .V.Empty}}<span class="dim">""</span>{{else if .V.Binary}}{{.V.Preview}}{{else}}{{.V.Text}}{{end}}</span></div>{{end}}</div>
-  {{else}}<div class="dim" style="font-size:11.5px">No headers on this record.</div>{{end}}
+  {{else}}<div class="note">No headers on this record.</div>{{end}}
 
   <div x-data="{f: '{{if .Value.Binary}}hex{{else}}text{{end}}'}">
-    <div class="sec-title" style="display:flex;align-items:center;gap:8px">Value
-      {{if or .Value.Null .Value.Empty}}<span class="dim sz">{{if .Value.Null}}null — a tombstone{{else}}empty{{end}}</span>
-      {{else}}<span class="dim sz">{{.Value.SizeText}}{{if .Value.Binary}} · binary{{else if .Value.Pretty}} · JSON{{end}}</span>
+    <div class="sec-title flush row">Value
+      {{if or .Value.Null .Value.Empty}}<span class="sz">{{if .Value.Null}}null — a tombstone{{else}}empty{{end}}</span>
+      {{else}}<span class="sz">{{.Value.SizeText}}{{if .Value.Binary}} · binary{{else if .Value.Pretty}} · JSON{{end}}</span>
       <span class="seg fmt" role="group" aria-label="Value format">
         {{if not .Value.Binary}}<button type="button" :class="f==='text'&&'on'" :aria-pressed="f==='text'" @click="f='text'">Text</button>{{end}}
         <button type="button" :class="f==='hex'&&'on'" :aria-pressed="f==='hex'" @click="f='hex'">Hex</button>
         {{if .Value.B64}}<button type="button" :class="f==='b64'&&'on'" :aria-pressed="f==='b64'" @click="f='b64'">Base64</button>{{end}}
       </span>
-      {{if .Value.B64}}<button type="button" class="copy-btn" data-copy="{{.Value.B64}}" title="Copy as base64">{{icon "copy"}}</button>{{end}}{{end}}
+      {{if .Value.B64}}<button type="button" class="copy-btn" data-copy="{{.Value.B64}}" title="Copy as base64" aria-label="Copy as base64">{{icon "copy"}}</button>{{end}}{{end}}
     </div>
     {{if or .Value.Null .Value.Empty}}
     <div class="valuebox dim">{{if .Value.Null}}This record has a null value.{{else}}This record has an empty value.{{end}}</div>
@@ -262,7 +260,7 @@
       data-headers="{{.EditHeaders}}" data-partition="{{.Partition}}" data-tombstone="{{if .Value.Null}}1{{end}}"
       title="Open the composer with this record's contents, to change and send">Edit a copy…</button>
     {{else}}
-    <span class="dim sz">Too large to edit in the browser.</span>
+    <span class="sz">Too large to edit in the browser.</span>
     {{end}}
   </div>
 </div>

@@ -18,11 +18,6 @@
     return null; // plain text.
   }
 
-  function looksLikeJSON(text) {
-    var t = text.trimStart();
-    return t.startsWith("{") || t.startsWith("[");
-  }
-
   // jsonError parses text and, on failure, returns {message, line}. The
   // character offset in V8's "...at position N" message is mapped to a line;
   // engines without it still surface the message (line -1 = no marker).
@@ -72,7 +67,7 @@
         return;
       }
       if (!text.trim()) { pill.className = "cm-valid"; pill.textContent = ""; return; }
-      if (!looksLikeJSON(text)) { pill.className = "cm-valid"; pill.textContent = "plain text"; return; }
+      if (!detectMode(text)) { pill.className = "cm-valid"; pill.textContent = "plain text"; return; }
       var err = jsonError(text);
       if (!err) { pill.className = "cm-valid ok"; pill.textContent = "✓ valid JSON"; return; }
       pill.className = "cm-valid bad";
@@ -114,9 +109,6 @@
       var curIsJSON = !!cur && typeof cur === "object" && cur.json;
       var nextIsJSON = !!m;
       if (curIsJSON !== nextIsJSON) cm.setOption("mode", m);
-      // Re-emit as a bubbling input event so live listeners (debounced htmx
-      // triggers, dirty flags) hear edits made inside the editor.
-      ta.dispatchEvent(new Event("input", { bubbles: true }));
     });
     cm.setSize("100%", null);
     if (isJSON) attachJsonChrome(cm, ta);
@@ -145,7 +137,8 @@
   // document-wide pass correctly attaches editors to newly-swapped content.
   document.addEventListener("htmx:afterSwap", function () { upgradeAll(); });
 
-  // Programmatic access (e.g. "Edit item" prefills the put-item editor).
+  // For shell.js: "Edit a copy" fills the composer's editor, and the composer
+  // switches validation off for base64 and null values.
   window.dozeEditor = {
     set: function (ta, value) {
       if (typeof ta === "string") ta = document.querySelector(ta);
