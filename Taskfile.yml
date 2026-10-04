@@ -87,6 +87,14 @@ tasks:
     cmds:
       - go mod tidy
 
+  test:e2e:
+    desc: 'The console in a real browser (Playwright): builds the binary, boots it on its own ports over a fresh data dir, seeds it'
+    dir: e2e
+    cmds:
+      - bun install --frozen-lockfile
+      - bunx playwright install chromium
+      - bunx playwright test
+
   fuzz:
     desc: 'Fuzz the wire-protocol decoder: each target for FUZZ_TIME (default 30s)'
     vars:

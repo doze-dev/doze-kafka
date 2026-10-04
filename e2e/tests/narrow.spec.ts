@@ -1,0 +1,43 @@
+import { test, expect } from '../fixtures/console';
+
+// Below ~640px the list and the detail become two screens; nothing may need a
+// sideways scroll at 420 or 360px.
+for (const width of [420, 360]) {
+  test(`no page overflows sideways at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 760 });
+    for (const path of ['topics', 'topics/seed-orders', 'topics/seed-orders?open=5', 'topics/seed-orders?q=ord&all=1', 'groups', 'groups/g-lag', 'cluster', 'new/topic']) {
+      await page.goto(path);
+      await page.waitForTimeout(250);
+      const over = await page.evaluate(() => {
+        const vw = window.innerWidth;
+        const stray = Array.from(document.querySelectorAll('body *')).filter((e) => {
+          const r = e.getBoundingClientRect();
+          if (r.width === 0 || r.right <= vw + 1 || (e as HTMLElement).offsetParent === null) return false;
+          for (let p = e.parentElement; p; p = p.parentElement) { const o = getComputedStyle(p).overflowX; if (o === 'auto' || o === 'scroll' || o === 'hidden') return false; }
+          return true;
+        }).slice(0, 3).map((e) => e.className || e.tagName);
+        return { doc: document.documentElement.scrollWidth - vw, stray };
+      });
+      expect(over, `${path} at ${width}px`).toEqual({ doc: 0, stray: [] });
+    }
+  });
+}
+
+test('a topic opened on a phone is its own screen, with a way back to the list', async ({ page }) => {
+  await page.setViewportSize({ width: 420, height: 800 });
+  await page.goto('topics');
+  await expect(page.locator('.listpane')).toBeVisible();
+  await page.locator('.listpane .li[data-name="seed-orders"]').click();
+  await expect(page.locator('.idband h1')).toHaveText('seed-orders');
+  await expect(page.locator('.listpane')).toBeHidden();
+  await page.locator('.backbar').click();
+  await expect(page.locator('.listpane')).toBeVisible();
+});
+
+test('an open composer joins the page instead of covering a small screen', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 700 });
+  await page.goto('topics/seed-orders');
+  await page.locator('#compose-head').click();
+  const dock = await page.locator('.dock').evaluate((el) => getComputedStyle(el).position);
+  expect(dock).toBe('static');
+});

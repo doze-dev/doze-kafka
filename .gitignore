@@ -15,3 +15,9 @@ coverage.*
 
 # Editor / OS noise.
 .DS_Store
+
+# Playwright suite: installed packages, boot artefacts and reports.
+e2e/node_modules/
+e2e/.tmp/
+e2e/test-results/
+e2e/playwright-report/

@@ -47,9 +47,11 @@ first and watch it fail.
 - Fuzz targets live next to the codec; a crasher goes in `testdata/fuzz/` so it stays
   fixed. `go tool task fuzz` runs all three for 30s each (`FUZZ_TIME=5m` for longer);
   `soak` and `chaos` run the long harnesses.
-- The console's behaviour in a browser is checked by
-  `console/testdata/browser-audit.cjs` (Playwright, against a running broker). It is
-  not in the gate yet.
+- The console in a real browser is checked by the Playwright suite in `e2e/`
+  (`go tool task test:e2e`; needs `bun`). It builds the binary, boots it on its own
+  ports over a fresh data directory, and seeds it (`e2e/seed`). It runs in CI as its
+  own workflow, not in `task check`. A console change that the Go tests cannot see
+  (focus, the keyboard, live updates, layout) gets a spec there.
 
 ## Adding a Kafka API
 

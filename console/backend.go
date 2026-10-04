@@ -296,6 +296,9 @@ func (b *backend) createTopic(ctx context.Context, name string, partitions int32
 		return err
 	}
 	for _, t := range resp.Topics {
+		if t.ErrorCode == kerr.TopicAlreadyExists.Code {
+			return badInput("a topic named %q already exists", name)
+		}
 		if err := refusal(t.ErrorCode, t.ErrorMessage); err != nil {
 			return err
 		}

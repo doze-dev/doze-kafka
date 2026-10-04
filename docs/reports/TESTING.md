@@ -48,9 +48,12 @@ handling), answering "does it work when someone actually runs it."
   closes the connection (fail fast) instead of hanging the client, and is never
   decoded or served: `TestUnhandledAPI_ClosesConnectionNotHang` and
   `TestOnlyAdvertisedAPIsAndVersionsAreServed`.
-- **The console in a browser**: `console/testdata/browser-audit.cjs` drives a real
-  browser through the shortcuts, the drawer, live updates and narrow widths. It is run
-  by hand against a running broker; it is not in the gate.
+- **The console in a browser**: 50 Playwright tests in `e2e/` drive a real Chromium
+  against the real binary (a fresh data directory, a seeded broker): navigation and
+  Back, the theme, the palette, the drawer, live updates and Pause, the composer, search,
+  group offset changes, topic settings, the keyboard, and layout at phone width. They run
+  in their own CI workflow (`e2e.yml`) and with `go tool task test:e2e`; they are not part
+  of `task check`.
 - **Codec fuzzing**: `FuzzParseAndDecodeRequest`, `FuzzSkipTaggedFields`,
   `FuzzReadFrame` — arbitrary bytes through the request decoder must never panic;
   the seeds (including a once-found crasher, a tagged-field loop in the upstream

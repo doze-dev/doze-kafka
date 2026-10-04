@@ -1,0 +1,105 @@
+import { test, expect } from '../fixtures/console';
+
+test('a topic is created with its partitions and shows them', async ({ page, createTopic, uniqueName }) => {
+  const name = uniqueName('made');
+  await createTopic(name, 3);
+  await expect(page.locator('.idchips')).toContainText('3 partitions');
+  await expect(page.locator('.ptab')).toHaveCount(3);
+  await expect(page.locator('.listpane .li.on')).toHaveAttribute('data-name', name);
+  await expect(page.locator('#flashbar')).toContainText('Topic created');
+  expect(page.url()).not.toContain('flash='); // the one-shot banner is not left in the address bar to replay.
+});
+
+test('a bad name or partition count is explained beside the form, and nothing is created', async ({ page }) => {
+  await page.goto('new/topic');
+  await page.locator('#f-name').fill('bad name!');
+  await page.getByRole('button', { name: 'Create topic' }).click();
+  await expect(page.locator('[data-err-slot]')).toContainText('invalid topic name');
+  await expect(page.locator('#f-name')).toHaveValue('bad name!'); // what was typed is still there.
+  await page.locator('#f-name').fill('seed-orders');
+  await page.getByRole('button', { name: 'Create topic' }).click();
+  await expect(page.locator('[data-err-slot]')).toContainText(`a topic named "seed-orders" already exists`);
+  await page.locator('#f-name').fill('fine-name');
+  await page.locator('#f-partitions').evaluate((el: HTMLInputElement) => { el.type = 'text'; });
+  await page.locator('#f-partitions').fill('abc');
+  await page.getByRole('button', { name: 'Create topic' }).click();
+  await expect(page.locator('[data-err-slot]')).toContainText('not a number of partitions');
+  await page.goto('topics');
+  await expect(page.locator('.listpane .li[data-name="fine-name"]')).toHaveCount(0);
+});
+
+test('a sent message appears, and the live tape stays one region', async ({ page, createTopic, uniqueName, send, waitForToast, waitForLive }) => {
+  await createTopic(uniqueName('live'));
+  await send('{"hello":"world"}', { key: 'k1' });
+  expect(await waitForToast()).toContain('Sent to partition 0');
+  await waitForLive((t) => t.includes('hello'));
+  for (const n of [1, 2, 3]) {
+    await send(`second-${n}`);
+    await waitForLive((t) => t.includes(`second-${n}`));
+  }
+  // Updates replace the region. They used to nest a copy inside it, so there were
+  // two regions, two pollers, and twice the requests.
+  await expect(page.locator('#tape-and-table')).toHaveCount(1);
+  await expect(page.locator('tr[id^="msg-"]')).toHaveCount(4);
+  await expect(page.locator('.counter')).toContainText('0000004');
+});
+
+test('Pause stops the tape following the log, and Resume catches up', async ({ page, request, createTopic, uniqueName, waitForLive }) => {
+  const name = uniqueName('pause');
+  await createTopic(name);
+  await page.locator('[data-live-toggle]').click();
+  await expect(page.locator('[data-live-toggle]')).toHaveAttribute('aria-pressed', 'true');
+  const sent = await request.post(`topics/${name}/produce`, { form: { partition: '0', partition_ctx: '0', value: 'while-paused' } });
+  expect(sent.ok()).toBe(true);
+  await page.waitForTimeout(3500); // longer than a poll interval.
+  await expect(page.locator('tr[id^="msg-"]')).toHaveCount(0);
+  await page.locator('[data-live-toggle]').click();
+  await waitForLive((t) => t.includes('while-paused'));
+});
+
+test('a poll that cannot reach the console is shown as "not updating", once, without toasts', async ({ page, createTopic, uniqueName }) => {
+  await createTopic(uniqueName('offline'));
+  await page.route('**/tape?*', (r) => r.abort());
+  await expect(page.locator('[data-live].disconnected')).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('.toast')).toHaveCount(0);
+  await page.unroute('**/tape?*');
+  await expect(page.locator('[data-live].disconnected')).toHaveCount(0, { timeout: 10_000 });
+});
+
+test('Purge empties a topic but keeps its settings; Delete removes it', async ({ page, createTopic, uniqueName, send, waitForToast, confirmDialog, waitForLive }) => {
+  const name = uniqueName('doomed');
+  await createTopic(name);
+  await page.locator('#topic-config summary').click();
+  await page.locator('[id="cfg-retention.ms"]').fill('3d');
+  await page.locator('#topic-config').getByRole('button', { name: 'Save settings' }).click();
+  await waitForToast();
+  await send('to be purged');
+  await waitForLive((t) => t.includes('to be purged'));
+  await page.getByRole('button', { name: 'Purge' }).click();
+  await confirmDialog('accept');
+  await expect(page.locator('.tape-empty')).toBeVisible();
+  await expect(page.locator('#topic-config .cfgsum')).toContainText('3d'); // a purge used to drop the topic's own settings.
+  await page.getByRole('button', { name: 'Delete' }).first().click();
+  await confirmDialog('accept');
+  await expect(page).toHaveURL(/\/topics$/);
+  await expect(page.locator(`.listpane .li[data-name="${name}"]`)).toHaveCount(0);
+});
+
+test('moving between topics replaces only the detail, and nothing moves after it appears', async ({ page }) => {
+  await page.goto('topics/seed-orders');
+  await page.evaluate(() => {
+    (window as any).__shifts = [];
+    new PerformanceObserver((l) => { for (const e of l.getEntries() as any[]) if (!e.hadRecentInput) (window as any).__shifts.push(e.value); }).observe({ type: 'layout-shift' });
+    document.querySelector('.listpane')!.setAttribute('data-same', '1');
+    document.querySelector('.lp-scroll')!.scrollTop = 20;
+  });
+  for (const name of ['seed-empty', 'seed-orders', 'seed-empty']) {
+    await page.locator(`.listpane .li[data-name="${name}"]`).click();
+    await expect(page.locator('.idband h1')).toHaveText(name);
+    await expect(page.locator('.listpane .li.on')).toHaveAttribute('data-name', name);
+    await page.waitForTimeout(400);
+  }
+  expect(await page.evaluate(() => (window as any).__shifts)).toEqual([]);
+  await expect(page.locator('.listpane')).toHaveAttribute('data-same', '1'); // the list was not redrawn.
+  expect(await page.evaluate(() => document.querySelectorAll('[hx-trigger="load"]').length)).toBe(0);
+});
