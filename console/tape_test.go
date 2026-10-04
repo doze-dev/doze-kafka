@@ -150,13 +150,14 @@ func TestDrawerIsADialogWithNeighbours(t *testing.T) {
 	}
 
 	mid := drawerFor(t, c, "1")
-	if !strings.Contains(mid, "offset=0") || !strings.Contains(mid, "offset=2") || strings.Contains(mid, "disabled") {
+	// " disabled" is the bare attribute (hx-disabled-elt does not count).
+	if !strings.Contains(mid, "offset=0") || !strings.Contains(mid, "offset=2") || strings.Contains(mid, `" disabled`) {
 		t.Error("a middle record should link to both neighbours")
 	}
-	if first := drawerFor(t, c, "0"); !strings.Contains(first, `aria-label="Older record"`) || !strings.Contains(first, "disabled") {
+	if first := drawerFor(t, c, "0"); !strings.Contains(first, `aria-label="Older record"`) || !strings.Contains(first, `" disabled`) {
 		t.Error("the oldest record has no older neighbour: that button should be disabled")
 	}
-	if last := drawerFor(t, c, "2"); strings.Count(last, "disabled") != 1 {
+	if last := drawerFor(t, c, "2"); strings.Count(last, `" disabled`) != 1 {
 		t.Error("the newest record has no newer neighbour: exactly that button should be disabled")
 	}
 }

@@ -182,7 +182,7 @@ func TestTypeScaleIsClosed(t *testing.T) {
 // that table stated in the most local place available, and converting eighty of
 // those to classes would make the markup worse and the stylesheet longer.
 var inlineBudget = map[string]int{
-	"cluster.html": 4, "groups.html": 5, "layout.html": 2, "panes.html": 1, "topics.html": 16,
+	"cluster.html": 4, "groups.html": 5, "layout.html": 2, "panes.html": 1, "topics.html": 15,
 }
 
 func TestInlineStyleBudget(t *testing.T) {

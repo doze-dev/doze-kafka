@@ -11,6 +11,7 @@ import (
 	"context"
 	"crypto/tls"
 	"embed"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -70,6 +71,9 @@ func New(opts Options) (*Console, error) {
 		prefix = "/_console"
 	}
 	prefix = "/" + strings.Trim(prefix, "/")
+	if prefix == "/" {
+		prefix = "" // mounted at the root: routes are "/topics", not "//topics".
+	}
 
 	// Developing the console itself: DOZE_KAFKA_CONSOLE_DEV=./console reads the
 	// templates and static files from disk on every request, so an edit shows on
@@ -132,7 +136,18 @@ func (c *Console) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "cross-origin request refused", http.StatusForbidden)
 			return
 		}
+		// Browsers say where a request came from; a state change coming from
+		// another site is refused even if it somehow carries no Origin.
+		if site := r.Header.Get("Sec-Fetch-Site"); site == "cross-site" {
+			http.Error(w, "cross-site request refused", http.StatusForbidden)
+			return
+		}
 	}
+	// The console is never meant to be shown inside another page: framed, its
+	// buttons could be clicked through by a page the user thinks they are using.
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	// Every request gets a deadline. The console talks to the broker through a
 	// Kafka client that retries a dead connection for a long time, and with no
 	// bound a page, a poll or a button hangs for as long as that takes.
@@ -169,9 +184,19 @@ func (c *Console) routes() {
 		})
 	}
 
-	// Topics is the home surface.
-	m.HandleFunc("GET "+p+"/", c.topics)
-	m.HandleFunc("GET "+p, c.topics)
+	// Topics is the home surface. "/" also catches every path under the prefix
+	// that nothing else matches, so it answers only for the prefix itself; a
+	// mistyped address is a 404, not the home page with a 200.
+	m.HandleFunc("GET "+p+"/", func(w http.ResponseWriter, r *http.Request) {
+		if strings.TrimSuffix(r.URL.Path, "/") != strings.TrimSuffix(p, "/") {
+			c.fail(w, r, fmt.Errorf("%w: there is no page at %s", errNotFound, r.URL.Path))
+			return
+		}
+		c.topics(w, r)
+	})
+	if p != "" { // mounted at the root, "/" above is the only spelling.
+		m.HandleFunc("GET "+p, c.topics)
+	}
 	m.HandleFunc("GET "+p+"/topics", c.topics)
 	m.HandleFunc("GET "+newTopicPath(p), c.topicCreatePage)
 	m.HandleFunc("POST "+newTopicPath(p), c.topicCreate)
@@ -180,6 +205,7 @@ func (c *Console) routes() {
 	m.HandleFunc("POST "+p+"/topics/{name}/purge", c.topicPurge)
 	m.HandleFunc("GET "+p+"/topics/{name}/tape", c.topicTape) // HTMX partial (polled)
 	m.HandleFunc("POST "+p+"/topics/{name}/produce", c.topicProduce)
+	m.HandleFunc("POST "+p+"/topics/{name}/resend", c.topicResend)  // an exact copy of a stored record
 	m.HandleFunc("GET "+p+"/topics/{name}/groups", c.topicGroups)   // "who consumes this" strip
 	m.HandleFunc("GET "+p+"/topics/{name}/message", c.topicMessage) // drawer partial
 	m.HandleFunc("GET "+p+"/topics/{name}/message/raw", c.topicMessageRaw)

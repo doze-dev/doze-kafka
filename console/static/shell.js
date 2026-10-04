@@ -214,14 +214,14 @@
     navigator.clipboard.writeText(el.getAttribute("data-copy")).then(function () { toast("Copied"); });
   });
 
-  // ---------- "Send again" (drawer → compose) ----------
+  // ---------- "Edit a copy" (drawer → compose) ----------
   // Prefills the compose panel from a record in the drawer: key, value, headers,
-  // partition, and how each is encoded. A binary value arrives as base64 with the
-  // composer's b64 switch on, and a tombstone as the null-value box ticked, so
-  // sending it reproduces the record rather than a lossy rendering of it.
+  // partition, and how each is encoded, for changing before sending. ("Send
+  // again" is a different thing: the server re-produces the stored record
+  // exactly, which a form cannot promise.)
   // Delegated, because the drawer's content is swapped in per record by htmx.
   document.addEventListener("click", function (e) {
-    var b = e.target.closest("#drawer-resend");
+    var b = e.target.closest("#drawer-edit");
     if (!b) return;
     if (window.dozeCloseDrawer) dozeCloseDrawer();
     var panel = document.getElementById("compose-panel");
@@ -568,6 +568,12 @@
   document.addEventListener("DOMContentLoaded", reopenFromURL);
   // Sending a record again dismisses the drawer without stealing focus back.
   window.dozeCloseDrawer = function () { closeDrawer(false); };
+  // "Send again" closes the drawer once the broker has taken the copy; on a
+  // failure it stays open, with the error beside the button.
+  document.addEventListener("htmx:afterRequest", function (e) {
+    var el = e.detail.elt;
+    if (el && el.hasAttribute && el.hasAttribute("data-close-drawer-on-success") && e.detail.successful) closeDrawer(false);
+  });
 
   // ---------- docked composer ----------
   // Open or closed is remembered, and the toggle is a real button that says so.

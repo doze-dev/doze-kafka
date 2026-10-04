@@ -8,9 +8,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -334,6 +336,9 @@ func reachable(hostport string) bool {
 	return true
 }
 
+// consoleUserName is the SASL user the console logs in as.
+const consoleUserName = "__console"
+
 // provisionConsoleCredential generates a random password for a reserved
 // "__console" SASL user and injects it into cfg.Credentials — a real
 // credential, not a bypass, using whichever mechanism the broker already has
@@ -353,7 +358,12 @@ func provisionConsoleCredential(cfg *config.Config) (user, pass, mech string, er
 	if mech == "" && len(cfg.SASLMechanisms) > 0 {
 		mech = cfg.SASLMechanisms[0]
 	}
-	user, pass = "__console", hex.EncodeToString(buf)
+	user, pass = consoleUserName, hex.EncodeToString(buf)
+	if _, taken := cfg.Credentials[user]; taken {
+		// The console's password would have replaced the configured one without a
+		// word, and that user could then no longer log in.
+		return "", "", "", fmt.Errorf("the SASL user name %q is reserved for the web console; rename that user, or turn the console off with --console=false", user)
+	}
 	if cfg.Credentials == nil {
 		cfg.Credentials = map[string]string{}
 	}
@@ -374,9 +384,11 @@ func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger
 
 	var tlsCfg *tls.Config
 	if cfg.TLSEnabled() {
-		if tlsCfg, err = cfg.TLSConfig(); err != nil {
+		serverTLS, err := cfg.TLSConfig()
+		if err != nil {
 			return nil, "", err
 		}
+		tlsCfg = consoleClientTLS(serverTLS)
 	}
 
 	var lc net.ListenConfig
@@ -415,6 +427,34 @@ func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger
 	}()
 
 	return func() { con.Close() }, ln.Addr().String(), nil
+}
+
+// consoleClientTLS is the TLS configuration the console's own Kafka client uses to
+// reach the broker in this process.
+//
+// The console used to be handed the broker's server configuration, which has a
+// certificate to present and no roots to trust, so with TLS on every console page
+// failed ("bad certificate") while the start-up summary still advertised it.
+// Trusting the system roots would not help either: a development certificate is
+// usually self-signed. The console is talking to its own broker, so it accepts
+// exactly one certificate: the one that broker was started with.
+func consoleClientTLS(server *tls.Config) *tls.Config {
+	var own []byte
+	if len(server.Certificates) > 0 && len(server.Certificates[0].Certificate) > 0 {
+		own = server.Certificates[0].Certificate[0]
+	}
+	return &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		// Verification is not skipped; it is done below, by identity rather than
+		// by chain and host name.
+		InsecureSkipVerify: true, //nolint:gosec
+		VerifyPeerCertificate: func(raw [][]byte, _ [][]*x509.Certificate) error {
+			if len(raw) == 0 || own == nil || !bytes.Equal(raw[0], own) {
+				return errors.New("console: the broker presented a certificate other than its own")
+			}
+			return nil
+		},
+	}
 }
 
 // consoleHosts is every extra host name the console should answer to: whatever

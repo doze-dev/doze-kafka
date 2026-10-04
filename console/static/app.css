@@ -674,3 +674,5 @@ tr[data-drawer-open]:focus-visible { outline: 2px solid var(--brass); outline-of
 .lag-zero { color: var(--ok); }
 .lag-some { color: var(--warn); }
 .psel-wrap { display: inline-flex; align-items: center; }
+
+.note-gap { margin-top: 8px; }

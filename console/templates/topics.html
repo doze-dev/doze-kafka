@@ -246,19 +246,23 @@
     {{if not .Value.Binary}}<div class="valuebox" x-show="f==='text'">{{jsonTint .Value.Text}}</div>{{end}}
     <div class="valuebox hexbox" x-show="f==='hex'" {{if not .Value.Binary}}style="display:none"{{end}}>{{.Value.Hex}}</div>
     {{if .Value.B64}}<div class="valuebox" x-show="f==='b64'" style="display:none">{{.Value.B64}}</div>{{end}}
-    {{if .Value.Truncated}}<div class="honest" style="margin-top:8px">{{icon "info"}}<div>Showing the start of a {{.Value.SizeText}} value.</div></div>{{end}}
+    {{if .Value.Truncated}}<div class="honest note-gap">{{icon "info"}}<div>Showing the start of a {{.Value.SizeText}} value. Download it for the rest.</div></div>{{else if .Value.HexCut}}<div class="honest note-gap" x-show="f==='hex'" style="display:none">{{icon "info"}}<div>The hex view shows the first 16 KB of {{.Value.SizeText}}.</div></div>{{end}}
     <div class="drawer-dl"><a class="btn btn-outline" href="{{topicURL .Topic}}/message/raw?partition={{.Partition}}&offset={{.Msg.Offset}}&field=value" download>Download value</a></div>
     {{end}}
   </div>
 
   <div class="drawer-acts">
-    {{if .CanResend}}
-    <button type="button" class="btn btn-outline" id="drawer-resend"
-      data-key="{{.ResendKey}}" data-key-enc="{{.ResendKeyEnc}}" data-value="{{.ResendValue}}" data-value-enc="{{.ResendValueEnc}}"
-      data-headers="{{.ResendHeaders}}" data-partition="{{.Partition}}" data-tombstone="{{if .Value.Null}}1{{end}}"
-      title="Prefill the compose panel with this record, byte for byte">{{icon "send"}} Send again…</button>
+    <button type="button" class="btn btn-outline" data-close-drawer-on-success
+      hx-post="{{topicURL .Topic}}/resend" hx-vals='{"partition":"{{.Partition}}","offset":"{{.Msg.Offset}}"}'
+      hx-target="#tape-and-table" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
+      title="Produce an exact copy of this record (same key, value and headers, byte for byte) to partition {{.Partition}}">{{icon "send"}} Send again</button>
+    {{if .CanEdit}}
+    <button type="button" class="btn btn-outline" id="drawer-edit"
+      data-key="{{.EditKey}}" data-key-enc="{{.EditKeyEnc}}" data-value="{{.EditValue}}" data-value-enc="{{.EditValueEnc}}"
+      data-headers="{{.EditHeaders}}" data-partition="{{.Partition}}" data-tombstone="{{if .Value.Null}}1{{end}}"
+      title="Open the composer with this record's contents, to change and send">Edit a copy…</button>
     {{else}}
-    <span class="dim" style="font-size:11.5px">Too large to resend from the browser — download it instead.</span>
+    <span class="dim sz">Too large to edit in the browser.</span>
     {{end}}
   </div>
 </div>

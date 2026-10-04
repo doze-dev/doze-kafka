@@ -32,8 +32,11 @@ func consoleRoutes(t *testing.T) []route {
 		}
 		out = append(out, route{m[1], path})
 	}
-	if len(out) < 15 {
-		t.Fatalf("parsed only %d routes from console.go; the route-table pattern has drifted", len(out))
+	// Every registration but one is under the prefix and must be seen: the pattern
+	// used to miss a route written a little differently, which then went unswept.
+	// (The one is the redirect from "/" to the prefix.)
+	if registered := strings.Count(string(src), "m.Handle"); len(out) != registered-1 {
+		t.Fatalf("console.go registers %d routes and the sweep sees %d; the route-table pattern has drifted", registered, len(out))
 	}
 	return out
 }
@@ -60,7 +63,14 @@ func assertRendered(t *testing.T, what string, rec *httptest.ResponseRecorder) {
 			t.Errorf("%s rendered %q: …%s…", what, bad, body[i:end])
 		}
 	}
+	// A misspelled key in a template is not an error to html/template: it renders
+	// nothing. A heading with nothing in it is the visible result.
+	if m := emptyHeading.FindString(body); m != "" {
+		t.Errorf("%s rendered an empty heading: %s", what, m)
+	}
 }
+
+var emptyHeading = regexp.MustCompile(`<h[12][^>]*>\s*</h[12]>`)
 
 // Every page and partial renders, with data and with nothing: a topic that has
 // messages, a group that has commits, and a brand-new broker.
@@ -84,6 +94,13 @@ func TestEverySurfaceRenders(t *testing.T) {
 			continue
 		}
 		assertRendered(t, "GET "+path, rec)
+		// A page about a resource names it.
+		body := rec.Body.String()
+		for pattern, name := range map[string]string{"{name}": "orders", "{id}": "billing"} {
+			if strings.HasSuffix(rt.path, pattern) && !strings.Contains(body, name) {
+				t.Errorf("GET %s does not mention %q anywhere", path, name)
+			}
+		}
 	}
 }
 

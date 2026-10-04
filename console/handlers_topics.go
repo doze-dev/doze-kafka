@@ -33,9 +33,16 @@ func (c *Console) topicCreatePage(w http.ResponseWriter, r *http.Request) {
 
 func (c *Console) topicCreate(w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
-	partitions, err := strconv.Atoi(r.FormValue("partitions"))
-	if err != nil || partitions < 1 {
-		partitions = 1
+	// What was typed is what is created, or it is an error: "abc", 0 and -5 used
+	// to make a one-partition topic, and 4294967299 a three-partition one.
+	partitions := int64(1)
+	if raw := strings.TrimSpace(r.FormValue("partitions")); raw != "" {
+		n, err := strconv.ParseInt(raw, 10, 32)
+		if err != nil || n < 1 {
+			c.fail(w, r, badInput("%q is not a number of partitions; use a whole number, 1 or more", raw))
+			return
+		}
+		partitions = n
 	}
 	if err := c.be.CreateTopic(r.Context(), name, int32(partitions)); err != nil {
 		c.fail(w, r, err)
@@ -74,7 +81,7 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	partition := partitionParam(r, detail.Partitions)
 
-	tape, err := c.tapeData(ctx, name, partition, detail.Partitions, fromParam(r), hlParam(r), jumpParam(r))
+	tape, err := c.tapeData(ctx, name, detail.ID, partition, detail.Partitions, fromParam(r), hlParam(r), jumpParam(r))
 	if err != nil {
 		c.fail(w, r, err)
 		return
@@ -93,7 +100,7 @@ func (c *Console) topicTape(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	ctx := r.Context()
 
-	count, err := c.be.PartitionCount(ctx, name)
+	id, count, err := c.be.TopicShape(ctx, name)
 	if err != nil {
 		c.fail(w, r, err)
 		return
@@ -105,12 +112,12 @@ func (c *Console) topicTape(w http.ResponseWriter, r *http.Request) {
 		c.fail(w, r, err)
 		return
 	}
-	hash := boundsHash(bounds)
+	hash := boundsHash(id, bounds)
 	if liveUnchanged(w, r, hash) {
 		return
 	}
 
-	tape, err := c.tapeData(ctx, name, partition, count, -1, -1, -1)
+	tape, err := c.tapeData(ctx, name, id, partition, count, -1, -1, -1)
 	if err != nil {
 		c.fail(w, r, err)
 		return
@@ -124,7 +131,7 @@ func (c *Console) topicProduce(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	ctx := r.Context()
 
-	count, err := c.be.PartitionCount(ctx, name)
+	id, count, err := c.be.TopicShape(ctx, name)
 	if err != nil {
 		c.fail(w, r, err)
 		return
@@ -154,7 +161,7 @@ func (c *Console) topicProduce(w http.ResponseWriter, r *http.Request) {
 	// Re-render the tape/table for the partition the message actually landed
 	// on, so a produce to a different partition than the one being viewed is
 	// still honestly reflected (not silently shown against the wrong tape).
-	tape, err := c.tapeData(ctx, name, result.Partition, count, -1, -1, -1)
+	tape, err := c.tapeData(ctx, name, id, result.Partition, count, -1, -1, -1)
 	if err != nil {
 		c.fail(w, r, err)
 		return
@@ -166,22 +173,13 @@ func (c *Console) topicProduce(w http.ResponseWriter, r *http.Request) {
 
 func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	partition := int32(0)
-	if raw := r.URL.Query().Get("partition"); raw != "" {
-		n, err := strconv.ParseInt(raw, 10, 32)
-		if err != nil || n < 0 {
-			c.fail(w, r, fmt.Errorf("%w: partition %q is not a partition number", errBadInput, raw))
-			return
-		}
-		partition = int32(n)
-	}
-	offset, err := strconv.ParseInt(r.URL.Query().Get("offset"), 10, 64)
-	if err != nil || offset < 0 {
-		c.fail(w, r, fmt.Errorf("%w: offset %q is not an offset", errBadInput, r.URL.Query().Get("offset")))
+	partition, offset, err := recordCoordinates(r.URL.Query().Get("partition"), r.URL.Query().Get("offset"))
+	if err != nil {
+		c.fail(w, r, err)
 		return
 	}
 	msgs, err := c.be.FetchWindow(r.Context(), name, partition, offset, 1)
-	if err == nil && len(msgs) == 0 {
+	if err == nil && (len(msgs) == 0 || msgs[0].Offset != offset) {
 		// Nothing there is not an error to the broker, but it is to the person who
 		// clicked: the record is gone (retention, a purge) or never existed. This
 		// used to pass a nil error on and panic reading its message.
@@ -208,24 +206,88 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 	c.partial(w, "message_drawer", map[string]any{
 		"Topic": name, "Partition": partition, "Msg": m, "Older": older, "Newer": newer,
 		"TimeStr": m.Timestamp.Format(time.RFC3339), "Key": keyV, "Value": valueV, "Headers": hdrs,
-		// What "Send again" carries. Text travels as text; anything else as base64
-		// with its encoding named, so the resend is byte-identical.
-		"ResendKey": resendField(keyV), "ResendKeyEnc": resendEnc(keyV),
-		"ResendValue": resendField(valueV), "ResendValueEnc": resendEnc(valueV),
-		"ResendHeaders": resendHeaders(hdrs),
-		"CanResend":     valueV.Null || valueV.Empty || valueV.B64 != "",
+		// "Send again" is done by the server from the stored record, so it is exact
+		// for any bytes. These are for "Edit a copy": the composer is prefilled with
+		// the record as text (or base64 when it is not text), as stored rather than
+		// as displayed, for changing before it is sent.
+		"EditKey": editField(keyV), "EditKeyEnc": resendEnc(keyV),
+		"EditValue": editField(valueV), "EditValueEnc": resendEnc(valueV),
+		"EditHeaders": resendHeaders(hdrs),
+		"CanEdit":     (valueV.Null || valueV.Empty || valueV.B64 != "") && (keyV.Null || keyV.Empty || keyV.B64 != ""),
 	})
 }
 
-// resendField is the text a field is carried as when resent.
-func resendField(v bytesView) string {
+// topicResend produces an exact copy of a stored record: the same key, value and
+// headers, byte for byte, to the same partition. It is done here rather than by
+// prefilling a form because a browser cannot carry arbitrary bytes faithfully: a
+// text input drops newlines, an editor rewrites line endings, re-indented JSON is
+// not the JSON that was stored, and a form has no way to say "an empty key" as
+// distinct from "no key".
+func (c *Console) topicResend(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	ctx := r.Context()
+	partition, offset, err := recordCoordinates(r.FormValue("partition"), r.FormValue("offset"))
+	if err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	msgs, err := c.be.FetchWindow(ctx, name, partition, offset, 1)
+	if err == nil && (len(msgs) == 0 || msgs[0].Offset != offset) {
+		err = fmt.Errorf("%w: no record at offset %d of partition %d — it may have been deleted by retention or a purge", errNotFound, offset, partition)
+	}
+	if err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	m := msgs[0]
+	result, err := c.be.Produce(ctx, name, partition, m.Key, m.Value, m.Headers, "1")
+	if err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	toast(w, "Sent an exact copy to partition "+strconv.Itoa(int(result.Partition))+" · offset "+strconv.FormatInt(result.Offset, 10))
+	id, count, err := c.be.TopicShape(ctx, name)
+	if err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	tape, err := c.tapeData(ctx, name, id, partition, count, -1, -1, -1)
+	if err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	data := map[string]any{"Topic": topicRef{Name: name}, "Partition": partition}
+	maps.Copy(data, tape)
+	c.partial(w, "tape_and_table", data)
+}
+
+// recordCoordinates parses a partition and an offset that name one record. Both
+// must be numbers: a partition that is not one used to be read as partition 0.
+func recordCoordinates(rawPartition, rawOffset string) (int32, int64, error) {
+	partition := int64(0)
+	if rawPartition != "" {
+		n, err := strconv.ParseInt(rawPartition, 10, 32)
+		if err != nil || n < 0 {
+			return 0, 0, fmt.Errorf("%w: partition %q is not a partition number", errBadInput, rawPartition)
+		}
+		partition = n
+	}
+	offset, err := strconv.ParseInt(rawOffset, 10, 64)
+	if err != nil || offset < 0 {
+		return 0, 0, fmt.Errorf("%w: offset %q is not an offset", errBadInput, rawOffset)
+	}
+	return int32(partition), offset, nil
+}
+
+// editField is the text a field is carried as into the composer.
+func editField(v bytesView) string {
 	switch {
 	case v.Null || v.Empty:
 		return ""
 	case v.Binary:
 		return v.B64
 	default:
-		return v.Text
+		return v.Raw
 	}
 }
 
@@ -245,7 +307,7 @@ func previewOnly(b []byte) bytesView {
 		v.Null, v.Preview = true, "∅ null"
 	case len(b) == 0:
 		v.Empty, v.Preview = true, `""`
-	case looksBinary(b[:min(len(b), 4096)]) || !utf8Valid(b[:min(len(b), 4096)]):
+	case looksBinarySample(b):
 		v.Binary, v.Preview = true, binaryPreview(b)
 	default:
 		v.Preview = oneLine(string(b[:min(len(b), previewRunes*4)]), previewRunes)
@@ -272,11 +334,20 @@ func fromParam(r *http.Request) int64 {
 	return n
 }
 
-// jumpParam reads ?jump= (the "go to offset" box); -1 when absent or malformed.
+// jumpMalformed is jumpParam's answer for something typed that is not an offset.
+const jumpMalformed = -2
+
+// jumpParam reads ?jump= (the "go to offset" box): the offset, -1 when absent, or
+// jumpMalformed when something was typed that is not one. The last used to be
+// treated as absent, so "12abc" showed the tail as if nothing had been asked.
 func jumpParam(r *http.Request) int64 {
-	n, err := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("jump")), 10, 64)
-	if err != nil || n < 0 {
+	raw := strings.TrimSpace(r.URL.Query().Get("jump"))
+	if raw == "" {
 		return -1
+	}
+	n, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || n < 0 {
+		return jumpMalformed
 	}
 	return n
 }
@@ -314,8 +385,13 @@ const maxPartitionTabs = 24
 
 // boundsHash identifies what the tape shows: every partition's retained range, so
 // a produce to ANY partition changes it and the tabs' counts refresh.
-func boundsHash(bounds []PartitionBound) string {
+func boundsHash(topicID string, bounds []PartitionBound) string {
 	var b strings.Builder
+	// The topic's id, because a topic purged (deleted and re-created) and written
+	// to again can hold different records at exactly the same offsets; without it
+	// another open tab was told "nothing changed" and kept showing the old ones.
+	b.WriteString(topicID)
+	b.WriteByte('|')
 	for _, p := range bounds {
 		fmt.Fprintf(&b, "%d-%d,", p.Earliest, p.Latest)
 	}
@@ -329,7 +405,7 @@ func boundsHash(bounds []PartitionBound) string {
 // the tail window live-polls: paging back pins the view, so the 2.5s
 // refresher can't yank the reader back to the newest messages. hl, when ≥0,
 // marks that offset's row for highlight-and-scroll (jump-to-offset).
-func (c *Console) tapeData(ctx context.Context, topic string, partition, partitionCount int32, from, hl, jump int64) (map[string]any, error) {
+func (c *Console) tapeData(ctx context.Context, topic, topicID string, partition, partitionCount int32, from, hl, jump int64) (map[string]any, error) {
 	bounds, err := c.be.PartitionBounds(ctx, topic, partitionCount)
 	if err != nil {
 		return nil, err
@@ -339,6 +415,10 @@ func (c *Console) tapeData(ctx context.Context, topic string, partition, partiti
 	// A jump to an offset the log does not hold says so, rather than quietly
 	// landing somewhere else.
 	jumpNote := ""
+	if jump == jumpMalformed {
+		jumpNote = "That is not an offset. Type a whole number, 0 or more."
+		jump = -1
+	}
 	if jump >= 0 {
 		switch {
 		case latest == earliest:
@@ -373,7 +453,7 @@ func (c *Console) tapeData(ctx context.Context, topic string, partition, partiti
 		asc[i] = msgView{
 			Offset: m.Offset, Timestamp: m.Timestamp, TimeStr: m.Timestamp.Format("15:04:05"),
 			TimeFull:   m.Timestamp.Format(time.RFC3339),
-			Key:        newBytesView(m.Key, m.Key == nil),
+			Key:        previewOnly(m.Key), // the table shows one line; the drawer does the rest.
 			Value:      previewOnly(m.Value),
 			Headers:    m.Headers,
 			Hot:        atTail && i >= len(msgs)-3,
@@ -395,7 +475,7 @@ func (c *Console) tapeData(ctx context.Context, topic string, partition, partiti
 		"Earliest":       earliest,
 		"Latest":         latest,
 		"Count":          latest - earliest,
-		"Hash":           boundsHash(bounds),
+		"Hash":           boundsHash(topicID, bounds),
 		"AtTail":         atTail,
 		"HasOlder":       from > earliest,
 		"HasNewer":       !atTail,
@@ -430,13 +510,11 @@ func tickHeight(size int) int {
 // too large to read in the drawer or one that is binary.
 func (c *Console) topicMessageRaw(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	partition64, _ := strconv.ParseInt(r.URL.Query().Get("partition"), 10, 32)
-	offset, err := strconv.ParseInt(r.URL.Query().Get("offset"), 10, 64)
+	partition, offset, err := recordCoordinates(r.URL.Query().Get("partition"), r.URL.Query().Get("offset"))
 	if err != nil {
-		c.fail(w, r, fmt.Errorf("%w: offset is not a number", errBadInput))
+		c.fail(w, r, err)
 		return
 	}
-	partition := int32(partition64)
 	msgs, err := c.be.FetchWindow(r.Context(), name, partition, offset, 1)
 	if err == nil && (len(msgs) == 0 || msgs[0].Offset != offset) {
 		err = fmt.Errorf("%w: no record at offset %d of partition %d", errNotFound, offset, partition)

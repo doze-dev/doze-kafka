@@ -247,31 +247,48 @@ func (b *backend) ListTopics(ctx context.Context) ([]TopicSummary, error) {
 // trip) — for call sites like the tape's live poll that need to know how
 // many partition tabs to draw but not the full effective config.
 func (b *backend) PartitionCount(ctx context.Context, name string) (int32, error) {
+	_, n, err := b.TopicShape(ctx, name)
+	return n, err
+}
+
+// TopicShape returns a topic's id and partition count from one Metadata request.
+func (b *backend) TopicShape(ctx context.Context, name string) (id string, partitions int32, err error) {
 	req := kmsg.NewPtrMetadataRequest()
 	mt := kmsg.NewMetadataRequestTopic()
 	mt.Topic = &name
 	req.Topics = []kmsg.MetadataRequestTopic{mt}
 	resp, err := req.RequestWith(ctx, b.cl)
 	if err != nil {
-		return 0, err
+		return "", 0, err
 	}
 	if len(resp.Topics) == 0 {
-		return 0, fmt.Errorf("%w: topic %q", errNotFound, name)
+		return "", 0, fmt.Errorf("%w: topic %q", errNotFound, name)
 	}
 	if resp.Topics[0].ErrorCode != 0 {
-		return 0, kerr.ErrorForCode(resp.Topics[0].ErrorCode)
+		return "", 0, kerr.ErrorForCode(resp.Topics[0].ErrorCode)
 	}
-	return int32(len(resp.Topics[0].Partitions)), nil
+	return topicIDString(resp.Topics[0].TopicID), int32(len(resp.Topics[0].Partitions)), nil
 }
 
 // CreateTopic creates a topic. Replication factor is always 1 — doze-kafka
 // is single-node, so there's no meaningful choice to offer here.
 func (b *backend) CreateTopic(ctx context.Context, name string, partitions int32) error {
+	return b.createTopic(ctx, name, partitions, nil)
+}
+
+// createTopic creates a topic with per-topic config overrides.
+func (b *backend) createTopic(ctx context.Context, name string, partitions int32, config map[string]string) error {
 	req := kmsg.NewPtrCreateTopicsRequest()
 	rt := kmsg.NewCreateTopicsRequestTopic()
 	rt.Topic = name
 	rt.NumPartitions = partitions
 	rt.ReplicationFactor = 1
+	for _, k := range sortedConfigKeys(config) {
+		rc := kmsg.NewCreateTopicsRequestTopicConfig()
+		v := config[k]
+		rc.Name, rc.Value = k, &v
+		rt.Configs = append(rt.Configs, rc)
+	}
 	req.Topics = []kmsg.CreateTopicsRequestTopic{rt}
 	resp, err := req.RequestWith(ctx, b.cl)
 	if err != nil {
@@ -315,6 +332,13 @@ func (b *backend) PurgeTopic(ctx context.Context, name string) error {
 	if err != nil {
 		return err
 	}
+	// The topic's own settings (a retention override, say) are part of what it is;
+	// read them first so the re-created topic has them. They used to be dropped,
+	// silently turning a topic with one-minute retention into one that kept everything.
+	overrides, err := b.topicOverrides(ctx, name)
+	if err != nil {
+		return err
+	}
 	if err := b.DeleteTopic(ctx, name); err != nil {
 		return err
 	}
@@ -322,16 +346,50 @@ func (b *backend) PurgeTopic(ctx context.Context, name string) error {
 	// name frees up rather than surfacing a spurious ALREADY_EXISTS.
 	var lastErr error
 	for range 20 {
-		if lastErr = b.CreateTopic(ctx, name, partitions); lastErr == nil {
+		if lastErr = b.createTopic(ctx, name, partitions, overrides); lastErr == nil {
 			return nil
 		}
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("the topic was deleted but could not be re-created in time (%d partitions); create it again: %w", partitions, ctx.Err())
 		case <-time.After(50 * time.Millisecond):
 		}
 	}
-	return fmt.Errorf("recreate after purge: %w", lastErr)
+	return fmt.Errorf("the topic was deleted but could not be re-created (%d partitions); create it again: %w", partitions, lastErr)
+}
+
+// topicOverrides returns the config a topic was created or altered with, as
+// distinct from the broker defaults it would otherwise inherit.
+func (b *backend) topicOverrides(ctx context.Context, name string) (map[string]string, error) {
+	req := kmsg.NewPtrDescribeConfigsRequest()
+	res := kmsg.NewDescribeConfigsRequestResource()
+	res.ResourceType, res.ResourceName = kmsg.ConfigResourceTypeTopic, name
+	req.Resources = append(req.Resources, res)
+	resp, err := req.RequestWith(ctx, b.cl)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]string{}
+	for _, r := range resp.Resources {
+		if r.ErrorCode != 0 {
+			return nil, kerr.ErrorForCode(r.ErrorCode)
+		}
+		for _, c := range r.Configs {
+			if c.Source == kmsg.ConfigSourceDynamicTopicConfig && c.Value != nil {
+				out[c.Name] = *c.Value
+			}
+		}
+	}
+	return out, nil
+}
+
+func sortedConfigKeys(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // DescribeTopic returns a topic's identity and effective config.
@@ -504,6 +562,20 @@ func (b *backend) FetchWindow(ctx context.Context, topic string, partition int32
 	if limit <= 0 {
 		limit = 1
 	}
+	// Ask where the partition's records are first. A fetch at an offset that holds
+	// nothing waits out its whole timeout, and one for a topic or partition that
+	// does not exist returned "no records" after 800 ms, which the caller then
+	// described as a record lost to retention. Both are answered here at once.
+	earliest, latest, err := b.PartitionOffsets(ctx, topic, partition)
+	if err != nil {
+		return nil, err
+	}
+	if fromOffset < earliest || fromOffset >= latest {
+		return nil, nil
+	}
+	if int64(limit) > latest-fromOffset {
+		limit = int(latest - fromOffset)
+	}
 	kopts := append(seedOpts(b.addr), kgo.ClientID("doze-kafka-console-fetch"),
 		kgo.ConsumePartitions(map[string]map[int32]kgo.Offset{topic: {partition: kgo.NewOffset().At(fromOffset)}}),
 		kgo.FetchMaxBytes(4<<20),
@@ -524,7 +596,9 @@ func (b *backend) FetchWindow(ctx context.Context, topic string, partition int32
 	}
 	defer cl.Close()
 
-	fctx, cancel := context.WithTimeout(ctx, 800*time.Millisecond)
+	// The records are known to exist, so this is a bound on a healthy broker's
+	// answer, not a guess at how long "nothing there" takes.
+	fctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	var out []Message
@@ -553,6 +627,10 @@ func (b *backend) FetchWindow(ctx context.Context, topic string, partition int32
 		if fctx.Err() != nil {
 			break
 		}
+	}
+	if len(out) == 0 && fctx.Err() != nil && ctx.Err() == nil {
+		// Records are there and none arrived in time: a failure, not an empty topic.
+		return nil, fmt.Errorf("fetching %s partition %d from offset %d: %w", topic, partition, fromOffset, context.DeadlineExceeded)
 	}
 	return out, nil
 }

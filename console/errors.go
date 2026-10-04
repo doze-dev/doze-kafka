@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/twmb/franz-go/pkg/kerr"
+	"github.com/twmb/franz-go/pkg/kgo"
+	"syscall"
 )
 
 // errNotFound marks "this thing does not exist", which deserves a 404 page that
@@ -42,26 +44,41 @@ func classify(err error) failure {
 		return failure{http.StatusNotFound, "notfound", "Not found", err.Error()}
 	case errors.Is(err, errBadInput):
 		return failure{http.StatusBadRequest, "refused", "Check the form", err.Error()}
-	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled), isNetworkError(err):
-		return failure{http.StatusBadGateway, "unreachable", "Can't reach the broker",
-			"The console could not get an answer from the broker. It may have stopped, or be busy."}
 	}
+	// A broker error is the broker's answer and is classified by what it is, before
+	// anything is guessed from the wording (a topic called "EOF-events" used to
+	// turn INVALID_TOPIC into "can't reach the broker").
 	var ke *kerr.Error
 	if errors.As(err, &ke) {
-		return failure{http.StatusBadRequest, "refused", "The broker refused that", err.Error()}
+		switch {
+		case ke.Retriable, ke.Code == kerr.UnknownServerError.Code, ke.Code == kerr.KafkaStorageError.Code:
+			// The broker's problem, not the request's: timeouts, a coordinator
+			// still loading, a storage failure.
+			return failure{http.StatusServiceUnavailable, "unreachable", "The broker could not do that right now", ke.Message + "."}
+		case ke.Code == kerr.SaslAuthenticationFailed.Code:
+			return failure{http.StatusBadGateway, "unreachable", "The broker refused the console's login",
+				"The console's own credentials were rejected by the broker."}
+		}
+		return failure{http.StatusBadRequest, "refused", "The broker refused that", ke.Message + "."}
+	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) || isNetworkError(err) {
+		return failure{http.StatusBadGateway, "unreachable", "Can't reach the broker",
+			"The console could not get an answer from the broker. It may have stopped, or be busy."}
 	}
 	return failure{http.StatusInternalServerError, "internal", "Something went wrong", err.Error()}
 }
 
+// isNetworkError reports whether err is a failure to talk to the broker at all.
+// It goes by the error's type; the client's own "could not dial" is the one case
+// with no type to test, and is matched as a prefix, not anywhere in the text.
 func isNetworkError(err error) bool {
 	var ne net.Error
-	if errors.As(err, &ne) {
+	if errors.As(err, &ne) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.Is(err, net.ErrClosed) || errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.ECONNRESET) ||
+		errors.Is(err, syscall.EPIPE) || errors.Is(err, kgo.ErrClientClosed) {
 		return true
 	}
-	s := err.Error()
-	return strings.Contains(s, "unable to dial") || strings.Contains(s, "connection refused") ||
-		strings.Contains(s, "broken pipe") || strings.Contains(s, "connection reset") ||
-		strings.Contains(s, "EOF") || strings.Contains(s, "client closed")
+	return strings.HasPrefix(err.Error(), "unable to dial")
 }
 
 // wantsPage reports whether this request is a navigation (a plain page load or a
@@ -87,9 +104,16 @@ func (c *Console) fail(w http.ResponseWriter, r *http.Request, err error) {
 		c.renderError(w, r, f, errorPage{})
 		return
 	}
+	// What the person did wrong is said in their terms (the form's own message);
+	// anything else gets the same plain explanation a page would, not the client
+	// library's raw error ("unable to dial: dial tcp 127.0.0.1:1: connect: ...").
+	msg := f.message
+	if errors.Is(err, errBadInput) || f.kind == "notfound" {
+		msg = err.Error()
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(f.status)
-	io.WriteString(w, `<div class="err">`+template.HTMLEscapeString(err.Error())+`</div>`)
+	io.WriteString(w, `<div class="err">`+template.HTMLEscapeString(msg)+`</div>`)
 }
 
 // failResource is fail for a page about one named thing. When that thing does not
@@ -170,7 +194,9 @@ func (c *Console) suggest(ctx context.Context, kind, name string) []suggestion {
 		case strings.Contains(ln, lower) || strings.Contains(lower, ln):
 			cands = append(cands, scored{n, 0})
 		default:
-			if d := editDistance(ln, lower); d <= 2+len(lower)/6 {
+			// Close enough to be a typo: at most a third of the name's letters differ
+			// (never offering "zz" for "a"), and no more than a couple plus a little.
+			if d := editDistance(ln, lower); d <= min(2+len(lower)/6, max(len(lower), len(ln))/3) {
 				cands = append(cands, scored{n, d})
 			}
 		}

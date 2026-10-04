@@ -36,8 +36,12 @@ func decodeField(name, raw, enc string) ([]byte, error) {
 	case "base64":
 		b, err := base64.StdEncoding.DecodeString(raw)
 		if err != nil {
-			// Be forgiving about the padding and URL alphabet people paste.
-			if b2, err2 := base64.RawStdEncoding.DecodeString(trimPadding(raw)); err2 == nil {
+			// Be forgiving about the padding and the URL-safe alphabet people paste.
+			trimmed := trimPadding(raw)
+			if b2, err2 := base64.RawStdEncoding.DecodeString(trimmed); err2 == nil {
+				return b2, nil
+			}
+			if b2, err2 := base64.RawURLEncoding.DecodeString(trimmed); err2 == nil {
 				return b2, nil
 			}
 			return nil, badInput("the %s is not valid base64: %v", name, err)
@@ -114,11 +118,11 @@ func parseProduceForm(r *http.Request, partitions int32) (produceInput, error) {
 	case "", "auto":
 		in.Auto = true
 	default:
-		n, err := strconv.Atoi(p)
+		n, err := strconv.ParseInt(p, 10, 64)
 		if err != nil {
 			return in, badInput("%q is not a partition number", p)
 		}
-		if n < 0 || int32(n) >= partitions {
+		if n < 0 || n >= int64(partitions) { // compared before narrowing: 4294967296 is not partition 0.
 			return in, badInput("partition %d does not exist; this topic has %d (0–%d)", n, partitions, partitions-1)
 		}
 		in.Partition = int32(n)

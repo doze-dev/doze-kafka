@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -40,16 +41,28 @@ func staticETags() map[string]string {
 func (c *Console) staticHandler() http.Handler {
 	if c.dev != "" {
 		// Dev mode: straight from disk, never cached.
-		files := http.FileServerFS(os.DirFS(c.dev))
+		// Rooted at static/ itself, so "static/../console.go" has nowhere to go: it
+		// used to serve any file in the dev directory, source and templates included.
+		files := http.StripPrefix("/static", http.FileServerFS(os.DirFS(filepath.Join(c.dev, "static"))))
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !strings.HasPrefix(path.Clean("/"+r.URL.Path), "/static/") {
+				http.NotFound(w, r)
+				return
+			}
 			w.Header().Set("Cache-Control", "no-store")
-			files.ServeHTTP(w, r)
+			r2 := r.Clone(r.Context())
+			r2.URL.Path = path.Clean("/" + r.URL.Path)
+			files.ServeHTTP(w, r2)
 		})
 	}
 	files := http.FileServerFS(staticFS)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// The mux strips the console prefix, leaving "static/…".
 		name := path.Clean(strings.TrimPrefix(r.URL.Path, "/"))
+		if strings.HasSuffix(r.URL.Path, "/") || name == "static" {
+			http.NotFound(w, r) // no directory listings.
+			return
+		}
 		if tag, ok := staticETags()[name]; ok {
 			w.Header().Set("ETag", tag)
 			w.Header().Set("Cache-Control", "no-cache")

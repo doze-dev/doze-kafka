@@ -2,6 +2,7 @@ package console
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -307,14 +308,33 @@ func (b *backend) ResetGroupOffsets(ctx context.Context, id, to string) (int, er
 	if err != nil {
 		return 0, err
 	}
+	// The broker decides each partition on its own. It also refuses the whole
+	// request if a consumer joined after the check above (a commit that names no
+	// member is not accepted by a group that has members), which is the real guard.
+	failed, moved := 0, 0
+	var firstErr error
 	for _, t := range resp.Topics {
 		for _, p := range t.Partitions {
 			if p.ErrorCode != 0 {
-				return 0, kerr.ErrorForCode(p.ErrorCode)
+				failed++
+				if firstErr == nil {
+					firstErr = kerr.ErrorForCode(p.ErrorCode)
+				}
+				continue
 			}
+			moved++
 		}
 	}
-	return n, nil
+	switch {
+	case failed == 0:
+		return moved, nil
+	case errors.Is(firstErr, kerr.UnknownMemberID), errors.Is(firstErr, kerr.IllegalGeneration), errors.Is(firstErr, kerr.RebalanceInProgress):
+		return moved, badInput("a consumer joined the group while its offsets were being reset; stop its consumers and try again")
+	case moved > 0:
+		return moved, fmt.Errorf("%d of %d offsets were reset; the rest failed: %w", moved, moved+failed, firstErr)
+	default:
+		return 0, firstErr
+	}
 }
 
 // DeleteGroup removes an inactive group and its committed offsets.

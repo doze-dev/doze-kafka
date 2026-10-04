@@ -167,7 +167,9 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 		fmt.Fprint(h, m.ID, m.ClientID, m.Host, m.Assigned, ";")
 	}
 	for _, o := range rows {
-		fmt.Fprint(h, o.Topic, o.Partition, o.Committed, o.Latest, ",")
+		// Everything a row shows: a record trimmed by retention, a topic deleted,
+		// or a partition changing hands must refresh the page, not answer 204.
+		fmt.Fprint(h, o.Topic, o.Partition, o.Committed, o.Latest, o.Trimmed, o.Deleted, o.Ahead, o.Owner, ",")
 	}
 
 	return map[string]any{
@@ -179,7 +181,7 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 }
 
 func (c *Console) groupDetail(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id := groupFromSegment(r.PathValue("id"))
 	data, err := c.groupData(r, id)
 	if err != nil {
 		c.failResource(w, r, err, "group", id)
@@ -193,7 +195,7 @@ func (c *Console) groupDetail(w http.ResponseWriter, r *http.Request) {
 // groupLive is the live-polled partial behind the group page: members, offsets and
 // lag. Lag is the number someone watches a group for, and used to need a refresh.
 func (c *Console) groupLive(w http.ResponseWriter, r *http.Request) {
-	data, err := c.groupData(r, r.PathValue("id"))
+	data, err := c.groupData(r, groupFromSegment(r.PathValue("id")))
 	if err != nil {
 		c.fail(w, r, err)
 		return
@@ -207,7 +209,7 @@ func (c *Console) groupLive(w http.ResponseWriter, r *http.Request) {
 // groupReset moves an inactive group's committed offsets to the earliest or latest
 // position and re-renders the page's live region.
 func (c *Console) groupReset(w http.ResponseWriter, r *http.Request) {
-	id, to := r.PathValue("id"), r.FormValue("to")
+	id, to := groupFromSegment(r.PathValue("id")), r.FormValue("to")
 	n, err := c.be.ResetGroupOffsets(r.Context(), id, to)
 	if err != nil {
 		c.fail(w, r, err)
@@ -223,7 +225,7 @@ func (c *Console) groupReset(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *Console) groupDelete(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id := groupFromSegment(r.PathValue("id"))
 	if err := c.be.DeleteGroup(r.Context(), id); err != nil {
 		c.fail(w, r, err)
 		return
