@@ -38,16 +38,6 @@ func (r *Reader) need(n int) bool {
 	return true
 }
 
-// Int8 reads a signed 8-bit integer.
-func (r *Reader) Int8() int8 {
-	if !r.need(1) {
-		return 0
-	}
-	v := int8(r.buf[r.pos])
-	r.pos++
-	return v
-}
-
 // Int16 reads a big-endian signed 16-bit integer.
 func (r *Reader) Int16() int16 {
 	if !r.need(2) {
@@ -68,16 +58,6 @@ func (r *Reader) Int32() int32 {
 	return v
 }
 
-// Int64 reads a big-endian signed 64-bit integer.
-func (r *Reader) Int64() int64 {
-	if !r.need(8) {
-		return 0
-	}
-	v := int64(binary.BigEndian.Uint64(r.buf[r.pos:]))
-	r.pos += 8
-	return v
-}
-
 // NullableString reads an int16-length-prefixed string. A length of -1 is the
 // null encoding and yields ("", false); otherwise ok is true.
 func (r *Reader) NullableString() (value string, ok bool) {
@@ -91,15 +71,6 @@ func (r *Reader) NullableString() (value string, ok bool) {
 	s := string(r.buf[r.pos : r.pos+int(n)])
 	r.pos += int(n)
 	return s, true
-}
-
-// Remaining returns the bytes not yet consumed (e.g. the request body after the
-// header). It returns nil once an error has occurred.
-func (r *Reader) Remaining() []byte {
-	if r.err != nil {
-		return nil
-	}
-	return r.buf[r.pos:]
 }
 
 // Pos returns the current cursor offset into the buffer.

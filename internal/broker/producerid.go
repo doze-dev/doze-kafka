@@ -32,12 +32,12 @@ func (b *Broker) nextProducerID() (int64, error) {
 	return id, nil
 }
 
-// handleInitProducerID hands out a fresh monotonic producer id (epoch 0). This is
-// mandatory even without transactions: modern producers default to
-// enable.idempotence=true and call it before producing anything, so failing it
-// puts the client into a fatal state. We accept producer sequence numbers without
-// enforcing real dedup (at-least-once is fine for local dev) and never advertise
-// transactions.
+// handleInitProducerID hands out a fresh producer id (epoch 0). It is needed even
+// without transactions: producers default to enable.idempotence=true and call it
+// before producing anything, so failing it puts the client into a fatal state.
+// The id is what the produce path deduplicates on (idempotency.go). A
+// transactional.id in the request is not acted on: there are no transactions
+// here, and the transaction APIs that would follow are not advertised.
 func (b *Broker) handleInitProducerID(ctx context.Context, req *protocol.Request, _ *kmsg.InitProducerIDRequest, resp *kmsg.InitProducerIDResponse) error {
 	pid, err := b.nextProducerID()
 	if err != nil {

@@ -3,11 +3,11 @@ package protocol
 // RequestHeader carries the fields common to every Kafka request, decoded far
 // enough to route and log.
 //
-// Request header versions ≥2 append a tagged-fields block after client_id. The
-// skeleton does not consume it here — full, version-aware request decoding is the
-// handler's job (via kmsg). ParseRequestHeader therefore reports the body offset
-// as the position immediately after client_id, and any header tagged fields fall
-// at the start of the body slice for the handler to skip.
+// Request header versions ≥2 append a tagged-fields block after client_id. It is
+// not consumed here, because whether a request is that version depends on its API
+// and version, which is the codec's knowledge: ParseRequestHeader reports the body
+// as starting immediately after client_id, and DecodeRequest skips the header's
+// tagged fields at the start of that body for the versions that have them.
 type RequestHeader struct {
 	APIKey        APIKey
 	APIVersion    int16

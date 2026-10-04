@@ -94,7 +94,7 @@ func listen(t *testing.T, router *Router, auth bool, tune func(*Server)) string 
 }
 
 func echoRouter() *Router {
-	r := NewRouter(quietLogger())
+	r := NewRouter()
 	r.Register(kmsg.ApiVersions, func(_ context.Context, req *Request) ([]byte, error) {
 		return binary.BigEndian.AppendUint32(nil, uint32(req.Header.CorrelationID)), nil
 	})
@@ -289,7 +289,7 @@ func TestOnlyProduceMayBeLarge(t *testing.T) {
 
 // A peer that sends requests and never reads must not park a goroutine in Write.
 func TestWriterIsNotHeldByAPeerThatNeverReads(t *testing.T) {
-	r := NewRouter(quietLogger())
+	r := NewRouter()
 	r.Register(kmsg.ApiVersions, func(context.Context, *Request) ([]byte, error) { return make([]byte, 64<<20), nil }) // far more than socket buffers hold.
 	var srv *Server
 	addr := listen(t, r, false, func(s *Server) { srv = s })
@@ -334,7 +334,7 @@ func TestConnectionsAboveTheLimitAreRefused(t *testing.T) {
 
 // CloseAfterResponse: the client gets its answer, then the connection is gone.
 func TestCloseAfterResponseSendsTheAnswerThenCloses(t *testing.T) {
-	r := NewRouter(quietLogger())
+	r := NewRouter()
 	r.Register(kmsg.ApiVersions, func(_ context.Context, req *Request) ([]byte, error) {
 		req.Conn.CloseAfterResponse()
 		return []byte{1, 2, 3, 4}, nil

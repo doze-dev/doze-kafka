@@ -91,9 +91,6 @@ func (c *Conn) RemoteHost() string {
 	return "/" + host
 }
 
-// Authenticated reports whether this connection has completed SASL auth.
-func (c *Conn) Authenticated() bool { return c.authenticated }
-
 // SetAuthenticated marks the connection authenticated after a successful SASL
 // exchange, lifting the pre-auth gate.
 func (c *Conn) SetAuthenticated(v bool) { c.authenticated = v }

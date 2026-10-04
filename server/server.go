@@ -240,7 +240,7 @@ func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		SegmentBytes:       cfg.SegmentBytes,
 		IndexIntervalBytes: cfg.IndexIntervalBytes,
 		FsyncInterval:      cfg.FsyncInterval,
-		Retention:          cfg.Retention(),
+		Retention:          broker.RetentionPolicy(cfg),
 		Logger:             logger,
 	})
 	if err != nil {
@@ -259,7 +259,7 @@ func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		metaStore.Close()
 		return nil, err
 	}
-	router := protocol.NewRouter(logger)
+	router := protocol.NewRouter()
 	b.Register(router)
 
 	srv := protocol.NewServer(cfg.ListenAddr, router, logger)

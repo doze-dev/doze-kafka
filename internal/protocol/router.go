@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 )
@@ -20,14 +19,15 @@ type Request struct {
 // Handler processes one request and returns the full response payload to be
 // length-prefixed onto the wire — the response header (correlation id, plus
 // tagged fields for flexible versions) followed by the response body. Returning
-// (nil, nil) sends nothing, which is how an API behaves while unimplemented.
+// (nil, nil) sends nothing, which is right for exactly one request: a Produce
+// with acks=0, to which Kafka gives no answer. Returning an error closes the
+// connection.
 type Handler func(ctx context.Context, req *Request) ([]byte, error)
 
 // Router dispatches requests to handlers by API key.
 type Router struct {
 	handlers map[APIKey]Handler
 	ranges   map[APIKey]VersionRange // what ApiVersions advertises; nil = no gate (tests).
-	log      *slog.Logger
 }
 
 // ErrNotAdvertised is returned for a request the broker never offered: an API
@@ -47,14 +47,15 @@ func (r *Router) Advertise(key APIKey, min, max int16) {
 }
 
 // NewRouter returns an empty Router.
-func NewRouter(log *slog.Logger) *Router {
-	return &Router{handlers: make(map[APIKey]Handler), log: log}
+func NewRouter() *Router {
+	return &Router{handlers: make(map[APIKey]Handler)}
 }
 
 // Register binds a handler to an API key, replacing any previous binding.
 func (r *Router) Register(key APIKey, h Handler) { r.handlers[key] = h }
 
-// Route dispatches req to its handler. An unregistered key is a protocol error.
+// Route dispatches req to its handler. A key or version that was not advertised,
+// or a key with no handler, is an error (and the connection is closed).
 func (r *Router) Route(ctx context.Context, req *Request) ([]byte, error) {
 	if r.ranges != nil {
 		rng, ok := r.ranges[req.Header.APIKey]

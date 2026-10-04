@@ -11,10 +11,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/doze-dev/doze-kafka/internal/protocol"
-	"github.com/doze-dev/doze-kafka/internal/storage/log"
 )
+
+// The Kafka majors that can be emulated (--kafka-version). The API table in
+// internal/protocol has a column for each; a test holds the two to each other.
+// They are stated here, rather than asked of that package, so that config depends
+// on nothing else in the broker and anything may depend on it.
+const MinKafkaMajor, MaxKafkaMajor = 1, 4
 
 // SASL mechanisms this broker can serve.
 const (
@@ -103,7 +106,7 @@ const (
 // Default returns a Config suitable for zero-config local development.
 func Default() Config {
 	return Config{
-		Version:                protocol.DefaultKafkaMajor,
+		Version:                MaxKafkaMajor,
 		ListenAddr:             defaultListenAddr,
 		AdvertisedHost:         "localhost",
 		DataDir:                DefaultDataDir,
@@ -181,8 +184,8 @@ func holdsPartitionData(dir string) bool {
 
 // Validate reports the first problem that would prevent the broker from starting.
 func (c Config) Validate() error {
-	if _, ok := protocol.ProfileFor(c.Version); !ok {
-		return fmt.Errorf("config: unsupported Kafka version %d; supported majors are %v", c.Version, protocol.SupportedKafkaMajors())
+	if c.Version < MinKafkaMajor || c.Version > MaxKafkaMajor {
+		return fmt.Errorf("config: unsupported Kafka version %d; supported majors are %d to %d", c.Version, MinKafkaMajor, MaxKafkaMajor)
 	}
 	switch {
 	case c.ListenAddr == "":
@@ -296,14 +299,6 @@ func (c Config) TLSConfig() (*tls.Config, error) {
 		return nil, fmt.Errorf("config: cannot load the TLS certificate and key (--tls-cert %s, --tls-key %s): %w", c.TLSCertFile, c.TLSKeyFile, err)
 	}
 	return &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}, nil
-}
-
-// Retention converts the retention config into a storage-layer policy.
-func (c Config) Retention() log.RetentionPolicy {
-	return log.RetentionPolicy{
-		MaxBytes: c.RetentionBytes,
-		MaxAge:   time.Duration(c.RetentionMs) * time.Millisecond,
-	}
 }
 
 // validHostPort reports whether addr is host:port, with an empty host (":9092")

@@ -22,11 +22,17 @@ import (
 // the last two have no broker-wide counterpart and apply only where a topic sets
 // them.
 
+// RetentionPolicy is the broker-wide retention from the configuration, as the log
+// applies it. Zero in the configuration means no limit.
+func RetentionPolicy(cfg config.Config) log.RetentionPolicy {
+	return log.RetentionPolicy{MaxBytes: cfg.RetentionBytes, MaxAge: time.Duration(cfg.RetentionMs) * time.Millisecond}
+}
+
 // TopicLimits resolves a topic's own configuration against the broker's into the
 // limits the log should apply. own is false when the topic overrides nothing that
 // is enforced, and the broker's limits apply as they are.
 func TopicLimits(cfg config.Config, topicConfig map[string]string) (limits log.TopicLimits, own bool) {
-	limits.Retention = cfg.Retention()
+	limits.Retention = RetentionPolicy(cfg)
 	num := func(key string) (int64, bool) {
 		v, ok := topicConfig[key]
 		if !ok {
