@@ -98,7 +98,7 @@ func TestTopicLifecycle(t *testing.T) {
 		t.Fatalf("detail: status %d: %s", rec.Code, rec.Body)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"orders.created", "3 partition", "Effective config", "No messages on this partition yet"} {
+	for _, want := range []string{"orders.created", "3 partition", "Save settings", "No messages on this partition yet"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("detail missing %q", want)
 		}

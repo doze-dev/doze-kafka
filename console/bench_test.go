@@ -15,7 +15,7 @@ import (
 func BenchmarkFetchWindow(b *testing.B) {
 	c := newTestConsole(b)
 	ctx := context.Background()
-	if err := c.be.CreateTopic(ctx, "bench", 1); err != nil {
+	if err := c.be.CreateTopic(ctx, "bench", 1, nil); err != nil {
 		b.Fatal(err)
 	}
 	for i := 0; i < 60; i++ {
@@ -37,7 +37,7 @@ func BenchmarkFetchWindow(b *testing.B) {
 func BenchmarkListGroups100(b *testing.B) {
 	c, addr := newTestConsoleAddr(b)
 	ctx := context.Background()
-	if err := c.be.CreateTopic(ctx, "t", 1); err != nil {
+	if err := c.be.CreateTopic(ctx, "t", 1, nil); err != nil {
 		b.Fatal(err)
 	}
 	cl, err := kgo.NewClient(kgo.SeedBrokers(addr))
@@ -69,7 +69,7 @@ func BenchmarkCounts(b *testing.B) {
 	c := newTestConsole(b)
 	ctx := context.Background()
 	for i := 0; i < 20; i++ {
-		if err := c.be.CreateTopic(ctx, "t"+string(rune('a'+i)), 6); err != nil {
+		if err := c.be.CreateTopic(ctx, "t"+string(rune('a'+i)), 6, nil); err != nil {
 			b.Fatal(err)
 		}
 	}

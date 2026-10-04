@@ -203,7 +203,8 @@ func (c *Console) routes() {
 	m.HandleFunc("GET "+p+"/topics/{name}", c.topicDetail)
 	m.HandleFunc("POST "+p+"/topics/{name}/delete", c.topicDelete)
 	m.HandleFunc("POST "+p+"/topics/{name}/purge", c.topicPurge)
-	m.HandleFunc("GET "+p+"/topics/{name}/tape", c.topicTape) // HTMX partial (polled)
+	m.HandleFunc("POST "+p+"/topics/{name}/config", c.topicConfig) // the topic's own retention and segment size
+	m.HandleFunc("GET "+p+"/topics/{name}/tape", c.topicTape)      // HTMX partial (polled)
 	m.HandleFunc("POST "+p+"/topics/{name}/produce", c.topicProduce)
 	m.HandleFunc("POST "+p+"/topics/{name}/resend", c.topicResend)  // an exact copy of a stored record
 	m.HandleFunc("GET "+p+"/topics/{name}/message", c.topicMessage) // drawer partial
@@ -312,6 +313,7 @@ func templateFuncs(prefix string) template.FuncMap {
 		"sub":       func(a, b int) int { return a - b },
 		"ago":       ago,
 		"hasPrefix": strings.HasPrefix,
+		"lower":     strings.ToLower,
 		"jsonTint":  jsonTint,
 		"stateBadge": func(state string) string {
 			switch state {

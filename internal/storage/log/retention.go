@@ -111,7 +111,10 @@ func (rp RetentionPolicy) enforceDir(dir string) error {
 // would cost two file descriptors each); the directory is held under the manager
 // lock so one cannot be opened mid-sweep.
 func (m *Manager) EnforceClosedRetention() error {
-	if !m.opts.Retention.enabled() {
+	m.mu.Lock()
+	any := m.anyRetentionLocked()
+	m.mu.Unlock()
+	if !any {
 		return nil
 	}
 	entries, err := os.ReadDir(m.dir)
@@ -131,7 +134,8 @@ func (m *Manager) EnforceClosedRetention() error {
 		m.mu.Lock()
 		_, open := m.partitions[topicPartition{match[1], int32(n)}]
 		if !open && !m.stopped {
-			if err := m.opts.Retention.enforceDir(filepath.Join(m.dir, e.Name())); err != nil && firstErr == nil {
+			// Each topic by its own policy, which may differ from the manager's.
+			if err := m.retentionLocked(match[1]).enforceDir(filepath.Join(m.dir, e.Name())); err != nil && firstErr == nil {
 				firstErr = err
 			}
 		}

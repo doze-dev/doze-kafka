@@ -228,7 +228,7 @@ function report(id, ok, detail) {
     const bad = [];
     const long = await (await open('/topics')).evaluate(() => Array.from(document.querySelectorAll('.li')).map(l => l.dataset.name).sort((a, b) => b.length - a.length)[0]);
     for (const w of [420, 360]) {
-      for (const [path, dock] of [['/topics', 0], ['/topics/orders', 0], ['/topics/orders', 1], ['/topics/' + long, 0], ['/groups/analytics', 0], ['/groups/' + encodeURIComponent(GROUP), 0], ['/cluster', 0], ['/new/topic', 0], ['/topics/orders?open=5', 0]]) {
+      for (const [path, dock] of [['/topics', 0], ['/topics/orders', 0], ['/topics/orders', 1], ['/topics/' + long, 0], ['/groups/analytics', 0], ['/groups/' + encodeURIComponent(GROUP), 0], ['/cluster', 0], ['/new/topic', 0], ['/topics/orders?open=5', 0], ['/topics/orders?q=ord&all=1', 0]]) {
         const page = await open(path, { w, h: 760, dock: !!dock });
         await page.waitForTimeout(250);
         const over = await page.evaluate(() => {
@@ -426,6 +426,27 @@ function report(id, ok, detail) {
     await page.waitForSelector('#drawer-title[data-offset]');
     const opened = await page.evaluate(() => ({ title: document.getElementById('drawer-title').textContent, url: location.search }));
     report('search', typed === 'ord_89' && st.rows > 3 && st.parts === 3 && !st.live && /q=ord_89/.test(st.url) && !/open=/.test(opened.url), JSON.stringify({ typedSurvivedRefresh: typed, ...st, opened }));
+    await page.context().close();
+  });
+
+  // A topic's own retention: saved from its page, shown in the summary, and a
+  // refusal is explained beside the form with what was typed still there.
+  await check('settings', async () => {
+    const page = await open('/topics/payments.events.v1');
+    await page.click('#topic-config summary');
+    await page.fill('#cfg-retention\\.ms', '3d');
+    await page.fill('#cfg-retention\\.bytes', '');
+    await page.click('#topic-config button[type=submit]');
+    await page.waitForSelector('.toast');
+    const saved = await page.evaluate(() => ({ open: document.getElementById('topic-config').open, summary: document.querySelector('#topic-config .cfgsum').innerText.replace(/\s+/g, ' '), field: document.getElementById('cfg-retention.ms').value }));
+    await page.fill('#cfg-segment\\.bytes', '10');
+    await page.click('#topic-config button[type=submit]');
+    await page.waitForSelector('#topic-config [data-err-slot]:not([hidden])');
+    const refused = await page.evaluate(() => ({ err: document.querySelector('#topic-config [data-err-slot]').innerText, typed: document.getElementById('cfg-segment.bytes').value }));
+    await page.reload({ waitUntil: 'networkidle' });
+    const after = await page.evaluate(() => document.querySelector('#topic-config .cfgsum').innerText.replace(/\s+/g, ' '));
+    report('settings', saved.open && /keep records for 3d this topic/.test(saved.summary) && saved.field === '3d' && /minimum of 1024/.test(refused.err) && refused.typed === '10' && /keep records for 3d this topic/.test(after),
+      JSON.stringify({ saved, refused, after: after.slice(0, 70) }));
     await page.context().close();
   });
 

@@ -45,6 +45,12 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   produces an exact copy (the same key, value and headers, byte for byte), and
   **Edit a copy** opens the composer filled in with it, to change first.
 - **Consumed by** lists the groups reading the topic, with their lag.
+- **Settings** shows what is in force for the topic (how long records are kept, how
+  much, and the segment size), marks the ones that are the topic's own, and lets you
+  change them: type `7d`, `1GB`, `forever`, or leave a field blank to follow the
+  broker. The same three fields are on the create-topic form. Other Kafka topic
+  settings are listed for reading; a topic that asks for compaction is told it is not
+  compacted.
 - **Purge** empties a topic (it is deleted and recreated, so it gets a new id) and
   **Delete** removes it. Both ask first, naming the action.
 

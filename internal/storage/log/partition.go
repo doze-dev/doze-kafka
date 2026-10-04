@@ -21,11 +21,12 @@ var ErrOffsetOutOfRange = errors.New("log: offset out of range")
 // log-end offset (LEO) and log-start offset and assigns offsets to record batches.
 type Partition struct {
 	dir           string
-	segmentBytes  int64
+	topic         string // set by the Manager; which topic's limits apply.
 	indexInterval int64
 	beforeSync    func() error
 
 	mu             sync.Mutex
+	segmentBytes   int64      // roll the active segment past this size; guarded by mu.
 	segments       []*Segment // sorted by base offset; last == active.
 	logEndOffset   int64
 	logStartOffset int64
@@ -337,4 +338,12 @@ func removeSegmentFiles(dir string, baseOffset int64) error {
 		return err
 	}
 	return nil
+}
+
+// setSegmentBytes changes the size at which the active segment rolls, from the
+// next append on. Segments already written are left as they are.
+func (p *Partition) setSegmentBytes(n int64) {
+	p.mu.Lock()
+	p.segmentBytes = n
+	p.mu.Unlock()
 }

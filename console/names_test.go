@@ -176,8 +176,9 @@ func TestCreateTopicWithInvalidNameShowsTheReason(t *testing.T) {
 	if rec.Code < 400 {
 		t.Fatalf("an invalid name was accepted: %d", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "INVALID_TOPIC_EXCEPTION") {
-		t.Fatalf("the error should name the Kafka error, got %q", rec.Body.String())
+	// The broker's own explanation, not just the name of the Kafka error.
+	if body := rec.Body.String(); rec.Code != 400 || !strings.Contains(body, "invalid topic name") || !strings.Contains(body, "only ASCII letters") || strings.Contains(body, "meta:") {
+		t.Fatalf("the error should say what is wrong with the name: %d %q", rec.Code, body)
 	}
 }
 

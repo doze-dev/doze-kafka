@@ -28,7 +28,7 @@ func (c *Console) topics(w http.ResponseWriter, r *http.Request) {
 
 func (c *Console) topicCreatePage(w http.ResponseWriter, r *http.Request) {
 	list, _ := c.be.ListTopics(r.Context())
-	c.render(w, r, "topic_create", map[string]any{"List": list, "Page": "topics", "Title": "Create topic"})
+	c.render(w, r, "topic_create", map[string]any{"List": list, "Page": "topics", "Title": "Create topic", "Config": newConfigView(nil)})
 }
 
 func (c *Console) topicCreate(w http.ResponseWriter, r *http.Request) {
@@ -44,7 +44,13 @@ func (c *Console) topicCreate(w http.ResponseWriter, r *http.Request) {
 		}
 		partitions = n
 	}
-	if err := c.be.CreateTopic(r.Context(), name, int32(partitions)); err != nil {
+	// Settings left blank follow the broker's defaults, now and if those change.
+	config, _, err := settingsFromForm(r)
+	if err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	if err := c.be.CreateTopic(r.Context(), name, int32(partitions), config); err != nil {
 		c.fail(w, r, err)
 		return
 	}
@@ -85,6 +91,7 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 		"List": list, "Topic": detail, "Page": "topics",
 		"Partition": partition, "Title": name,
 		"Consumers": c.topicConsumers(ctx, name),
+		"Config":    newConfigView(detail.Config),
 	}
 	if q, all, before, asked := searchParams(r); asked {
 		// A search replaces the tape and the live table with what it found.

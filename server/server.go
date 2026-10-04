@@ -223,7 +223,20 @@ func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		dirLock.Close()
 		return nil, err
 	}
+	// Topics with a segment size or retention of their own, in place before the
+	// log manager's first retention sweep.
+	registered, err := metaStore.ListTopics()
+	if err != nil {
+		metaStore.Close()
+		dirLock.Close()
+		return nil, err
+	}
+	topicConfigs := make(map[string]map[string]string, len(registered))
+	for _, t := range registered {
+		topicConfigs[t.Name] = t.Config
+	}
 	logs, err := log.OpenManager(cfg.DataDir, log.ManagerOptions{
+		TopicLimits:        broker.InitialTopicLimits(cfg, topicConfigs),
 		SegmentBytes:       cfg.SegmentBytes,
 		IndexIntervalBytes: cfg.IndexIntervalBytes,
 		FsyncInterval:      cfg.FsyncInterval,

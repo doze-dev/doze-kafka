@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
@@ -56,7 +57,7 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 	}
 	if err := meta.ValidateTopicName(t.Topic); err != nil {
 		rt.ErrorCode = int16(protocol.ErrInvalidTopic)
-		msg := err.Error()
+		msg := strings.TrimPrefix(err.Error(), "meta: ") // a client is shown this; the package is not its business.
 		rt.ErrorMessage = &msg
 		return rt
 	}
@@ -90,7 +91,7 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 			rt.ErrorCode = int16(protocol.ErrTopicAlreadyExists)
 		} else if errors.Is(err, meta.ErrTopicCollides) {
 			rt.ErrorCode = int16(protocol.ErrInvalidTopic)
-			msg := err.Error()
+			msg := strings.TrimPrefix(err.Error(), "meta: ")
 			rt.ErrorMessage = &msg
 		} else {
 			rt.ErrorCode = int16(protocol.ErrUnknownServer)
@@ -112,6 +113,7 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 		return rt
 	}
 
+	b.applyTopicLimits(created.Name, created.Config)
 	b.cg848.topicChanged(created.Name)
 
 	rt.TopicID = created.ID

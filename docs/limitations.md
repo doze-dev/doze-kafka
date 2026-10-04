@@ -30,12 +30,18 @@ implement it.
   restart could still duplicate (rare, and `acks=all` makes it rarer still, since an
   acked batch was fsynced and the producer won't resend it).
 - **Log compaction.** Retention is delete-only (by size and age). `cleanup.policy=compact`
-  is not honored; compacted topics like a real `__consumer_offsets` aren't emulated
-  (offsets are stored in the metadata database instead).
-- **Config writes.** `DescribeConfigs`/`DescribeCluster` report the effective
-  configuration, but there's no `AlterConfigs`. Most knobs (retention, segment size)
-  are broker-global here, so a per-topic config change would be stored without taking
-  effect — better to be read-only and honest than to accept a write that lies.
+  is accepted and reported, because Kafka Connect and Schema Registry check for it on
+  their own topics, but nothing is compacted: every record is kept until retention
+  removes it. A consumer reading a "compacted" topic from the start sees every value a
+  key ever had, not only the latest. (Committed offsets are stored in the metadata
+  database, not in a compacted `__consumer_offsets` topic.)
+- **Topic configuration: three settings act, the rest are kept.** A topic's own
+  `retention.ms`, `retention.bytes` and `segment.bytes`, given at `CreateTopics` or
+  changed later with `AlterConfigs` / `IncrementalAlterConfigs`, are in force for that
+  topic and override the broker's. Every other Kafka topic config is validated, stored
+  and reported by `DescribeConfigs`, and changes nothing. `segment.bytes` must be at
+  least 1024. The broker's own configuration cannot be altered over the wire: it comes
+  from flags and the config file, and a request to change it is refused.
 - **ACLs and quotas.** Authentication exists (SASL/TLS), but there is no
   authorization: an authenticated client can do anything. No throttling either.
 - **Some admin APIs.** `CreatePartitions`, `OffsetForLeaderEpoch`, `DescribeLogDirs`,

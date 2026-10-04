@@ -176,6 +176,7 @@ type TopicDetail struct {
 // ConfigEntry is one effective-config key/value pair.
 type ConfigEntry struct {
 	Name, Value string
+	Own         bool // set on the topic itself, rather than the broker's default.
 }
 
 // ListTopics returns every topic, sorted by name. AllowAutoTopicCreation is
@@ -272,8 +273,8 @@ func (b *backend) TopicShape(ctx context.Context, name string) (id string, parti
 
 // CreateTopic creates a topic. Replication factor is always 1 — doze-kafka
 // is single-node, so there's no meaningful choice to offer here.
-func (b *backend) CreateTopic(ctx context.Context, name string, partitions int32) error {
-	return b.createTopic(ctx, name, partitions, nil)
+func (b *backend) CreateTopic(ctx context.Context, name string, partitions int32, config map[string]string) error {
+	return b.createTopic(ctx, name, partitions, config)
 }
 
 // createTopic creates a topic with per-topic config overrides.
@@ -295,8 +296,8 @@ func (b *backend) createTopic(ctx context.Context, name string, partitions int32
 		return err
 	}
 	for _, t := range resp.Topics {
-		if t.ErrorCode != 0 {
-			return kerr.ErrorForCode(t.ErrorCode)
+		if err := refusal(t.ErrorCode, t.ErrorMessage); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -430,7 +431,7 @@ func (b *backend) DescribeTopic(ctx context.Context, name string) (*TopicDetail,
 			if c.Value != nil {
 				v = *c.Value
 			}
-			cfg = append(cfg, ConfigEntry{Name: c.Name, Value: v})
+			cfg = append(cfg, ConfigEntry{Name: c.Name, Value: v, Own: c.Source == kmsg.ConfigSourceDynamicTopicConfig})
 		}
 	}
 

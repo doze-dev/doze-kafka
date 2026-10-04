@@ -865,3 +865,120 @@ func TestListLinksReplaceOnlyTheDetailPane(t *testing.T) {
 		t.Error("the composer should close when you move to another page, and not be restored from storage")
 	}
 }
+
+// ---- a topic's own retention and segment size ----
+
+func TestTopicSettingsAreTypedAndShownAsPeopleSayThem(t *testing.T) {
+	for _, tc := range []struct {
+		parse    func(string) (string, error)
+		in, want string
+		show     func(string) string
+		shown    string
+	}{
+		{parseDuration, "7d", "604800000", showDuration, "7d"},
+		{parseDuration, " 12 H ", "43200000", showDuration, "12h"},
+		{parseDuration, "90s", "90000", showDuration, "90s"},
+		{parseDuration, "1500", "1500", showDuration, "1500ms"},
+		{parseDuration, "forever", "-1", showDuration, "forever"},
+		{parseDuration, "0", "0", showDuration, "0ms"},
+		{parseSize, "1GB", "1073741824", showSize, "1 GB"},
+		{parseSize, "500 mb", "524288000", showSize, "500 MB"},
+		{parseSize, "4096", "4096", showSize, "4 KB"},
+		{parseSize, "unlimited", "-1", showSize, "unlimited"},
+		{parseSegment, "64MB", "67108864", showSize, "64 MB"},
+	} {
+		got, err := tc.parse(tc.in)
+		if err != nil || got != tc.want {
+			t.Errorf("parse(%q) = %q, %v; want %q", tc.in, got, err, tc.want)
+			continue
+		}
+		if s := tc.show(got); s != tc.shown {
+			t.Errorf("show(%q) = %q, want %q", got, s, tc.shown)
+		}
+		// What is shown can be typed back in and means the same thing.
+		if again, err := tc.parse(tc.shown); err != nil || again != tc.want {
+			t.Errorf("parse(show) of %q = %q, %v; want %q", tc.in, again, err, tc.want)
+		}
+	}
+	for _, bad := range []string{"soon", "7 weeks", "-5", "1.5h", "d", "99999999999999999999d", "12h30m"} {
+		if got, err := parseDuration(bad); err == nil {
+			t.Errorf("parseDuration(%q) = %q, want an error", bad, got)
+		}
+	}
+	if got, err := parseSegment("unlimited"); err == nil {
+		t.Errorf("a segment size of %q should not be accepted (got %q)", "unlimited", got)
+	}
+}
+
+func TestATopicCanBeCreatedWithItsOwnRetentionAndChangedLater(t *testing.T) {
+	c := newTestConsole(t)
+	form := req(t, c, "GET", "/_console/new/topic", nil).Body.String()
+	for _, name := range []string{`name="retention.ms"`, `name="retention.bytes"`, `name="segment.bytes"`} {
+		if !strings.Contains(form, name) {
+			t.Errorf("the create form has no field %s", name)
+		}
+	}
+
+	rec := req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"t"}, "partitions": {"2"}, "retention.ms": {"7d"}, "segment.bytes": {"64MB"}, "retention.bytes": {""}})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("create: %d %s", rec.Code, rec.Body)
+	}
+	own, err := c.be.topicOverrides(context.Background(), "t")
+	if err != nil || len(own) != 2 || own["retention.ms"] != "604800000" || own["segment.bytes"] != "67108864" {
+		t.Fatalf("the topic's own config after creating it: %v %v", own, err)
+	}
+	page := req(t, c, "GET", "/_console/topics/t", nil).Body.String()
+	for _, want := range []string{`name="retention.ms" value="7d"`, `name="segment.bytes" value="64MB"`, `name="retention.bytes" value=""`, "unlimited (broker default)", "this topic"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the topic page is missing %q", want)
+		}
+	}
+
+	// Change one, set one, clear one.
+	rec = req(t, c, "POST", "/_console/topics/t/config", url.Values{"retention.ms": {"12h"}, "retention.bytes": {"1GB"}, "segment.bytes": {""}})
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `value="12h"`) || !strings.Contains(rec.Body.String(), "<details") {
+		t.Fatalf("save: %d %.200s", rec.Code, rec.Body)
+	}
+	own, _ = c.be.topicOverrides(context.Background(), "t")
+	if len(own) != 2 || own["retention.ms"] != "43200000" || own["retention.bytes"] != "1073741824" {
+		t.Errorf("the topic's own config after the change: %v", own)
+	}
+
+	// Refusals: what was typed, and what the broker will not have.
+	for _, bad := range []url.Values{
+		{"retention.ms": {"soon"}},
+		{"segment.bytes": {"10"}}, // below the broker's minimum: its own message is shown.
+	} {
+		rec := req(t, c, "POST", "/_console/topics/t/config", bad)
+		if rec.Code != 400 || len(rec.Body.String()) < 20 {
+			t.Errorf("%v: %d %q", bad, rec.Code, rec.Body)
+		}
+	}
+	if rec := req(t, c, "POST", "/_console/topics/t/config", url.Values{"segment.bytes": {"10"}}); !strings.Contains(rec.Body.String(), "minimum of 1024") {
+		t.Errorf("the broker's reason should be shown: %q", rec.Body)
+	}
+	if rec := req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"u"}, "partitions": {"1"}, "retention.bytes": {"lots"}}); rec.Code != 400 {
+		t.Errorf("creating a topic with a setting that cannot be read: %d", rec.Code)
+	}
+	if after, _ := c.be.topicOverrides(context.Background(), "t"); fmt.Sprint(after) != fmt.Sprint(own) {
+		t.Errorf("a refused change altered the topic: %v", after)
+	}
+	if rec := req(t, c, "POST", "/_console/topics/missing/config", url.Values{"retention.ms": {"1d"}}); rec.Code != 404 {
+		t.Errorf("settings of a topic that does not exist: %d", rec.Code)
+	}
+}
+
+// A topic that asks for compaction is told plainly that it is not compacted.
+func TestCompactionIsShownAsNotApplied(t *testing.T) {
+	c := newTestConsole(t)
+	if err := c.be.CreateTopic(context.Background(), "c", 1, map[string]string{"cleanup.policy": "compact"}); err != nil {
+		t.Fatal(err)
+	}
+	page := req(t, c, "GET", "/_console/topics/c", nil).Body.String()
+	if !strings.Contains(page, "compaction asked for, not applied") || !strings.Contains(page, "does not compact") {
+		t.Error("a compacted topic's page should say compaction is not applied")
+	}
+	if plain := req(t, c, "GET", "/_console/new/topic", nil).Body.String(); strings.Contains(plain, "not applied") {
+		t.Error("the note should appear only where compaction was asked for")
+	}
+}

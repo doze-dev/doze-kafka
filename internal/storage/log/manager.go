@@ -41,6 +41,13 @@ type ManagerOptions struct {
 	// Retention bounds on-disk size; a zero policy keeps everything.
 	Retention RetentionPolicy
 
+	// TopicLimits are the topics that have a segment size or retention of their
+	// own, known when the manager opens. They must be in place before the first
+	// retention sweep, which is why they are an option rather than a call made
+	// afterwards: a topic set to keep everything must not be trimmed by the
+	// broker-wide default in the moment between the two.
+	TopicLimits map[string]TopicLimits
+
 	// BeforeSync, if set, runs before every fsync, and a non-nil error is returned
 	// in its place. It is fault injection for tests ("the disk failed"); leave it
 	// nil in production.
@@ -66,6 +73,82 @@ type Manager struct {
 	done   chan struct{}
 	wg     sync.WaitGroup
 	bounds map[topicPartition]cachedBounds // Bounds answers for closed partitions; guarded by mu.
+	limits map[string]TopicLimits          // topics with limits of their own; guarded by mu.
+}
+
+// TopicLimits is one topic's segment size and retention, where they differ from
+// the manager's. They are the values in force, already resolved by the caller: a
+// zero SegmentBytes means the manager's, and a zero bound in Retention means that
+// bound is off for this topic (even if the manager's default has one).
+type TopicLimits struct {
+	SegmentBytes int64
+	Retention    RetentionPolicy
+}
+
+// SetTopicLimits gives a topic its own segment size and retention, from now on:
+// partitions already open roll at the new size from their next append, and the
+// next retention sweep uses the new bounds.
+func (m *Manager) SetTopicLimits(topic string, l TopicLimits) {
+	m.mu.Lock()
+	m.limits[topic] = l
+	var open []*Partition
+	for tp, p := range m.partitions {
+		if tp.topic == topic {
+			open = append(open, p)
+		}
+	}
+	size := m.segmentBytesLocked(topic)
+	m.mu.Unlock()
+	for _, p := range open {
+		p.setSegmentBytes(size)
+	}
+}
+
+// ClearTopicLimits returns a topic to the manager's own limits (its overrides were
+// removed, or the topic was deleted).
+func (m *Manager) ClearTopicLimits(topic string) {
+	m.mu.Lock()
+	delete(m.limits, topic)
+	var open []*Partition
+	for tp, p := range m.partitions {
+		if tp.topic == topic {
+			open = append(open, p)
+		}
+	}
+	m.mu.Unlock()
+	for _, p := range open {
+		p.setSegmentBytes(m.opts.SegmentBytes)
+	}
+}
+
+// segmentBytesLocked is the segment size in force for a topic. The caller holds mu.
+func (m *Manager) segmentBytesLocked(topic string) int64 {
+	if l, ok := m.limits[topic]; ok && l.SegmentBytes > 0 {
+		return l.SegmentBytes
+	}
+	return m.opts.SegmentBytes
+}
+
+// retentionLocked is the retention policy in force for a topic. The caller holds mu.
+func (m *Manager) retentionLocked(topic string) RetentionPolicy {
+	if l, ok := m.limits[topic]; ok {
+		return l.Retention
+	}
+	return m.opts.Retention
+}
+
+// anyRetentionLocked reports whether any retention is in force anywhere, which is
+// whether a sweep of the data directory is worth doing. The caller holds mu.
+func (m *Manager) anyRetentionLocked() bool {
+	if m.opts.Retention.enabled() {
+		return true
+	}
+	for _, l := range m.limits {
+		if l.Retention.enabled() {
+			return true
+		}
+	}
+	return false
 }
 
 type topicPartition struct {
@@ -98,12 +181,16 @@ func OpenManager(dir string, opts ManagerOptions) (*Manager, error) {
 		log:        logger,
 		partitions: make(map[topicPartition]*Partition),
 		bounds:     make(map[topicPartition]cachedBounds),
+		limits:     make(map[string]TopicLimits),
 		done:       make(chan struct{}),
 	}
-	if opts.FsyncInterval > 0 || opts.Retention.enabled() {
-		m.wg.Add(1)
-		go m.maintain()
+	for topic, l := range opts.TopicLimits {
+		m.limits[topic] = l
 	}
+	// Always: a topic can be given retention of its own at any time, whatever the
+	// broker-wide setting was at start-up. An idle sweep costs nothing on disk.
+	m.wg.Add(1)
+	go m.maintain()
 	return m, nil
 }
 
@@ -150,10 +237,13 @@ func (m *Manager) open(topic string, partition int32, create bool) (*Partition, 
 			return nil, fmt.Errorf("%w: %s-%d", ErrNoSuchPartition, topic, partition)
 		}
 	}
-	p, err := openPartition(dir, m.opts)
+	opts := m.opts
+	opts.SegmentBytes = m.segmentBytesLocked(topic)
+	p, err := openPartition(dir, opts)
 	if err != nil {
 		return nil, err
 	}
+	p.topic = topic
 	m.partitions[tp] = p
 	return p, nil
 }
@@ -316,6 +406,7 @@ type cachedBounds struct {
 func (m *Manager) RemoveTopic(topic string, partitions int32) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	delete(m.limits, topic) // the next topic of this name starts from the defaults.
 	var firstErr error
 	for p := int32(0); p < partitions; p++ {
 		tp := topicPartition{topic, p}
@@ -390,7 +481,10 @@ func (m *Manager) Sync() error {
 func (m *Manager) EnforceRetention() error {
 	var firstErr error
 	for _, p := range m.snapshot() {
-		if err := m.opts.Retention.Enforce(p); err != nil && firstErr == nil {
+		m.mu.Lock()
+		rp := m.retentionLocked(p.topic)
+		m.mu.Unlock()
+		if err := rp.Enforce(p); err != nil && firstErr == nil {
 			firstErr = err
 		}
 	}
@@ -403,28 +497,24 @@ func (m *Manager) maintain() {
 	defer m.wg.Done()
 
 	// Cold partitions are swept once now and then once a minute: it reads the
-	// whole data directory, which is not something to do every second.
-	var closedC <-chan time.Time
-	if m.opts.Retention.enabled() {
-		if err := m.EnforceClosedRetention(); err != nil {
-			m.log.Warn("retention of unopened partitions failed", "err", err)
-		}
-		t := time.NewTicker(closedRetentionInterval)
-		defer t.Stop()
-		closedC = t.C
+	// whole data directory, which is not something to do every second. The sweeps
+	// themselves do nothing where no retention is in force.
+	if err := m.EnforceClosedRetention(); err != nil {
+		m.log.Warn("retention of unopened partitions failed", "err", err)
 	}
+	closedT := time.NewTicker(closedRetentionInterval)
+	defer closedT.Stop()
+	closedC := closedT.C
 
-	var fsyncC, retentionC <-chan time.Time
+	var fsyncC <-chan time.Time
 	if m.opts.FsyncInterval > 0 {
 		t := time.NewTicker(m.opts.FsyncInterval)
 		defer t.Stop()
 		fsyncC = t.C
 	}
-	if m.opts.Retention.enabled() {
-		t := time.NewTicker(retentionCheckInterval)
-		defer t.Stop()
-		retentionC = t.C
-	}
+	retentionT := time.NewTicker(retentionCheckInterval)
+	defer retentionT.Stop()
+	retentionC := retentionT.C
 
 	for {
 		select {

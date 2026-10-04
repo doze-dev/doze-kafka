@@ -341,6 +341,14 @@ details.cfg { border: 1px solid var(--border); border-radius: var(--radius); bac
 .cfgchip { font-family: var(--mono); font-size: var(--fs-xs); padding: 3px 8px; border-radius: var(--radius-sm); background: var(--muted); color: var(--muted-foreground); }
 .cfgchip b { color: var(--foreground); font-weight: 500; }
 .cfgchip.note { background: transparent; border: 1px dashed var(--border); font-family: var(--sans); }
+.cfgchip.own { box-shadow: inset 2px 0 0 var(--brand); }
+.cfgsum .own { font-size: var(--fs-xs); color: var(--foreground); background: var(--accent); border-radius: var(--radius-sm); padding: 0 5px; }
+.cfgform { padding: 2px 12px 12px; border-top: 1px solid var(--border); color: var(--foreground); }
+.cfgfoot { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 12px; }
+.crow.settings .hint { font-size: var(--fs-xs); }
+.crow.settings label .hint { margin-left: 4px; }
+.panel-h h2 .sz { margin-left: 6px; }
+p.note { margin: 0; }
 
 /* ---------- create-form pages ---------- */
 .panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); }
@@ -739,6 +747,7 @@ form.htmx-request .btn.primary::after { content: ""; width: 11px; height: 11px; 
   table.tbl .col-time, table.tbl .col-hdrs { display: none; }
   .cell-key { max-width: 110px; }
   .crow .field, .field.w-part, .field.w-acks { flex: 1 1 100%; }
+  .cfgfoot { flex-direction: column; align-items: stretch; }
   /* Open, the composer is most of a small screen; it joins the page's flow
      instead of sitting over it. */
   :root[data-dock="open"] .dock { position: static; }

@@ -2,8 +2,10 @@ package broker
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Topic configuration accepted at CreateTopics.
@@ -73,6 +75,26 @@ func cleanupPolicy(v string) error {
 
 func anyValue(string) error { return nil }
 
+// minSegmentBytes is the smallest per-topic segment size. Kafka itself asks for a
+// megabyte since 4.0; this is lower, so retention can be tried out on a handful
+// of records, but not so low that every record becomes a file of its own: each
+// segment is two open files for as long as its partition is in use.
+const minSegmentBytes = 1024
+
+// retentionMs is isInt(-1) with the ceiling a duration has.
+func retentionMs(v string) error {
+	if err := isInt(-1)(v); err != nil {
+		return err
+	}
+	if n, _ := strconv.ParseInt(v, 10, 64); n > maxRetentionMs {
+		return fmt.Errorf("%d is too large (the most is %d, about 292 years); use -1 to keep records for ever", n, int64(maxRetentionMs))
+	}
+	return nil
+}
+
+// maxRetentionMs is the longest retention that fits in a time.Duration.
+const maxRetentionMs = math.MaxInt64 / int64(time.Millisecond)
+
 // topicConfigs is every topic-level config Kafka defines, with its check.
 var topicConfigs = map[string]configCheck{
 	"cleanup.policy":                          cleanupPolicy,
@@ -105,8 +127,8 @@ var topicConfigs = map[string]configCheck{
 	"remote.log.delete.on.disable":            isBool,
 	"remote.storage.enable":                   isBool,
 	"retention.bytes":                         isInt(-1),
-	"retention.ms":                            isInt(-1),
-	"segment.bytes":                           isInt(14),
+	"retention.ms":                            retentionMs,
+	"segment.bytes":                           isInt(minSegmentBytes),
 	"segment.index.bytes":                     isInt(4),
 	"segment.jitter.ms":                       isInt(0),
 	"segment.ms":                              isInt(1),

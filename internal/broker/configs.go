@@ -13,10 +13,9 @@ import (
 
 // The admin config-read APIs — DescribeConfigs and DescribeCluster — back
 // `kafka-configs --describe` and the cluster view that admin tools and UIs show.
-// They are read-only: doze-kafka does not implement AlterConfigs, because most
-// topic knobs (retention, segment size) are broker-global here, so accepting a
-// per-topic alter would store a value that never takes effect. Reporting the
-// effective config honestly is better than a cosmetic writer.
+// A topic's configuration is the broker's defaults overlaid with the topic's own
+// values (set at CreateTopics or by AlterConfigs; see alterconfigs.go). The
+// broker's own configuration is static and reported read-only.
 
 // unbounded is how Kafka reports a disabled size/time bound; our config uses 0.
 func retentionValue(v int64) string {

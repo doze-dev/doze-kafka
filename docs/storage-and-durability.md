@@ -42,12 +42,19 @@ property that lets doze-kafka sit quietly in the background without ballooning.
 
 ## Retention
 
-By default doze-kafka keeps everything. Bound a partition's disk use with either or
-both of:
+By default doze-kafka keeps everything. Bound a partition's disk use, for every topic,
+with either or both of:
 
 - `--retention-bytes` — delete the oldest whole segments once a partition exceeds this
   total size.
 - `--retention-ms` — delete segments whose newest record is older than this.
+
+A topic can have its own: `retention.ms`, `retention.bytes` and `segment.bytes` set
+when it is created, or changed later (`kafka-configs --alter`, any admin client, or the
+console's topic page), apply to that topic and take precedence over the flags above,
+in both directions. `-1` means no limit, so one topic can keep everything on a broker
+that otherwise trims, and one topic can be trimmed on a broker that otherwise keeps
+everything. A change applies at once, and survives a restart.
 
 Retention is **delete-only** — there's no log compaction. The active segment is never
 deleted, so a partition always keeps its most recent data. A background sweep enforces

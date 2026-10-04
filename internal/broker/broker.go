@@ -19,6 +19,7 @@ import (
 
 // Broker holds the shared state every handler needs.
 type Broker struct {
+	alterMu sync.Mutex // one topic-config change at a time (see alterTopic).
 	cfg     config.Config
 	log     *slog.Logger
 	logs    *log.Manager
@@ -107,6 +108,8 @@ func (b *Broker) Register(r *protocol.Router) {
 	r.Register(protocol.APIOffsetDelete, b.handleOffsetDelete)
 	r.Register(protocol.APIDescribeGroups, b.handleDescribeGroups)
 	r.Register(protocol.APIDescribeConfigs, b.handleDescribeConfigs)
+	r.Register(protocol.APIAlterConfigs, b.handleAlterConfigs)
+	r.Register(protocol.APIIncrAlterConfigs, b.handleIncrementalAlterConfigs)
 	r.Register(protocol.APIDescribeCluster, b.handleDescribeCluster)
 
 	// SASL authentication — only when configured. The connection gate

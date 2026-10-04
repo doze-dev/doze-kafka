@@ -71,8 +71,8 @@ the last sub-second of unsynced writes (see
 
 ## A Kafka UI shows errors but produce/consume works
 
-Some UIs probe admin APIs doze-kafka doesn't implement (e.g. `DescribeConfigs` is
-supported, but `AlterConfigs`, `CreatePartitions`, or `DescribeLogDirs` aren't). The
+Some UIs probe admin APIs doze-kafka doesn't implement (e.g. `DescribeConfigs` and
+`AlterConfigs` are supported, but `CreatePartitions` and `DescribeLogDirs` aren't). The
 broker closes that individual call cleanly; the UI may show a warning but the core
 topic/group/message views keep working. See [Limitations](limitations.md).
 

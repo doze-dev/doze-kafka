@@ -77,6 +77,9 @@ type Store interface {
 	TopicByID(id TopicID) (Topic, bool, error)
 	ListTopics() ([]Topic, error)
 	DeleteTopic(name string) error
+	// SetTopicConfig replaces a topic's own configuration (its overrides of the
+	// broker's defaults) and returns the topic as it now is.
+	SetTopicConfig(name string, config map[string]string) (Topic, error)
 
 	CommitOffset(group, topic string, partition int32, offset int64, metadata string) error
 	FetchOffset(group, topic string, partition int32) (offset int64, ok bool, err error)
@@ -288,6 +291,44 @@ func (s *boltStore) ListTopics() ([]Topic, error) {
 	s.mu.RUnlock()
 	slices.SortFunc(topics, func(a, b Topic) int { return strings.Compare(a.Name, b.Name) })
 	return topics, nil
+}
+
+// ErrNoSuchTopic is returned by SetTopicConfig for a topic that is not registered.
+var ErrNoSuchTopic = errors.New("meta: no such topic")
+
+func (s *boltStore) SetTopicConfig(name string, config map[string]string) (Topic, error) {
+	if len(config) == 0 {
+		config = nil
+	}
+	// Under topicMu, like create and delete, so the stored record and the cache
+	// change together and a concurrent delete cannot be undone by this write.
+	s.topicMu.Lock()
+	defer s.topicMu.Unlock()
+	var rec topicRecord
+	err := s.update(func(tx *bbolt.Tx) error {
+		topics := tx.Bucket(bucketTopics)
+		v := topics.Get([]byte(name))
+		if v == nil {
+			return ErrNoSuchTopic
+		}
+		if err := json.Unmarshal(v, &rec); err != nil {
+			return err
+		}
+		rec.Config = config
+		val, err := json.Marshal(rec)
+		if err != nil {
+			return err
+		}
+		return topics.Put([]byte(name), val)
+	})
+	if err != nil {
+		return Topic{}, err
+	}
+	t := Topic{Name: name, ID: rec.ID, Partitions: rec.Partitions, Config: config}
+	s.mu.Lock()
+	s.byName[name] = cloneTopic(t)
+	s.mu.Unlock()
+	return cloneTopic(t), nil
 }
 
 func (s *boltStore) DeleteTopic(name string) error {

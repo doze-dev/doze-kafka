@@ -17,7 +17,7 @@ specifically testing an older client's paths.
 |---|---|---|
 | ApiVersions | 18 | Version negotiation (the first thing every client does). |
 | Metadata | 3 | Discover brokers, topics, and partitions. |
-| CreateTopics | 19 | Create topics (with per-topic config). |
+| CreateTopics | 19 | Create topics, with their own retention and segment size if given. |
 | DeleteTopics | 20 | Delete topics and their data. |
 | Produce | 0 | Append records to partitions. |
 | Fetch | 1 | Read records (topic-ID aware; supports long-poll). |
@@ -30,7 +30,9 @@ specifically testing an older client's paths.
 | ConsumerGroupDescribe | 69 | Describe KIP-848 groups (version 4 only). |
 | ListGroups | 16 | List consumer groups. |
 | DescribeGroups | 15 | Describe classic consumer groups. |
-| DescribeConfigs | 32 | Read topic and broker configuration (read-only). |
+| DescribeConfigs | 32 | Read topic and broker configuration. |
+| AlterConfigs | 33 | Replace a topic's own configuration. |
+| IncrementalAlterConfigs | 44 | Set or remove individual topic configs (Kafka 2 and later). |
 | DeleteGroups | 42 | Delete empty consumer groups and their committed offsets. |
 | OffsetDelete | 47 | Delete a group's committed offsets for a topic, including an offset left over from a topic that no longer exists. |
 | DescribeCluster | 60 | Describe the cluster (this single node). |
@@ -70,7 +72,9 @@ the highest version both sides support; a request outside them is not served.
 | DeleteTopics | 20 | 0–1 | 0–3 | 0–5 | 0–6 |
 | InitProducerId | 22 | 0–1 | 0–1 | 0–4 | 0–4 |
 | DescribeConfigs | 32 | 0–1 | 0–2 | 0–4 | 0–4 |
+| AlterConfigs | 33 | 0–0 | 0–2 | 0–2 | 0–2 |
 | DeleteGroups | 42 | 0–1 | 0–2 | 0–2 | 0–2 |
+| IncrementalAlterConfigs | 44 | — | 0–1 | 0–1 | 0–1 |
 | OffsetDelete | 47 | — | 0–0 | 0–0 | 0–0 |
 | DescribeCluster | 60 | — | — | 0–1 | 0–2 |
 | ConsumerGroupHeartbeat | 68 | — | — | — | 0–1 |
@@ -83,9 +87,7 @@ emulated major is 1; the pre-0.11 message-set format is not supported.
 
 Transactions — idempotent producers are fully supported (`InitProducerId` plus
 sequence-number deduplication), but there's no transactional produce/commit
-(`AddPartitionsToTxn`/`EndTxn`). `AlterConfigs` (config is read-only — the size/time
-knobs are broker-global here, so a per-topic write wouldn't take effect),
-`CreatePartitions`, `OffsetForLeaderEpoch`, `DescribeLogDirs`, ACL and quota APIs, and
+(`AddPartitionsToTxn`/`EndTxn`). `CreatePartitions`, `OffsetForLeaderEpoch`, `DescribeLogDirs`, ACL and quota APIs, and
 the client-metrics/telemetry APIs. The broker serves exactly what it advertises: a
 request for an API it does not have, or at a version outside the advertised range,
 gets no response and its connection is closed, rather than being left to hang (the one

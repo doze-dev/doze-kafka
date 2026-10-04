@@ -25,6 +25,10 @@
         <div class="field"><label for="f-name">Topic name <span class="hint">letters, digits, <span class="mono">.</span> <span class="mono">_</span> <span class="mono">-</span></span></label><input class="input mono" id="f-name" name="name" placeholder="orders.created" required autocomplete="off" autofocus></div>
         <div class="field narrow"><label for="f-partitions">Partitions</label><input class="input mono" id="f-partitions" name="partitions" type="number" min="1" max="1000" value="1" required></div>
       </div></div>
+      <div class="panel form-sec"><div class="panel-h"><h2>Retention <span class="sz">optional — leave blank to follow the broker's settings</span></h2></div><div class="form-b">
+        {{template "topic_settings_fields" .Config}}
+        <p class="note">Retention is delete-only and works in whole segments: a partition is trimmed when a full segment falls outside the limit, so a smaller segment size makes it act sooner. You can change these later from the topic's page.</p>
+      </div></div>
       <div class="err form-err" data-err-slot hidden role="alert"></div>
       <div class="det-foot">
         <a class="btn btn-outline" href="{{.Prefix}}/topics">Cancel</a>
@@ -51,17 +55,7 @@
       </div>
     </div>
 
-    <details class="cfg">
-      <summary>
-        {{icon "info"}}
-        <span class="cfgsum"><b>Effective config</b> — read-only, no <span class="mono">AlterConfigs</span>{{range $i, $c := .Topic.Config}}{{if lt $i 2}} · <span class="mono">{{$c.Name}} <b>{{$c.Value}}</b></span>{{end}}{{end}} · …</span>
-        <span class="twist">{{icon "chevron"}}</span>
-      </summary>
-      <div class="cfgchips">
-        {{range .Topic.Config}}<span class="cfgchip">{{.Name}} <b>{{.Value}}</b></span>{{end}}
-        <span class="cfgchip note">most of these knobs are broker-wide in doze-kafka — there's nothing to edit per topic</span>
-      </div>
-    </details>
+    {{template "topic_config" .}}
 
     {{template "topic_groups" .}}
 
@@ -280,4 +274,42 @@
     {{end}}
   </div>
 </div>
+{{end}}
+
+{{/* topic_settings_fields: the three settings the broker acts on, as form fields.
+     Blank means "follow the broker". */}}
+{{define "topic_settings_fields"}}
+<div class="crow settings">
+  {{range .Settings}}
+  <div class="field">
+    <label for="cfg-{{.Key}}">{{.Label}} <span class="hint mono">{{.Key}}</span></label>
+    <input class="input mono" id="cfg-{{.Key}}" name="{{.Key}}" value="{{.Own}}" placeholder="{{if .Effective}}{{.Effective}} (broker default){{else}}broker default{{end}}" autocomplete="off" spellcheck="false">
+    <span class="hint">{{.Hint}}</span>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
+{{/* topic_config: one collapsed line of what is in force; opened, the three
+     settings to change and everything else the broker reports. */}}
+{{define "topic_config"}}
+<details class="cfg" id="topic-config" {{if .Open}}open{{end}}>
+  <summary>
+    {{icon "info"}}
+    <span class="cfgsum"><b>Settings</b>{{range .Config.Settings}} · {{.Label | lower}} <span class="mono"><b>{{.Effective}}</b></span>{{if .Own}} <span class="own">this topic</span>{{end}}{{end}}{{if .Config.Compact}} · <span class="lag-some">compaction asked for, not applied</span>{{end}}</span>
+    <span class="twist">{{icon "chevron"}}</span>
+  </summary>
+  <form class="cfgform" hx-post="{{topicURL .Topic.Name}}/config" hx-target="#topic-config" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]">
+    {{template "topic_settings_fields" .Config}}
+    <div class="err form-err" data-err-slot hidden role="alert"></div>
+    <div class="cfgfoot">
+      <span class="note">Blank follows the broker's setting. Changes apply at once: a shorter retention deletes what now falls outside it.</span>
+      <button type="submit" class="btn primary">Save settings</button>
+    </div>
+  </form>
+  <div class="cfgchips">
+    {{range .Config.Others}}<span class="cfgchip {{if .Own}}own{{end}}" {{if .Own}}title="Set on this topic"{{end}}>{{.Name}} <b>{{.Value}}</b></span>{{end}}
+    <span class="cfgchip note">{{if .Config.Compact}}This topic asks for compaction. doze-kafka accepts the setting and does not compact: every record is kept until retention removes it. {{end}}Other Kafka topic settings are stored and reported, and change nothing here.</span>
+  </div>
+</details>
 {{end}}
