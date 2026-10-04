@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -92,7 +93,7 @@ func TestHelpIsGroupedAndComplete(t *testing.T) {
 	if code != 0 || errOut != "" {
 		t.Fatalf("--help: code %d, stderr %q", code, errOut)
 	}
-	for _, want := range []string{"Usage:", "Commands:", "Network:", "Storage:", "Security:", "Console:", "--kafka-version", "--log-level", "--zone", "dns-setup"} {
+	for _, want := range []string{"Usage:", "Commands:", "Network:", "Storage:", "Security:", "Console:", "--kafka-version", "--log-level", "--name", "dns-setup", "doctor", "env"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("--help is missing %q", want)
 		}
@@ -159,14 +160,16 @@ func TestDefaultsAreLoopbackAndSelfContained(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.cfg.ListenAddr != "127.0.0.1:9092" || st.cfg.ConsoleAddr != "127.0.0.1:9093" {
-		t.Errorf("default listeners = %q and %q, want loopback", st.cfg.ListenAddr, st.cfg.ConsoleAddr)
+	// Name first: with no --listen there is no address to bind, the instance is its
+	// .doze name (on Windows, where there are none, loopback stands in).
+	if runtime.GOOS != "windows" && (st.cfg.ListenAddr != "" || st.cfg.ConsoleAddr != "" || !st.cfg.ByName()) {
+		t.Errorf("default listeners = %q and %q, want none: the name is the address", st.cfg.ListenAddr, st.cfg.ConsoleAddr)
 	}
 	if want := filepath.Join("data", "meta.db"); filepath.Clean(st.cfg.MetaDB) != want {
 		t.Errorf("default meta db = %q, want %s", st.cfg.MetaDB, want)
 	}
-	if !st.cfg.Zone || !st.cfg.Console {
-		t.Errorf("zone and console should default on: %+v", st.cfg)
+	if !st.cfg.Console {
+		t.Errorf("the console should default on: %+v", st.cfg)
 	}
 
 }
@@ -238,7 +241,7 @@ func TestFileKeysCoverTheProcessSettings(t *testing.T) {
 console = false
 console-addr = "127.0.0.1:19999"
 console-allow-host = ["devbox.lan"]
-zone = false
+name = "harbour"
 log-level = "debug"
 log-format = "json"
 pprof-addr = "127.0.0.1:6060"
@@ -250,7 +253,7 @@ kafka-version = 3
 	}
 	c := st.cfg
 	if c.Console || c.ConsoleAddr != "127.0.0.1:19999" || !reflect.DeepEqual(c.ConsoleAllowHosts, []string{"devbox.lan"}) ||
-		c.Zone || c.LogLevel != "debug" || c.LogFormat != "json" || c.PprofAddr != "127.0.0.1:6060" || c.Version != 3 {
+		c.Name != "harbour" || c.LogLevel != "debug" || c.LogFormat != "json" || c.PprofAddr != "127.0.0.1:6060" || c.Version != 3 {
 		t.Errorf("file did not apply: %+v", c)
 	}
 	// The older `version` key keeps working, and a flag still wins over the file.
@@ -258,8 +261,8 @@ kafka-version = 3
 	if st, err = loadConfig([]string{"--config", old}); err != nil || st.cfg.Version != 2 {
 		t.Errorf("legacy version key: %+v %v", st.cfg.Version, err)
 	}
-	if st, _ = loadConfig([]string{"--config", path, "--zone"}); !st.cfg.Zone {
-		t.Error("--zone did not override zone = false in the file")
+	if st, _ = loadConfig([]string{"--config", path, "--name", "atlas"}); st.cfg.Name != "atlas" {
+		t.Error("--name did not override name = \"harbour\" in the file")
 	}
 	if !errors.Is(errHelp, flag.ErrHelp) {
 		t.Error("errHelp should be flag.ErrHelp")
@@ -269,7 +272,7 @@ kafka-version = 3
 // The effective configuration shows the advertised host that will be used, not a blank.
 func TestConfigPrintShowsTheDerivedAdvertisedHost(t *testing.T) {
 	t.Chdir(t.TempDir())
-	for args, want := range map[string]string{"": `advertised-host = "127.0.0.1"`, ":9092": `advertised-host = "localhost"`} {
+	for args, want := range map[string]string{"127.0.0.1:9092": `advertised-host = "127.0.0.1"`, ":9092": `advertised-host = "localhost"`} {
 		argv := []string{"config", "print"}
 		if args != "" {
 			argv = append(argv, "--listen", args)

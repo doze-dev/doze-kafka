@@ -32,7 +32,7 @@ tasks:
   dev:
     desc: 'Run the broker with the console read live from disk: edit console/templates or console/static and reload'
     cmds:
-      - DOZE_KAFKA_CONSOLE_DEV=./console go run ./cmd/doze-kafka --zone=false {{.CLI_ARGS}}
+      - DOZE_KAFKA_CONSOLE_DEV=./console go run ./cmd/doze-kafka --listen 127.0.0.1:9092 {{.CLI_ARGS}}
 
   test:
     desc: Run the whole test suite (unit + integration)

@@ -210,7 +210,7 @@ func TestExampleFileSurvivesUncommentingItsTables(t *testing.T) {
 	}
 	// And nothing else was swallowed by a table.
 	d := Default()
-	if cfg.Console != d.Console || cfg.ConsoleAddr != d.ConsoleAddr || cfg.Zone != d.Zone || cfg.LogLevel != d.LogLevel || cfg.LogFormat != d.LogFormat {
-		t.Errorf("settings after the tables changed: console %v %q, zone %v, log %q %q", cfg.Console, cfg.ConsoleAddr, cfg.Zone, cfg.LogLevel, cfg.LogFormat)
+	if cfg.Console != d.Console || cfg.ConsoleAddr != d.ConsoleAddr || cfg.Name != d.Name || cfg.LogLevel != d.LogLevel || cfg.LogFormat != d.LogFormat {
+		t.Errorf("settings after the tables changed: console %v %q, name %q, log %q %q", cfg.Console, cfg.ConsoleAddr, cfg.Name, cfg.LogLevel, cfg.LogFormat)
 	}
 }

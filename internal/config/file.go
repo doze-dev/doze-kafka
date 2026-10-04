@@ -43,7 +43,7 @@ type fileConfig struct {
 	ConsoleAddr            *string           `toml:"console-addr"`
 	ConsoleAllowHost       []string          `toml:"console-allow-host"`
 	PprofAddr              *string           `toml:"pprof-addr"`
-	Zone                   *bool             `toml:"zone"`
+	Name                   *string           `toml:"name"`
 	LogLevel               *string           `toml:"log-level"`
 	LogFormat              *string           `toml:"log-format"`
 }
@@ -152,8 +152,8 @@ func (fc fileConfig) applyTo(cfg *Config) error {
 	if fc.PprofAddr != nil {
 		cfg.PprofAddr = *fc.PprofAddr
 	}
-	if fc.Zone != nil {
-		cfg.Zone = *fc.Zone
+	if fc.Name != nil {
+		cfg.Name = *fc.Name
 	}
 	if fc.LogLevel != nil {
 		cfg.LogLevel = *fc.LogLevel
@@ -194,7 +194,7 @@ func WriteTOML(w io.Writer, cfg Config) error {
 		MaxPartitions:          &cfg.MaxPartitions,
 		Console:                &cfg.Console,
 		ConsoleAddr:            &cfg.ConsoleAddr,
-		Zone:                   &cfg.Zone,
+		Name:                   &cfg.Name,
 		LogLevel:               &cfg.LogLevel,
 		LogFormat:              &cfg.LogFormat,
 	}

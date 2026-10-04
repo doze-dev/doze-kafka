@@ -54,7 +54,7 @@ func selfSigned(t *testing.T) (certFile, keyFile string) {
 func TestConsoleReachesTheBrokerOverTLS(t *testing.T) {
 	cert, key := selfSigned(t)
 	out, _ := start(t, "--tls-cert", cert, "--tls-key", key)
-	waitFor(t, "the summary", func() bool { return strings.Contains(out.String(), "ready") })
+	waitFor(t, "the summary", func() bool { return strings.Contains(out.String(), "doze-kafka is up") })
 	base := regexp.MustCompile(`http://127\.0\.0\.1:\d+`).FindString(out.String())
 	resp, err := http.Get(base + "/_console/cluster")
 	if err != nil {
@@ -94,7 +94,7 @@ func TestConsoleClientTLSAcceptsOnlyTheBrokersCertificate(t *testing.T) {
 // configuration used to have its password replaced without a word.
 func TestTheConsoleUserNameIsReserved(t *testing.T) {
 	t.Chdir(t.TempDir())
-	st, err := loadConfig([]string{"--listen", "127.0.0.1:0", "--console-addr", "127.0.0.1:0", "--zone=false", "--data-dir", t.TempDir(),
+	st, err := loadConfig([]string{"--listen", "127.0.0.1:0", "--console-addr", "127.0.0.1:0", "--data-dir", t.TempDir(),
 		"--sasl-mechanisms", "PLAIN", "--sasl-user", "__console:mine"})
 	if err == nil {
 		out := &safeBuf{}

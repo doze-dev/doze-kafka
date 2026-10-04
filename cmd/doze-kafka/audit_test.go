@@ -7,6 +7,8 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+
+	"github.com/doze-dev/doze-kafka/internal/config"
 )
 
 // Tests added by the October audit for the command line.
@@ -23,7 +25,7 @@ func TestAFlagsValueIsNeverReadAsTheVersionFlag(t *testing.T) {
 		{[]string{"--sasl-user", "-version"}, false},
 		{[]string{"--config", "-v", "--listen", ":1"}, false},
 		{[]string{"--console=false", "--version"}, true},
-		{[]string{"--zone", "-v"}, true}, // --zone is a switch: -v is its own flag.
+		{[]string{"--console", "-v"}, true}, // --console is a switch: -v is its own flag.
 		{[]string{"--listen", ":1", "-v"}, true},
 		{[]string{"--", "--version"}, false},
 	} {
@@ -108,7 +110,7 @@ func TestAnEmptyConfigFlagMeansNoFile(t *testing.T) {
 		t.Fatalf("the file in the working directory should be used by default: %+v %v", st.cfg.ListenAddr, err)
 	}
 	st, err := loadConfig([]string{"--config", ""})
-	if err != nil || st.cfg.ListenAddr != "127.0.0.1:9092" || st.configFile != "" {
+	if err != nil || st.cfg.ListenAddr != config.Default().ListenAddr || st.configFile != "" {
 		t.Errorf(`--config "": listen %q, file %q, err %v; want the defaults and no file`, st.cfg.ListenAddr, st.configFile, err)
 	}
 }

@@ -16,7 +16,7 @@ table, and `--tls-cert` / `--tls-key` are `cert` and `key` under `[tls]`. Put ta
 last: in TOML, every key after a `[table]` line belongs to that table.
 
 ```toml
-listen = "127.0.0.1:9092"
+name = "harbour"            # answers on kafka.harbour.doze (default: this directory's name)
 data-dir = "./data"
 retention-ms = 604800000   # 7 days
 fsync-interval = "500ms"
@@ -76,8 +76,9 @@ where this one says `kafka-version`; that spelling is still read.
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--listen` | `127.0.0.1:9092` | `host:port` to accept connections on. The default is **loopback only**: nothing on your network can reach an unauthenticated development broker. Use `:9092` to accept connections from other machines or containers (and read the note on `--advertised-host` below). Use `127.0.0.1:0` for a free port. |
-| `--advertised-host` | *derived* | Host returned to clients in Metadata: a host name or an IP address, without a port. **This is the address clients actually reconnect to** — see the note below. Unset, it follows `--listen`: a specific address is advertised as itself (`127.0.0.1` by default), and a wildcard (`:9092`) as `localhost`. |
+| `--name` | *this directory's name* | This instance's name: it answers on `kafka.<name>.doze:9092`, on a loopback address of its own, so two projects can both be on port 9092 and nothing on your network can reach it. |
+| `--listen` | *(unset)* | Serve this `host:port` **instead of** the name: no name is claimed, no DNS check runs, nothing is written to the registry. For a case a name cannot serve, such as a sibling container. `:9092` accepts other machines and containers (read the note on `--advertised-host` below); `127.0.0.1:9092` restores the old loopback default; `127.0.0.1:0` is a free port. On Windows, which has no names, the default is `127.0.0.1:9092`. |
+| `--advertised-host` | *derived* | Host returned to clients in Metadata: a host name or an IP address, without a port. **This is the address clients actually reconnect to** — see the note below. Unset, it is the instance name (or its address where the name does not resolve on this machine); under `--listen` it follows the address: a specific one is advertised as itself, and a wildcard (`:9092`) as `localhost`. |
 | `--advertised-port` | `0` | Port advertised to clients. `0` means the port actually bound, which is right even with `:0`. |
 
 ### Storage
@@ -126,7 +127,7 @@ where this one says `kafka-version`; that spelling is still read.
 | Flag | Default | Meaning |
 |---|---|---|
 | `--console` | `true` | Serve the web console. `--console=false` to turn it off. |
-| `--console-addr` | `127.0.0.1:9093` | `host:port` for the console's HTTP listener. A taken port is an error naming this flag. |
+| `--console-addr` | *beside the broker* | `host:port` for the console's HTTP listener. Unset, it is port 9093 on the name's own address (and `http://kafka.<name>.doze`, port-less, through the shared front door); under `--listen`, `127.0.0.1:9093`. A taken port is an error naming this flag. |
 | `--console-allow-host` | *(none)* | Extra Host names the console answers to, besides `localhost`, IP addresses and `*.doze`. Comma-separated or repeated. A guard against DNS rebinding. |
 
 ### Process
@@ -134,7 +135,6 @@ where this one says `kafka-version`; that spelling is still read.
 | Flag | Default | Meaning |
 |---|---|---|
 | `--config` | `./doze-kafka.toml` if present | Path to a TOML config file. `--config ""` uses none, ignoring a `doze-kafka.toml` in the working directory. |
-| `--zone` | `true` | Join the shared `.doze` name zone (`kafka.doze`). `--zone=false` opts out. See [Endpoints](endpoints.md). |
 | `--log-level` | `info` | `debug`, `info`, `warn` or `error`. `debug` logs every request (client id, API, version). |
 | `--log-format` | `text` | `text` or `json`. |
 | `--pprof-addr` | *(none)* | If set, serve `net/http/pprof` there (for soak and debugging). |
@@ -144,6 +144,8 @@ where this one says `kafka-version`; that spelling is still read.
 | Command | Does |
 |---|---|
 | `doze-kafka version` / `--version` / `-v` | Print doze-kafka's version and the Kafka range it speaks. |
+| `doze-kafka env` | Print the shell block that points a client at this instance (`eval "$(doze-kafka env)"`): `KAFKA_BOOTSTRAP_SERVERS` and `KAFKA_BROKERS`. |
+| `doze-kafka doctor` | Report what is set up for `.doze` names and what is not, and which process holds which name. Needs no privilege. |
 | `doze-kafka config print [flags]` | Print the effective configuration as TOML. |
 | `doze-kafka dns-setup` | One-time setup for the shared `.doze` names. See [Endpoints](endpoints.md). |
 | `doze-kafka help` | The grouped help. |
@@ -182,7 +184,7 @@ consumer groups only):
 **Throwaway broker on a random port** (handy for scripts and CI):
 
 ```sh
-./doze-kafka --listen 127.0.0.1:0 --console-addr 127.0.0.1:0 --data-dir "$(mktemp -d)" --zone=false
+./doze-kafka --listen 127.0.0.1:0 --console-addr 127.0.0.1:0 --data-dir "$(mktemp -d)"
 # the summary printed at start-up has the bootstrap address and the console URL
 ```
 
@@ -205,28 +207,35 @@ consumer groups only):
 Once everything is bound — and only then — doze-kafka prints where it is:
 
 ```text
-doze-kafka 1.2.0 ready — emulating Kafka 4
-  Kafka      127.0.0.1:9092   (also kafka.doze:9092)
-  Console    http://127.0.0.1:9093   (also http://kafka.doze)
-  Data       /home/you/project/data
-  Security   no auth · plaintext
+  doze-kafka is up.
+
+    kafka     kafka.project.doze:9092
+    console   http://kafka.project.doze   topics, messages and consumer groups, live
+    data      /home/you/project/data
+    serving   Kafka 4 protocol · no auth · plaintext
+
+    eval "$(doze-kafka env)" point this shell at it
+    doze-kafka doctor        when something looks wrong
 ```
 
-The "also" addresses appear only when they actually answer. With `--listen :9092`
-the Kafka line gives the advertised address (`localhost:9092`) and notes that the
-broker is listening on every interface, since `[::]:9092` is not something to paste
-into a client. Ctrl-C, `SIGTERM` and closing the terminal (`SIGHUP`) all stop the
+The summary goes to **stdout** and the log lines to stderr, so `doze-kafka 2>/dev/null`
+shows just the summary. The kafka line is the name, or the address where the name does not
+resolve on this machine. With `--listen :9092` it gives the advertised address
+(`localhost:9092`) and notes that the broker is listening on every interface, since
+`[::]:9092` is not something to paste into a client. Ctrl-C, `SIGTERM` and closing the terminal (`SIGHUP`) all stop the
 broker cleanly: it stops accepting, flushes the logs and exits 0. With
 `--log-format json` it is a single `ready` record instead, and with
-`--log-level warn` or `error` it is not printed.
+`--log-level warn` or `error` it is not printed. The first run on a machine without `.doze`
+set up asks once (root installs without asking; a terminal gets a Y/n prompt; with neither,
+it prints the command and exits).
 
 ## A note on `--advertised-host`
 
 Kafka clients connect to a bootstrap address, ask the broker for Metadata, and then
-**reconnect to whatever host and port the broker advertises**. By default that follows
-`--listen`: `127.0.0.1:<bound-port>` for the default loopback listener, which is right
-for a client on the same machine, and `localhost:<port>` when listening on every
-interface. (It is the address and not the name `localhost` for a loopback listener
+**reconnect to whatever host and port the broker advertises**. By default that is
+the instance name (or its address where the name does not resolve here), which is right
+for a client on the same machine. Under `--listen` it follows the address: `127.0.0.1:<bound-port>`
+for a loopback listener, and `localhost:<port>` when listening on every interface. (It is the address and not the name `localhost` for a loopback listener
 because that name can resolve to `::1` first, where nothing is listening, and not every
 client goes on to try the other address: kcat stops at the first refusal.)
 

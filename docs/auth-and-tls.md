@@ -44,7 +44,7 @@ The client must present a matching mechanism and credential. For example:
 **kcat:**
 
 ```sh
-kcat -b localhost:9092 \
+kcat -b "$KAFKA_BOOTSTRAP_SERVERS" \
   -X security.protocol=SASL_PLAINTEXT \
   -X sasl.mechanism=SCRAM-SHA-256 \
   -X sasl.username=alice -X sasl.password=s3cret \
@@ -55,7 +55,7 @@ kcat -b localhost:9092 \
 
 ```go
 kgo.NewClient(
-    kgo.SeedBrokers("localhost:9092"),
+    kgo.SeedBrokers("kafka.myproject.doze:9092"),
     kgo.SASL(scram.Auth{User: "alice", Pass: "s3cret"}.AsSha256Mechanism()),
 )
 ```
@@ -63,7 +63,7 @@ kgo.NewClient(
 **kafkajs:**
 
 ```js
-new Kafka({ brokers: ["localhost:9092"], sasl: { mechanism: "scram-sha-256", username: "alice", password: "s3cret" } })
+new Kafka({ brokers: ["kafka.myproject.doze:9092"], sasl: { mechanism: "scram-sha-256", username: "alice", password: "s3cret" } })
 ```
 
 ## TLS
@@ -94,12 +94,12 @@ verification:
 
 ```sh
 # kcat, trusting the cert
-kcat -b localhost:9092 -X security.protocol=SSL -X ssl.ca.location=cert.pem -t demo -P
+kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -X security.protocol=SSL -X ssl.ca.location=cert.pem -t demo -P
 ```
 
 ```go
 // franz-go, trusting the cert (build a RootCAs pool from cert.pem)
-kgo.NewClient(kgo.SeedBrokers("localhost:9092"), kgo.DialTLSConfig(&tls.Config{RootCAs: pool}))
+kgo.NewClient(kgo.SeedBrokers("kafka.myproject.doze:9092"), kgo.DialTLSConfig(&tls.Config{RootCAs: pool}))
 ```
 
 ## SASL over TLS

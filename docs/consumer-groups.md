@@ -13,13 +13,13 @@ persists committed offsets so a restarted consumer resumes where it stopped.
 
 ```sh
 # kcat: consume topic "demo" as part of group "workers"
-kcat -b localhost:9092 -G workers demo
+kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -G workers demo
 ```
 
 ```go
 // franz-go
 cl, _ := kgo.NewClient(
-    kgo.SeedBrokers("localhost:9092"),
+    kgo.SeedBrokers("kafka.myproject.doze:9092"),
     kgo.ConsumerGroup("workers"),
     kgo.ConsumeTopics("demo"),
 )
@@ -88,8 +88,8 @@ Apache Kafka.
 The admin APIs `kafka-consumer-groups` uses are implemented:
 
 ```sh
-kafka-consumer-groups.sh --bootstrap-server localhost:9092 --list
-kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group workers
+kafka-consumer-groups.sh --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --list
+kafka-consumer-groups.sh --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --describe --group workers
 ```
 
 `ListGroups` reports classic and KIP-848 groups (with their type); `DescribeGroups`

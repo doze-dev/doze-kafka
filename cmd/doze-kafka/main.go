@@ -66,6 +66,10 @@ func realMain(args []string, stdout, stderr io.Writer) int {
 			// every doze binary because the setup belongs to the zone rather than
 			// to any one of them: whichever you installed first can do it.
 			return runDNSSetup(args[1:])
+		case "doctor":
+			return runDoctor(args[1:], stdout, stderr)
+		case "env":
+			return runEnv(args[1:], stdout, stderr)
 		case "config":
 			return runConfig(args[1:], stdout, stderr)
 		default:
@@ -75,7 +79,7 @@ func realMain(args []string, stdout, stderr io.Writer) int {
 				fmt.Fprintf(stderr, "doze-kafka: unexpected argument %q — did you mean --%s?\n", args[0], args[0])
 				return exitUsage
 			}
-			fmt.Fprintf(stderr, "doze-kafka: unknown command %q — the commands are version, config, dns-setup and help (doze-kafka --help)\n", args[0])
+			fmt.Fprintf(stderr, "doze-kafka: unknown command %q — the commands are version, env, config, dns-setup, doctor and help (doze-kafka --help)\n", args[0])
 			return exitUsage
 		}
 	}
@@ -118,7 +122,7 @@ func realMain(args []string, stdout, stderr io.Writer) int {
 	// broker with no flush and no clean close of its storage.
 	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
 	defer stop()
-	if err := run(ctx, st, logger, stderr); err != nil {
+	if err := run(ctx, st, logger, stdout); err != nil {
 		logger.Error("fatal", "err", err)
 		return exitRuntime
 	}
@@ -211,52 +215,77 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 		}
 	}
 
+	// Where this instance answers is decided BEFORE the broker is built, because
+	// what Metadata tells clients to dial depends on where it ended up listening.
+	//
+	// The two modes are exclusive. Without --listen this instance is its .doze name
+	// and nothing else; with --listen it is that address and nothing else: no name
+	// is claimed, no DNS check runs, and the registry records nothing. One instance,
+	// one way to reach it. See listen.go.
+	z, err := prepareZone(ctx, cfg, logger)
+	if err != nil {
+		return err
+	}
+	defer z.close()
+
+	bind, err := openListener(cfg, z, logger, net.DefaultResolver.LookupHost)
+	if err != nil {
+		if !cfg.ByName() {
+			return fmt.Errorf("listen on %s: %w (is another broker running there? choose another with --listen)", cfg.ListenAddr, err)
+		}
+		return err
+	}
+	// Until Serve takes over (and closes storage on its way out), a failure below
+	// must release what was opened above.
+	serving := false
+	defer func() {
+		if !serving {
+			bind.ln.Close()
+		}
+	}()
+	if cfg.ByName() {
+		// What clients are sent back to is the name, or the address where the name
+		// does not resolve here: openListener already asked. The port is the bound one.
+		cfg.AdvertisedHost = bind.host
+	}
+
 	srv, err := server.NewFromConfig(cfg, logger)
 	if err != nil {
 		return err
 	}
-	// Until Serve takes over (and closes storage on its way out), a failure below
-	// must release what NewFromConfig opened.
-	serving := false
 	defer func() {
 		if !serving {
 			srv.Close()
 		}
 	}()
 
-	// Bind before anything advertises an address. With a ":0" listen address the
-	// real port is not known until now, and both the zone and the console need
-	// it; Serve picks up the listener Bind opened.
-	bound, err := srv.Bind(ctx)
-	if err != nil {
-		return fmt.Errorf("listen on %s: %w (is another broker running there? choose another with --listen)", cfg.ListenAddr, err)
+	bootstrap := bind.bootstrap
+	if !cfg.ByName() {
+		bootstrap = dialable(bind.ln.Addr(), cfg.AdvertisedHost)
 	}
-
-	// Join the shared .doze zone. Additive: the configured address above is the
-	// contract, and every failure in here is a log line rather than a refusal
-	// to start.
-	var z *zone
-	ready := readyInfo{version: version, kafka: cfg.Version, bootstrap: dialable(bound, cfg.AdvertisedHost), dataDir: absPath(cfg.DataDir),
+	ready := readyInfo{version: version, kafka: cfg.Version, bootstrap: bootstrap, dataDir: absPath(cfg.DataDir),
 		auth: authSummary(cfg), configFile: st.configFile}
-	if cfg.Zone {
-		z = joinZone(ctx, logger)
-		defer z.close()
-		ready.bootstrapName = z.reachBroker(ctx, logger, srv, bound)
-	}
 
 	if cfg.Console {
-		closeConsole, consoleAddr, err := startConsole(ctx, cfg, bound, logger, consoleUser, consolePass, consoleMech)
+		if cfg.ConsoleAddr == "" {
+			cfg.ConsoleAddr = consoleAddrFor(z.ip())
+		}
+		closeConsole, consoleAddr, err := startConsole(ctx, cfg, bind.ln.Addr(), logger, consoleUser, consolePass, consoleMech)
 		if err != nil {
 			return err
 		}
 		defer closeConsole()
-		ready.consoleURL = "http://" + consoleAddr
-		ready.consoleName = z.routeConsole(logger, consoleAddr)
+		// A name's URL is port-less when the shared front door is up; where it is not
+		// (or this instance has no name) the address it actually bound is the URL.
+		ready.consoleURL = z.routeConsole(logger, consoleAddr)
+		if ready.consoleURL == "" {
+			ready.consoleURL = "http://" + consoleAddr
+		}
 	}
 
 	announce(out, logger, cfg, ready)
 	serving = true
-	if err := srv.Serve(ctx); err != nil {
+	if err := srv.ServeListener(ctx, bind.ln); err != nil {
 		return err
 	}
 	// Serve has returned: accepting stopped and connections drained; storage was
@@ -267,10 +296,9 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 
 // readyInfo is what the start-up summary reports.
 type readyInfo struct {
-	version, bootstrap, bootstrapName string
-	kafka                             int
-	consoleURL, consoleName           string
-	dataDir, auth, configFile         string
+	version, bootstrap, consoleURL string
+	kafka                          int
+	dataDir, auth, configFile      string
 }
 
 // authSummary is one phrase for how the listener is protected.
@@ -290,36 +318,34 @@ func authSummary(cfg config.Config) string {
 }
 
 // announce prints the one block a developer reads to learn how to connect: what to
-// point a client at, where the console is, where the data lives. As text it is a
-// few aligned lines; as JSON it is a single "ready" record; it stays quiet when
-// the log level asked for quiet.
+// point a client at, where the console is, where the data lives. As text it is a few
+// aligned lines on stdout (logs stay on stderr); as JSON it is a single "ready"
+// record; it stays quiet when the log level asked for quiet. The text matches
+// doze-aws's: one experience across the doze tools.
 func announce(out io.Writer, logger *slog.Logger, cfg config.Config, r readyInfo) {
 	if cfg.LogLevel == "warn" || cfg.LogLevel == "error" {
 		return
 	}
 	if cfg.LogFormat == "json" {
-		logger.Info("ready", "bootstrap", r.bootstrap, "bootstrap_name", r.bootstrapName, "console", r.consoleURL,
-			"console_name", r.consoleName, "data_dir", r.dataDir, "auth", r.auth, "kafka_compat", r.kafka)
+		logger.Info("ready", "bootstrap", r.bootstrap, "console", r.consoleURL,
+			"data_dir", r.dataDir, "auth", r.auth, "kafka_compat", r.kafka, "instance", cfg.InstanceName())
 		return
 	}
-	line := func(label, value, alt string) {
-		if value == "" {
-			return
-		}
-		if alt != "" {
-			value += "   (also " + alt + ")"
-		}
-		fmt.Fprintf(out, "  %-10s %s\n", label, value)
+	var b strings.Builder
+	b.WriteString("\n  doze-kafka is up.\n\n")
+	fmt.Fprintf(&b, "    kafka     %s\n", r.bootstrap)
+	if r.consoleURL != "" {
+		fmt.Fprintf(&b, "    console   %s   topics, messages and consumer groups, live\n", r.consoleURL)
 	}
-	fmt.Fprintf(out, "\ndoze-kafka %s ready — emulating Kafka %d\n", r.version, r.kafka)
-	line("Kafka", r.bootstrap, r.bootstrapName)
-	line("Console", r.consoleURL, r.consoleName)
-	line("Data", r.dataDir, "")
-	line("Security", r.auth, "")
+	fmt.Fprintf(&b, "    data      %s\n", r.dataDir)
+	fmt.Fprintf(&b, "    serving   Kafka %d protocol · %s\n", r.kafka, r.auth)
 	if r.configFile != "" {
-		line("Config", r.configFile, "")
+		fmt.Fprintf(&b, "    config    %s\n", r.configFile)
 	}
-	fmt.Fprintln(out)
+	b.WriteString("\n")
+	fmt.Fprintf(&b, "    %-24s point this shell at it\n", `eval "$(doze-kafka env)"`)
+	fmt.Fprintf(&b, "    %-24s when something looks wrong\n\n", "doze-kafka doctor")
+	io.WriteString(out, b.String()) //nolint:errcheck // a banner on stdout
 }
 
 // dialable is the bound address as something to paste into a client. A wildcard
@@ -344,18 +370,6 @@ func absPath(p string) string {
 		return a
 	}
 	return p
-}
-
-// reachable reports whether something accepts a TCP connection at hostport. It is
-// how a by-name address earns its place in the start-up summary: a name that does
-// not resolve, or does not answer, is not worth advertising.
-func reachable(hostport string) bool {
-	c, err := net.DialTimeout("tcp", hostport, 400*time.Millisecond)
-	if err != nil {
-		return false
-	}
-	c.Close()
-	return true
 }
 
 // consoleUserName is the SASL user the console logs in as.

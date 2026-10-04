@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -78,20 +79,36 @@ type Config struct {
 	ConsoleAddr       string   // host:port for the console's HTTP listener.
 	ConsoleAllowHosts []string // extra Host names the console answers to (DNS-rebinding guard).
 
+	// Name is this instance's name in the shared .doze zone. It answers on
+	// kafka.<name>.doze, so two projects on one machine are two instances that
+	// never contend for an address or a port. Empty means derive one from the
+	// working directory (DeriveName), which the configuration loader does.
+	Name string
+
 	// Process.
-	Zone      bool   // join the shared .doze name zone (kafka.doze).
 	PprofAddr string // if set, serve net/http/pprof here.
 	LogLevel  string // debug, info, warn or error.
 	LogFormat string // text or json.
 }
 
 const (
-	// The default listener is loopback: a development broker with no auth should
-	// not be reachable from the network it happens to be plugged into. Listening
-	// beyond this machine is a choice (--listen :9092) and docs/configuration.md
-	// says what else to set when making it.
-	defaultListenAddr   = "127.0.0.1:9092"
-	defaultConsoleAddr  = "127.0.0.1:9093"
+	// There is no default address. An instance is its .doze name, and an address
+	// is the opt-in (--listen) for the places a name cannot serve: a container
+	// reaching this one over a compose network, CI, anywhere without DNS. The
+	// two are exclusive, as they are in doze-aws: one instance, one way to
+	// reach it.
+	//
+	// A name resolves to a loopback address of its own, so the broker is not
+	// reachable from the network it happens to be plugged into, and two
+	// instances can both be on port 9092. An address that is not loopback
+	// (--listen :9092) is a choice, and docs/configuration.md says what else to
+	// set when making it.
+	defaultListenAddr = ""
+	// The console is HTTP, which cannot share the broker's port. In name mode it
+	// sits beside the broker on the name's own address, port 9093; under --listen
+	// it is on loopback unless --console-addr says otherwise.
+	defaultConsoleAddr  = ""
+	listenModeConsole   = "127.0.0.1:9093"
 	defaultSegmentBytes = 128 << 20 // 128 MiB
 	defaultIndexStride  = 4 << 10   // 4 KiB
 
@@ -105,9 +122,15 @@ const (
 
 // Default returns a Config suitable for zero-config local development.
 func Default() Config {
+	// Windows has no .doze zone (doze-names does not build there), so an instance
+	// cannot be its name: it listens on the address a --listen would have named.
+	listen := defaultListenAddr
+	if runtime.GOOS == "windows" {
+		listen = "127.0.0.1:9092"
+	}
 	return Config{
 		Version:                MaxKafkaMajor,
-		ListenAddr:             defaultListenAddr,
+		ListenAddr:             listen,
 		AdvertisedHost:         "", // derived from the listen address: see ResolveAdvertisedHost.
 		DataDir:                DefaultDataDir,
 		MetaDB:                 "", // empty = <data-dir>/meta.db; see ResolveMetaDB.
@@ -120,9 +143,53 @@ func Default() Config {
 		MaxPartitions:          defaultMaxPartitions,
 		Console:                true,
 		ConsoleAddr:            defaultConsoleAddr,
-		Zone:                   true,
 		LogLevel:               "info",
 		LogFormat:              "text",
+	}
+}
+
+// DefaultName is the instance name used when nothing better can be derived: a
+// directory whose name has no letters or digits in it at all.
+const DefaultName = "local"
+
+// InstanceName is the name to claim and to report, and is never empty.
+//
+// Name is normally filled in when the configuration is loaded, from the project
+// directory. This is the floor for a Config built directly in code: without it an
+// empty name renders as kafka..doze, which resolves to nothing and reads like a
+// bug in the zone rather than a missing setting.
+func (c Config) InstanceName() string {
+	if c.Name == "" {
+		return DefaultName
+	}
+	return c.Name
+}
+
+// DeriveName picks an instance name from a project directory: its base name.
+//
+// The result is not sanitised here. doze-names reduces a name to a DNS label on
+// claim, and duplicating that rule is the kind of mirror that drifts; what this
+// checks is only whether anything would SURVIVE the reduction, since a directory
+// called "~" would otherwise claim the empty label.
+func DeriveName(dir string) string {
+	base := filepath.Base(dir)
+	for _, r := range base {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			return base
+		}
+	}
+	return DefaultName
+}
+
+// ByName reports whether this instance answers on its .doze name. It does unless
+// --listen gave it an address, which replaces the name rather than adding to it.
+func (c Config) ByName() bool { return c.ListenAddr == "" }
+
+// ResolveConsoleAddr fills in the console's address under --listen. In name mode
+// it stays empty until the name's own address is known (see cmd/doze-kafka).
+func (c *Config) ResolveConsoleAddr() {
+	if c.ConsoleAddr == "" && !c.ByName() {
+		c.ConsoleAddr = listenModeConsole
 	}
 }
 
@@ -144,8 +211,8 @@ const DefaultDataDir = "./data"
 //
 // An advertised host that was set is never changed.
 func (c *Config) ResolveAdvertisedHost() {
-	if c.AdvertisedHost != "" {
-		return
+	if c.AdvertisedHost != "" || c.ByName() {
+		return // set, or the instance's name, which is only known once it is claimed.
 	}
 	c.AdvertisedHost = "localhost"
 	host, _, err := net.SplitHostPort(c.ListenAddr)
@@ -218,11 +285,9 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: unsupported Kafka version %d; supported majors are %d to %d", c.Version, MinKafkaMajor, MaxKafkaMajor)
 	}
 	switch {
-	case c.ListenAddr == "":
-		return fmt.Errorf("config: listen address is empty")
-	case !validHostPort(c.ListenAddr):
+	case c.ListenAddr != "" && !validHostPort(c.ListenAddr): // "" is name mode.
 		return fmt.Errorf("config: listen address %q is not host:port (for example 127.0.0.1:9092 or :9092)", c.ListenAddr)
-	case c.Console && !validHostPort(c.ConsoleAddr):
+	case c.Console && c.ConsoleAddr != "" && !validHostPort(c.ConsoleAddr):
 		return fmt.Errorf("config: console address %q is not host:port (for example 127.0.0.1:9093)", c.ConsoleAddr)
 	case c.LogLevel != "debug" && c.LogLevel != "info" && c.LogLevel != "warn" && c.LogLevel != "error":
 		return fmt.Errorf("config: log level %q is not one of debug, info, warn, error", c.LogLevel)

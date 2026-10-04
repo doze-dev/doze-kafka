@@ -15,8 +15,13 @@ kafka-version = 4
 
 # --- network -------------------------------------------------------------------
 
-listen = "127.0.0.1:9092" # host:port the broker listens on. ":9092" accepts other machines and containers.
-# advertised-host = "localhost" # host returned to clients in Metadata. Unset, it is the listen address itself ("127.0.0.1"), or "localhost" when listening on every interface.
+# The instance is its name: kafka.<name>.doze, on its own loopback address, port 9092.
+# The name defaults to this directory's name; one instance per project, all on 9092.
+# name = "harbour"
+# --listen REPLACES the name (no .doze name is claimed). It is for a case a name cannot
+# serve, such as a sibling container reaching this one. ":9092" accepts other machines.
+# listen = "127.0.0.1:9092"
+# advertised-host = "localhost" # host returned to clients in Metadata. Unset, it is the name, or under listen the address itself ("127.0.0.1"), or "localhost" on every interface.
 advertised-port = 0       # port advertised to clients; 0 = the port actually bound.
 
 # --- storage -------------------------------------------------------------------
@@ -51,12 +56,11 @@ max-partitions = 1000     # most partitions one topic may have; each is a direct
 # --- console -------------------------------------------------------------------
 
 console = true                   # serve the web console.
-console-addr = "127.0.0.1:9093"  # host:port for the console's HTTP listener.
+# console-addr = "127.0.0.1:9093" # unset: beside the broker on the name's address (9093), or 127.0.0.1:9093 under listen.
 # console-allow-host = ["devbox.lan"] # extra Host names the console answers to.
 
 # --- process -------------------------------------------------------------------
 
-zone = true                      # join the shared .doze name zone (kafka.doze).
 log-level = "info"               # debug (logs every request), info, warn or error.
 log-format = "text"              # text or json.
 # pprof-addr = "127.0.0.1:6060"  # serve net/http/pprof here.

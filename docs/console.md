@@ -1,8 +1,9 @@
 # The web console
 
 doze-kafka serves a small web console beside the broker. It is on by default at
-**http://127.0.0.1:9093** (the start-up summary prints the address; with the
-[`.doze` zone](endpoints.md) set up, also `http://kafka.doze`). Turn it off with
+**http://kafka.&lt;name&gt;.doze** (port-less, through the shared front door; the start-up
+summary prints the address). Under `--listen` there is no name and it is on
+`127.0.0.1:9093`. Turn it off with
 `--console=false`; move it with `--console-addr`.
 
 It is a development tool, not an operations product. It answers the questions you

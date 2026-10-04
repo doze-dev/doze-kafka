@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 // The suite boots the real binary on its own ports, over a fresh data directory,
-// with the .doze zone off: no DNS, no name claimed, nothing shared with a broker
+// on an address (--listen): no DNS, no name claimed, nothing shared with a broker
 // already running on the machine. E2E_PORT moves it, so two runs can coexist.
 const PORT = Number(process.env.E2E_PORT ?? 14092);
 export const KAFKA_ADDR = `127.0.0.1:${PORT}`;
@@ -31,7 +31,7 @@ export default defineConfig({
     command:
       `sh -c "cd .. && GOWORK=off go build -o e2e/.tmp/bin/doze-kafka-${PORT} ./cmd/doze-kafka && ` +
       `cd e2e/.tmp && rm -rf data-${PORT} && mkdir -p data-${PORT} && ` +
-      `./bin/doze-kafka-${PORT} --listen ${KAFKA_ADDR} --console-addr 127.0.0.1:${CONSOLE_PORT} --zone=false --data-dir data-${PORT}"`,
+      `./bin/doze-kafka-${PORT} --listen ${KAFKA_ADDR} --console-addr 127.0.0.1:${CONSOLE_PORT} --data-dir data-${PORT}"`,
     url: `http://127.0.0.1:${CONSOLE_PORT}/healthz`,
     reuseExistingServer: false, // a reused server keeps its state, and the wipe above never runs.
     timeout: 120_000,

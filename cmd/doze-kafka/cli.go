@@ -87,13 +87,13 @@ var helpGroups = []struct {
 	title string
 	flags []string
 }{
-	{"Network", []string{"listen", "advertised-host", "advertised-port"}},
+	{"Network", []string{"name", "listen", "advertised-host", "advertised-port"}},
 	{"Storage", []string{"data-dir", "meta-db", "segment-bytes", "index-interval-bytes"}},
 	{"Retention and durability", []string{"retention-bytes", "retention-ms", "fsync-interval"}},
 	{"Topics and groups", []string{"kafka-version", "auto-create-topics", "default-partitions", "max-partitions", "consumer-session-timeout"}},
 	{"Security", []string{"sasl-mechanisms", "sasl-user", "tls-cert", "tls-key"}},
 	{"Console", []string{"console", "console-addr", "console-allow-host"}},
-	{"Process", []string{"config", "zone", "log-level", "log-format", "pprof-addr"}},
+	{"Process", []string{"config", "log-level", "log-format", "pprof-addr"}},
 }
 
 // printHelp writes the usage text. It goes to stdout when asked for, so
@@ -107,9 +107,11 @@ Usage:
 
 Commands:
   version                       print the doze-kafka version
+  env                           print the shell block that points a client at this instance
   config print [flags]          print the effective configuration as TOML
   dns-setup [--check|--uninstall|--print]
                                 one-time setup for the shared .doze names
+  doctor                        report what is set up for .doze names, and what is not
   help                          show this help
 
 Every flag can also be set in doze-kafka.toml (see --config); flags win over the
@@ -179,10 +181,21 @@ func loadConfig(args []string) (startup, error) {
 	if _, _, err = parseFlags(args, &c); err != nil {
 		return startup{}, err
 	}
+	// The instance name is resolved HERE rather than in Default, so the server, doctor
+	// and env, which all run in the project directory and all go through loadConfig,
+	// give the same answer.
+	if c.Name == "" {
+		wd, err := os.Getwd()
+		if err != nil {
+			return startup{}, fmt.Errorf("config: cannot read the working directory to name this instance: %w", err)
+		}
+		c.Name = config.DeriveName(wd)
+	}
 	if n := c.ResolveMetaDB(); n != "" {
 		notices = append(notices, n)
 	}
 	c.ResolveAdvertisedHost()
+	c.ResolveConsoleAddr()
 	if err := c.Validate(); err != nil {
 		return startup{}, err
 	}
@@ -307,14 +320,15 @@ func unexpectedArgument(fs *flag.FlagSet, arg string) error {
 			return fmt.Errorf("unexpected argument %q — did you mean --%s?", arg, n)
 		}
 	}
-	return fmt.Errorf("unexpected argument %q — doze-kafka takes flags (--name value) and the commands version, config, dns-setup and help", arg)
+	return fmt.Errorf("unexpected argument %q — doze-kafka takes flags (--name value) and the commands version, env, config, dns-setup, doctor and help", arg)
 }
 
 // registerFlags binds command-line flags onto cfg, using its current values as
 // defaults. See config.Default for the meaning of each field.
 func registerFlags(fs *flag.FlagSet, cfg *config.Config) {
 	// Network.
-	fs.StringVar(&cfg.ListenAddr, "listen", cfg.ListenAddr, "host:port to listen on; use :9092 to accept connections from other machines or containers")
+	fs.StringVar(&cfg.Name, "name", cfg.Name, "this instance's name: it answers on kafka.<name>.doze (default: the project directory's name)")
+	fs.StringVar(&cfg.ListenAddr, "listen", cfg.ListenAddr, "serve on this host:port INSTEAD of the .doze name (no name is claimed); use :9092 to accept connections from other machines or containers")
 	fs.StringVar(&cfg.AdvertisedHost, "advertised-host", cfg.AdvertisedHost, "host advertised to clients in Metadata (default: derived from --listen: the address itself, or localhost for a wildcard)")
 	fs.IntVar(&cfg.AdvertisedPort, "advertised-port", cfg.AdvertisedPort, "port advertised to clients (0 = the port actually bound)")
 
@@ -351,7 +365,6 @@ func registerFlags(fs *flag.FlagSet, cfg *config.Config) {
 	fs.Var(&stringSliceFlag{vals: &cfg.ConsoleAllowHosts}, "console-allow-host", "extra host name the console answers to, besides localhost, IP addresses and *.doze (comma-separated or repeated); guards against DNS rebinding")
 
 	// Process.
-	fs.BoolVar(&cfg.Zone, "zone", cfg.Zone, "join the shared .doze name zone (kafka.doze); --zone=false to opt out")
 	fs.StringVar(&cfg.LogLevel, "log-level", cfg.LogLevel, "log verbosity: debug, info, warn or error (debug logs every request)")
 	fs.StringVar(&cfg.LogFormat, "log-format", cfg.LogFormat, "log format: text or json")
 	fs.StringVar(&cfg.PprofAddr, "pprof-addr", cfg.PprofAddr, "if set, serve net/http/pprof here (goroutine/heap profiling for soak/debug)")

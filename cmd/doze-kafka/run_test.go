@@ -21,12 +21,12 @@ type safeBuf struct {
 func (s *safeBuf) Write(p []byte) (int, error) { s.mu.Lock(); defer s.mu.Unlock(); return s.b.Write(p) }
 func (s *safeBuf) String() string              { s.mu.Lock(); defer s.mu.Unlock(); return s.b.String() }
 
-// start runs the broker with the given flags (zone off, free ports) until the test
+// start runs the broker with the given flags (on an address, so no name; free ports) until the test
 // ends, and returns its output once the summary has been printed.
 func start(t *testing.T, flags ...string) (out *safeBuf, stop func() error) {
 	t.Helper()
 	t.Chdir(t.TempDir())
-	args := append([]string{"--listen", "127.0.0.1:0", "--console-addr", "127.0.0.1:0", "--zone=false", "--data-dir", t.TempDir()}, flags...)
+	args := append([]string{"--listen", "127.0.0.1:0", "--console-addr", "127.0.0.1:0", "--data-dir", t.TempDir()}, flags...)
 	st, err := loadConfig(args)
 	if err != nil {
 		t.Fatal(err)
@@ -61,15 +61,15 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 // printed only once everything it names is bound.
 func TestStartupSummaryNamesWhatIsListening(t *testing.T) {
 	out, stop := start(t)
-	waitFor(t, "the summary", func() bool { return strings.Contains(out.String(), "ready") })
+	waitFor(t, "the summary", func() bool { return strings.Contains(out.String(), "doze-kafka is up") })
 	text := out.String()
-	for _, want := range []string{"emulating Kafka 4", "Kafka ", "Console ", "http://127.0.0.1:", "Data ", "Security ", "no auth · plaintext"} {
+	for _, want := range []string{"doze-kafka is up", "kafka     127.0.0.1:", "console   http://127.0.0.1:", "data      ", "Kafka 4 protocol · no auth · plaintext", `eval "$(doze-kafka env)"`, "doze-kafka doctor"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("the summary is missing %q:\n%s", want, text)
 		}
 	}
-	if strings.Contains(text, "also") {
-		t.Errorf("with the zone off nothing is reachable by name, but the summary says so:\n%s", text)
+	if strings.Contains(text, ".doze") {
+		t.Errorf("under --listen no name is claimed, but the summary names one:\n%s", text)
 	}
 
 	// The console answers where the summary says, /healthz included.
@@ -117,7 +117,7 @@ func TestPortClashesAreErrorsAndReleaseTheDataDir(t *testing.T) {
 	dir := t.TempDir()
 
 	tryRun := func(listen, console string) error {
-		st, err := loadConfig([]string{"--listen", listen, "--console-addr", console, "--zone=false", "--data-dir", dir})
+		st, err := loadConfig([]string{"--listen", listen, "--console-addr", console, "--data-dir", dir})
 		if err != nil {
 			t.Fatal(err)
 		}

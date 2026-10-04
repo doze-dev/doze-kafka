@@ -24,7 +24,8 @@ You now have a single self-contained binary named `doze-kafka`.
 
 ## Run
 
-With no flags at all, it listens on `127.0.0.1:9092` (this machine only) and stores
+With no flags at all, it is `kafka.<project>.doze:9092`, named for the current
+directory and reachable from this machine only, and stores
 everything under the current directory in `./data`: the partition logs, and
 `meta.db`, the topic and offset registry:
 
@@ -35,15 +36,25 @@ everything under the current directory in `./data`: the partition logs, and
 You'll see it come up, with everything you need to connect:
 
 ```text
-doze-kafka dev ready — emulating Kafka 4
-  Kafka      127.0.0.1:9092
-  Console    http://127.0.0.1:9093
-  Data       /home/you/project/data
-  Security   no auth · plaintext
+  doze-kafka is up.
+
+    kafka     kafka.project.doze:9092
+    console   http://kafka.project.doze   topics, messages and consumer groups, live
+    data      /home/you/project/data
+    serving   Kafka 4 protocol · no auth · plaintext
+
+    eval "$(doze-kafka env)" point this shell at it
+    doze-kafka doctor        when something looks wrong
 ```
 
-That's it — there's a Kafka broker on `localhost:9092`, and a web console at the
-URL on the next line ([Console](console.md)). Leave it running in this terminal;
+The first time, if `.doze` names are not set up on the machine, it asks once
+(`Set it up now? [Y/n]`, one `sudo`, per machine rather than per project). With no
+terminal to ask on it prints the command to run and exits rather than waiting on a
+password. `doze-kafka --listen 127.0.0.1:9092` skips names entirely.
+
+That's it — there's a Kafka broker at that name, and a web console at the URL on the
+next line ([Console](console.md)). Run `eval "$(doze-kafka env)"` in the client
+terminal so the commands below find it. Leave it running in this terminal;
 open another for the client.
 
 ## Produce and consume
@@ -52,10 +63,10 @@ With **kcat**:
 
 ```sh
 # produce three messages (type lines, then Ctrl-D)
-printf 'one\ntwo\nthree\n' | kcat -b localhost:9092 -t demo -P
+printf 'one\ntwo\nthree\n' | kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -t demo -P
 
 # consume them back from the beginning, then exit
-kcat -b localhost:9092 -t demo -C -o beginning -e
+kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -t demo -C -o beginning -e
 ```
 
 ```
@@ -68,11 +79,11 @@ The topic `demo` was created automatically on first use (auto-create is on by
 default; turn it off with `--auto-create-topics=false`).
 
 Prefer the official tools? They work the same way — point `--bootstrap-server` at
-`localhost:9092`:
+`$KAFKA_BOOTSTRAP_SERVERS`:
 
 ```sh
-kafka-console-producer.sh --bootstrap-server localhost:9092 --topic demo
-kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic demo --from-beginning
+kafka-console-producer.sh --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --topic demo
+kafka-console-consumer.sh --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --topic demo --from-beginning
 ```
 
 ## Confirm it's durable
@@ -88,7 +99,7 @@ Start it again with the same command, and read the topic once more:
 
 ```sh
 ./doze-kafka &
-kcat -b localhost:9092 -t demo -C -o beginning -e
+kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -t demo -C -o beginning -e
 ```
 
 ```

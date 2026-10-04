@@ -65,7 +65,8 @@ Prefer to build it yourself? See below.
 ## Quickstart
 
 ```sh
-# zero config: listens on 127.0.0.1:9092, console on :9093, data (logs and metadata) in ./data
+# zero config: answers on kafka.<this-directory>.doze:9092, console at http://kafka.<this-directory>.doze,
+# data (logs and metadata) in ./data
 doze-kafka
 ```
 
@@ -75,24 +76,25 @@ Or build from source:
 go build -o doze-kafka ./cmd/doze-kafka && ./doze-kafka
 ```
 
-Point any Kafka client at `localhost:9092`:
+Point any Kafka client at the address it prints (`eval "$(doze-kafka env)"` exports it):
 
 ```sh
 # with kcat (librdkafka)
-echo "hello" | kcat -b localhost:9092 -t demo -P
-kcat -b localhost:9092 -t demo -C -o beginning -e
+echo "hello" | kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -t demo -P
+kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -t demo -C -o beginning -e
 ```
 
-Open **http://127.0.0.1:9093** for the web console: browse topics and messages,
+Open the console URL it prints (**http://kafka.&lt;name&gt;.doze**) for the web console: browse topics and messages,
 send a record, watch a consumer group's lag. ([Console](docs/console.md))
 
 Press Ctrl-C to stop — it flushes to disk and exits cleanly. Start it again over the
 same `--data-dir` and your topics, messages, and committed offsets are all still
 there.
 
-The broker listens on **loopback only** by default, so nothing on your network can
-reach it. To reach it from a container or another machine, see
-[Endpoints](docs/endpoints.md).
+The instance is its name, on its own loopback address, so nothing on your network can
+reach it and two projects can both be on port 9092. `--listen host:port` serves an address
+INSTEAD of the name (no name is claimed); `doze-kafka doctor` says what is set up. To reach
+it from a container or another machine, see [Endpoints](docs/endpoints.md).
 
 Full walkthrough: **[docs/getting-started.md](docs/getting-started.md)**.
 

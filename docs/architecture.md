@@ -93,8 +93,11 @@ nothing changed. See [Console](console.md).
 router and listener exactly as the CLI does, so the two cannot drift
 ([Embedding](embedding.md)). `cmd/doze-kafka` resolves configuration (defaults, then
 `doze-kafka.toml`, then flags — one `config.Config` for all of it), validates it, binds
-the broker and the console, joins the `.doze` zone ([Endpoints](endpoints.md)), and
-prints the start-up summary. `names.go` is the zone; on Windows a stub stands in.
+the broker and the console, claims the instance name in the `.doze` zone (or, under `--listen`, serves that address
+instead; the two are exclusive, see [Endpoints](endpoints.md)), and prints the start-up
+summary on stdout. `names.go` is the zone, `dnsready.go` the first-run setup, `listen.go`
+where the broker binds and what it advertises, `doctor.go`/`env.go` the two commands; on
+Windows a stub stands in.
 
 ## Why this stays small
 

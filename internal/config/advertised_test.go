@@ -33,6 +33,7 @@ func TestResolveAdvertisedHostFollowsTheListener(t *testing.T) {
 	}
 	// Resolving twice is the same as once.
 	c := Default()
+	c.ListenAddr = "127.0.0.1:9092"
 	c.ResolveAdvertisedHost()
 	first := c.AdvertisedHost
 	c.ListenAddr = ":9092"

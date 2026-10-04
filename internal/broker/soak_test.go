@@ -200,7 +200,7 @@ func (s *supervisor) launch() {
 	cmd := exec.Command(s.bin,
 		"-listen", s.addr, "-data-dir", s.dataDir, "-meta-db", s.metaDB,
 		"-pprof-addr", s.pprofAddr, "-fsync-interval", "200ms",
-		"-console=false", "-zone=false")
+		"-console=false")
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
 	if s.stderrLog != "" { // a race-detector run keeps what the binary says, across every restart.

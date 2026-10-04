@@ -3,20 +3,39 @@
 Most problems connecting to doze-kafka are the same ones you'd hit with any Kafka
 broker. Here are the common ones and their fixes.
 
+## The name does not resolve
+
+`kafka.<project>.doze` is only an address once `.doze` is set up on the machine. If a
+client says the host is unknown, or connects to nothing, run:
+
+```sh
+doze-kafka doctor            # what is set up and what is not, no sudo
+doze-kafka dns-setup         # one sudo, once per machine
+doze-kafka dns-setup --print # the script, to read or run yourself
+```
+
+`doctor` also lists which process holds which name: "my name stopped working" is usually
+another instance with the same name (start this one with `--name <other>`). When the name
+does not resolve on the machine the broker is on, it advertises its address instead, so
+clients still reach it. With no terminal and no setup, the broker prints the command and
+exits; it never waits on a password. `--listen host:port` serves an address and needs none
+of this.
+
 ## The client connects, then hangs or fails on the next request
 
 Almost always an **advertised address** problem. A client bootstraps to the address
 you gave it, asks for Metadata, then reconnects to the host/port the broker
-*advertises*. By default that's `127.0.0.1:<port>` (or `localhost:<port>` when listening on every interface) — perfect for a client on the same
-machine, wrong for one somewhere else.
+*advertises*. By default that's the instance name (or its address where the name does not resolve),
+and under `--listen` the listen address itself (`localhost` for a wildcard) — perfect for a
+client on the same machine, wrong for one somewhere else.
 
 If your client runs in another container, VM, or host, set `--advertised-host` (and
 `--advertised-port` if it's remapped) to an address that client can actually reach:
 
 ```sh
-./doze-kafka --advertised-host 192.168.1.50
+./doze-kafka --listen :9092 --advertised-host 192.168.1.50
 # or, from inside Docker talking to a broker on the host:
-./doze-kafka --advertised-host host.docker.internal
+./doze-kafka --listen :9092 --advertised-host host.docker.internal
 ```
 
 Check what's being advertised with `kcat -b <bootstrap> -L` — the broker list it

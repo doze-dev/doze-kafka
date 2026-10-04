@@ -1,8 +1,12 @@
 # Clients
 
 doze-kafka speaks the real Kafka wire protocol, so you connect to it exactly like
-you'd connect to Apache Kafka: give your client `localhost:9092` as the bootstrap
-server and go. There's no special SDK and no doze-specific configuration.
+you'd connect to Apache Kafka: give your client its bootstrap address and go. With no flags that is
+`kafka.<project>.doze:9092` (the name defaults to the directory you started it in);
+`eval "$(doze-kafka env)"` sets `KAFKA_BOOTSTRAP_SERVERS` (and `KAFKA_BROKERS`) to the
+right address for this instance, and the shell examples below use it. In Go and
+Node snippets, `kafka.myproject.doze:9092` stands for your own instance name. Under
+`--listen` it is the address you gave it. There's no special SDK and no doze-specific configuration.
 
 This page covers how a few common clients connect, and the handful of things worth
 knowing.
@@ -48,29 +52,29 @@ If you hit a compatibility problem with any of these, it's a bug worth reporting
 **kcat / kafkacat** (librdkafka):
 
 ```sh
-kcat -b localhost:9092 -t demo -P          # produce (type lines, Ctrl-D)
-kcat -b localhost:9092 -t demo -C -o beginning -e   # consume from start
-kcat -b localhost:9092 -L                  # list metadata
+kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -t demo -P          # produce (type lines, Ctrl-D)
+kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -t demo -C -o beginning -e   # consume from start
+kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -L                  # list metadata
 ```
 
 **franz-go** (Go):
 
 ```go
-cl, _ := kgo.NewClient(kgo.SeedBrokers("localhost:9092"))
+cl, _ := kgo.NewClient(kgo.SeedBrokers("kafka.myproject.doze:9092"))
 cl.ProduceSync(ctx, &kgo.Record{Topic: "demo", Value: []byte("hi")})
 ```
 
 **Sarama** (Go):
 
 ```go
-p, _ := sarama.NewSyncProducer([]string{"localhost:9092"}, sarama.NewConfig())
+p, _ := sarama.NewSyncProducer([]string{"kafka.myproject.doze:9092"}, sarama.NewConfig())
 p.SendMessage(&sarama.ProducerMessage{Topic: "demo", Value: sarama.StringEncoder("hi")})
 ```
 
 **kafkajs** (Node):
 
 ```js
-const kafka = new Kafka({ brokers: ["localhost:9092"] })
+const kafka = new Kafka({ brokers: ["kafka.myproject.doze:9092"] })
 const producer = kafka.producer()
 await producer.connect()
 await producer.send({ topic: "demo", messages: [{ value: "hi" }] })
@@ -79,8 +83,8 @@ await producer.send({ topic: "demo", messages: [{ value: "hi" }] })
 **Apache Kafka Java tools:**
 
 ```sh
-kafka-console-producer.sh --bootstrap-server localhost:9092 --topic demo
-kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic demo --from-beginning
+kafka-console-producer.sh --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --topic demo
+kafka-console-consumer.sh --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --topic demo --from-beginning
 ```
 
 ## Things worth knowing
