@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/twmb/franz-go/pkg/kmsg"
+	"github.com/doze-dev/doze-kafka/internal/kmsg"
 )
 
 // TestDecodeRequestRejectsOutOfRangeVersions: a version outside what kmsg
@@ -24,7 +24,7 @@ func TestDecodeRequestRejectsOutOfRangeVersions(t *testing.T) {
 	}
 }
 
-// TestTaggedFieldCountCannotSpin is the guard for third_party/kmsg (see its
+// TestTaggedFieldCountCannotSpin is the guard for internal/kmsg (see its
 // PATCHES.md). A flexible Produce request whose tagged-field count (4 billion)
 // outruns its bytes makes upstream kmsg iterate until the count runs out —
 // well over a minute for ~70 bytes. If the replace directive is dropped or the
@@ -48,7 +48,7 @@ func TestTaggedFieldCountCannotSpin(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		t.Fatal("DecodeRequest is still spinning on an exhausted tagged-field section: third_party/kmsg is not in use")
+		t.Fatal("DecodeRequest is still spinning on an exhausted tagged-field section: the patched internal/kmsg is not in use")
 	}
 }
 

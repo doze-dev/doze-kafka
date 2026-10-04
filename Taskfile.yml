@@ -62,7 +62,8 @@ tasks:
   check:
     desc: 'Pre-push gate: gofmt check, go vet, Windows cross-vet, and the full race suite. Wire it as a git pre-push hook (task hooks:install).'
     cmds:
-      - test -z "$(gofmt -l .)" || { echo 'gofmt needed:'; gofmt -l .; exit 1; }
+      # Tracked and new files only: scratch worktrees and vendored trees are not ours to format.
+      - 'files=$(git ls-files --cached --others --exclude-standard -- "*.go"); test -z "$(gofmt -l $files)" || { echo "gofmt needed:"; gofmt -l $files; exit 1; }'
       - go vet ./...
       # Windows ships in the release and nobody here runs it; this at least proves it compiles.
       - GOOS=windows GOARCH=amd64 go vet ./...

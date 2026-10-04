@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/twmb/franz-go/pkg/kmsg"
+	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/storage/log"
@@ -130,7 +130,12 @@ func newFetchBudget(maxBytes int32) *fetchBudget {
 
 // readPartition fills rp from one partition and returns the record bytes read.
 func (b *Broker) readPartition(topic string, part kmsg.FetchRequestTopicPartition, fr *kmsg.FetchRequest, rp *kmsg.FetchResponseTopicPartition, budget *fetchBudget) int {
-	plog, err := b.logs.Partition(topic, part.Partition)
+	plog, err := b.logs.ExistingPartition(topic, part.Partition)
+	if errors.Is(err, log.ErrNoSuchPartition) {
+		// The topic was deleted between resolving it and opening its log.
+		rp.ErrorCode = int16(protocol.ErrUnknownTopicOrPart)
+		return 0
+	}
 	if err != nil {
 		rp.ErrorCode = b.storageFault("fetch: open partition", err, "topic", topic, "partition", part.Partition)
 		return 0

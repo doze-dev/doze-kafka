@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/twmb/franz-go/pkg/kmsg"
+	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/internal/protocol"
@@ -60,6 +60,9 @@ func TestProduceAcksFsync(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := metaStore.CreateTopic("t", 1, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := logs.EnsurePartitionDirs("t", 1); err != nil { // as createTopic does.
 		t.Fatal(err)
 	}
 
@@ -160,6 +163,9 @@ func newTestBroker(t *testing.T, failSync *bool) (*Broker, *log.Manager) {
 		t.Fatal(err)
 	}
 	if _, err := metaStore.CreateTopic("t", 1, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := logs.EnsurePartitionDirs("t", 1); err != nil { // as createTopic does.
 		t.Fatal(err)
 	}
 	return b, logs

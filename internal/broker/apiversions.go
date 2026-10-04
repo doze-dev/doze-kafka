@@ -3,7 +3,7 @@ package broker
 import (
 	"context"
 
-	"github.com/twmb/franz-go/pkg/kmsg"
+	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 )
@@ -16,31 +16,12 @@ import (
 // UNSUPPORTED_VERSION with our supported ranges, after which it retries lower.
 func (b *Broker) handleAPIVersions(ctx context.Context, req *protocol.Request) ([]byte, error) {
 	resp := kmsg.NewPtrApiVersionsResponse()
-	for _, a := range b.profile.Advertised() {
+	for _, a := range b.advertised() {
 		k := kmsg.NewApiVersionsResponseApiKey()
 		k.ApiKey = int16(a.Key)
 		k.MinVersion = a.Min
 		k.MaxVersion = a.Max
 		resp.ApiKeys = append(resp.ApiKeys, k)
-	}
-
-	// Advertise SASL only when auth is configured. franz-go uses the presence of
-	// SaslAuthenticate (36) to choose the request-wrapped handshake flow, so both
-	// keys must appear here for a client to authenticate.
-	if b.auth != nil {
-		for _, sa := range []struct {
-			key      protocol.APIKey
-			min, max int16
-		}{
-			{protocol.APISASLHandshake, 0, 1},
-			{protocol.APISASLAuthenticate, 0, 2},
-		} {
-			k := kmsg.NewApiVersionsResponseApiKey()
-			k.ApiKey = int16(sa.key)
-			k.MinVersion = sa.min
-			k.MaxVersion = sa.max
-			resp.ApiKeys = append(resp.ApiKeys, k)
-		}
 	}
 
 	var maxVer int16

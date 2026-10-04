@@ -1,9 +1,12 @@
 package meta
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
+
+	"go.etcd.io/bbolt"
 )
 
 func openStore(t *testing.T) Store {
@@ -72,6 +75,7 @@ func TestDeleteTopicRemovesItsOffsetsOnly(t *testing.T) {
 
 func TestGroupOffsetHelpers(t *testing.T) {
 	s := openStore(t)
+	mustTopics(t, s, "a", "b")
 	for _, c := range []struct {
 		g, topic string
 		p        int32
@@ -132,6 +136,15 @@ func TestSecondOpenOfTheSameFileFailsWithAReason(t *testing.T) {
 
 func TestCommitOffsetsIsOneAtomicWrite(t *testing.T) {
 	s := openStore(t)
+	mustTopics(t, s, "a", "b")
+	writes := func() int64 { return s.(*boltStore).writeTxns.Load() }
+	before := writes()
+	defer func() {
+		// One request, one transaction (one fsync): that is the whole point.
+		if n := writes() - before; n != 1 {
+			t.Errorf("CommitOffsets used %d write transactions for 3 offsets, want 1", n)
+		}
+	}()
 	err := s.CommitOffsets("g", []OffsetCommit{
 		{Topic: "a", Partition: 0, Offset: 1}, {Topic: "a", Partition: 1, Offset: 2, Metadata: "m"}, {Topic: "b", Partition: 0, Offset: 3},
 	})
@@ -229,5 +242,126 @@ func TestTopicCacheIsCoherent(t *testing.T) {
 	}
 	if _, ok, _ := s2.TopicByID(created.ID); ok {
 		t.Error("a deleted topic is still served by id")
+	}
+}
+
+func mustTopics(t *testing.T, s Store, names ...string) {
+	t.Helper()
+	for _, n := range names {
+		if _, err := s.CreateTopic(n, 2, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// "Orders" and "orders" are one directory on a case-insensitive filesystem, so two
+// such topics would share a log. The second is refused, everywhere.
+func TestTopicNamesDifferingOnlyInCaseAreRefused(t *testing.T) {
+	s := openStore(t)
+	mustTopics(t, s, "Orders")
+	_, err := s.CreateTopic("orders", 1, nil)
+	if !errors.Is(err, ErrTopicCollides) {
+		t.Fatalf("CreateTopic(orders) with Orders present = %v, want ErrTopicCollides", err)
+	}
+	if _, err := s.CreateTopic("Orders", 1, nil); !errors.Is(err, ErrTopicExists) {
+		t.Errorf("the same name again = %v, want ErrTopicExists", err)
+	}
+	// Once the first is gone the other spelling is free.
+	if err := s.DeleteTopic("Orders"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateTopic("orders", 1, nil); err != nil {
+		t.Errorf("after deleting Orders, orders should be creatable: %v", err)
+	}
+}
+
+// The cache and the database must agree whatever order a concurrent create and
+// delete of one name commit in. They used to be updated in separate critical
+// sections: a delete could commit and update the cache between a create's commit
+// and its cache update, leaving a topic the cache had and the database did not.
+func TestCreateAndDeleteCannotInterleaveBetweenCommitAndCache(t *testing.T) {
+	s := openStore(t)
+	bs := s.(*boltStore)
+	committed, release := make(chan struct{}), make(chan struct{})
+	bs.afterCreateCommit = func() { close(committed); <-release }
+
+	created := make(chan struct{})
+	go func() { defer close(created); s.CreateTopic("t", 1, nil) }()
+	<-committed // the create is committed; its cache update has not happened yet.
+
+	deleted := make(chan struct{})
+	go func() { defer close(deleted); s.DeleteTopic("t") }()
+	select {
+	case <-deleted:
+		// The delete ran in the gap. Let the create finish and see what is left.
+	case <-time.After(300 * time.Millisecond):
+		// The delete is waiting for the create, as it should.
+	}
+	close(release)
+	<-created
+	<-deleted
+
+	_, cached, _ := s.Topic("t")
+	var stored bool
+	bs.db.View(func(tx *bbolt.Tx) error { stored = tx.Bucket(bucketTopics).Get([]byte("t")) != nil; return nil })
+	if cached != stored {
+		t.Fatalf("the cache says exists=%v, the database says exists=%v", cached, stored)
+	}
+}
+
+// NUL separates group, topic and partition in an offset key, so a group id with
+// one in it would address another group's offsets.
+func TestGroupIDWithNULIsRefused(t *testing.T) {
+	s := openStore(t)
+	mustTopics(t, s, "orders")
+	if err := s.CommitOffsets("g\x00x", []OffsetCommit{{Topic: "orders", Offset: 7}}); !errors.Is(err, ErrInvalidGroupID) {
+		t.Fatalf("commit for a group id containing NUL = %v, want ErrInvalidGroupID", err)
+	}
+	if es, _ := s.ListOffsets("g"); len(es) != 0 {
+		t.Errorf("group g sees offsets it never committed: %+v", es)
+	}
+}
+
+// A commit that reaches the store after its topic was deleted must not be kept:
+// the next topic of that name would start with a committed offset it never had.
+func TestCommitForADeletedTopicIsNotKept(t *testing.T) {
+	s := openStore(t)
+	mustTopics(t, s, "orders")
+	if err := s.DeleteTopic("orders"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CommitOffsets("g", []OffsetCommit{{Topic: "orders", Offset: 500}}); err != nil {
+		t.Fatal(err)
+	}
+	mustTopics(t, s, "orders")
+	if off, ok, _ := s.FetchOffset("g", "orders", 0); ok {
+		t.Errorf("the re-created topic inherited committed offset %d from the deleted one", off)
+	}
+}
+
+// Deleting a topic removes its id mapping too, or the id would resolve to a name
+// that no longer exists after a restart.
+func TestDeleteTopicRemovesTheIDMapping(t *testing.T) {
+	path := t.TempDir() + "/meta.db"
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topic, err := s.CreateTopic("gone", 1, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeleteTopic("gone"); err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+	if s, err = Open(path); err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	var left bool
+	s.(*boltStore).db.View(func(tx *bbolt.Tx) error { left = tx.Bucket(bucketTopicsByID).Get(topic.ID[:]) != nil; return nil })
+	if left {
+		t.Error("the topic id is still mapped after the topic was deleted")
 	}
 }

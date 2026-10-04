@@ -6,7 +6,7 @@ import (
 	"crypto/subtle"
 	"fmt"
 
-	"github.com/twmb/franz-go/pkg/kmsg"
+	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/internal/protocol"

@@ -2,8 +2,9 @@ package broker
 
 import (
 	"context"
+	"errors"
 
-	"github.com/twmb/franz-go/pkg/kmsg"
+	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/storage/log"
@@ -94,7 +95,12 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 // payload (producer id -1) takes the plain fast path; an idempotent one goes through
 // sequence dedup. It reports whether any new data was written.
 func (b *Broker) appendRecords(topic string, part kmsg.ProduceRequestTopicPartition, rp *kmsg.ProduceResponseTopicPartition) bool {
-	plog, err := b.logs.Partition(topic, part.Partition)
+	plog, err := b.logs.ExistingPartition(topic, part.Partition)
+	if errors.Is(err, log.ErrNoSuchPartition) {
+		// The topic was deleted between resolving it and opening its log.
+		rp.ErrorCode = int16(protocol.ErrUnknownTopicOrPart)
+		return false
+	}
 	if err != nil {
 		rp.ErrorCode = b.storageFault("produce: open partition", err, "topic", topic, "partition", part.Partition)
 		return false

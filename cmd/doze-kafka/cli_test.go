@@ -169,25 +169,65 @@ func TestDefaultsAreLoopbackAndSelfContained(t *testing.T) {
 		t.Errorf("zone and console should default on: %+v", st.cfg)
 	}
 
-	// An earlier version's ./meta.db keeps being used, with a notice.
-	if err := os.WriteFile("meta.db", []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
+}
+
+// Earlier versions kept the metadata database in ./meta.db whatever the data
+// directory was. Upgrading must find it for every way of naming that directory;
+// matching on the literal "./data" silently started everyone else empty.
+func TestLegacyMetaDBIsFoundHoweverTheDataDirIsSpelled(t *testing.T) {
+	legacy := func(t *testing.T, dataDir string) string {
+		t.Helper()
+		dir := t.TempDir()
+		t.Chdir(dir)
+		if err := os.MkdirAll(filepath.Join(dataDir, "orders-0"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile("meta.db", []byte("an old registry"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return dir
 	}
-	st, err = loadConfig(nil)
-	if err != nil || st.cfg.MetaDB != "meta.db" || len(st.notices) != 1 || !strings.Contains(st.notices[0], "earlier version") {
-		t.Fatalf("legacy ./meta.db: %q notices %v err %v", st.cfg.MetaDB, st.notices, err)
+	for _, tc := range []struct {
+		name, dataDir string
+		args          func(cwd string) []string
+	}{
+		{"default", "data", func(string) []string { return nil }},
+		{"--data-dir data", "data", func(string) []string { return []string{"--data-dir", "data"} }},
+		{"--data-dir ./data/", "data", func(string) []string { return []string{"--data-dir", "./data/"} }},
+		{"absolute path", "data", func(cwd string) []string { return []string{"--data-dir", filepath.Join(cwd, "data")} }},
+		{"custom directory", "kafka-logs", func(string) []string { return []string{"--data-dir", "kafka-logs"} }},
+	} {
+		cwd := legacy(t, tc.dataDir)
+		st, err := loadConfig(tc.args(cwd))
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if st.cfg.MetaDB != "meta.db" || len(st.notices) != 1 || !strings.Contains(st.notices[0], "earlier version") {
+			t.Errorf("%s: MetaDB = %q, notices %v; want the legacy ./meta.db and a notice", tc.name, st.cfg.MetaDB, st.notices)
+		}
 	}
-	// ...but not once the new location exists, and never for a custom data dir.
-	if err := os.MkdirAll("data", 0o755); err != nil {
-		t.Fatal(err)
+
+	// Not legacy: a data directory with its own database, an empty or new data
+	// directory, and a meta.db that is not a database file.
+	cwd := legacy(t, "data")
+	os.WriteFile(filepath.Join("data", "meta.db"), []byte("new"), 0o644)
+	if st, _ := loadConfig(nil); filepath.Clean(st.cfg.MetaDB) != filepath.Join("data", "meta.db") || len(st.notices) != 0 {
+		t.Errorf("with data/meta.db present the legacy file was chosen: %q %v", st.cfg.MetaDB, st.notices)
 	}
-	os.WriteFile(filepath.Join("data", "meta.db"), []byte("y"), 0o644)
-	if st, _ = loadConfig(nil); filepath.Clean(st.cfg.MetaDB) != filepath.Join("data", "meta.db") {
-		t.Errorf("with data/meta.db present the legacy file was still chosen: %q", st.cfg.MetaDB)
+	_ = cwd
+	t.Chdir(t.TempDir())
+	os.WriteFile("meta.db", []byte("stray"), 0o644)
+	if st, _ := loadConfig(nil); filepath.Clean(st.cfg.MetaDB) != filepath.Join("data", "meta.db") {
+		t.Errorf("a fresh directory adopted a stray ./meta.db: %q", st.cfg.MetaDB)
 	}
-	os.Remove(filepath.Join("data", "meta.db"))
-	if st, _ = loadConfig([]string{"--data-dir", "elsewhere"}); filepath.Clean(st.cfg.MetaDB) != filepath.Join("elsewhere", "meta.db") {
-		t.Errorf("a custom data dir picked up ./meta.db: %q", st.cfg.MetaDB)
+	if st, _ := loadConfig([]string{"--data-dir", "elsewhere"}); filepath.Clean(st.cfg.MetaDB) != filepath.Join("elsewhere", "meta.db") {
+		t.Errorf("an empty custom data dir adopted ./meta.db: %q", st.cfg.MetaDB)
+	}
+	legacy(t, "data")
+	os.Remove("meta.db")
+	os.Mkdir("meta.db", 0o755)
+	if st, _ := loadConfig(nil); st.cfg.MetaDB == "meta.db" {
+		t.Error("a directory named meta.db was adopted as the database")
 	}
 }
 

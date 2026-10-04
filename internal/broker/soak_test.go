@@ -158,7 +158,8 @@ func (s *supervisor) launch() {
 	defer s.mu.Unlock()
 	cmd := exec.Command(s.bin,
 		"-listen", s.addr, "-data-dir", s.dataDir, "-meta-db", s.metaDB,
-		"-pprof-addr", s.pprofAddr, "-fsync-interval", "200ms")
+		"-pprof-addr", s.pprofAddr, "-fsync-interval", "200ms",
+		"-console=false", "-zone=false")
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
 	if err := cmd.Start(); err != nil {

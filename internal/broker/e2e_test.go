@@ -37,7 +37,10 @@ func buildBinary(t *testing.T) string {
 func startBinary(t *testing.T, bin, addr, dataDir, metaDB string) (*exec.Cmd, *bytes.Buffer) {
 	t.Helper()
 	var log bytes.Buffer
-	cmd := exec.Command(bin, "-listen", addr, "-data-dir", dataDir, "-meta-db", metaDB)
+	cmd := exec.Command(bin, "-listen", addr, "-data-dir", dataDir, "-meta-db", metaDB,
+		// Only what the test is about: no console on the default port (the suite
+		// failed whenever 9093 was busy) and no entry in the developer's real zone.
+		"-console=false", "-zone=false")
 	cmd.Stdout = &log
 	cmd.Stderr = &log
 	if err := cmd.Start(); err != nil {

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/twmb/franz-go/pkg/kmsg"
+	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/storage/meta"
@@ -60,6 +60,10 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 	if err != nil {
 		if errors.Is(err, meta.ErrTopicExists) {
 			rt.ErrorCode = int16(protocol.ErrTopicAlreadyExists)
+		} else if errors.Is(err, meta.ErrTopicCollides) {
+			rt.ErrorCode = int16(protocol.ErrInvalidTopic)
+			msg := err.Error()
+			rt.ErrorMessage = &msg
 		} else {
 			rt.ErrorCode = int16(protocol.ErrUnknownServer)
 			msg := err.Error()
@@ -130,6 +134,14 @@ func (b *Broker) maybeAutoCreate(name string, requested bool) (meta.Topic, bool)
 func (b *Broker) materialize(t meta.Topic) error {
 	// Create the directories only; partitions open on first use. Opening them all
 	// here held two descriptors per partition for as long as the broker ran.
+	// The registry has just said this name was free, so any partition directory
+	// already on disk for it belongs to no topic (a lost or relocated metadata
+	// database leaves them). Adopting them would hand the new topic old records.
+	if n, err := b.logs.RemoveStrayTopicDirs(t.Name); err != nil {
+		b.log.Warn("create topic: could not clear leftover partition directories", "topic", t.Name, "err", err)
+	} else if n > 0 {
+		b.log.Warn("create topic: removed leftover partition directories that belonged to no topic", "topic", t.Name, "directories", n)
+	}
 	if err := b.logs.EnsurePartitionDirs(t.Name, t.Partitions); err != nil {
 		if derr := b.meta.DeleteTopic(t.Name); derr != nil {
 			b.log.Warn("create topic: rollback of registration failed", "topic", t.Name, "err", derr)

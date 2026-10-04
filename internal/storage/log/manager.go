@@ -105,19 +105,48 @@ func OpenManager(dir string, opts ManagerOptions) (*Manager, error) {
 	return m, nil
 }
 
+// ErrNoSuchPartition is returned by ExistingPartition when the partition has no
+// directory: its topic was never created here, or has been deleted.
+var ErrNoSuchPartition = errors.New("log: no such partition")
+
+// ErrManagerClosed is returned once Close has run: nothing may be opened after
+// shutdown, since nothing would ever flush or close it.
+var ErrManagerClosed = errors.New("log: manager is closed")
+
 // Partition returns the log for topic/partition, opening and recovering it (and
 // creating its directory) on first use.
 func (m *Manager) Partition(topic string, partition int32) (*Partition, error) {
+	return m.open(topic, partition, true)
+}
+
+// ExistingPartition is Partition for a partition that must already have its
+// directory (EnsurePartitionDirs creates them when the topic is created). The
+// broker's produce and fetch paths use it: a request that resolved its topic just
+// before DeleteTopics must not re-create the directory behind the delete, where
+// the next topic of that name would find the old records.
+func (m *Manager) ExistingPartition(topic string, partition int32) (*Partition, error) {
+	return m.open(topic, partition, false)
+}
+
+func (m *Manager) open(topic string, partition int32, create bool) (*Partition, error) {
 	tp := topicPartition{topic, partition}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.stopped {
+		return nil, ErrManagerClosed
+	}
 	if p, ok := m.partitions[tp]; ok {
 		return p, nil
 	}
 	dir, err := m.dirFor(tp)
 	if err != nil {
 		return nil, err
+	}
+	if !create {
+		if st, err := os.Stat(dir); err != nil || !st.IsDir() {
+			return nil, fmt.Errorf("%w: %s-%d", ErrNoSuchPartition, topic, partition)
+		}
 	}
 	p, err := openPartition(dir, m.opts)
 	if err != nil {
@@ -161,6 +190,78 @@ func (m *Manager) EnsurePartitionDirs(topic string, partitions int32) error {
 	}
 	syncDir(m.dir) // one flush for all the new entries.
 	return nil
+}
+
+// StrayDirs lists the partition directories on disk whose topic the registry does
+// not know (known reports a topic's partition count). They are what is left when
+// the metadata database is lost or pointed elsewhere: data with no topic.
+func (m *Manager) StrayDirs(known func(topic string) (partitions int32, ok bool)) []string {
+	entries, err := os.ReadDir(m.dir)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		topic, part, ok := splitPartitionDir(e.Name())
+		if !ok {
+			continue
+		}
+		if n, ok := known(topic); !ok || part >= n {
+			out = append(out, e.Name())
+		}
+	}
+	return out
+}
+
+// RemoveStrayTopicDirs deletes every directory that looks like a partition of
+// topic, whatever its number, and reports how many it removed. CreateTopics calls
+// it before making a new topic's directories: anything already there belongs to no
+// topic (the registry has just said the name is free) and would otherwise become
+// the new topic's first records.
+func (m *Manager) RemoveStrayTopicDirs(topic string) (int, error) {
+	if _, err := m.dirFor(topicPartition{topic, 0}); err != nil {
+		return 0, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	entries, err := os.ReadDir(m.dir)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, e := range entries {
+		t, part, ok := splitPartitionDir(e.Name())
+		if !ok || !e.IsDir() || t != topic {
+			continue
+		}
+		tp := topicPartition{topic, part}
+		if p, open := m.partitions[tp]; open {
+			_ = p.close()
+			delete(m.partitions, tp)
+		}
+		if err := os.RemoveAll(filepath.Join(m.dir, e.Name())); err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
+}
+
+// splitPartitionDir parses "orders-3" into ("orders", 3). The partition is the
+// digits after the last dash, so topic names containing dashes are unambiguous.
+func splitPartitionDir(name string) (topic string, partition int32, ok bool) {
+	i := strings.LastIndexByte(name, '-')
+	if i <= 0 || i == len(name)-1 {
+		return "", 0, false
+	}
+	n, err := strconv.ParseInt(name[i+1:], 10, 32)
+	if err != nil || n < 0 || strconv.Itoa(int(n)) != name[i+1:] {
+		return "", 0, false
+	}
+	return name[:i], int32(n), true
 }
 
 // OpenPartitions reports how many partitions are currently open (each holds file
@@ -330,15 +431,18 @@ func (m *Manager) maintain() {
 // (a graceful, durable shutdown), returning the first error encountered.
 func (m *Manager) Close() error {
 	m.mu.Lock()
-	if !m.stopped {
-		m.stopped = true
-		close(m.done)
+	if m.stopped {
+		m.mu.Unlock()
+		return nil // already closed: closing twice is not an error.
 	}
+	m.stopped = true
+	close(m.done)
 	m.mu.Unlock()
 	m.wg.Wait()
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	defer func() { m.partitions = make(map[topicPartition]*Partition) }()
 	// Close in parallel: each close is an fsync (when there is unflushed data) and
 	// several file closes, and doing 5,000 of them one after another took half a
 	// minute at shutdown. The pool is bounded so it cannot exhaust descriptors

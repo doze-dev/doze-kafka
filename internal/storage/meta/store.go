@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.etcd.io/bbolt"
@@ -27,6 +28,27 @@ var lockTimeout = 2 * time.Second
 
 // ErrTopicExists is returned by CreateTopic when the name is already registered.
 var ErrTopicExists = errors.New("meta: topic already exists")
+
+// ErrTopicCollides is returned by CreateTopic when the name differs from an
+// existing topic's only in letter case. Partition directories are named after the
+// topic, and on a case-insensitive filesystem (the macOS and Windows defaults)
+// "Orders" and "orders" are one directory: two topics would share a log, read each
+// other's records, and delete each other's data. Refused on every platform so a
+// data directory behaves the same wherever it is opened.
+var ErrTopicCollides = errors.New("meta: topic name collides with an existing topic")
+
+// ErrInvalidGroupID is returned for a group id that cannot be a key: NUL is the
+// separator between group, topic and partition in the offsets bucket, so a group
+// id containing one would read and delete another group's offsets.
+var ErrInvalidGroupID = errors.New("meta: invalid group id")
+
+// ValidateGroupID reports whether a group id can be stored.
+func ValidateGroupID(group string) error {
+	if strings.IndexByte(group, 0) >= 0 {
+		return fmt.Errorf("%w: contains a NUL byte", ErrInvalidGroupID)
+	}
+	return nil
+}
 
 var (
 	bucketTopics     = []byte("topics")       // name -> topicRecord (JSON)
@@ -151,9 +173,21 @@ type OffsetCommit struct {
 type boltStore struct {
 	db *bbolt.DB
 
-	mu     sync.RWMutex
-	byName map[string]Topic
-	byID   map[TopicID]string
+	writeTxns atomic.Int64
+
+	afterCreateCommit func() // test hook: runs between the commit and the cache update.
+
+	topicMu sync.Mutex // serializes registry writes together with their cache update.
+	mu      sync.RWMutex
+	byName  map[string]Topic
+	byID    map[TopicID]string
+}
+
+// update runs one write transaction (one fsync) and counts it, so a test can pin
+// "this operation is a single transaction".
+func (s *boltStore) update(fn func(tx *bbolt.Tx) error) error {
+	s.writeTxns.Add(1)
+	return s.db.Update(fn)
 }
 
 type topicRecord struct {
@@ -188,7 +222,21 @@ func (s *boltStore) CreateTopic(name string, partitions int32, config map[string
 		return Topic{}, err
 	}
 	rec := topicRecord{ID: id, Partitions: partitions, Config: config}
-	err := s.db.Update(func(tx *bbolt.Tx) error {
+	// The registry write and the cache update are one step under topicMu: with
+	// two separate critical sections a concurrent create and delete of the same
+	// name could commit in one order and update the cache in the other, leaving a
+	// topic the store has and the cache does not (invisible, yet uncreatable).
+	s.topicMu.Lock()
+	defer s.topicMu.Unlock()
+	s.mu.RLock()
+	for existing := range s.byName {
+		if existing != name && strings.EqualFold(existing, name) {
+			s.mu.RUnlock()
+			return Topic{}, fmt.Errorf("%w: %q and %q differ only in letter case", ErrTopicCollides, name, existing)
+		}
+	}
+	s.mu.RUnlock()
+	err := s.update(func(tx *bbolt.Tx) error {
 		topics := tx.Bucket(bucketTopics)
 		if topics.Get([]byte(name)) != nil {
 			return ErrTopicExists
@@ -206,6 +254,9 @@ func (s *boltStore) CreateTopic(name string, partitions int32, config map[string
 		return Topic{}, err
 	}
 	t := Topic{Name: name, ID: id, Partitions: partitions, Config: config}
+	if s.afterCreateCommit != nil {
+		s.afterCreateCommit()
+	}
 	s.mu.Lock()
 	s.byName[name] = cloneTopic(t)
 	s.byID[id] = name
@@ -240,7 +291,9 @@ func (s *boltStore) ListTopics() ([]Topic, error) {
 }
 
 func (s *boltStore) DeleteTopic(name string) error {
-	err := s.db.Update(func(tx *bbolt.Tx) error {
+	s.topicMu.Lock()
+	defer s.topicMu.Unlock()
+	err := s.update(func(tx *bbolt.Tx) error {
 		topics := tx.Bucket(bucketTopics)
 		v := topics.Get([]byte(name))
 		if v == nil {
@@ -303,9 +356,20 @@ func (s *boltStore) CommitOffsets(group string, offsets []OffsetCommit) error {
 	if len(offsets) == 0 {
 		return nil
 	}
-	return s.db.Update(func(tx *bbolt.Tx) error {
+	if err := ValidateGroupID(group); err != nil {
+		return err
+	}
+	return s.update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucketOffsets)
+		topics := tx.Bucket(bucketTopics)
 		for _, o := range offsets {
+			// The topic is checked inside the transaction that writes the offset.
+			// DeleteTopic removes a topic's offsets with it; a commit that had
+			// already passed the handler's lookup would otherwise land after the
+			// delete and be inherited by the next topic of that name.
+			if topics.Get([]byte(o.Topic)) == nil {
+				continue
+			}
 			val, err := json.Marshal(offsetRecord{Offset: o.Offset, Metadata: o.Metadata})
 			if err != nil {
 				return err
@@ -319,13 +383,7 @@ func (s *boltStore) CommitOffsets(group string, offsets []OffsetCommit) error {
 }
 
 func (s *boltStore) CommitOffset(group, topic string, partition int32, offset int64, metadata string) error {
-	val, err := json.Marshal(offsetRecord{Offset: offset, Metadata: metadata})
-	if err != nil {
-		return err
-	}
-	return s.db.Update(func(tx *bbolt.Tx) error {
-		return tx.Bucket(bucketOffsets).Put(offsetKey(group, topic, partition), val)
-	})
+	return s.CommitOffsets(group, []OffsetCommit{{Topic: topic, Partition: partition, Offset: offset, Metadata: metadata}})
 }
 
 func (s *boltStore) FetchOffset(group, topic string, partition int32) (int64, bool, error) {
@@ -376,7 +434,7 @@ func (s *boltStore) OffsetGroups() ([]string, error) {
 func (s *boltStore) DeleteGroupOffsets(group string) (int, error) {
 	prefix := append([]byte(group), 0)
 	var n int
-	err := s.db.Update(func(tx *bbolt.Tx) error {
+	err := s.update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucketOffsets)
 		var keys [][]byte
 		c := b.Cursor()
@@ -395,7 +453,7 @@ func (s *boltStore) DeleteGroupOffsets(group string) (int, error) {
 }
 
 func (s *boltStore) DeleteOffset(group, topic string, partition int32) error {
-	return s.db.Update(func(tx *bbolt.Tx) error {
+	return s.update(func(tx *bbolt.Tx) error {
 		return tx.Bucket(bucketOffsets).Delete(offsetKey(group, topic, partition))
 	})
 }
@@ -430,7 +488,7 @@ func (s *boltStore) ReserveProducerIDs(n int64) (int64, error) {
 		n = 1
 	}
 	var first int64
-	err := s.db.Update(func(tx *bbolt.Tx) error {
+	err := s.update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucketMeta)
 		var next int64
 		if v := b.Get(keyProducerID); len(v) == 8 {

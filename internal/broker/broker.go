@@ -75,6 +75,12 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 // Register binds every handler to its API key on the router. Which group-protocol
 // handlers are registered depends on the active version profile.
 func (b *Broker) Register(r *protocol.Router) {
+	// The router enforces exactly what ApiVersions advertises: the profile's
+	// ranges, plus SASL when it is configured.
+	for _, a := range b.advertised() {
+		r.Advertise(a.Key, a.Min, a.Max)
+	}
+
 	// Available on every supported Kafka major.
 	r.Register(protocol.APIApiVersions, b.handleAPIVersions)
 	r.Register(protocol.APIMetadata, b.handleMetadata)
@@ -235,4 +241,18 @@ func (n *notifier) signal(topic string) {
 		}
 	}
 	n.mu.Unlock()
+}
+
+// advertised is the full ApiVersions table: the profile, plus the SASL APIs when
+// auth is configured. ApiVersions and the router both read it, so what is offered
+// and what is accepted cannot differ.
+func (b *Broker) advertised() []protocol.AdvertisedAPI {
+	out := b.profile.Advertised()
+	if b.auth != nil {
+		// SaslHandshake v1 only: v0 means "raw tokens follow", which is not served.
+		out = append(out,
+			protocol.AdvertisedAPI{Key: protocol.APISASLHandshake, Min: 1, Max: 1},
+			protocol.AdvertisedAPI{Key: protocol.APISASLAuthenticate, Min: 0, Max: 2})
+	}
+	return out
 }

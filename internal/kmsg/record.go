@@ -1,6 +1,6 @@
 package kmsg
 
-import "github.com/twmb/franz-go/pkg/kmsg/internal/kbin"
+import "github.com/doze-dev/doze-kafka/internal/kmsg/internal/kbin"
 
 // A Record is a Kafka v0.11.0.0 record. It corresponds to an individual
 // message as it is written on the wire.

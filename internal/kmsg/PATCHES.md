@@ -1,7 +1,7 @@
 # Local patches to kmsg v1.13.1
 
-This is `github.com/twmb/franz-go/pkg/kmsg` v1.13.1 with one change, wired in
-by the `replace` directive in the repo's go.mod. Upstream's license applies
+This is `github.com/twmb/franz-go/pkg/kmsg` v1.13.1 with one change, kept inside
+the module as `internal/kmsg` and imported by the broker's own code. Upstream's license applies
 unchanged (see LICENSE).
 
 ## internalReadTags: stop when the reader has failed (api.go)
@@ -20,9 +20,14 @@ upstream as of 2026-10. The patch adds `&& b.Ok()` to the loop condition.
 
 `internal/protocol/codec_test.go` fails if this copy is not the one in use.
 
-Note for embedders: a `replace` directive only applies to the main module being
-built. A program that imports `github.com/doze-dev/doze-kafka/server` gets
-upstream kmsg unless it carries the same `replace` (or upstream has fixed it).
+It is a package of this module rather than a `replace` directive on purpose. A
+`replace` only applies to the main module being built: anyone importing
+`github.com/doze-dev/doze-kafka/server` would have compiled the broker against
+upstream kmsg and had the hang back, and `go install …@version` refuses modules
+that carry one. `TestBrokerCodeUsesTheInModuleKmsg` keeps both from returning.
 
-To drop this fork: once upstream merges the equivalent fix, delete
-third_party/kmsg and the replace line.
+The console and the tests still use upstream kmsg through franz-go's client; the
+two are wire-compatible and never exchange Go values.
+
+To drop this fork: once upstream merges the equivalent fix, delete internal/kmsg and
+point the imports back at `github.com/twmb/franz-go/pkg/kmsg`.

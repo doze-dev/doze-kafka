@@ -31,7 +31,7 @@ first and watch it fail.
 | `internal/storage/meta` | bbolt: topic registry, committed offsets, producer ids. |
 | `internal/config` | `Config`, defaults, validation, the TOML file layer. |
 | `console/` | The web console. A *client* of the broker: imports nothing from `internal/`. |
-| `third_party/kmsg` | A patched copy of franz-go's `kmsg`; see `PATCHES.md`. |
+| `internal/kmsg` | A patched copy of franz-go's `kmsg`, used by the broker's own code; see its `PATCHES.md`. |
 | `docs/` | User documentation. `docs/reports/history/` is the build history. |
 
 [docs/architecture.md](docs/architecture.md) explains how the pieces fit.

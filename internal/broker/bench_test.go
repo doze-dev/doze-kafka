@@ -43,6 +43,9 @@ func benchBroker(b *testing.B, topic string, partitions int32) *Broker {
 	if _, err := metaStore.CreateTopic(topic, partitions, nil); err != nil {
 		b.Fatal(err)
 	}
+	if err := logs.EnsurePartitionDirs(topic, partitions); err != nil {
+		b.Fatal(err)
+	}
 	return br
 }
 

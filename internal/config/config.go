@@ -7,6 +7,8 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
@@ -128,28 +130,52 @@ const MetaDBFile = "meta.db"
 
 // ResolveMetaDB fills in MetaDB when it was not given: <data-dir>/meta.db, so a
 // data directory is self-contained and moving or deleting it takes the topic
-// registry and committed offsets with it (they used to live in ./meta.db, which
-// outlived a deleted ./data and left offsets pointing at topics that were gone).
+// registry and committed offsets with it.
 //
-// A directory that was set up the old way keeps working: when the data dir is the
-// default one, has no metadata database yet, and ./meta.db exists, that file is
-// used and the returned notice says so. The notice is empty otherwise.
+// Earlier versions defaulted the database to ./meta.db in the working directory,
+// whatever the data directory was. A set-up like that keeps working: when the data
+// directory has no database of its own, already holds partition data, and a
+// ./meta.db file exists, that file is used and the returned notice says so. The
+// test is the layout on disk, not how the data directory was spelled: comparing
+// the path to "./data" missed `--data-dir data`, absolute paths and every custom
+// directory, and those upgrades silently started with an empty registry.
 func (c *Config) ResolveMetaDB() (notice string) {
 	if c.MetaDB != "" {
 		return ""
 	}
-	c.MetaDB = filepath.Join(c.DataDir, MetaDBFile)
-	if c.DataDir != DefaultDataDir {
+	inside := filepath.Join(c.DataDir, MetaDBFile)
+	c.MetaDB = inside
+	if _, err := os.Stat(inside); err == nil {
 		return ""
 	}
-	if _, err := os.Stat(c.MetaDB); err == nil {
+	if st, err := os.Stat(MetaDBFile); err != nil || !st.Mode().IsRegular() || st.Size() == 0 {
 		return ""
 	}
-	if _, err := os.Stat("meta.db"); err == nil {
-		c.MetaDB = "meta.db"
-		return "using ./meta.db from an earlier version; move it to " + filepath.Join(DefaultDataDir, MetaDBFile) + " to keep the data directory self-contained"
+	if !holdsPartitionData(c.DataDir) {
+		return "" // nothing here for an old database to describe.
 	}
-	return ""
+	c.MetaDB = MetaDBFile
+	return "using ./" + MetaDBFile + " from an earlier version, which kept it beside the data directory; move it to " + inside + " (with the broker stopped) to make the data directory self-contained"
+}
+
+// holdsPartitionData reports whether dir contains at least one partition
+// directory ("<topic>-<n>").
+func holdsPartitionData(dir string) bool {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		name := e.Name()
+		i := strings.LastIndexByte(name, '-')
+		if !e.IsDir() || i <= 0 || i == len(name)-1 {
+			continue
+		}
+		if _, err := strconv.Atoi(name[i+1:]); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // Validate reports the first problem that would prevent the broker from starting.

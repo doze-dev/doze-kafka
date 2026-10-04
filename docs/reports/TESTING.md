@@ -47,7 +47,7 @@ handling), answering "does it work when someone actually runs it."
 - **Codec fuzzing**: `FuzzParseAndDecodeRequest`, `FuzzSkipTaggedFields`,
   `FuzzReadFrame` — arbitrary bytes through the request decoder must never panic;
   the seeds (including a once-found crasher, a tagged-field loop in the upstream
-  `kmsg` decoder, now fixed in a vendored patch under `third_party/kmsg`) run in the
+  `kmsg` decoder, now fixed in a vendored patch under `internal/kmsg`) run in the
   normal suite, and a scheduled job fuzzes for longer and opens an issue when it fails.
 - **Session-timeout eviction** (the ungraceful-death path every graceful-close group
   test skips): a member joins at the wire level and goes silent; the coordinator

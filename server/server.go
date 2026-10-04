@@ -28,8 +28,11 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
+
+	"go.etcd.io/bbolt"
 
 	"github.com/doze-dev/doze-kafka/internal/broker"
 	"github.com/doze-dev/doze-kafka/internal/config"
@@ -105,6 +108,8 @@ type Server struct {
 
 	mu    sync.Mutex
 	bound net.Addr // set by Bind.
+
+	dirLock io.Closer // held for the life of the server: one broker per data directory.
 
 	closeOnce sync.Once
 	closeErr  error
@@ -199,8 +204,16 @@ func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 			return nil, fmt.Errorf("create %s: %w", dir, err)
 		}
 	}
+	// One broker per data directory. The metadata database is locked by whoever
+	// opens it, but it can live elsewhere (--meta-db), and two brokers with
+	// different databases over one data directory would write the same log files.
+	dirLock, err := lockDataDir(cfg.DataDir)
+	if err != nil {
+		return nil, err
+	}
 	metaStore, err := meta.Open(cfg.MetaDB)
 	if err != nil {
+		dirLock.Close()
 		return nil, err
 	}
 	logs, err := log.OpenManager(cfg.DataDir, log.ManagerOptions{
@@ -211,6 +224,12 @@ func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		Logger:             logger,
 	})
 	if err != nil {
+		metaStore.Close()
+		dirLock.Close()
+		return nil, err
+	}
+	if err := reconcileDisk(cfg, logger, logs, metaStore); err != nil {
+		logs.Close()
 		metaStore.Close()
 		return nil, err
 	}
@@ -236,7 +255,40 @@ func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	if cfg.AuthEnabled() {
 		srv.RequireAuth()
 	}
-	return &Server{cfg: cfg, log: logger, meta: metaStore, logs: logs, srv: srv, b: b, ready: make(chan struct{})}, nil
+	return &Server{cfg: cfg, log: logger, meta: metaStore, logs: logs, srv: srv, b: b, dirLock: dirLock, ready: make(chan struct{})}, nil
+}
+
+// reconcileDisk makes the data directory and the registry agree at start-up.
+//
+// Every registered topic gets its partition directories (a partition is only
+// opened if its directory exists, so one that was never written to must still
+// have one). Directories whose topic the registry does not know are reported, not
+// touched: they are what is left when the metadata database was lost or the broker
+// was pointed at a different one, and saying nothing made that look like an empty
+// broker.
+func reconcileDisk(cfg config.Config, logger *slog.Logger, logs *log.Manager, store meta.Store) error {
+	topics, err := store.ListTopics()
+	if err != nil {
+		return err
+	}
+	counts := make(map[string]int32, len(topics))
+	for _, t := range topics {
+		counts[t.Name] = t.Partitions
+		if err := logs.EnsurePartitionDirs(t.Name, t.Partitions); err != nil {
+			logger.Warn("could not create partition directories", "topic", t.Name, "err", err)
+		}
+	}
+	stray := logs.StrayDirs(func(topic string) (int32, bool) { n, ok := counts[topic]; return n, ok })
+	if len(stray) > 0 {
+		sample := stray
+		if len(sample) > 5 {
+			sample = sample[:5]
+		}
+		logger.Warn("the data directory holds partition data for topics the metadata database does not know; "+
+			"if the database was moved, point at it with --meta-db (the data is left untouched until a topic of the same name is created)",
+			"data_dir", cfg.DataDir, "meta_db", cfg.MetaDB, "directories", len(stray), "examples", strings.Join(sample, ", "))
+	}
+	return nil
 }
 
 // Bind opens the TCP listener without accepting and returns the bound address
@@ -321,6 +373,9 @@ func (s *Server) closeStorage(err *error) {
 		if cerr := s.logs.Close(); cerr != nil && s.closeErr == nil {
 			s.closeErr = fmt.Errorf("flush partition logs on shutdown: %w", cerr)
 		}
+		if s.dirLock != nil {
+			s.dirLock.Close()
+		}
 	})
 	if *err == nil {
 		*err = s.closeErr
@@ -358,4 +413,22 @@ func (s *Server) Config() Config {
 		DataDir: s.cfg.DataDir, MetaDB: s.cfg.MetaDB,
 		SASL: s.cfg.AuthEnabled(), TLS: s.cfg.TLSEnabled(),
 	}
+}
+
+// dataDirLockFile is the lock taken inside the data directory.
+const dataDirLockFile = ".doze-kafka.lock"
+
+// lockDataDir takes an exclusive lock on the data directory, or explains who is in
+// the way. It is a small bbolt file because bbolt already carries a file lock that
+// works on every platform this ships for, with a timeout.
+func lockDataDir(dir string) (io.Closer, error) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, fmt.Errorf("create %s: %w", dir, err)
+	}
+	db, err := bbolt.Open(filepath.Join(dir, dataDirLockFile), 0o600, &bbolt.Options{Timeout: 2 * time.Second})
+	if err != nil {
+		return nil, fmt.Errorf("data directory %s is in use by another doze-kafka (or its lock could not be taken: %w); "+
+			"stop the other broker or choose another --data-dir", dir, err)
+	}
+	return db, nil
 }
