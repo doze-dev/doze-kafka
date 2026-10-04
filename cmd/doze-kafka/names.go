@@ -1,5 +1,3 @@
-//go:build !windows
-
 package main
 
 // Adoption of the shared .doze zone.
@@ -104,6 +102,11 @@ func joinZone(ctx context.Context, logger *slog.Logger, instance string) *zone {
 func prepareZone(ctx context.Context, cfg config.Config, logger *slog.Logger) (*zone, error) {
 	if !cfg.ByName() {
 		return nil, nil
+	}
+	if names.Disabled() {
+		// One switch for every doze binary. With names off and no address given there
+		// is nothing to listen on, and the answer is the one openListener gives.
+		return nil, errNothingToListenOn
 	}
 	if _, err := ensureNames(liveNameEnv()); err != nil {
 		return nil, err

@@ -1,5 +1,3 @@
-//go:build !windows
-
 package main
 
 // `doze-kafka doctor` — what is in place, what is not, and what to run.

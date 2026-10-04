@@ -1,5 +1,3 @@
-//go:build !windows
-
 package main
 
 // Making sure .doze resolves before anything depends on it.

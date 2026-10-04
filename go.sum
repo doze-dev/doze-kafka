@@ -126,6 +126,8 @@ github.com/dominikbraun/graph v0.23.0 h1:TdZB4pPqCLFxYhdyMFb1TBdFxp8XLcJfTTBQucV
 github.com/dominikbraun/graph v0.23.0/go.mod h1:yOjYyogZLY1LSG9E33JWZJiq5k83Qy2C6POAuiViluc=
 github.com/doze-dev/doze-names v0.1.0 h1:baMk4bnjw4Iy6yYhgVopDHf1F0ShnBxXoM/X2PXzOfQ=
 github.com/doze-dev/doze-names v0.1.0/go.mod h1:mMmncxtG5bBQlGZILYjU/u4oQckRy14Di4vXdw9T4xg=
+github.com/doze-dev/doze-names v0.1.1-0.20261004130222-a18b816af589 h1:4NkNtOtQ6/VmDi9vqfwufHe1ARbfbB6C7gChI3c28As=
+github.com/doze-dev/doze-names v0.1.1-0.20261004130222-a18b816af589/go.mod h1:mMmncxtG5bBQlGZILYjU/u4oQckRy14Di4vXdw9T4xg=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/eapache/go-resiliency v1.7.0 h1:n3NRTnBn5N0Cbi/IeOHuQn9s2UwVUH7Ga0ZWcP+9JTA=

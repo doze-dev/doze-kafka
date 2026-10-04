@@ -1,5 +1,3 @@
-//go:build !windows
-
 package main
 
 import (
@@ -273,5 +271,20 @@ func TestNameModeAdvertisesWhereTheBrokerIs(t *testing.T) {
 	}
 	if len(resp.Brokers) != 1 || resp.Brokers[0].Host != ip || resp.Brokers[0].Port != 9092 {
 		t.Errorf("Metadata brokers = %+v, want one at %s:9092", resp.Brokers, ip)
+	}
+}
+
+// DOZE_ZONE=off is every doze binary's switch: with no --listen to fall back on,
+// the instance cannot start, and says what to do instead rather than touching the zone.
+func TestZoneOffWithoutListenHasNothingToListenOn(t *testing.T) {
+	t.Setenv(names.EnvZone, "off")
+	_, err := prepareZone(context.Background(), config.Default(), quietLogger())
+	if !errors.Is(err, errNothingToListenOn) {
+		t.Errorf("err = %v, want errNothingToListenOn", err)
+	}
+	cfg := config.Default()
+	cfg.ListenAddr = "127.0.0.1:0"
+	if z, err := prepareZone(context.Background(), cfg, quietLogger()); z != nil || err != nil {
+		t.Errorf("--listen touched the zone: %v %v", z, err)
 	}
 }
