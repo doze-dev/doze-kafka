@@ -109,3 +109,107 @@ func TestBrokerCodeUsesTheInModuleKmsg(t *testing.T) {
 		}
 	}
 }
+
+// rawConn speaks requests with a v1 header (null client id) over one connection.
+type rawConn struct {
+	t *testing.T
+	c net.Conn
+}
+
+func openRaw(t *testing.T, addr string) *rawConn {
+	t.Helper()
+	c, err := net.DialTimeout("tcp", addr, 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { c.Close() })
+	return &rawConn{t, c}
+}
+
+// do sends req and decodes the answer into resp; ok is false if the connection
+// was closed instead.
+func (r *rawConn) do(req kmsg.Request, resp kmsg.Response) (ok bool) {
+	r.t.Helper()
+	body := req.AppendTo(nil)
+	hdr := []byte{byte(req.Key() >> 8), byte(req.Key()), byte(req.GetVersion() >> 8), byte(req.GetVersion()), 0, 0, 0, 9, 0xff, 0xff}
+	if req.IsFlexible() {
+		hdr = append(hdr, 0) // header tagged fields.
+	}
+	frame := binary.BigEndian.AppendUint32(nil, uint32(len(hdr)+len(body)))
+	r.c.SetDeadline(time.Now().Add(3 * time.Second))
+	if _, err := r.c.Write(append(append(frame, hdr...), body...)); err != nil {
+		return false
+	}
+	var n [4]byte
+	if _, err := io.ReadFull(r.c, n[:]); err != nil {
+		return false
+	}
+	buf := make([]byte, binary.BigEndian.Uint32(n[:]))
+	if _, err := io.ReadFull(r.c, buf); err != nil {
+		return false
+	}
+	skip := 4 // correlation id.
+	if resp.IsFlexible() && resp.Key() != 18 {
+		skip++ // response header tagged fields.
+	}
+	resp.SetVersion(req.GetVersion())
+	if err := resp.ReadFrom(buf[skip:]); err != nil {
+		r.t.Fatalf("decode %T: %v", resp, err)
+	}
+	return true
+}
+
+func (r *rawConn) plain(user, pass string) (code int16, open bool) {
+	r.t.Helper()
+	hs := kmsg.NewPtrSASLHandshakeRequest()
+	hs.SetVersion(1)
+	hs.Mechanism = "PLAIN"
+	var hr kmsg.SASLHandshakeResponse
+	if !r.do(hs, &hr) {
+		return 0, false
+	}
+	au := kmsg.NewPtrSASLAuthenticateRequest()
+	au.SetVersion(1)
+	au.SASLAuthBytes = []byte("\x00" + user + "\x00" + pass)
+	var ar kmsg.SASLAuthenticateResponse
+	if !r.do(au, &ar) {
+		return 0, false
+	}
+	return ar.ErrorCode, true
+}
+
+func (r *rawConn) metadataWorks() bool {
+	md := kmsg.NewPtrMetadataRequest()
+	md.SetVersion(1)
+	var mr kmsg.MetadataResponse
+	return r.do(md, &mr)
+}
+
+// A failed authentication ends the connection, so each guess costs a new one. It
+// used to stay open: 5,000 wrong passwords were tried on one connection in 144 ms,
+// and a failed re-authentication left an authenticated connection authenticated.
+func TestFailedAuthenticationClosesTheConnection(t *testing.T) {
+	addr := startAuthBroker(t, []string{"PLAIN"}, map[string]string{"alice": "secret"}, "", "")
+
+	c := openRaw(t, addr)
+	if code, open := c.plain("alice", "wrong"); !open || code != 58 {
+		t.Fatalf("a wrong password: code %d, answered %v; want SASL_AUTHENTICATION_FAILED (58), answered", code, open)
+	}
+	if _, open := c.plain("alice", "secret"); open {
+		t.Fatal("the connection was still usable after a failed authentication")
+	}
+
+	// A good login, then a failed re-authentication: the connection must not stay
+	// authenticated.
+	c = openRaw(t, addr)
+	if code, open := c.plain("alice", "secret"); !open || code != 0 {
+		t.Fatalf("a correct login: code %d, answered %v", code, open)
+	}
+	if !c.metadataWorks() {
+		t.Fatal("an authenticated connection should be served")
+	}
+	c.plain("alice", "wrong")
+	if c.metadataWorks() {
+		t.Fatal("after a failed re-authentication the connection was still authenticated")
+	}
+}

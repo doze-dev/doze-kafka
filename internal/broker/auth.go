@@ -163,6 +163,11 @@ func (b *Broker) handleSASLAuthenticate(ctx context.Context, req *protocol.Reque
 		msg := err.Error()
 		resp.ErrorMessage = &msg
 		req.Conn.SetSASLState(nil)
+		// The connection ends with this answer, as on a real broker: thousands of
+		// passwords could otherwise be tried over one connection, and a failed
+		// re-authentication left an authenticated connection authenticated.
+		req.Conn.SetAuthenticated(false)
+		req.Conn.CloseAfterResponse()
 		b.log.Warn("SASL authentication failed", "mechanism", mechanism, "err", err)
 		return protocol.EncodeResponse(req.Header, resp), nil
 	}

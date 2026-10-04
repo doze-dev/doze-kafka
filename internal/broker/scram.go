@@ -116,7 +116,7 @@ func (a *authenticator) scramFirst(mechanism string, in []byte) ([]byte, *scramC
 
 	cred := a.scram[mechanism][user]
 	if cred == nil {
-		return nil, nil, fmt.Errorf("scram: unknown user")
+		return nil, nil, fmt.Errorf("scram: invalid credentials") // the same answer as a wrong password: do not confirm which users exist.
 	}
 
 	serverNonce, err := randomNonce()

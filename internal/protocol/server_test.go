@@ -200,3 +200,149 @@ func TestAcceptErrorsDoNotEndTheBroker(t *testing.T) {
 	default:
 	}
 }
+
+// ---- limits that hold with or without authentication (audit P2, P4) ----
+
+func dial(t *testing.T, addr string) net.Conn {
+	t.Helper()
+	c, err := net.DialTimeout("tcp", addr, 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { c.Close() })
+	return c
+}
+
+// A stranger who keeps sending ApiVersions does not reset the clock: the time to
+// authenticate is counted from when the connection was accepted.
+func TestPreAuthBudgetIsNotResetByRequests(t *testing.T) {
+	addr := listen(t, echoRouter(), true, func(s *Server) { s.preAuthTimeout = 400 * time.Millisecond })
+	c := dial(t, addr)
+	hdr, payload := frameFor(APIApiVersions, 0, 1)
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		c.SetDeadline(time.Now().Add(time.Second))
+		if _, err := c.Write(append(hdr, payload...)); err != nil {
+			return // dropped.
+		}
+		if _, err := ReadFrame(c); err != nil {
+			return // dropped.
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatal("an unauthenticated connection was still being served 3s after a 400ms budget")
+}
+
+// With no SASL configured there used to be no deadline of any kind.
+func TestSilentAndTricklingConnectionsAreDroppedWithoutAuth(t *testing.T) {
+	addr := listen(t, echoRouter(), false, func(s *Server) {
+		s.idleTimeout, s.frameTimeout = 200*time.Millisecond, 200*time.Millisecond
+	})
+	silent := dial(t, addr)
+	expectClosed(t, silent, 2*time.Second) // connected, said nothing.
+
+	trickle := dial(t, addr)
+	// Announce a 64-byte Produce request and send only its first few bytes.
+	trickle.Write(append(binary.BigEndian.AppendUint32(nil, 64), 0, 0, 0, 9))
+	expectClosed(t, trickle, 2*time.Second)
+
+	// A connection that is actually used is not disturbed between requests that
+	// arrive inside the idle window.
+	live := dial(t, addr)
+	for i := int32(0); i < 4; i++ {
+		hdr, payload := frameFor(APIApiVersions, 0, i)
+		live.SetDeadline(time.Now().Add(time.Second))
+		live.Write(append(hdr, payload...))
+		if _, err := ReadFrame(live); err != nil {
+			t.Fatalf("request %d on a live connection: %v", i, err)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+// Only Produce carries record data. Anything else over a megabyte is refused
+// before its body is read, authenticated or not.
+func TestOnlyProduceMayBeLarge(t *testing.T) {
+	r := echoRouter()
+	r.Register(APIProduce, func(_ context.Context, req *Request) ([]byte, error) {
+		return binary.BigEndian.AppendUint32(nil, uint32(len(req.Body))), nil
+	})
+	addr := listen(t, r, false, nil)
+
+	big := dial(t, addr)
+	big.Write(append(binary.BigEndian.AppendUint32(nil, 8<<20), 0, byte(APIMetadata))) // Metadata, 8 MiB claimed.
+	expectClosed(t, big, 2*time.Second)
+
+	// The same size as a Produce is accepted and read in full.
+	prod := dial(t, addr)
+	hdr, payload := frameFor(APIProduce, 3, 1, make([]byte, 2<<20)...)
+	prod.SetDeadline(time.Now().Add(5 * time.Second))
+	if _, err := prod.Write(append(hdr, payload...)); err != nil {
+		t.Fatal(err)
+	}
+	if resp, err := ReadFrame(prod); err != nil || binary.BigEndian.Uint32(resp) != 2<<20 {
+		t.Fatalf("a 2 MiB Produce: %v %v", resp, err)
+	}
+}
+
+// A peer that sends requests and never reads must not park a goroutine in Write.
+func TestWriterIsNotHeldByAPeerThatNeverReads(t *testing.T) {
+	r := NewRouter(quietLogger())
+	r.Register(APIApiVersions, func(context.Context, *Request) ([]byte, error) { return make([]byte, 64<<20), nil }) // far more than socket buffers hold.
+	var srv *Server
+	addr := listen(t, r, false, func(s *Server) { srv = s })
+	srv.mu.Lock()
+	srv.writeTimeout = 300 * time.Millisecond
+	srv.mu.Unlock()
+	c := dial(t, addr)
+	hdr, payload := frameFor(APIApiVersions, 0, 1)
+	c.Write(append(hdr, payload...)) // and never read the answer.
+	seen := time.Now().Add(2 * time.Second)
+	for srv.connCount() == 0 {
+		if time.Now().After(seen) {
+			t.Fatal("the connection was never accepted")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	deadline := time.Now().Add(4 * time.Second)
+	for srv.connCount() > 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the connection is still held 4s after a 300ms write timeout")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+func TestConnectionsAboveTheLimitAreRefused(t *testing.T) {
+	var srv *Server
+	addr := listen(t, echoRouter(), false, func(s *Server) { s.maxConns = 3; srv = s })
+	for i := 0; i < 3; i++ {
+		dial(t, addr)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for srv.connCount() < 3 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	extra := dial(t, addr)
+	expectClosed(t, extra, 2*time.Second)
+	if srv.refused.Load() == 0 {
+		t.Error("the refusal was not counted")
+	}
+}
+
+// CloseAfterResponse: the client gets its answer, then the connection is gone.
+func TestCloseAfterResponseSendsTheAnswerThenCloses(t *testing.T) {
+	r := NewRouter(quietLogger())
+	r.Register(APIApiVersions, func(_ context.Context, req *Request) ([]byte, error) {
+		req.Conn.CloseAfterResponse()
+		return []byte{1, 2, 3, 4}, nil
+	})
+	c := dial(t, listen(t, r, false, nil))
+	hdr, payload := frameFor(APIApiVersions, 0, 1)
+	c.SetDeadline(time.Now().Add(2 * time.Second))
+	c.Write(append(hdr, payload...))
+	if resp, err := ReadFrame(c); err != nil || len(resp) != 4 {
+		t.Fatalf("the answer should arrive before the close: %v %v", resp, err)
+	}
+	expectClosed(t, c, 2*time.Second)
+}

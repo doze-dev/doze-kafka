@@ -772,12 +772,17 @@ func (b *Reader) CompactNullableBytes() []byte {
 	return r
 }
 
+// MaxArrayLen is the most elements any one array may claim (doze-kafka patch; see
+// PATCHES.md). No request this broker serves comes near it, and without a ceiling
+// a 100 MiB frame of validly encoded empty elements still decodes into gigabytes.
+const MaxArrayLen = 1 << 20
+
 // ArrayLen returns a Kafka array length from the reader.
 func (b *Reader) ArrayLen() int32 {
 	r := b.Int32()
 	// The min size of a Kafka type is a byte, so if we do not have
 	// at least the array length of bytes left, it is bad.
-	if len(b.Src) < int(r) {
+	if len(b.Src) < int(r) || r > MaxArrayLen {
 		b.bad = true
 		b.Src = nil
 		return 0
@@ -790,7 +795,7 @@ func (b *Reader) VarintArrayLen() int32 {
 	r := b.Varint()
 	// The min size of a Kafka type is a byte, so if we do not have
 	// at least the array length of bytes left, it is bad.
-	if len(b.Src) < int(r) {
+	if len(b.Src) < int(r) || r > MaxArrayLen {
 		b.bad = true
 		b.Src = nil
 		return 0
@@ -803,7 +808,7 @@ func (b *Reader) CompactArrayLen() int32 {
 	r := int32(b.Uvarint()) - 1
 	// The min size of a Kafka type is a byte, so if we do not have
 	// at least the array length of bytes left, it is bad.
-	if len(b.Src) < int(r) {
+	if len(b.Src) < int(r) || r > MaxArrayLen {
 		b.bad = true
 		b.Src = nil
 		return 0

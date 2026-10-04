@@ -2,6 +2,8 @@ package protocol
 
 import (
 	"bytes"
+	"encoding/binary"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -107,4 +109,32 @@ func TestEncodeResponseSizedMatchesEncodeResponse(t *testing.T) {
 		t.Errorf("capacity %d for %d encoded bytes: the buffer was regrown", cap(got), len(plain))
 	}
 	_ = resp
+}
+
+// An array count is a claim, not a size. The decoder used to allocate count
+// elements up front, so a request whose count said "millions" (with nothing
+// behind it) cost about 86 times its own size before it was rejected.
+func TestDecodeDoesNotAllocateWhatTheCountClaims(t *testing.T) {
+	const frame = 4 << 20
+	for _, tc := range []struct {
+		name    string
+		key     APIKey
+		version int16
+	}{{"CreateTopics v0", APICreateTopics, 0}, {"Metadata v1", APIMetadata, 1}, {"Fetch v4", APIFetch, 4}, {"Produce v3", APIProduce, 3}} {
+		// 0xff everywhere, so nothing after the count decodes as a run of tiny
+		// elements: what is measured is the count's claim alone. The count is
+		// written at each offset the first array could start at.
+		body := bytes.Repeat([]byte{0xff}, frame)
+		for _, off := range []int{0, 2, 6, 8, 12, 17, 21} {
+			binary.BigEndian.PutUint32(body[off:], uint32(frame-64))
+		}
+		var before, after runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&before)
+		_, _ = DecodeRequest(RequestHeader{APIKey: tc.key, APIVersion: tc.version}, body)
+		runtime.ReadMemStats(&after)
+		if grew := (after.TotalAlloc - before.TotalAlloc) >> 20; grew > 4*(frame>>20) {
+			t.Errorf("%s: decoding a %d MiB request allocated %d MiB", tc.name, frame>>20, grew)
+		}
+	}
 }

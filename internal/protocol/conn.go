@@ -19,6 +19,24 @@ import (
 // long-polling consumers are idle by design.
 const defaultPreAuthTimeout = 30 * time.Second
 
+const (
+	// defaultIdleTimeout closes a connection that has sent nothing for this long
+	// (Kafka's connections.max.idle.ms default). Clients reconnect on demand. It
+	// is measured between requests: a long-poll fetch or a parked JoinGroup is a
+	// request in progress, not idleness.
+	defaultIdleTimeout = 10 * time.Minute
+
+	// defaultFrameTimeout is how long a request may take to arrive once its
+	// first byte has. A peer that announces a frame and then trickles it would
+	// otherwise hold the bytes received so far, and a goroutine, for as long as
+	// it liked — with or without authentication.
+	defaultFrameTimeout = 30 * time.Second
+
+	// defaultWriteTimeout bounds one response write. A peer that sends requests
+	// and never reads fills its socket buffer and parks the goroutine in Write.
+	defaultWriteTimeout = 30 * time.Second
+)
+
 // Conn is a single client connection. Requests on one connection are processed
 // and answered in order; a handler echoes the request's correlation id.
 //
@@ -36,6 +54,11 @@ type Conn struct {
 	authRequired   bool
 	authenticated  bool
 	preAuthTimeout time.Duration
+	idleTimeout    time.Duration
+	frameTimeout   time.Duration
+	writeTimeout   time.Duration
+	accepted       time.Time // when the connection was accepted; the pre-auth budget runs from here.
+	closeAfter     bool      // close once the current response is written (a failed authentication).
 	saslMechanism  string
 	saslState      any // opaque per-connection state owned by the SASL handler (e.g. SCRAM step).
 }
@@ -49,6 +72,10 @@ func newConn(raw net.Conn, router *Router, logger *slog.Logger, authRequired boo
 		log:            logger.With("remote", raw.RemoteAddr().String()),
 		authRequired:   authRequired,
 		preAuthTimeout: defaultPreAuthTimeout,
+		idleTimeout:    defaultIdleTimeout,
+		frameTimeout:   defaultFrameTimeout,
+		writeTimeout:   defaultWriteTimeout,
+		accepted:       time.Now(),
 	}
 }
 
@@ -82,6 +109,11 @@ func (c *Conn) SASLState() any { return c.saslState }
 // SetSASLState stores the SASL handler's opaque per-connection state between steps.
 func (c *Conn) SetSASLState(s any) { c.saslState = s }
 
+// CloseAfterResponse makes the connection close once the response to the current
+// request has been written. A failed authentication uses it: the client is told
+// why, and then the connection is gone, so each guess costs a new connection.
+func (c *Conn) CloseAfterResponse() { c.closeAfter = true }
+
 // close tears down the underlying socket. The server calls it on shutdown to
 // unblock a connection parked in a blocking read so its serve loop can exit.
 func (c *Conn) close() error { return c.raw.Close() }
@@ -106,14 +138,39 @@ func (c *Conn) serve(ctx context.Context) {
 			return
 		}
 
-		limit := maxFrameBytes
-		if c.authRequired && !c.authenticated {
-			limit = maxPreAuthFrameBytes
-			_ = c.raw.SetReadDeadline(time.Now().Add(c.preAuthTimeout))
-		} else if c.authRequired {
-			_ = c.raw.SetReadDeadline(time.Time{}) // authenticated: idle is fine.
+		// Wait for the next request to begin. A connection that still has to
+		// authenticate has one budget for the whole of that, counted from when it
+		// was accepted (resetting it per request let a stranger stay forever by
+		// sending ApiVersions now and then). Everyone else may idle, within reason.
+		preAuth := c.authRequired && !c.authenticated
+		wait := time.Now().Add(c.idleTimeout)
+		if preAuth {
+			wait = c.accepted.Add(c.preAuthTimeout)
 		}
-		frame, err := ReadFrameLimit(c.r, limit)
+		_ = c.raw.SetReadDeadline(wait)
+		if _, err := c.r.Peek(1); err != nil {
+			if !errors.Is(err, io.EOF) && !errors.Is(err, net.ErrClosed) {
+				c.log.Debug("connection closed", "err", err)
+			}
+			return
+		}
+		// It has begun: the rest must arrive promptly.
+		deadline := time.Now().Add(c.frameTimeout)
+		if preAuth && wait.Before(deadline) {
+			deadline = wait
+		}
+		_ = c.raw.SetReadDeadline(deadline)
+		frame, err := readRequestFrame(c.r, func(key APIKey) int {
+			switch {
+			case preAuth:
+				return maxPreAuthFrameBytes
+			case key == APIProduce:
+				return maxFrameBytes
+			default:
+				return maxControlFrameBytes
+			}
+		})
+		_ = c.raw.SetReadDeadline(time.Time{}) // a handler may legitimately take long (long-poll, parked joins).
 		if err != nil {
 			if !errors.Is(err, io.EOF) && !errors.Is(err, net.ErrClosed) {
 				c.log.Debug("connection closed", "err", err)
@@ -166,12 +223,16 @@ func (c *Conn) serve(ctx context.Context) {
 			continue
 		}
 
+		_ = c.raw.SetWriteDeadline(time.Now().Add(c.writeTimeout))
 		if err := WriteFrame(c.w, resp); err != nil {
 			c.log.Debug("write failed", "err", err)
 			return
 		}
 		if err := c.w.Flush(); err != nil {
 			c.log.Debug("flush failed", "err", err)
+			return
+		}
+		if c.closeAfter {
 			return
 		}
 	}

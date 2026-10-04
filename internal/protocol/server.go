@@ -7,8 +7,13 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 )
+
+// defaultMaxConns is far above what local development uses (a busy app is tens of
+// connections) and far below what exhausts a default descriptor limit.
+const defaultMaxConns = 2048
 
 // Server accepts TCP connections and serves each one with the Router.
 type Server struct {
@@ -21,7 +26,12 @@ type Server struct {
 	tlsConfig    *tls.Config // when set, the listener terminates TLS.
 	authRequired bool        // when true, connections must complete SASL before other APIs.
 
-	preAuthTimeout time.Duration // idle limit for a connection that has yet to authenticate.
+	preAuthTimeout time.Duration // total time a connection has to authenticate.
+	idleTimeout    time.Duration // how long a connection may sit between requests.
+	frameTimeout   time.Duration // how long a request may take to arrive once begun.
+	writeTimeout   time.Duration // how long one response may take to write.
+	maxConns       int           // connections served at once; more are refused.
+	refused        atomic.Int64  // connections refused at the cap (for the log line and tests).
 
 	mu    sync.Mutex
 	conns map[*Conn]struct{} // in-flight connections, for shutdown drain.
@@ -31,7 +41,8 @@ type Server struct {
 
 // NewServer returns a Server that will listen on addr.
 func NewServer(addr string, router *Router, log *slog.Logger) *Server {
-	return &Server{addr: addr, router: router, log: log, conns: make(map[*Conn]struct{}), preAuthTimeout: defaultPreAuthTimeout}
+	return &Server{addr: addr, router: router, log: log, conns: make(map[*Conn]struct{}), preAuthTimeout: defaultPreAuthTimeout,
+		idleTimeout: defaultIdleTimeout, frameTimeout: defaultFrameTimeout, writeTimeout: defaultWriteTimeout, maxConns: defaultMaxConns}
 }
 
 // UseTLS makes the listener terminate TLS with the given config. Call before Bind.
@@ -153,8 +164,20 @@ func (s *Server) acceptLoop(ctx context.Context, ln net.Listener) error {
 			continue
 		}
 		backoff = 0
+		if s.connCount() >= s.maxConns {
+			// A ceiling, so connections that cost nothing to open cannot exhaust
+			// descriptors and memory. Logged once in a while, not per refusal.
+			if n := s.refused.Add(1); n == 1 || n%1000 == 0 {
+				s.log.Warn("refusing connections: at the connection limit", "limit", s.maxConns, "refused_so_far", n)
+			}
+			_ = raw.Close()
+			continue
+		}
 		conn := newConn(raw, s.router, s.log, s.authRequired)
-		conn.preAuthTimeout = s.preAuthTimeout
+		conn.preAuthTimeout, conn.idleTimeout, conn.frameTimeout = s.preAuthTimeout, s.idleTimeout, s.frameTimeout
+		s.mu.Lock()
+		conn.writeTimeout = s.writeTimeout
+		s.mu.Unlock()
 		s.track(conn)
 		s.wg.Add(1)
 		go func() {
@@ -169,6 +192,12 @@ func (s *Server) track(c *Conn) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.conns[c] = struct{}{}
+}
+
+func (s *Server) connCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.conns)
 }
 
 func (s *Server) untrack(c *Conn) {

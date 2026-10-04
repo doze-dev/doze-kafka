@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -17,6 +18,13 @@ const (
 	// ApiVersions and the SASL exchange — is well under a kilobyte, so there is
 	// no reason to let a stranger ask for more than this.
 	maxPreAuthFrameBytes = 1 << 20
+
+	// maxControlFrameBytes caps every request except Produce. Only Produce carries
+	// record data; everything else is names, numbers and offsets, and a megabyte
+	// of that is thousands of partitions. Decoding turns each small wire element
+	// into a larger struct, so the smaller the frame a stranger may send, the
+	// less a hostile one can cost.
+	maxControlFrameBytes = 1 << 20
 
 	// frameChunk is how much of a frame is trusted up front. A frame bigger than
 	// this is read as the bytes arrive, so memory follows what the peer actually
@@ -75,4 +83,24 @@ func WriteFrame(w io.Writer, payload []byte) error {
 	}
 	_, err := w.Write(payload)
 	return err
+}
+
+// readRequestFrame reads one request, applying a size limit chosen from the API
+// key (the first two bytes of every request) before any of the body is read. A
+// length above every limit is refused on the length alone, without waiting for a
+// key that may never come.
+func readRequestFrame(r *bufio.Reader, limitFor func(key APIKey) int) ([]byte, error) {
+	head, err := r.Peek(4)
+	if err != nil {
+		return ReadFrameLimit(r, maxControlFrameBytes) // reports the short read.
+	}
+	n := int64(binary.BigEndian.Uint32(head))
+	if n > int64(limitFor(APIProduce)) || n < 2 {
+		return ReadFrameLimit(r, limitFor(APIProduce)) // too large for anything, or too short to hold a key.
+	}
+	head, err = r.Peek(6)
+	if err != nil {
+		return nil, err
+	}
+	return ReadFrameLimit(r, limitFor(APIKey(int16(binary.BigEndian.Uint16(head[4:])))))
 }

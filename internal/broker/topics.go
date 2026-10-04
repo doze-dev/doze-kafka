@@ -208,6 +208,7 @@ func (b *Broker) handleDeleteTopics(ctx context.Context, req *protocol.Request) 
 			}
 			b.idem.dropPartitions(name, topic.Partitions)
 			b.cg848.topicChanged(name)
+			b.produce.signal(name) // wake fetches parked on it: they have an answer now (the topic is gone).
 		}
 		resp.Topics = append(resp.Topics, rt)
 	}

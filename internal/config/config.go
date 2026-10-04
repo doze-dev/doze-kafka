@@ -226,9 +226,12 @@ func (c Config) Validate() error {
 		if len(c.Credentials) == 0 {
 			return fmt.Errorf("config: SASL is enabled but no credentials are configured")
 		}
-		for user := range c.Credentials {
+		for user, pass := range c.Credentials {
 			if user == "" {
 				return fmt.Errorf("config: SASL credential has an empty username")
+			}
+			if pass == "" {
+				return fmt.Errorf("config: SASL user %q has an empty password", user)
 			}
 		}
 	}

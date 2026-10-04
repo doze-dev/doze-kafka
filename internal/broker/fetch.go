@@ -13,6 +13,13 @@ import (
 
 const defaultFetchMaxBytes = 1 << 20 // 1 MiB when a client sets no bound.
 
+// maxFetchWait caps a long-poll. A fetch waits inside its connection's goroutine,
+// which cannot notice the client going away until it writes the answer; with no
+// cap, a client that asked for 24 days and disconnected left that goroutine (and
+// its socket) parked for 24 days. Answering early with no data is always correct:
+// the client simply fetches again.
+var maxFetchWait = 30 * time.Second
+
 // handleFetch serves raw record batches from each partition's fetch offset,
 // resolving topic IDs (modern versions address topics by UUID). It long-polls: if
 // nothing is available it waits up to MaxWaitMillis for a produce, then returns
@@ -25,8 +32,19 @@ func (b *Broker) handleFetch(ctx context.Context, req *protocol.Request) ([]byte
 	}
 	fr := kreq.(*kmsg.FetchRequest)
 
+	// Fetch sessions (KIP-227) are not kept: every response says session 0, so a
+	// conforming client keeps sending full fetches. One that continues a session
+	// anyway must be told it does not exist, not handed an empty success.
+	if fr.SessionID != 0 && fr.SessionEpoch > 0 {
+		resp := kmsg.NewPtrFetchResponse()
+		resp.SetVersion(req.Header.APIVersion)
+		resp.ErrorCode = int16(protocol.ErrFetchSessionIDNotFound)
+		return protocol.EncodeResponse(req.Header, resp), nil
+	}
+
 	minBytes := max(int(fr.MinBytes), 1)
-	deadline := time.Now().Add(time.Duration(fr.MaxWaitMillis) * time.Millisecond)
+	wait := min(time.Duration(fr.MaxWaitMillis)*time.Millisecond, maxFetchWait)
+	deadline := time.Now().Add(wait)
 
 	var sub *subscription
 	for {
@@ -37,8 +55,11 @@ func (b *Broker) handleFetch(ctx context.Context, req *protocol.Request) ([]byte
 			sub = b.produce.subscribe(b.fetchTopics(fr))
 			defer sub.Close()
 		}
-		resp, total := b.buildFetchResponse(fr, req.Header.APIVersion)
-		if total >= minBytes || fr.MaxWaitMillis <= 0 || !time.Now().Before(deadline) {
+		resp, total, failed := b.buildFetchResponse(fr, req.Header.APIVersion)
+		// An error is an answer: the client has to act on it (reset its offset,
+		// refresh metadata), and making it wait MaxWait first cost every consumer
+		// offset reset a full fetch.max.wait.ms.
+		if failed || total >= minBytes || wait <= 0 || !time.Now().Before(deadline) {
 			return encodeFetchResponse(req.Header, resp, total), nil
 		}
 		// Wait for a produce to one of these topics or the deadline, then re-read.
@@ -80,12 +101,13 @@ func encodeFetchResponse(header protocol.RequestHeader, resp *kmsg.FetchResponse
 }
 
 // buildFetchResponse reads every requested partition once and returns the response
-// plus the total record bytes gathered (used to decide long-poll satisfaction).
-func (b *Broker) buildFetchResponse(fr *kmsg.FetchRequest, version int16) (*kmsg.FetchResponse, int) {
+// plus the total record bytes gathered (used to decide long-poll satisfaction) and
+// whether any partition answered with an error.
+func (b *Broker) buildFetchResponse(fr *kmsg.FetchRequest, version int16) (*kmsg.FetchResponse, int, bool) {
 	resp := kmsg.NewPtrFetchResponse()
 	resp.SetVersion(version)
 
-	total := 0
+	total, failed := 0, false
 	budget := newFetchBudget(fr.MaxBytes)
 	for _, t := range fr.Topics {
 		rt := kmsg.NewFetchResponseTopic()
@@ -100,22 +122,33 @@ func (b *Broker) buildFetchResponse(fr *kmsg.FetchRequest, version int16) (*kmsg
 			if !ok || part.Partition < 0 || part.Partition >= topic.Partitions {
 				rp.ErrorCode = int16(b.unknownTopicErr(t.Topic))
 				rt.Partitions = append(rt.Partitions, rp)
+				failed = true
 				continue
 			}
 			total += b.readPartition(name, part, fr, &rp, budget)
+			failed = failed || rp.ErrorCode != 0
 			rt.Partitions = append(rt.Partitions, rp)
 		}
 		resp.Topics = append(resp.Topics, rt)
 	}
-	return resp, total
+	if afterFetchRead != nil {
+		afterFetchRead()
+	}
+	return resp, total, failed
 }
 
-// fetchBudget enforces the request-level MaxBytes across partitions. It is a soft
-// limit, as in Kafka: the first partition that has data is returned whole even if
-// it alone exceeds the budget (so a large batch can always be fetched), and no
-// partition after it may push the response past what is left. Without it a
-// request naming 100 backlogged partitions assembled a response 100 times the
-// limit the client asked for.
+// afterFetchRead is a test hook that runs once the partitions have been read and
+// before the caller decides whether to wait: the instant a produce must not be
+// missed.
+var afterFetchRead func()
+
+// fetchBudget enforces the request-level MaxBytes across partitions, as Kafka
+// does: each partition may read up to min(its own limit, what the request has
+// left). The limit is soft in exactly one way: the first batch of the first
+// partition with data is returned even if it alone is larger (so a large batch can
+// always be fetched). Reading each partition against what is left, rather than
+// reading its full allowance and discarding it when it does not fit, is what lets
+// a later partition make progress while an earlier one keeps producing a little.
 type fetchBudget struct {
 	remaining int64
 	gaveData  bool // a partition has already returned data.
@@ -147,6 +180,13 @@ func (b *Broker) readPartition(topic string, part kmsg.FetchRequestTopicPartitio
 	}
 	if maxBytes <= 0 {
 		maxBytes = defaultFetchMaxBytes
+	}
+
+	if maxBytes > budget.remaining {
+		maxBytes = budget.remaining
+	}
+	if maxBytes <= 0 {
+		maxBytes = 1 // nothing left: Read still reports offsets and errors; data is dropped below.
 	}
 
 	data, err := plog.Read(part.FetchOffset, maxBytes)

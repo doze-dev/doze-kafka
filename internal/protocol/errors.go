@@ -25,6 +25,12 @@ const (
 	ErrUnknownServer             ErrorCode = -1
 	ErrUnknownTopicID            ErrorCode = 100
 	ErrInvalidRequest            ErrorCode = 42
+	ErrInvalidRequiredAcks       ErrorCode = 21  // acks is not -1, 0 or 1.
+	ErrInvalidGroupID            ErrorCode = 24  // the group id is empty or unusable.
+	ErrInvalidConfig             ErrorCode = 40  // a topic config key or value is not acceptable.
+	ErrFetchSessionIDNotFound    ErrorCode = 70  // the client continued a fetch session this broker does not keep.
+	ErrFencedInstanceID          ErrorCode = 82  // another member now holds this group.instance.id.
+	ErrUnreleasedInstanceID      ErrorCode = 111 // a live member already holds this group.instance.id.
 
 	// Idempotent producer (sequence-number deduplication).
 	ErrOutOfOrderSequence   ErrorCode = 45 // a gap in the producer's sequence numbers.

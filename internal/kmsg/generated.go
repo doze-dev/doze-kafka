@@ -1288,10 +1288,8 @@ func (v *GroupMetadataValue) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]GroupMetadataValueMember, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]GroupMetadataValueMember, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -1745,10 +1743,8 @@ func (v *TxnMetadataValue) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]TxnMetadataValueTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]TxnMetadataValueTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -1782,10 +1778,8 @@ func (v *TxnMetadataValue) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -2039,10 +2033,8 @@ func (v *ConsumerMemberMetadata) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]string, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]string, 1)...)
 			var v string
 			if unsafe {
 				v = b.UnsafeString()
@@ -2067,10 +2059,8 @@ func (v *ConsumerMemberMetadata) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ConsumerMemberMetadataOwnedPartition, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ConsumerMemberMetadataOwnedPartition, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -2092,10 +2082,8 @@ func (v *ConsumerMemberMetadata) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -2228,10 +2216,8 @@ func (v *ConsumerMemberAssignment) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ConsumerMemberAssignmentTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ConsumerMemberAssignmentTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -2253,10 +2239,8 @@ func (v *ConsumerMemberAssignment) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -2550,10 +2534,8 @@ func (v *ConnectMemberAssignment) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ConnectMemberAssignmentAssignment, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ConnectMemberAssignmentAssignment, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -2575,10 +2557,8 @@ func (v *ConnectMemberAssignment) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int16, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int16, 1)...)
 					v := b.Int16()
 					a[i] = v
 				}
@@ -2598,10 +2578,8 @@ func (v *ConnectMemberAssignment) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ConnectMemberAssignmentRevoked, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ConnectMemberAssignmentRevoked, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -2623,10 +2601,8 @@ func (v *ConnectMemberAssignment) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int16, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int16, 1)...)
 					v := b.Int16()
 					a[i] = v
 				}
@@ -3047,10 +3023,8 @@ func (v *LeaderChangeMessage) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]LeaderChangeMessageVoter, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]LeaderChangeMessageVoter, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -3082,10 +3056,8 @@ func (v *LeaderChangeMessage) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]LeaderChangeMessageVoter, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]LeaderChangeMessageVoter, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -3377,10 +3349,8 @@ func (v *ProduceRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ProduceRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ProduceRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -3418,10 +3388,8 @@ func (v *ProduceRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ProduceRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ProduceRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -4000,10 +3968,8 @@ func (v *ProduceResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ProduceResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ProduceResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -4041,10 +4007,8 @@ func (v *ProduceResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ProduceResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ProduceResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -4081,10 +4045,8 @@ func (v *ProduceResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]ProduceResponseTopicPartitionErrorRecord, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]ProduceResponseTopicPartitionErrorRecord, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -4194,10 +4156,8 @@ func (v *ProduceResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ProduceResponseBroker, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ProduceResponseBroker, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -4832,10 +4792,8 @@ func (v *FetchRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]FetchRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]FetchRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -4873,10 +4831,8 @@ func (v *FetchRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]FetchRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]FetchRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -4950,10 +4906,8 @@ func (v *FetchRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]FetchRequestForgottenTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]FetchRequestForgottenTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -4991,10 +4945,8 @@ func (v *FetchRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -5784,10 +5736,8 @@ func (v *FetchResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]FetchResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]FetchResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -5825,10 +5775,8 @@ func (v *FetchResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]FetchResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]FetchResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -5868,10 +5816,8 @@ func (v *FetchResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]FetchResponseTopicPartitionAbortedTransaction, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]FetchResponseTopicPartitionAbortedTransaction, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -5998,10 +5944,8 @@ func (v *FetchResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]FetchResponseBroker, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]FetchResponseBroker, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -6364,10 +6308,8 @@ func (v *ListOffsetsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ListOffsetsRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ListOffsetsRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -6401,10 +6343,8 @@ func (v *ListOffsetsRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ListOffsetsRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ListOffsetsRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -6731,10 +6671,8 @@ func (v *ListOffsetsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ListOffsetsResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ListOffsetsResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -6768,10 +6706,8 @@ func (v *ListOffsetsResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ListOffsetsResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ListOffsetsResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -6796,10 +6732,8 @@ func (v *ListOffsetsResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int64, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int64, 1)...)
 							v := b.Int64()
 							a[i] = v
 						}
@@ -7042,10 +6976,8 @@ func (v *MetadataRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]MetadataRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]MetadataRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -7557,10 +7489,8 @@ func (v *MetadataResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]MetadataResponseBroker, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]MetadataResponseBroker, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -7647,10 +7577,8 @@ func (v *MetadataResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]MetadataResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]MetadataResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -7714,10 +7642,8 @@ func (v *MetadataResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]MetadataResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]MetadataResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -7750,10 +7676,8 @@ func (v *MetadataResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -7773,10 +7697,8 @@ func (v *MetadataResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -7796,10 +7718,8 @@ func (v *MetadataResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -8373,10 +8293,8 @@ func (v *LeaderAndISRRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]LeaderAndISRRequestTopicPartition, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]LeaderAndISRRequestTopicPartition, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -8426,10 +8344,8 @@ func (v *LeaderAndISRRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -8453,10 +8369,8 @@ func (v *LeaderAndISRRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -8476,10 +8390,8 @@ func (v *LeaderAndISRRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -8499,10 +8411,8 @@ func (v *LeaderAndISRRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -8537,10 +8447,8 @@ func (v *LeaderAndISRRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]LeaderAndISRRequestTopicState, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]LeaderAndISRRequestTopicState, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -8578,10 +8486,8 @@ func (v *LeaderAndISRRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]LeaderAndISRRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]LeaderAndISRRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -8631,10 +8537,8 @@ func (v *LeaderAndISRRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -8658,10 +8562,8 @@ func (v *LeaderAndISRRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -8681,10 +8583,8 @@ func (v *LeaderAndISRRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -8704,10 +8604,8 @@ func (v *LeaderAndISRRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -8749,10 +8647,8 @@ func (v *LeaderAndISRRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]LeaderAndISRRequestLiveLeader, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]LeaderAndISRRequestLiveLeader, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -8990,10 +8886,8 @@ func (v *LeaderAndISRResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]LeaderAndISRResponseTopicPartition, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]LeaderAndISRResponseTopicPartition, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -9042,10 +8936,8 @@ func (v *LeaderAndISRResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]LeaderAndISRResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]LeaderAndISRResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -9066,10 +8958,8 @@ func (v *LeaderAndISRResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]LeaderAndISRResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]LeaderAndISRResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -9391,10 +9281,8 @@ func (v *StopReplicaRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]StopReplicaRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]StopReplicaRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -9432,10 +9320,8 @@ func (v *StopReplicaRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -9455,10 +9341,8 @@ func (v *StopReplicaRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]StopReplicaRequestTopicPartitionState, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]StopReplicaRequestTopicPartitionState, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -9641,10 +9525,8 @@ func (v *StopReplicaResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]StopReplicaResponsePartition, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]StopReplicaResponsePartition, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -10212,10 +10094,8 @@ func (v *UpdateMetadataRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]UpdateMetadataRequestTopicPartition, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]UpdateMetadataRequestTopicPartition, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -10265,10 +10145,8 @@ func (v *UpdateMetadataRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -10292,10 +10170,8 @@ func (v *UpdateMetadataRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -10315,10 +10191,8 @@ func (v *UpdateMetadataRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -10345,10 +10219,8 @@ func (v *UpdateMetadataRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]UpdateMetadataRequestTopicState, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]UpdateMetadataRequestTopicState, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -10386,10 +10258,8 @@ func (v *UpdateMetadataRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]UpdateMetadataRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]UpdateMetadataRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -10439,10 +10309,8 @@ func (v *UpdateMetadataRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -10466,10 +10334,8 @@ func (v *UpdateMetadataRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -10489,10 +10355,8 @@ func (v *UpdateMetadataRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -10526,10 +10390,8 @@ func (v *UpdateMetadataRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]UpdateMetadataRequestLiveBroker, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]UpdateMetadataRequestLiveBroker, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -10571,10 +10433,8 @@ func (v *UpdateMetadataRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]UpdateMetadataRequestLiveBrokerEndpoint, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]UpdateMetadataRequestLiveBrokerEndpoint, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -10998,10 +10858,8 @@ func (v *ControlledShutdownResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ControlledShutdownResponsePartitionsRemaining, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ControlledShutdownResponsePartitionsRemaining, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -11400,10 +11258,8 @@ func (v *OffsetCommitRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]OffsetCommitRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]OffsetCommitRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -11441,10 +11297,8 @@ func (v *OffsetCommitRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]OffsetCommitRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]OffsetCommitRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -11736,10 +11590,8 @@ func (v *OffsetCommitResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]OffsetCommitResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]OffsetCommitResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -11777,10 +11629,8 @@ func (v *OffsetCommitResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]OffsetCommitResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]OffsetCommitResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -12156,10 +12006,8 @@ func (v *OffsetFetchRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]OffsetFetchRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]OffsetFetchRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -12193,10 +12041,8 @@ func (v *OffsetFetchRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -12223,10 +12069,8 @@ func (v *OffsetFetchRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]OffsetFetchRequestGroup, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]OffsetFetchRequestGroup, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -12284,10 +12128,8 @@ func (v *OffsetFetchRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]OffsetFetchRequestGroupTopic, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]OffsetFetchRequestGroupTopic, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -12325,10 +12167,8 @@ func (v *OffsetFetchRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -12790,10 +12630,8 @@ func (v *OffsetFetchResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]OffsetFetchResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]OffsetFetchResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -12827,10 +12665,8 @@ func (v *OffsetFetchResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]OffsetFetchResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]OffsetFetchResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -12898,10 +12734,8 @@ func (v *OffsetFetchResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]OffsetFetchResponseGroup, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]OffsetFetchResponseGroup, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -12935,10 +12769,8 @@ func (v *OffsetFetchResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]OffsetFetchResponseGroupTopic, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]OffsetFetchResponseGroupTopic, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -12976,10 +12808,8 @@ func (v *OffsetFetchResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]OffsetFetchResponseGroupTopicPartition, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]OffsetFetchResponseGroupTopicPartition, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -13206,10 +13036,8 @@ func (v *FindCoordinatorRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]string, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]string, 1)...)
 			var v string
 			if unsafe {
 				if isFlexible {
@@ -13524,10 +13352,8 @@ func (v *FindCoordinatorResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]FindCoordinatorResponseCoordinator, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]FindCoordinatorResponseCoordinator, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -13952,10 +13778,8 @@ func (v *JoinGroupRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]JoinGroupRequestProtocol, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]JoinGroupRequestProtocol, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -14404,10 +14228,8 @@ func (v *JoinGroupResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]JoinGroupResponseMember, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]JoinGroupResponseMember, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -14987,10 +14809,8 @@ func (v *LeaveGroupRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]LeaveGroupRequestMember, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]LeaveGroupRequestMember, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -15244,10 +15064,8 @@ func (v *LeaveGroupResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]LeaveGroupResponseMember, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]LeaveGroupResponseMember, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -15609,10 +15427,8 @@ func (v *SyncGroupRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]SyncGroupRequestGroupAssignment, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]SyncGroupRequestGroupAssignment, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -15972,10 +15788,8 @@ func (v *DescribeGroupsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]string, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]string, 1)...)
 			var v string
 			if unsafe {
 				if isFlexible {
@@ -16334,10 +16148,8 @@ func (v *DescribeGroupsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeGroupsResponseGroup, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeGroupsResponseGroup, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -16443,10 +16255,8 @@ func (v *DescribeGroupsResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DescribeGroupsResponseGroupMember, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DescribeGroupsResponseGroupMember, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -16696,10 +16506,8 @@ func (v *ListGroupsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]string, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]string, 1)...)
 			var v string
 			if unsafe {
 				if isFlexible {
@@ -16732,10 +16540,8 @@ func (v *ListGroupsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]string, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]string, 1)...)
 			var v string
 			if unsafe {
 				if isFlexible {
@@ -16952,10 +16758,8 @@ func (v *ListGroupsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ListGroupsResponseGroup, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ListGroupsResponseGroup, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -17224,10 +17028,8 @@ func (v *SASLHandshakeResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]string, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]string, 1)...)
 			var v string
 			if unsafe {
 				v = b.UnsafeString()
@@ -17752,10 +17554,8 @@ func (v *ApiVersionsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ApiVersionsResponseApiKey, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ApiVersionsResponseApiKey, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -17801,10 +17601,8 @@ func (v *ApiVersionsResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ApiVersionsResponseSupportedFeature, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ApiVersionsResponseSupportedFeature, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -17863,10 +17661,8 @@ func (v *ApiVersionsResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ApiVersionsResponseFinalizedFeature, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ApiVersionsResponseFinalizedFeature, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -18221,10 +18017,8 @@ func (v *CreateTopicsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]CreateTopicsRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]CreateTopicsRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -18266,10 +18060,8 @@ func (v *CreateTopicsRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]CreateTopicsRequestTopicReplicaAssignment, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]CreateTopicsRequestTopicReplicaAssignment, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -18290,10 +18082,8 @@ func (v *CreateTopicsRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -18320,10 +18110,8 @@ func (v *CreateTopicsRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]CreateTopicsRequestTopicConfig, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]CreateTopicsRequestTopicConfig, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -18714,10 +18502,8 @@ func (v *CreateTopicsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]CreateTopicsResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]CreateTopicsResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -18787,10 +18573,8 @@ func (v *CreateTopicsResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]CreateTopicsResponseTopicConfig, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]CreateTopicsResponseTopicConfig, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -19049,10 +18833,8 @@ func (v *DeleteTopicsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]string, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]string, 1)...)
 			var v string
 			if unsafe {
 				if isFlexible {
@@ -19085,10 +18867,8 @@ func (v *DeleteTopicsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DeleteTopicsRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DeleteTopicsRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -19337,10 +19117,8 @@ func (v *DeleteTopicsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DeleteTopicsResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DeleteTopicsResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -19633,10 +19411,8 @@ func (v *DeleteRecordsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DeleteRecordsRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DeleteRecordsRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -19670,10 +19446,8 @@ func (v *DeleteRecordsRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DeleteRecordsRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DeleteRecordsRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -19932,10 +19706,8 @@ func (v *DeleteRecordsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DeleteRecordsResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DeleteRecordsResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -19969,10 +19741,8 @@ func (v *DeleteRecordsResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DeleteRecordsResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DeleteRecordsResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -20540,10 +20310,8 @@ func (v *OffsetForLeaderEpochRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]OffsetForLeaderEpochRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]OffsetForLeaderEpochRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -20577,10 +20345,8 @@ func (v *OffsetForLeaderEpochRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]OffsetForLeaderEpochRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]OffsetForLeaderEpochRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -20870,10 +20636,8 @@ func (v *OffsetForLeaderEpochResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]OffsetForLeaderEpochResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]OffsetForLeaderEpochResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -20907,10 +20671,8 @@ func (v *OffsetForLeaderEpochResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]OffsetForLeaderEpochResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]OffsetForLeaderEpochResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -21293,10 +21055,8 @@ func (v *AddPartitionsToTxnRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AddPartitionsToTxnRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AddPartitionsToTxnRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -21330,10 +21090,8 @@ func (v *AddPartitionsToTxnRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -21360,10 +21118,8 @@ func (v *AddPartitionsToTxnRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AddPartitionsToTxnRequestTransaction, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AddPartitionsToTxnRequestTransaction, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -21409,10 +21165,8 @@ func (v *AddPartitionsToTxnRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]AddPartitionsToTxnRequestTransactionTopic, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]AddPartitionsToTxnRequestTransactionTopic, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -21446,10 +21200,8 @@ func (v *AddPartitionsToTxnRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -21860,10 +21612,8 @@ func (v *AddPartitionsToTxnResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AddPartitionsToTxnResponseTransaction, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AddPartitionsToTxnResponseTransaction, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -21897,10 +21647,8 @@ func (v *AddPartitionsToTxnResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]AddPartitionsToTxnResponseTransactionTopic, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]AddPartitionsToTxnResponseTransactionTopic, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -21934,10 +21682,8 @@ func (v *AddPartitionsToTxnResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]AddPartitionsToTxnResponseTransactionTopicPartition, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]AddPartitionsToTxnResponseTransactionTopicPartition, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -21983,10 +21729,8 @@ func (v *AddPartitionsToTxnResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AddPartitionsToTxnResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AddPartitionsToTxnResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -22020,10 +21764,8 @@ func (v *AddPartitionsToTxnResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]AddPartitionsToTxnResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]AddPartitionsToTxnResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -22870,10 +22612,8 @@ func (v *WriteTxnMarkersRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]WriteTxnMarkersRequestMarker, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]WriteTxnMarkersRequestMarker, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -22902,10 +22642,8 @@ func (v *WriteTxnMarkersRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]WriteTxnMarkersRequestMarkerTopic, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]WriteTxnMarkersRequestMarkerTopic, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -22939,10 +22677,8 @@ func (v *WriteTxnMarkersRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -23212,10 +22948,8 @@ func (v *WriteTxnMarkersResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]WriteTxnMarkersResponseMarker, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]WriteTxnMarkersResponseMarker, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -23236,10 +22970,8 @@ func (v *WriteTxnMarkersResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]WriteTxnMarkersResponseMarkerTopic, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]WriteTxnMarkersResponseMarkerTopic, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -23273,10 +23005,8 @@ func (v *WriteTxnMarkersResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]WriteTxnMarkersResponseMarkerTopicPartition, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]WriteTxnMarkersResponseMarkerTopicPartition, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -23684,10 +23414,8 @@ func (v *TxnOffsetCommitRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]TxnOffsetCommitRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]TxnOffsetCommitRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -23721,10 +23449,8 @@ func (v *TxnOffsetCommitRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]TxnOffsetCommitRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]TxnOffsetCommitRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -24014,10 +23740,8 @@ func (v *TxnOffsetCommitResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]TxnOffsetCommitResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]TxnOffsetCommitResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -24051,10 +23775,8 @@ func (v *TxnOffsetCommitResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]TxnOffsetCommitResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]TxnOffsetCommitResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -24632,10 +24354,8 @@ func (v *DescribeACLsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeACLsResponseResource, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeACLsResponseResource, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -24687,10 +24407,8 @@ func (v *DescribeACLsResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DescribeACLsResponseResourceACL, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DescribeACLsResponseResourceACL, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -24981,10 +24699,8 @@ func (v *CreateACLsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]CreateACLsRequestCreation, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]CreateACLsRequestCreation, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -25238,10 +24954,8 @@ func (v *CreateACLsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]CreateACLsResponseResult, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]CreateACLsResponseResult, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -25476,10 +25190,8 @@ func (v *DeleteACLsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DeleteACLsRequestFilter, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DeleteACLsRequestFilter, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -25855,10 +25567,8 @@ func (v *DeleteACLsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DeleteACLsResponseResult, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DeleteACLsResponseResult, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -25896,10 +25606,8 @@ func (v *DeleteACLsResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DeleteACLsResponseResultMatchingACL, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DeleteACLsResponseResultMatchingACL, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -26223,10 +25931,8 @@ func (v *DescribeConfigsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeConfigsRequestResource, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeConfigsRequestResource, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -26272,10 +25978,8 @@ func (v *DescribeConfigsRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]string, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]string, 1)...)
 					var v string
 					if unsafe {
 						if isFlexible {
@@ -26694,10 +26398,8 @@ func (v *DescribeConfigsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeConfigsResponseResource, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeConfigsResponseResource, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -26761,10 +26463,8 @@ func (v *DescribeConfigsResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DescribeConfigsResponseResourceConfig, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DescribeConfigsResponseResourceConfig, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -26836,10 +26536,8 @@ func (v *DescribeConfigsResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]DescribeConfigsResponseResourceConfigConfigSynonym, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]DescribeConfigsResponseResourceConfigConfigSynonym, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -27176,10 +26874,8 @@ func (v *AlterConfigsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AlterConfigsRequestResource, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AlterConfigsRequestResource, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -27222,10 +26918,8 @@ func (v *AlterConfigsRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]AlterConfigsRequestResourceConfig, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]AlterConfigsRequestResourceConfig, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -27472,10 +27166,8 @@ func (v *AlterConfigsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AlterConfigsResponseResource, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AlterConfigsResponseResource, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -27743,10 +27435,8 @@ func (v *AlterReplicaLogDirsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AlterReplicaLogDirsRequestDir, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AlterReplicaLogDirsRequestDir, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -27780,10 +27470,8 @@ func (v *AlterReplicaLogDirsRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]AlterReplicaLogDirsRequestDirTopic, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]AlterReplicaLogDirsRequestDirTopic, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -27817,10 +27505,8 @@ func (v *AlterReplicaLogDirsRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -28060,10 +27746,8 @@ func (v *AlterReplicaLogDirsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AlterReplicaLogDirsResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AlterReplicaLogDirsResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -28097,10 +27781,8 @@ func (v *AlterReplicaLogDirsResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]AlterReplicaLogDirsResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]AlterReplicaLogDirsResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -28290,10 +27972,8 @@ func (v *DescribeLogDirsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeLogDirsRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeLogDirsRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -28327,10 +28007,8 @@ func (v *DescribeLogDirsRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -28664,10 +28342,8 @@ func (v *DescribeLogDirsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeLogDirsResponseDir, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeLogDirsResponseDir, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -28705,10 +28381,8 @@ func (v *DescribeLogDirsResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DescribeLogDirsResponseDirTopic, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DescribeLogDirsResponseDirTopic, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -28742,10 +28416,8 @@ func (v *DescribeLogDirsResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]DescribeLogDirsResponseDirTopicPartition, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]DescribeLogDirsResponseDirTopicPartition, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -29285,10 +28957,8 @@ func (v *CreatePartitionsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]CreatePartitionsRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]CreatePartitionsRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -29329,10 +28999,8 @@ func (v *CreatePartitionsRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]CreatePartitionsRequestTopicAssignment, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]CreatePartitionsRequestTopicAssignment, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -29349,10 +29017,8 @@ func (v *CreatePartitionsRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -29576,10 +29242,8 @@ func (v *CreatePartitionsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]CreatePartitionsResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]CreatePartitionsResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -29862,10 +29526,8 @@ func (v *CreateDelegationTokenRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]CreateDelegationTokenRequestRenewer, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]CreateDelegationTokenRequestRenewer, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -30864,10 +30526,8 @@ func (v *DescribeDelegationTokenRequest) readFrom(src []byte, unsafe bool) error
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeDelegationTokenRequestOwner, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeDelegationTokenRequestOwner, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -31210,10 +30870,8 @@ func (v *DescribeDelegationTokenResponse) readFrom(src []byte, unsafe bool) erro
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeDelegationTokenResponseTokenDetail, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeDelegationTokenResponseTokenDetail, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -31336,10 +30994,8 @@ func (v *DescribeDelegationTokenResponse) readFrom(src []byte, unsafe bool) erro
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DescribeDelegationTokenResponseTokenDetailRenewer, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DescribeDelegationTokenResponseTokenDetailRenewer, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -31514,10 +31170,8 @@ func (v *DeleteGroupsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]string, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]string, 1)...)
 			var v string
 			if unsafe {
 				if isFlexible {
@@ -31706,10 +31360,8 @@ func (v *DeleteGroupsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DeleteGroupsResponseGroup, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DeleteGroupsResponseGroup, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -31937,10 +31589,8 @@ func (v *ElectLeadersRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ElectLeadersRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ElectLeadersRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -31974,10 +31624,8 @@ func (v *ElectLeadersRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -32232,10 +31880,8 @@ func (v *ElectLeadersResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ElectLeadersResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ElectLeadersResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -32269,10 +31915,8 @@ func (v *ElectLeadersResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ElectLeadersResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ElectLeadersResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -32573,10 +32217,8 @@ func (v *IncrementalAlterConfigsRequest) readFrom(src []byte, unsafe bool) error
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]IncrementalAlterConfigsRequestResource, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]IncrementalAlterConfigsRequestResource, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -32619,10 +32261,8 @@ func (v *IncrementalAlterConfigsRequest) readFrom(src []byte, unsafe bool) error
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]IncrementalAlterConfigsRequestResourceConfig, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]IncrementalAlterConfigsRequestResourceConfig, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -32883,10 +32523,8 @@ func (v *IncrementalAlterConfigsResponse) readFrom(src []byte, unsafe bool) erro
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]IncrementalAlterConfigsResponseResource, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]IncrementalAlterConfigsResponseResource, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -33185,10 +32823,8 @@ func (v *AlterPartitionAssignmentsRequest) readFrom(src []byte, unsafe bool) err
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AlterPartitionAssignmentsRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AlterPartitionAssignmentsRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -33222,10 +32858,8 @@ func (v *AlterPartitionAssignmentsRequest) readFrom(src []byte, unsafe bool) err
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]AlterPartitionAssignmentsRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]AlterPartitionAssignmentsRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -33249,10 +32883,8 @@ func (v *AlterPartitionAssignmentsRequest) readFrom(src []byte, unsafe bool) err
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -33556,10 +33188,8 @@ func (v *AlterPartitionAssignmentsResponse) readFrom(src []byte, unsafe bool) er
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AlterPartitionAssignmentsResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AlterPartitionAssignmentsResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -33593,10 +33223,8 @@ func (v *AlterPartitionAssignmentsResponse) readFrom(src []byte, unsafe bool) er
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]AlterPartitionAssignmentsResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]AlterPartitionAssignmentsResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -33827,10 +33455,8 @@ func (v *ListPartitionReassignmentsRequest) readFrom(src []byte, unsafe bool) er
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ListPartitionReassignmentsRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ListPartitionReassignmentsRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -33864,10 +33490,8 @@ func (v *ListPartitionReassignmentsRequest) readFrom(src []byte, unsafe bool) er
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -34170,10 +33794,8 @@ func (v *ListPartitionReassignmentsResponse) readFrom(src []byte, unsafe bool) e
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ListPartitionReassignmentsResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ListPartitionReassignmentsResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -34207,10 +33829,8 @@ func (v *ListPartitionReassignmentsResponse) readFrom(src []byte, unsafe bool) e
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ListPartitionReassignmentsResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ListPartitionReassignmentsResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -34231,10 +33851,8 @@ func (v *ListPartitionReassignmentsResponse) readFrom(src []byte, unsafe bool) e
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -34254,10 +33872,8 @@ func (v *ListPartitionReassignmentsResponse) readFrom(src []byte, unsafe bool) e
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -34277,10 +33893,8 @@ func (v *ListPartitionReassignmentsResponse) readFrom(src []byte, unsafe bool) e
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -34468,10 +34082,8 @@ func (v *OffsetDeleteRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]OffsetDeleteRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]OffsetDeleteRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -34493,10 +34105,8 @@ func (v *OffsetDeleteRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]OffsetDeleteRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]OffsetDeleteRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -34696,10 +34306,8 @@ func (v *OffsetDeleteResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]OffsetDeleteResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]OffsetDeleteResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -34721,10 +34329,8 @@ func (v *OffsetDeleteResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]OffsetDeleteResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]OffsetDeleteResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -34920,10 +34526,8 @@ func (v *DescribeClientQuotasRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeClientQuotasRequestComponent, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeClientQuotasRequestComponent, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -35277,10 +34881,8 @@ func (v *DescribeClientQuotasResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeClientQuotasResponseEntry, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeClientQuotasResponseEntry, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -35297,10 +34899,8 @@ func (v *DescribeClientQuotasResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DescribeClientQuotasResponseEntryEntity, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DescribeClientQuotasResponseEntryEntity, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -35358,10 +34958,8 @@ func (v *DescribeClientQuotasResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DescribeClientQuotasResponseEntryValue, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DescribeClientQuotasResponseEntryValue, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -35661,10 +35259,8 @@ func (v *AlterClientQuotasRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AlterClientQuotasRequestEntry, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AlterClientQuotasRequestEntry, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -35681,10 +35277,8 @@ func (v *AlterClientQuotasRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]AlterClientQuotasRequestEntryEntity, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]AlterClientQuotasRequestEntryEntity, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -35742,10 +35336,8 @@ func (v *AlterClientQuotasRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]AlterClientQuotasRequestEntryOp, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]AlterClientQuotasRequestEntryOp, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -36007,10 +35599,8 @@ func (v *AlterClientQuotasResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AlterClientQuotasResponseEntry, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AlterClientQuotasResponseEntry, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -36048,10 +35638,8 @@ func (v *AlterClientQuotasResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]AlterClientQuotasResponseEntryEntity, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]AlterClientQuotasResponseEntryEntity, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -36256,10 +35844,8 @@ func (v *DescribeUserSCRAMCredentialsRequest) readFrom(src []byte, unsafe bool) 
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeUserSCRAMCredentialsRequestUser, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeUserSCRAMCredentialsRequestUser, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -36555,10 +36141,8 @@ func (v *DescribeUserSCRAMCredentialsResponse) readFrom(src []byte, unsafe bool)
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeUserSCRAMCredentialsResponseResult, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeUserSCRAMCredentialsResponseResult, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -36613,10 +36197,8 @@ func (v *DescribeUserSCRAMCredentialsResponse) readFrom(src []byte, unsafe bool)
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DescribeUserSCRAMCredentialsResponseResultCredentialInfo, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DescribeUserSCRAMCredentialsResponseResultCredentialInfo, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -36885,10 +36467,8 @@ func (v *AlterUserSCRAMCredentialsRequest) readFrom(src []byte, unsafe bool) err
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AlterUserSCRAMCredentialsRequestDeletion, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AlterUserSCRAMCredentialsRequestDeletion, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -36933,10 +36513,8 @@ func (v *AlterUserSCRAMCredentialsRequest) readFrom(src []byte, unsafe bool) err
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AlterUserSCRAMCredentialsRequestUpsertion, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AlterUserSCRAMCredentialsRequestUpsertion, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -37162,10 +36740,8 @@ func (v *AlterUserSCRAMCredentialsResponse) readFrom(src []byte, unsafe bool) er
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AlterUserSCRAMCredentialsResponseResult, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AlterUserSCRAMCredentialsResponseResult, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -37489,10 +37065,8 @@ func (v *VoteRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]VoteRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]VoteRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -37526,10 +37100,8 @@ func (v *VoteRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]VoteRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]VoteRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -37862,10 +37434,8 @@ func (v *VoteResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]VoteResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]VoteResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -37899,10 +37469,8 @@ func (v *VoteResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]VoteResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]VoteResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -37959,10 +37527,8 @@ func (v *VoteResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]VoteResponseNodeEndpoint, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]VoteResponseNodeEndpoint, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -38312,10 +37878,8 @@ func (v *BeginQuorumEpochRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]BeginQuorumEpochRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]BeginQuorumEpochRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -38349,10 +37913,8 @@ func (v *BeginQuorumEpochRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]BeginQuorumEpochRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]BeginQuorumEpochRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -38399,10 +37961,8 @@ func (v *BeginQuorumEpochRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]BeginQuorumEpochRequestLeaderEndpoint, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]BeginQuorumEpochRequestLeaderEndpoint, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -38729,10 +38289,8 @@ func (v *BeginQuorumEpochResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]BeginQuorumEpochResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]BeginQuorumEpochResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -38766,10 +38324,8 @@ func (v *BeginQuorumEpochResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]BeginQuorumEpochResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]BeginQuorumEpochResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -38822,10 +38378,8 @@ func (v *BeginQuorumEpochResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]BeginQuorumEpochResponseNodeEndpoint, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]BeginQuorumEpochResponseNodeEndpoint, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -39218,10 +38772,8 @@ func (v *EndQuorumEpochRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]EndQuorumEpochRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]EndQuorumEpochRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -39255,10 +38807,8 @@ func (v *EndQuorumEpochRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]EndQuorumEpochRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]EndQuorumEpochRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -39287,10 +38837,8 @@ func (v *EndQuorumEpochRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -39310,10 +38858,8 @@ func (v *EndQuorumEpochRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]EndQuorumEpochRequestTopicPartitionPreferredCandidate, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]EndQuorumEpochRequestTopicPartitionPreferredCandidate, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -39359,10 +38905,8 @@ func (v *EndQuorumEpochRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]EndQuorumEpochRequestLeaderEndpoint, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]EndQuorumEpochRequestLeaderEndpoint, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -39688,10 +39232,8 @@ func (v *EndQuorumEpochResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]EndQuorumEpochResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]EndQuorumEpochResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -39725,10 +39267,8 @@ func (v *EndQuorumEpochResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]EndQuorumEpochResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]EndQuorumEpochResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -39781,10 +39321,8 @@ func (v *EndQuorumEpochResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]EndQuorumEpochResponseNodeEndpoint, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]EndQuorumEpochResponseNodeEndpoint, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -40049,10 +39587,8 @@ func (v *DescribeQuorumRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeQuorumRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeQuorumRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -40086,10 +39622,8 @@ func (v *DescribeQuorumRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DescribeQuorumRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DescribeQuorumRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -40531,10 +40065,8 @@ func (v *DescribeQuorumResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeQuorumResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeQuorumResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -40568,10 +40100,8 @@ func (v *DescribeQuorumResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DescribeQuorumResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DescribeQuorumResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -40625,10 +40155,8 @@ func (v *DescribeQuorumResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]DescribeQuorumResponseTopicPartitionReplicaState, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]DescribeQuorumResponseTopicPartitionReplicaState, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -40672,10 +40200,8 @@ func (v *DescribeQuorumResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]DescribeQuorumResponseTopicPartitionReplicaState, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]DescribeQuorumResponseTopicPartitionReplicaState, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -40733,10 +40259,8 @@ func (v *DescribeQuorumResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeQuorumResponseNode, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeQuorumResponseNode, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -40757,10 +40281,8 @@ func (v *DescribeQuorumResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DescribeQuorumResponseNodeListener, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DescribeQuorumResponseNodeListener, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -41122,10 +40644,8 @@ func (v *AlterPartitionRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AlterPartitionRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AlterPartitionRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -41163,10 +40683,8 @@ func (v *AlterPartitionRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]AlterPartitionRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]AlterPartitionRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -41191,10 +40709,8 @@ func (v *AlterPartitionRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -41214,10 +40730,8 @@ func (v *AlterPartitionRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]AlterPartitionRequestTopicPartitionNewEpochISR, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]AlterPartitionRequestTopicPartitionNewEpochISR, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -41510,10 +41024,8 @@ func (v *AlterPartitionResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AlterPartitionResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AlterPartitionResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -41551,10 +41063,8 @@ func (v *AlterPartitionResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]AlterPartitionResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]AlterPartitionResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -41587,10 +41097,8 @@ func (v *AlterPartitionResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -41820,10 +41328,8 @@ func (v *UpdateFeaturesRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]UpdateFeaturesRequestFeatureUpdate, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]UpdateFeaturesRequestFeatureUpdate, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -42071,10 +41577,8 @@ func (v *UpdateFeaturesResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]UpdateFeaturesResponseResult, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]UpdateFeaturesResponseResult, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -42694,10 +42198,8 @@ func (v *FetchSnapshotRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]FetchSnapshotRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]FetchSnapshotRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -42731,10 +42233,8 @@ func (v *FetchSnapshotRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]FetchSnapshotRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]FetchSnapshotRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -43240,10 +42740,8 @@ func (v *FetchSnapshotResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]FetchSnapshotResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]FetchSnapshotResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -43277,10 +42775,8 @@ func (v *FetchSnapshotResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]FetchSnapshotResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]FetchSnapshotResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -43382,10 +42878,8 @@ func (v *FetchSnapshotResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]FetchSnapshotResponseNodeEndpoint, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]FetchSnapshotResponseNodeEndpoint, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -43830,10 +43324,8 @@ func (v *DescribeClusterResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeClusterResponseBroker, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeClusterResponseBroker, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -44060,10 +43552,8 @@ func (v *DescribeProducersRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeProducersRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeProducersRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -44097,10 +43587,8 @@ func (v *DescribeProducersRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -44417,10 +43905,8 @@ func (v *DescribeProducersResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeProducersResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeProducersResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -44454,10 +43940,8 @@ func (v *DescribeProducersResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DescribeProducersResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DescribeProducersResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -44499,10 +43983,8 @@ func (v *DescribeProducersResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]DescribeProducersResponseTopicPartitionActiveProducer, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]DescribeProducersResponseTopicPartitionActiveProducer, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -44875,10 +44357,8 @@ func (v *BrokerRegistrationRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]BrokerRegistrationRequestListener, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]BrokerRegistrationRequestListener, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -44944,10 +44424,8 @@ func (v *BrokerRegistrationRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]BrokerRegistrationRequestFeature, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]BrokerRegistrationRequestFeature, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -45017,10 +44495,8 @@ func (v *BrokerRegistrationRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([][16]byte, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([][16]byte, 1)...)
 			v := b.Uuid()
 			a[i] = v
 		}
@@ -45344,10 +44820,8 @@ func (v *BrokerHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([][16]byte, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([][16]byte, 1)...)
 					v := b.Uuid()
 					a[i] = v
 				}
@@ -45836,10 +45310,8 @@ func (v *DescribeTransactionsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]string, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]string, 1)...)
 			var v string
 			if unsafe {
 				if isFlexible {
@@ -46133,10 +45605,8 @@ func (v *DescribeTransactionsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeTransactionsResponseTransactionState, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeTransactionsResponseTransactionState, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -46207,10 +45677,8 @@ func (v *DescribeTransactionsResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DescribeTransactionsResponseTransactionStateTopic, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DescribeTransactionsResponseTransactionStateTopic, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -46244,10 +45712,8 @@ func (v *DescribeTransactionsResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -46430,10 +45896,8 @@ func (v *ListTransactionsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]string, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]string, 1)...)
 			var v string
 			if unsafe {
 				if isFlexible {
@@ -46466,10 +45930,8 @@ func (v *ListTransactionsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]int64, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]int64, 1)...)
 			v := b.Int64()
 			a[i] = v
 		}
@@ -46707,10 +46169,8 @@ func (v *ListTransactionsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]string, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]string, 1)...)
 			var v string
 			if unsafe {
 				if isFlexible {
@@ -46743,10 +46203,8 @@ func (v *ListTransactionsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ListTransactionsResponseTransactionState, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ListTransactionsResponseTransactionState, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -47373,10 +46831,8 @@ func (v *ConsumerGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error 
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]string, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]string, 1)...)
 			var v string
 			if unsafe {
 				if isFlexible {
@@ -47446,10 +46902,8 @@ func (v *ConsumerGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error 
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ConsumerGroupHeartbeatRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ConsumerGroupHeartbeatRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -47470,10 +46924,8 @@ func (v *ConsumerGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error 
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -47792,10 +47244,8 @@ func (v *ConsumerGroupHeartbeatResponse) readFrom(src []byte, unsafe bool) error
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ConsumerGroupHeartbeatResponseAssignmentTopic, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ConsumerGroupHeartbeatResponseAssignmentTopic, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -47816,10 +47266,8 @@ func (v *ConsumerGroupHeartbeatResponse) readFrom(src []byte, unsafe bool) error
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -47988,10 +47436,8 @@ func (v *ConsumerGroupDescribeRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]string, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]string, 1)...)
 			var v string
 			if unsafe {
 				if isFlexible {
@@ -48484,10 +47930,8 @@ func (v *ConsumerGroupDescribeResponse) readFrom(src []byte, unsafe bool) error 
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ConsumerGroupDescribeResponseGroup, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ConsumerGroupDescribeResponseGroup, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -48584,10 +48028,8 @@ func (v *ConsumerGroupDescribeResponse) readFrom(src []byte, unsafe bool) error 
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ConsumerGroupDescribeResponseGroupMember, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ConsumerGroupDescribeResponseGroupMember, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -48693,10 +48135,8 @@ func (v *ConsumerGroupDescribeResponse) readFrom(src []byte, unsafe bool) error 
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]string, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]string, 1)...)
 							var v string
 							if unsafe {
 								if isFlexible {
@@ -48750,10 +48190,8 @@ func (v *ConsumerGroupDescribeResponse) readFrom(src []byte, unsafe bool) error 
 								return b.Complete()
 							}
 							a = a[:0]
-							if l > 0 {
-								a = append(a, make([]AssignmentTopicPartition, l)...)
-							}
-							for i := int32(0); i < l; i++ {
+							for i := int32(0); i < l && b.Ok(); i++ {
+								a = append(a, make([]AssignmentTopicPartition, 1)...)
 								v := &a[i]
 								v.Default()
 								s := v
@@ -48791,10 +48229,8 @@ func (v *ConsumerGroupDescribeResponse) readFrom(src []byte, unsafe bool) error 
 										return b.Complete()
 									}
 									a = a[:0]
-									if l > 0 {
-										a = append(a, make([]int32, l)...)
-									}
-									for i := int32(0); i < l; i++ {
+									for i := int32(0); i < l && b.Ok(); i++ {
+										a = append(a, make([]int32, 1)...)
 										v := b.Int32()
 										a[i] = v
 									}
@@ -48829,10 +48265,8 @@ func (v *ConsumerGroupDescribeResponse) readFrom(src []byte, unsafe bool) error 
 								return b.Complete()
 							}
 							a = a[:0]
-							if l > 0 {
-								a = append(a, make([]AssignmentTopicPartition, l)...)
-							}
-							for i := int32(0); i < l; i++ {
+							for i := int32(0); i < l && b.Ok(); i++ {
+								a = append(a, make([]AssignmentTopicPartition, 1)...)
 								v := &a[i]
 								v.Default()
 								s := v
@@ -48870,10 +48304,8 @@ func (v *ConsumerGroupDescribeResponse) readFrom(src []byte, unsafe bool) error 
 										return b.Complete()
 									}
 									a = a[:0]
-									if l > 0 {
-										a = append(a, make([]int32, l)...)
-									}
-									for i := int32(0); i < l; i++ {
+									for i := int32(0); i < l && b.Ok(); i++ {
+										a = append(a, make([]int32, 1)...)
 										v := b.Int32()
 										a[i] = v
 									}
@@ -49172,10 +48604,8 @@ func (v *ControllerRegistrationRequest) readFrom(src []byte, unsafe bool) error 
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ControllerRegistrationRequestListener, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ControllerRegistrationRequestListener, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -49241,10 +48671,8 @@ func (v *ControllerRegistrationRequest) readFrom(src []byte, unsafe bool) error 
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ControllerRegistrationRequestFeature, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ControllerRegistrationRequestFeature, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -49700,10 +49128,8 @@ func (v *GetTelemetrySubscriptionsResponse) readFrom(src []byte, unsafe bool) er
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]int8, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]int8, 1)...)
 			v := b.Int8()
 			a[i] = v
 		}
@@ -49735,10 +49161,8 @@ func (v *GetTelemetrySubscriptionsResponse) readFrom(src []byte, unsafe bool) er
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]string, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]string, 1)...)
 			var v string
 			if unsafe {
 				if isFlexible {
@@ -50254,10 +49678,8 @@ func (v *AssignReplicasToDirsRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AssignReplicasToDirsRequestDirectory, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AssignReplicasToDirsRequestDirectory, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -50278,10 +49700,8 @@ func (v *AssignReplicasToDirsRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]AssignReplicasToDirsRequestDirectoryTopic, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]AssignReplicasToDirsRequestDirectoryTopic, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -50302,10 +49722,8 @@ func (v *AssignReplicasToDirsRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]AssignReplicasToDirsRequestDirectoryTopicPartition, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]AssignReplicasToDirsRequestDirectoryTopicPartition, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -50581,10 +49999,8 @@ func (v *AssignReplicasToDirsResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AssignReplicasToDirsResponseDirectory, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AssignReplicasToDirsResponseDirectory, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -50605,10 +50021,8 @@ func (v *AssignReplicasToDirsResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]AssignReplicasToDirsResponseDirectoryTopic, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]AssignReplicasToDirsResponseDirectoryTopic, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -50629,10 +50043,8 @@ func (v *AssignReplicasToDirsResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]AssignReplicasToDirsResponseDirectoryTopicPartition, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]AssignReplicasToDirsResponseDirectoryTopicPartition, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -50781,10 +50193,8 @@ func (v *ListConfigResourcesRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]int8, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]int8, 1)...)
 			v := b.Int8()
 			a[i] = v
 		}
@@ -50963,10 +50373,8 @@ func (v *ListConfigResourcesResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ListConfigResourcesResponseConfigResource, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ListConfigResourcesResponseConfigResource, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -51206,10 +50614,8 @@ func (v *DescribeTopicPartitionsRequest) readFrom(src []byte, unsafe bool) error
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeTopicPartitionsRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeTopicPartitionsRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -51653,10 +51059,8 @@ func (v *DescribeTopicPartitionsResponse) readFrom(src []byte, unsafe bool) erro
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeTopicPartitionsResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeTopicPartitionsResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -51702,10 +51106,8 @@ func (v *DescribeTopicPartitionsResponse) readFrom(src []byte, unsafe bool) erro
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DescribeTopicPartitionsResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DescribeTopicPartitionsResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -51738,10 +51140,8 @@ func (v *DescribeTopicPartitionsResponse) readFrom(src []byte, unsafe bool) erro
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -51761,10 +51161,8 @@ func (v *DescribeTopicPartitionsResponse) readFrom(src []byte, unsafe bool) erro
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -51787,10 +51185,8 @@ func (v *DescribeTopicPartitionsResponse) readFrom(src []byte, unsafe bool) erro
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -51813,10 +51209,8 @@ func (v *DescribeTopicPartitionsResponse) readFrom(src []byte, unsafe bool) erro
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -51836,10 +51230,8 @@ func (v *DescribeTopicPartitionsResponse) readFrom(src []byte, unsafe bool) erro
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -52119,10 +51511,8 @@ func (v *ShareGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]string, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]string, 1)...)
 			var v string
 			if unsafe {
 				if isFlexible {
@@ -52448,10 +51838,8 @@ func (v *ShareGroupHeartbeatResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ShareGroupHeartbeatResponseAssignmentTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ShareGroupHeartbeatResponseAssignmentTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -52472,10 +51860,8 @@ func (v *ShareGroupHeartbeatResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -52627,10 +52013,8 @@ func (v *ShareGroupDescribeRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]string, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]string, 1)...)
 			var v string
 			if unsafe {
 				if isFlexible {
@@ -53089,10 +52473,8 @@ func (v *ShareGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ShareGroupDescribeResponseGroup, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ShareGroupDescribeResponseGroup, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -53189,10 +52571,8 @@ func (v *ShareGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ShareGroupDescribeResponseGroupMember, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ShareGroupDescribeResponseGroupMember, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -53281,10 +52661,8 @@ func (v *ShareGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]string, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]string, 1)...)
 							var v string
 							if unsafe {
 								if isFlexible {
@@ -53321,10 +52699,8 @@ func (v *ShareGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 								return b.Complete()
 							}
 							a = a[:0]
-							if l > 0 {
-								a = append(a, make([]ShareGroupDescribeResponseGroupMemberAssignmentTopicPartition, l)...)
-							}
-							for i := int32(0); i < l; i++ {
+							for i := int32(0); i < l && b.Ok(); i++ {
+								a = append(a, make([]ShareGroupDescribeResponseGroupMemberAssignmentTopicPartition, 1)...)
 								v := &a[i]
 								v.Default()
 								s := v
@@ -53362,10 +52738,8 @@ func (v *ShareGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 										return b.Complete()
 									}
 									a = a[:0]
-									if l > 0 {
-										a = append(a, make([]int32, l)...)
-									}
-									for i := int32(0); i < l; i++ {
+									for i := int32(0); i < l && b.Ok(); i++ {
+										a = append(a, make([]int32, 1)...)
 										v := b.Int32()
 										a[i] = v
 									}
@@ -53879,10 +53253,8 @@ func (v *ShareFetchRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ShareFetchRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ShareFetchRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -53903,10 +53275,8 @@ func (v *ShareFetchRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ShareFetchRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ShareFetchRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -53931,10 +53301,8 @@ func (v *ShareFetchRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]ShareFetchRequestTopicPartitionAcknowledgementBatch, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]ShareFetchRequestTopicPartitionAcknowledgementBatch, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -53959,10 +53327,8 @@ func (v *ShareFetchRequest) readFrom(src []byte, unsafe bool) error {
 									return b.Complete()
 								}
 								a = a[:0]
-								if l > 0 {
-									a = append(a, make([]int8, l)...)
-								}
-								for i := int32(0); i < l; i++ {
+								for i := int32(0); i < l && b.Ok(); i++ {
+									a = append(a, make([]int8, 1)...)
 									v := b.Int8()
 									a[i] = v
 								}
@@ -54003,10 +53369,8 @@ func (v *ShareFetchRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ShareFetchRequestForgottenTopicsData, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ShareFetchRequestForgottenTopicsData, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -54027,10 +53391,8 @@ func (v *ShareFetchRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -54525,10 +53887,8 @@ func (v *ShareFetchResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ShareFetchResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ShareFetchResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -54549,10 +53909,8 @@ func (v *ShareFetchResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ShareFetchResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ShareFetchResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -54640,10 +53998,8 @@ func (v *ShareFetchResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]ShareFetchResponseTopicPartitionAcquiredRecord, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]ShareFetchResponseTopicPartitionAcquiredRecord, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -54693,10 +54049,8 @@ func (v *ShareFetchResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ShareFetchResponseNodeEndpoint, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ShareFetchResponseNodeEndpoint, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -55087,10 +54441,8 @@ func (v *ShareAcknowledgeRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ShareAcknowledgeRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ShareAcknowledgeRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -55111,10 +54463,8 @@ func (v *ShareAcknowledgeRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ShareAcknowledgeRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ShareAcknowledgeRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -55135,10 +54485,8 @@ func (v *ShareAcknowledgeRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]ShareAcknowledgeRequestTopicPartitionAcknowledgementBatch, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]ShareAcknowledgeRequestTopicPartitionAcknowledgementBatch, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -55163,10 +54511,8 @@ func (v *ShareAcknowledgeRequest) readFrom(src []byte, unsafe bool) error {
 									return b.Complete()
 								}
 								a = a[:0]
-								if l > 0 {
-									a = append(a, make([]int8, l)...)
-								}
-								for i := int32(0); i < l; i++ {
+								for i := int32(0); i < l && b.Ok(); i++ {
+									a = append(a, make([]int8, 1)...)
 									v := b.Int8()
 									a[i] = v
 								}
@@ -55587,10 +54933,8 @@ func (v *ShareAcknowledgeResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ShareAcknowledgeResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ShareAcknowledgeResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -55611,10 +54955,8 @@ func (v *ShareAcknowledgeResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ShareAcknowledgeResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ShareAcknowledgeResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -55686,10 +55028,8 @@ func (v *ShareAcknowledgeResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ShareAcknowledgeResponseNodeEndpoint, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ShareAcknowledgeResponseNodeEndpoint, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -55984,10 +55324,8 @@ func (v *AddRaftVoterRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AddRaftVoterRequestListener, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AddRaftVoterRequestListener, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -56690,10 +56028,8 @@ func (v *UpdateRaftVoterRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]UpdateRaftVoterRequestListener, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]UpdateRaftVoterRequestListener, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -57227,10 +56563,8 @@ func (v *InitializeShareGroupStateRequest) readFrom(src []byte, unsafe bool) err
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]InitializeShareGroupStateRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]InitializeShareGroupStateRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -57251,10 +56585,8 @@ func (v *InitializeShareGroupStateRequest) readFrom(src []byte, unsafe bool) err
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]InitializeShareGroupStateRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]InitializeShareGroupStateRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -57481,10 +56813,8 @@ func (v *InitializeShareGroupStateResponse) readFrom(src []byte, unsafe bool) er
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]InitializeShareGroupStateResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]InitializeShareGroupStateResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -57505,10 +56835,8 @@ func (v *InitializeShareGroupStateResponse) readFrom(src []byte, unsafe bool) er
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]InitializeShareGroupStateResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]InitializeShareGroupStateResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -57770,10 +57098,8 @@ func (v *ReadShareGroupStateRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ReadShareGroupStateRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ReadShareGroupStateRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -57794,10 +57120,8 @@ func (v *ReadShareGroupStateRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ReadShareGroupStateRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ReadShareGroupStateRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -58102,10 +57426,8 @@ func (v *ReadShareGroupStateResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ReadShareGroupStateResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ReadShareGroupStateResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -58126,10 +57448,8 @@ func (v *ReadShareGroupStateResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ReadShareGroupStateResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ReadShareGroupStateResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -58179,10 +57499,8 @@ func (v *ReadShareGroupStateResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]ReadShareGroupStateResponseTopicPartitionStateBatch, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]ReadShareGroupStateResponseTopicPartitionStateBatch, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -58534,10 +57852,8 @@ func (v *WriteShareGroupStateRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]WriteShareGroupStateRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]WriteShareGroupStateRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -58558,10 +57874,8 @@ func (v *WriteShareGroupStateRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]WriteShareGroupStateRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]WriteShareGroupStateRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -58598,10 +57912,8 @@ func (v *WriteShareGroupStateRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]WriteShareGroupStateRequestTopicPartitionStateBatch, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]WriteShareGroupStateRequestTopicPartitionStateBatch, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -58842,10 +58154,8 @@ func (v *WriteShareGroupStateResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]WriteShareGroupStateResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]WriteShareGroupStateResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -58866,10 +58176,8 @@ func (v *WriteShareGroupStateResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]WriteShareGroupStateResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]WriteShareGroupStateResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -59124,10 +58432,8 @@ func (v *DeleteShareGroupStateRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DeleteShareGroupStateRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DeleteShareGroupStateRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -59148,10 +58454,8 @@ func (v *DeleteShareGroupStateRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DeleteShareGroupStateRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DeleteShareGroupStateRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -59372,10 +58676,8 @@ func (v *DeleteShareGroupStateResponse) readFrom(src []byte, unsafe bool) error 
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DeleteShareGroupStateResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DeleteShareGroupStateResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -59396,10 +58698,8 @@ func (v *DeleteShareGroupStateResponse) readFrom(src []byte, unsafe bool) error 
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DeleteShareGroupStateResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DeleteShareGroupStateResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -59663,10 +58963,8 @@ func (v *ReadShareGroupStateSummaryRequest) readFrom(src []byte, unsafe bool) er
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ReadShareGroupStateSummaryRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ReadShareGroupStateSummaryRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -59687,10 +58985,8 @@ func (v *ReadShareGroupStateSummaryRequest) readFrom(src []byte, unsafe bool) er
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ReadShareGroupStateSummaryRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ReadShareGroupStateSummaryRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -59947,10 +59243,8 @@ func (v *ReadShareGroupStateSummaryResponse) readFrom(src []byte, unsafe bool) e
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]ReadShareGroupStateSummaryResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]ReadShareGroupStateSummaryResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -59971,10 +59265,8 @@ func (v *ReadShareGroupStateSummaryResponse) readFrom(src []byte, unsafe bool) e
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]ReadShareGroupStateSummaryResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]ReadShareGroupStateSummaryResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -61089,10 +60381,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]StreamsGroupHeartbeatRequestTopologySubtopology, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]StreamsGroupHeartbeatRequestTopologySubtopology, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -61126,10 +60416,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]string, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]string, 1)...)
 							var v string
 							if unsafe {
 								if isFlexible {
@@ -61162,10 +60450,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]string, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]string, 1)...)
 							var v string
 							if unsafe {
 								if isFlexible {
@@ -61198,10 +60484,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]TopicInfo, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]TopicInfo, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -61243,10 +60527,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 									return b.Complete()
 								}
 								a = a[:0]
-								if l > 0 {
-									a = append(a, make([]TopicInfoConfig, l)...)
-								}
-								for i := int32(0); i < l; i++ {
+								for i := int32(0); i < l && b.Ok(); i++ {
+									a = append(a, make([]TopicInfoConfig, 1)...)
 									v := &a[i]
 									v.Default()
 									s := v
@@ -61311,10 +60593,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]string, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]string, 1)...)
 							var v string
 							if unsafe {
 								if isFlexible {
@@ -61347,10 +60627,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]TopicInfo, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]TopicInfo, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -61392,10 +60670,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 									return b.Complete()
 								}
 								a = a[:0]
-								if l > 0 {
-									a = append(a, make([]TopicInfoConfig, l)...)
-								}
-								for i := int32(0); i < l; i++ {
+								for i := int32(0); i < l && b.Ok(); i++ {
+									a = append(a, make([]TopicInfoConfig, 1)...)
 									v := &a[i]
 									v.Default()
 									s := v
@@ -61460,10 +60736,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]StreamsGroupHeartbeatRequestTopologySubtopologyCopartitionGroup, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]StreamsGroupHeartbeatRequestTopologySubtopologyCopartitionGroup, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -61480,10 +60754,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 									return b.Complete()
 								}
 								a = a[:0]
-								if l > 0 {
-									a = append(a, make([]int16, l)...)
-								}
-								for i := int32(0); i < l; i++ {
+								for i := int32(0); i < l && b.Ok(); i++ {
+									a = append(a, make([]int16, 1)...)
 									v := b.Int16()
 									a[i] = v
 								}
@@ -61503,10 +60775,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 									return b.Complete()
 								}
 								a = a[:0]
-								if l > 0 {
-									a = append(a, make([]int16, l)...)
-								}
-								for i := int32(0); i < l; i++ {
+								for i := int32(0); i < l && b.Ok(); i++ {
+									a = append(a, make([]int16, 1)...)
 									v := b.Int16()
 									a[i] = v
 								}
@@ -61526,10 +60796,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 									return b.Complete()
 								}
 								a = a[:0]
-								if l > 0 {
-									a = append(a, make([]int16, l)...)
-								}
-								for i := int32(0); i < l; i++ {
+								for i := int32(0); i < l && b.Ok(); i++ {
+									a = append(a, make([]int16, 1)...)
 									v := b.Int16()
 									a[i] = v
 								}
@@ -61571,10 +60839,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]TaskIDs, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]TaskIDs, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -61608,10 +60874,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -61641,10 +60905,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]TaskIDs, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]TaskIDs, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -61678,10 +60940,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -61711,10 +60971,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]TaskIDs, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]TaskIDs, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -61748,10 +61006,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -61830,10 +61086,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]StreamsGroupHeartbeatRequestClientTag, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]StreamsGroupHeartbeatRequestClientTag, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -61894,10 +61148,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]TaskOffset, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]TaskOffset, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -61949,10 +61201,8 @@ func (v *StreamsGroupHeartbeatRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]TaskOffset, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]TaskOffset, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -62594,10 +61844,8 @@ func (v *StreamsGroupHeartbeatResponse) readFrom(src []byte, unsafe bool) error 
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]StreamsGroupHeartbeatResponseStatus, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]StreamsGroupHeartbeatResponseStatus, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -62645,10 +61893,8 @@ func (v *StreamsGroupHeartbeatResponse) readFrom(src []byte, unsafe bool) error 
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]TaskIDs, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]TaskIDs, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -62682,10 +61928,8 @@ func (v *StreamsGroupHeartbeatResponse) readFrom(src []byte, unsafe bool) error 
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -62715,10 +61959,8 @@ func (v *StreamsGroupHeartbeatResponse) readFrom(src []byte, unsafe bool) error 
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]TaskIDs, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]TaskIDs, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -62752,10 +61994,8 @@ func (v *StreamsGroupHeartbeatResponse) readFrom(src []byte, unsafe bool) error 
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -62785,10 +62025,8 @@ func (v *StreamsGroupHeartbeatResponse) readFrom(src []byte, unsafe bool) error 
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]TaskIDs, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]TaskIDs, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -62822,10 +62060,8 @@ func (v *StreamsGroupHeartbeatResponse) readFrom(src []byte, unsafe bool) error 
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]int32, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]int32, 1)...)
 					v := b.Int32()
 					a[i] = v
 				}
@@ -62859,10 +62095,8 @@ func (v *StreamsGroupHeartbeatResponse) readFrom(src []byte, unsafe bool) error 
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]StreamsGroupHeartbeatResponsePartitionsByUserEndpoint, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]StreamsGroupHeartbeatResponsePartitionsByUserEndpoint, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -62908,10 +62142,8 @@ func (v *StreamsGroupHeartbeatResponse) readFrom(src []byte, unsafe bool) error 
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]StreamsGroupHeartbeatResponsePartitionsByUserEndpointActivePartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]StreamsGroupHeartbeatResponsePartitionsByUserEndpointActivePartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -62945,10 +62177,8 @@ func (v *StreamsGroupHeartbeatResponse) readFrom(src []byte, unsafe bool) error 
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -62975,10 +62205,8 @@ func (v *StreamsGroupHeartbeatResponse) readFrom(src []byte, unsafe bool) error 
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]StreamsGroupHeartbeatResponsePartitionsByUserEndpointStandbyPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]StreamsGroupHeartbeatResponsePartitionsByUserEndpointStandbyPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -63012,10 +62240,8 @@ func (v *StreamsGroupHeartbeatResponse) readFrom(src []byte, unsafe bool) error 
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -63189,10 +62415,8 @@ func (v *StreamsGroupDescribeRequest) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]string, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]string, 1)...)
 			var v string
 			if unsafe {
 				if isFlexible {
@@ -64233,10 +63457,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]StreamsGroupDescribeResponseGroup, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]StreamsGroupDescribeResponseGroup, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -64329,10 +63551,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]StreamsGroupDescribeResponseGroupTopologySubtopology, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]StreamsGroupDescribeResponseGroupTopologySubtopology, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -64366,10 +63586,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 									return b.Complete()
 								}
 								a = a[:0]
-								if l > 0 {
-									a = append(a, make([]string, l)...)
-								}
-								for i := int32(0); i < l; i++ {
+								for i := int32(0); i < l && b.Ok(); i++ {
+									a = append(a, make([]string, 1)...)
 									var v string
 									if unsafe {
 										if isFlexible {
@@ -64402,10 +63620,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 									return b.Complete()
 								}
 								a = a[:0]
-								if l > 0 {
-									a = append(a, make([]string, l)...)
-								}
-								for i := int32(0); i < l; i++ {
+								for i := int32(0); i < l && b.Ok(); i++ {
+									a = append(a, make([]string, 1)...)
 									var v string
 									if unsafe {
 										if isFlexible {
@@ -64438,10 +63654,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 									return b.Complete()
 								}
 								a = a[:0]
-								if l > 0 {
-									a = append(a, make([]TopicInfo, l)...)
-								}
-								for i := int32(0); i < l; i++ {
+								for i := int32(0); i < l && b.Ok(); i++ {
+									a = append(a, make([]TopicInfo, 1)...)
 									v := &a[i]
 									v.Default()
 									s := v
@@ -64483,10 +63697,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 											return b.Complete()
 										}
 										a = a[:0]
-										if l > 0 {
-											a = append(a, make([]TopicInfoConfig, l)...)
-										}
-										for i := int32(0); i < l; i++ {
+										for i := int32(0); i < l && b.Ok(); i++ {
+											a = append(a, make([]TopicInfoConfig, 1)...)
 											v := &a[i]
 											v.Default()
 											s := v
@@ -64551,10 +63763,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 									return b.Complete()
 								}
 								a = a[:0]
-								if l > 0 {
-									a = append(a, make([]TopicInfo, l)...)
-								}
-								for i := int32(0); i < l; i++ {
+								for i := int32(0); i < l && b.Ok(); i++ {
+									a = append(a, make([]TopicInfo, 1)...)
 									v := &a[i]
 									v.Default()
 									s := v
@@ -64596,10 +63806,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 											return b.Complete()
 										}
 										a = a[:0]
-										if l > 0 {
-											a = append(a, make([]TopicInfoConfig, l)...)
-										}
-										for i := int32(0); i < l; i++ {
+										for i := int32(0); i < l && b.Ok(); i++ {
+											a = append(a, make([]TopicInfoConfig, 1)...)
 											v := &a[i]
 											v.Default()
 											s := v
@@ -64676,10 +63884,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]StreamsGroupDescribeResponseGroupMember, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]StreamsGroupDescribeResponseGroupMember, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -64838,10 +64044,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]StreamsGroupDescribeResponseGroupMemberClientTag, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]StreamsGroupDescribeResponseGroupMemberClientTag, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -64899,10 +64103,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]TaskOffset, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]TaskOffset, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -64951,10 +64153,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]TaskOffset, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]TaskOffset, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -65007,10 +64207,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 								return b.Complete()
 							}
 							a = a[:0]
-							if l > 0 {
-								a = append(a, make([]TaskIDs, l)...)
-							}
-							for i := int32(0); i < l; i++ {
+							for i := int32(0); i < l && b.Ok(); i++ {
+								a = append(a, make([]TaskIDs, 1)...)
 								v := &a[i]
 								v.Default()
 								s := v
@@ -65044,10 +64242,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 										return b.Complete()
 									}
 									a = a[:0]
-									if l > 0 {
-										a = append(a, make([]int32, l)...)
-									}
-									for i := int32(0); i < l; i++ {
+									for i := int32(0); i < l && b.Ok(); i++ {
+										a = append(a, make([]int32, 1)...)
 										v := b.Int32()
 										a[i] = v
 									}
@@ -65074,10 +64270,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 								return b.Complete()
 							}
 							a = a[:0]
-							if l > 0 {
-								a = append(a, make([]TaskIDs, l)...)
-							}
-							for i := int32(0); i < l; i++ {
+							for i := int32(0); i < l && b.Ok(); i++ {
+								a = append(a, make([]TaskIDs, 1)...)
 								v := &a[i]
 								v.Default()
 								s := v
@@ -65111,10 +64305,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 										return b.Complete()
 									}
 									a = a[:0]
-									if l > 0 {
-										a = append(a, make([]int32, l)...)
-									}
-									for i := int32(0); i < l; i++ {
+									for i := int32(0); i < l && b.Ok(); i++ {
+										a = append(a, make([]int32, 1)...)
 										v := b.Int32()
 										a[i] = v
 									}
@@ -65141,10 +64333,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 								return b.Complete()
 							}
 							a = a[:0]
-							if l > 0 {
-								a = append(a, make([]TaskIDs, l)...)
-							}
-							for i := int32(0); i < l; i++ {
+							for i := int32(0); i < l && b.Ok(); i++ {
+								a = append(a, make([]TaskIDs, 1)...)
 								v := &a[i]
 								v.Default()
 								s := v
@@ -65178,10 +64368,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 										return b.Complete()
 									}
 									a = a[:0]
-									if l > 0 {
-										a = append(a, make([]int32, l)...)
-									}
-									for i := int32(0); i < l; i++ {
+									for i := int32(0); i < l && b.Ok(); i++ {
+										a = append(a, make([]int32, 1)...)
 										v := b.Int32()
 										a[i] = v
 									}
@@ -65216,10 +64404,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 								return b.Complete()
 							}
 							a = a[:0]
-							if l > 0 {
-								a = append(a, make([]TaskIDs, l)...)
-							}
-							for i := int32(0); i < l; i++ {
+							for i := int32(0); i < l && b.Ok(); i++ {
+								a = append(a, make([]TaskIDs, 1)...)
 								v := &a[i]
 								v.Default()
 								s := v
@@ -65253,10 +64439,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 										return b.Complete()
 									}
 									a = a[:0]
-									if l > 0 {
-										a = append(a, make([]int32, l)...)
-									}
-									for i := int32(0); i < l; i++ {
+									for i := int32(0); i < l && b.Ok(); i++ {
+										a = append(a, make([]int32, 1)...)
 										v := b.Int32()
 										a[i] = v
 									}
@@ -65283,10 +64467,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 								return b.Complete()
 							}
 							a = a[:0]
-							if l > 0 {
-								a = append(a, make([]TaskIDs, l)...)
-							}
-							for i := int32(0); i < l; i++ {
+							for i := int32(0); i < l && b.Ok(); i++ {
+								a = append(a, make([]TaskIDs, 1)...)
 								v := &a[i]
 								v.Default()
 								s := v
@@ -65320,10 +64502,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 										return b.Complete()
 									}
 									a = a[:0]
-									if l > 0 {
-										a = append(a, make([]int32, l)...)
-									}
-									for i := int32(0); i < l; i++ {
+									for i := int32(0); i < l && b.Ok(); i++ {
+										a = append(a, make([]int32, 1)...)
 										v := b.Int32()
 										a[i] = v
 									}
@@ -65350,10 +64530,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 								return b.Complete()
 							}
 							a = a[:0]
-							if l > 0 {
-								a = append(a, make([]TaskIDs, l)...)
-							}
-							for i := int32(0); i < l; i++ {
+							for i := int32(0); i < l && b.Ok(); i++ {
+								a = append(a, make([]TaskIDs, 1)...)
 								v := &a[i]
 								v.Default()
 								s := v
@@ -65387,10 +64565,8 @@ func (v *StreamsGroupDescribeResponse) readFrom(src []byte, unsafe bool) error {
 										return b.Complete()
 									}
 									a = a[:0]
-									if l > 0 {
-										a = append(a, make([]int32, l)...)
-									}
-									for i := int32(0); i < l; i++ {
+									for i := int32(0); i < l && b.Ok(); i++ {
+										a = append(a, make([]int32, 1)...)
 										v := b.Int32()
 										a[i] = v
 									}
@@ -65639,10 +64815,8 @@ func (v *DescribeShareGroupOffsetsRequest) readFrom(src []byte, unsafe bool) err
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeShareGroupOffsetsRequestGroup, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeShareGroupOffsetsRequestGroup, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -65679,10 +64853,8 @@ func (v *DescribeShareGroupOffsetsRequest) readFrom(src []byte, unsafe bool) err
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DescribeShareGroupOffsetsRequestGroupTopic, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DescribeShareGroupOffsetsRequestGroupTopic, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -65716,10 +64888,8 @@ func (v *DescribeShareGroupOffsetsRequest) readFrom(src []byte, unsafe bool) err
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]int32, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]int32, 1)...)
 							v := b.Int32()
 							a[i] = v
 						}
@@ -66063,10 +65233,8 @@ func (v *DescribeShareGroupOffsetsResponse) readFrom(src []byte, unsafe bool) er
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DescribeShareGroupOffsetsResponseGroup, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DescribeShareGroupOffsetsResponseGroup, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -66100,10 +65268,8 @@ func (v *DescribeShareGroupOffsetsResponse) readFrom(src []byte, unsafe bool) er
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]DescribeShareGroupOffsetsResponseGroupTopic, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]DescribeShareGroupOffsetsResponseGroupTopic, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -66141,10 +65307,8 @@ func (v *DescribeShareGroupOffsetsResponse) readFrom(src []byte, unsafe bool) er
 							return b.Complete()
 						}
 						a = a[:0]
-						if l > 0 {
-							a = append(a, make([]DescribeShareGroupOffsetsResponseGroupTopicPartition, l)...)
-						}
-						for i := int32(0); i < l; i++ {
+						for i := int32(0); i < l && b.Ok(); i++ {
+							a = append(a, make([]DescribeShareGroupOffsetsResponseGroupTopicPartition, 1)...)
 							v := &a[i]
 							v.Default()
 							s := v
@@ -66450,10 +65614,8 @@ func (v *AlterShareGroupOffsetsRequest) readFrom(src []byte, unsafe bool) error 
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AlterShareGroupOffsetsRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AlterShareGroupOffsetsRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -66487,10 +65649,8 @@ func (v *AlterShareGroupOffsetsRequest) readFrom(src []byte, unsafe bool) error 
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]AlterShareGroupOffsetsRequestTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]AlterShareGroupOffsetsRequestTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -66789,10 +65949,8 @@ func (v *AlterShareGroupOffsetsResponse) readFrom(src []byte, unsafe bool) error
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]AlterShareGroupOffsetsResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]AlterShareGroupOffsetsResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -66830,10 +65988,8 @@ func (v *AlterShareGroupOffsetsResponse) readFrom(src []byte, unsafe bool) error
 					return b.Complete()
 				}
 				a = a[:0]
-				if l > 0 {
-					a = append(a, make([]AlterShareGroupOffsetsResponseTopicPartition, l)...)
-				}
-				for i := int32(0); i < l; i++ {
+				for i := int32(0); i < l && b.Ok(); i++ {
+					a = append(a, make([]AlterShareGroupOffsetsResponseTopicPartition, 1)...)
 					v := &a[i]
 					v.Default()
 					s := v
@@ -67049,10 +66205,8 @@ func (v *DeleteShareGroupOffsetsRequest) readFrom(src []byte, unsafe bool) error
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DeleteShareGroupOffsetsRequestTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DeleteShareGroupOffsetsRequestTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
@@ -67312,10 +66466,8 @@ func (v *DeleteShareGroupOffsetsResponse) readFrom(src []byte, unsafe bool) erro
 			return b.Complete()
 		}
 		a = a[:0]
-		if l > 0 {
-			a = append(a, make([]DeleteShareGroupOffsetsResponseTopic, l)...)
-		}
-		for i := int32(0); i < l; i++ {
+		for i := int32(0); i < l && b.Ok(); i++ {
+			a = append(a, make([]DeleteShareGroupOffsetsResponseTopic, 1)...)
 			v := &a[i]
 			v.Default()
 			s := v
