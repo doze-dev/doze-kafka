@@ -63,8 +63,9 @@ type Manager struct {
 	stopped    bool
 	syncOps    atomic.Int64 // count of SyncPartition calls (durable-ack fsyncs).
 
-	done chan struct{}
-	wg   sync.WaitGroup
+	done   chan struct{}
+	wg     sync.WaitGroup
+	bounds map[topicPartition]cachedBounds // Bounds answers for closed partitions; guarded by mu.
 }
 
 type topicPartition struct {
@@ -96,6 +97,7 @@ func OpenManager(dir string, opts ManagerOptions) (*Manager, error) {
 		opts:       opts,
 		log:        logger,
 		partitions: make(map[topicPartition]*Partition),
+		bounds:     make(map[topicPartition]cachedBounds),
 		done:       make(chan struct{}),
 	}
 	if opts.FsyncInterval > 0 || opts.Retention.enabled() {
@@ -287,7 +289,24 @@ func (m *Manager) Bounds(topic string, partition int32) (start, end int64, err e
 	if err != nil {
 		return 0, 0, err
 	}
-	return boundsFromDisk(dir)
+	// The scan validates the tail as recovery does (checksums over up to 8 MiB),
+	// so its answer is kept until the partition's files change.
+	sig, ok := boundsSignature(dir)
+	if c, hit := m.bounds[tp]; ok && hit && c.sig == sig {
+		return c.start, c.end, nil
+	}
+	start, end, err = boundsFromDisk(dir)
+	if err == nil && ok {
+		m.bounds[tp] = cachedBounds{sig: sig, start: start, end: end}
+	} else {
+		delete(m.bounds, tp)
+	}
+	return start, end, err
+}
+
+type cachedBounds struct {
+	sig        string
+	start, end int64
 }
 
 // RemoveTopic closes and deletes every partition of a topic from disk (used by

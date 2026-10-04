@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -22,7 +23,19 @@ type Segment struct {
 	lastModified  time.Time // wall-clock time of the most recent append (for age-based retention).
 	beforeSync    func() error
 	logDirty      atomic.Bool // bytes written since the last fsync of the log.
+
+	// syncMu makes sync one-at-a-time per segment. The dirty flag is cleared
+	// before the fsync it stands for has finished, so a second caller arriving
+	// mid-flush (the roll sealing this segment, say) would see "clean", skip its
+	// own fsync, and move on; if the first then failed, the segment was left
+	// unsynced with nobody coming back for it. Waiting for the flush in progress
+	// means every caller returns knowing how it actually ended.
+	syncMu sync.Mutex
 }
+
+// fsyncFile flushes a file to stable storage. A variable so tests can make an
+// fsync fail or stall, which no real disk will do on request.
+var fsyncFile = func(f *os.File) error { return f.Sync() }
 
 // segmentName is the 20-digit zero-padded base offset used for a segment's files.
 func segmentName(baseOffset int64) string { return fmt.Sprintf("%020d", baseOffset) }
@@ -77,6 +90,13 @@ func (s *Segment) append(offset int64, batch []byte) error {
 	s.lastModified = time.Now()
 	if len(s.index.entries) == 0 || s.sinceIndex >= s.indexInterval {
 		if err := s.index.append(offset, pos); err != nil {
+			// The append is reported as failed, so it must leave no trace: the
+			// caller does not advance the log-end offset, and bytes left counted in
+			// the segment would make the next append write the same offset again
+			// after them — two batches claiming one offset, forever.
+			s.sizeBytes = pos
+			s.sinceIndex -= int64(len(batch))
+			_ = s.log.Truncate(pos)
 			return err
 		}
 		s.sinceIndex = 0
@@ -88,6 +108,8 @@ func (s *Segment) append(offset int64, batch []byte) error {
 // durability: the coarse fsync timer syncs the active segment, a roll syncs the
 // segment being sealed, and graceful shutdown syncs everything before close.
 func (s *Segment) sync() error {
+	s.syncMu.Lock()
+	defer s.syncMu.Unlock()
 	if s.logDirty.Load() || s.index.dirty.Load() {
 		if s.beforeSync != nil {
 			if err := s.beforeSync(); err != nil {
@@ -99,7 +121,7 @@ func (s *Segment) sync() error {
 	// partition's log and index whether or not anything had been written, which on
 	// an idle broker is pure waste.
 	if s.logDirty.Swap(false) {
-		if err := s.log.Sync(); err != nil {
+		if err := fsyncFile(s.log); err != nil {
 			s.logDirty.Store(true)
 			return err
 		}
@@ -126,7 +148,7 @@ func (s *Segment) truncate(size int64) error {
 	s.sizeBytes = size
 	// Make the cut durable: otherwise a second crash resurrects the torn bytes
 	// that this recovery just decided were not part of the log.
-	return s.log.Sync()
+	return fsyncFile(s.log)
 }
 
 // syncDir flushes a directory's entries to stable storage. Best effort: some

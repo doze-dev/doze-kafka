@@ -254,10 +254,13 @@ func (p *Partition) Sync() error {
 
 	// The fsync itself runs without p.mu: holding it blocked every produce and
 	// fetch on the partition for the duration of a disk flush. File operations are
-	// safe to run concurrently with appends. A segment that rolled and was dropped
-	// by retention in the meantime reports ErrClosed; it was sealed with an fsync
-	// at the roll, so there is nothing left to flush.
-	if err := seg.sync(); err != nil && !errors.Is(err, os.ErrClosed) {
+	// safe to run concurrently with appends. If the segment rolled in the
+	// meantime it was sealed with its own fsync (which waits for this one), and a
+	// sealed, flushed segment makes this a no-op. Any error, including a closed
+	// file, means the flush did not happen and must be reported: "closed" was once
+	// treated as "already safe", which acknowledged writes that a failed shutdown
+	// flush had left in the page cache.
+	if err := seg.sync(); err != nil {
 		return err
 	}
 	p.syncedSeq.Store(upto)
@@ -285,7 +288,15 @@ func (p *Partition) dropOldestLocked() error {
 func (p *Partition) close() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	firstErr := p.active().sync() // a no-op if nothing is unflushed.
+	// Every segment, not only the active one: a sealed segment is normally clean
+	// (a no-op here), but one whose seal failed is still dirty, and this is the
+	// last chance to flush it.
+	var firstErr error
+	for _, seg := range p.segments {
+		if err := seg.sync(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
 	for _, seg := range p.segments {
 		if err := seg.close(); err != nil && firstErr == nil {
 			firstErr = err

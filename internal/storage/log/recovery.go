@@ -20,52 +20,14 @@ const recoveryCRCWindow = 8 << 20
 // interrupted append, a zero-filled tail after a power cut, and a body that
 // never fully reached the disk. It then makes the index agree with what is left.
 func recoverSegment(s *Segment) (int64, error) {
-	leo := s.baseOffset
-	crcFrom := s.sizeBytes - recoveryCRCWindow
-
-	var (
-		pos   int64
-		want  []indexEntry // the index this log should have, built as append would.
-		since int64        // bytes since the last index entry.
-	)
-	for pos < s.sizeBytes {
-		if s.sizeBytes-pos < batchFullHeaderBytes {
-			if err := s.truncate(pos); err != nil {
-				return 0, err
-			}
-			break
-		}
-		header, err := s.readAt(pos, batchFullHeaderBytes)
-		if err != nil {
+	valid, leo, want, since, err := scanLog(s.readAt, s.sizeBytes, s.baseOffset, s.indexInterval)
+	if err != nil {
+		return 0, err
+	}
+	if valid < s.sizeBytes {
+		if err := s.truncate(valid); err != nil {
 			return 0, err
 		}
-		info, ok := parseHeader(header)
-		if !ok || header[batchMagicOff] != batchMagicV2 || pos+info.totalBytes > s.sizeBytes || info.recordCount <= 0 {
-			if err := s.truncate(pos); err != nil {
-				return 0, err
-			}
-			break
-		}
-		if pos >= crcFrom {
-			batch, err := s.readAt(pos, int(info.totalBytes))
-			if err != nil {
-				return 0, err
-			}
-			if _, err := checkBatchShape(batch); err != nil || !crcOK(batch) {
-				if err := s.truncate(pos); err != nil {
-					return 0, err
-				}
-				break
-			}
-		}
-
-		since += info.totalBytes
-		if len(want) == 0 || since >= s.indexInterval {
-			want = append(want, indexEntry{offset: info.baseOffset, position: pos})
-			since = 0
-		}
-		leo = info.baseOffset + int64(info.recordCount)
-		pos += info.totalBytes
 	}
 
 	// The index is derived from the log, so when they disagree the log wins. An
@@ -79,4 +41,49 @@ func recoverSegment(s *Segment) (int64, error) {
 	}
 	s.sinceIndex = since
 	return leo, nil
+}
+
+// scanLog walks a segment's batches from the start and reports where the valid log
+// ends: the byte position (validEnd), the offset after the last good batch (leo),
+// and the sparse index that log should have. It changes nothing. Recovery acts on
+// the result (truncating at validEnd); Bounds only reads it, so the two can never
+// disagree about where a partition ends.
+//
+// A batch is good if its header is whole, its magic is 2, it fits in the file, it
+// claims at least one record, and — within the last recoveryCRCWindow bytes, the
+// only part a crash can have damaged — its shape and CRC check out.
+func scanLog(read func(pos int64, n int) ([]byte, error), size, base, indexInterval int64) (validEnd, leo int64, want []indexEntry, since int64, err error) {
+	leo = base
+	crcFrom := size - recoveryCRCWindow
+	var pos int64
+	for pos < size {
+		if size-pos < batchFullHeaderBytes {
+			break
+		}
+		header, err := read(pos, batchFullHeaderBytes)
+		if err != nil {
+			return 0, 0, nil, 0, err
+		}
+		info, ok := parseHeader(header)
+		if !ok || len(header) < batchFullHeaderBytes || header[batchMagicOff] != batchMagicV2 || pos+info.totalBytes > size || info.recordCount <= 0 {
+			break
+		}
+		if pos >= crcFrom {
+			batch, err := read(pos, int(info.totalBytes))
+			if err != nil {
+				return 0, 0, nil, 0, err
+			}
+			if _, err := checkBatchShape(batch); err != nil || !crcOK(batch) {
+				break
+			}
+		}
+		since += info.totalBytes
+		if len(want) == 0 || since >= indexInterval {
+			want = append(want, indexEntry{offset: info.baseOffset, position: pos})
+			since = 0
+		}
+		leo = info.baseOffset + int64(info.recordCount)
+		pos += info.totalBytes
+	}
+	return pos, leo, want, since, nil
 }
