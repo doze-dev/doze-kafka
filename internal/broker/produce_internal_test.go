@@ -17,6 +17,8 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/storage/log"
 	"github.com/doze-dev/doze-kafka/internal/storage/meta"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // plainBatch is a minimal header-valid, non-idempotent (producer id -1) batch.
@@ -80,7 +82,7 @@ func TestProduceAcksFsync(t *testing.T) {
 		req.Topics = append(req.Topics, pt)
 
 		r := &protocol.Request{
-			Header: protocol.RequestHeader{APIKey: protocol.APIProduce, APIVersion: 7, CorrelationID: 1},
+			Header: protocol.RequestHeader{APIKey: protocol.APIKey(kmsg.Produce), APIVersion: 7, CorrelationID: 1},
 			Body:   req.AppendTo(nil),
 		}
 		if _, err := b.handleProduce(context.Background(), r); err != nil {
@@ -118,7 +120,7 @@ func produceOnce(t *testing.T, b *Broker, acks int16, records []byte) *kmsg.Prod
 	pt.Partitions = append(pt.Partitions, pp)
 	req.Topics = append(req.Topics, pt)
 	out, err := b.handleProduce(context.Background(), &protocol.Request{
-		Header: protocol.RequestHeader{APIKey: protocol.APIProduce, APIVersion: 8, CorrelationID: 1},
+		Header: protocol.RequestHeader{APIKey: protocol.APIKey(kmsg.Produce), APIVersion: 8, CorrelationID: 1},
 		Body:   req.AppendTo(nil),
 	})
 	if err != nil {
@@ -182,8 +184,8 @@ func TestProduceFsyncFailureIsReportedNotAcknowledged(t *testing.T) {
 	failSync = true
 	resp := produceOnce(t, b, -1, plainBatch())
 	p := resp.Topics[0].Partitions[0]
-	if p.ErrorCode != int16(protocol.ErrKafkaStorageError) {
-		t.Fatalf("acks=all with a failing fsync: error code %d, want KAFKA_STORAGE_ERROR (%d)", p.ErrorCode, protocol.ErrKafkaStorageError)
+	if p.ErrorCode != kerr.KafkaStorageError.Code {
+		t.Fatalf("acks=all with a failing fsync: error code %d, want KAFKA_STORAGE_ERROR (%d)", p.ErrorCode, kerr.KafkaStorageError.Code)
 	}
 	if p.ErrorMessage == nil || !strings.Contains(*p.ErrorMessage, "input/output error") {
 		t.Errorf("the failure should say why, got %v", p.ErrorMessage)
@@ -219,8 +221,8 @@ func TestProduceRefusesCorruptBatches(t *testing.T) {
 	}
 	for name, records := range cases {
 		p := produceOnce(t, b, 1, records).Topics[0].Partitions[0]
-		if p.ErrorCode != int16(protocol.ErrCorruptMessage) {
-			t.Errorf("%s: error code %d, want CORRUPT_MESSAGE (%d)", name, p.ErrorCode, protocol.ErrCorruptMessage)
+		if p.ErrorCode != kerr.CorruptMessage.Code {
+			t.Errorf("%s: error code %d, want CORRUPT_MESSAGE (%d)", name, p.ErrorCode, kerr.CorruptMessage.Code)
 		}
 	}
 	part, err := logs.Partition("t", 0)
@@ -264,8 +266,8 @@ func TestTopicCreationAndOffsetListingDoNotOpenPartitions(t *testing.T) {
 			rt.Partitions = append(rt.Partitions, rp)
 		}
 		lo.Topics = []kmsg.ListOffsetsRequestTopic{rt}
-		out, err := b.handleListOffsets(context.Background(), &protocol.Request{
-			Header: protocol.RequestHeader{APIKey: protocol.APIListOffsets, APIVersion: 5, CorrelationID: 1},
+		out, err := typed(b.handleListOffsets)(context.Background(), &protocol.Request{
+			Header: protocol.RequestHeader{APIKey: protocol.APIKey(kmsg.ListOffsets), APIVersion: 5, CorrelationID: 1},
 			Body:   lo.AppendTo(nil),
 		})
 		if err != nil {
@@ -325,10 +327,10 @@ func TestIdempotentProduceRefusesWhatItCannotPlace(t *testing.T) {
 	}
 	end := part.LogEndOffset()
 	// Sequences 3-6: two new records behind two old ones.
-	if c, _ := code(idemBatch(9, 0, 3, 4, 0)); c != int16(protocol.ErrOutOfOrderSequence) {
+	if c, _ := code(idemBatch(9, 0, 3, 4, 0)); c != kerr.OutOfOrderSequenceNumber.Code {
 		t.Errorf("an overlapping batch: code %d, want OUT_OF_ORDER_SEQUENCE_NUMBER (45)", c)
 	}
-	if c, _ := code(idemBatch(9, 0, 9, 1, 0)); c != int16(protocol.ErrOutOfOrderSequence) {
+	if c, _ := code(idemBatch(9, 0, 9, 1, 0)); c != kerr.OutOfOrderSequenceNumber.Code {
 		t.Errorf("a gap: code %d, want 45", c)
 	}
 	if got := part.LogEndOffset(); got != end {
@@ -342,12 +344,12 @@ func TestProduceValidatesAcksControlBatchesAndRecordCounts(t *testing.T) {
 	part, _ := logs.Partition("t", 0)
 
 	for _, acks := range []int16{2, -2, 100} {
-		if c := produceOnce(t, b, acks, plainBatch()).Topics[0].Partitions[0].ErrorCode; c != int16(protocol.ErrInvalidRequiredAcks) {
+		if c := produceOnce(t, b, acks, plainBatch()).Topics[0].Partitions[0].ErrorCode; c != kerr.InvalidRequiredAcks.Code {
 			t.Errorf("acks=%d: code %d, want INVALID_REQUIRED_ACKS (21)", acks, c)
 		}
 	}
 	// A control batch (attributes bit 5) is the broker's to write, not a client's.
-	if c := produceOnce(t, b, 1, idemBatch(-1, 0, 0, 1, 0x20)).Topics[0].Partitions[0].ErrorCode; c != int16(protocol.ErrCorruptMessage) {
+	if c := produceOnce(t, b, 1, idemBatch(-1, 0, 0, 1, 0x20)).Topics[0].Partitions[0].ErrorCode; c != kerr.CorruptMessage.Code {
 		t.Errorf("a client-sent control batch: code %d, want it refused (2)", c)
 	}
 	// A header that claims two billion records over an 8-byte body.
@@ -355,7 +357,7 @@ func TestProduceValidatesAcksControlBatchesAndRecordCounts(t *testing.T) {
 	binary.BigEndian.PutUint32(huge[23:], uint32(1<<31-2))
 	binary.BigEndian.PutUint32(huge[57:], uint32(1<<31-1))
 	binary.BigEndian.PutUint32(huge[17:], crc32.Checksum(huge[21:], crc32.MakeTable(crc32.Castagnoli)))
-	if c := produceOnce(t, b, 1, huge).Topics[0].Partitions[0].ErrorCode; c != int16(protocol.ErrCorruptMessage) {
+	if c := produceOnce(t, b, 1, huge).Topics[0].Partitions[0].ErrorCode; c != kerr.CorruptMessage.Code {
 		t.Errorf("a batch claiming 2^31-1 records in 8 bytes: code %d, want it refused (2)", c)
 	}
 	if end := part.LogEndOffset(); end != 0 {
@@ -380,14 +382,14 @@ func TestAcksZeroWithAnInvalidBatchFailsTheRequest(t *testing.T) {
 	pt.Partitions = append(pt.Partitions, pp)
 	req.Topics = append(req.Topics, pt)
 	out, err := b.handleProduce(context.Background(), &protocol.Request{
-		Header: protocol.RequestHeader{APIKey: protocol.APIProduce, APIVersion: 8}, Body: req.AppendTo(nil)})
+		Header: protocol.RequestHeader{APIKey: protocol.APIKey(kmsg.Produce), APIVersion: 8}, Body: req.AppendTo(nil)})
 	if err == nil || out != nil {
 		t.Fatalf("acks=0 with a corrupt batch returned (%v, %v); want an error so the connection closes", out, err)
 	}
 	pp.Records = plainBatch()
 	req.Topics[0].Partitions[0] = pp
 	if out, err := b.handleProduce(context.Background(), &protocol.Request{
-		Header: protocol.RequestHeader{APIKey: protocol.APIProduce, APIVersion: 8}, Body: req.AppendTo(nil)}); err != nil || out != nil {
+		Header: protocol.RequestHeader{APIKey: protocol.APIKey(kmsg.Produce), APIVersion: 8}, Body: req.AppendTo(nil)}); err != nil || out != nil {
 		t.Fatalf("acks=0 with a valid batch returned (%v, %v); want silence", out, err)
 	}
 }
@@ -403,8 +405,8 @@ func TestDeletingATopicForgetsItsProducerState(t *testing.T) {
 	del := kmsg.NewPtrDeleteTopicsRequest()
 	del.SetVersion(3)
 	del.TopicNames = []string{"t"}
-	if _, err := b.handleDeleteTopics(context.Background(), &protocol.Request{
-		Header: protocol.RequestHeader{APIKey: protocol.APIDeleteTopics, APIVersion: 3}, Body: del.AppendTo(nil)}); err != nil {
+	if _, err := typed(b.handleDeleteTopics)(context.Background(), &protocol.Request{
+		Header: protocol.RequestHeader{APIKey: protocol.APIKey(kmsg.DeleteTopics), APIVersion: 3}, Body: del.AppendTo(nil)}); err != nil {
 		t.Fatal(err)
 	}
 	ct := kmsg.NewCreateTopicsRequestTopic()

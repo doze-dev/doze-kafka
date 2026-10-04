@@ -10,6 +10,8 @@ import (
 	"net"
 	"runtime/debug"
 	"time"
+
+	"github.com/doze-dev/doze-kafka/internal/kmsg"
 )
 
 // defaultPreAuthTimeout is how long a connection that must authenticate may sit
@@ -122,7 +124,7 @@ func (c *Conn) close() error { return c.raw.Close() }
 // version handshake and the SASL exchange itself.
 func preAuthAllowed(key APIKey) bool {
 	switch key {
-	case APIApiVersions, APISASLHandshake, APISASLAuthenticate:
+	case kmsg.ApiVersions, kmsg.SASLHandshake, kmsg.SASLAuthenticate:
 		return true
 	default:
 		return false
@@ -164,7 +166,7 @@ func (c *Conn) serve(ctx context.Context) {
 			switch {
 			case preAuth:
 				return maxPreAuthFrameBytes
-			case key == APIProduce:
+			case key == kmsg.Produce:
 				return maxFrameBytes
 			default:
 				return maxControlFrameBytes
@@ -186,7 +188,7 @@ func (c *Conn) serve(ctx context.Context) {
 		// Debug: one line per request is a firehose at info (a consumer polls many
 		// times a second), and drowned the lines that mattered.
 		c.log.Debug("request",
-			"api", header.APIKey.Name(),
+			"api", APIName(header.APIKey),
 			"version", header.APIVersion,
 			"correlation_id", header.CorrelationID,
 			"client_id", header.ClientID,
@@ -196,7 +198,7 @@ func (c *Conn) serve(ctx context.Context) {
 		// version handshake and the SASL exchange are allowed. A violation is a
 		// misbehaving or unauthenticated client — drop the connection.
 		if c.authRequired && !c.authenticated && !preAuthAllowed(header.APIKey) {
-			c.log.Warn("unauthenticated request rejected", "api", header.APIKey.Name())
+			c.log.Warn("unauthenticated request rejected", "api", APIName(header.APIKey))
 			return
 		}
 
@@ -206,7 +208,7 @@ func (c *Conn) serve(ctx context.Context) {
 		if errors.As(err, &pe) {
 			// The handler's bug must cost this connection, not the broker: every
 			// other client keeps being served.
-			c.log.Error("handler panicked; closing the connection", "api", header.APIKey.Name(),
+			c.log.Error("handler panicked; closing the connection", "api", APIName(header.APIKey),
 				"version", header.APIVersion, "client_id", header.ClientID, "panic", pe.value, "stack", pe.stack)
 			return
 		}
@@ -216,7 +218,7 @@ func (c *Conn) serve(ctx context.Context) {
 			// correlation id. Close the connection so it fails fast instead of
 			// hanging until its own timeout. Conformant clients never hit this —
 			// they only call APIs we advertise.
-			c.log.Warn("closing connection: unhandled request", "api", header.APIKey.Name(), "err", err)
+			c.log.Warn("closing connection: unhandled request", "api", APIName(header.APIKey), "err", err)
 			return
 		}
 		if resp == nil {

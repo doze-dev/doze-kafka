@@ -10,7 +10,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"github.com/twmb/franz-go/pkg/kversion"
 
-	"github.com/doze-dev/doze-kafka/internal/protocol"
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 func metadataNames(resp *kmsg.MetadataResponse) map[string]int16 {
@@ -110,8 +110,8 @@ func TestMetadata_TopicByIDOnly(t *testing.T) {
 	if mt := byID[id]; mt.ErrorCode != 0 || mt.Topic == nil || *mt.Topic != "named" || len(mt.Partitions) != 2 {
 		t.Errorf("topic by id: %+v, want the topic named, with 2 partitions", mt)
 	}
-	if mt := byID[unknown.TopicID]; mt.ErrorCode != int16(protocol.ErrUnknownTopicID) {
-		t.Errorf("unknown id: code %d, want UNKNOWN_TOPIC_ID (%d)", mt.ErrorCode, protocol.ErrUnknownTopicID)
+	if mt := byID[unknown.TopicID]; mt.ErrorCode != kerr.UnknownTopicID.Code {
+		t.Errorf("unknown id: code %d, want UNKNOWN_TOPIC_ID (%d)", mt.ErrorCode, kerr.UnknownTopicID.Code)
 	}
 }
 

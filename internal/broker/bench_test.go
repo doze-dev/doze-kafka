@@ -92,7 +92,7 @@ func BenchmarkOffsetCommit20Partitions(b *testing.B) {
 	body := req.AppendTo(nil)
 	b.ResetTimer()
 	for range b.N {
-		call(b, br.handleOffsetCommit, protocol.APIOffsetCommit, 7, body)
+		call(b, typed(br.handleOffsetCommit), protocol.APIKey(kmsg.OffsetCommit), 7, body)
 	}
 }
 
@@ -104,7 +104,7 @@ func BenchmarkInitProducerID(b *testing.B) {
 	body := req.AppendTo(nil)
 	b.ResetTimer()
 	for range b.N {
-		call(b, br.handleInitProducerID, protocol.APIInitProducerID, 3, body)
+		call(b, typed(br.handleInitProducerID), protocol.APIKey(kmsg.InitProducerID), 3, body)
 	}
 }
 
@@ -113,7 +113,7 @@ func BenchmarkProduceAcksOne(b *testing.B) {
 	body := produceBody(1, "t", 0)
 	b.ResetTimer()
 	for range b.N {
-		call(b, br.handleProduce, protocol.APIProduce, 8, body)
+		call(b, br.handleProduce, protocol.APIKey(kmsg.Produce), 8, body)
 	}
 }
 
@@ -122,7 +122,7 @@ func BenchmarkProduceAcksAll(b *testing.B) {
 	body := produceBody(-1, "t", 0)
 	b.ResetTimer()
 	for range b.N {
-		call(b, br.handleProduce, protocol.APIProduce, 8, body)
+		call(b, br.handleProduce, protocol.APIKey(kmsg.Produce), 8, body)
 	}
 }
 
@@ -135,7 +135,7 @@ func BenchmarkProduceAcksAllParallel8(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			call(b, br.handleProduce, protocol.APIProduce, 8, body)
+			call(b, br.handleProduce, protocol.APIKey(kmsg.Produce), 8, body)
 		}
 	})
 }

@@ -38,14 +38,12 @@ func (b *Broker) nextProducerID() (int64, error) {
 // puts the client into a fatal state. We accept producer sequence numbers without
 // enforcing real dedup (at-least-once is fine for local dev) and never advertise
 // transactions.
-func (b *Broker) handleInitProducerID(ctx context.Context, req *protocol.Request) ([]byte, error) {
+func (b *Broker) handleInitProducerID(ctx context.Context, req *protocol.Request, _ *kmsg.InitProducerIDRequest, resp *kmsg.InitProducerIDResponse) error {
 	pid, err := b.nextProducerID()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	resp := kmsg.NewPtrInitProducerIDResponse()
-	resp.SetVersion(req.Header.APIVersion)
 	resp.ProducerID = pid
 	resp.ProducerEpoch = 0
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }

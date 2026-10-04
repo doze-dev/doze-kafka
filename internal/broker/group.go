@@ -11,7 +11,7 @@ import (
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
-	"github.com/doze-dev/doze-kafka/internal/protocol"
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // defaultSessionTimeout is used when a client requests a non-positive one.
@@ -286,12 +286,12 @@ func (gm *groupManager) forget(group string) bool {
 // first version that knows the code. An older client would not know what to do
 // with it, so it is given an id and joined in one step, as Kafka does.
 func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who clientRef) (joinResult, error) {
-	refuse := func(code protocol.ErrorCode) (joinResult, error) {
+	refuse := func(code int16) (joinResult, error) {
 		return joinResult{errorCode: int16(code), memberID: r.MemberID, generation: -1}, nil
 	}
 	// A member with no protocols has nothing the group could agree on.
 	if len(r.Protocols) == 0 {
-		return refuse(protocol.ErrInconsistentGroupProtocol)
+		return refuse(kerr.InconsistentGroupProtocol.Code)
 	}
 	static := r.InstanceID != nil && *r.InstanceID != ""
 
@@ -300,7 +300,7 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 	// wrong with this request.
 	if owner := gm.claims.ownerOf(r.Group); owner != "" && owner != protoClassic {
 		gm.mu.Unlock()
-		return refuse(protocol.ErrInconsistentGroupProtocol)
+		return refuse(kerr.InconsistentGroupProtocol.Code)
 	}
 	g := gm.groups[r.Group]
 
@@ -318,7 +318,7 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 				}
 			case r.MemberID != cur:
 				gm.mu.Unlock()
-				return refuse(protocol.ErrFencedInstanceID)
+				return refuse(kerr.FencedInstanceID.Code)
 			}
 		}
 	}
@@ -331,7 +331,7 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 		if r.GetVersion() >= 4 && !static {
 			gm.issue(r.Group, id)
 			gm.mu.Unlock()
-			return joinResult{errorCode: int16(protocol.ErrMemberIDRequired), memberID: id, generation: -1}, nil
+			return joinResult{errorCode: kerr.MemberIDRequired.Code, memberID: id, generation: -1}, nil
 		}
 		r.MemberID = id
 	case g == nil || g.members[r.MemberID] == nil:
@@ -339,13 +339,13 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 		// member was removed (or never existed) and must start again.
 		if !gm.issued(r.Group, r.MemberID) {
 			gm.mu.Unlock()
-			return refuse(protocol.ErrUnknownMemberID)
+			return refuse(kerr.UnknownMemberID.Code)
 		}
 	}
 
 	if !gm.claims.claim(r.Group, protoClassic) {
 		gm.mu.Unlock()
-		return refuse(protocol.ErrInconsistentGroupProtocol)
+		return refuse(kerr.InconsistentGroupProtocol.Code)
 	}
 	g = gm.getOrCreate(r.Group)
 
@@ -356,7 +356,7 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 	if others := g.othersThan(r.MemberID); len(others) > 0 {
 		if r.ProtocolType != g.protocolType || !commonProtocol(offered, others) {
 			gm.mu.Unlock()
-			return refuse(protocol.ErrInconsistentGroupProtocol)
+			return refuse(kerr.InconsistentGroupProtocol.Code)
 		}
 	} else {
 		g.protocolType = r.ProtocolType
@@ -433,11 +433,11 @@ func (gm *groupManager) replaceStatic(g *group, oldID string, r *kmsg.JoinGroupR
 
 	// Whatever the old incarnation had parked is answered: it has been replaced.
 	if old.awaitingJoin && old.joinResult != nil {
-		old.joinResult <- joinResult{errorCode: int16(protocol.ErrFencedInstanceID), memberID: oldID, generation: -1}
+		old.joinResult <- joinResult{errorCode: kerr.FencedInstanceID.Code, memberID: oldID, generation: -1}
 		old.awaitingJoin = false
 	}
 	if ch, ok := g.pendingSync[oldID]; ok {
-		ch <- syncResult{errorCode: int16(protocol.ErrFencedInstanceID)}
+		ch <- syncResult{errorCode: kerr.FencedInstanceID.Code}
 		delete(g.pendingSync, oldID)
 	}
 	old.stopSession()
@@ -528,24 +528,24 @@ func (gm *groupManager) sync(ctx context.Context, r *kmsg.SyncGroupRequest) (syn
 	g := gm.groups[r.Group]
 	if g == nil {
 		gm.mu.Unlock()
-		return syncResult{errorCode: int16(protocol.ErrUnknownMemberID)}, nil
+		return syncResult{errorCode: kerr.UnknownMemberID.Code}, nil
 	}
 	if g.fenced(r.MemberID, r.InstanceID) {
 		gm.mu.Unlock()
-		return syncResult{errorCode: int16(protocol.ErrFencedInstanceID)}, nil
+		return syncResult{errorCode: kerr.FencedInstanceID.Code}, nil
 	}
 	m := g.members[r.MemberID]
 	if m == nil {
 		gm.mu.Unlock()
-		return syncResult{errorCode: int16(protocol.ErrUnknownMemberID)}, nil
+		return syncResult{errorCode: kerr.UnknownMemberID.Code}, nil
 	}
 	if r.Generation != g.generation {
 		gm.mu.Unlock()
-		return syncResult{errorCode: int16(protocol.ErrIllegalGeneration)}, nil
+		return syncResult{errorCode: kerr.IllegalGeneration.Code}, nil
 	}
 	if g.state == statePreparingRebalance {
 		gm.mu.Unlock()
-		return syncResult{errorCode: int16(protocol.ErrRebalanceInProgress)}, nil
+		return syncResult{errorCode: kerr.RebalanceInProgress.Code}, nil
 	}
 	gm.resetSession(g, m)
 
@@ -576,7 +576,7 @@ func (gm *groupManager) sync(ctx context.Context, r *kmsg.SyncGroupRequest) (syn
 	// retry on a new connection). The first is answered, not dropped: nothing
 	// else would ever release it.
 	if old, parked := g.pendingSync[r.MemberID]; parked {
-		old <- syncResult{errorCode: int16(protocol.ErrUnknownMemberID)}
+		old <- syncResult{errorCode: kerr.UnknownMemberID.Code}
 	}
 	ch := make(chan syncResult, 1)
 	g.pendingSync[r.MemberID] = ch
@@ -597,23 +597,23 @@ func (gm *groupManager) heartbeat(r *kmsg.HeartbeatRequest) int16 {
 	defer gm.mu.Unlock()
 	g := gm.groups[r.Group]
 	if g == nil {
-		return int16(protocol.ErrUnknownMemberID)
+		return kerr.UnknownMemberID.Code
 	}
 	if g.fenced(r.MemberID, r.InstanceID) {
-		return int16(protocol.ErrFencedInstanceID)
+		return kerr.FencedInstanceID.Code
 	}
 	m := g.members[r.MemberID]
 	if m == nil {
-		return int16(protocol.ErrUnknownMemberID)
+		return kerr.UnknownMemberID.Code
 	}
 	if r.Generation != g.generation {
-		return int16(protocol.ErrIllegalGeneration)
+		return kerr.IllegalGeneration.Code
 	}
 	gm.resetSession(g, m)
 	if g.state == statePreparingRebalance {
-		return int16(protocol.ErrRebalanceInProgress)
+		return kerr.RebalanceInProgress.Code
 	}
-	return int16(protocol.ErrNone)
+	return errNone
 }
 
 // leave removes the named members and, if any were removed, rebalances the rest.
@@ -629,7 +629,7 @@ func (gm *groupManager) leave(r *kmsg.LeaveGroupRequest) []leaveResult {
 	var results []leaveResult
 	removed := false
 	for _, who := range membersToLeave(r) {
-		res := leaveResult{memberID: who.memberID, instanceID: who.instanceID, errorCode: int16(protocol.ErrUnknownMemberID)}
+		res := leaveResult{memberID: who.memberID, instanceID: who.instanceID, errorCode: kerr.UnknownMemberID.Code}
 		if g != nil {
 			id := who.memberID
 			if who.instanceID != nil && *who.instanceID != "" {
@@ -638,7 +638,7 @@ func (gm *groupManager) leave(r *kmsg.LeaveGroupRequest) []leaveResult {
 				case !held:
 					id = ""
 				case id != "" && id != cur:
-					res.errorCode = int16(protocol.ErrFencedInstanceID)
+					res.errorCode = kerr.FencedInstanceID.Code
 					id = ""
 				default:
 					id = cur
@@ -646,7 +646,7 @@ func (gm *groupManager) leave(r *kmsg.LeaveGroupRequest) []leaveResult {
 			}
 			if id != "" && g.members[id] != nil {
 				gm.removeMember(g, id)
-				res.memberID, res.errorCode = id, int16(protocol.ErrNone)
+				res.memberID, res.errorCode = id, errNone
 				removed = true
 			}
 		}
@@ -674,26 +674,26 @@ func (gm *groupManager) validateCommit(groupID, memberID string, instanceID *str
 	g := gm.groups[groupID]
 	if g == nil {
 		if generation < 0 {
-			return int16(protocol.ErrNone)
+			return errNone
 		}
-		return int16(protocol.ErrIllegalGeneration)
+		return kerr.IllegalGeneration.Code
 	}
 	if generation < 0 && len(g.members) == 0 {
-		return int16(protocol.ErrNone)
+		return errNone
 	}
 	if g.fenced(memberID, instanceID) {
-		return int16(protocol.ErrFencedInstanceID)
+		return kerr.FencedInstanceID.Code
 	}
 	if g.members[memberID] == nil {
-		return int16(protocol.ErrUnknownMemberID)
+		return kerr.UnknownMemberID.Code
 	}
 	if generation != g.generation {
-		return int16(protocol.ErrIllegalGeneration)
+		return kerr.IllegalGeneration.Code
 	}
 	if g.state == stateCompletingRebalance {
-		return int16(protocol.ErrRebalanceInProgress)
+		return kerr.RebalanceInProgress.Code
 	}
-	return int16(protocol.ErrNone)
+	return errNone
 }
 
 // --- internal state transitions (all called under gm.mu) ---
@@ -716,11 +716,11 @@ func (g *group) beginRebalance() {
 	// not delivered, and this rebalance supersedes the generation it belongs to.
 	// Tell them so; otherwise they sit until their own client timeout (30s for
 	// the Java client) while the server goroutine stays blocked.
-	g.failPendingSyncs(protocol.ErrRebalanceInProgress)
+	g.failPendingSyncs(kerr.RebalanceInProgress.Code)
 }
 
 // failPendingSyncs answers every parked SyncGroup with code and forgets them.
-func (g *group) failPendingSyncs(code protocol.ErrorCode) {
+func (g *group) failPendingSyncs(code int16) {
 	for id, ch := range g.pendingSync {
 		ch <- syncResult{errorCode: int16(code)} // buffered, never blocks.
 		delete(g.pendingSync, id)
@@ -730,7 +730,7 @@ func (g *group) failPendingSyncs(code protocol.ErrorCode) {
 // failPendingJoin answers a JoinGroup still parked for this member, if any.
 func (m *groupMember) failPendingJoin() {
 	if m.awaitingJoin && m.joinResult != nil {
-		m.joinResult <- joinResult{errorCode: int16(protocol.ErrUnknownMemberID), memberID: m.id, generation: -1}
+		m.joinResult <- joinResult{errorCode: kerr.UnknownMemberID.Code, memberID: m.id, generation: -1}
 	}
 	m.awaitingJoin = false
 }
@@ -945,7 +945,7 @@ func (gm *groupManager) removeMember(g *group, id string) {
 		}
 	}
 	if ch, ok := g.pendingSync[id]; ok {
-		ch <- syncResult{errorCode: int16(protocol.ErrUnknownMemberID)}
+		ch <- syncResult{errorCode: kerr.UnknownMemberID.Code}
 	}
 	delete(g.members, id)
 	delete(g.pendingSync, id)

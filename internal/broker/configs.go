@@ -9,6 +9,8 @@ import (
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/storage/meta"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // The admin config-read APIs — DescribeConfigs and DescribeCluster — back
@@ -29,16 +31,7 @@ func retentionValue(v int64) string {
 // broker. Topic configs are the broker defaults overlaid with the per-topic
 // overrides stored at CreateTopics; broker configs are the process's static
 // settings.
-func (b *Broker) handleDescribeConfigs(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	dr := kreq.(*kmsg.DescribeConfigsRequest)
-
-	resp := kmsg.NewPtrDescribeConfigsResponse()
-	resp.SetVersion(req.Header.APIVersion)
-
+func (b *Broker) handleDescribeConfigs(ctx context.Context, req *protocol.Request, dr *kmsg.DescribeConfigsRequest, resp *kmsg.DescribeConfigsResponse) error {
 	for _, res := range dr.Resources {
 		rr := kmsg.NewDescribeConfigsResponseResource()
 		rr.ResourceType = res.ResourceType
@@ -48,20 +41,20 @@ func (b *Broker) handleDescribeConfigs(ctx context.Context, req *protocol.Reques
 		case kmsg.ConfigResourceTypeTopic:
 			t, ok, err := b.meta.Topic(res.ResourceName)
 			if err != nil || !ok {
-				rr.ErrorCode = int16(protocol.ErrUnknownTopicOrPart)
+				rr.ErrorCode = kerr.UnknownTopicOrPartition.Code
 			} else {
 				rr.Configs = b.topicConfigEntries(t, res.ConfigNames)
 			}
 		case kmsg.ConfigResourceTypeBroker:
 			rr.Configs = b.brokerConfigEntries(res.ConfigNames)
 		default:
-			rr.ErrorCode = int16(protocol.ErrInvalidRequest)
+			rr.ErrorCode = kerr.InvalidRequest.Code
 			msg := "unsupported config resource type"
 			rr.ErrorMessage = &msg
 		}
 		resp.Resources = append(resp.Resources, rr)
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }
 
 // configEntry is one effective config value plus where it came from.
@@ -131,13 +124,7 @@ func configEntries(eff map[string]configEntry, names []string) []kmsg.DescribeCo
 
 // handleDescribeCluster returns the single-node cluster view: this broker is the
 // only node and its own controller.
-func (b *Broker) handleDescribeCluster(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	if _, err := protocol.DecodeRequest(req.Header, req.Body); err != nil {
-		return nil, err
-	}
-
-	resp := kmsg.NewPtrDescribeClusterResponse()
-	resp.SetVersion(req.Header.APIVersion)
+func (b *Broker) handleDescribeCluster(ctx context.Context, req *protocol.Request, _ *kmsg.DescribeClusterRequest, resp *kmsg.DescribeClusterResponse) error {
 	resp.ClusterID = b.clusterID()
 	resp.ControllerID = b.nodeID()
 
@@ -149,5 +136,5 @@ func (b *Broker) handleDescribeCluster(ctx context.Context, req *protocol.Reques
 
 	// Sentinel meaning "authorized operations not included" (we have no ACLs).
 	resp.ClusterAuthorizedOperations = -2147483648
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }

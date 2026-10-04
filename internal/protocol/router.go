@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+
+	"github.com/doze-dev/doze-kafka/internal/kmsg"
 )
 
 // Request is a decoded request handed to a handler. Body holds the bytes after
@@ -59,13 +61,13 @@ func (r *Router) Route(ctx context.Context, req *Request) ([]byte, error) {
 		v := req.Header.APIVersion
 		// ApiVersions is exempt from the version check: a client that asks at a
 		// version we do not know must still be told what we support.
-		if !ok || (req.Header.APIKey != APIApiVersions && (v < rng.Min || v > rng.Max)) {
-			return nil, fmt.Errorf("%w: %s v%d", ErrNotAdvertised, req.Header.APIKey.Name(), v)
+		if !ok || (req.Header.APIKey != kmsg.ApiVersions && (v < rng.Min || v > rng.Max)) {
+			return nil, fmt.Errorf("%w: %s v%d", ErrNotAdvertised, APIName(req.Header.APIKey), v)
 		}
 	}
 	h, ok := r.handlers[req.Header.APIKey]
 	if !ok {
-		return nil, fmt.Errorf("no handler for API %s v%d", req.Header.APIKey.Name(), req.Header.APIVersion)
+		return nil, fmt.Errorf("no handler for API %s v%d", APIName(req.Header.APIKey), req.Header.APIVersion)
 	}
 	return h(ctx, req)
 }

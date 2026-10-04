@@ -6,6 +6,8 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // DeleteGroups and OffsetDelete are what teardown scripts and admin tools use to
@@ -20,35 +22,26 @@ func (b *Broker) groupIsActive(id string) bool {
 
 // handleDeleteGroups removes empty groups. A group with live members is refused
 // (NON_EMPTY_GROUP), an unknown one is GROUP_ID_NOT_FOUND, as on Kafka.
-func (b *Broker) handleDeleteGroups(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	dr := kreq.(*kmsg.DeleteGroupsRequest)
-
-	resp := kmsg.NewPtrDeleteGroupsResponse()
-	resp.SetVersion(req.Header.APIVersion)
-
+func (b *Broker) handleDeleteGroups(ctx context.Context, req *protocol.Request, dr *kmsg.DeleteGroupsRequest, resp *kmsg.DeleteGroupsResponse) error {
 	for _, id := range dr.Groups {
 		rg := kmsg.NewDeleteGroupsResponseGroup()
 		rg.Group = id
 		rg.ErrorCode = b.deleteGroup(id)
 		resp.Groups = append(resp.Groups, rg)
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }
 
 func (b *Broker) deleteGroup(id string) int16 {
 	if b.groupIsActive(id) {
-		return int16(protocol.ErrNonEmptyGroup)
+		return kerr.NonEmptyGroup.Code
 	}
 	// Hold the id for the length of the deletion. Checking for members and then
 	// deleting left a gap in which a consumer could join and have the offsets it
 	// was about to read removed underneath it.
 	const deleting = "deleting"
 	if !b.claims.claim(id, deleting) {
-		return int16(protocol.ErrNonEmptyGroup)
+		return kerr.NonEmptyGroup.Code
 	}
 	defer b.claims.release(id, deleting)
 	existed := b.groups.forget(id)
@@ -58,12 +51,12 @@ func (b *Broker) deleteGroup(id string) int16 {
 	n, err := b.meta.DeleteGroupOffsets(id)
 	if err != nil {
 		b.log.Warn("delete group: could not remove committed offsets", "group", id, "err", err)
-		return int16(protocol.ErrUnknownServer)
+		return kerr.UnknownServerError.Code
 	}
 	if !existed && n == 0 {
-		return int16(protocol.ErrGroupIDNotFound)
+		return kerr.GroupIDNotFound.Code
 	}
-	return int16(protocol.ErrNone)
+	return errNone
 }
 
 // handleOffsetDelete removes a group's committed offsets for named partitions —
@@ -71,20 +64,11 @@ func (b *Broker) deleteGroup(id string) int16 {
 // protocol's subscriptions are opaque bytes to a relay, so whether a live member
 // reads a topic cannot be told; any group with live members is treated as
 // subscribed and refused (GROUP_SUBSCRIBED_TO_TOPIC), which is the safe answer.
-func (b *Broker) handleOffsetDelete(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	odr := kreq.(*kmsg.OffsetDeleteRequest)
-
-	resp := kmsg.NewPtrOffsetDeleteResponse()
-	resp.SetVersion(req.Header.APIVersion)
-
+func (b *Broker) handleOffsetDelete(ctx context.Context, req *protocol.Request, odr *kmsg.OffsetDeleteRequest, resp *kmsg.OffsetDeleteResponse) error {
 	known := b.groupIsActive(odr.Group) || b.groupHasOffsets(odr.Group)
 	if !known {
-		resp.ErrorCode = int16(protocol.ErrGroupIDNotFound)
-		return protocol.EncodeResponse(req.Header, resp), nil
+		resp.ErrorCode = kerr.GroupIDNotFound.Code
+		return nil
 	}
 	active := b.groupIsActive(odr.Group)
 
@@ -97,9 +81,9 @@ func (b *Broker) handleOffsetDelete(ctx context.Context, req *protocol.Request) 
 			rp.Partition = p.Partition
 			switch {
 			case active:
-				rp.ErrorCode = int16(protocol.ErrGroupSubscribedToTopic)
+				rp.ErrorCode = kerr.GroupSubscribedToTopic.Code
 			case (!topicOK || p.Partition < 0 || p.Partition >= topic.Partitions) && !b.hasOffset(odr.Group, t.Topic, p.Partition):
-				rp.ErrorCode = int16(protocol.ErrUnknownTopicOrPart)
+				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
 			default:
 				// Including an offset whose topic is gone. Kafka answers
 				// UNKNOWN_TOPIC_OR_PARTITION there, but it also never keeps such an
@@ -107,14 +91,14 @@ func (b *Broker) handleOffsetDelete(ctx context.Context, req *protocol.Request) 
 				// can hold one, and refusing left no way to remove it short of
 				// deleting the whole group.
 				if err := b.meta.DeleteOffset(odr.Group, t.Topic, p.Partition); err != nil {
-					rp.ErrorCode = int16(protocol.ErrUnknownServer)
+					rp.ErrorCode = kerr.UnknownServerError.Code
 				}
 			}
 			rt.Partitions = append(rt.Partitions, rp)
 		}
 		resp.Topics = append(resp.Topics, rt)
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }
 
 // hasOffset reports whether the group has a committed offset stored for the partition.

@@ -136,21 +136,12 @@ func (gm *groupManager) describe(id string) (classicGroupDesc, bool) {
 
 // handleListGroups lists groups across both protocols, applying the optional
 // state/type filters (v4+/v5+). Single-node: every group is coordinated here.
-func (b *Broker) handleListGroups(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	lr := kreq.(*kmsg.ListGroupsRequest)
-
+func (b *Broker) handleListGroups(ctx context.Context, req *protocol.Request, lr *kmsg.ListGroupsRequest, resp *kmsg.ListGroupsResponse) error {
 	// Both filters match without regard to case, as Kafka's do: the Java admin
 	// client sends "Classic" and "Consumer", and a case-sensitive match returned
 	// nothing for `kafka-consumer-groups --list --type classic`.
 	stateFilter := toSet(lr.StatesFilter)
 	typeFilter := toSet(lr.TypesFilter)
-
-	resp := kmsg.NewPtrListGroupsResponse()
-	resp.SetVersion(req.Header.APIVersion)
 
 	for _, g := range b.listAllGroups() {
 		if len(stateFilter) > 0 && !stateFilter[strings.ToLower(g.state)] {
@@ -169,22 +160,13 @@ func (b *Broker) handleListGroups(ctx context.Context, req *protocol.Request) ([
 		rg.GroupType = g.groupType
 		resp.Groups = append(resp.Groups, rg)
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }
 
 // handleDescribeGroups describes classic groups (the API predates KIP-848; new-
 // protocol groups are described via ConsumerGroupDescribe). An unknown group is
 // reported as Dead with no members — Kafka's behaviour, not an error.
-func (b *Broker) handleDescribeGroups(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	dr := kreq.(*kmsg.DescribeGroupsRequest)
-
-	resp := kmsg.NewPtrDescribeGroupsResponse()
-	resp.SetVersion(req.Header.APIVersion)
-
+func (b *Broker) handleDescribeGroups(ctx context.Context, req *protocol.Request, dr *kmsg.DescribeGroupsRequest, resp *kmsg.DescribeGroupsResponse) error {
 	for _, id := range dr.Groups {
 		rg := kmsg.NewDescribeGroupsResponseGroup()
 		rg.Group = id
@@ -218,7 +200,7 @@ func (b *Broker) handleDescribeGroups(ctx context.Context, req *protocol.Request
 		}
 		resp.Groups = append(resp.Groups, rg)
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }
 
 func toSet(vals []string) map[string]bool {

@@ -13,6 +13,8 @@ import (
 
 	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/internal/protocol"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // Per-topic configuration: retention.ms, retention.bytes and segment.bytes set on
@@ -274,13 +276,13 @@ func TestTopicConfig_AlterIsValidatedAndRefusesWhatItCannotDo(t *testing.T) {
 	for _, tc := range []struct {
 		what string
 		op   alterOp
-		want protocol.ErrorCode
+		want int16
 	}{
-		{"a value that is not a number", alterOp{"retention.ms", opSet, "soon"}, protocol.ErrInvalidConfig},
-		{"a key Kafka does not have", alterOp{"no.such.config", opSet, "1"}, protocol.ErrInvalidConfig},
-		{"a segment too small to be sane", alterOp{"segment.bytes", opSet, "100"}, protocol.ErrInvalidConfig},
-		{"a retention that overflows", alterOp{"retention.ms", opSet, "9223372036854775807"}, protocol.ErrInvalidConfig},
-		{"appending to something that is not a list", alterOp{"retention.ms", opAppend, "5"}, protocol.ErrInvalidRequest},
+		{"a value that is not a number", alterOp{"retention.ms", opSet, "soon"}, kerr.InvalidConfig.Code},
+		{"a key Kafka does not have", alterOp{"no.such.config", opSet, "1"}, kerr.InvalidConfig.Code},
+		{"a segment too small to be sane", alterOp{"segment.bytes", opSet, "100"}, kerr.InvalidConfig.Code},
+		{"a retention that overflows", alterOp{"retention.ms", opSet, "9223372036854775807"}, kerr.InvalidConfig.Code},
+		{"appending to something that is not a list", alterOp{"retention.ms", opAppend, "5"}, kerr.InvalidRequest.Code},
 	} {
 		code, msg := alter(tc.op)
 		if code != int16(tc.want) || msg == "" {
@@ -288,17 +290,17 @@ func TestTopicConfig_AlterIsValidatedAndRefusesWhatItCannotDo(t *testing.T) {
 		}
 	}
 	// One bad config refuses the whole change, good ones included.
-	if code, _ := alter(alterOp{"retention.bytes", opSet, "4096"}, alterOp{"segment.bytes", opSet, "banana"}); code != int16(protocol.ErrInvalidConfig) {
+	if code, _ := alter(alterOp{"retention.bytes", opSet, "4096"}, alterOp{"segment.bytes", opSet, "banana"}); code != kerr.InvalidConfig.Code {
 		t.Errorf("a change with one bad value: code %d", code)
 	}
 	if values, own := describe(t, ctx, cl, "t"); values["retention.ms"] != "60000" || own["retention.bytes"] {
 		t.Errorf("a refused change altered the topic: %v", values)
 	}
 
-	if code, _ := incrementalAlter(t, ctx, cl, topic, "nope", false, alterOp{"retention.ms", opSet, "1"}); code != int16(protocol.ErrUnknownTopicOrPart) {
+	if code, _ := incrementalAlter(t, ctx, cl, topic, "nope", false, alterOp{"retention.ms", opSet, "1"}); code != kerr.UnknownTopicOrPartition.Code {
 		t.Errorf("a topic that does not exist: code %d", code)
 	}
-	if code, msg := incrementalAlter(t, ctx, cl, kmsg.ConfigResourceTypeBroker, "1", false, alterOp{"log.retention.ms", opSet, "1"}); code != int16(protocol.ErrInvalidRequest) || !strings.Contains(msg, "read-only") {
+	if code, msg := incrementalAlter(t, ctx, cl, kmsg.ConfigResourceTypeBroker, "1", false, alterOp{"log.retention.ms", opSet, "1"}); code != kerr.InvalidRequest.Code || !strings.Contains(msg, "read-only") {
 		t.Errorf("altering the broker's own config: code %d %q, want INVALID_REQUEST saying it is read-only", code, msg)
 	}
 
@@ -336,10 +338,10 @@ func TestTopicConfig_AlterIsValidatedAndRefusesWhatItCannotDo(t *testing.T) {
 func TestTopicConfig_AlterAPIsAreAdvertisedByProfile(t *testing.T) {
 	for major, wantIncremental := range map[int]bool{1: false, 2: true, 4: true} {
 		p, _ := protocol.ProfileFor(major)
-		if _, ok := p.APIRanges[protocol.APIAlterConfigs]; !ok {
+		if _, ok := p.RangeFor(protocol.APIKey(kmsg.AlterConfigs)); !ok {
 			t.Errorf("Kafka %d profile does not offer AlterConfigs", major)
 		}
-		if _, ok := p.APIRanges[protocol.APIIncrAlterConfigs]; ok != wantIncremental {
+		if _, ok := p.RangeFor(protocol.APIKey(kmsg.IncrementalAlterConfigs)); ok != wantIncremental {
 			t.Errorf("Kafka %d profile: IncrementalAlterConfigs offered=%v, want %v", major, ok, wantIncremental)
 		}
 	}

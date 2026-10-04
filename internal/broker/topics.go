@@ -10,20 +10,13 @@ import (
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/storage/meta"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // handleCreateTopics registers each topic (assigning a UUID) and materializes its
 // partition directories with LEO=0. Single-node: replication factor is always 1.
-func (b *Broker) handleCreateTopics(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	cr := kreq.(*kmsg.CreateTopicsRequest)
-
-	resp := kmsg.NewPtrCreateTopicsResponse()
-	resp.SetVersion(req.Header.APIVersion)
-
+func (b *Broker) handleCreateTopics(ctx context.Context, req *protocol.Request, cr *kmsg.CreateTopicsRequest, resp *kmsg.CreateTopicsResponse) error {
 	// A name listed twice is a malformed request: neither entry is acted on.
 	count := map[string]int{}
 	for _, t := range cr.Topics {
@@ -33,7 +26,7 @@ func (b *Broker) handleCreateTopics(ctx context.Context, req *protocol.Request) 
 		if count[t.Topic] > 1 {
 			rt := kmsg.NewCreateTopicsResponseTopic()
 			rt.Topic = t.Topic
-			rt.ErrorCode = int16(protocol.ErrInvalidRequest)
+			rt.ErrorCode = kerr.InvalidRequest.Code
 			msg := "the topic is named more than once in this request"
 			rt.ErrorMessage = &msg
 			resp.Topics = append(resp.Topics, rt)
@@ -41,7 +34,7 @@ func (b *Broker) handleCreateTopics(ctx context.Context, req *protocol.Request) 
 		}
 		resp.Topics = append(resp.Topics, b.createTopic(t, cr.ValidateOnly))
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }
 
 // createTopic handles a single topic and returns its response entry.
@@ -56,25 +49,25 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 		partitions = int32(b.cfg.DefaultPartitions)
 	}
 	if err := meta.ValidateTopicName(t.Topic); err != nil {
-		rt.ErrorCode = int16(protocol.ErrInvalidTopic)
+		rt.ErrorCode = kerr.InvalidTopicException.Code
 		msg := strings.TrimPrefix(err.Error(), "meta: ") // a client is shown this; the package is not its business.
 		rt.ErrorMessage = &msg
 		return rt
 	}
 	if partitions <= 0 {
-		rt.ErrorCode = int16(protocol.ErrInvalidPartitions)
+		rt.ErrorCode = kerr.InvalidPartitions.Code
 		msg := fmt.Sprintf("%d is not a partition count (use -1 for the broker default)", t.NumPartitions)
 		rt.ErrorMessage = &msg
 		return rt
 	}
 	if err := validateTopicConfig(configMap(t.Configs)); err != nil {
-		rt.ErrorCode = int16(protocol.ErrInvalidConfig)
+		rt.ErrorCode = kerr.InvalidConfig.Code
 		msg := err.Error()
 		rt.ErrorMessage = &msg
 		return rt
 	}
 	if int(partitions) > b.cfg.MaxPartitions {
-		rt.ErrorCode = int16(protocol.ErrInvalidPartitions)
+		rt.ErrorCode = kerr.InvalidPartitions.Code
 		msg := fmt.Sprintf("%d partitions is above this broker's limit of %d (--max-partitions)", partitions, b.cfg.MaxPartitions)
 		rt.ErrorMessage = &msg
 		return rt
@@ -88,13 +81,13 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 	created, err := b.meta.CreateTopic(t.Topic, partitions, configMap(t.Configs))
 	if err != nil {
 		if errors.Is(err, meta.ErrTopicExists) {
-			rt.ErrorCode = int16(protocol.ErrTopicAlreadyExists)
+			rt.ErrorCode = kerr.TopicAlreadyExists.Code
 		} else if errors.Is(err, meta.ErrTopicCollides) {
-			rt.ErrorCode = int16(protocol.ErrInvalidTopic)
+			rt.ErrorCode = kerr.InvalidTopicException.Code
 			msg := strings.TrimPrefix(err.Error(), "meta: ")
 			rt.ErrorMessage = &msg
 		} else {
-			rt.ErrorCode = int16(protocol.ErrUnknownServer)
+			rt.ErrorCode = kerr.UnknownServerError.Code
 			msg := err.Error()
 			rt.ErrorMessage = &msg
 		}
@@ -107,7 +100,7 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 	// second must undo the first: otherwise the name stays registered, every later
 	// produce fails, and CreateTopics answers TOPIC_ALREADY_EXISTS.
 	if err := b.materialize(created); err != nil {
-		rt.ErrorCode = int16(protocol.ErrUnknownServer)
+		rt.ErrorCode = kerr.UnknownServerError.Code
 		msg := err.Error()
 		rt.ErrorMessage = &msg
 		return rt
@@ -186,16 +179,7 @@ func (b *Broker) materialize(t meta.Topic) error {
 
 // handleDeleteTopics removes each topic from the registry and deletes its partition
 // data from disk. It accepts the v0-v5 name list and the v6+ (name-or-id) form.
-func (b *Broker) handleDeleteTopics(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	dr := kreq.(*kmsg.DeleteTopicsRequest)
-
-	resp := kmsg.NewPtrDeleteTopicsResponse()
-	resp.SetVersion(req.Header.APIVersion)
-
+func (b *Broker) handleDeleteTopics(ctx context.Context, req *protocol.Request, dr *kmsg.DeleteTopicsRequest, resp *kmsg.DeleteTopicsResponse) error {
 	// Normalize both request forms into (name, id) targets.
 	type target struct {
 		name string
@@ -224,7 +208,7 @@ func (b *Broker) handleDeleteTopics(ctx context.Context, req *protocol.Request) 
 		}
 		switch {
 		case !ok:
-			rt.ErrorCode = int16(protocol.ErrUnknownTopicOrPart)
+			rt.ErrorCode = kerr.UnknownTopicOrPartition.Code
 		default:
 			rt.TopicID = topic.ID
 			if err := b.meta.DeleteTopic(name); err != nil {
@@ -242,5 +226,5 @@ func (b *Broker) handleDeleteTopics(ctx context.Context, req *protocol.Request) 
 		}
 		resp.Topics = append(resp.Topics, rt)
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }

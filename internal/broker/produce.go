@@ -11,6 +11,8 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/storage/log"
 	"strconv"
 	"time"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // handleProduce appends each partition's record batches to its log: stamp the base
@@ -43,7 +45,7 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 			for _, part := range t.Partitions {
 				rp := kmsg.NewProduceResponseTopicPartition()
 				rp.Partition, rp.BaseOffset = part.Partition, -1
-				rp.ErrorCode = int16(protocol.ErrInvalidRequiredAcks)
+				rp.ErrorCode = kerr.InvalidRequiredAcks.Code
 				rt.Partitions = append(rt.Partitions, rp)
 			}
 			resp.Topics = append(resp.Topics, rt)
@@ -70,10 +72,10 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 
 			switch {
 			case !ok || part.Partition < 0 || part.Partition >= topic.Partitions:
-				rp.ErrorCode = int16(protocol.ErrUnknownTopicOrPart)
+				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
 			default:
 				wrote := b.appendRecords(name, topic.Config, part, &rp)
-				refused = refused || rp.ErrorCode == int16(protocol.ErrCorruptMessage) || rp.ErrorCode == int16(protocol.ErrMessageTooLarge)
+				refused = refused || rp.ErrorCode == kerr.CorruptMessage.Code || rp.ErrorCode == kerr.MessageTooLarge.Code
 				if wrote {
 					producedTopics[name] = struct{}{}
 					tp := topicPartition{name, part.Partition}
@@ -111,7 +113,7 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 			msg := "fsync failed: " + err.Error()
 			for _, s := range slots {
 				rp := &resp.Topics[s.topic].Partitions[s.part]
-				rp.ErrorCode = int16(protocol.ErrKafkaStorageError)
+				rp.ErrorCode = kerr.KafkaStorageError.Code
 				rp.ErrorMessage = &msg
 				rp.BaseOffset = -1
 			}
@@ -127,7 +129,7 @@ func (b *Broker) appendRecords(topic string, topicConfig map[string]string, part
 	plog, err := b.logs.ExistingPartition(topic, part.Partition)
 	if errors.Is(err, log.ErrNoSuchPartition) {
 		// The topic was deleted between resolving it and opening its log.
-		rp.ErrorCode = int16(protocol.ErrUnknownTopicOrPart)
+		rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
 		return false
 	}
 	if err != nil {
@@ -139,7 +141,7 @@ func (b *Broker) appendRecords(topic string, topicConfig map[string]string, part
 	// be stored (every consumer would then fail on it, forever) and must not leave
 	// the batches before it half-appended.
 	if err := log.ValidateBatches(part.Records); err != nil {
-		rp.ErrorCode = int16(protocol.ErrCorruptMessage)
+		rp.ErrorCode = kerr.CorruptMessage.Code
 		msg := err.Error()
 		rp.ErrorMessage = &msg
 		rp.BaseOffset = -1
@@ -151,7 +153,7 @@ func (b *Broker) appendRecords(topic string, topicConfig map[string]string, part
 	// Kafka's 1 MB would surprise more people than it helped.)
 	if limit, ok := topicInt(topicConfig, "max.message.bytes"); ok {
 		if largest := log.LargestBatch(part.Records); largest > limit {
-			rp.ErrorCode = int16(protocol.ErrMessageTooLarge)
+			rp.ErrorCode = kerr.MessageTooLarge.Code
 			msg := fmt.Sprintf("a record batch of %d bytes is larger than this topic's max.message.bytes (%d)", largest, limit)
 			rp.ErrorMessage = &msg
 			rp.BaseOffset = -1
@@ -219,7 +221,7 @@ func (b *Broker) appendIdempotent(topic string, partition int32, plog *log.Parti
 	for pos := 0; pos < len(records); {
 		hdr, ok := log.ParseBatch(records[pos:])
 		if !ok || hdr.TotalBytes <= 0 || pos+hdr.TotalBytes > len(records) {
-			rp.ErrorCode = int16(protocol.ErrUnknownServer)
+			rp.ErrorCode = kerr.UnknownServerError.Code
 			return wrote
 		}
 		batch := records[pos : pos+hdr.TotalBytes]
@@ -246,13 +248,13 @@ func (b *Broker) appendIdempotent(topic string, partition int32, plog *log.Parti
 				firstOffset = v.offset
 			}
 		case seqDuplicateOld:
-			rp.ErrorCode = int16(protocol.ErrDuplicateSequence)
+			rp.ErrorCode = kerr.DuplicateSequenceNumber.Code
 			return wrote
 		case seqOutOfOrder:
-			rp.ErrorCode = int16(protocol.ErrOutOfOrderSequence)
+			rp.ErrorCode = kerr.OutOfOrderSequenceNumber.Code
 			return wrote
 		case seqFenced:
-			rp.ErrorCode = int16(protocol.ErrInvalidProducerEpoch)
+			rp.ErrorCode = kerr.InvalidProducerEpoch.Code
 			return wrote
 		}
 		pos += hdr.TotalBytes

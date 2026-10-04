@@ -15,13 +15,13 @@ import (
 // defines for the key must be refused up front, never decoded.
 func TestDecodeRequestRejectsOutOfRangeVersions(t *testing.T) {
 	for _, v := range []int16{-1, 12336, 32767} {
-		_, err := DecodeRequest(RequestHeader{APIKey: APIMetadata, APIVersion: v}, []byte{0, 0, 0, 0})
+		_, err := DecodeRequest(RequestHeader{APIKey: kmsg.Metadata, APIVersion: v}, []byte{0, 0, 0, 0})
 		if err == nil || !strings.Contains(err.Error(), "outside the known range") {
 			t.Errorf("Metadata v%d: err = %v, want an out-of-range refusal", v, err)
 		}
 	}
 	// In range still decodes.
-	if _, err := DecodeRequest(RequestHeader{APIKey: APIMetadata, APIVersion: 1}, []byte{0, 0, 0, 0}); err != nil {
+	if _, err := DecodeRequest(RequestHeader{APIKey: kmsg.Metadata, APIVersion: 1}, []byte{0, 0, 0, 0}); err != nil {
 		t.Errorf("Metadata v1 should decode: %v", err)
 	}
 }
@@ -45,7 +45,7 @@ func TestTaggedFieldCountCannotSpin(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		_, _ = DecodeRequest(RequestHeader{APIKey: APIProduce, APIVersion: 11}, body)
+		_, _ = DecodeRequest(RequestHeader{APIKey: kmsg.Produce, APIVersion: 11}, body)
 	}()
 	select {
 	case <-done:
@@ -76,10 +76,10 @@ func TestDecodeRequestHostileInputIsCheap(t *testing.T) {
 func TestProfilesDoNotAdvertiseLegacyMessageSetVersions(t *testing.T) {
 	for _, major := range SupportedKafkaMajors() {
 		prof, _ := ProfileFor(major)
-		if r, ok := prof.RangeFor(APIProduce); !ok || r.Min < 3 {
+		if r, ok := prof.RangeFor(kmsg.Produce); !ok || r.Min < 3 {
 			t.Errorf("Kafka %d profile advertises Produce from v%d; record batches start at v3", major, r.Min)
 		}
-		if r, ok := prof.RangeFor(APIFetch); !ok || r.Min < 4 {
+		if r, ok := prof.RangeFor(kmsg.Fetch); !ok || r.Min < 4 {
 			t.Errorf("Kafka %d profile advertises Fetch from v%d; record batches start at v4", major, r.Min)
 		}
 	}
@@ -88,7 +88,7 @@ func TestProfilesDoNotAdvertiseLegacyMessageSetVersions(t *testing.T) {
 func TestEncodeResponseSizedMatchesEncodeResponse(t *testing.T) {
 	resp := kmsg.NewPtrApiVersionsResponse()
 	resp.SetVersion(3)
-	hdr := RequestHeader{APIKey: APIFetch, APIVersion: 12, CorrelationID: 99}
+	hdr := RequestHeader{APIKey: kmsg.Fetch, APIVersion: 12, CorrelationID: 99}
 	fr := kmsg.NewPtrFetchResponse()
 	fr.SetVersion(12)
 	rt := kmsg.NewFetchResponseTopic()
@@ -120,7 +120,7 @@ func TestDecodeDoesNotAllocateWhatTheCountClaims(t *testing.T) {
 		name    string
 		key     APIKey
 		version int16
-	}{{"CreateTopics v0", APICreateTopics, 0}, {"Metadata v1", APIMetadata, 1}, {"Fetch v4", APIFetch, 4}, {"Produce v3", APIProduce, 3}} {
+	}{{"CreateTopics v0", kmsg.CreateTopics, 0}, {"Metadata v1", kmsg.Metadata, 1}, {"Fetch v4", kmsg.Fetch, 4}, {"Produce v3", kmsg.Produce, 3}} {
 		// 0xff everywhere, so nothing after the count decodes as a run of tiny
 		// elements: what is measured is the count's claim alone. The count is
 		// written at each offset the first array could start at.

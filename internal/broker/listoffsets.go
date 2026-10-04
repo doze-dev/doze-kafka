@@ -6,6 +6,8 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // Special ListOffsets timestamps.
@@ -17,16 +19,7 @@ const (
 // handleListOffsets answers earliest/latest offset queries. A real timestamp is
 // served coarsely as the earliest offset — a per-record timestamp index is not
 // implemented (local dev consumers use earliest/latest almost exclusively).
-func (b *Broker) handleListOffsets(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	lr := kreq.(*kmsg.ListOffsetsRequest)
-
-	resp := kmsg.NewPtrListOffsetsResponse()
-	resp.SetVersion(req.Header.APIVersion)
-
+func (b *Broker) handleListOffsets(ctx context.Context, req *protocol.Request, lr *kmsg.ListOffsetsRequest, resp *kmsg.ListOffsetsResponse) error {
 	for _, t := range lr.Topics {
 		rt := kmsg.NewListOffsetsResponseTopic()
 		rt.Topic = t.Topic
@@ -39,7 +32,7 @@ func (b *Broker) handleListOffsets(ctx context.Context, req *protocol.Request) (
 			rp.LeaderEpoch = -1
 
 			if !ok || part.Partition < 0 || part.Partition >= topic.Partitions {
-				rp.ErrorCode = int16(protocol.ErrUnknownTopicOrPart)
+				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
 				rt.Partitions = append(rt.Partitions, rp)
 				continue
 			}
@@ -68,5 +61,5 @@ func (b *Broker) handleListOffsets(ctx context.Context, req *protocol.Request) (
 		}
 		resp.Topics = append(resp.Topics, rt)
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }

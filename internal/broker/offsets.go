@@ -7,6 +7,8 @@ import (
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/storage/meta"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // handleOffsetCommit persists a group's committed offsets for topic-partitions to
@@ -14,17 +16,8 @@ import (
 // commit is fenced by generation/memberID — a stale generation or unknown member is
 // rejected per-partition (validateCommit lets simple consumers with no group
 // through). Committed offsets are the only durable consumer-group state.
-func (b *Broker) handleOffsetCommit(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	oc := kreq.(*kmsg.OffsetCommitRequest)
-
+func (b *Broker) handleOffsetCommit(ctx context.Context, req *protocol.Request, oc *kmsg.OffsetCommitRequest, resp *kmsg.OffsetCommitResponse) error {
 	fence := b.commitFence(oc)
-
-	resp := kmsg.NewPtrOffsetCommitResponse()
-	resp.SetVersion(req.Header.APIVersion)
 
 	// Validate every partition first and write the valid ones in ONE transaction:
 	// a bolt transaction is an fsync, so committing a 20-partition poll one
@@ -44,10 +37,10 @@ func (b *Broker) handleOffsetCommit(ctx context.Context, req *protocol.Request) 
 			rp := kmsg.NewOffsetCommitResponseTopicPartition()
 			rp.Partition = p.Partition
 			switch {
-			case fence != int16(protocol.ErrNone):
+			case fence != errNone:
 				rp.ErrorCode = fence
 			case !ok || p.Partition < 0 || p.Partition >= topic.Partitions:
-				rp.ErrorCode = int16(protocol.ErrUnknownTopicOrPart)
+				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
 			default:
 				md := ""
 				if p.Metadata != nil {
@@ -66,23 +59,14 @@ func (b *Broker) handleOffsetCommit(ctx context.Context, req *protocol.Request) 
 			resp.Topics[s.topic].Partitions[s.part].ErrorCode = code
 		}
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }
 
 // handleOffsetFetch returns a group's committed offsets, or -1 for any partition
 // with no commit so the client applies its auto.offset.reset. It answers both the
 // v0-v7 single-group form (top-level Group + Topics) and the v8+ batched form
 // (Groups). A nil topic list means "all committed offsets for the group".
-func (b *Broker) handleOffsetFetch(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	of := kreq.(*kmsg.OffsetFetchRequest)
-
-	resp := kmsg.NewPtrOffsetFetchResponse()
-	resp.SetVersion(req.Header.APIVersion)
-
+func (b *Broker) handleOffsetFetch(ctx context.Context, req *protocol.Request, of *kmsg.OffsetFetchRequest, resp *kmsg.OffsetFetchResponse) error {
 	if len(of.Groups) > 0 { // v8+ batched form.
 		for _, g := range of.Groups {
 			rg := kmsg.NewOffsetFetchResponseGroup()
@@ -99,7 +83,7 @@ func (b *Broker) handleOffsetFetch(ctx context.Context, req *protocol.Request) (
 			}
 			partitions, err := b.groupOffsets(g.Group, groupTopicNames(g.Topics), g.Topics == nil)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			for _, po := range partitions {
 				rt := findOrAppendGroupTopic(&rg, po.topic)
@@ -111,13 +95,13 @@ func (b *Broker) handleOffsetFetch(ctx context.Context, req *protocol.Request) (
 			}
 			resp.Groups = append(resp.Groups, rg)
 		}
-		return protocol.EncodeResponse(req.Header, resp), nil
+		return nil
 	}
 
 	// v0-v7 single-group form.
 	partitions, err := b.groupOffsets(of.Group, requestTopicNames(of.Topics), of.Topics == nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, po := range partitions {
 		rt := findOrAppendTopic(resp, po.topic)
@@ -127,7 +111,7 @@ func (b *Broker) handleOffsetFetch(ctx context.Context, req *protocol.Request) (
 		tp.Metadata = po.metadata
 		rt.Partitions = append(rt.Partitions, tp) // rt points into resp.Topics; mutation sticks.
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }
 
 // partitionOffset is one resolved (topic, partition) committed offset. A partition
@@ -238,7 +222,7 @@ func findOrAppendGroupTopic(rg *kmsg.OffsetFetchResponseGroup, name string) *kms
 // group as it stands now, under whichever protocol the group runs.
 func (b *Broker) commitFence(oc *kmsg.OffsetCommitRequest) int16 {
 	if oc.Group == "" || meta.ValidateGroupID(oc.Group) != nil {
-		return int16(protocol.ErrInvalidGroupID)
+		return kerr.InvalidGroupID.Code
 	}
 	if b.claims.ownerOf(oc.Group) == protoConsumer {
 		return b.cg848.validateCommit(oc.Group, oc.MemberID, oc.Generation)

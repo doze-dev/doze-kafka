@@ -53,18 +53,24 @@ first and watch it fail.
 
 ## Adding a Kafka API
 
-An API is advertised only once something serves it. Today that is four places. The
-router refuses a request the profile does not advertise, so a handler alone exposes
-nothing; but nothing yet checks that every advertised API has a handler, or that the
-document matches the code. One table that all four read from is planned.
+There is one table, `protocol.APIs` in `internal/protocol/versions.go`. `ApiVersions`
+answers from it, the router refuses anything not in it, and tests hold the rest to it.
 
-1. **`internal/protocol/versions.go`**: add its key and `[min,max]` to each profile
-   that should offer it. (Check franz-go's `kversion` for the real ranges.)
-2. **`internal/broker/<api>.go`**: write the handler; decode with `kmsg`, answer with
-   `kmsg`.
-3. **`internal/broker/broker.go`**: register it in `Register`.
-4. **`docs/api-support.md`**: add its row to both tables, by hand, from the
-   profiles. There is no generator.
+1. **`internal/protocol/versions.go`**: add a row: the key, and the `[min,max]` it is
+   offered at for each Kafka major (`none` where that major does not have it). Check
+   franz-go's `kversion` for the real ranges.
+2. **`internal/broker/<api>.go`**: write the handler against its own types,
+   `func (b *Broker) handleX(ctx, req, q *kmsg.XRequest, resp *kmsg.XResponse) error`.
+   Decoding, making the response at the right version and framing it are done for you
+   (`typed` in `broker.go`); fill in `resp` and return nil.
+3. **`internal/broker/broker.go`**: add it to `handlers()`. A row with no handler
+   stops the broker starting and fails `TestEveryAPIInTheTableHasAHandlerAndTheReverse`.
+4. **`docs/api-support.md`**: describe it in the first table, then regenerate the
+   version table: `UPDATE_API_DOCS=1 go test ./internal/protocol -run TestAPISupportDoc`.
+   The same test fails whenever the document and the table differ.
+
+Error codes are the protocol library's (`kerr.UnknownTopicOrPartition.Code`), not a list
+kept here; the list that used to be kept here had one number wrong.
 
 Then test it with a raw `kmsg` request at the minimum, a middle and the maximum
 version, and with a real client if one exercises it.

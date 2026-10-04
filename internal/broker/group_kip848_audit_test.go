@@ -189,7 +189,7 @@ func TestGroupKIP848_RequestsAreValidated(t *testing.T) {
 		{"no rebalance timeout", func(r *kmsg.ConsumerGroupHeartbeatRequest) { r.RebalanceTimeoutMillis = -1 }, 42},
 		{"no group id", func(r *kmsg.ConsumerGroupHeartbeatRequest) { r.Group = "" }, 42},
 		{"an epoch below -2", func(r *kmsg.ConsumerGroupHeartbeatRequest) { r.MemberEpoch = -3 }, 42},
-		{"a pattern that does not compile", func(r *kmsg.ConsumerGroupHeartbeatRequest) { r.SubscribedTopicRegex = kmsg.StringPtr("(") }, 117},
+		{"a pattern that does not compile", func(r *kmsg.ConsumerGroupHeartbeatRequest) { r.SubscribedTopicRegex = kmsg.StringPtr("(") }, 128}, // INVALID_REGULAR_EXPRESSION. (It was answered as 117, UNKNOWN_SUBSCRIPTION_ID, from a mistyped constant.)
 		{"an unknown member at a later epoch", func(r *kmsg.ConsumerGroupHeartbeatRequest) { r.MemberEpoch = 3 }, 25},
 		{"leaving a group that does not exist", func(r *kmsg.ConsumerGroupHeartbeatRequest) { r.MemberEpoch = -1 }, 69},
 	} {

@@ -9,7 +9,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 
-	"github.com/doze-dev/doze-kafka/internal/protocol"
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // Raw ConsumerGroupHeartbeat tests: a real client's reconciliation loop hides
@@ -231,8 +231,8 @@ func TestGroupCoordinators_ShareNoGroupID(t *testing.T) {
 	// A live classic group refuses a KIP-848 member.
 	stableGroupOfOne(t, ctx, cl, "classic-first", testSessionMs, testRebalanceMsDefault)
 	m := newCGMember(t, addr, "classic-first", "new-protocol-member")
-	if resp := m.heartbeat(t, ctx, []string{"t"}, false); resp.ErrorCode != int16(protocol.ErrGroupIDNotFound) {
-		t.Errorf("KIP-848 join into a live classic group: code %d, want GROUP_ID_NOT_FOUND (%d)", resp.ErrorCode, protocol.ErrGroupIDNotFound)
+	if resp := m.heartbeat(t, ctx, []string{"t"}, false); resp.ErrorCode != kerr.GroupIDNotFound.Code {
+		t.Errorf("KIP-848 join into a live classic group: code %d, want GROUP_ID_NOT_FOUND (%d)", resp.ErrorCode, kerr.GroupIDNotFound.Code)
 	}
 
 	// A live KIP-848 group refuses a classic member.
@@ -244,8 +244,8 @@ func TestGroupCoordinators_ShareNoGroupID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.ErrorCode != int16(protocol.ErrInconsistentGroupProtocol) {
-		t.Errorf("classic join into a live KIP-848 group: code %d, want INCONSISTENT_GROUP_PROTOCOL (%d)", resp.ErrorCode, protocol.ErrInconsistentGroupProtocol)
+	if resp.ErrorCode != kerr.InconsistentGroupProtocol.Code {
+		t.Errorf("classic join into a live KIP-848 group: code %d, want INCONSISTENT_GROUP_PROTOCOL (%d)", resp.ErrorCode, kerr.InconsistentGroupProtocol.Code)
 	}
 
 	// Neither id is listed twice.

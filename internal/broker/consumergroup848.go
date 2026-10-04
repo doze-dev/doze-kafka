@@ -13,6 +13,8 @@ import (
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/storage/meta"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // KIP-848 (the broker-driven consumer group protocol) inverts the classic model:
@@ -219,7 +221,7 @@ type cg848Result struct {
 	assignment  *kmsg.ConsumerGroupHeartbeatResponseAssignment // nil => keepalive (no change).
 }
 
-func cg848Error(code protocol.ErrorCode, msg string) cg848Result {
+func cg848Error(code int16, msg string) cg848Result {
 	return cg848Result{errorCode: int16(code), errorMsg: msg}
 }
 
@@ -227,10 +229,10 @@ func cg848Error(code protocol.ErrorCode, msg string) cg848Result {
 // or leave (epoch -1, or -2 for a static member that will be back).
 func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clientRef) cg848Result {
 	if r.Group == "" || meta.ValidateGroupID(r.Group) != nil {
-		return cg848Error(protocol.ErrInvalidRequest, "the group id is empty or not usable")
+		return cg848Error(kerr.InvalidRequest.Code, "the group id is empty or not usable")
 	}
 	if r.MemberEpoch < -2 {
-		return cg848Error(protocol.ErrInvalidRequest, "the member epoch is not a valid value")
+		return cg848Error(kerr.InvalidRequest.Code, "the member epoch is not a valid value")
 	}
 	static := r.InstanceID != nil && *r.InstanceID != ""
 
@@ -241,11 +243,11 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 	if r.MemberEpoch < 0 {
 		g := m.groups[r.Group]
 		if g == nil {
-			return cg848Error(protocol.ErrGroupIDNotFound, "no such group")
+			return cg848Error(kerr.GroupIDNotFound.Code, "no such group")
 		}
 		mem := g.members[r.MemberID]
 		if mem == nil {
-			return cg848Error(protocol.ErrUnknownMemberID, "not a member of the group")
+			return cg848Error(kerr.UnknownMemberID.Code, "not a member of the group")
 		}
 		if r.MemberEpoch == -2 && static {
 			// A static member going away for a restart: its place and its
@@ -266,28 +268,28 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 		if r.MemberID == "" {
 			// v0 clients send no id and expect one; from v1 the client makes its own.
 			if r.GetVersion() >= 1 {
-				return cg848Error(protocol.ErrInvalidRequest, "a member id is required")
+				return cg848Error(kerr.InvalidRequest.Code, "a member id is required")
 			}
 			r.MemberID = generateMemberID(r.InstanceID)
 		}
 		if r.RebalanceTimeoutMillis <= 0 {
-			return cg848Error(protocol.ErrInvalidRequest, "the rebalance timeout must be set when joining")
+			return cg848Error(kerr.InvalidRequest.Code, "the rebalance timeout must be set when joining")
 		}
 		if r.SubscribedTopicNames == nil && r.SubscribedTopicRegex == nil {
-			return cg848Error(protocol.ErrInvalidRequest, "a subscription must be set when joining")
+			return cg848Error(kerr.InvalidRequest.Code, "a subscription must be set when joining")
 		}
 	}
 	assignor := ""
 	if r.ServerAssignor != nil && *r.ServerAssignor != "" {
 		if assignor = *r.ServerAssignor; assignor != assignorUniform && assignor != assignorRange {
-			return cg848Error(protocol.ErrUnsupportedAssignor, "the assignors offered are uniform and range")
+			return cg848Error(kerr.UnsupportedAssignor.Code, "the assignors offered are uniform and range")
 		}
 	}
 	var regex *regexp.Regexp
 	if r.SubscribedTopicRegex != nil && *r.SubscribedTopicRegex != "" {
 		re, err := regexp.Compile(*r.SubscribedTopicRegex)
 		if err != nil {
-			return cg848Error(protocol.ErrInvalidRegularExpression, err.Error())
+			return cg848Error(kerr.InvalidRegularExpression.Code, err.Error())
 		}
 		regex = re
 	}
@@ -296,19 +298,19 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 	if g == nil {
 		if r.MemberEpoch != 0 {
 			// Unknown here (after a broker restart, say): the member must rejoin.
-			return cg848Error(protocol.ErrUnknownMemberID, "no such member; rejoin")
+			return cg848Error(kerr.UnknownMemberID.Code, "no such member; rejoin")
 		}
 		// The id is taken for this protocol in one step; a classic group holding
 		// it (or one being formed at this instant) wins and this join is refused.
 		if !m.claims.claim(r.Group, protoConsumer) {
-			return cg848Error(protocol.ErrGroupIDNotFound, "the group id is in use by a classic group")
+			return cg848Error(kerr.GroupIDNotFound.Code, "the group id is in use by a classic group")
 		}
 		g = &cg848Group{id: r.Group, assignor: assignorUniform, members: make(map[string]*cg848Member)}
 		m.groups[r.Group] = g
 	} else if len(g.members) == 0 && r.MemberEpoch == 0 {
 		// An emptied group kept for listing: joining it needs the claim again.
 		if !m.claims.claim(r.Group, protoConsumer) {
-			return cg848Error(protocol.ErrGroupIDNotFound, "the group id is in use by a classic group")
+			return cg848Error(kerr.GroupIDNotFound.Code, "the group id is in use by a classic group")
 		}
 	}
 
@@ -323,7 +325,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 					continue
 				}
 				if !other.left {
-					return cg848Error(protocol.ErrUnreleasedInstanceID, "another member holds this instance id")
+					return cg848Error(kerr.UnreleasedInstanceID.Code, "another member holds this instance id")
 				}
 				// Its restarted self: take over the place it left, partitions and all.
 				other.stopTimers()
@@ -350,7 +352,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 		mem.rebalanceTimeout = time.Duration(r.RebalanceTimeoutMillis) * time.Millisecond
 	} else {
 		if mem == nil || mem.left {
-			return cg848Error(protocol.ErrUnknownMemberID, "no such member; rejoin")
+			return cg848Error(kerr.UnknownMemberID.Code, "no such member; rejoin")
 		}
 		switch {
 		case r.MemberEpoch == mem.epoch:
@@ -358,7 +360,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 			// The response that advanced its epoch was lost; tell it again.
 			mem.sent = nil
 		default:
-			return cg848Error(protocol.ErrFencedMemberEpoch, "the member epoch is stale; rejoin")
+			return cg848Error(kerr.FencedMemberEpoch.Code, "the member epoch is stale; rejoin")
 		}
 	}
 	mem.client = who
@@ -780,22 +782,22 @@ func (m *cg848Manager) validateCommit(groupID, memberID string, epoch int32) int
 	return int16(m.memberCheck(groupID, memberID, epoch))
 }
 
-func (m *cg848Manager) memberCheck(groupID, memberID string, epoch int32) protocol.ErrorCode {
+func (m *cg848Manager) memberCheck(groupID, memberID string, epoch int32) int16 {
 	g := m.groups[groupID]
 	if g == nil || len(g.members) == 0 {
 		if epoch < 0 && memberID == "" {
-			return protocol.ErrNone
+			return errNone
 		}
-		return protocol.ErrUnknownMemberID
+		return kerr.UnknownMemberID.Code
 	}
 	mem := g.members[memberID]
 	if mem == nil {
-		return protocol.ErrUnknownMemberID
+		return kerr.UnknownMemberID.Code
 	}
 	if epoch != mem.epoch {
-		return protocol.ErrStaleMemberEpoch
+		return kerr.StaleMemberEpoch.Code
 	}
-	return protocol.ErrNone
+	return errNone
 }
 
 // stateName is the group's state as ConsumerGroupDescribe / ListGroups report it.
@@ -863,50 +865,33 @@ func (m *cg848Manager) describe(group string) (state string, epoch int32, assign
 
 // handleConsumerGroupHeartbeat is the single KIP-848 API that carries join, poll,
 // and leave. The broker computes and drives the assignment (see cg848Manager).
-func (b *Broker) handleConsumerGroupHeartbeat(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	hr := kreq.(*kmsg.ConsumerGroupHeartbeatRequest)
-
+func (b *Broker) handleConsumerGroupHeartbeat(ctx context.Context, req *protocol.Request, hr *kmsg.ConsumerGroupHeartbeatRequest, resp *kmsg.ConsumerGroupHeartbeatResponse) error {
 	res := b.cg848.heartbeat(hr, clientRef{req.Header.ClientID, req.Conn.RemoteHost()})
 
-	resp := kmsg.NewPtrConsumerGroupHeartbeatResponse()
-	resp.SetVersion(req.Header.APIVersion)
 	resp.ErrorCode = res.errorCode
 	if res.errorMsg != "" {
 		resp.ErrorMessage = &res.errorMsg
 	}
-	if res.errorCode == int16(protocol.ErrNone) {
+	if res.errorCode == errNone {
 		mid := res.memberID
 		resp.MemberID = &mid
 		resp.MemberEpoch = res.memberEpoch
 		resp.HeartbeatIntervalMillis = cg848HeartbeatMs
 		resp.Assignment = res.assignment
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }
 
 // handleConsumerGroupDescribe reports the broker-driven group's state, epoch, and
 // members with their current assignments — the data `kafka-consumer-groups
 // --describe` shows. Unknown groups get GROUP_ID_NOT_FOUND.
-func (b *Broker) handleConsumerGroupDescribe(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	dr := kreq.(*kmsg.ConsumerGroupDescribeRequest)
-
-	resp := kmsg.NewPtrConsumerGroupDescribeResponse()
-	resp.SetVersion(req.Header.APIVersion)
-
+func (b *Broker) handleConsumerGroupDescribe(ctx context.Context, req *protocol.Request, dr *kmsg.ConsumerGroupDescribeRequest, resp *kmsg.ConsumerGroupDescribeResponse) error {
 	for _, group := range dr.Groups {
 		rg := kmsg.NewConsumerGroupDescribeResponseGroup()
 		rg.Group = group
 		state, epoch, assignor, members, ok := b.cg848.describe(group)
 		if !ok || (len(members) == 0 && b.claims.ownerOf(group) == protoClassic) {
-			rg.ErrorCode = int16(protocol.ErrGroupIDNotFound)
+			rg.ErrorCode = kerr.GroupIDNotFound.Code
 			resp.Groups = append(resp.Groups, rg)
 			continue
 		}
@@ -932,7 +917,7 @@ func (b *Broker) handleConsumerGroupDescribe(ctx context.Context, req *protocol.
 		}
 		resp.Groups = append(resp.Groups, rg)
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }
 
 // describeAssignment renders a set of partitions as a ConsumerGroupDescribe

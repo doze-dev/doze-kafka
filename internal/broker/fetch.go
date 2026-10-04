@@ -9,6 +9,8 @@ import (
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/storage/log"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 const defaultFetchMaxBytes = 1 << 20 // 1 MiB when a client sets no bound.
@@ -38,7 +40,7 @@ func (b *Broker) handleFetch(ctx context.Context, req *protocol.Request) ([]byte
 	if fr.SessionID != 0 && fr.SessionEpoch > 0 {
 		resp := kmsg.NewPtrFetchResponse()
 		resp.SetVersion(req.Header.APIVersion)
-		resp.ErrorCode = int16(protocol.ErrFetchSessionIDNotFound)
+		resp.ErrorCode = kerr.FetchSessionIDNotFound.Code
 		return protocol.EncodeResponse(req.Header, resp), nil
 	}
 
@@ -166,7 +168,7 @@ func (b *Broker) readPartition(topic string, part kmsg.FetchRequestTopicPartitio
 	plog, err := b.logs.ExistingPartition(topic, part.Partition)
 	if errors.Is(err, log.ErrNoSuchPartition) {
 		// The topic was deleted between resolving it and opening its log.
-		rp.ErrorCode = int16(protocol.ErrUnknownTopicOrPart)
+		rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
 		return 0
 	}
 	if err != nil {
@@ -196,7 +198,7 @@ func (b *Broker) readPartition(topic string, part kmsg.FetchRequestTopicPartitio
 
 	switch {
 	case errors.Is(err, log.ErrOffsetOutOfRange):
-		rp.ErrorCode = int16(protocol.ErrOffsetOutOfRange)
+		rp.ErrorCode = kerr.OffsetOutOfRange.Code
 		return 0
 	case err != nil:
 		rp.ErrorCode = b.storageFault("fetch: read", err, "topic", topic, "partition", part.Partition, "offset", part.FetchOffset)
@@ -217,9 +219,9 @@ func (b *Broker) readPartition(topic string, part kmsg.FetchRequestTopicPartitio
 
 // unknownTopicErr picks the right "unknown topic" code depending on whether the
 // request addressed the topic by name or by id.
-func (b *Broker) unknownTopicErr(nameInRequest string) protocol.ErrorCode {
+func (b *Broker) unknownTopicErr(nameInRequest string) int16 {
 	if nameInRequest == "" {
-		return protocol.ErrUnknownTopicID
+		return kerr.UnknownTopicID.Code
 	}
-	return protocol.ErrUnknownTopicOrPart
+	return kerr.UnknownTopicOrPartition.Code
 }

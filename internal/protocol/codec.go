@@ -21,14 +21,14 @@ func DecodeRequest(header RequestHeader, body []byte) (kmsg.Request, error) {
 	// Refuse it before parsing any of the body.
 	if header.APIVersion < 0 || header.APIVersion > req.MaxVersion() {
 		return nil, fmt.Errorf("protocol: %s v%d is outside the known range 0-%d",
-			header.APIKey.Name(), header.APIVersion, req.MaxVersion())
+			APIName(header.APIKey), header.APIVersion, req.MaxVersion())
 	}
 	req.SetVersion(header.APIVersion)
 	if req.IsFlexible() {
 		body = skipTaggedFields(body)
 	}
 	if err := req.ReadFrom(body); err != nil {
-		return nil, fmt.Errorf("protocol: decode %s v%d: %w", header.APIKey.Name(), header.APIVersion, err)
+		return nil, fmt.Errorf("protocol: decode %s v%d: %w", APIName(header.APIKey), header.APIVersion, err)
 	}
 	return req, nil
 }
@@ -50,7 +50,7 @@ func EncodeResponse(header RequestHeader, resp kmsg.Response) []byte {
 func EncodeResponseSized(header RequestHeader, resp kmsg.Response, sizeHint int) []byte {
 	buf := make([]byte, 0, max(sizeHint, 128))
 	buf = binary.BigEndian.AppendUint32(buf, uint32(header.CorrelationID))
-	if header.APIKey != APIApiVersions && flexibleResponse(header.APIKey, resp.GetVersion()) {
+	if header.APIKey != kmsg.ApiVersions && flexibleResponse(header.APIKey, resp.GetVersion()) {
 		buf = append(buf, 0) // empty tagged-fields section (unsigned varint 0).
 	}
 	return resp.AppendTo(buf)

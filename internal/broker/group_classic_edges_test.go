@@ -9,7 +9,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"github.com/twmb/franz-go/pkg/kversion"
 
-	"github.com/doze-dev/doze-kafka/internal/protocol"
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // These tests drive the classic coordinator with raw requests so they can assert
@@ -18,12 +18,15 @@ import (
 
 const (
 	codeNone               = int16(0)
-	codeIllegalGeneration  = int16(protocol.ErrIllegalGeneration)
-	codeUnknownMember      = int16(protocol.ErrUnknownMemberID)
-	codeRebalanceInProg    = int16(protocol.ErrRebalanceInProgress)
-	codeMemberIDRequired   = int16(protocol.ErrMemberIDRequired)
 	testSessionMs          = 30_000
 	testRebalanceMsDefault = 30_000
+)
+
+var (
+	codeIllegalGeneration = kerr.IllegalGeneration.Code
+	codeUnknownMember     = kerr.UnknownMemberID.Code
+	codeRebalanceInProg   = kerr.RebalanceInProgress.Code
+	codeMemberIDRequired  = kerr.MemberIDRequired.Code
 )
 
 func joinRequest(group, member string, sessionMs, rebalanceMs int32) *kmsg.JoinGroupRequest {

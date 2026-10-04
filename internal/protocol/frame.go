@@ -6,6 +6,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+
+	"github.com/doze-dev/doze-kafka/internal/kmsg"
 )
 
 const (
@@ -95,8 +97,8 @@ func readRequestFrame(r *bufio.Reader, limitFor func(key APIKey) int) ([]byte, e
 		return ReadFrameLimit(r, maxControlFrameBytes) // reports the short read.
 	}
 	n := int64(binary.BigEndian.Uint32(head))
-	if n > int64(limitFor(APIProduce)) || n < 2 {
-		return ReadFrameLimit(r, limitFor(APIProduce)) // too large for anything, or too short to hold a key.
+	if n > int64(limitFor(kmsg.Produce)) || n < 2 {
+		return ReadFrameLimit(r, limitFor(kmsg.Produce)) // too large for anything, or too short to hold a key.
 	}
 	head, err = r.Peek(6)
 	if err != nil {

@@ -41,6 +41,12 @@ func rawRequest(t *testing.T, addr string, key, version int16, body []byte) (ans
 	return true, resp
 }
 
+// wellFormed is a request with default fields, encoded at the given version.
+func wellFormed(r kmsg.Request, version int16) []byte {
+	r.SetVersion(version)
+	return r.AppendTo(nil)
+}
+
 // The broker serves exactly what ApiVersions advertises. It used to answer any
 // version kmsg could decode and any API with a handler: Produce v0 (a format the
 // log cannot store) was appended, Fetch v0 was answered with batches a v0 client
@@ -61,10 +67,12 @@ func TestOnlyAdvertisedAPIsAndVersionsAreServed(t *testing.T) {
 		{"InitProducerId v1 (advertised)", 22, 1, ipid(1), true},
 		{"InitProducerId v100", 22, 100, ipid(1), false},
 		{"InitProducerId v-1", 22, -1, ipid(1), false},
-		{"Produce v2 (below the minimum)", 0, 2, nil, false},
-		{"Fetch v3 (below the minimum)", 1, 3, nil, false},
-		{"Metadata v13 (above the maximum)", 3, 13, nil, false},
-		{"CreatePartitions (no such API here)", 37, 0, nil, false},
+		// Well-formed requests, so that being refused is about the version and not
+		// about a body that would not have decoded anyway.
+		{"Produce v2 (below the minimum)", 0, 2, wellFormed(kmsg.NewPtrProduceRequest(), 2), false},
+		{"Fetch v3 (below the minimum)", 1, 3, wellFormed(kmsg.NewPtrFetchRequest(), 3), false},
+		{"Metadata v13 (above the maximum)", 3, 13, wellFormed(kmsg.NewPtrMetadataRequest(), 13), false},
+		{"CreatePartitions (no such API here)", 37, 0, wellFormed(kmsg.NewPtrCreatePartitionsRequest(), 0), false},
 		// ApiVersions is the exception: an unknown version is told what is supported.
 		{"ApiVersions v99", 18, 99, nil, true},
 	} {

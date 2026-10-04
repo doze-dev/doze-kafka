@@ -9,7 +9,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"github.com/twmb/franz-go/pkg/kversion"
 
-	"github.com/doze-dev/doze-kafka/internal/protocol"
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 func produceN(t *testing.T, ctx context.Context, cl *kgo.Client, topic string, n int) {
@@ -119,7 +119,7 @@ func TestFetchBeyondTheLogEnd(t *testing.T) {
 	produceN(t, ctx, cl, "t", 3)
 	fcl := nameFetchClient(t, addr)
 
-	oor := int16(protocol.ErrOffsetOutOfRange)
+	oor := kerr.OffsetOutOfRange.Code
 	if code, n := fetchCode(t, ctx, fcl, "t", 3); code != 0 || n != 0 {
 		t.Errorf("fetch at the log end: code %d with %d bytes, want 0 and none (caught up)", code, n)
 	}
@@ -165,7 +165,7 @@ func TestDeleteAndRecreateDropsCommittedOffsets(t *testing.T) {
 	if got := fetchCommitted(t, ctx, cl, "billing", "orders"); got != -1 {
 		t.Errorf("the recreated topic inherited committed offset %d, want -1 (none)", got)
 	}
-	if code, _ := fetchCode(t, ctx, nameFetchClient(t, addr), "orders", 10); code != int16(protocol.ErrOffsetOutOfRange) {
+	if code, _ := fetchCode(t, ctx, nameFetchClient(t, addr), "orders", 10); code != kerr.OffsetOutOfRange.Code {
 		t.Errorf("fetch at the stale offset 10 on a 3-record log: code %d, want OFFSET_OUT_OF_RANGE", code)
 	}
 }

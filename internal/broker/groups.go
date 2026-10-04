@@ -16,16 +16,7 @@ import (
 // handleFindCoordinator returns this broker as the coordinator for any group (or
 // transaction) key — single-node is always its own coordinator. It answers both
 // the v0-v3 single-key form and the v4+ batched CoordinatorKeys form.
-func (b *Broker) handleFindCoordinator(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	fr := kreq.(*kmsg.FindCoordinatorRequest)
-
-	resp := kmsg.NewPtrFindCoordinatorResponse()
-	resp.SetVersion(req.Header.APIVersion)
-
+func (b *Broker) handleFindCoordinator(ctx context.Context, req *protocol.Request, fr *kmsg.FindCoordinatorRequest, resp *kmsg.FindCoordinatorResponse) error {
 	host, port, node := b.cfg.AdvertisedHost, b.advertisedPort(), b.nodeID()
 
 	// v0-v3 single-coordinator fields.
@@ -42,7 +33,7 @@ func (b *Broker) handleFindCoordinator(ctx context.Context, req *protocol.Reques
 		c.Port = port
 		resp.Coordinators = append(resp.Coordinators, c)
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }
 
 // handleJoinGroup runs the classic join relay. The first contact from a new member
@@ -50,28 +41,20 @@ func (b *Broker) handleFindCoordinator(ctx context.Context, req *protocol.Reques
 // otherwise the request is parked until the rebalance window closes, then this
 // member's slice of the result is returned. Only the elected leader receives every
 // member's subscription metadata.
-func (b *Broker) handleJoinGroup(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	jr := kreq.(*kmsg.JoinGroupRequest)
-
+func (b *Broker) handleJoinGroup(ctx context.Context, req *protocol.Request, jr *kmsg.JoinGroupRequest, resp *kmsg.JoinGroupResponse) error {
 	// One group id, one protocol: a group already running under KIP-848 cannot
 	// also be a classic group, or every partition would go to both.
 	// (the coordinator claims the id on join; see groupClaims).
 	res, err := b.groups.join(ctx, jr, clientRef{req.Header.ClientID, req.Conn.RemoteHost()})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	resp := kmsg.NewPtrJoinGroupResponse()
-	resp.SetVersion(req.Header.APIVersion)
 	resp.ErrorCode = res.errorCode
 	resp.Generation = res.generation
 	resp.LeaderID = res.leaderID
 	resp.MemberID = res.memberID
-	if res.errorCode != int16(protocol.ErrNone) {
+	if res.errorCode != errNone {
 		resp.Generation = -1 // no generation on an errored join.
 	}
 	if res.protocol != "" {
@@ -89,63 +72,39 @@ func (b *Broker) handleJoinGroup(ctx context.Context, req *protocol.Request) ([]
 		m.ProtocolMetadata = mi.metadata
 		resp.Members = append(resp.Members, m)
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }
 
 // handleSyncGroup distributes assignments: the leader uploads everyone's assignment
 // bytes and each member (leader included) receives its own slice. Followers block
 // until the leader's SyncGroup arrives.
-func (b *Broker) handleSyncGroup(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	sr := kreq.(*kmsg.SyncGroupRequest)
-
+func (b *Broker) handleSyncGroup(ctx context.Context, req *protocol.Request, sr *kmsg.SyncGroupRequest, resp *kmsg.SyncGroupResponse) error {
 	res, err := b.groups.sync(ctx, sr)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	resp := kmsg.NewPtrSyncGroupResponse()
-	resp.SetVersion(req.Header.APIVersion)
 	resp.ErrorCode = res.errorCode
 	resp.MemberAssignment = res.assignment
 	resp.ProtocolType = sr.ProtocolType // v5+; nil echoes to nothing on older versions.
 	resp.Protocol = sr.Protocol
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }
 
 // handleHeartbeat refreshes a member's session and returns REBALANCE_IN_PROGRESS
 // while a rebalance is under way (so the member rejoins) or a fencing error for a
 // stale generation / unknown member.
-func (b *Broker) handleHeartbeat(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	hr := kreq.(*kmsg.HeartbeatRequest)
-
-	resp := kmsg.NewPtrHeartbeatResponse()
-	resp.SetVersion(req.Header.APIVersion)
+func (b *Broker) handleHeartbeat(ctx context.Context, req *protocol.Request, hr *kmsg.HeartbeatRequest, resp *kmsg.HeartbeatResponse) error {
 	resp.ErrorCode = b.groups.heartbeat(hr)
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }
 
 // handleLeaveGroup removes the named members and triggers a rebalance for the rest.
 // The top-level ErrorCode serves v0-v2 clients (one member per request); v3+ get a
 // per-member result list.
-func (b *Broker) handleLeaveGroup(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	lr := kreq.(*kmsg.LeaveGroupRequest)
-
+func (b *Broker) handleLeaveGroup(ctx context.Context, req *protocol.Request, lr *kmsg.LeaveGroupRequest, resp *kmsg.LeaveGroupResponse) error {
 	results := b.groups.leave(lr)
 
-	resp := kmsg.NewPtrLeaveGroupResponse()
-	resp.SetVersion(req.Header.APIVersion)
 	if len(results) > 0 {
 		resp.ErrorCode = results[0].errorCode
 	}
@@ -156,5 +115,5 @@ func (b *Broker) handleLeaveGroup(ctx context.Context, req *protocol.Request) ([
 		m.ErrorCode = r.errorCode
 		resp.Members = append(resp.Members, m)
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }

@@ -13,7 +13,7 @@ import (
 
 	"go.etcd.io/bbolt"
 
-	"github.com/doze-dev/doze-kafka/internal/protocol"
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // Committed offsets are the durable consumer state, but the group objects that
@@ -131,11 +131,11 @@ func TestGroupAdmin_DeleteGroups(t *testing.T) {
 	if codes["idle"] != 0 {
 		t.Errorf("deleting an idle group with offsets: code %d, want 0", codes["idle"])
 	}
-	if codes["busy"] != int16(protocol.ErrNonEmptyGroup) {
-		t.Errorf("deleting a group with a live member: code %d, want NON_EMPTY_GROUP (%d)", codes["busy"], protocol.ErrNonEmptyGroup)
+	if codes["busy"] != kerr.NonEmptyGroup.Code {
+		t.Errorf("deleting a group with a live member: code %d, want NON_EMPTY_GROUP (%d)", codes["busy"], kerr.NonEmptyGroup.Code)
 	}
-	if codes["nonexistent"] != int16(protocol.ErrGroupIDNotFound) {
-		t.Errorf("deleting an unknown group: code %d, want GROUP_ID_NOT_FOUND (%d)", codes["nonexistent"], protocol.ErrGroupIDNotFound)
+	if codes["nonexistent"] != kerr.GroupIDNotFound.Code {
+		t.Errorf("deleting an unknown group: code %d, want GROUP_ID_NOT_FOUND (%d)", codes["nonexistent"], kerr.GroupIDNotFound.Code)
 	}
 
 	got := listedGroups(t, ctx, cl)
@@ -177,7 +177,7 @@ func TestGroupAdmin_OffsetDelete(t *testing.T) {
 		return resp
 	}
 
-	if r := od("nobody", "t", 0); r.ErrorCode != int16(protocol.ErrGroupIDNotFound) {
+	if r := od("nobody", "t", 0); r.ErrorCode != kerr.GroupIDNotFound.Code {
 		t.Errorf("unknown group: code %d, want GROUP_ID_NOT_FOUND", r.ErrorCode)
 	}
 	r := od("g", "t", 0, 7) // 7 is not a partition of t.
@@ -188,7 +188,7 @@ func TestGroupAdmin_OffsetDelete(t *testing.T) {
 	for _, p := range r.Topics[0].Partitions {
 		got[p.Partition] = p.ErrorCode
 	}
-	if got[0] != 0 || got[7] != int16(protocol.ErrUnknownTopicOrPart) {
+	if got[0] != 0 || got[7] != kerr.UnknownTopicOrPartition.Code {
 		t.Errorf("per-partition codes = %v, want 0 for a real partition and UNKNOWN_TOPIC_OR_PARTITION for 7", got)
 	}
 	if off := fetchCommitted(t, ctx, cl, "g", "t"); off != -1 {
@@ -201,7 +201,7 @@ func TestGroupAdmin_OffsetDelete(t *testing.T) {
 	commitOffset(t, ctx, cl, "live", "t", 3)
 	stableGroupOfOne(t, ctx, cl, "live", testSessionMs, testRebalanceMsDefault)
 	r = od("live", "t", 0)
-	if len(r.Topics) == 0 || r.Topics[0].Partitions[0].ErrorCode != int16(protocol.ErrGroupSubscribedToTopic) {
+	if len(r.Topics) == 0 || r.Topics[0].Partitions[0].ErrorCode != kerr.GroupSubscribedToTopic.Code {
 		t.Errorf("OffsetDelete on a group with live members: %+v, want GROUP_SUBSCRIBED_TO_TOPIC", r)
 	}
 }
@@ -333,10 +333,10 @@ func TestGroupAdmin_OffsetDeleteRemovesAnOffsetWhoseTopicIsGone(t *testing.T) {
 		t.Errorf("after removing it the group holds %v, want only kept: 3", got)
 	}
 	// Where there is nothing stored, an unknown topic is still an unknown topic.
-	if code := del("gone", 0); code != int16(protocol.ErrUnknownTopicOrPart) {
+	if code := del("gone", 0); code != kerr.UnknownTopicOrPartition.Code {
 		t.Errorf("a topic that does not exist and has no offset: code %d, want UNKNOWN_TOPIC_OR_PARTITION", code)
 	}
-	if code := del("never", 0); code != int16(protocol.ErrUnknownTopicOrPart) {
+	if code := del("never", 0); code != kerr.UnknownTopicOrPartition.Code {
 		t.Errorf("an unknown topic: code %d", code)
 	}
 	if off := fetchCommitted(t, ctx, cl, "g", "kept"); off != 3 {

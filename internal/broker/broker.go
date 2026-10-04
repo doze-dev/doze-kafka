@@ -11,10 +11,15 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"context"
+	"fmt"
 	"github.com/doze-dev/doze-kafka/internal/config"
+	"github.com/doze-dev/doze-kafka/internal/kmsg"
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/storage/log"
 	"github.com/doze-dev/doze-kafka/internal/storage/meta"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // Broker holds the shared state every handler needs.
@@ -76,56 +81,90 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 	}, nil
 }
 
-// Register binds every handler to its API key on the router. Which group-protocol
-// handlers are registered depends on the active version profile.
+// Register binds a handler to every API the active profile offers, and tells the
+// router to refuse everything else. What is offered comes from protocol.APIs; what
+// serves it comes from handlers() below. An offered API with no handler is a
+// programming error and panics here, at start-up, rather than surfacing as a
+// client whose request is never answered.
 func (b *Broker) Register(r *protocol.Router) {
-	// The router enforces exactly what ApiVersions advertises: the profile's
-	// ranges, plus SASL when it is configured.
+	handlers := b.handlers()
 	for _, a := range b.advertised() {
+		h, ok := handlers[a.Key]
+		if !ok {
+			panic(fmt.Sprintf("broker: %s is advertised (protocol.APIs) but has no handler", protocol.APIName(a.Key)))
+		}
 		r.Advertise(a.Key, a.Min, a.Max)
+		r.Register(a.Key, h)
 	}
+}
 
-	// Available on every supported Kafka major.
-	r.Register(protocol.APIApiVersions, b.handleAPIVersions)
-	r.Register(protocol.APIMetadata, b.handleMetadata)
-	r.Register(protocol.APICreateTopics, b.handleCreateTopics)
-	r.Register(protocol.APIDeleteTopics, b.handleDeleteTopics)
-	r.Register(protocol.APIProduce, b.handleProduce)
-	r.Register(protocol.APIFetch, b.handleFetch)
-	r.Register(protocol.APIListOffsets, b.handleListOffsets)
-	r.Register(protocol.APIInitProducerID, b.handleInitProducerID)
+// handlers is the handler for every API in protocol.APIs. Most are written
+// against their decoded request and a response to fill in (see typed); Produce,
+// Fetch and ApiVersions frame their own, for the reasons given where they are
+// defined.
+func (b *Broker) handlers() map[protocol.APIKey]protocol.Handler {
+	return map[protocol.APIKey]protocol.Handler{
+		kmsg.ApiVersions: b.handleAPIVersions,
+		kmsg.Produce:     b.handleProduce,
+		kmsg.Fetch:       b.handleFetch,
 
-	// Classic consumer-group protocol (the JoinGroup/SyncGroup relay).
-	r.Register(protocol.APIFindCoordinator, b.handleFindCoordinator)
-	r.Register(protocol.APIJoinGroup, b.handleJoinGroup)
-	r.Register(protocol.APISyncGroup, b.handleSyncGroup)
-	r.Register(protocol.APIHeartbeat, b.handleHeartbeat)
-	r.Register(protocol.APILeaveGroup, b.handleLeaveGroup)
-	r.Register(protocol.APIOffsetCommit, b.handleOffsetCommit)
-	r.Register(protocol.APIOffsetFetch, b.handleOffsetFetch)
-	r.Register(protocol.APIListGroups, b.handleListGroups)
-	r.Register(protocol.APIDeleteGroups, b.handleDeleteGroups)
-	r.Register(protocol.APIOffsetDelete, b.handleOffsetDelete)
-	r.Register(protocol.APIDescribeGroups, b.handleDescribeGroups)
-	r.Register(protocol.APIDescribeConfigs, b.handleDescribeConfigs)
-	r.Register(protocol.APIAlterConfigs, b.handleAlterConfigs)
-	r.Register(protocol.APIIncrAlterConfigs, b.handleIncrementalAlterConfigs)
-	r.Register(protocol.APIDescribeCluster, b.handleDescribeCluster)
+		kmsg.Metadata:                typed(b.handleMetadata),
+		kmsg.CreateTopics:            typed(b.handleCreateTopics),
+		kmsg.DeleteTopics:            typed(b.handleDeleteTopics),
+		kmsg.ListOffsets:             typed(b.handleListOffsets),
+		kmsg.InitProducerID:          typed(b.handleInitProducerID),
+		kmsg.DescribeConfigs:         typed(b.handleDescribeConfigs),
+		kmsg.AlterConfigs:            typed(b.handleAlterConfigs),
+		kmsg.IncrementalAlterConfigs: typed(b.handleIncrementalAlterConfigs),
+		kmsg.DescribeCluster:         typed(b.handleDescribeCluster),
 
-	// SASL authentication — only when configured. The connection gate
-	// (protocol.Server.RequireAuth) blocks every other API until the handshake
-	// completes; these two handlers, and ApiVersions, are the pre-auth exceptions.
-	if b.auth != nil {
-		r.Register(protocol.APISASLHandshake, b.handleSASLHandshake)
-		r.Register(protocol.APISASLAuthenticate, b.handleSASLAuthenticate)
+		// The classic consumer-group protocol, and what both protocols share.
+		kmsg.FindCoordinator: typed(b.handleFindCoordinator),
+		kmsg.JoinGroup:       typed(b.handleJoinGroup),
+		kmsg.SyncGroup:       typed(b.handleSyncGroup),
+		kmsg.Heartbeat:       typed(b.handleHeartbeat),
+		kmsg.LeaveGroup:      typed(b.handleLeaveGroup),
+		kmsg.OffsetCommit:    typed(b.handleOffsetCommit),
+		kmsg.OffsetFetch:     typed(b.handleOffsetFetch),
+		kmsg.ListGroups:      typed(b.handleListGroups),
+		kmsg.DescribeGroups:  typed(b.handleDescribeGroups),
+		kmsg.DeleteGroups:    typed(b.handleDeleteGroups),
+		kmsg.OffsetDelete:    typed(b.handleOffsetDelete),
+
+		// KIP-848, offered by the Kafka 4 profile only.
+		kmsg.ConsumerGroupHeartbeat: typed(b.handleConsumerGroupHeartbeat),
+		kmsg.ConsumerGroupDescribe:  typed(b.handleConsumerGroupDescribe),
+
+		// SASL, offered only when authentication is configured. The connection gate
+		// (protocol.Server.RequireAuth) blocks every other API until the handshake
+		// completes; these two, and ApiVersions, are the pre-auth exceptions.
+		kmsg.SASLHandshake:    typed(b.handleSASLHandshake),
+		kmsg.SASLAuthenticate: typed(b.handleSASLAuthenticate),
 	}
+}
 
-	// KIP-848 broker-driven group protocol — Kafka 4+ profiles only. A client at
-	// the default group.protocol=consumer negotiates this via the advertised
-	// ConsumerGroupHeartbeat/Describe APIs.
-	if b.profile.GroupProtocol == protocol.GroupClassicAndConsumer {
-		r.Register(protocol.APIConsumerGroupHeartbeat, b.handleConsumerGroupHeartbeat)
-		r.Register(protocol.APIConsumerGroupDescribe, b.handleConsumerGroupDescribe)
+// typed adapts a handler written against its own request and response types to
+// the router's: it decodes the request, makes the matching response at the
+// request's version, calls the handler to fill it in, and frames the result. That
+// is the preamble and the last line every handler used to repeat.
+func typed[Q kmsg.Request, R kmsg.Response](fn func(ctx context.Context, req *protocol.Request, q Q, resp R) error) protocol.Handler {
+	return func(ctx context.Context, req *protocol.Request) ([]byte, error) {
+		kreq, err := protocol.DecodeRequest(req.Header, req.Body)
+		if err != nil {
+			return nil, err
+		}
+		q, ok := kreq.(Q)
+		if !ok {
+			return nil, fmt.Errorf("broker: %s decoded as %T", protocol.APIName(req.Header.APIKey), kreq)
+		}
+		resp, ok := q.ResponseKind().(R)
+		if !ok {
+			return nil, fmt.Errorf("broker: %s answers with %T", protocol.APIName(req.Header.APIKey), q.ResponseKind())
+		}
+		if err := fn(ctx, req, q, resp); err != nil {
+			return nil, err
+		}
+		return protocol.EncodeResponse(req.Header, resp), nil
 	}
 }
 
@@ -134,7 +173,7 @@ func (b *Broker) Register(r *protocol.Router) {
 // this, the cause of "my produce fails" existed nowhere a developer could look.
 func (b *Broker) storageFault(op string, err error, attrs ...any) int16 {
 	b.log.Error("request failed: "+op, append(attrs, "err", err)...)
-	return int16(protocol.ErrUnknownServer)
+	return kerr.UnknownServerError.Code
 }
 
 // nodeID is this broker's node id. Single-node, so it is a constant.
@@ -253,14 +292,7 @@ func (n *notifier) signal(topic string) {
 // auth is configured. ApiVersions and the router both read it, so what is offered
 // and what is accepted cannot differ.
 func (b *Broker) advertised() []protocol.AdvertisedAPI {
-	out := b.profile.Advertised()
-	if b.auth != nil {
-		// SaslHandshake v1 only: v0 means "raw tokens follow", which is not served.
-		out = append(out,
-			protocol.AdvertisedAPI{Key: protocol.APISASLHandshake, Min: 1, Max: 1},
-			protocol.AdvertisedAPI{Key: protocol.APISASLAuthenticate, Min: 0, Max: 2})
-	}
-	return out
+	return b.profile.Advertised(b.auth != nil)
 }
 
 // Stop ends the coordinators' timers. The server calls it before closing storage:
@@ -270,3 +302,7 @@ func (b *Broker) Stop() {
 	b.groups.stop()
 	b.cg848.stop()
 }
+
+// errNone is the error code of a response with nothing wrong. Every other code is
+// the protocol library's (kerr), which has no name for zero.
+const errNone int16 = 0

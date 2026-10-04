@@ -10,12 +10,13 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
-	"github.com/doze-dev/doze-kafka/internal/protocol"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
-const (
-	codeInvalidTopic      = int16(protocol.ErrInvalidTopic)
-	codeInvalidPartitions = int16(protocol.ErrInvalidPartitions)
+var (
+	codeInvalidTopic      = kerr.InvalidTopicException.Code
+	codeInvalidPartitions = kerr.InvalidPartitions.Code
 )
 
 func createTopicCode(t *testing.T, ctx context.Context, addr, name string, partitions int32, validateOnly bool) kmsg.CreateTopicsResponseTopic {

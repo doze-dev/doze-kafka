@@ -36,12 +36,13 @@ specifically testing an older client's paths.
 | DeleteGroups | 42 | Delete empty consumer groups and their committed offsets. |
 | OffsetDelete | 47 | Delete a group's committed offsets for a topic, including an offset left over from a topic that no longer exists. |
 | DescribeCluster | 60 | Describe the cluster (this single node). |
-| SaslHandshake / SaslAuthenticate | 17 / 36 | SASL, advertised only when auth is enabled (handshake 0–1, authenticate 0–2, in every profile). |
+| SaslHandshake / SaslAuthenticate | 17 / 36 | SASL, advertised only when auth is enabled. |
 
 ## Advertised version ranges
 
 Each emulated major advertises the ranges below (min–max); a client uses the highest
-version you both support. This table is the broker's own, printed from the code.
+version you both support. This table is the broker's own, generated from the code (a
+test fails if the two differ).
 
 The ranges are **ours**, not a copy of Apache Kafka's. Each profile is close to what a
 real broker of that major offers, but not the same: several maxima are lower, because
@@ -52,7 +53,8 @@ first versions that carry record batch format v2, the only format the log stores
 None of this needs configuring. A client reads the ranges from `ApiVersions` and uses
 the highest version both sides support; a request outside them is not served.
 
-| API | Key | v1 | v2 | v3 | v4 |
+<!-- api-table:begin (generated from internal/protocol/versions.go; do not edit by hand) -->
+| API | Key | Kafka 1 | Kafka 2 | Kafka 3 | Kafka 4 |
 |---|---|---|---|---|---|
 | Produce | 0 | 3–5 | 3–7 | 3–9 | 3–9 |
 | Fetch | 1 | 4–6 | 4–10 | 4–13 | 4–13 |
@@ -67,18 +69,21 @@ the highest version both sides support; a request outside them is not served.
 | SyncGroup | 14 | 0–1 | 0–3 | 0–4 | 0–5 |
 | DescribeGroups | 15 | 0–1 | 0–3 | 0–5 | 0–5 |
 | ListGroups | 16 | 0–2 | 0–2 | 0–4 | 0–5 |
+| SASLHandshake | 17 | 1–1 | 1–1 | 1–1 | 1–1 | only when SASL is configured
 | ApiVersions | 18 | 0–1 | 0–2 | 0–3 | 0–3 |
 | CreateTopics | 19 | 0–2 | 0–3 | 0–7 | 0–7 |
 | DeleteTopics | 20 | 0–1 | 0–3 | 0–5 | 0–6 |
-| InitProducerId | 22 | 0–1 | 0–1 | 0–4 | 0–4 |
+| InitProducerID | 22 | 0–1 | 0–1 | 0–4 | 0–4 |
 | DescribeConfigs | 32 | 0–1 | 0–2 | 0–4 | 0–4 |
 | AlterConfigs | 33 | 0–0 | 0–2 | 0–2 | 0–2 |
+| SASLAuthenticate | 36 | 0–2 | 0–2 | 0–2 | 0–2 | only when SASL is configured
 | DeleteGroups | 42 | 0–1 | 0–2 | 0–2 | 0–2 |
 | IncrementalAlterConfigs | 44 | — | 0–1 | 0–1 | 0–1 |
 | OffsetDelete | 47 | — | 0–0 | 0–0 | 0–0 |
 | DescribeCluster | 60 | — | — | 0–1 | 0–2 |
 | ConsumerGroupHeartbeat | 68 | — | — | — | 0–1 |
 | ConsumerGroupDescribe | 69 | — | — | — | 0–1 |
+<!-- api-table:end -->
 
 The hard floor is Kafka's record-batch format v2 (Kafka 0.11), so the oldest
 emulated major is 1; the pre-0.11 message-set format is not supported.

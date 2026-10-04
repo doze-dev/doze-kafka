@@ -11,6 +11,8 @@ import (
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/storage/meta"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // AlterConfigs and IncrementalAlterConfigs change a topic's own configuration
@@ -35,7 +37,7 @@ var listConfigs = map[string]bool{
 
 // alterError is a refusal to alter one resource: the code and what to say.
 type alterError struct {
-	code protocol.ErrorCode
+	code int16
 	msg  string
 }
 
@@ -51,10 +53,10 @@ func (b *Broker) alterTopic(name string, next func(current map[string]string) (m
 
 	t, ok, err := b.meta.Topic(name)
 	if err != nil {
-		return &alterError{protocol.ErrUnknownServer, err.Error()}
+		return &alterError{kerr.UnknownServerError.Code, err.Error()}
 	}
 	if !ok {
-		return &alterError{protocol.ErrUnknownTopicOrPart, fmt.Sprintf("there is no topic %q", name)}
+		return &alterError{kerr.UnknownTopicOrPartition.Code, fmt.Sprintf("there is no topic %q", name)}
 	}
 	config, err := next(maps.Clone(t.Config))
 	if err != nil {
@@ -62,10 +64,10 @@ func (b *Broker) alterTopic(name string, next func(current map[string]string) (m
 		if errors.As(err, &ae) {
 			return ae
 		}
-		return &alterError{protocol.ErrInvalidConfig, err.Error()}
+		return &alterError{kerr.InvalidConfig.Code, err.Error()}
 	}
 	if err := validateTopicConfig(config); err != nil {
-		return &alterError{protocol.ErrInvalidConfig, err.Error()}
+		return &alterError{kerr.InvalidConfig.Code, err.Error()}
 	}
 	if validateOnly {
 		return nil
@@ -73,10 +75,10 @@ func (b *Broker) alterTopic(name string, next func(current map[string]string) (m
 	updated, err := b.meta.SetTopicConfig(name, config)
 	if err != nil {
 		if errors.Is(err, meta.ErrNoSuchTopic) { // deleted since the lookup above.
-			return &alterError{protocol.ErrUnknownTopicOrPart, fmt.Sprintf("there is no topic %q", name)}
+			return &alterError{kerr.UnknownTopicOrPartition.Code, fmt.Sprintf("there is no topic %q", name)}
 		}
 		b.log.Warn("alter configs: could not store the topic's configuration", "topic", name, "err", err)
-		return &alterError{protocol.ErrUnknownServer, err.Error()}
+		return &alterError{kerr.UnknownServerError.Code, err.Error()}
 	}
 	b.applyTopicLimits(updated.Name, updated.Config)
 	return nil
@@ -85,15 +87,7 @@ func (b *Broker) alterTopic(name string, next func(current map[string]string) (m
 // handleAlterConfigs is the original, all-or-nothing form: the configs named are
 // the topic's whole configuration from now on, and anything it had that is not
 // named goes back to the broker's default.
-func (b *Broker) handleAlterConfigs(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	ar := kreq.(*kmsg.AlterConfigsRequest)
-	resp := kmsg.NewPtrAlterConfigsResponse()
-	resp.SetVersion(req.Header.APIVersion)
-
+func (b *Broker) handleAlterConfigs(ctx context.Context, req *protocol.Request, ar *kmsg.AlterConfigsRequest, resp *kmsg.AlterConfigsResponse) error {
 	for _, res := range ar.Resources {
 		rr := kmsg.NewAlterConfigsResponseResource()
 		rr.ResourceType, rr.ResourceName = res.ResourceType, res.ResourceName
@@ -104,7 +98,7 @@ func (b *Broker) handleAlterConfigs(ctx context.Context, req *protocol.Request) 
 				next := map[string]string{}
 				for _, c := range res.Configs {
 					if _, dup := next[c.Name]; dup {
-						return nil, &alterError{protocol.ErrInvalidRequest, fmt.Sprintf("config %q is named more than once", c.Name)}
+						return nil, &alterError{kerr.InvalidRequest.Code, fmt.Sprintf("config %q is named more than once", c.Name)}
 					}
 					if c.Value == nil {
 						return nil, fmt.Errorf("config %q has no value (leave a config out to return it to the default)", c.Name)
@@ -114,30 +108,22 @@ func (b *Broker) handleAlterConfigs(ctx context.Context, req *protocol.Request) 
 				return next, nil
 			}, ar.ValidateOnly)
 		case kmsg.ConfigResourceTypeBroker:
-			ae = &alterError{protocol.ErrInvalidRequest, errBrokerConfigReadOnly}
+			ae = &alterError{kerr.InvalidRequest.Code, errBrokerConfigReadOnly}
 		default:
-			ae = &alterError{protocol.ErrInvalidRequest, "unsupported config resource type"}
+			ae = &alterError{kerr.InvalidRequest.Code, "unsupported config resource type"}
 		}
 		if ae != nil {
 			rr.ErrorCode, rr.ErrorMessage = int16(ae.code), &ae.msg
 		}
 		resp.Resources = append(resp.Resources, rr)
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }
 
 // handleIncrementalAlterConfigs changes only the configs it names: SET one,
 // DELETE one (back to the broker's default), or APPEND to / SUBTRACT from one
 // whose value is a list.
-func (b *Broker) handleIncrementalAlterConfigs(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	ar := kreq.(*kmsg.IncrementalAlterConfigsRequest)
-	resp := kmsg.NewPtrIncrementalAlterConfigsResponse()
-	resp.SetVersion(req.Header.APIVersion)
-
+func (b *Broker) handleIncrementalAlterConfigs(ctx context.Context, req *protocol.Request, ar *kmsg.IncrementalAlterConfigsRequest, resp *kmsg.IncrementalAlterConfigsResponse) error {
 	for _, res := range ar.Resources {
 		rr := kmsg.NewIncrementalAlterConfigsResponseResource()
 		rr.ResourceType, rr.ResourceName = res.ResourceType, res.ResourceName
@@ -151,7 +137,7 @@ func (b *Broker) handleIncrementalAlterConfigs(ctx context.Context, req *protoco
 				seen := map[string]bool{}
 				for _, c := range res.Configs {
 					if seen[c.Name] {
-						return nil, &alterError{protocol.ErrInvalidRequest, fmt.Sprintf("config %q is named more than once", c.Name)}
+						return nil, &alterError{kerr.InvalidRequest.Code, fmt.Sprintf("config %q is named more than once", c.Name)}
 					}
 					seen[c.Name] = true
 					if err := applyIncremental(current, c); err != nil {
@@ -161,16 +147,16 @@ func (b *Broker) handleIncrementalAlterConfigs(ctx context.Context, req *protoco
 				return current, nil
 			}, ar.ValidateOnly)
 		case kmsg.ConfigResourceTypeBroker:
-			ae = &alterError{protocol.ErrInvalidRequest, errBrokerConfigReadOnly}
+			ae = &alterError{kerr.InvalidRequest.Code, errBrokerConfigReadOnly}
 		default:
-			ae = &alterError{protocol.ErrInvalidRequest, "unsupported config resource type"}
+			ae = &alterError{kerr.InvalidRequest.Code, "unsupported config resource type"}
 		}
 		if ae != nil {
 			rr.ErrorCode, rr.ErrorMessage = int16(ae.code), &ae.msg
 		}
 		resp.Resources = append(resp.Resources, rr)
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }
 
 // applyIncremental applies one incremental operation to a topic's configuration.
@@ -189,7 +175,7 @@ func applyIncremental(config map[string]string, c kmsg.IncrementalAlterConfigsRe
 		delete(config, c.Name)
 	case kmsg.IncrementalAlterConfigOpAppend, kmsg.IncrementalAlterConfigOpSubtract:
 		if !listConfigs[c.Name] {
-			return &alterError{protocol.ErrInvalidRequest, fmt.Sprintf("config %q is not a list, so there is nothing to append to or subtract from", c.Name)}
+			return &alterError{kerr.InvalidRequest.Code, fmt.Sprintf("config %q is not a list, so there is nothing to append to or subtract from", c.Name)}
 		}
 		// A list not set on the topic starts from its default, as Kafka does:
 		// appending "compact" to an unset cleanup.policy gives "delete,compact".
@@ -222,7 +208,7 @@ func applyIncremental(config map[string]string, c kmsg.IncrementalAlterConfigsRe
 		}
 		config[c.Name] = strings.Join(items, ",")
 	default:
-		return &alterError{protocol.ErrInvalidRequest, fmt.Sprintf("unknown operation %d on config %q", c.Op, c.Name)}
+		return &alterError{kerr.InvalidRequest.Code, fmt.Sprintf("unknown operation %d on config %q", c.Op, c.Name)}
 	}
 	return nil
 }

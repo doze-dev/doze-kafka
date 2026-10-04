@@ -10,6 +10,8 @@ import (
 
 	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/internal/protocol"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // authenticator holds the enabled SASL mechanisms and the credential verifiers.
@@ -115,51 +117,34 @@ func (a *authenticator) plainStep(in []byte) ([]byte, bool, error) {
 // enabled mechanisms; if the requested one is enabled it is recorded on the
 // connection and the client proceeds to SaslAuthenticate, otherwise the client
 // gets UNSUPPORTED_SASL_MECHANISM and picks from the advertised list.
-func (b *Broker) handleSASLHandshake(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	hr := kreq.(*kmsg.SASLHandshakeRequest)
-
-	resp := kmsg.NewPtrSASLHandshakeResponse()
-	resp.SetVersion(req.Header.APIVersion)
+func (b *Broker) handleSASLHandshake(ctx context.Context, req *protocol.Request, hr *kmsg.SASLHandshakeRequest, resp *kmsg.SASLHandshakeResponse) error {
 	resp.SupportedMechanisms = b.auth.mechanisms()
 
 	if b.auth.enabled[hr.Mechanism] {
 		req.Conn.SetSASLMechanism(hr.Mechanism)
 		req.Conn.SetSASLState(nil)
 	} else {
-		resp.ErrorCode = int16(protocol.ErrUnsupportedSASLMechanism)
+		resp.ErrorCode = kerr.UnsupportedSaslMechanism.Code
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }
 
 // handleSASLAuthenticate carries one SASL token exchange. A failed attempt returns
 // SASL_AUTHENTICATION_FAILED with a message and leaves the connection
 // unauthenticated (so the gate still blocks it); success on the final step marks
 // the connection authenticated.
-func (b *Broker) handleSASLAuthenticate(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	ar := kreq.(*kmsg.SASLAuthenticateRequest)
-
-	resp := kmsg.NewPtrSASLAuthenticateResponse()
-	resp.SetVersion(req.Header.APIVersion)
-
+func (b *Broker) handleSASLAuthenticate(ctx context.Context, req *protocol.Request, ar *kmsg.SASLAuthenticateRequest, resp *kmsg.SASLAuthenticateResponse) error {
 	mechanism := req.Conn.SASLMechanism()
 	if mechanism == "" {
-		resp.ErrorCode = int16(protocol.ErrIllegalSASLState)
+		resp.ErrorCode = kerr.IllegalSaslState.Code
 		msg := "SaslAuthenticate before a successful SaslHandshake"
 		resp.ErrorMessage = &msg
-		return protocol.EncodeResponse(req.Header, resp), nil
+		return nil
 	}
 
 	out, done, err := b.auth.step(req.Conn, mechanism, ar.SASLAuthBytes)
 	if err != nil {
-		resp.ErrorCode = int16(protocol.ErrSASLAuthenticationFailed)
+		resp.ErrorCode = kerr.SaslAuthenticationFailed.Code
 		msg := err.Error()
 		resp.ErrorMessage = &msg
 		req.Conn.SetSASLState(nil)
@@ -169,7 +154,7 @@ func (b *Broker) handleSASLAuthenticate(ctx context.Context, req *protocol.Reque
 		req.Conn.SetAuthenticated(false)
 		req.Conn.CloseAfterResponse()
 		b.log.Warn("SASL authentication failed", "mechanism", mechanism, "err", err)
-		return protocol.EncodeResponse(req.Header, resp), nil
+		return nil
 	}
 
 	resp.SASLAuthBytes = out
@@ -177,5 +162,5 @@ func (b *Broker) handleSASLAuthenticate(ctx context.Context, req *protocol.Reque
 		req.Conn.SetAuthenticated(true)
 		b.log.Info("SASL authentication succeeded", "mechanism", mechanism)
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return nil
 }

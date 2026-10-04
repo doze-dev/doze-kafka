@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/doze-dev/doze-kafka/internal/kmsg"
 )
 
 func quietLogger() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
@@ -93,7 +95,7 @@ func listen(t *testing.T, router *Router, auth bool, tune func(*Server)) string 
 
 func echoRouter() *Router {
 	r := NewRouter(quietLogger())
-	r.Register(APIApiVersions, func(_ context.Context, req *Request) ([]byte, error) {
+	r.Register(kmsg.ApiVersions, func(_ context.Context, req *Request) ([]byte, error) {
 		return binary.BigEndian.AppendUint32(nil, uint32(req.Header.CorrelationID)), nil
 	})
 	return r
@@ -107,7 +109,7 @@ func roundTrip(t *testing.T, addr string, corr int32) {
 	}
 	defer c.Close()
 	c.SetDeadline(time.Now().Add(3 * time.Second))
-	hdr, payload := frameFor(APIApiVersions, 0, corr)
+	hdr, payload := frameFor(kmsg.ApiVersions, 0, corr)
 	c.Write(append(hdr, payload...))
 	resp, err := ReadFrame(c)
 	if err != nil || len(resp) != 4 || int32(binary.BigEndian.Uint32(resp)) != corr {
@@ -150,7 +152,7 @@ func TestPreAuthIdleConnectionIsDropped(t *testing.T) {
 
 func TestHandlerPanicCostsTheConnectionNotTheBroker(t *testing.T) {
 	r := echoRouter()
-	r.Register(APIMetadata, func(context.Context, *Request) ([]byte, error) { panic("handler bug") })
+	r.Register(kmsg.Metadata, func(context.Context, *Request) ([]byte, error) { panic("handler bug") })
 	addr := listen(t, r, false, nil)
 
 	c, err := net.Dial("tcp", addr)
@@ -158,7 +160,7 @@ func TestHandlerPanicCostsTheConnectionNotTheBroker(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer c.Close()
-	hdr, payload := frameFor(APIMetadata, 0, 7)
+	hdr, payload := frameFor(kmsg.Metadata, 0, 7)
 	c.Write(append(hdr, payload...))
 	expectClosed(t, c, 2*time.Second) // that connection is gone...
 
@@ -218,7 +220,7 @@ func dial(t *testing.T, addr string) net.Conn {
 func TestPreAuthBudgetIsNotResetByRequests(t *testing.T) {
 	addr := listen(t, echoRouter(), true, func(s *Server) { s.preAuthTimeout = 400 * time.Millisecond })
 	c := dial(t, addr)
-	hdr, payload := frameFor(APIApiVersions, 0, 1)
+	hdr, payload := frameFor(kmsg.ApiVersions, 0, 1)
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
 		c.SetDeadline(time.Now().Add(time.Second))
@@ -250,7 +252,7 @@ func TestSilentAndTricklingConnectionsAreDroppedWithoutAuth(t *testing.T) {
 	// arrive inside the idle window.
 	live := dial(t, addr)
 	for i := int32(0); i < 4; i++ {
-		hdr, payload := frameFor(APIApiVersions, 0, i)
+		hdr, payload := frameFor(kmsg.ApiVersions, 0, i)
 		live.SetDeadline(time.Now().Add(time.Second))
 		live.Write(append(hdr, payload...))
 		if _, err := ReadFrame(live); err != nil {
@@ -264,18 +266,18 @@ func TestSilentAndTricklingConnectionsAreDroppedWithoutAuth(t *testing.T) {
 // before its body is read, authenticated or not.
 func TestOnlyProduceMayBeLarge(t *testing.T) {
 	r := echoRouter()
-	r.Register(APIProduce, func(_ context.Context, req *Request) ([]byte, error) {
+	r.Register(kmsg.Produce, func(_ context.Context, req *Request) ([]byte, error) {
 		return binary.BigEndian.AppendUint32(nil, uint32(len(req.Body))), nil
 	})
 	addr := listen(t, r, false, nil)
 
 	big := dial(t, addr)
-	big.Write(append(binary.BigEndian.AppendUint32(nil, 8<<20), 0, byte(APIMetadata))) // Metadata, 8 MiB claimed.
+	big.Write(append(binary.BigEndian.AppendUint32(nil, 8<<20), 0, byte(kmsg.Metadata))) // Metadata, 8 MiB claimed.
 	expectClosed(t, big, 2*time.Second)
 
 	// The same size as a Produce is accepted and read in full.
 	prod := dial(t, addr)
-	hdr, payload := frameFor(APIProduce, 3, 1, make([]byte, 2<<20)...)
+	hdr, payload := frameFor(kmsg.Produce, 3, 1, make([]byte, 2<<20)...)
 	prod.SetDeadline(time.Now().Add(5 * time.Second))
 	if _, err := prod.Write(append(hdr, payload...)); err != nil {
 		t.Fatal(err)
@@ -288,14 +290,14 @@ func TestOnlyProduceMayBeLarge(t *testing.T) {
 // A peer that sends requests and never reads must not park a goroutine in Write.
 func TestWriterIsNotHeldByAPeerThatNeverReads(t *testing.T) {
 	r := NewRouter(quietLogger())
-	r.Register(APIApiVersions, func(context.Context, *Request) ([]byte, error) { return make([]byte, 64<<20), nil }) // far more than socket buffers hold.
+	r.Register(kmsg.ApiVersions, func(context.Context, *Request) ([]byte, error) { return make([]byte, 64<<20), nil }) // far more than socket buffers hold.
 	var srv *Server
 	addr := listen(t, r, false, func(s *Server) { srv = s })
 	srv.mu.Lock()
 	srv.writeTimeout = 300 * time.Millisecond
 	srv.mu.Unlock()
 	c := dial(t, addr)
-	hdr, payload := frameFor(APIApiVersions, 0, 1)
+	hdr, payload := frameFor(kmsg.ApiVersions, 0, 1)
 	c.Write(append(hdr, payload...)) // and never read the answer.
 	seen := time.Now().Add(2 * time.Second)
 	for srv.connCount() == 0 {
@@ -333,12 +335,12 @@ func TestConnectionsAboveTheLimitAreRefused(t *testing.T) {
 // CloseAfterResponse: the client gets its answer, then the connection is gone.
 func TestCloseAfterResponseSendsTheAnswerThenCloses(t *testing.T) {
 	r := NewRouter(quietLogger())
-	r.Register(APIApiVersions, func(_ context.Context, req *Request) ([]byte, error) {
+	r.Register(kmsg.ApiVersions, func(_ context.Context, req *Request) ([]byte, error) {
 		req.Conn.CloseAfterResponse()
 		return []byte{1, 2, 3, 4}, nil
 	})
 	c := dial(t, listen(t, r, false, nil))
-	hdr, payload := frameFor(APIApiVersions, 0, 1)
+	hdr, payload := frameFor(kmsg.ApiVersions, 0, 1)
 	c.SetDeadline(time.Now().Add(2 * time.Second))
 	c.Write(append(hdr, payload...))
 	if resp, err := ReadFrame(c); err != nil || len(resp) != 4 {

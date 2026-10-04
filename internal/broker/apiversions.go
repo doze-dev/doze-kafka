@@ -6,6 +6,8 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // handleAPIVersions advertises the min/max version supported per API key — the
@@ -25,7 +27,7 @@ func (b *Broker) handleAPIVersions(ctx context.Context, req *protocol.Request) (
 	}
 
 	var maxVer int16
-	if r, ok := b.profile.RangeFor(protocol.APIApiVersions); ok {
+	if r, ok := b.profile.RangeFor(kmsg.ApiVersions); ok {
 		maxVer = r.Max
 	}
 
@@ -33,11 +35,11 @@ func (b *Broker) handleAPIVersions(ctx context.Context, req *protocol.Request) (
 		// Downgrade dance: reply at v0 so any client can parse it, carrying the
 		// error and our ranges. The client retries at a version we support.
 		resp.SetVersion(0)
-		resp.ErrorCode = int16(protocol.ErrUnsupportedVersion)
+		resp.ErrorCode = kerr.UnsupportedVersion.Code
 		return protocol.EncodeResponse(req.Header, resp), nil
 	}
 
 	resp.SetVersion(req.Header.APIVersion)
-	resp.ErrorCode = int16(protocol.ErrNone)
+	resp.ErrorCode = errNone
 	return protocol.EncodeResponse(req.Header, resp), nil
 }
