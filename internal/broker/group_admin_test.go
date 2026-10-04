@@ -191,8 +191,10 @@ func TestGroupAdmin_OffsetDelete(t *testing.T) {
 	}
 
 	// With a live member the group is treated as subscribed.
-	stableGroupOfOne(t, ctx, cl, "live", testSessionMs, testRebalanceMsDefault)
+	// (The offset is committed first: a commit that names no member is refused
+	// once the group has one.)
 	commitOffset(t, ctx, cl, "live", "t", 3)
+	stableGroupOfOne(t, ctx, cl, "live", testSessionMs, testRebalanceMsDefault)
 	r = od("live", "t", 0)
 	if len(r.Topics) == 0 || r.Topics[0].Partitions[0].ErrorCode != int16(protocol.ErrGroupSubscribedToTopic) {
 		t.Errorf("OffsetDelete on a group with live members: %+v, want GROUP_SUBSCRIBED_TO_TOPIC", r)

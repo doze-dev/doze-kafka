@@ -43,6 +43,14 @@ func (b *Broker) deleteGroup(id string) int16 {
 	if b.groupIsActive(id) {
 		return int16(protocol.ErrNonEmptyGroup)
 	}
+	// Hold the id for the length of the deletion. Checking for members and then
+	// deleting left a gap in which a consumer could join and have the offsets it
+	// was about to read removed underneath it.
+	const deleting = "deleting"
+	if !b.claims.claim(id, deleting) {
+		return int16(protocol.ErrNonEmptyGroup)
+	}
+	defer b.claims.release(id, deleting)
 	existed := b.groups.forget(id)
 	n, err := b.meta.DeleteGroupOffsets(id)
 	if err != nil {

@@ -2,6 +2,7 @@ package broker
 
 import (
 	"context"
+	"strings"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
@@ -16,9 +17,11 @@ import (
 // adminGroupListing is one row of ListGroups: a group id, its state, and whether it
 // is a classic or a KIP-848 (consumer) group.
 type adminGroupListing struct {
-	id        string
-	state     string
-	groupType string // "classic" or "consumer".
+	id           string
+	state        string
+	groupType    string // "classic" or "consumer".
+	protocolType string // what the members are; "consumer" for a consumer group.
+	members      int
 }
 
 // list returns every classic group. Called under no lock; takes gm.mu itself.
@@ -27,7 +30,11 @@ func (gm *groupManager) list() []adminGroupListing {
 	defer gm.mu.Unlock()
 	out := make([]adminGroupListing, 0, len(gm.groups))
 	for id, g := range gm.groups {
-		out = append(out, adminGroupListing{id: id, state: g.state.String(), groupType: "classic"})
+		pt := g.protocolType
+		if pt == "" {
+			pt = "consumer"
+		}
+		out = append(out, adminGroupListing{id: id, state: g.state.String(), groupType: "classic", protocolType: pt, members: len(g.members)})
 	}
 	return out
 }
@@ -63,9 +70,20 @@ func (g *cg848Group) stateName() string {
 // offsets vanishes from every listing the moment the broker restarts, even
 // though its consumers will resume from them.
 func (b *Broker) listAllGroups() []adminGroupListing {
-	groups := append(b.groups.list(), b.cg848.list()...)
-	known := make(map[string]bool, len(groups))
-	for _, g := range groups {
+	// A group id belongs to one protocol at a time. A classic group object that
+	// has no members but is kept for its offsets must not be listed beside the
+	// KIP-848 group now running under the same id.
+	var groups []adminGroupListing
+	known := map[string]bool{}
+	for _, g := range b.cg848.list() {
+		groups = append(groups, g)
+		known[g.id] = true
+	}
+	for _, g := range b.groups.list() {
+		if known[g.id] && g.members == 0 {
+			continue
+		}
+		groups = append(groups, g)
 		known[g.id] = true
 	}
 	ids, err := b.meta.OffsetGroups()
@@ -75,7 +93,7 @@ func (b *Broker) listAllGroups() []adminGroupListing {
 	}
 	for _, id := range ids {
 		if !known[id] {
-			groups = append(groups, adminGroupListing{id: id, state: "Empty", groupType: "classic"})
+			groups = append(groups, adminGroupListing{id: id, state: "Empty", groupType: "classic", protocolType: "consumer"})
 		}
 	}
 	return groups
@@ -90,9 +108,10 @@ func (b *Broker) groupHasOffsets(id string) bool {
 // classicGroupDesc is a classic group's DescribeGroups view: its state, selected
 // assignor, and members (with the opaque subscription/assignment bytes we relay).
 type classicGroupDesc struct {
-	state    string
-	protocol string
-	members  []classicMemberDesc
+	state        string
+	protocolType string
+	protocol     string
+	members      []classicMemberDesc
 }
 
 type classicMemberDesc struct {
@@ -110,7 +129,7 @@ func (gm *groupManager) describe(id string) (classicGroupDesc, bool) {
 	if g == nil {
 		return classicGroupDesc{}, false
 	}
-	d := classicGroupDesc{state: g.state.String(), protocol: g.protocol}
+	d := classicGroupDesc{state: g.state.String(), protocol: g.protocol, protocolType: g.protocolType}
 	for _, mid := range sortedMemberIDs(g) {
 		m := g.members[mid]
 		d.members = append(d.members, classicMemberDesc{
@@ -133,6 +152,9 @@ func (b *Broker) handleListGroups(ctx context.Context, req *protocol.Request) ([
 	}
 	lr := kreq.(*kmsg.ListGroupsRequest)
 
+	// Both filters match without regard to case, as Kafka's do: the Java admin
+	// client sends "Classic" and "Consumer", and a case-sensitive match returned
+	// nothing for `kafka-consumer-groups --list --type classic`.
 	stateFilter := toSet(lr.StatesFilter)
 	typeFilter := toSet(lr.TypesFilter)
 
@@ -140,15 +162,18 @@ func (b *Broker) handleListGroups(ctx context.Context, req *protocol.Request) ([
 	resp.SetVersion(req.Header.APIVersion)
 
 	for _, g := range b.listAllGroups() {
-		if len(stateFilter) > 0 && !stateFilter[g.state] {
+		if len(stateFilter) > 0 && !stateFilter[strings.ToLower(g.state)] {
 			continue
 		}
-		if len(typeFilter) > 0 && !typeFilter[g.groupType] {
+		if len(typeFilter) > 0 && !typeFilter[strings.ToLower(g.groupType)] {
 			continue
 		}
 		rg := kmsg.NewListGroupsResponseGroup()
 		rg.Group = g.id
-		rg.ProtocolType = "consumer"
+		rg.ProtocolType = g.protocolType
+		if rg.ProtocolType == "" {
+			rg.ProtocolType = "consumer"
+		}
 		rg.GroupState = g.state
 		rg.GroupType = g.groupType
 		resp.Groups = append(resp.Groups, rg)
@@ -187,6 +212,9 @@ func (b *Broker) handleDescribeGroups(ctx context.Context, req *protocol.Request
 		}
 		rg.State = d.state
 		rg.Protocol = d.protocol
+		if d.protocolType != "" {
+			rg.ProtocolType = d.protocolType
+		}
 		for _, m := range d.members {
 			rm := kmsg.NewDescribeGroupsResponseGroupMember()
 			rm.MemberID = m.id
@@ -208,7 +236,7 @@ func toSet(vals []string) map[string]bool {
 	}
 	m := make(map[string]bool, len(vals))
 	for _, v := range vals {
-		m[v] = true
+		m[strings.ToLower(v)] = true
 	}
 	return m
 }

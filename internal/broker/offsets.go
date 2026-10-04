@@ -21,7 +21,7 @@ func (b *Broker) handleOffsetCommit(ctx context.Context, req *protocol.Request) 
 	}
 	oc := kreq.(*kmsg.OffsetCommitRequest)
 
-	fence := b.groups.validateCommit(oc.Group, oc.MemberID, oc.Generation)
+	fence := b.commitFence(oc)
 
 	resp := kmsg.NewPtrOffsetCommitResponse()
 	resp.SetVersion(req.Header.APIVersion)
@@ -151,16 +151,26 @@ func (b *Broker) groupOffsets(group string, topics map[string][]int32, fetchAll 
 		return out, nil
 	}
 
+	// One read of the group's offsets answers every requested partition, with its
+	// metadata. Looking each one up separately returned only the number.
+	entries, err := b.meta.ListOffsets(group)
+	if err != nil {
+		return nil, err
+	}
+	committed := make(map[topicPartition]meta.OffsetEntry, len(entries))
+	for _, e := range entries {
+		committed[topicPartition{e.Topic, e.Partition}] = e
+	}
 	var out []partitionOffset
 	for topic, parts := range topics {
 		for _, part := range parts {
 			po := partitionOffset{topic: topic, partition: part, offset: -1}
-			offset, ok, err := b.meta.FetchOffset(group, topic, part)
-			if err != nil {
-				return nil, err
-			}
-			if ok {
-				po.offset = offset
+			if e, ok := committed[topicPartition{topic, part}]; ok {
+				po.offset = e.Offset
+				if e.Metadata != "" { // the metadata committed with the offset comes back with it.
+					md := e.Metadata
+					po.metadata = &md
+				}
 			}
 			out = append(out, po)
 		}
@@ -211,4 +221,17 @@ func findOrAppendGroupTopic(rg *kmsg.OffsetFetchResponseGroup, name string) *kms
 	rt.Topic = name
 	rg.Topics = append(rg.Topics, rt)
 	return &rg.Topics[len(rg.Topics)-1]
+}
+
+// commitFence decides whether a group's OffsetCommit may be stored at all. The
+// group id must be storable, and the committer must be entitled to commit for the
+// group as it stands now, under whichever protocol the group runs.
+func (b *Broker) commitFence(oc *kmsg.OffsetCommitRequest) int16 {
+	if oc.Group == "" || meta.ValidateGroupID(oc.Group) != nil {
+		return int16(protocol.ErrInvalidGroupID)
+	}
+	if b.claims.ownerOf(oc.Group) == protoConsumer {
+		return b.cg848.validateCommit(oc.Group, oc.MemberID, oc.Generation)
+	}
+	return b.groups.validateCommit(oc.Group, oc.MemberID, oc.InstanceID, oc.Generation)
 }

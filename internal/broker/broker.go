@@ -23,6 +23,7 @@ type Broker struct {
 	log     *slog.Logger
 	logs    *log.Manager
 	meta    meta.Store
+	claims  *groupClaims // which protocol each live group id belongs to.
 	groups  *groupManager
 	cg848   *cg848Manager    // KIP-848 broker-driven groups (Kafka-4 profile).
 	auth    *authenticator   // nil when SASL is disabled.
@@ -55,16 +56,18 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 	if err != nil {
 		return nil, err
 	}
+	claims := newGroupClaims()
 	return &Broker{
-		cfg:  cfg,
-		log:  logger,
-		logs: logs,
-		meta: m,
+		cfg:    cfg,
+		log:    logger,
+		logs:   logs,
+		meta:   m,
+		claims: claims,
 		groups: newGroupManager(func(group string) bool {
 			entries, err := m.ListOffsets(group)
 			return err == nil && len(entries) > 0
-		}),
-		cg848:   newCG848Manager(m, logger, cfg.ConsumerSessionTimeout),
+		}, claims),
+		cg848:   newCG848Manager(m, logger, cfg.ConsumerSessionTimeout, claims),
 		auth:    auth,
 		idem:    newIdempotency(),
 		profile: profile,

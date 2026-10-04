@@ -360,10 +360,20 @@ func TestGroupClassic_AssignmentsDoNotCarryOverAGeneration(t *testing.T) {
 	ida, _ := stableGroupOfOne(t, ctx, A, g, testSessionMs, testRebalanceMsDefault)
 	idb := acquireID(t, ctx, B, g)
 
-	rejoinBoth := func() (int32, int32) {
-		jB := joinAsync(ctx, B, g, idb, testSessionMs, testRebalanceMsDefault)
-		time.Sleep(200 * time.Millisecond) // B starts the rebalance; A rejoins on hearing of it.
-		jA := joinAsync(ctx, A, g, ida, testSessionMs, testRebalanceMsDefault)
+	// Who starts the rebalance: a new member's first join does; after that only
+	// the leader rejoining does (a follower rejoining with nothing changed is
+	// simply told the current generation). The other one rejoins on hearing of it.
+	rejoinBoth := func(first string) (int32, int32) {
+		var jA, jB <-chan joinOutcome
+		if first == idb {
+			jB = joinAsync(ctx, B, g, idb, testSessionMs, testRebalanceMsDefault)
+			time.Sleep(200 * time.Millisecond)
+			jA = joinAsync(ctx, A, g, ida, testSessionMs, testRebalanceMsDefault)
+		} else {
+			jA = joinAsync(ctx, A, g, ida, testSessionMs, testRebalanceMsDefault)
+			time.Sleep(200 * time.Millisecond)
+			jB = joinAsync(ctx, B, g, idb, testSessionMs, testRebalanceMsDefault)
+		}
 		rA := mustJoin(t, await(t, jA, 5*time.Second, "A join"), "A join")
 		rB := mustJoin(t, await(t, jB, 5*time.Second, "B join"), "B join")
 		if rA.LeaderID != ida {
@@ -372,7 +382,7 @@ func TestGroupClassic_AssignmentsDoNotCarryOverAGeneration(t *testing.T) {
 		return rA.Generation, rB.Generation
 	}
 
-	gen2, _ := rejoinBoth()
+	gen2, _ := rejoinBoth(idb)
 	bSync := syncAsync(ctx, B, g, idb, gen2, nil)
 	time.Sleep(150 * time.Millisecond)
 	await(t, syncAsync(ctx, A, g, ida, gen2, map[string]string{ida: "a-gen2", idb: "b-gen2"}), 5*time.Second, "leader sync")
@@ -380,7 +390,7 @@ func TestGroupClassic_AssignmentsDoNotCarryOverAGeneration(t *testing.T) {
 		t.Fatalf("B's gen-2 assignment = %+v %v, want b-gen2", o.resp, o.err)
 	}
 
-	gen3, _ := rejoinBoth()
+	gen3, _ := rejoinBoth(ida)
 	bSync = syncAsync(ctx, B, g, idb, gen3, nil)
 	time.Sleep(150 * time.Millisecond)
 	await(t, syncAsync(ctx, A, g, ida, gen3, map[string]string{ida: "a-gen3"}), 5*time.Second, "leader sync") // B omitted.

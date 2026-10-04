@@ -148,6 +148,20 @@ func TestGroupClassic_TwoConsumersSplitPartitions(t *testing.T) {
 	stable := make(chan struct{})
 	var stableOnce sync.Once
 
+	held := func(idx int, a map[string][]int32, sign int) {
+		n := 0
+		for _, ps := range a {
+			n += len(ps)
+		}
+		mu.Lock()
+		assignedN[idx] += sign * n
+		bothHavePartition := assignedN[0] > 0 && assignedN[1] > 0
+		mu.Unlock()
+		if bothHavePartition {
+			stableOnce.Do(func() { close(stable) })
+		}
+	}
+
 	consume := func(idx int) {
 		cl, err := kgo.NewClient(
 			kgo.SeedBrokers(addr),
@@ -155,18 +169,18 @@ func TestGroupClassic_TwoConsumersSplitPartitions(t *testing.T) {
 			kgo.GroupProtocol("classic"), // pin to classic; version 4 also advertises KIP-848.
 			kgo.ConsumeTopics("work"),
 			kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
+			// The balancer is cooperative: a callback reports what was ADDED (or
+			// taken away), not the whole assignment. Counting only the latest
+			// callback's size called a member that kept its partition "empty", and
+			// the test then waited a minute for a split that had already happened.
 			kgo.OnPartitionsAssigned(func(_ context.Context, _ *kgo.Client, a map[string][]int32) {
-				n := 0
-				for _, ps := range a {
-					n += len(ps)
-				}
-				mu.Lock()
-				assignedN[idx] = n
-				bothHavePartition := assignedN[0] > 0 && assignedN[1] > 0
-				mu.Unlock()
-				if bothHavePartition {
-					stableOnce.Do(func() { close(stable) })
-				}
+				held(idx, a, +1)
+			}),
+			kgo.OnPartitionsRevoked(func(_ context.Context, _ *kgo.Client, a map[string][]int32) {
+				held(idx, a, -1)
+			}),
+			kgo.OnPartitionsLost(func(_ context.Context, _ *kgo.Client, a map[string][]int32) {
+				held(idx, a, -1)
 			}),
 			kgo.DialTimeout(2*time.Second),
 		)

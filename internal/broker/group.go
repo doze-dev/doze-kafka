@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -15,6 +16,62 @@ import (
 
 // defaultSessionTimeout is used when a client requests a non-positive one.
 const defaultSessionTimeout = 30 * time.Second
+
+// initialRebalanceDelay is how long the first rebalance of an empty group waits
+// for more members before completing (Kafka's group.initial.rebalance.delay.ms).
+// Without it the first consumer of an application forms a generation alone within
+// microseconds, and each of the others starting beside it forces another: N
+// consumers, N rebalances. Kafka waits three seconds; a local broker need not, but
+// it must wait long enough for the rest of one process's consumers to arrive.
+var initialRebalanceDelay = 200 * time.Millisecond
+
+// pendingMemberTTL is how long a member id issued with MEMBER_ID_REQUIRED stays
+// valid for the join that should follow it.
+const pendingMemberTTL = 5 * time.Minute
+
+// Which protocol a group id belongs to.
+const (
+	protoClassic  = "classic"
+	protoConsumer = "consumer"
+)
+
+// groupClaims records which protocol each live group id belongs to. A group is
+// classic or KIP-848, never both: with one coordinator asking the other "do you
+// have members?" and then joining, two first joins arriving together (one per
+// protocol) both saw "no" and both succeeded. Claiming is one step under one lock.
+type groupClaims struct {
+	mu    sync.Mutex
+	owner map[string]string
+}
+
+func newGroupClaims() *groupClaims { return &groupClaims{owner: map[string]string{}} }
+
+// claim takes the group id for proto, or confirms proto already holds it.
+func (c *groupClaims) claim(id, proto string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if cur, ok := c.owner[id]; ok {
+		return cur == proto
+	}
+	c.owner[id] = proto
+	return true
+}
+
+// release gives the id up, if proto holds it (its last member is gone).
+func (c *groupClaims) release(id, proto string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.owner[id] == proto {
+		delete(c.owner, id)
+	}
+}
+
+// ownerOf is the protocol holding the id, or "".
+func (c *groupClaims) ownerOf(id string) string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.owner[id]
+}
 
 // groupManager holds ephemeral, in-memory consumer-group state. Membership,
 // generation, and assignments live only in memory and are rebuilt when clients
@@ -34,10 +91,56 @@ type groupManager struct {
 	// that has none holds nothing worth keeping and is forgotten; one that has
 	// some stays listed (as Empty) because its offsets are durable.
 	hasOffsets func(group string) bool
+
+	claims *groupClaims
+
+	// pending holds member ids handed out with MEMBER_ID_REQUIRED and not yet
+	// used: group -> member id -> when issued. The join that follows must bring
+	// one of these (or the id of an existing member); any other id is unknown.
+	pending map[string]map[string]time.Time
 }
 
-func newGroupManager(hasOffsets func(string) bool) *groupManager {
-	return &groupManager{groups: make(map[string]*group), hasOffsets: hasOffsets}
+func newGroupManager(hasOffsets func(string) bool, claims *groupClaims) *groupManager {
+	if claims == nil {
+		claims = newGroupClaims()
+	}
+	return &groupManager{groups: make(map[string]*group), hasOffsets: hasOffsets, claims: claims,
+		pending: make(map[string]map[string]time.Time)}
+}
+
+// issue remembers a member id handed out for a later join (caller holds mu).
+func (gm *groupManager) issue(group, id string) {
+	cutoff := time.Now().Add(-pendingMemberTTL)
+	for g, ids := range gm.pending {
+		for mid, at := range ids {
+			if at.Before(cutoff) {
+				delete(ids, mid)
+			}
+		}
+		if len(ids) == 0 {
+			delete(gm.pending, g)
+		}
+	}
+	if gm.pending[group] == nil {
+		gm.pending[group] = map[string]time.Time{}
+	}
+	gm.pending[group][id] = time.Now()
+}
+
+// issued reports whether id was handed out for group and is still valid (caller
+// holds mu).
+func (gm *groupManager) issued(group, id string) bool {
+	at, ok := gm.pending[group][id]
+	return ok && time.Since(at) <= pendingMemberTTL
+}
+
+// redeem uses up an issued id once the member it was issued to has joined (caller
+// holds mu). A join that is refused does not spend the id: the client may retry.
+func (gm *groupManager) redeem(group, id string) {
+	delete(gm.pending[group], id)
+	if len(gm.pending[group]) == 0 {
+		delete(gm.pending, group)
+	}
 }
 
 // groupState is the classic-protocol group lifecycle state.
@@ -67,15 +170,18 @@ func (s groupState) String() string {
 }
 
 type group struct {
-	id          string
-	state       groupState
-	generation  int32
-	leader      string
-	protocol    string // selected assignor name.
-	members     map[string]*groupMember
-	pendingSync map[string]chan syncResult
-	joinTimer   *time.Timer
-	joinGen     uint64 // bumped whenever the join timer is stopped or re-armed; see armJoinTimer.
+	id           string
+	state        groupState
+	generation   int32
+	leader       string
+	protocolType string // what the members are: "consumer", "connect", ...
+	protocol     string // selected assignor name.
+	members      map[string]*groupMember
+	static       map[string]string // group.instance.id -> member id, for static members.
+	holding      bool              // the initial rebalance delay is running: wait for it even if everyone has joined.
+	pendingSync  map[string]chan syncResult
+	joinTimer    *time.Timer
+	joinGen      uint64 // bumped whenever the join timer is stopped or re-armed; see armJoinTimer.
 }
 
 // clientRef says who a member is: the client.id it connected with and the host it
@@ -128,8 +234,9 @@ type syncResult struct {
 }
 
 type leaveResult struct {
-	memberID  string
-	errorCode int16
+	memberID   string
+	instanceID *string
+	errorCode  int16
 }
 
 // hasMembers reports whether the group id is in use here, so the KIP-848
@@ -152,6 +259,7 @@ func (gm *groupManager) forget(group string) bool {
 	}
 	g.stopJoinTimer()
 	delete(gm.groups, group)
+	gm.claims.release(group, protoClassic)
 	return true
 }
 
@@ -162,22 +270,97 @@ func (gm *groupManager) forget(group string) bool {
 // first version that knows the code. An older client would not know what to do
 // with it, so it is given an id and joined in one step, as Kafka does.
 func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who clientRef) (joinResult, error) {
-	gm.mu.Lock()
+	refuse := func(code protocol.ErrorCode) (joinResult, error) {
+		return joinResult{errorCode: int16(code), memberID: r.MemberID, generation: -1}, nil
+	}
+	// A member with no protocols has nothing the group could agree on.
+	if len(r.Protocols) == 0 {
+		return refuse(protocol.ErrInconsistentGroupProtocol)
+	}
+	static := r.InstanceID != nil && *r.InstanceID != ""
 
-	if r.MemberID == "" {
+	gm.mu.Lock()
+	// A group running under KIP-848 is not a classic group, whatever else is
+	// wrong with this request.
+	if owner := gm.claims.ownerOf(r.Group); owner != "" && owner != protoClassic {
+		gm.mu.Unlock()
+		return refuse(protocol.ErrInconsistentGroupProtocol)
+	}
+	g := gm.groups[r.Group]
+
+	// Static membership (group.instance.id): the instance id, not the member id,
+	// is the member's identity. A restarted instance arrives with no member id and
+	// takes over its predecessor's place; a second process claiming an instance
+	// that is already held under another member id is fenced.
+	if static && g != nil {
+		if cur, held := g.static[*r.InstanceID]; held && g.members[cur] != nil {
+			switch {
+			case r.MemberID == "":
+				if res, done := gm.replaceStatic(g, cur, r, who); done {
+					gm.mu.Unlock()
+					return res, nil
+				}
+			case r.MemberID != cur:
+				gm.mu.Unlock()
+				return refuse(protocol.ErrFencedInstanceID)
+			}
+		}
+	}
+
+	switch {
+	case r.MemberID == "":
 		id := generateMemberID(r.InstanceID)
-		if r.GetVersion() >= 4 {
+		// KIP-394: a dynamic member on v4+ is first given an id and told to come
+		// back with it. Static members and older clients join in one step.
+		if r.GetVersion() >= 4 && !static {
+			gm.issue(r.Group, id)
 			gm.mu.Unlock()
-			return joinResult{errorCode: int16(protocol.ErrMemberIDRequired), memberID: id}, nil
+			return joinResult{errorCode: int16(protocol.ErrMemberIDRequired), memberID: id, generation: -1}, nil
 		}
 		r.MemberID = id
+	case g == nil || g.members[r.MemberID] == nil:
+		// An id this coordinator did not issue and no current member holds: the
+		// member was removed (or never existed) and must start again.
+		if !gm.issued(r.Group, r.MemberID) {
+			gm.mu.Unlock()
+			return refuse(protocol.ErrUnknownMemberID)
+		}
 	}
-	g := gm.getOrCreate(r.Group)
+
+	if !gm.claims.claim(r.Group, protoClassic) {
+		gm.mu.Unlock()
+		return refuse(protocol.ErrInconsistentGroupProtocol)
+	}
+	g = gm.getOrCreate(r.Group)
+
+	// Everyone in a group must be the same kind of member and share at least one
+	// protocol (assignor). A joiner that cannot agree is refused; it used to be
+	// admitted, and the leader was handed empty metadata for it.
+	offered := protocolEntries(r.Protocols)
+	if others := g.othersThan(r.MemberID); len(others) > 0 {
+		if r.ProtocolType != g.protocolType || !commonProtocol(offered, others) {
+			gm.mu.Unlock()
+			return refuse(protocol.ErrInconsistentGroupProtocol)
+		}
+	} else {
+		g.protocolType = r.ProtocolType
+	}
 
 	m := g.members[r.MemberID]
+	// A follower that rejoins a stable group with nothing changed is told where
+	// the group is; it does not need a rebalance, and forcing one made every
+	// such rejoin cost the whole group a generation.
+	if m != nil && g.state == stateStable && r.MemberID != g.leader && sameProtocols(m.protocols, offered) {
+		m.client = who
+		gm.resetSession(g, m)
+		res := joinResult{generation: g.generation, protocol: g.protocol, leaderID: g.leader, memberID: m.id}
+		gm.mu.Unlock()
+		return res, nil
+	}
 	if m == nil {
 		m = &groupMember{id: r.MemberID}
 		g.members[r.MemberID] = m
+		gm.redeem(r.Group, r.MemberID)
 	}
 	// A retried JoinGroup replaces one still parked: the old request's client is
 	// waiting on an answer that this one supersedes, so release it (Kafka answers
@@ -185,7 +368,10 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 	m.failPendingJoin()
 	m.client = who
 	m.instanceID = r.InstanceID
-	m.protocols = protocolEntries(r.Protocols)
+	if static {
+		g.static[*r.InstanceID] = m.id
+	}
+	m.protocols = offered
 	m.sessionTimeout = time.Duration(r.SessionTimeoutMillis) * time.Millisecond
 	m.rebalanceTimeout = 0
 	if r.RebalanceTimeoutMillis > 0 {
@@ -193,14 +379,16 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 	}
 
 	if g.state != statePreparingRebalance {
+		wasEmpty := g.state == stateEmpty
 		g.beginRebalance()
+		g.holding = wasEmpty && initialRebalanceDelay > 0
 	}
 	m.rejoined = true
 	m.awaitingJoin = true
 	m.joinResult = make(chan joinResult, 1)
 	gm.resetSession(g, m)
 
-	if g.allRejoined() {
+	if g.allRejoined() && !g.holding {
 		gm.completeJoin(g)
 	} else {
 		gm.armJoinTimer(g)
@@ -217,6 +405,105 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 	}
 }
 
+// replaceStatic hands a static member's place to its restarted instance, which
+// has a new member id. In a stable group with unchanged protocols that is all
+// that happens: no rebalance, the assignment is kept, and done is true with the
+// answer. Otherwise the member is swapped in and the caller carries on into a
+// normal rebalance (done is false, r.MemberID holds the new id). Caller holds mu.
+func (gm *groupManager) replaceStatic(g *group, oldID string, r *kmsg.JoinGroupRequest, who clientRef) (joinResult, bool) {
+	old := g.members[oldID]
+	newID := generateMemberID(r.InstanceID)
+	offered := protocolEntries(r.Protocols)
+
+	// Whatever the old incarnation had parked is answered: it has been replaced.
+	if old.awaitingJoin && old.joinResult != nil {
+		old.joinResult <- joinResult{errorCode: int16(protocol.ErrFencedInstanceID), memberID: oldID, generation: -1}
+		old.awaitingJoin = false
+	}
+	if ch, ok := g.pendingSync[oldID]; ok {
+		ch <- syncResult{errorCode: int16(protocol.ErrFencedInstanceID)}
+		delete(g.pendingSync, oldID)
+	}
+	old.stopSession()
+	delete(g.members, oldID)
+
+	m := &groupMember{
+		id: newID, instanceID: r.InstanceID, client: who, protocols: offered,
+		assignment: old.assignment, rejoined: old.rejoined,
+		sessionTimeout: time.Duration(r.SessionTimeoutMillis) * time.Millisecond,
+	}
+	if r.RebalanceTimeoutMillis > 0 {
+		m.rebalanceTimeout = time.Duration(r.RebalanceTimeoutMillis) * time.Millisecond
+	}
+	g.members[newID] = m
+	g.static[*r.InstanceID] = newID
+	if g.leader == oldID {
+		g.leader = newID
+	}
+	r.MemberID = newID
+
+	if g.state != stateStable || !sameProtocols(old.protocols, offered) {
+		return joinResult{}, false
+	}
+	gm.resetSession(g, m)
+	res := joinResult{generation: g.generation, protocol: g.protocol, leaderID: g.leader, memberID: newID}
+	if newID == g.leader {
+		res.members = g.memberInfos(g.protocol)
+	}
+	return res, true
+}
+
+// fenced reports whether a request naming a static instance comes from a member
+// id that no longer holds it (its restarted successor does).
+func (g *group) fenced(memberID string, instanceID *string) bool {
+	if instanceID == nil || *instanceID == "" {
+		return false
+	}
+	cur, held := g.static[*instanceID]
+	return held && cur != memberID
+}
+
+// othersThan is the group's members apart from id.
+func (g *group) othersThan(id string) []*groupMember {
+	out := make([]*groupMember, 0, len(g.members))
+	for mid, m := range g.members {
+		if mid != id {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// commonProtocol reports whether at least one offered protocol is supported by
+// every one of the given members.
+func commonProtocol(offered []groupProtocolEntry, members []*groupMember) bool {
+	for _, p := range offered {
+		all := true
+		for _, m := range members {
+			if !m.has(p.name) {
+				all = false
+				break
+			}
+		}
+		if all {
+			return true
+		}
+	}
+	return false
+}
+
+func sameProtocols(a, b []groupProtocolEntry) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].name != b[i].name || !bytes.Equal(a[i].metadata, b[i].metadata) {
+			return false
+		}
+	}
+	return true
+}
+
 // sync distributes assignments. The leader uploads everyone's assignment; each
 // member (leader included) receives its own slice. Followers block until the
 // leader's SyncGroup arrives.
@@ -226,6 +513,10 @@ func (gm *groupManager) sync(ctx context.Context, r *kmsg.SyncGroupRequest) (syn
 	if g == nil {
 		gm.mu.Unlock()
 		return syncResult{errorCode: int16(protocol.ErrUnknownMemberID)}, nil
+	}
+	if g.fenced(r.MemberID, r.InstanceID) {
+		gm.mu.Unlock()
+		return syncResult{errorCode: int16(protocol.ErrFencedInstanceID)}, nil
 	}
 	m := g.members[r.MemberID]
 	if m == nil {
@@ -251,6 +542,7 @@ func (gm *groupManager) sync(ctx context.Context, r *kmsg.SyncGroupRequest) (syn
 		g.state = stateStable
 		for id, ch := range g.pendingSync {
 			ch <- syncResult{assignment: g.members[id].assignment}
+			gm.resetSession(g, g.members[id]) // it has been parked; its session restarts now.
 		}
 		g.pendingSync = make(map[string]chan syncResult)
 		assignment := m.assignment
@@ -263,6 +555,12 @@ func (gm *groupManager) sync(ctx context.Context, r *kmsg.SyncGroupRequest) (syn
 		assignment := m.assignment
 		gm.mu.Unlock()
 		return syncResult{assignment: assignment}, nil
+	}
+	// A second SyncGroup from the same member supersedes one still parked (a
+	// retry on a new connection). The first is answered, not dropped: nothing
+	// else would ever release it.
+	if old, parked := g.pendingSync[r.MemberID]; parked {
+		old <- syncResult{errorCode: int16(protocol.ErrUnknownMemberID)}
 	}
 	ch := make(chan syncResult, 1)
 	g.pendingSync[r.MemberID] = ch
@@ -285,6 +583,9 @@ func (gm *groupManager) heartbeat(r *kmsg.HeartbeatRequest) int16 {
 	if g == nil {
 		return int16(protocol.ErrUnknownMemberID)
 	}
+	if g.fenced(r.MemberID, r.InstanceID) {
+		return int16(protocol.ErrFencedInstanceID)
+	}
 	m := g.members[r.MemberID]
 	if m == nil {
 		return int16(protocol.ErrUnknownMemberID)
@@ -299,42 +600,82 @@ func (gm *groupManager) heartbeat(r *kmsg.HeartbeatRequest) int16 {
 	return int16(protocol.ErrNone)
 }
 
-// leave removes the named members and triggers a rebalance for the rest.
+// leave removes the named members and, if any were removed, rebalances the rest.
+// A member is named by its member id or, for a static member, its instance id.
+// Naming a member that is not in the group changes nothing: it used to start a
+// rebalance of a perfectly healthy group (a consumer evicted earlier, shutting
+// down with its old id, was enough).
 func (gm *groupManager) leave(r *kmsg.LeaveGroupRequest) []leaveResult {
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
 	g := gm.groups[r.Group]
 
 	var results []leaveResult
-	for _, id := range membersToLeave(r) {
-		if g != nil && g.members[id] != nil {
-			gm.removeMember(g, id)
-			results = append(results, leaveResult{memberID: id, errorCode: int16(protocol.ErrNone)})
-		} else {
-			results = append(results, leaveResult{memberID: id, errorCode: int16(protocol.ErrUnknownMemberID)})
+	removed := false
+	for _, who := range membersToLeave(r) {
+		res := leaveResult{memberID: who.memberID, instanceID: who.instanceID, errorCode: int16(protocol.ErrUnknownMemberID)}
+		if g != nil {
+			id := who.memberID
+			if who.instanceID != nil && *who.instanceID != "" {
+				cur, held := g.static[*who.instanceID]
+				switch {
+				case !held:
+					id = ""
+				case id != "" && id != cur:
+					res.errorCode = int16(protocol.ErrFencedInstanceID)
+					id = ""
+				default:
+					id = cur
+				}
+			}
+			if id != "" && g.members[id] != nil {
+				gm.removeMember(g, id)
+				res.memberID, res.errorCode = id, int16(protocol.ErrNone)
+				removed = true
+			}
 		}
+		results = append(results, res)
 	}
-	if g != nil {
+	if g != nil && removed {
 		gm.rebalanceAfterChange(g)
 	}
 	return results
 }
 
-// validateCommit fences a stale OffsetCommit. An unknown/empty group (a simple
-// consumer) is allowed; a known group requires a live member at the current
-// generation.
-func (gm *groupManager) validateCommit(groupID, memberID string, generation int32) int16 {
+// validateCommit decides whether an OffsetCommit may be stored, by Kafka's rules:
+//
+//   - a commit that names no generation (a simple consumer, or an admin tool
+//     resetting offsets) is allowed only while the group has no members;
+//   - otherwise the member must be in the group, at the group's generation, and the
+//     group must not be waiting for the leader's assignment.
+//
+// The check used to be skipped whenever the generation was negative, so anything
+// could overwrite a running group's offsets, and whenever the group had no
+// members, so a consumer that had already left could commit at its old generation.
+func (gm *groupManager) validateCommit(groupID, memberID string, instanceID *string, generation int32) int16 {
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
 	g := gm.groups[groupID]
-	if g == nil || len(g.members) == 0 || generation < 0 {
+	if g == nil {
+		if generation < 0 {
+			return int16(protocol.ErrNone)
+		}
+		return int16(protocol.ErrIllegalGeneration)
+	}
+	if generation < 0 && len(g.members) == 0 {
 		return int16(protocol.ErrNone)
+	}
+	if g.fenced(memberID, instanceID) {
+		return int16(protocol.ErrFencedInstanceID)
 	}
 	if g.members[memberID] == nil {
 		return int16(protocol.ErrUnknownMemberID)
 	}
 	if generation != g.generation {
 		return int16(protocol.ErrIllegalGeneration)
+	}
+	if g.state == stateCompletingRebalance {
+		return int16(protocol.ErrRebalanceInProgress)
 	}
 	return int16(protocol.ErrNone)
 }
@@ -344,7 +685,7 @@ func (gm *groupManager) validateCommit(groupID, memberID string, generation int3
 func (gm *groupManager) getOrCreate(id string) *group {
 	g := gm.groups[id]
 	if g == nil {
-		g = &group{id: id, state: stateEmpty, members: make(map[string]*groupMember)}
+		g = &group{id: id, state: stateEmpty, members: make(map[string]*groupMember), static: make(map[string]string)}
 		gm.groups[id] = g
 	}
 	return g
@@ -441,6 +782,7 @@ func (g *group) allRejoined() bool {
 // JoinGroup response.
 func (g *group) completeJoin() {
 	g.stopJoinTimer()
+	g.holding = false
 	for id, m := range g.members {
 		if !m.rejoined {
 			m.stopSession()
@@ -451,6 +793,11 @@ func (g *group) completeJoin() {
 		g.state = stateEmpty
 		g.leader = ""
 		return
+	}
+	for inst, id := range g.static {
+		if g.members[id] == nil {
+			delete(g.static, inst)
+		}
 	}
 
 	g.generation++
@@ -486,6 +833,14 @@ func (gm *groupManager) completeJoin(g *group) {
 	g.completeJoin()
 	if g.state == stateEmpty {
 		gm.dropIfUnused(g)
+		return
+	}
+	// Every member's session starts afresh with the new generation. A member was
+	// last heard from when it sent its JoinGroup, possibly a whole rebalance ago;
+	// without this its timer could fire in the moment between its join being
+	// answered and its SyncGroup arriving.
+	for _, m := range g.members {
+		gm.resetSession(g, m)
 	}
 }
 
@@ -496,6 +851,8 @@ func (gm *groupManager) dropIfUnused(g *group) {
 	if gm.groups[g.id] != g || len(g.members) != 0 {
 		return
 	}
+	// No members: the id is free for either protocol again.
+	gm.claims.release(g.id, protoClassic)
 	if gm.hasOffsets != nil && gm.hasOffsets(g.id) {
 		return
 	}
@@ -508,16 +865,25 @@ func (gm *groupManager) armJoinTimer(g *group) {
 	}
 	g.joinGen++
 	gen := g.joinGen
-	g.joinTimer = time.AfterFunc(g.rebalanceTimeout(), func() {
-		gm.mu.Lock()
-		defer gm.mu.Unlock()
-		// Stale if the rebalance already ended (or restarted) while this waited
-		// for the lock.
-		if g.joinGen != gen || g.state != statePreparingRebalance {
-			return
-		}
-		gm.completeJoin(g)
-	})
+	wait := g.rebalanceTimeout()
+	if g.holding {
+		wait = min(wait, initialRebalanceDelay)
+	}
+	g.joinTimer = time.AfterFunc(wait, func() { gm.joinExpired(g, gen) })
+}
+
+// joinExpired is the join timer firing: the rebalance stops waiting for members
+// that have not rejoined. gen is the timer's identity. time.Timer.Stop cannot
+// recall a timer that has already fired and is waiting for the lock, so a firing
+// whose gen is no longer current belongs to a rebalance that already ended (or
+// restarted) and must do nothing.
+func (gm *groupManager) joinExpired(g *group, gen uint64) {
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
+	if g.joinGen != gen || g.state != statePreparingRebalance {
+		return
+	}
+	gm.completeJoin(g)
 }
 
 func (gm *groupManager) resetSession(g *group, m *groupMember) {
@@ -526,24 +892,41 @@ func (gm *groupManager) resetSession(g *group, m *groupMember) {
 	if timeout <= 0 {
 		timeout = defaultSessionTimeout
 	}
-	id, gen := m.id, m.sessionGen
-	m.sessionTimer = time.AfterFunc(timeout, func() {
-		gm.mu.Lock()
-		defer gm.mu.Unlock()
-		// Stale if the member was replaced, or heartbeated, while this waited
-		// for the lock.
-		if g.members[id] != m || m.sessionGen != gen {
-			return
-		}
-		gm.removeMember(g, id)
-		gm.rebalanceAfterChange(g)
-	})
+	gen := m.sessionGen
+	m.sessionTimer = time.AfterFunc(timeout, func() { gm.sessionExpired(g, m, gen) })
+}
+
+// sessionExpired is a member's session timer firing. gen is the timer's identity:
+// a firing whose gen is not the member's current one was overtaken by a heartbeat
+// (or the member was replaced) while it waited for the lock, and evicting on it
+// would remove a member that had just proved it was alive.
+func (gm *groupManager) sessionExpired(g *group, m *groupMember, gen uint64) {
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
+	id := m.id
+	if g.members[id] != m || m.sessionGen != gen {
+		return
+	}
+	// A member parked in JoinGroup or SyncGroup is waiting on the group, not
+	// gone: it cannot heartbeat while it waits, and a rebalance may take up to
+	// the rebalance timeout, which is normally longer than the session
+	// timeout. Evicting it here made a joiner with a short session lose its
+	// place every few seconds for as long as another member was busy.
+	if _, syncing := g.pendingSync[id]; m.awaitingJoin || syncing {
+		gm.resetSession(g, m)
+		return
+	}
+	gm.removeMember(g, id)
+	gm.rebalanceAfterChange(g)
 }
 
 func (gm *groupManager) removeMember(g *group, id string) {
 	if m := g.members[id]; m != nil {
 		m.stopSession()
 		m.failPendingJoin()
+		if m.instanceID != nil && g.static[*m.instanceID] == id {
+			delete(g.static, *m.instanceID)
+		}
 	}
 	if ch, ok := g.pendingSync[id]; ok {
 		ch <- syncResult{errorCode: int16(protocol.ErrUnknownMemberID)}
@@ -565,7 +948,8 @@ func (gm *groupManager) rebalanceAfterChange(g *group) {
 	}
 	if g.state != statePreparingRebalance {
 		g.beginRebalance()
-	} else if g.allRejoined() {
+		gm.armJoinTimer(g)
+	} else if g.allRejoined() && !g.holding {
 		gm.completeJoin(g)
 	}
 }
@@ -651,16 +1035,22 @@ func protocolEntries(ps []kmsg.JoinGroupRequestProtocol) []groupProtocolEntry {
 	return out
 }
 
-func membersToLeave(r *kmsg.LeaveGroupRequest) []string {
+// leaving names one member to remove: by member id, by static instance id, or both.
+type leaving struct {
+	memberID   string
+	instanceID *string
+}
+
+func membersToLeave(r *kmsg.LeaveGroupRequest) []leaving {
 	if len(r.Members) > 0 {
-		ids := make([]string, 0, len(r.Members))
+		out := make([]leaving, 0, len(r.Members))
 		for _, m := range r.Members {
-			ids = append(ids, m.MemberID)
+			out = append(out, leaving{m.MemberID, m.InstanceID})
 		}
-		return ids
+		return out
 	}
 	if r.MemberID != "" {
-		return []string{r.MemberID}
+		return []leaving{{memberID: r.MemberID}}
 	}
 	return nil
 }

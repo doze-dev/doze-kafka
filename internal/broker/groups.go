@@ -59,12 +59,10 @@ func (b *Broker) handleJoinGroup(ctx context.Context, req *protocol.Request) ([]
 
 	// One group id, one protocol: a group already running under KIP-848 cannot
 	// also be a classic group, or every partition would go to both.
-	res := joinResult{errorCode: int16(protocol.ErrInconsistentGroupProtocol), memberID: jr.MemberID}
-	if !b.cg848.hasMembers(jr.Group) {
-		res, err = b.groups.join(ctx, jr, clientRef{req.Header.ClientID, req.Conn.RemoteHost()})
-		if err != nil {
-			return nil, err
-		}
+	// (the coordinator claims the id on join; see groupClaims).
+	res, err := b.groups.join(ctx, jr, clientRef{req.Header.ClientID, req.Conn.RemoteHost()})
+	if err != nil {
+		return nil, err
 	}
 
 	resp := kmsg.NewPtrJoinGroupResponse()
@@ -154,6 +152,7 @@ func (b *Broker) handleLeaveGroup(ctx context.Context, req *protocol.Request) ([
 	for _, r := range results {
 		m := kmsg.NewLeaveGroupResponseMember()
 		m.MemberID = r.memberID
+		m.InstanceID = r.instanceID
 		m.ErrorCode = r.errorCode
 		resp.Members = append(resp.Members, m)
 	}

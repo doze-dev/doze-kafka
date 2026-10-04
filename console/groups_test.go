@@ -178,6 +178,9 @@ func TestResetAndDeleteAnInactiveGroup(t *testing.T) {
 	}
 
 	// An active group is refused, and says why.
+	// (Committed before the member joins: a commit naming no member is refused by
+	// the broker once the group has one.)
+	commitFor(t, addr, "busy", "t", map[int32]int64{0: 1})
 	cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.ConsumerGroup("busy"), kgo.ConsumeTopics("t"))
 	if err != nil {
 		t.Fatal(err)
@@ -186,7 +189,6 @@ func TestResetAndDeleteAnInactiveGroup(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	cl.PollFetches(ctx)
 	cancel()
-	commitFor(t, addr, "busy", "t", map[int32]int64{0: 1})
 	if code, body := post("/_console/groups/busy/reset", url.Values{"to": {"latest"}}); code != 400 || !strings.Contains(body, "active member") {
 		t.Errorf("reset of an active group: %d %q, want a refusal naming the members", code, body)
 	}

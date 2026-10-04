@@ -50,13 +50,17 @@ type cg848Manager struct {
 	meta           meta.Store
 	log            *slog.Logger
 	sessionTimeout time.Duration
+	claims         *groupClaims
 }
 
-func newCG848Manager(m meta.Store, logger *slog.Logger, sessionTimeout time.Duration) *cg848Manager {
+func newCG848Manager(m meta.Store, logger *slog.Logger, sessionTimeout time.Duration, claims *groupClaims) *cg848Manager {
 	if sessionTimeout <= 0 {
 		sessionTimeout = cg848DefaultSessionTimeout
 	}
-	return &cg848Manager{groups: make(map[string]*cg848Group), meta: m, log: logger, sessionTimeout: sessionTimeout}
+	if claims == nil {
+		claims = newGroupClaims()
+	}
+	return &cg848Manager{groups: make(map[string]*cg848Group), meta: m, log: logger, sessionTimeout: sessionTimeout, claims: claims}
 }
 
 type cg848Group struct {
@@ -117,6 +121,11 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 			// Unknown group at a non-zero epoch (e.g. after a broker restart): fence
 			// so the member abandons its partitions and rejoins at epoch 0.
 			return cg848Result{errorCode: int16(protocol.ErrFencedMemberEpoch)}
+		}
+		// The id is taken for this protocol in one step; a classic group holding
+		// it (or one being formed at this instant) wins and this join is refused.
+		if !m.claims.claim(r.Group, protoConsumer) {
+			return cg848Result{errorCode: int16(protocol.ErrGroupIDNotFound)}
 		}
 		g = &cg848Group{id: r.Group, members: make(map[string]*cg848Member)}
 		m.groups[r.Group] = g
@@ -301,6 +310,7 @@ func (m *cg848Manager) removeMember(g *cg848Group, id string) {
 	delete(g.members, id)
 	if len(g.members) == 0 {
 		delete(m.groups, g.id)
+		m.claims.release(g.id, protoConsumer)
 	}
 }
 
@@ -468,14 +478,8 @@ func (b *Broker) handleConsumerGroupHeartbeat(ctx context.Context, req *protocol
 	}
 	hr := kreq.(*kmsg.ConsumerGroupHeartbeatRequest)
 
-	// One group id, one protocol. A live classic group is not a consumer group, and
-	// joining it here would give every partition to both sets of members.
-	if hr.MemberEpoch >= 0 && b.groups.hasMembers(hr.Group) {
-		resp := kmsg.NewPtrConsumerGroupHeartbeatResponse()
-		resp.SetVersion(req.Header.APIVersion)
-		resp.ErrorCode = int16(protocol.ErrGroupIDNotFound)
-		return protocol.EncodeResponse(req.Header, resp), nil
-	}
+	// One group id, one protocol: the coordinator claims the id when the group is
+	// formed (see groupClaims) and refuses if a classic group holds it.
 	res := b.cg848.heartbeat(hr, clientRef{req.Header.ClientID, req.Conn.RemoteHost()})
 
 	resp := kmsg.NewPtrConsumerGroupHeartbeatResponse()
@@ -552,4 +556,27 @@ func (m *cg848Manager) describeAssignment(a map[string][]int32) kmsg.Assignment 
 		out.TopicPartitions = append(out.TopicPartitions, at)
 	}
 	return out
+}
+
+// validateCommit decides whether an OffsetCommit for a KIP-848 group may be
+// stored: the member must be in the group and at the group's current epoch for
+// it. A commit naming no member is allowed only while the group has none.
+func (m *cg848Manager) validateCommit(groupID, memberID string, epoch int32) int16 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	g := m.groups[groupID]
+	if g == nil || len(g.members) == 0 {
+		if epoch < 0 && memberID == "" {
+			return int16(protocol.ErrNone)
+		}
+		return int16(protocol.ErrUnknownMemberID)
+	}
+	mem := g.members[memberID]
+	if mem == nil {
+		return int16(protocol.ErrUnknownMemberID)
+	}
+	if epoch != mem.epoch {
+		return int16(protocol.ErrStaleMemberEpoch)
+	}
+	return int16(protocol.ErrNone)
 }
