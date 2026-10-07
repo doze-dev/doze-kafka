@@ -65,6 +65,7 @@ func TestOnlyAdvertisedAPIsAndVersionsAreServed(t *testing.T) {
 		want         bool
 	}{
 		{"InitProducerId v1 (advertised)", 22, 1, ipid(1), true},
+		{"CreatePartitions v4 (above the maximum)", 37, 4, wellFormed(kmsg.NewPtrCreatePartitionsRequest(), 3), false},
 		{"InitProducerId v100", 22, 100, ipid(1), false},
 		{"InitProducerId v-1", 22, -1, ipid(1), false},
 		// Well-formed requests, so that being refused is about the version and not
@@ -72,7 +73,7 @@ func TestOnlyAdvertisedAPIsAndVersionsAreServed(t *testing.T) {
 		{"Produce v2 (below the minimum)", 0, 2, wellFormed(kmsg.NewPtrProduceRequest(), 2), false},
 		{"Fetch v3 (below the minimum)", 1, 3, wellFormed(kmsg.NewPtrFetchRequest(), 3), false},
 		{"Metadata v13 (above the maximum)", 3, 13, wellFormed(kmsg.NewPtrMetadataRequest(), 13), false},
-		{"CreatePartitions (no such API here)", 37, 0, wellFormed(kmsg.NewPtrCreatePartitionsRequest(), 0), false},
+		{"DescribeLogDirs (no such API here)", 35, 0, wellFormed(kmsg.NewPtrDescribeLogDirsRequest(), 0), false},
 		// ApiVersions is the exception: an unknown version is told what is supported.
 		{"ApiVersions v99", 18, 99, nil, true},
 	} {

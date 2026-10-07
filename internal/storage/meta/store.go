@@ -80,6 +80,10 @@ type Store interface {
 	// SetTopicConfig replaces a topic's own configuration (its overrides of the
 	// broker's defaults) and returns the topic as it now is.
 	SetTopicConfig(name string, config map[string]string) (Topic, error)
+	// SetPartitions raises a topic's partition count and returns the topic as it
+	// now is. A count that is not above the current one is ErrPartitionsNotIncreased:
+	// partitions are never removed.
+	SetPartitions(name string, count int32) (Topic, error)
 
 	CommitOffset(group, topic string, partition int32, offset int64, metadata string) error
 	FetchOffset(group, topic string, partition int32) (offset int64, ok bool, err error)
@@ -555,4 +559,41 @@ func offsetKey(group, topic string, partition int32) []byte {
 	var pb [4]byte
 	binary.BigEndian.PutUint32(pb[:], uint32(partition))
 	return append(key, pb[:]...)
+}
+
+// ErrPartitionsNotIncreased is returned by SetPartitions for a count that is not
+// above the topic's current one.
+var ErrPartitionsNotIncreased = errors.New("meta: partition count must increase")
+
+func (s *boltStore) SetPartitions(name string, count int32) (Topic, error) {
+	s.topicMu.Lock()
+	defer s.topicMu.Unlock()
+	var rec topicRecord
+	err := s.update(func(tx *bbolt.Tx) error {
+		topics := tx.Bucket(bucketTopics)
+		v := topics.Get([]byte(name))
+		if v == nil {
+			return ErrNoSuchTopic
+		}
+		if err := json.Unmarshal(v, &rec); err != nil {
+			return err
+		}
+		if count <= rec.Partitions {
+			return ErrPartitionsNotIncreased
+		}
+		rec.Partitions = count
+		val, err := json.Marshal(rec)
+		if err != nil {
+			return err
+		}
+		return topics.Put([]byte(name), val)
+	})
+	if err != nil {
+		return Topic{}, err
+	}
+	t := Topic{Name: name, ID: rec.ID, Partitions: rec.Partitions, Config: rec.Config}
+	s.mu.Lock()
+	s.byName[name] = cloneTopic(t)
+	s.mu.Unlock()
+	return cloneTopic(t), nil
 }

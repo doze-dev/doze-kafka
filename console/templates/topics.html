@@ -57,6 +57,8 @@
 
     {{template "topic_config" .}}
 
+    {{template "topic_addparts" .}}
+
     {{template "topic_groups" .}}
 
     {{template "tape_and_table" .}}
@@ -318,5 +320,25 @@
     {{range .Config.Others}}<span class="cfgchip {{if .Own}}own{{end}}" {{if .Own}}title="Set on this topic"{{end}}>{{.Name}} <b>{{.Value}}</b></span>{{end}}
     <span class="cfgchip note">{{if .Config.Compact}}This topic asks for compaction. doze-kafka accepts the setting and does not compact: every record is kept until retention removes it. {{end}}Other Kafka topic settings are stored and reported, and change nothing here.</span>
   </div>
+</details>
+{{end}}
+
+{{/* topic_addparts: growing a topic. Partitions only ever increase, and a record's
+     partition is its key's hash modulo the count, so the warning is the point. */}}
+{{define "topic_addparts"}}
+<details class="cfg" id="topic-addparts">
+  <summary>
+    {{icon "plus"}}
+    <span class="cfgsum"><b>Partitions</b> · <span class="mono"><b>{{.Topic.Partitions}}</b></span> · add more</span>
+    <span class="twist">{{icon "chevron"}}</span>
+  </summary>
+  <form class="cfgform" hx-post="{{topicURL .Topic.Name}}/partitions" hx-disabled-elt="find button[type=submit]" data-confirm-title="Add partitions" data-confirm-verb="Add partitions" hx-confirm="Add partitions to &quot;{{.Topic.Name}}&quot;? They cannot be removed afterwards, and a key may hash to a different partition than before, so records with the same key stop being ordered together across the change.">
+    <div class="field narrow"><label for="f-addparts">Add</label><input class="input mono" id="f-addparts" name="add" type="number" min="1" value="1" required></div>
+    <div class="err form-err" data-err-slot hidden role="alert"></div>
+    <div class="cfgfoot">
+      <span class="note">Now {{.Topic.Partitions}}. Consumers pick the new partitions up on their own; records already written stay where they are.</span>
+      <button type="submit" class="btn primary">Add partitions</button>
+    </div>
+  </form>
 </details>
 {{end}}

@@ -107,6 +107,7 @@ var APIs = []API{
 	{Key: kmsg.DescribeConfigs, Versions: [4]Offered{v(0, 1), v(0, 2), v(0, 4), v(0, 4)}},
 	{Key: kmsg.AlterConfigs, Versions: [4]Offered{v(0, 0), v(0, 2), v(0, 2), v(0, 2)}},
 	{Key: kmsg.SASLAuthenticate, Versions: [4]Offered{v(0, 2), v(0, 2), v(0, 2), v(0, 2)}, When: WhenSASL},
+	{Key: kmsg.CreatePartitions, Versions: [4]Offered{v(0, 0), v(0, 1), v(0, 3), v(0, 3)}},
 	{Key: kmsg.DeleteGroups, Versions: [4]Offered{v(0, 1), v(0, 2), v(0, 2), v(0, 2)}},
 	{Key: kmsg.IncrementalAlterConfigs, Versions: [4]Offered{none, v(0, 1), v(0, 1), v(0, 1)}},
 	{Key: kmsg.OffsetDelete, Versions: [4]Offered{none, v(0, 0), v(0, 0), v(0, 0)}},

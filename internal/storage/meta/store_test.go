@@ -414,3 +414,41 @@ func TestSetTopicConfigReplacesPersistsAndRefusesUnknownTopics(t *testing.T) {
 		t.Errorf("after reopening: %+v", got)
 	}
 }
+
+// A topic's partition count only goes up, keeps its id and config, and is what a
+// reopened store reports.
+func TestSetPartitionsOnlyIncreasesAndPersists(t *testing.T) {
+	path := t.TempDir() + "/meta.db"
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := s.CreateTopic("t", 2, map[string]string{"retention.ms": "1000"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	grown, err := s.SetPartitions("t", 5)
+	if err != nil || grown.Partitions != 5 || grown.ID != created.ID || grown.Config["retention.ms"] != "1000" {
+		t.Fatalf("SetPartitions = %+v, %v", grown, err)
+	}
+	for _, n := range []int32{5, 4, 0} {
+		if _, err := s.SetPartitions("t", n); !errors.Is(err, ErrPartitionsNotIncreased) {
+			t.Errorf("SetPartitions(%d) = %v, want ErrPartitionsNotIncreased", n, err)
+		}
+	}
+	if _, err := s.SetPartitions("missing", 9); !errors.Is(err, ErrNoSuchTopic) {
+		t.Errorf("an unknown topic: %v", err)
+	}
+	if got, _, _ := s.Topic("t"); got.Partitions != 5 {
+		t.Errorf("the cache says %d partitions", got.Partitions)
+	}
+	s.Close()
+	s, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if got, _, _ := s.Topic("t"); got.Partitions != 5 {
+		t.Errorf("after reopening: %d partitions, want 5", got.Partitions)
+	}
+}

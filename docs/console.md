@@ -54,6 +54,10 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   create-topic form. Other Kafka topic
   settings are listed for reading; a topic that asks for compaction is told it is not
   compacted.
+- **Partitions** shows the count and adds more. Partitions can only be added, never
+  removed, and a key's partition depends on the count, so records with the same key
+  stop being ordered together across the change; the page says so before it asks.
+  Consumers in a group pick the new partitions up on their own.
 - **Purge** empties a topic (it is deleted and recreated, so it gets a new id) and
   **Delete** removes it. Both ask first, naming the action.
 

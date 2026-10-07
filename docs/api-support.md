@@ -33,6 +33,7 @@ specifically testing an older client's paths.
 | DescribeConfigs | 32 | Read topic and broker configuration. |
 | AlterConfigs | 33 | Replace a topic's own configuration. |
 | IncrementalAlterConfigs | 44 | Set or remove individual topic configs (Kafka 2 and later). |
+| CreatePartitions | 37 | Raise a topic's partition count (never lower it). |
 | DeleteGroups | 42 | Delete empty consumer groups and their committed offsets. |
 | OffsetDelete | 47 | Delete a group's committed offsets for a topic, including an offset left over from a topic that no longer exists. |
 | DescribeCluster | 60 | Describe the cluster (this single node). |
@@ -77,6 +78,7 @@ the highest version both sides support; a request outside them is not served.
 | DescribeConfigs | 32 | 0–1 | 0–2 | 0–4 | 0–4 |
 | AlterConfigs | 33 | 0–0 | 0–2 | 0–2 | 0–2 |
 | SASLAuthenticate | 36 | 0–2 | 0–2 | 0–2 | 0–2 | only when SASL is configured
+| CreatePartitions | 37 | 0–0 | 0–1 | 0–3 | 0–3 |
 | DeleteGroups | 42 | 0–1 | 0–2 | 0–2 | 0–2 |
 | IncrementalAlterConfigs | 44 | — | 0–1 | 0–1 | 0–1 |
 | OffsetDelete | 47 | — | 0–0 | 0–0 | 0–0 |
@@ -92,7 +94,7 @@ emulated major is 1; the pre-0.11 message-set format is not supported.
 
 Transactions — idempotent producers are fully supported (`InitProducerId` plus
 sequence-number deduplication), but there's no transactional produce/commit
-(`AddPartitionsToTxn`/`EndTxn`). `CreatePartitions`, `OffsetForLeaderEpoch`, `DescribeLogDirs`, ACL and quota APIs, and
+(`AddPartitionsToTxn`/`EndTxn`). `OffsetForLeaderEpoch`, `DescribeLogDirs`, ACL and quota APIs, and
 the client-metrics/telemetry APIs. The broker serves exactly what it advertises: a
 request for an API it does not have, or at a version outside the advertised range,
 gets no response and its connection is closed, rather than being left to hang (the one

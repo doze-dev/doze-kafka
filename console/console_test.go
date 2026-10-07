@@ -378,3 +378,37 @@ func TestUnixSocketConsole(t *testing.T) {
 		t.Errorf("endpoint chip should show DisplayAddr, got page containing unix:// or missing it")
 	}
 }
+
+// Growing a topic from its page: partitions are added, never removed, and the page
+// says what that costs before it is done.
+func TestAddPartitions(t *testing.T) {
+	c := newTestConsole(t)
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"grow"}, "partitions": {"2"}})
+
+	page := req(t, c, "GET", "/_console/topics/grow", nil).Body.String()
+	for _, want := range []string{`id="topic-addparts"`, "/topics/grow/partitions", "cannot be removed", "stop being ordered"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the topic page is missing %q", want)
+		}
+	}
+
+	if rec := req(t, c, "POST", "/_console/topics/grow/partitions", url.Values{"add": {"3"}}); rec.Code != http.StatusSeeOther {
+		t.Fatalf("add 3: status %d: %s", rec.Code, rec.Body)
+	}
+	if body := req(t, c, "GET", "/_console/topics/grow", nil).Body.String(); !strings.Contains(body, "5 partitions") {
+		t.Error("the topic does not show 5 partitions after adding 3 to 2")
+	}
+
+	for _, bad := range []string{"0", "-1", "", "x"} {
+		rec := req(t, c, "POST", "/_console/topics/grow/partitions", url.Values{"add": {bad}})
+		if rec.Code < 400 || !strings.Contains(rec.Body.String()+rec.Header().Get("HX-Doze-Error"), "how many partitions to add") {
+			t.Errorf("add %q: status %d, want a refusal that says what to enter: %q", bad, rec.Code, rec.Body)
+		}
+	}
+	if rec := req(t, c, "POST", "/_console/topics/nope/partitions", url.Values{"add": {"1"}}); rec.Code < 400 {
+		t.Errorf("an unknown topic: status %d", rec.Code)
+	}
+	if body := req(t, c, "GET", "/_console/topics/grow", nil).Body.String(); !strings.Contains(body, "5 partitions") {
+		t.Error("refused requests changed the topic")
+	}
+}

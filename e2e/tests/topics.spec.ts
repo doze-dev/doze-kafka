@@ -103,3 +103,26 @@ test('moving between topics replaces only the detail, and nothing moves after it
   await expect(page.locator('.listpane')).toHaveAttribute('data-same', '1'); // the list was not redrawn.
   expect(await page.evaluate(() => document.querySelectorAll('[hx-trigger="load"]').length)).toBe(0);
 });
+
+test('partitions are added after a warning, the tabs grow, and a bad number is explained in place', async ({ page, createTopic, uniqueName, confirmDialog }) => {
+  const name = uniqueName('grow');
+  await createTopic(name, 2);
+  await expect(page.locator('.ptab')).toHaveCount(2);
+
+  await page.locator('#topic-addparts summary').click();
+  await page.locator('#f-addparts').evaluate((el: HTMLInputElement) => { el.type = 'text'; }); // past the browser's own check.
+  await page.locator('#f-addparts').fill('x');
+  await page.locator('#topic-addparts').getByRole('button', { name: 'Add partitions' }).click();
+  await confirmDialog('accept');
+  await expect(page.locator('#topic-addparts [data-err-slot]')).toContainText('how many partitions to add');
+  await expect(page.locator('.ptab')).toHaveCount(2);
+
+  await page.locator('#f-addparts').evaluate((el: HTMLInputElement) => { el.type = 'number'; });
+  await page.locator('#f-addparts').fill('2');
+  await page.locator('#topic-addparts').getByRole('button', { name: 'Add partitions' }).click();
+  await expect(page.locator('#confirm')).toContainText('cannot be removed'); // the cost is said before it is paid.
+  await confirmDialog('accept');
+  await expect(page.locator('#flashbar')).toContainText('Topic now has 4 partitions');
+  await expect(page.locator('.idchips')).toContainText('4 partitions');
+  await expect(page.locator('.ptab')).toHaveCount(4);
+});

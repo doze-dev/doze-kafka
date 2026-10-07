@@ -11,7 +11,7 @@ import (
 
 // TestUnhandledAPI_ClosesConnectionNotHang covers the fix for a real DX bug: a
 // client that calls an API the broker doesn't serve (one not advertised in
-// ApiVersions — e.g. some Kafka UIs probe CreatePartitions) used to get no response
+// ApiVersions — e.g. some Kafka UIs probe DescribeLogDirs) used to get no response
 // and hang until its own timeout. The broker must instead close the connection so
 // the client fails fast.
 func TestUnhandledAPI_ClosesConnectionNotHang(t *testing.T) {
@@ -23,11 +23,11 @@ func TestUnhandledAPI_ClosesConnectionNotHang(t *testing.T) {
 	}
 	defer conn.Close()
 
-	// A well-formed CreatePartitions (api key 37), which this broker does not
+	// A well-formed DescribeLogDirs (api key 35), which this broker does not
 	// offer. (This used to send DescribeConfigs, which was unserved then and is
 	// served now, with no body: it was closed for being malformed, so the test
 	// passed without testing what it claimed to.)
-	payload := append([]byte{0, 37, 0, 0, 0, 0, 0, 1, 0xff, 0xff}, kmsg.NewPtrCreatePartitionsRequest().AppendTo(nil)...)
+	payload := append([]byte{0, 35, 0, 0, 0, 0, 0, 1, 0xff, 0xff}, kmsg.NewPtrDescribeLogDirsRequest().AppendTo(nil)...)
 	frame := make([]byte, 4+len(payload))
 	binary.BigEndian.PutUint32(frame, uint32(len(payload)))
 	copy(frame[4:], payload)

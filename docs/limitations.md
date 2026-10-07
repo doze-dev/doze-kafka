@@ -47,7 +47,7 @@ implement it.
   from flags and the config file, and a request to change it is refused.
 - **ACLs and quotas.** Authentication exists (SASL/TLS), but there is no
   authorization: an authenticated client can do anything. No throttling either.
-- **Some admin APIs.** `CreatePartitions`, `OffsetForLeaderEpoch`, `DescribeLogDirs`,
+- **Some admin APIs.** `OffsetForLeaderEpoch`, `DescribeLogDirs`,
   and the client-metrics/telemetry APIs are not implemented. A Kafka UI that probes
   these will get a clean connection close on that call, not a hang — and generally
   keeps working for everything else.
