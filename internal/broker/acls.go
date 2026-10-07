@@ -13,12 +13,10 @@ import (
 	"github.com/twmb/franz-go/pkg/kerr"
 )
 
-// The ACL APIs (DescribeAcls, CreateAcls, DeleteAcls) are served so that provisioning
-// scripts and Terraform complete and can read back what they created. The entries are
-// stored, durably, and NEVER ENFORCED: there is no authorizer, and every authenticated
-// client may do everything whatever is stored here. That is said at start-up when any
-// exist, in docs/limitations.md, and on the console's Access page, so a stored entry is
-// not mistaken for security.
+// The ACL APIs (DescribeAcls, CreateAcls, DeleteAcls) store entries durably, and the
+// authorizer (authorizer.go) enforces them: an entry created here is what the next
+// request is checked against. Creating and deleting them needs Alter on the cluster,
+// and reading them Describe, as in Kafka.
 
 // aclFilter is a describe or delete filter: nil strings and the "any" values match
 // everything, as in Kafka's AclBindingFilter.
@@ -120,29 +118,43 @@ func validateCreation(a meta.ACL) string {
 }
 
 // aclState serialises changes to the stored entries, so a delete's matches and its
-// removal are one step, and says the not-enforced fact once per process.
+// removal are one step.
 type aclState struct {
-	mu     sync.Mutex
-	warned sync.Once
+	mu sync.Mutex
 }
 
-// WarnIfACLs says at start-up that stored ACLs are not enforced, when there are any.
-func (b *Broker) WarnIfACLs() {
-	if acls, err := b.meta.ListACLs(); err == nil && len(acls) > 0 {
-		b.warnACLsNotEnforced(len(acls))
+// refreshAuthorizer makes the authorizer see what is stored now. Callers hold acls.mu.
+func (b *Broker) refreshAuthorizer() {
+	if all, err := b.meta.ListACLs(); err == nil {
+		b.authz.set(all)
 	}
 }
 
-func (b *Broker) warnACLsNotEnforced(n int) {
-	b.acls.warned.Do(func() {
-		b.log.Warn("ACLs are stored but NOT enforced: every authenticated client can still do everything", "acls", n)
-	})
+// AnnounceACLs says at start-up that ACLs are in force, when there are any or when
+// the default is to refuse, so nobody wonders why a client is being turned away.
+func (b *Broker) AnnounceACLs() {
+	acls, err := b.meta.ListACLs()
+	if err != nil {
+		return
+	}
+	if len(acls) == 0 && b.authz.defaultAll {
+		return
+	}
+	b.log.Info("ACLs are enforced", "acls", len(acls), "no_acl_means", b.cfg.ACLDefault, "super_users", len(b.authz.supers))
 }
 
 func (b *Broker) handleCreateACLs(ctx context.Context, req *protocol.Request, cr *kmsg.CreateACLsRequest, resp *kmsg.CreateACLsResponse) error {
 	b.acls.mu.Lock()
 	defer b.acls.mu.Unlock()
 
+	if !b.canCluster(req.Conn, opAlter) {
+		for range cr.Creations {
+			rr := kmsg.NewCreateACLsResponseResult()
+			rr.ErrorCode = kerr.ClusterAuthorizationFailed.Code
+			resp.Results = append(resp.Results, rr)
+		}
+		return nil
+	}
 	var accepted []meta.ACL
 	valid := make([]bool, len(cr.Creations))
 	for i, c := range cr.Creations {
@@ -168,10 +180,7 @@ func (b *Broker) handleCreateACLs(ctx context.Context, req *protocol.Request, cr
 		}
 		return nil
 	}
-	if len(accepted) > 0 {
-		all, _ := b.meta.ListACLs()
-		b.warnACLsNotEnforced(len(all))
-	}
+	b.refreshAuthorizer()
 	return nil
 }
 
@@ -180,6 +189,10 @@ func filterFrom(rt kmsg.ACLResourceType, name *string, pt kmsg.ACLResourcePatter
 }
 
 func (b *Broker) handleDescribeACLs(ctx context.Context, req *protocol.Request, dr *kmsg.DescribeACLsRequest, resp *kmsg.DescribeACLsResponse) error {
+	if !b.canCluster(req.Conn, opDescribe) {
+		resp.ErrorCode = kerr.ClusterAuthorizationFailed.Code
+		return nil
+	}
 	f := filterFrom(dr.ResourceType, dr.ResourceName, dr.ResourcePatternType, dr.Principal, dr.Host, dr.Operation, dr.PermissionType)
 	if msg := f.validate(); msg != "" {
 		resp.ErrorCode = kerr.InvalidRequest.Code
@@ -235,6 +248,14 @@ func (b *Broker) handleDeleteACLs(ctx context.Context, req *protocol.Request, dr
 	b.acls.mu.Lock()
 	defer b.acls.mu.Unlock()
 
+	if !b.canCluster(req.Conn, opAlter) {
+		for range dr.Filters {
+			rr := kmsg.NewDeleteACLsResponseResult()
+			rr.ErrorCode = kerr.ClusterAuthorizationFailed.Code
+			resp.Results = append(resp.Results, rr)
+		}
+		return nil
+	}
 	all, err := b.meta.ListACLs()
 	if err != nil {
 		for range dr.Filters {
@@ -273,6 +294,8 @@ func (b *Broker) handleDeleteACLs(ctx context.Context, req *protocol.Request, dr
 				resp.Results[i].ErrorCode, resp.Results[i].MatchingACLs = code, nil
 			}
 		}
+		return nil
 	}
+	b.refreshAuthorizer()
 	return nil
 }

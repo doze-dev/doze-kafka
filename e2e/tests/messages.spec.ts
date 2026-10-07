@@ -4,6 +4,12 @@ import { test, expect } from '../fixtures/console';
 // no key, 41 a tombstone, 42 binary, 43 a very long key, 44 "the newest record".
 const row = (page: any, offset: number) => page.locator(`#msg-${offset}`);
 
+// htmx processes content it has just swapped in about 20 ms later (in its settle step), and
+// until then a click on it does nothing. A person cannot click that fast; a test on a busy
+// machine can, so it waits for the swap to have settled before clicking what the swap
+// brought.
+const settled = (page: any) => page.waitForFunction(() => !document.querySelector('.htmx-added, .htmx-swapping, .htmx-settling'));
+
 test('a record opens in the drawer, with its place in the URL, and Esc closes it', async ({ page }) => {
   await page.goto('topics/seed-orders');
   await row(page, 5).click();
@@ -21,10 +27,15 @@ test('a record opens in the drawer, with its place in the URL, and Esc closes it
 test('a link with ?open= reopens the record; Older and Newer step through the log', async ({ page }) => {
   await page.goto('topics/seed-orders?partition=0&open=20');
   await expect(page.locator('#drawer-title')).toHaveAttribute('data-offset', '20');
+  await settled(page);
   await page.getByRole('button', { name: 'Older record' }).click();
   await expect(page.locator('#drawer-title')).toHaveAttribute('data-offset', '19');
   await expect(page.getByRole('button', { name: 'Older record' })).toBeFocused(); // stepping keeps its place.
+  // One step at a time: each load replaces the drawer, buttons included.
+  await settled(page);
   await page.getByRole('button', { name: 'Newer record' }).click();
+  await expect(page.locator('#drawer-title')).toHaveAttribute('data-offset', '20');
+  await settled(page);
   await page.getByRole('button', { name: 'Newer record' }).click();
   await expect(page.locator('#drawer-title')).toHaveAttribute('data-offset', '21');
   await expect(page.locator('#reqbar')).toBeHidden(); // the slow-request bar does not stay on.
@@ -72,6 +83,7 @@ test('Send again produces an exact copy; Edit a copy fills the composer', async 
   await page.getByRole('button', { name: 'Send again' }).click();
   await expect(page.locator('#drawer-overlay')).toBeHidden(); // closes once the broker has taken the copy.
   await expect(row(page, 1)).toBeVisible();
+  await settled(page); // a row only answers a click once htmx has processed it.
   await row(page, 1).click();
   await expect(page.locator('#drawer')).toContainText('"b"');
   // The drawer shows JSON indented to read; "Edit a copy" and "Send again" carry the stored bytes.

@@ -24,7 +24,8 @@ at a local broker. If you just want to get going, read
 6. **[Consumer groups](consumer-groups.md)** — using consumer groups, the classic
    and KIP-848 protocols, committing and resuming offsets, and rebalancing.
 7. **[Auth & TLS](auth-and-tls.md)** — enabling SASL/PLAIN, SASL/SCRAM, and TLS, with
-   matching client configuration.
+   matching client configuration. **[Authorization](authorization.md)** — ACLs, enforced
+   with Kafka's rules.
 8. **[Storage & durability](storage-and-durability.md)** — how messages are stored,
    how retention works, what a restart or crash keeps, and the flat-memory property.
 9. **[API support](api-support.md)** — the exact set of Kafka APIs and versions the

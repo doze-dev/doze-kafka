@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"time"
@@ -57,7 +58,7 @@ func (b *Broker) handleFetch(ctx context.Context, req *protocol.Request) ([]byte
 			sub = b.produce.subscribe(b.fetchTopics(fr))
 			defer sub.Close()
 		}
-		resp, total, failed := b.buildFetchResponse(fr, req.Header.APIVersion)
+		resp, total, failed := b.buildFetchResponse(req.Conn, fr, req.Header.APIVersion)
 		// An error is an answer: the client has to act on it (reset its offset,
 		// refresh metadata), and making it wait MaxWait first cost every consumer
 		// offset reset a full fetch.max.wait.ms.
@@ -105,7 +106,7 @@ func encodeFetchResponse(header protocol.RequestHeader, resp *kmsg.FetchResponse
 // buildFetchResponse reads every requested partition once and returns the response
 // plus the total record bytes gathered (used to decide long-poll satisfaction) and
 // whether any partition answered with an error.
-func (b *Broker) buildFetchResponse(fr *kmsg.FetchRequest, version int16) (*kmsg.FetchResponse, int, bool) {
+func (b *Broker) buildFetchResponse(conn *protocol.Conn, fr *kmsg.FetchRequest, version int16) (*kmsg.FetchResponse, int, bool) {
 	resp := kmsg.NewPtrFetchResponse()
 	resp.SetVersion(version)
 
@@ -116,11 +117,18 @@ func (b *Broker) buildFetchResponse(fr *kmsg.FetchRequest, version int16) (*kmsg
 		rt.TopicID = t.TopicID
 		name, topic, ok := b.resolveTopic(t.Topic, t.TopicID)
 		rt.Topic = name
+		authorized := b.canTopic(conn, cmp.Or(name, t.Topic), opRead)
 
 		for _, part := range t.Partitions {
 			rp := kmsg.NewFetchResponseTopicPartition()
 			rp.Partition = part.Partition
 
+			if !authorized {
+				rp.ErrorCode = kerr.TopicAuthorizationFailed.Code
+				rt.Partitions = append(rt.Partitions, rp)
+				failed = true
+				continue
+			}
 			if !ok || part.Partition < 0 || part.Partition >= topic.Partitions {
 				rp.ErrorCode = int16(b.unknownTopicErr(t.Topic))
 				rt.Partitions = append(rt.Partitions, rp)

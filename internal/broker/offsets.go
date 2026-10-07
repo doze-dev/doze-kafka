@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"cmp"
 	"context"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
@@ -18,6 +19,9 @@ import (
 // through). Committed offsets are the only durable consumer-group state.
 func (b *Broker) handleOffsetCommit(ctx context.Context, req *protocol.Request, oc *kmsg.OffsetCommitRequest, resp *kmsg.OffsetCommitResponse) error {
 	fence := b.commitFence(oc)
+	if !b.canGroup(req.Conn, oc.Group, opRead) {
+		fence = kerr.GroupAuthorizationFailed.Code
+	}
 
 	// Validate every partition first and write the valid ones in ONE transaction:
 	// a bolt transaction is an fsync, so committing a 20-partition poll one
@@ -32,6 +36,7 @@ func (b *Broker) handleOffsetCommit(ctx context.Context, req *protocol.Request, 
 		rt.Topic = t.Topic
 		rt.TopicID = t.TopicID
 		name, topic, ok := b.resolveTopic(t.Topic, t.TopicID)
+		topicRead := b.canTopic(req.Conn, cmp.Or(name, t.Topic), opRead)
 
 		for _, p := range t.Partitions {
 			rp := kmsg.NewOffsetCommitResponseTopicPartition()
@@ -39,6 +44,8 @@ func (b *Broker) handleOffsetCommit(ctx context.Context, req *protocol.Request, 
 			switch {
 			case fence != errNone:
 				rp.ErrorCode = fence
+			case !topicRead:
+				rp.ErrorCode = kerr.TopicAuthorizationFailed.Code
 			case !ok || p.Partition < 0 || p.Partition >= topic.Partitions:
 				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
 			default:
@@ -71,6 +78,11 @@ func (b *Broker) handleOffsetFetch(ctx context.Context, req *protocol.Request, o
 		for _, g := range of.Groups {
 			rg := kmsg.NewOffsetFetchResponseGroup()
 			rg.Group = g.Group
+			if !b.canGroup(req.Conn, g.Group, opDescribe) {
+				rg.ErrorCode = kerr.GroupAuthorizationFailed.Code
+				resp.Groups = append(resp.Groups, rg)
+				continue
+			}
 			// A KIP-848 member names itself and its epoch: one the coordinator no
 			// longer knows, or knows at another epoch, must not be handed offsets
 			// to resume from as if it still held the partitions.
@@ -86,11 +98,21 @@ func (b *Broker) handleOffsetFetch(ctx context.Context, req *protocol.Request, o
 				return err
 			}
 			for _, po := range partitions {
+				// A topic the principal may not describe is left out of an "all
+				// offsets" answer and refused by name in an explicit one.
+				denied := !b.canTopic(req.Conn, po.topic, opDescribe)
+				if denied && g.Topics == nil {
+					continue
+				}
 				rt := findOrAppendGroupTopic(&rg, po.topic)
 				gp := kmsg.NewOffsetFetchResponseGroupTopicPartition()
 				gp.Partition = po.partition
 				gp.Offset = po.offset
 				gp.Metadata = po.metadata
+				if denied {
+					gp.Offset, gp.Metadata = -1, nil
+					gp.ErrorCode = kerr.TopicAuthorizationFailed.Code
+				}
 				rt.Partitions = append(rt.Partitions, gp) // rt points into rg.Topics; mutation sticks.
 			}
 			resp.Groups = append(resp.Groups, rg)
@@ -99,16 +121,28 @@ func (b *Broker) handleOffsetFetch(ctx context.Context, req *protocol.Request, o
 	}
 
 	// v0-v7 single-group form.
+	if !b.canGroup(req.Conn, of.Group, opDescribe) {
+		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
+		return nil
+	}
 	partitions, err := b.groupOffsets(of.Group, requestTopicNames(of.Topics), of.Topics == nil)
 	if err != nil {
 		return err
 	}
 	for _, po := range partitions {
+		denied := !b.canTopic(req.Conn, po.topic, opDescribe)
+		if denied && of.Topics == nil {
+			continue
+		}
 		rt := findOrAppendTopic(resp, po.topic)
 		tp := kmsg.NewOffsetFetchResponseTopicPartition()
 		tp.Partition = po.partition
 		tp.Offset = po.offset
 		tp.Metadata = po.metadata
+		if denied {
+			tp.Offset, tp.Metadata = -1, nil
+			tp.ErrorCode = kerr.TopicAuthorizationFailed.Code
+		}
 		rt.Partitions = append(rt.Partitions, tp) // rt points into resp.Topics; mutation sticks.
 	}
 	return nil

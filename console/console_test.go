@@ -418,12 +418,13 @@ func TestAddPartitions(t *testing.T) {
 	}
 }
 
-// The Access page says, before anything else, that what it lists is not enforced; it
-// lists what is stored, and says plainly when nothing is.
-func TestAccessPageListsStoredACLsUnderTheNotEnforcedBanner(t *testing.T) {
+// The Access page says, before anything else, that what it lists is enforced and how a
+// resource with no ACL is treated; it lists what is stored, and says plainly when
+// nothing is.
+func TestAccessPageListsACLsUnderTheEnforcedBanner(t *testing.T) {
 	c := newTestConsole(t)
 	empty := req(t, c, "GET", "/_console/access", nil).Body.String()
-	for _, want := range []string{"These are not enforced", "None stored", "This is not security"} {
+	for _, want := range []string{"These are enforced", "open to everyone", "User:ANONYMOUS", "None stored"} {
 		if !strings.Contains(empty, want) {
 			t.Errorf("the empty Access page is missing %q", want)
 		}
@@ -438,7 +439,7 @@ func TestAccessPageListsStoredACLsUnderTheNotEnforcedBanner(t *testing.T) {
 		t.Fatalf("create an ACL: %v %+v", err, resp)
 	}
 	page := req(t, c, "GET", "/_console/access", nil).Body.String()
-	for _, want := range []string{"These are not enforced", "allow · read", "User:alice", "orders", "literal"} {
+	for _, want := range []string{"These are enforced", "allow · read", "User:alice", "orders", "literal"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the Access page is missing %q after one ACL was stored", want)
 		}

@@ -39,6 +39,8 @@ type fileConfig struct {
 	SASLMechanisms         []string          `toml:"sasl-mechanisms"`
 	Credentials            map[string]string `toml:"credentials"`
 	TLS                    *tlsFile          `toml:"tls"`
+	ACLDefault             *string           `toml:"acl-default"`
+	ACLSuperUsers          []string          `toml:"acl-super-user"`
 	Console                *bool             `toml:"console"`
 	ConsoleAddr            *string           `toml:"console-addr"`
 	ConsoleAllowHost       []string          `toml:"console-allow-host"`
@@ -140,6 +142,12 @@ func (fc fileConfig) applyTo(cfg *Config) error {
 			cfg.Credentials[user] = pass
 		}
 	}
+	if fc.ACLDefault != nil {
+		cfg.ACLDefault = *fc.ACLDefault
+	}
+	if fc.ACLSuperUsers != nil {
+		cfg.ACLSuperUsers = fc.ACLSuperUsers
+	}
 	if fc.Console != nil {
 		cfg.Console = *fc.Console
 	}
@@ -205,6 +213,12 @@ func WriteTOML(w io.Writer, cfg Config) error {
 	}
 	if len(cfg.ConsoleAllowHosts) > 0 {
 		fc.ConsoleAllowHost = cfg.ConsoleAllowHosts
+	}
+	if cfg.ACLDefault != ACLAllow {
+		fc.ACLDefault = &cfg.ACLDefault
+	}
+	if len(cfg.ACLSuperUsers) > 0 {
+		fc.ACLSuperUsers = cfg.ACLSuperUsers
 	}
 	if cfg.PprofAddr != "" {
 		fc.PprofAddr = &cfg.PprofAddr

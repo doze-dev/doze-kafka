@@ -110,7 +110,6 @@ func TestCreateACLsRejectsEntriesThatAreNotConcrete(t *testing.T) {
 		{"no host", createACL(kmsg.ACLResourceTypeTopic, "t", lit, "User:a", "", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAllow), false},
 		{"no name", createACL(kmsg.ACLResourceTypeTopic, "", lit, "User:a", "*", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAllow), false},
 		{"a cluster by another name", createACL(kmsg.ACLResourceTypeCluster, "mine", lit, "User:a", "*", kmsg.ACLOperationAlter, kmsg.ACLPermissionTypeAllow), false},
-		{"the cluster", createACL(kmsg.ACLResourceTypeCluster, "kafka-cluster", lit, "User:a", "*", kmsg.ACLOperationAlter, kmsg.ACLPermissionTypeAllow), true},
 	} {
 		res := createACLs(t, ctx, cl, tc.c)[0]
 		if tc.ok && res.ErrorCode != 0 {
@@ -120,8 +119,13 @@ func TestCreateACLsRejectsEntriesThatAreNotConcrete(t *testing.T) {
 			t.Errorf("%s: code %d, want INVALID_REQUEST with a message", tc.name, res.ErrorCode)
 		}
 	}
-	if all, _ := describeACLs(t, ctx, cl, anyACL()); len(all) != 3 {
-		t.Errorf("%d entries stored after the table, want only the 3 good ones: %v", len(all), all)
+	if all, _ := describeACLs(t, ctx, cl, anyACL()); len(all) != 2 {
+		t.Errorf("%d entries stored after the table, want only the 2 good ones: %v", len(all), all)
+	}
+	// The cluster resource has one name, and that name is accepted. (Last: an ACL on
+	// the cluster is enforced like any other, and would refuse this anonymous client.)
+	if r := createACLs(t, ctx, cl, createACL(kmsg.ACLResourceTypeCluster, "kafka-cluster", lit, "User:a", "*", kmsg.ACLOperationAlter, kmsg.ACLPermissionTypeAllow))[0]; r.ErrorCode != 0 {
+		t.Errorf("the cluster by its own name: %d %v", r.ErrorCode, r.ErrorMessage)
 	}
 }
 
@@ -214,10 +218,10 @@ func TestACLsRoundTripWithFilters(t *testing.T) {
 	}
 }
 
-// Stored ACLs survive a restart, the broker says at start-up that they are not
-// enforced, and an operation an entry would deny still succeeds: that is the
-// documented behaviour, and this pins it so it cannot become half-true.
-func TestACLsPersistAreAnnouncedAndNeverEnforced(t *testing.T) {
+// ACLs survive a restart and are in force after it: a denial created before the
+// restart still refuses, the broker says at start-up that ACLs are enforced, and it
+// stays quiet when there are none to say it about.
+func TestACLsPersistAndAreEnforcedAfterARestart(t *testing.T) {
 	skipShort(t)
 	dir := t.TempDir()
 	cfg := config.Default()
@@ -243,17 +247,14 @@ func TestACLsPersistAreAnnouncedAndNeverEnforced(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cl := newClient(t, cfg.ListenAddr)
-	if strings.Contains(first.String(), "NOT enforced") {
-		t.Error("announced non-enforcement with no ACLs stored")
+	if strings.Contains(first.String(), "ACLs are enforced") {
+		t.Error("announced enforcement with no ACLs stored")
 	}
 	mustCreateTopic(t, ctx, cl, "guarded", 1)
-	createACLs(t, ctx, cl, createACL(kmsg.ACLResourceTypeTopic, "guarded", kmsg.ACLResourcePatternTypeLiteral, "User:*", "*", kmsg.ACLOperationWrite, kmsg.ACLPermissionTypeDeny))
-	if !strings.Contains(first.String(), "NOT enforced") {
-		t.Errorf("creating an ACL did not say it is not enforced:\n%s", first.String())
-	}
-	// Denied to everyone, and written anyway.
-	if err := cl.ProduceSync(ctx, &kgo.Record{Topic: "guarded", Value: []byte("still allowed")}).FirstErr(); err != nil {
-		t.Errorf("a write an ACL denies failed: %v: the ACLs are stored, not enforced", err)
+	// Nothing authenticates here, so everyone is User:ANONYMOUS, and an ACL can name it.
+	createACLs(t, ctx, cl, createACL(kmsg.ACLResourceTypeTopic, "guarded", kmsg.ACLResourcePatternTypeLiteral, "User:ANONYMOUS", "*", kmsg.ACLOperationWrite, kmsg.ACLPermissionTypeDeny))
+	if err := cl.ProduceSync(ctx, &kgo.Record{Topic: "guarded", Value: []byte("denied")}).FirstErr(); err == nil {
+		t.Error("a write an ACL denies succeeded")
 	}
 	cl.Close()
 	stop()
@@ -261,13 +262,16 @@ func TestACLsPersistAreAnnouncedAndNeverEnforced(t *testing.T) {
 	var second lockedLog
 	stop = start(&second)
 	defer stop()
-	if !strings.Contains(second.String(), "NOT enforced") {
-		t.Errorf("a restart with ACLs stored did not say they are not enforced:\n%s", second.String())
+	if !strings.Contains(second.String(), "ACLs are enforced") {
+		t.Errorf("a restart with ACLs stored did not say they are enforced:\n%s", second.String())
 	}
 	cl = newClient(t, cfg.ListenAddr)
 	defer cl.Close()
 	if all, _ := describeACLs(t, ctx, cl, anyACL()); len(all) != 1 {
 		t.Errorf("after a restart: %v, want the one entry", all)
+	}
+	if err := cl.ProduceSync(ctx, &kgo.Record{Topic: "guarded", Value: []byte("still denied")}).FirstErr(); err == nil {
+		t.Error("after a restart the denial no longer holds")
 	}
 }
 

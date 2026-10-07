@@ -6,6 +6,8 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // producerIDBlock is how many producer ids are reserved from the metadata store at
@@ -39,6 +41,12 @@ func (b *Broker) nextProducerID() (int64, error) {
 // transactional.id in the request is not acted on: there are no transactions
 // here, and the transaction APIs that would follow are not advertised.
 func (b *Broker) handleInitProducerID(ctx context.Context, req *protocol.Request, _ *kmsg.InitProducerIDRequest, resp *kmsg.InitProducerIDResponse) error {
+	if !b.canWriteIdempotently(req.Conn) {
+		resp.ErrorCode = kerr.ClusterAuthorizationFailed.Code
+		resp.ProducerID = -1
+		resp.ProducerEpoch = -1
+		return nil
+	}
 	pid, err := b.nextProducerID()
 	if err != nil {
 		return err

@@ -2,6 +2,7 @@ package broker
 
 import (
 	"context"
+	"slices"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
@@ -17,6 +18,17 @@ import (
 // handleConsumerGroupHeartbeat is the single KIP-848 API that carries join, poll,
 // and leave. The broker computes and drives the assignment (see cg848Manager).
 func (b *Broker) handleConsumerGroupHeartbeat(ctx context.Context, req *protocol.Request, hr *kmsg.ConsumerGroupHeartbeatRequest, resp *kmsg.ConsumerGroupHeartbeatResponse) error {
+	if !b.canGroup(req.Conn, hr.Group, opRead) {
+		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
+		msg := "not authorized to read group " + hr.Group
+		resp.ErrorMessage = &msg
+		return nil
+	}
+	// A topic the member may not describe is not part of what it subscribes to, as in
+	// Kafka: it is left out of the assignment rather than failing the heartbeat.
+	hr.SubscribedTopicNames = slices.DeleteFunc(slices.Clone(hr.SubscribedTopicNames), func(t string) bool {
+		return !b.canTopic(req.Conn, t, opDescribe)
+	})
 	res := b.cg848.heartbeat(hr, clientRef{req.Header.ClientID, req.Conn.RemoteHost()})
 
 	resp.ErrorCode = res.errorCode
@@ -40,6 +52,11 @@ func (b *Broker) handleConsumerGroupDescribe(ctx context.Context, req *protocol.
 	for _, group := range dr.Groups {
 		rg := kmsg.NewConsumerGroupDescribeResponseGroup()
 		rg.Group = group
+		if !b.canGroup(req.Conn, group, opDescribe) {
+			rg.ErrorCode = kerr.GroupAuthorizationFailed.Code
+			resp.Groups = append(resp.Groups, rg)
+			continue
+		}
 		state, epoch, assignor, members, ok := b.cg848.describe(group)
 		if !ok || (len(members) == 0 && b.claims.ownerOf(group) == protoClassic) {
 			rg.ErrorCode = kerr.GroupIDNotFound.Code

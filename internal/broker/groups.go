@@ -6,6 +6,8 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // This file holds the classic consumer-group request handlers — the thin wire
@@ -19,10 +21,19 @@ import (
 func (b *Broker) handleFindCoordinator(ctx context.Context, req *protocol.Request, fr *kmsg.FindCoordinatorRequest, resp *kmsg.FindCoordinatorResponse) error {
 	host, port, node := b.cfg.AdvertisedHost, b.advertisedPort(), b.nodeID()
 
+	// Finding a group's coordinator needs Describe on the group; a principal that may
+	// not describe it is told so here rather than at its first JoinGroup.
+	groupKey := fr.CoordinatorType == 0 // 0 is a group, 1 a transaction.
+	denied := func(key string) bool { return groupKey && !b.canGroup(req.Conn, key, opDescribe) }
+
 	// v0-v3 single-coordinator fields.
 	resp.NodeID = node
 	resp.Host = host
 	resp.Port = port
+	if denied(fr.CoordinatorKey) {
+		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
+		resp.NodeID, resp.Host, resp.Port = -1, "", -1
+	}
 
 	// v4+ batched fields — one coordinator entry per requested key, all us.
 	for _, key := range fr.CoordinatorKeys {
@@ -31,6 +42,10 @@ func (b *Broker) handleFindCoordinator(ctx context.Context, req *protocol.Reques
 		c.NodeID = node
 		c.Host = host
 		c.Port = port
+		if denied(key) {
+			c.ErrorCode = kerr.GroupAuthorizationFailed.Code
+			c.NodeID, c.Host, c.Port = -1, "", -1
+		}
 		resp.Coordinators = append(resp.Coordinators, c)
 	}
 	return nil
@@ -42,6 +57,11 @@ func (b *Broker) handleFindCoordinator(ctx context.Context, req *protocol.Reques
 // member's slice of the result is returned. Only the elected leader receives every
 // member's subscription metadata.
 func (b *Broker) handleJoinGroup(ctx context.Context, req *protocol.Request, jr *kmsg.JoinGroupRequest, resp *kmsg.JoinGroupResponse) error {
+	if !b.canGroup(req.Conn, jr.Group, opRead) {
+		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
+		resp.Generation = -1
+		return nil
+	}
 	// One group id, one protocol: a group already running under KIP-848 cannot
 	// also be a classic group, or every partition would go to both.
 	// (the coordinator claims the id on join; see groupClaims).
@@ -79,6 +99,10 @@ func (b *Broker) handleJoinGroup(ctx context.Context, req *protocol.Request, jr 
 // bytes and each member (leader included) receives its own slice. Followers block
 // until the leader's SyncGroup arrives.
 func (b *Broker) handleSyncGroup(ctx context.Context, req *protocol.Request, sr *kmsg.SyncGroupRequest, resp *kmsg.SyncGroupResponse) error {
+	if !b.canGroup(req.Conn, sr.Group, opRead) {
+		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
+		return nil
+	}
 	res, err := b.groups.sync(ctx, sr)
 	if err != nil {
 		return err
@@ -95,6 +119,10 @@ func (b *Broker) handleSyncGroup(ctx context.Context, req *protocol.Request, sr 
 // while a rebalance is under way (so the member rejoins) or a fencing error for a
 // stale generation / unknown member.
 func (b *Broker) handleHeartbeat(ctx context.Context, req *protocol.Request, hr *kmsg.HeartbeatRequest, resp *kmsg.HeartbeatResponse) error {
+	if !b.canGroup(req.Conn, hr.Group, opRead) {
+		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
+		return nil
+	}
 	resp.ErrorCode = b.groups.heartbeat(hr)
 	return nil
 }
@@ -103,6 +131,15 @@ func (b *Broker) handleHeartbeat(ctx context.Context, req *protocol.Request, hr 
 // The top-level ErrorCode serves v0-v2 clients (one member per request); v3+ get a
 // per-member result list.
 func (b *Broker) handleLeaveGroup(ctx context.Context, req *protocol.Request, lr *kmsg.LeaveGroupRequest, resp *kmsg.LeaveGroupResponse) error {
+	if !b.canGroup(req.Conn, lr.Group, opRead) {
+		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
+		for _, m := range lr.Members {
+			rm := kmsg.NewLeaveGroupResponseMember()
+			rm.MemberID, rm.InstanceID, rm.ErrorCode = m.MemberID, m.InstanceID, kerr.GroupAuthorizationFailed.Code
+			resp.Members = append(resp.Members, rm)
+		}
+		return nil
+	}
 	results := b.groups.leave(lr)
 
 	if len(results) > 0 {

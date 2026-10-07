@@ -34,7 +34,7 @@ specifically testing an older client's paths.
 | AlterConfigs | 33 | Replace a topic's own configuration. |
 | IncrementalAlterConfigs | 44 | Set or remove individual topic configs (Kafka 2 and later). |
 | CreatePartitions | 37 | Raise a topic's partition count (never lower it). |
-| DescribeACLs / CreateACLs / DeleteACLs | 29 / 30 / 31 | Store and read back ACLs. **Stored, never enforced.** |
+| DescribeACLs / CreateACLs / DeleteACLs | 29 / 30 / 31 | Create, read and delete ACLs. They are enforced ([Authorization](authorization.md)). |
 | DeleteRecords | 21 | Move a partition's log-start offset up (-1 empties it), deleting what is below. |
 | DeleteGroups | 42 | Delete empty consumer groups and their committed offsets. |
 | OffsetDelete | 47 | Delete a group's committed offsets for a topic, including an offset left over from a topic that no longer exists. |

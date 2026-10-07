@@ -91,7 +91,7 @@ var helpGroups = []struct {
 	{"Storage", []string{"data-dir", "meta-db", "segment-bytes", "index-interval-bytes"}},
 	{"Retention and durability", []string{"retention-bytes", "retention-ms", "fsync-interval"}},
 	{"Topics and groups", []string{"kafka-version", "auto-create-topics", "default-partitions", "max-partitions", "consumer-session-timeout"}},
-	{"Security", []string{"sasl-mechanisms", "sasl-user", "tls-cert", "tls-key"}},
+	{"Security", []string{"sasl-mechanisms", "sasl-user", "tls-cert", "tls-key", "acl-default", "acl-super-user"}},
 	{"Console", []string{"console", "console-addr", "console-allow-host"}},
 	{"Process", []string{"config", "log-level", "log-format", "pprof-addr"}},
 }
@@ -358,6 +358,8 @@ func registerFlags(fs *flag.FlagSet, cfg *config.Config) {
 	fs.Var(credsFlag{cfg.Credentials}, "sasl-user", "SASL credential as user:password (repeatable); needs --sasl-mechanisms")
 	fs.StringVar(&cfg.TLSCertFile, "tls-cert", cfg.TLSCertFile, "PEM certificate file (enables TLS together with --tls-key)")
 	fs.StringVar(&cfg.TLSKeyFile, "tls-key", cfg.TLSKeyFile, "PEM private key file")
+	fs.StringVar(&cfg.ACLDefault, "acl-default", cfg.ACLDefault, "what a resource with no ACL allows: allow, or deny (Kafka's default). ACLs you create are enforced either way")
+	fs.Var(&stringSliceFlag{vals: &cfg.ACLSuperUsers}, "acl-super-user", "principal ACLs never refuse, as Type:name such as User:admin (comma-separated or repeated)")
 
 	// Console.
 	fs.BoolVar(&cfg.Console, "console", cfg.Console, "serve the web console (topics, messages, consumer groups)")

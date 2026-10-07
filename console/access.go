@@ -9,10 +9,10 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
-// The Access page lists the ACLs stored on the broker, read-only, under a banner that
-// says what they are not: doze-kafka stores them so that tooling which provisions
-// ACLs completes and can read them back, and enforces none of them. Every
-// authenticated client can do everything.
+// The Access page lists the ACLs stored on the broker, read-only, and says how they are
+// applied: they are enforced, and a resource with no ACL is allowed or refused by the
+// broker's default. They are managed through the Kafka API (kafka-acls, Terraform),
+// not here.
 
 // ACLRow is one stored entry, in words.
 type ACLRow struct {
@@ -52,5 +52,20 @@ func (c *Console) access(w http.ResponseWriter, r *http.Request) {
 		c.fail(w, r, err)
 		return
 	}
-	c.render(w, r, "access_detail", map[string]any{"ACLs": rows, "Page": "access", "Title": "Access"})
+	info, err := c.be.ClusterInfo(r.Context())
+	if err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	// What the broker reports about its authorizer, under Kafka's names.
+	openByDefault, supers := true, ""
+	for _, e := range info.BrokerConfig {
+		switch e.Name {
+		case "allow.everyone.if.no.acl.found":
+			openByDefault = e.Value == "true"
+		case "super.users":
+			supers = e.Value
+		}
+	}
+	c.render(w, r, "access_detail", map[string]any{"ACLs": rows, "OpenByDefault": openByDefault, "SuperUsers": supers, "Page": "access", "Title": "Access"})
 }

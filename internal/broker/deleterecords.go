@@ -26,11 +26,14 @@ func (b *Broker) handleDeleteRecords(ctx context.Context, req *protocol.Request,
 		rt := kmsg.NewDeleteRecordsResponseTopic()
 		rt.Topic = t.Topic
 		name, topic, ok := b.resolveTopic(t.Topic, [16]byte{})
+		authorized := b.canTopic(req.Conn, t.Topic, opDelete)
 		for _, p := range t.Partitions {
 			rp := kmsg.NewDeleteRecordsResponseTopicPartition()
 			rp.Partition = p.Partition
 			rp.LowWatermark = -1
 			switch {
+			case !authorized:
+				rp.ErrorCode = kerr.TopicAuthorizationFailed.Code
 			case !ok || p.Partition < 0 || p.Partition >= topic.Partitions:
 				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
 			default:

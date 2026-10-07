@@ -74,6 +74,12 @@ log-format = "text"              # text or json.
 # Enable SASL by listing mechanisms; supported: PLAIN, SCRAM-SHA-256, SCRAM-SHA-512.
 # sasl-mechanisms = ["SCRAM-SHA-256"]
 
+# ACLs created through the Kafka API are enforced. A resource nobody wrote an ACL
+# for follows acl-default: "allow" (the default) or "deny" (Kafka's own default).
+# Super users are never refused; name one before choosing "deny".
+# acl-default = "allow"
+# acl-super-user = ["User:admin"]
+
 # SASL users as username = "password". Required when sasl-mechanisms is set.
 # Keeping credentials here (rather than on the command line) keeps them out of
 # your shell history and the process's argument list.

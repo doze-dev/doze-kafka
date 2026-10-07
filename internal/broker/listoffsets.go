@@ -27,12 +27,19 @@ func (b *Broker) handleListOffsets(ctx context.Context, req *protocol.Request, l
 		rt := kmsg.NewListOffsetsResponseTopic()
 		rt.Topic = t.Topic
 		name, topic, ok := b.resolveTopic(t.Topic, [16]byte{})
+		authorized := b.canTopic(req.Conn, t.Topic, opDescribe)
 
 		for _, part := range t.Partitions {
 			rp := kmsg.NewListOffsetsResponseTopicPartition()
 			rp.Partition = part.Partition
 			rp.Timestamp = -1
 			rp.LeaderEpoch = -1
+
+			if !authorized {
+				rp.ErrorCode = kerr.TopicAuthorizationFailed.Code
+				rt.Partitions = append(rt.Partitions, rp)
+				continue
+			}
 
 			if !ok || part.Partition < 0 || part.Partition >= topic.Partitions {
 				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code

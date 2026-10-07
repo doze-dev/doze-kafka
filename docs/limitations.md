@@ -45,14 +45,9 @@ implement it.
   config is validated, stored and reported by `DescribeConfigs`, and changes nothing.
   `segment.bytes` must be at least 1024. The broker's own configuration cannot be altered over the wire: it comes
   from flags and the config file, and a request to change it is refused.
-- **ACLs are stored, not enforced; no quotas.** Authentication exists (SASL/TLS), but
-  there is no authorization: an authenticated client can do anything. `CreateAcls`,
-  `DescribeAcls` and `DeleteAcls` are served, with Kafka's filter semantics, and the
-  entries are kept across restarts, so Terraform and bootstrap scripts that provision
-  ACLs finish and can read them back. Nothing consults them: an operation an ACL would
-  deny still succeeds. This is not security. It is said when the first ACL is created
-  and at every start-up that has any, and on the console's Access page. No throttling
-  either.
+- **ACLs: users only; no quotas.** ACLs are enforced, with Kafka's rules (see
+  [Authorization](authorization.md)), but principals are `User:` names only and hosts
+  are matched as written. No throttling or quotas.
 - **Some admin APIs.** `OffsetForLeaderEpoch`, `DescribeLogDirs`,
   and the client-metrics/telemetry APIs are not implemented. A Kafka UI that probes
   these will get a clean connection close on that call, not a hang — and generally

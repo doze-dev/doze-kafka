@@ -74,6 +74,13 @@ type Config struct {
 	TLSCertFile    string            // PEM cert; with TLSKeyFile, enables TLS.
 	TLSKeyFile     string            // PEM private key.
 
+	// Authorization. ACLs created through CreateAcls are enforced. A resource with no
+	// ACL at all follows ACLDefault: "allow" (the default, so nothing changes until
+	// ACLs are created) or "deny" (Kafka's own default: only what an ACL allows).
+	// ACLSuperUsers ("User:admin") are never refused anything.
+	ACLDefault    string
+	ACLSuperUsers []string
+
 	// Console: the web UI, served over HTTP beside the broker.
 	Console           bool     // serve the console.
 	ConsoleAddr       string   // host:port for the console's HTTP listener.
@@ -142,6 +149,7 @@ func Default() Config {
 		DefaultPartitions:      1,
 		MaxPartitions:          defaultMaxPartitions,
 		Console:                true,
+		ACLDefault:             ACLAllow,
 		ConsoleAddr:            defaultConsoleAddr,
 		LogLevel:               "info",
 		LogFormat:              "text",
@@ -328,6 +336,17 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: pprof address %q is not host:port (for example 127.0.0.1:6060)", c.PprofAddr)
 	}
 
+	switch c.ACLDefault {
+	case ACLAllow, ACLDeny:
+	default:
+		return fmt.Errorf("config: acl-default %q must be %q or %q", c.ACLDefault, ACLAllow, ACLDeny)
+	}
+	for _, u := range c.ACLSuperUsers {
+		if i := strings.IndexByte(u, ':'); i <= 0 || i == len(u)-1 {
+			return fmt.Errorf("config: acl super user %q must be written Type:name, such as User:admin", u)
+		}
+	}
+
 	if !c.AuthEnabled() && len(c.Credentials) > 0 {
 		return fmt.Errorf("config: SASL users are configured but no mechanism is enabled; add --sasl-mechanisms (PLAIN, SCRAM-SHA-256 or SCRAM-SHA-512), or drop the users")
 	}
@@ -378,6 +397,12 @@ func validAdvertisedHost(h string) bool {
 }
 
 // AuthEnabled reports whether SASL authentication is configured.
+// The values of ACLDefault.
+const (
+	ACLAllow = "allow"
+	ACLDeny  = "deny"
+)
+
 func (c Config) AuthEnabled() bool { return len(c.SASLMechanisms) > 0 }
 
 // TLSEnabled reports whether a TLS certificate/key pair is configured.

@@ -54,9 +54,10 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   create-topic form. Other Kafka topic
   settings are listed for reading; a topic that asks for compaction is told it is not
   compacted.
-- **Access** lists the ACLs stored on the broker, read-only, under a banner that says
-  they are not enforced: nothing consults them, and every authenticated client can do
-  everything. They are stored so that tools which provision ACLs finish.
+- **Access** lists the ACLs on the broker, read-only, under a banner that says they are
+  enforced and how a resource with no ACL is treated (see
+  [Authorization](authorization.md)). They are managed with `kafka-acls` or your
+  provisioning tool, not here.
 - **Go to offset** and **go to time** sit above the messages. Time takes `15m`, `2h` or
   `1d` (that long ago), a date and time such as `2026-10-07 10:30` (read as UTC unless it
   carries a zone), or an epoch in milliseconds, and lands on the first message at or

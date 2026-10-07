@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -404,6 +405,9 @@ func provisionConsoleCredential(cfg *config.Config) (user, pass, mech string, er
 		cfg.Credentials = map[string]string{}
 	}
 	cfg.Credentials[user] = pass
+	// The console is the operator's own tool, and it has no way to be granted access
+	// topic by topic: it is never refused, whatever ACLs the broker holds.
+	cfg.ACLSuperUsers = append(slices.Clone(cfg.ACLSuperUsers), "User:"+user)
 	return user, pass, mech, nil
 }
 

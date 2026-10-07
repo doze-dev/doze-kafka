@@ -62,7 +62,8 @@ type Conn struct {
 	accepted       time.Time // when the connection was accepted; the pre-auth budget runs from here.
 	closeAfter     bool      // close once the current response is written (a failed authentication).
 	saslMechanism  string
-	saslState      any // opaque per-connection state owned by the SASL handler (e.g. SCRAM step).
+	saslState      any    // opaque per-connection state owned by the SASL handler (e.g. SCRAM step).
+	principal      string // who this connection authenticated as ("User:alice"); empty until it has.
 }
 
 func newConn(raw net.Conn, router *Router, logger *slog.Logger, authRequired bool) *Conn {
@@ -89,6 +90,36 @@ func (c *Conn) RemoteHost() string {
 		host = c.raw.RemoteAddr().String()
 	}
 	return "/" + host
+}
+
+// AnonymousPrincipal is who a connection is when nothing authenticated it: every
+// connection when SASL is off, so an ACL can still name them.
+const AnonymousPrincipal = "User:ANONYMOUS"
+
+// Principal is who the connection authenticated as, in Kafka's "Type:name" form, or
+// AnonymousPrincipal if it has not (or the broker does not ask). A nil connection,
+// as a handler test may pass, is anonymous.
+func (c *Conn) Principal() string {
+	if c == nil || c.principal == "" {
+		return AnonymousPrincipal
+	}
+	return c.principal
+}
+
+// SetPrincipal records who the SASL exchange authenticated. An empty string clears it.
+func (c *Conn) SetPrincipal(p string) { c.principal = p }
+
+// RemoteIP is the peer's address without the port or the leading slash RemoteHost
+// adds, as an ACL's host field is written.
+func (c *Conn) RemoteIP() string {
+	if c == nil {
+		return ""
+	}
+	host, _, err := net.SplitHostPort(c.raw.RemoteAddr().String())
+	if err != nil {
+		return c.raw.RemoteAddr().String()
+	}
+	return host
 }
 
 // SetAuthenticated marks the connection authenticated after a successful SASL

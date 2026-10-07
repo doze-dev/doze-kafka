@@ -26,6 +26,11 @@ func (b *Broker) handleDeleteGroups(ctx context.Context, req *protocol.Request, 
 	for _, id := range dr.Groups {
 		rg := kmsg.NewDeleteGroupsResponseGroup()
 		rg.Group = id
+		if !b.canGroup(req.Conn, id, opDelete) {
+			rg.ErrorCode = kerr.GroupAuthorizationFailed.Code
+			resp.Groups = append(resp.Groups, rg)
+			continue
+		}
 		rg.ErrorCode = b.deleteGroup(id)
 		resp.Groups = append(resp.Groups, rg)
 	}
@@ -65,6 +70,10 @@ func (b *Broker) deleteGroup(id string) int16 {
 // reads a topic cannot be told; any group with live members is treated as
 // subscribed and refused (GROUP_SUBSCRIBED_TO_TOPIC), which is the safe answer.
 func (b *Broker) handleOffsetDelete(ctx context.Context, req *protocol.Request, odr *kmsg.OffsetDeleteRequest, resp *kmsg.OffsetDeleteResponse) error {
+	if !b.canGroup(req.Conn, odr.Group, opDelete) {
+		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
+		return nil
+	}
 	known := b.groupIsActive(odr.Group) || b.groupHasOffsets(odr.Group)
 	if !known {
 		resp.ErrorCode = kerr.GroupIDNotFound.Code
@@ -80,6 +89,8 @@ func (b *Broker) handleOffsetDelete(ctx context.Context, req *protocol.Request, 
 			rp := kmsg.NewOffsetDeleteResponseTopicPartition()
 			rp.Partition = p.Partition
 			switch {
+			case !b.canTopic(req.Conn, t.Topic, opRead):
+				rp.ErrorCode = kerr.TopicAuthorizationFailed.Code
 			case active:
 				rp.ErrorCode = kerr.GroupSubscribedToTopic.Code
 			case (!topicOK || p.Partition < 0 || p.Partition >= topic.Partitions) && !b.hasOffset(odr.Group, t.Topic, p.Partition):

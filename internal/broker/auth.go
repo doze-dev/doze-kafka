@@ -73,7 +73,11 @@ func (a *authenticator) mechanisms() []string { return a.order }
 func (a *authenticator) step(conn *protocol.Conn, mechanism string, in []byte) (out []byte, done bool, err error) {
 	switch mechanism {
 	case config.SASLPlain:
-		return a.plainStep(in)
+		out, done, user, err := a.plainStep(in)
+		if done {
+			conn.SetPrincipal("User:" + user)
+		}
+		return out, done, err
 
 	case config.SASLScramSHA256, config.SASLScramSHA512:
 		if conn.SASLState() == nil {
@@ -92,6 +96,7 @@ func (a *authenticator) step(conn *protocol.Conn, mechanism string, in []byte) (
 		if err != nil {
 			return nil, false, err
 		}
+		conn.SetPrincipal("User:" + conv.user)
 		return resp, true, nil
 
 	default:
@@ -100,17 +105,17 @@ func (a *authenticator) step(conn *protocol.Conn, mechanism string, in []byte) (
 }
 
 // plainStep verifies a SASL/PLAIN response: [authzid] NUL authcid NUL password.
-func (a *authenticator) plainStep(in []byte) ([]byte, bool, error) {
+func (a *authenticator) plainStep(in []byte) (out []byte, done bool, user string, err error) {
 	parts := bytes.Split(in, []byte{0})
 	if len(parts) != 3 {
-		return nil, false, fmt.Errorf("plain: malformed response")
+		return nil, false, "", fmt.Errorf("plain: malformed response")
 	}
 	user, pass := string(parts[1]), parts[2]
 	want, ok := a.plain[user]
 	if !ok || subtle.ConstantTimeCompare(pass, []byte(want)) != 1 {
-		return nil, false, fmt.Errorf("plain: invalid credentials")
+		return nil, false, "", fmt.Errorf("plain: invalid credentials")
 	}
-	return nil, true, nil
+	return nil, true, user, nil
 }
 
 // handleSASLHandshake negotiates the mechanism. It always reports the full set of
@@ -152,6 +157,7 @@ func (b *Broker) handleSASLAuthenticate(ctx context.Context, req *protocol.Reque
 		// passwords could otherwise be tried over one connection, and a failed
 		// re-authentication left an authenticated connection authenticated.
 		req.Conn.SetAuthenticated(false)
+		req.Conn.SetPrincipal("")
 		req.Conn.CloseAfterResponse()
 		b.log.Warn("SASL authentication failed", "mechanism", mechanism, "err", err)
 		return nil

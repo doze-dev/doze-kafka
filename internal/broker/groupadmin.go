@@ -7,6 +7,8 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // This file holds the group admin APIs — ListGroups and DescribeGroups — that back
@@ -150,6 +152,10 @@ func (b *Broker) handleListGroups(ctx context.Context, req *protocol.Request, lr
 		if len(typeFilter) > 0 && !typeFilter[strings.ToLower(g.groupType)] {
 			continue
 		}
+		// Groups the principal may describe (Describe on the group, or on the cluster).
+		if !b.canGroup(req.Conn, g.id, opDescribe) && !b.canCluster(req.Conn, opDescribe) {
+			continue
+		}
 		rg := kmsg.NewListGroupsResponseGroup()
 		rg.Group = g.id
 		rg.ProtocolType = g.protocolType
@@ -171,6 +177,11 @@ func (b *Broker) handleDescribeGroups(ctx context.Context, req *protocol.Request
 		rg := kmsg.NewDescribeGroupsResponseGroup()
 		rg.Group = id
 		rg.ProtocolType = "consumer"
+		if !b.canGroup(req.Conn, id, opDescribe) {
+			rg.ErrorCode = kerr.GroupAuthorizationFailed.Code
+			resp.Groups = append(resp.Groups, rg)
+			continue
+		}
 
 		d, ok := b.groups.describe(id)
 		if !ok {

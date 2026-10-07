@@ -37,6 +37,9 @@ func (b *Broker) handleMetadata(ctx context.Context, req *protocol.Request, mr *
 			return err
 		}
 		for _, t := range topics {
+			if !b.canTopic(req.Conn, t.Name, opDescribe) {
+				continue // a listing shows what the principal may see, as Kafka's does.
+			}
 			resp.Topics = append(resp.Topics, b.topicMetadata(t.Name, t.ID, t.Partitions, errNone))
 		}
 		return nil
@@ -49,6 +52,12 @@ func (b *Broker) handleMetadata(ctx context.Context, req *protocol.Request, mr *
 				continue
 			}
 			if t, ok, err := b.meta.TopicByID(meta.TopicID(reqTopic.TopicID)); err == nil && ok {
+				if !b.canTopic(req.Conn, t.Name, opDescribe) {
+					rt := b.topicMetadata("", t.ID, 0, kerr.TopicAuthorizationFailed.Code)
+					rt.Topic = nil
+					resp.Topics = append(resp.Topics, rt)
+					continue
+				}
 				resp.Topics = append(resp.Topics, b.topicMetadata(t.Name, t.ID, t.Partitions, errNone))
 			} else {
 				rt := b.topicMetadata("", meta.TopicID(reqTopic.TopicID), 0, kerr.UnknownTopicID.Code)
@@ -58,6 +67,11 @@ func (b *Broker) handleMetadata(ctx context.Context, req *protocol.Request, mr *
 			continue
 		}
 		name := *reqTopic.Topic
+		// Before anything is said about the topic (even that it does not exist).
+		if !b.canTopic(req.Conn, name, opDescribe) {
+			resp.Topics = append(resp.Topics, b.topicMetadata(name, meta.TopicID{}, 0, kerr.TopicAuthorizationFailed.Code))
+			continue
+		}
 		if err := meta.ValidateTopicName(name); err != nil && !b.topicRegistered(name) {
 			// A name Kafka would refuse is INVALID_TOPIC_EXCEPTION, not "unknown":
 			// the difference tells a client its request can never succeed. Topics
@@ -74,6 +88,10 @@ func (b *Broker) handleMetadata(ctx context.Context, req *protocol.Request, mr *
 			// AllowAutoTopicCreation arrived in v4; before that a metadata request
 			// for an unknown topic always meant "create it if the broker allows".
 			allow := mr.AllowAutoTopicCreation || req.Header.APIVersion < 4
+			if allow && !b.canCreateTopic(req.Conn, name) {
+				resp.Topics = append(resp.Topics, b.topicMetadata(name, meta.TopicID{}, 0, kerr.TopicAuthorizationFailed.Code))
+				continue
+			}
 			if created, ok := b.maybeAutoCreate(name, allow); ok {
 				resp.Topics = append(resp.Topics, b.topicMetadata(created.Name, created.ID, created.Partitions, errNone))
 				continue

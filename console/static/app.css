@@ -620,7 +620,6 @@ td.rowacts { white-space: nowrap; text-align: right; }
 .apichip .apiv { color: var(--muted-foreground); margin-left: 3px; }
 /* A plain-words note: what a number means, or what the broker does not do. */
 .honest { display: flex; gap: 9px; align-items: flex-start; padding: 10px 12px; border-radius: var(--radius); background: color-mix(in srgb, var(--info) 7%, var(--card)); border: 1px solid color-mix(in srgb, var(--info) 28%, var(--border)); font-size: var(--fs-sm); color: var(--info-foreground); margin-top: 14px; }
-.honest.warn { background: color-mix(in srgb, var(--warn) 9%, var(--card)); border-color: color-mix(in srgb, var(--warn) 40%, var(--border)); color: var(--warn-foreground); }
 .honest .ic { width: 14px; height: 14px; flex: none; margin-top: 2px; }
 .honest.note-gap { margin-top: 8px; }
 

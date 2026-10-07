@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -65,12 +66,19 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 		rt.Topic = t.Topic
 		rt.TopicID = t.TopicID
 		name, topic, ok := b.resolveTopic(t.Topic, t.TopicID)
+		// Authorisation comes before existence, as in Kafka: a principal that may not
+		// write to a topic is not told whether it exists.
+		authorized := b.canTopic(req.Conn, cmp.Or(name, t.Topic), opWrite)
 
 		for _, part := range t.Partitions {
 			rp := kmsg.NewProduceResponseTopicPartition()
 			rp.Partition = part.Partition
 
 			switch {
+			case !authorized:
+				rp.ErrorCode = kerr.TopicAuthorizationFailed.Code
+				rp.BaseOffset = -1
+				refused = true
 			case !ok || part.Partition < 0 || part.Partition >= topic.Partitions:
 				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
 			default:

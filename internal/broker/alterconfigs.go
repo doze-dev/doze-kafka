@@ -92,8 +92,12 @@ func (b *Broker) handleAlterConfigs(ctx context.Context, req *protocol.Request, 
 		rr := kmsg.NewAlterConfigsResponseResource()
 		rr.ResourceType, rr.ResourceName = res.ResourceType, res.ResourceName
 		var ae *alterError
-		switch res.ResourceType {
-		case kmsg.ConfigResourceTypeTopic:
+		switch {
+		case res.ResourceType == kmsg.ConfigResourceTypeTopic && !b.canTopic(req.Conn, res.ResourceName, opAlterConfigs):
+			ae = &alterError{kerr.TopicAuthorizationFailed.Code, "not authorized to alter the configuration of " + res.ResourceName}
+		case res.ResourceType == kmsg.ConfigResourceTypeBroker && !b.canCluster(req.Conn, opAlterConfigs):
+			ae = &alterError{kerr.ClusterAuthorizationFailed.Code, "not authorized to alter the broker's configuration"}
+		case res.ResourceType == kmsg.ConfigResourceTypeTopic:
 			ae = b.alterTopic(res.ResourceName, func(map[string]string) (map[string]string, error) {
 				next := map[string]string{}
 				for _, c := range res.Configs {
@@ -107,7 +111,7 @@ func (b *Broker) handleAlterConfigs(ctx context.Context, req *protocol.Request, 
 				}
 				return next, nil
 			}, ar.ValidateOnly)
-		case kmsg.ConfigResourceTypeBroker:
+		case res.ResourceType == kmsg.ConfigResourceTypeBroker:
 			ae = &alterError{kerr.InvalidRequest.Code, errBrokerConfigReadOnly}
 		default:
 			ae = &alterError{kerr.InvalidRequest.Code, "unsupported config resource type"}
@@ -128,8 +132,12 @@ func (b *Broker) handleIncrementalAlterConfigs(ctx context.Context, req *protoco
 		rr := kmsg.NewIncrementalAlterConfigsResponseResource()
 		rr.ResourceType, rr.ResourceName = res.ResourceType, res.ResourceName
 		var ae *alterError
-		switch res.ResourceType {
-		case kmsg.ConfigResourceTypeTopic:
+		switch {
+		case res.ResourceType == kmsg.ConfigResourceTypeTopic && !b.canTopic(req.Conn, res.ResourceName, opAlterConfigs):
+			ae = &alterError{kerr.TopicAuthorizationFailed.Code, "not authorized to alter the configuration of " + res.ResourceName}
+		case res.ResourceType == kmsg.ConfigResourceTypeBroker && !b.canCluster(req.Conn, opAlterConfigs):
+			ae = &alterError{kerr.ClusterAuthorizationFailed.Code, "not authorized to alter the broker's configuration"}
+		case res.ResourceType == kmsg.ConfigResourceTypeTopic:
 			ae = b.alterTopic(res.ResourceName, func(current map[string]string) (map[string]string, error) {
 				if current == nil {
 					current = map[string]string{}
@@ -146,7 +154,7 @@ func (b *Broker) handleIncrementalAlterConfigs(ctx context.Context, req *protoco
 				}
 				return current, nil
 			}, ar.ValidateOnly)
-		case kmsg.ConfigResourceTypeBroker:
+		case res.ResourceType == kmsg.ConfigResourceTypeBroker:
 			ae = &alterError{kerr.InvalidRequest.Code, errBrokerConfigReadOnly}
 		default:
 			ae = &alterError{kerr.InvalidRequest.Code, "unsupported config resource type"}

@@ -143,6 +143,7 @@ Start here → **[docs/](docs/README.md)**
 | [Clients](docs/clients.md) | Connecting franz-go, Sarama, kafkajs, librdkafka/kcat, Java. |
 | [Consumer groups](docs/consumer-groups.md) | Classic vs KIP-848, offsets, rebalancing. |
 | [Auth & TLS](docs/auth-and-tls.md) | Turning on SASL and TLS, with client snippets. |
+| [Authorization](docs/authorization.md) | ACLs: who may do what, the rules, and what each API needs. |
 | [Storage & durability](docs/storage-and-durability.md) | Segments, retention, fsync, restart. |
 | [API support](docs/api-support.md) | The exact Kafka API/version matrix. |
 | [Architecture](docs/architecture.md) | How it works inside, for the curious. |

@@ -121,6 +121,8 @@ where this one says `kafka-version`; that spelling is still read.
 | `--sasl-user` | *(none)* | A `user:password` credential. Repeatable. Needs `--sasl-mechanisms`: users without a mechanism are an error, not silently ignored. |
 | `--tls-cert` | *(none)* | PEM certificate file. With `--tls-key`, terminates TLS on the listener. |
 | `--tls-key` | *(none)* | PEM private key file. |
+| `--acl-default` | `allow` | What a resource with no ACL allows: `allow`, or `deny` (Kafka's own default). ACLs you create are enforced either way. See [Authorization](authorization.md). |
+| `--acl-super-user` | *(none)* | A principal ACLs never refuse, as `User:admin`. Repeatable. |
 
 ### Console (see [Console](console.md))
 

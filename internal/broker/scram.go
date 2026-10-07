@@ -80,6 +80,7 @@ type scramConversation struct {
 	serverFirst     string
 	combinedNonce   string
 	gs2Header       string
+	user            string // who is authenticating, for the principal on success.
 }
 
 // scramFirst handles the client-first message and produces the server-first
@@ -133,6 +134,7 @@ func (a *authenticator) scramFirst(mechanism string, in []byte) ([]byte, *scramC
 		serverFirst:     serverFirst,
 		combinedNonce:   combined,
 		gs2Header:       gs2Header,
+		user:            user,
 	}, nil
 }
 

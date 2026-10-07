@@ -24,8 +24,9 @@ import (
 
 // Broker holds the shared state every handler needs.
 type Broker struct {
-	alterMu sync.Mutex // one topic-config change at a time (see alterTopic).
-	acls    aclState   // stored, never enforced (acls.go).
+	alterMu sync.Mutex  // one topic-config change at a time (see alterTopic).
+	acls    aclState    // the stored ACLs' writers (acls.go).
+	authz   *authorizer // enforces them (authorizer.go).
 	cfg     config.Config
 	log     *slog.Logger
 	logs    *log.Manager
@@ -64,7 +65,12 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 		return nil, err
 	}
 	claims := newGroupClaims()
+	acls, err := m.ListACLs()
+	if err != nil {
+		return nil, fmt.Errorf("broker: read the stored ACLs: %w", err)
+	}
 	return &Broker{
+		authz:  newAuthorizer(cfg, acls),
 		cfg:    cfg,
 		log:    logger,
 		logs:   logs,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
@@ -40,12 +41,18 @@ func (b *Broker) handleDescribeConfigs(ctx context.Context, req *protocol.Reques
 		switch res.ResourceType {
 		case kmsg.ConfigResourceTypeTopic:
 			t, ok, err := b.meta.Topic(res.ResourceName)
-			if err != nil || !ok {
+			if !b.canTopic(req.Conn, res.ResourceName, opDescribeConfig) {
+				rr.ErrorCode = kerr.TopicAuthorizationFailed.Code
+			} else if err != nil || !ok {
 				rr.ErrorCode = kerr.UnknownTopicOrPartition.Code
 			} else {
 				rr.Configs = b.topicConfigEntries(t, res.ConfigNames)
 			}
 		case kmsg.ConfigResourceTypeBroker:
+			if !b.canCluster(req.Conn, opDescribeConfig) {
+				rr.ErrorCode = kerr.ClusterAuthorizationFailed.Code
+				break
+			}
 			rr.Configs = b.brokerConfigEntries(res.ConfigNames)
 		default:
 			rr.ErrorCode = kerr.InvalidRequest.Code
@@ -90,6 +97,9 @@ func (b *Broker) brokerConfigEntries(names []string) []kmsg.DescribeConfigsRespo
 		"log.index.interval.bytes":  {strconv.FormatInt(b.cfg.IndexIntervalBytes, 10), kmsg.ConfigSourceStaticBrokerConfig},
 		"num.partitions":            {strconv.Itoa(b.cfg.DefaultPartitions), kmsg.ConfigSourceStaticBrokerConfig},
 		"auto.create.topics.enable": {strconv.FormatBool(b.cfg.AutoCreateTopics), kmsg.ConfigSourceStaticBrokerConfig},
+		// The authorizer's settings, under the names Kafka gives them.
+		"allow.everyone.if.no.acl.found": {strconv.FormatBool(b.authz.defaultAll), kmsg.ConfigSourceStaticBrokerConfig},
+		"super.users":                    {strings.Join(b.cfg.ACLSuperUsers, ";"), kmsg.ConfigSourceStaticBrokerConfig},
 	}
 	return configEntries(eff, names)
 }
@@ -125,6 +135,10 @@ func configEntries(eff map[string]configEntry, names []string) []kmsg.DescribeCo
 // handleDescribeCluster returns the single-node cluster view: this broker is the
 // only node and its own controller.
 func (b *Broker) handleDescribeCluster(ctx context.Context, req *protocol.Request, _ *kmsg.DescribeClusterRequest, resp *kmsg.DescribeClusterResponse) error {
+	if !b.canCluster(req.Conn, opDescribe) {
+		resp.ErrorCode = kerr.ClusterAuthorizationFailed.Code
+		return nil
+	}
 	resp.ClusterID = b.clusterID()
 	resp.ControllerID = b.nodeID()
 

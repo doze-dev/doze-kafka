@@ -3,19 +3,19 @@
     <div class="idband">
       <div>
         <h1 class="page-title">Access</h1>
-        <p class="lede">The ACLs stored on this broker, read-only.</p>
+        <p class="lede">The ACLs on this broker, read-only.</p>
       </div>
     </div>
-    <div class="honest warn" role="note">
+    <div class="honest" role="note">
       {{icon "info"}}
-      <div><b>These are not enforced.</b> doze-kafka stores ACLs so that tools which provision them (Terraform, bootstrap scripts, <code>kafka-acls</code>) finish and can read them back. Nothing consults them: every authenticated client can do everything, whatever is listed here. This is not security. See <a href="https://github.com/doze-dev/doze-kafka/blob/main/docs/limitations.md" target="_blank" rel="noopener">limitations</a>.</div>
+      <div><b>These are enforced.</b> {{if .OpenByDefault}}A topic, group or the cluster that no ACL is about is open to everyone; one that has ACLs allows only what they allow, and a DENY always wins.{{else}}Anything an ACL does not allow is refused (<code>--acl-default deny</code>); a DENY always wins.{{end}}{{if .SuperUsers}} Super users, never refused: <span class="mono">{{.SuperUsers}}</span>.{{end}} Without authentication every client is <span class="mono">User:ANONYMOUS</span>. Manage them with <code>kafka-acls</code> or your provisioning tool. See <a href="https://github.com/doze-dev/doze-kafka/blob/main/docs/authorization.md" target="_blank" rel="noopener">authorization</a>.</div>
     </div>
     {{if .ACLs}}
     <div class="cpanel">
       {{range .ACLs}}<div class="crow2"><span class="k mono">{{.Permission}} · {{.Operation}}</span><span class="v mono">{{.Principal}} from {{.Host}} on {{.Resource}} <b>{{.Name}}</b> ({{.Pattern}})</span></div>{{end}}
     </div>
     {{else}}
-    <div class="cpanel"><div class="crow2"><span class="k">None stored</span><span class="v">Create some with <code>kafka-acls.sh --add</code> or your provisioning tool; they appear here.</span></div></div>
+    <div class="cpanel"><div class="crow2"><span class="k">None stored</span><span class="v">Create some with <code>kafka-acls.sh --add</code> or your provisioning tool; they take effect at once and appear here.</span></div></div>
     {{end}}
   </div></main>
 {{template "shell_bottom" .}}{{end}}

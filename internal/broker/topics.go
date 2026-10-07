@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -28,6 +29,15 @@ func (b *Broker) handleCreateTopics(ctx context.Context, req *protocol.Request, 
 			rt.Topic = t.Topic
 			rt.ErrorCode = kerr.InvalidRequest.Code
 			msg := "the topic is named more than once in this request"
+			rt.ErrorMessage = &msg
+			resp.Topics = append(resp.Topics, rt)
+			continue
+		}
+		if !b.canCreateTopic(req.Conn, t.Topic) {
+			rt := kmsg.NewCreateTopicsResponseTopic()
+			rt.Topic = t.Topic
+			rt.ErrorCode = kerr.TopicAuthorizationFailed.Code
+			msg := "not authorized to create topic " + t.Topic
 			rt.ErrorMessage = &msg
 			resp.Topics = append(resp.Topics, rt)
 			continue
@@ -207,6 +217,8 @@ func (b *Broker) handleDeleteTopics(ctx context.Context, req *protocol.Request, 
 			rt.Topic = &n
 		}
 		switch {
+		case !b.canTopic(req.Conn, cmp.Or(name, tg.name), opDelete):
+			rt.ErrorCode = kerr.TopicAuthorizationFailed.Code
 		case !ok:
 			rt.ErrorCode = kerr.UnknownTopicOrPartition.Code
 		default:

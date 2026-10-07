@@ -33,6 +33,8 @@ func (b *Broker) handleCreatePartitions(ctx context.Context, req *protocol.Reque
 		rt.Topic = t.Topic
 		if seen[t.Topic] > 1 {
 			setPartitionsError(&rt, kerr.InvalidRequest, "the topic is named more than once in this request")
+		} else if !b.canTopic(req.Conn, t.Topic, opAlter) {
+			setPartitionsError(&rt, kerr.TopicAuthorizationFailed, "not authorized to alter topic "+t.Topic)
 		} else if ec, msg := b.growTopic(t, cr.ValidateOnly); ec != nil {
 			setPartitionsError(&rt, ec, msg)
 		}
