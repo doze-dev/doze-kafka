@@ -54,6 +54,10 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   create-topic form. Other Kafka topic
   settings are listed for reading; a topic that asks for compaction is told it is not
   compacted.
+- **Go to offset** and **go to time** sit above the messages. Time takes `15m`, `2h` or
+  `1d` (that long ago), a date and time such as `2026-10-07 10:30` (read as UTC unless it
+  carries a zone), or an epoch in milliseconds, and lands on the first message at or
+  after it.
 - **Partitions** shows the count and adds more. Partitions can only be added, never
   removed, and a key's partition depends on the count, so records with the same key
   stop being ordered together across the change; the page says so before it asks.

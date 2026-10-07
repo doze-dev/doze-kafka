@@ -104,12 +104,24 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 		c.render(w, r, "topic_detail", data)
 		return
 	}
-	tape, err := c.tapeData(ctx, name, detail.ID, partition, detail.Partitions, fromParam(r), hlParam(r), jumpParam(r))
+	jump := jumpParam(r)
+	atJump, atNote, atAsked, err := c.atParam(r, name, partition)
+	if err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	if atAsked {
+		jump = atJump
+	}
+	tape, err := c.tapeData(ctx, name, detail.ID, partition, detail.Partitions, fromParam(r), hlParam(r), jump)
 	if err != nil {
 		c.fail(w, r, err)
 		return
 	}
 	maps.Copy(data, tape)
+	if atNote != "" && tape["JumpNote"] == "" {
+		data["JumpNote"] = atNote
+	}
 	c.render(w, r, "topic_detail", data)
 }
 

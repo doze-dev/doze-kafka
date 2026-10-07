@@ -183,6 +183,12 @@
       <input class="input mono" id="jump-to" name="jump" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. {{if gt .Latest 0}}{{.Latest}}{{else}}0{{end}}" autocomplete="off">
       <button type="submit" class="btn btn-outline jump-go">Go</button>
     </form>
+    <form class="jump" method="get" action="{{topicURL .Topic.Name}}">
+      <input type="hidden" name="partition" value="{{.Partition}}">
+      <label for="jump-at">go to time</label>
+      <input class="input mono" id="jump-at" name="at" placeholder="15m, 2h, or 2026-10-07 10:30 (UTC)" autocomplete="off">
+      <button type="submit" class="btn btn-outline jump-go">Go</button>
+    </form>
     {{end}}
   </div>
   {{if .Search}}<div class="jumpnote" role="status">{{icon "info"}} <span>{{.Search.Note}}{{if .Search.OlderURL}} <a class="pagelink" href="{{.Search.OlderURL}}">Search older records</a>{{end}}</span></div>{{end}}

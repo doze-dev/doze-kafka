@@ -54,8 +54,12 @@ implement it.
 
 ## Behavioral simplifications
 
-- **Timestamp lookups are coarse.** `ListOffsets` by timestamp returns the earliest
-  offset; there's no per-record timestamp index. Earliest/latest are exact.
+- **Timestamp lookups read batch headers.** `ListOffsets` by timestamp (`offsetsForTimes`,
+  start-from-timestamp, "replay from ten minutes ago") and the max-timestamp query are
+  exact, but there is no time index on disk: the first lookup on a partition reads its
+  batch headers and keeps a summary in memory, and the active segment's is extended as
+  it grows. That is milliseconds for a development-sized log and proportional to its
+  size for a very large one.
 - **On-disk format is doze-kafka's own.** Record batches are stored verbatim (so
   compression round-trips), but the segment/index file layout is not byte-compatible
   with Apache Kafka's. Only doze-kafka reads its own files.

@@ -126,3 +126,19 @@ test('partitions are added after a warning, the tabs grow, and a bad number is e
   await expect(page.locator('.idchips')).toContainText('4 partitions');
   await expect(page.locator('.ptab')).toHaveCount(4);
 });
+
+test('go to time lands on the first message at or after it, and explains an empty or bad answer', async ({ page }) => {
+  await page.goto('topics/seed-orders');
+  await page.locator('#jump-at').fill('1d');
+  await page.locator('form.jump', { has: page.locator('#jump-at') }).getByRole('button', { name: 'Go' }).click();
+  await expect(page.locator('.jumpnote')).toContainText('first message at or after');
+  await expect(page.locator('tr.hl')).toHaveCount(1); // the landing row is highlighted.
+
+  await page.locator('#jump-at').fill('2999-01-01');
+  await page.locator('form.jump', { has: page.locator('#jump-at') }).getByRole('button', { name: 'Go' }).click();
+  await expect(page.locator('.jumpnote')).toContainText('No message on this partition is at or after');
+
+  await page.locator('#jump-at').fill('whenever');
+  await page.locator('form.jump', { has: page.locator('#jump-at') }).getByRole('button', { name: 'Go' }).click();
+  await expect(page.locator('.jumpnote')).toContainText('That is not a time');
+});

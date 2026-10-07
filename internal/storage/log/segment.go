@@ -23,6 +23,7 @@ type Segment struct {
 	lastModified  time.Time // wall-clock time of the most recent append (for age-based retention).
 	beforeSync    func() error
 	logDirty      atomic.Bool // bytes written since the last fsync of the log.
+	ts            tsScan      // timestamp summary for lookups (timestamps.go); guarded by the partition lock.
 
 	// syncMu makes sync one-at-a-time per segment. The dirty flag is cleared
 	// before the fsync it stands for has finished, so a second caller arriving

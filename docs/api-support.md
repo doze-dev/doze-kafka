@@ -21,7 +21,7 @@ specifically testing an older client's paths.
 | DeleteTopics | 20 | Delete topics and their data. |
 | Produce | 0 | Append records to partitions. |
 | Fetch | 1 | Read records (topic-ID aware; supports long-poll). |
-| ListOffsets | 2 | Resolve earliest/latest offsets. |
+| ListOffsets | 2 | Resolve earliest, latest and max-timestamp offsets, and the first offset at or after a timestamp. |
 | InitProducerId | 22 | Producer id for idempotent producers. |
 | FindCoordinator | 10 | Locate the group coordinator (always this node). |
 | JoinGroup / SyncGroup / Heartbeat / LeaveGroup | 11 / 14 / 12 / 13 | Classic consumer-group protocol. |

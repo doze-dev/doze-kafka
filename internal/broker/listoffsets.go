@@ -14,11 +14,14 @@ import (
 const (
 	listOffsetsLatest   = -1 // newest offset (the LEO).
 	listOffsetsEarliest = -2 // oldest retained offset (the log-start offset).
+	listOffsetsMaxTime  = -3 // the offset of the record with the largest timestamp (v7+).
 )
 
-// handleListOffsets answers earliest/latest offset queries. A real timestamp is
-// served coarsely as the earliest offset — a per-record timestamp index is not
-// implemented (local dev consumers use earliest/latest almost exclusively).
+// handleListOffsets answers earliest, latest and max-timestamp queries and, for a real
+// timestamp, the offset of the first record at or after it (offsetsForTimes, "replay
+// from ten minutes ago", Flink's start-from-timestamp). A timestamp after every
+// record is offset -1 with timestamp -1 for v1 and later, as in Kafka, and the log end
+// for v0, which has no way to say "none".
 func (b *Broker) handleListOffsets(ctx context.Context, req *protocol.Request, lr *kmsg.ListOffsetsRequest, resp *kmsg.ListOffsetsResponse) error {
 	for _, t := range lr.Topics {
 		rt := kmsg.NewListOffsetsResponseTopic()
@@ -48,8 +51,23 @@ func (b *Broker) handleListOffsets(ctx context.Context, req *protocol.Request, l
 			switch part.Timestamp {
 			case listOffsetsLatest:
 				rp.Offset = end
-			default: // earliest, or a real timestamp (coarse: earliest).
+			case listOffsetsEarliest:
 				rp.Offset = start
+			default:
+				off, ts, found, err := b.offsetByTime(name, part.Partition, part.Timestamp, start, end)
+				if err != nil {
+					rp.ErrorCode = b.storageFault("list offsets: timestamp lookup", err, "topic", name, "partition", part.Partition)
+					rt.Partitions = append(rt.Partitions, rp)
+					continue
+				}
+				switch {
+				case found:
+					rp.Offset, rp.Timestamp = off, ts
+				case req.Header.APIVersion == 0:
+					rp.Offset = end
+				default:
+					rp.Offset = -1
+				}
 			}
 			// v0 answers with a list of offsets ("up to MaxNumOffsets before the
 			// timestamp") instead of a single field; leaving it empty told a v0
@@ -62,4 +80,21 @@ func (b *Broker) handleListOffsets(ctx context.Context, req *protocol.Request, l
 		resp.Topics = append(resp.Topics, rt)
 	}
 	return nil
+}
+
+// offsetByTime answers a ListOffsets timestamp query for one partition. An empty
+// partition (or one with nothing at or after the timestamp) is not found; a partition
+// with no data to open has nothing to ask.
+func (b *Broker) offsetByTime(topic string, partition int32, timestamp, start, end int64) (offset, ts int64, found bool, err error) {
+	if start >= end {
+		return -1, -1, false, nil
+	}
+	p, err := b.logs.ExistingPartition(topic, partition)
+	if err != nil {
+		return 0, 0, false, err
+	}
+	if timestamp == listOffsetsMaxTime {
+		return p.OffsetOfMaxTimestamp()
+	}
+	return p.OffsetForTimestamp(timestamp)
 }

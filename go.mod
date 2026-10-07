@@ -6,6 +6,9 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/IBM/sarama v1.50.3
 	github.com/doze-dev/doze-names v0.1.1-0.20261004130222-a18b816af589
+	github.com/golang/snappy v0.0.4
+	github.com/klauspost/compress v1.18.7
+	github.com/pierrec/lz4/v4 v4.1.27
 	github.com/twmb/franz-go v1.21.5
 	github.com/twmb/franz-go/pkg/kmsg v1.13.1
 	go.etcd.io/bbolt v1.5.0
@@ -92,7 +95,6 @@ require (
 	github.com/jcmturner/gokrb5/v8 v8.4.4 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
-	github.com/klauspost/compress v1.18.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
@@ -102,7 +104,6 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/pierrec/lz4/v4 v4.1.27 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20250313105119-ba97887b0a25 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/puzpuzpuz/xsync/v4 v4.5.0 // indirect
