@@ -35,6 +35,7 @@ func (c *Console) apiPalette(w http.ResponseWriter, r *http.Request) {
 		{"views", "Topics", c.prefix + "/topics", "view"},
 		{"views", "Consumer groups", c.prefix + "/groups", "view"},
 		{"views", "Cluster", c.prefix + "/cluster", "view"},
+		{"views", "Access", c.prefix + "/access", "view"},
 		{"topics", "Create topic", c.newTopicURL(), "action"},
 	}
 	if topics, err := c.be.ListTopics(ctx); err == nil {

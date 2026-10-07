@@ -849,7 +849,7 @@ func TestListLinksReplaceOnlyTheDetailPane(t *testing.T) {
 	c, addr := newTestConsoleAddr(t)
 	topicWith(t, c, "t", 1, 1)
 	commitFor(t, addr, "g", "t", map[int32]int64{0: 1})
-	for _, path := range []string{"/_console/topics", "/_console/topics/t", "/_console/groups", "/_console/groups/g", "/_console/cluster", "/_console/new/topic", "/_console/topics/missing"} {
+	for _, path := range []string{"/_console/topics", "/_console/topics/t", "/_console/groups", "/_console/groups/g", "/_console/cluster", "/_console/access", "/_console/new/topic", "/_console/topics/missing"} {
 		page := req(t, c, "GET", path, nil).Body.String()
 		if n := strings.Count(page, `id="detail"`); n != 1 {
 			t.Errorf("%s has %d elements with id=\"detail\", want 1", path, n)

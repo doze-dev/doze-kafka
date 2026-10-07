@@ -222,6 +222,7 @@ func (c *Console) routes() {
 
 	// Cluster.
 	m.HandleFunc("GET "+p+"/cluster", c.cluster)
+	m.HandleFunc("GET "+p+"/access", c.access) // stored ACLs, read-only, with the banner that they are not enforced
 
 	// Resource index for the command palette.
 	m.HandleFunc("GET "+p+"/api/palette", c.apiPalette)

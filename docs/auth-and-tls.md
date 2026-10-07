@@ -118,5 +118,6 @@ Clients use `SASL_SSL` as their security protocol.
 ## What's not here
 
 No Kerberos/GSSAPI, no OAUTHBEARER, no delegation tokens, and **no authorization** —
-authentication only. An authenticated user can do anything; there are no ACLs. And
+authentication only. An authenticated user can do anything: ACLs can be created and
+read back, but they are stored, never enforced. And
 `SASLprep` normalization isn't applied, so stick to ASCII usernames and passwords.

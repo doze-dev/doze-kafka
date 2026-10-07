@@ -86,11 +86,11 @@ test('"go to offset" lands on the record, scrolled into view', async ({ page }) 
   await page.setViewportSize({ width: 1280, height: 600 });
   await page.goto('topics/seed-orders');
   await page.locator('#jump-to').fill('3');
-  await page.locator('.jump .jump-go').click();
+  await page.locator('form.jump', { has: page.locator('#jump-to') }).locator('.jump-go').click();
   await expect(page.locator('tr[data-hl]')).toHaveAttribute('id', 'msg-3');
   await expect(page.locator('tr[data-hl]')).toBeInViewport();
   await page.locator('#jump-to').fill('99999');
-  await page.locator('.jump .jump-go').click();
+  await page.locator('form.jump', { has: page.locator('#jump-to') }).locator('.jump-go').click();
   await expect(page.locator('.jumpnote')).toContainText('has not been written yet');
   // Something that is not a number is stopped by the field itself (the server
   // refuses it too: see the Go tests).

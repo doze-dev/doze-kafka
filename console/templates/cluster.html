@@ -23,7 +23,7 @@
     {{end}}
     <div class="honest">
       {{icon "info"}}
-      <div>Transactions, log compaction, ACLs, and adding partitions to an existing topic aren't implemented. If a client asks for one of these, the connection closes cleanly on that call — everything else keeps working. See <a href="https://github.com/doze-dev/doze-kafka/blob/main/docs/limitations.md" target="_blank" rel="noopener">limitations</a>.</div>
+      <div>Transactions and log compaction aren't implemented, and ACLs are stored but not enforced. If a client asks for one of these, the connection closes cleanly on that call — everything else keeps working. See <a href="https://github.com/doze-dev/doze-kafka/blob/main/docs/limitations.md" target="_blank" rel="noopener">limitations</a>.</div>
     </div>
   </div></main>
 {{template "shell_bottom" .}}{{end}}

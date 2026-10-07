@@ -67,6 +67,7 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
       {{template "ri" dict "P" .Prefix "URL" "/topics" "On" (hasPrefix .Page "topics") "Name" "Topics" "Glyph" "layers" "Ct" "topics"}}
       {{template "ri" dict "P" .Prefix "URL" "/groups" "On" (hasPrefix .Page "groups") "Name" "Consumer groups" "Glyph" "users" "Ct" "groups"}}
       {{template "ri" dict "P" .Prefix "URL" "/cluster" "On" (eq .Page "cluster") "Name" "Cluster" "Glyph" "server"}}
+      {{template "ri" dict "P" .Prefix "URL" "/access" "On" (eq .Page "access") "Name" "Access" "Glyph" "key"}}
       <button type="button" class="rail-toggle" id="rail-toggle" title="Collapse / expand ([)">
         <span class="rt-ic">{{icon "chevron"}}</span><span class="ri-nm">Collapse</span>
       </button>

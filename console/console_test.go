@@ -15,6 +15,7 @@ import (
 
 	"github.com/doze-dev/doze-kafka/server"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
 // newTestConsole boots a real broker (server.New, same as cmd/doze-kafka)
@@ -414,5 +415,38 @@ func TestAddPartitions(t *testing.T) {
 	}
 	if body := req(t, c, "GET", "/_console/topics/grow", nil).Body.String(); !strings.Contains(body, "5 partitions") {
 		t.Error("refused requests changed the topic")
+	}
+}
+
+// The Access page says, before anything else, that what it lists is not enforced; it
+// lists what is stored, and says plainly when nothing is.
+func TestAccessPageListsStoredACLsUnderTheNotEnforcedBanner(t *testing.T) {
+	c := newTestConsole(t)
+	empty := req(t, c, "GET", "/_console/access", nil).Body.String()
+	for _, want := range []string{"These are not enforced", "None stored", "This is not security"} {
+		if !strings.Contains(empty, want) {
+			t.Errorf("the empty Access page is missing %q", want)
+		}
+	}
+
+	creq := kmsg.NewPtrCreateACLsRequest()
+	cr := kmsg.NewCreateACLsRequestCreation()
+	cr.ResourceType, cr.ResourceName, cr.ResourcePatternType = kmsg.ACLResourceTypeTopic, "orders", kmsg.ACLResourcePatternTypeLiteral
+	cr.Principal, cr.Host, cr.Operation, cr.PermissionType = "User:alice", "*", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAllow
+	creq.Creations = append(creq.Creations, cr)
+	if resp, err := creq.RequestWith(context.Background(), c.be.cl); err != nil || resp.Results[0].ErrorCode != 0 {
+		t.Fatalf("create an ACL: %v %+v", err, resp)
+	}
+	page := req(t, c, "GET", "/_console/access", nil).Body.String()
+	for _, want := range []string{"These are not enforced", "allow · read", "User:alice", "orders", "literal"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the Access page is missing %q after one ACL was stored", want)
+		}
+	}
+	if strings.Contains(page, "None stored") {
+		t.Error("the page says none are stored while one is listed")
+	}
+	if pal := req(t, c, "GET", "/_console/api/palette", nil).Body.String(); !strings.Contains(pal, "/access") {
+		t.Error("the palette does not offer the Access page")
 	}
 }

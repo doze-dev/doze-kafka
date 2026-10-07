@@ -55,6 +55,7 @@ var (
 	bucketTopicsByID = []byte("topics_by_id") // uuid -> name
 	bucketOffsets    = []byte("offsets")      // group\0topic\0partition -> offsetRecord (JSON)
 	bucketMeta       = []byte("meta")         // singletons (producer-id counter, ...)
+	bucketACLs       = []byte("acls")         // acl key -> ACL (JSON); stored, never enforced.
 	keyProducerID    = []byte("producer_id")
 )
 
@@ -100,6 +101,15 @@ type Store interface {
 	// was 20 fsyncs; this is one.
 	CommitOffsets(group string, offsets []OffsetCommit) error
 
+	// AddACLs stores access-control entries. An entry already present is left as it
+	// is: adding twice is not an error, as in Kafka. They are kept for tooling that
+	// provisions and reads them back; nothing in the broker consults them.
+	AddACLs(acls []ACL) error
+	// ListACLs returns every stored entry, in a stable order.
+	ListACLs() ([]ACL, error)
+	// RemoveACLs deletes exactly these entries (any that are not there are ignored).
+	RemoveACLs(acls []ACL) error
+
 	NextProducerID() (int64, error)
 	// ReserveProducerIDs hands out a block of n consecutive producer ids in one
 	// transaction and returns the first. The block is durable before it is used,
@@ -123,7 +133,7 @@ func Open(path string) (Store, error) {
 		return nil, fmt.Errorf("meta: open %s: %w", path, err)
 	}
 	err = db.Update(func(tx *bbolt.Tx) error {
-		for _, name := range [][]byte{bucketTopics, bucketTopicsByID, bucketOffsets, bucketMeta} {
+		for _, name := range [][]byte{bucketTopics, bucketTopicsByID, bucketOffsets, bucketMeta, bucketACLs} {
 			if _, err := tx.CreateBucketIfNotExists(name); err != nil {
 				return err
 			}

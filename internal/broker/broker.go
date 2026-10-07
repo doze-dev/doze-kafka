@@ -25,6 +25,7 @@ import (
 // Broker holds the shared state every handler needs.
 type Broker struct {
 	alterMu sync.Mutex // one topic-config change at a time (see alterTopic).
+	acls    aclState   // stored, never enforced (acls.go).
 	cfg     config.Config
 	log     *slog.Logger
 	logs    *log.Manager
@@ -113,6 +114,9 @@ func (b *Broker) handlers() map[protocol.APIKey]protocol.Handler {
 		kmsg.DeleteTopics:            typed(b.handleDeleteTopics),
 		kmsg.CreatePartitions:        typed(b.handleCreatePartitions),
 		kmsg.DeleteRecords:           typed(b.handleDeleteRecords),
+		kmsg.DescribeACLs:            typed(b.handleDescribeACLs),
+		kmsg.CreateACLs:              typed(b.handleCreateACLs),
+		kmsg.DeleteACLs:              typed(b.handleDeleteACLs),
 		kmsg.ListOffsets:             typed(b.handleListOffsets),
 		kmsg.InitProducerID:          typed(b.handleInitProducerID),
 		kmsg.DescribeConfigs:         typed(b.handleDescribeConfigs),

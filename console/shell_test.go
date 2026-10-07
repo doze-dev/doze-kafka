@@ -66,6 +66,7 @@ func TestRailHighlightIsRightOnEveryPage(t *testing.T) {
 		"/_console/new/topic": "Topics",
 		"/_console/groups":    "Consumer groups",
 		"/_console/cluster":   "Cluster",
+		"/_console/access":    "Access",
 	} {
 		if got := litRailItem(t, req(t, c, "GET", path, nil).Body.String()); got != want {
 			t.Errorf("%s lights %q in the rail, want %q", path, got, want)

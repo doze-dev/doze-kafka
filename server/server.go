@@ -262,6 +262,7 @@ func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	}
 	router := protocol.NewRouter()
 	b.Register(router)
+	b.WarnIfACLs()
 
 	srv := protocol.NewServer(cfg.ListenAddr, router, logger)
 	if cfg.TLSEnabled() {
