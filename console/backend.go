@@ -325,41 +325,38 @@ func (b *backend) DeleteTopic(ctx context.Context, name string) error {
 	return nil
 }
 
-// PurgeTopic deletes and recreates a topic with the same partition count —
-// the only way to clear a topic's data over doze-kafka's wire protocol
-// (DeleteRecords isn't implemented, and retention can't be altered per-topic).
-// The recreated topic gets a fresh topic ID, and the broker drops the topic's
-// committed consumer offsets with it — consumers restart from their
-// auto.offset.reset policy, exactly as the confirm dialog warns.
+// PurgeTopic empties a topic by moving every partition's log-start offset to its
+// end (DeleteRecords). The topic keeps its id, its settings and what its consumers
+// have committed: a group that had read everything carries on with the next record.
+// It used to delete and recreate the topic, which gave it a new id, was not atomic,
+// and dropped every committed offset, so consumers started over from their reset
+// policy.
 func (b *backend) PurgeTopic(ctx context.Context, name string) error {
 	partitions, err := b.PartitionCount(ctx, name)
 	if err != nil {
 		return err
 	}
-	// The topic's own settings (a retention override, say) are part of what it is;
-	// read them first so the re-created topic has them. They used to be dropped,
-	// silently turning a topic with one-minute retention into one that kept everything.
-	overrides, err := b.topicOverrides(ctx, name)
+	req := kmsg.NewPtrDeleteRecordsRequest()
+	rt := kmsg.NewDeleteRecordsRequestTopic()
+	rt.Topic = name
+	for p := int32(0); p < partitions; p++ {
+		rp := kmsg.NewDeleteRecordsRequestTopicPartition()
+		rp.Partition, rp.Offset = p, -1 // the high watermark: everything.
+		rt.Partitions = append(rt.Partitions, rp)
+	}
+	req.Topics = append(req.Topics, rt)
+	resp, err := req.RequestWith(ctx, b.cl)
 	if err != nil {
 		return err
 	}
-	if err := b.DeleteTopic(ctx, name); err != nil {
-		return err
-	}
-	// doze-kafka deletes synchronously, but tolerate a beat of lag before the
-	// name frees up rather than surfacing a spurious ALREADY_EXISTS.
-	var lastErr error
-	for range 20 {
-		if lastErr = b.createTopic(ctx, name, partitions, overrides); lastErr == nil {
-			return nil
-		}
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("the topic was deleted but could not be re-created in time (%d partitions); create it again: %w", partitions, ctx.Err())
-		case <-time.After(50 * time.Millisecond):
+	for _, t := range resp.Topics {
+		for _, p := range t.Partitions {
+			if err := kerr.ErrorForCode(p.ErrorCode); err != nil {
+				return fmt.Errorf("purge partition %d: %w", p.Partition, err)
+			}
 		}
 	}
-	return fmt.Errorf("the topic was deleted but could not be re-created (%d partitions); create it again: %w", partitions, lastErr)
+	return nil
 }
 
 // topicOverrides returns the config a topic was created or altered with, as

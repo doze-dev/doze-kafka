@@ -34,6 +34,7 @@ specifically testing an older client's paths.
 | AlterConfigs | 33 | Replace a topic's own configuration. |
 | IncrementalAlterConfigs | 44 | Set or remove individual topic configs (Kafka 2 and later). |
 | CreatePartitions | 37 | Raise a topic's partition count (never lower it). |
+| DeleteRecords | 21 | Move a partition's log-start offset up (-1 empties it), deleting what is below. |
 | DeleteGroups | 42 | Delete empty consumer groups and their committed offsets. |
 | OffsetDelete | 47 | Delete a group's committed offsets for a topic, including an offset left over from a topic that no longer exists. |
 | DescribeCluster | 60 | Describe the cluster (this single node). |
@@ -74,6 +75,7 @@ the highest version both sides support; a request outside them is not served.
 | ApiVersions | 18 | 0–1 | 0–2 | 0–3 | 0–3 |
 | CreateTopics | 19 | 0–2 | 0–3 | 0–7 | 0–7 |
 | DeleteTopics | 20 | 0–1 | 0–3 | 0–5 | 0–6 |
+| DeleteRecords | 21 | 0–0 | 0–1 | 0–2 | 0–2 |
 | InitProducerID | 22 | 0–1 | 0–1 | 0–4 | 0–4 |
 | DescribeConfigs | 32 | 0–1 | 0–2 | 0–4 | 0–4 |
 | AlterConfigs | 33 | 0–0 | 0–2 | 0–2 | 0–2 |

@@ -50,7 +50,7 @@
         </div>
       </div>
       <div class="idband-acts">
-        <button class="btn btn-outline" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/purge" data-confirm-title="Purge topic" data-confirm-verb="Purge" hx-confirm="Purge &quot;{{.Topic.Name}}&quot;? Deletes and recreates the topic with the same partition count. Every message is gone, the topic gets a new ID, and consumers restart from their auto.offset.reset policy.">{{icon "eraser"}} Purge</button>
+        <button class="btn btn-outline" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/purge" data-confirm-title="Purge topic" data-confirm-verb="Purge" hx-confirm="Purge &quot;{{.Topic.Name}}&quot;? Every message in every partition is deleted. The topic keeps its ID and settings, and consumers keep their committed offsets, so a group that had read everything carries on with the next record.">{{icon "eraser"}} Purge</button>
         <button class="btn danger" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/delete" data-confirm-title="Delete topic" data-confirm-verb="Delete topic" hx-confirm="Delete topic &quot;{{.Topic.Name}}&quot;? This removes every partition's data.">{{icon "trash"}} Delete</button>
       </div>
     </div>

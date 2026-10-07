@@ -112,6 +112,7 @@ func (b *Broker) handlers() map[protocol.APIKey]protocol.Handler {
 		kmsg.CreateTopics:            typed(b.handleCreateTopics),
 		kmsg.DeleteTopics:            typed(b.handleDeleteTopics),
 		kmsg.CreatePartitions:        typed(b.handleCreatePartitions),
+		kmsg.DeleteRecords:           typed(b.handleDeleteRecords),
 		kmsg.ListOffsets:             typed(b.handleListOffsets),
 		kmsg.InitProducerID:          typed(b.handleInitProducerID),
 		kmsg.DescribeConfigs:         typed(b.handleDescribeConfigs),

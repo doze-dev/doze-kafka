@@ -177,11 +177,15 @@ func TestPurgeTopic(t *testing.T) {
 	req(t, c, "POST", "/_console/topics/junk/produce", url.Values{"partition": {"0"}, "value": {"m1"}, "acks": {"1"}})
 	req(t, c, "POST", "/_console/topics/junk/produce", url.Values{"partition": {"1"}, "value": {"m2"}, "acks": {"1"}})
 
+	idBefore, _, _ := c.be.TopicShape(context.Background(), "junk")
 	rec := req(t, c, "POST", "/_console/topics/junk/purge", url.Values{})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("purge: status %d: %s", rec.Code, rec.Body)
 	}
 
+	if idAfter, _, _ := c.be.TopicShape(context.Background(), "junk"); idAfter != idBefore || idBefore == "" {
+		t.Errorf("a purge changed the topic's id from %q to %q: it is DeleteRecords now, not a delete and recreate", idBefore, idAfter)
+	}
 	// Same name, same partition count, zero messages.
 	rec = req(t, c, "GET", "/_console/topics/junk", nil)
 	if rec.Code != 200 {

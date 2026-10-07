@@ -41,6 +41,10 @@ func boundsFromDisk(dir string) (start, end int64, err error) {
 	if err != nil {
 		return 0, 0, err
 	}
+	// DeleteRecords may have put the start inside the first segment.
+	if recorded := min(readLogStart(dir), end); recorded > start {
+		start = recorded
+	}
 	return start, end, nil
 }
 
@@ -57,7 +61,7 @@ func boundsSignature(dir string) (sig string, ok bool) {
 	if err != nil {
 		return "", false
 	}
-	return fmt.Sprintf("%d/%d/%d/%d/%d", bases[0], last, len(bases), info.Size(), info.ModTime().UnixNano()), true
+	return fmt.Sprintf("%d/%d/%d/%d/%d/%d", bases[0], last, len(bases), info.Size(), info.ModTime().UnixNano(), readLogStart(dir)), true
 }
 
 // windowReader serves the many small sequential reads of a scan from one larger

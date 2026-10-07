@@ -103,6 +103,7 @@ var APIs = []API{
 	{Key: kmsg.ApiVersions, Versions: [4]Offered{v(0, 1), v(0, 2), v(0, 3), v(0, 3)}},
 	{Key: kmsg.CreateTopics, Versions: [4]Offered{v(0, 2), v(0, 3), v(0, 7), v(0, 7)}},
 	{Key: kmsg.DeleteTopics, Versions: [4]Offered{v(0, 1), v(0, 3), v(0, 5), v(0, 6)}},
+	{Key: kmsg.DeleteRecords, Versions: [4]Offered{v(0, 0), v(0, 1), v(0, 2), v(0, 2)}},
 	{Key: kmsg.InitProducerID, Versions: [4]Offered{v(0, 1), v(0, 1), v(0, 4), v(0, 4)}},
 	{Key: kmsg.DescribeConfigs, Versions: [4]Offered{v(0, 1), v(0, 2), v(0, 4), v(0, 4)}},
 	{Key: kmsg.AlterConfigs, Versions: [4]Offered{v(0, 0), v(0, 2), v(0, 2), v(0, 2)}},

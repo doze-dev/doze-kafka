@@ -58,8 +58,9 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   removed, and a key's partition depends on the count, so records with the same key
   stop being ordered together across the change; the page says so before it asks.
   Consumers in a group pick the new partitions up on their own.
-- **Purge** empties a topic (it is deleted and recreated, so it gets a new id) and
-  **Delete** removes it. Both ask first, naming the action.
+- **Purge** empties a topic with `DeleteRecords`: the topic keeps its id, settings and
+  its groups' committed offsets, so a group that had read everything carries on with
+  the next record. **Delete** removes the topic. Both ask first, naming the action.
 
 ## Consumer groups
 

@@ -79,6 +79,11 @@ func openPartition(dir string, opts ManagerOptions) (*Partition, error) {
 		return nil, err
 	}
 	p.logEndOffset = leo
+	// DeleteRecords may have put the start inside a segment (see logstart.go); never
+	// past the end, which only a log truncated below it could produce.
+	if recorded := min(readLogStart(dir), leo); recorded > p.logStartOffset {
+		p.logStartOffset = recorded
+	}
 	return p, nil
 }
 
@@ -280,7 +285,7 @@ func (p *Partition) dropOldestLocked() error {
 		return err
 	}
 	p.segments = p.segments[1:]
-	p.logStartOffset = p.segments[0].baseOffset
+	p.logStartOffset = max(p.logStartOffset, p.segments[0].baseOffset)
 	return nil
 }
 
