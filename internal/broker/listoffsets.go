@@ -58,6 +58,15 @@ func (b *Broker) handleListOffsets(ctx context.Context, req *protocol.Request, l
 			switch part.Timestamp {
 			case listOffsetsLatest:
 				rp.Offset = end
+				// A read-committed consumer's "latest" is the last stable offset: what it
+				// may read, not what has been written.
+				if lr.IsolationLevel == 1 {
+					if lso, err := b.lastStableOffset(name, part.Partition, end); err != nil {
+						rp.ErrorCode = b.storageFault("list offsets: last stable offset", err, "topic", name, "partition", part.Partition)
+					} else {
+						rp.Offset = lso
+					}
+				}
 			case listOffsetsEarliest:
 				rp.Offset = start
 			default:
@@ -66,6 +75,13 @@ func (b *Broker) handleListOffsets(ctx context.Context, req *protocol.Request, l
 					rp.ErrorCode = b.storageFault("list offsets: timestamp lookup", err, "topic", name, "partition", part.Partition)
 					rt.Partitions = append(rt.Partitions, rp)
 					continue
+				}
+				if found && lr.IsolationLevel == 1 {
+					// Under read-committed nothing at or above the last stable offset
+					// exists yet, whatever its timestamp.
+					if lso, err := b.lastStableOffset(name, part.Partition, end); err == nil && off >= lso {
+						found = false
+					}
 				}
 				switch {
 				case found:
@@ -104,4 +120,17 @@ func (b *Broker) offsetByTime(topic string, partition int32, timestamp, start, e
 		return p.OffsetOfMaxTimestamp()
 	}
 	return p.OffsetForTimestamp(timestamp)
+}
+
+// lastStableOffset is a partition's last stable offset. A partition that has no
+// data on disk to open has none open, and its answer is the end.
+func (b *Broker) lastStableOffset(topic string, partition int32, end int64) (int64, error) {
+	if end == 0 {
+		return 0, nil
+	}
+	p, err := b.logs.ExistingPartition(topic, partition)
+	if err != nil {
+		return 0, err
+	}
+	return p.LastStableOffset()
 }

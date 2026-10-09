@@ -82,7 +82,7 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 			case !ok || part.Partition < 0 || part.Partition >= topic.Partitions:
 				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
 			default:
-				wrote := b.appendRecords(name, topic.Config, part, &rp)
+				wrote := b.appendRecords(req.Conn, pr.TransactionID, name, topic.Config, part, &rp)
 				refused = refused || rp.ErrorCode == kerr.CorruptMessage.Code || rp.ErrorCode == kerr.MessageTooLarge.Code
 				if wrote {
 					producedTopics[name] = struct{}{}
@@ -133,7 +133,7 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 // appendRecords appends one partition's records and fills rp. A non-idempotent
 // payload (producer id -1) takes the plain fast path; an idempotent one goes through
 // sequence dedup. It reports whether any new data was written.
-func (b *Broker) appendRecords(topic string, topicConfig map[string]string, part kmsg.ProduceRequestTopicPartition, rp *kmsg.ProduceResponseTopicPartition) bool {
+func (b *Broker) appendRecords(conn *protocol.Conn, txnID *string, topic string, topicConfig map[string]string, part kmsg.ProduceRequestTopicPartition, rp *kmsg.ProduceResponseTopicPartition) bool {
 	plog, err := b.logs.ExistingPartition(topic, part.Partition)
 	if errors.Is(err, log.ErrNoSuchPartition) {
 		// The topic was deleted between resolving it and opening its log.
@@ -178,6 +178,21 @@ func (b *Broker) appendRecords(topic string, topicConfig map[string]string, part
 	var wrote bool
 	if hdr, ok := log.ParseBatch(part.Records); !ok || hdr.ProducerID < 0 {
 		wrote = b.appendPlain(plog, part.Records, rp)
+	} else if hdr.Transactional {
+		// A transactional producer needs Write on its transactional id as well, and
+		// the transaction must be open on this partition for the length of the append.
+		if txnID != nil && !b.canTxnID(conn, *txnID, opWrite) {
+			rp.ErrorCode, rp.BaseOffset = kerr.TransactionalIDAuthorizationFailed.Code, -1
+			return false
+		}
+		unlock, code, msg := b.lockForProduce(txnID, hdr, topic, part.Partition)
+		if code != 0 {
+			rp.ErrorCode, rp.BaseOffset = code, -1
+			rp.ErrorMessage = &msg
+			return false
+		}
+		defer unlock()
+		wrote = b.appendIdempotent(topic, part.Partition, plog, part.Records, rp)
 	} else {
 		wrote = b.appendIdempotent(topic, part.Partition, plog, part.Records, rp)
 	}

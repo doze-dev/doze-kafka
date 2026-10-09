@@ -40,7 +40,18 @@ func (b *Broker) nextProducerID() (int64, error) {
 // The id is what the produce path deduplicates on (idempotency.go). A
 // transactional.id in the request is not acted on: there are no transactions
 // here, and the transaction APIs that would follow are not advertised.
-func (b *Broker) handleInitProducerID(ctx context.Context, req *protocol.Request, _ *kmsg.InitProducerIDRequest, resp *kmsg.InitProducerIDResponse) error {
+func (b *Broker) handleInitProducerID(ctx context.Context, req *protocol.Request, ir *kmsg.InitProducerIDRequest, resp *kmsg.InitProducerIDResponse) error {
+	// A transactional id makes the caller the owner of that id's transactions (txn.go).
+	if ir.TransactionalID != nil && *ir.TransactionalID != "" {
+		if !b.canTxnID(req.Conn, *ir.TransactionalID, opWrite) {
+			resp.ErrorCode = kerr.TransactionalIDAuthorizationFailed.Code
+			resp.ProducerID, resp.ProducerEpoch = -1, -1
+			return nil
+		}
+		pid, epoch, code := b.initTxnProducer(*ir.TransactionalID, ir.TransactionTimeoutMillis)
+		resp.ErrorCode, resp.ProducerID, resp.ProducerEpoch = code, pid, epoch
+		return nil
+	}
 	if !b.canWriteIdempotently(req.Conn) {
 		resp.ErrorCode = kerr.ClusterAuthorizationFailed.Code
 		resp.ProducerID = -1

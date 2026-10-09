@@ -185,3 +185,60 @@ func TestSarama_ConsumerGroupConsumeCommitResume(t *testing.T) {
 		t.Fatal("sarama group replayed g0 after restart (offset not resumed)")
 	}
 }
+
+// TestSarama_TransactionalProducer: a second client library drives the transaction
+// APIs end to end. One transaction commits and one aborts, and a read-committed reader
+// sees only the committed records.
+func TestSarama_TransactionalProducer(t *testing.T) {
+	skipShort(t)
+	addr := startBroker(t, 4)
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+	defer cancel()
+	fr := newClient(t, addr)
+	mustCreateTopic(t, ctx, fr, "sarama-tx", 1)
+
+	cfg := saramaConfig()
+	cfg.Version = sarama.V2_8_0_0
+	cfg.Producer.Idempotent = true
+	cfg.Producer.Transaction.ID = "sarama-tx-1"
+	cfg.Net.MaxOpenRequests = 1
+	cfg.Producer.Partitioner = sarama.NewManualPartitioner
+	p, err := sarama.NewAsyncProducer([]string{addr}, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Close()
+
+	txn := func(commit bool, vals ...string) {
+		t.Helper()
+		if err := p.BeginTxn(); err != nil {
+			t.Fatalf("BeginTxn: %v", err)
+		}
+		for _, v := range vals {
+			p.Input() <- &sarama.ProducerMessage{Topic: "sarama-tx", Partition: 0, Value: sarama.StringEncoder(v)}
+		}
+		for range vals {
+			select {
+			case <-p.Successes():
+			case err := <-p.Errors():
+				t.Fatalf("produce in a transaction: %v", err)
+			case <-ctx.Done():
+				t.Fatal("timed out waiting for the transaction's records to be acknowledged")
+			}
+		}
+		if commit {
+			if err := p.CommitTxn(); err != nil {
+				t.Fatalf("CommitTxn: %v", err)
+			}
+		} else if err := p.AbortTxn(); err != nil {
+			t.Fatalf("AbortTxn: %v", err)
+		}
+	}
+	txn(false, "sarama-aborted-1", "sarama-aborted-2")
+	txn(true, "sarama-kept-1", "sarama-kept-2", "sarama-kept-3")
+
+	got := values(reader(t, addr, "sarama-tx", true), 2*time.Second)
+	if !eq(got, []string{"sarama-kept-1", "sarama-kept-2", "sarama-kept-3"}) {
+		t.Errorf("read-committed saw %v, want only the committed transaction", got)
+	}
+}

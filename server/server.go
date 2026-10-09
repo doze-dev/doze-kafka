@@ -263,6 +263,7 @@ func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	router := protocol.NewRouter()
 	b.Register(router)
 	b.AnnounceACLs()
+	b.RecoverTransactions() // finish what a stop left half done, before anyone connects.
 
 	srv := protocol.NewServer(cfg.ListenAddr, router, logger)
 	if cfg.TLSEnabled() {
@@ -373,6 +374,7 @@ func (s *Server) Serve(ctx context.Context) (err error) {
 			return err
 		}
 	}
+	go s.b.RunTransactions(ctx)
 	return s.srv.Serve(ctx)
 }
 
@@ -397,6 +399,7 @@ func (s *Server) ServeListener(ctx context.Context, ln net.Listener) (err error)
 	s.bound = ln.Addr()
 	s.mu.Unlock()
 	s.markReady()
+	go s.b.RunTransactions(ctx)
 	return s.srv.Serve(ctx)
 }
 

@@ -99,7 +99,7 @@ kafka-console-consumer.sh --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --topic 
   timeout returns its original offset instead of appending a second copy. And because
   an idempotent producer uses `acks=all`, its acknowledged writes are **fsynced to
   disk before the ack** (see [storage & durability](storage-and-durability.md)). The
-  one gap is transactions (exactly-once *processing*), which aren't implemented.
+  transactions (exactly-once *processing*) work too: see [Transactions](transactions.md).
 - **Consumer group protocol** is negotiated for you. Older clients use the classic
   protocol; a client that opts in to KIP-848 (the Java client with
   `group.protocol=consumer`, which is **not** its default even in Kafka 4.x, where the

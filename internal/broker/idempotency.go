@@ -220,3 +220,32 @@ func (pp *partitionProducers) evictOldest(keep int64, n int) {
 		delete(pp.producers, e.id)
 	}
 }
+
+// producerView is one producer's state on a partition, for DescribeProducers.
+type producerView struct {
+	pid        int64
+	epoch      int16
+	lastSeq    int32
+	lastUsedMs int64
+}
+
+// snapshot lists the producers the tracker remembers on a partition.
+func (i *idempotency) snapshot(topic string, partition int32) []producerView {
+	i.mu.Lock()
+	pp := i.partitions[topicPartition{topic, partition}]
+	i.mu.Unlock()
+	if pp == nil {
+		return nil
+	}
+	pp.mu.Lock()
+	defer pp.mu.Unlock()
+	out := make([]producerView, 0, len(pp.producers))
+	for pid, st := range pp.producers {
+		v := producerView{pid: pid, epoch: st.epoch, lastSeq: -1, lastUsedMs: st.lastUsed.UnixMilli()}
+		if n := len(st.recent); n > 0 {
+			v.lastSeq = st.recent[n-1].lastSeq
+		}
+		out = append(out, v)
+	}
+	return out
+}

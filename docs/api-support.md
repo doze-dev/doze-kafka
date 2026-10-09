@@ -22,7 +22,9 @@ specifically testing an older client's paths.
 | Produce | 0 | Append records to partitions. |
 | Fetch | 1 | Read records (topic-ID aware; supports long-poll). |
 | ListOffsets | 2 | Resolve earliest, latest and max-timestamp offsets, and the first offset at or after a timestamp. |
-| InitProducerId | 22 | Producer id for idempotent producers. |
+| InitProducerId | 22 | Producer id for idempotent producers, and for a `transactional.id` (see [Transactions](transactions.md)). |
+| AddPartitionsToTxn / AddOffsetsToTxn / EndTxn / TxnOffsetCommit | 24 / 25 / 26 / 28 | Transactional producers: what a transaction touches, and its commit or abort. |
+| DescribeTransactions / ListTransactions / DescribeProducers | 65 / 66 / 61 | Inspect open transactions and a partition's producers. |
 | FindCoordinator | 10 | Locate the group coordinator (always this node). |
 | JoinGroup / SyncGroup / Heartbeat / LeaveGroup | 11 / 14 / 12 / 13 | Classic consumer-group protocol. |
 | OffsetCommit / OffsetFetch | 8 / 9 | Commit and read consumer-group offsets. |
@@ -78,6 +80,10 @@ the highest version both sides support; a request outside them is not served.
 | DeleteTopics | 20 | 0–1 | 0–3 | 0–5 | 0–6 |
 | DeleteRecords | 21 | 0–0 | 0–1 | 0–2 | 0–2 |
 | InitProducerID | 22 | 0–1 | 0–1 | 0–4 | 0–4 |
+| AddPartitionsToTxn | 24 | 0–0 | 0–1 | 0–3 | 0–3 |
+| AddOffsetsToTxn | 25 | 0–0 | 0–1 | 0–3 | 0–3 |
+| EndTxn | 26 | 0–0 | 0–1 | 0–3 | 0–3 |
+| TxnOffsetCommit | 28 | 0–0 | 0–2 | 0–3 | 0–3 |
 | DescribeACLs | 29 | 0–0 | 0–1 | 0–3 | 0–3 |
 | CreateACLs | 30 | 0–0 | 0–1 | 0–3 | 0–3 |
 | DeleteACLs | 31 | 0–0 | 0–1 | 0–3 | 0–3 |
@@ -89,6 +95,9 @@ the highest version both sides support; a request outside them is not served.
 | IncrementalAlterConfigs | 44 | — | 0–1 | 0–1 | 0–1 |
 | OffsetDelete | 47 | — | 0–0 | 0–0 | 0–0 |
 | DescribeCluster | 60 | — | — | 0–1 | 0–2 |
+| DescribeProducers | 61 | — | — | 0–0 | 0–0 |
+| DescribeTransactions | 65 | — | — | 0–0 | 0–0 |
+| ListTransactions | 66 | — | — | 0–0 | 0–0 |
 | ConsumerGroupHeartbeat | 68 | — | — | — | 0–1 |
 | ConsumerGroupDescribe | 69 | — | — | — | 0–1 |
 <!-- api-table:end -->
@@ -98,9 +107,7 @@ emulated major is 1; the pre-0.11 message-set format is not supported.
 
 ## Not implemented (by design)
 
-Transactions — idempotent producers are fully supported (`InitProducerId` plus
-sequence-number deduplication), but there's no transactional produce/commit
-(`AddPartitionsToTxn`/`EndTxn`). `OffsetForLeaderEpoch`, `DescribeLogDirs`, quota APIs, and
+`OffsetForLeaderEpoch`, `DescribeLogDirs`, quota APIs, and
 the client-metrics/telemetry APIs. The broker serves exactly what it advertises: a
 request for an API it does not have, or at a version outside the advertised range,
 gets no response and its connection is closed, rather than being left to hang (the one

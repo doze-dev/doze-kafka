@@ -23,15 +23,27 @@ func (b *Broker) handleFindCoordinator(ctx context.Context, req *protocol.Reques
 
 	// Finding a group's coordinator needs Describe on the group; a principal that may
 	// not describe it is told so here rather than at its first JoinGroup.
+	// A transaction's coordinator needs Describe on the transactional id.
 	groupKey := fr.CoordinatorType == 0 // 0 is a group, 1 a transaction.
-	denied := func(key string) bool { return groupKey && !b.canGroup(req.Conn, key, opDescribe) }
+	denied := func(key string) bool {
+		if groupKey {
+			return !b.canGroup(req.Conn, key, opDescribe)
+		}
+		return fr.CoordinatorType == 1 && !b.canTxnID(req.Conn, key, opDescribe)
+	}
+	deniedCode := func() int16 {
+		if groupKey {
+			return kerr.GroupAuthorizationFailed.Code
+		}
+		return kerr.TransactionalIDAuthorizationFailed.Code
+	}
 
 	// v0-v3 single-coordinator fields.
 	resp.NodeID = node
 	resp.Host = host
 	resp.Port = port
 	if denied(fr.CoordinatorKey) {
-		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
+		resp.ErrorCode = deniedCode()
 		resp.NodeID, resp.Host, resp.Port = -1, "", -1
 	}
 
@@ -43,7 +55,7 @@ func (b *Broker) handleFindCoordinator(ctx context.Context, req *protocol.Reques
 		c.Host = host
 		c.Port = port
 		if denied(key) {
-			c.ErrorCode = kerr.GroupAuthorizationFailed.Code
+			c.ErrorCode = deniedCode()
 			c.NodeID, c.Host, c.Port = -1, "", -1
 		}
 		resp.Coordinators = append(resp.Coordinators, c)

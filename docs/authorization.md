@@ -45,7 +45,11 @@ every other topic as it was.
 | CreatePartitions | Alter on the topic |
 | DescribeConfigs, AlterConfigs, IncrementalAlterConfigs | DescribeConfigs / AlterConfigs on the topic, or on the cluster for the broker |
 | DescribeCluster | Describe on the cluster |
-| InitProducerId | IdempotentWrite on the cluster, or Write on any topic |
+| InitProducerId | IdempotentWrite on the cluster, or Write on any topic; with a `transactional.id`, Write on that id |
+| AddPartitionsToTxn, AddOffsetsToTxn, EndTxn, TxnOffsetCommit | Write on the transactional id (and Write on each topic, Read on the group / topics for the offsets) |
+| Produce (transactional batch) | Write on the topic and on the transactional id |
+| FindCoordinator (transaction), DescribeTransactions, ListTransactions | Describe on the transactional id (a listing shows what may be described) |
+| DescribeProducers | Read on the topic |
 | FindCoordinator, DescribeGroups, ConsumerGroupDescribe, OffsetFetch | Describe on the group (OffsetFetch also Describe on each topic) |
 | JoinGroup, SyncGroup, Heartbeat, LeaveGroup, ConsumerGroupHeartbeat | Read on the group (a KIP-848 member also leaves out topics it may not Describe) |
 | OffsetCommit | Read on the group and on each topic |
@@ -85,5 +89,5 @@ create or delete ACLs, so name a super user first.
 ## Limits
 
 Principals are `User:` names only (no groups or roles), the host is matched as written
-(no CIDR ranges), and transactional ids and delegation tokens are not resources here
-(neither exists). ACLs are stored in the metadata database and survive restarts.
+(no CIDR ranges), and delegation tokens are not resources here (they do not exist). A transactional
+id is a resource: see [Transactions](transactions.md). ACLs are stored in the metadata database and survive restarts.

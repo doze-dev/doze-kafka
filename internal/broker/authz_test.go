@@ -209,3 +209,49 @@ func unwrap(err error) error {
 	}
 	return u.Unwrap()
 }
+
+// A transactional id is a resource of its own: Write on it lets a producer take it over
+// and run transactions, and the produce of a transactional batch needs it too, besides
+// Write on the topic.
+func TestTransactionalIDsAreAuthorized(t *testing.T) {
+	skipShort(t)
+	addr := startAuthzBroker(t, "deny")
+	admin := as(t, addr, "admin")
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	mustCreateTopic(t, ctx, admin, "t", 1)
+	for _, r := range createACLs(t, ctx, admin,
+		allow(addr, topicRes, "t", literal, "alice", kmsg.ACLOperationWrite, permit),
+		allow(addr, kmsg.ACLResourceTypeTransactionalId, "alice-tx", literal, "alice", kmsg.ACLOperationWrite, permit),
+		allow(addr, kmsg.ACLResourceTypeTransactionalId, "alice-tx", literal, "alice", kmsg.ACLOperationDescribe, permit),
+	) {
+		if r.ErrorCode != 0 {
+			t.Fatalf("create: %d %v", r.ErrorCode, r.ErrorMessage)
+		}
+	}
+	init := func(user, id string) int16 {
+		req := kmsg.NewPtrInitProducerIDRequest()
+		req.TransactionalID, req.TransactionTimeoutMillis = &id, 30000
+		return ask(t, rawAs(t, addr, user), req, 4, kmsg.NewPtrInitProducerIDResponse()).ErrorCode
+	}
+	if c := init("alice", "alice-tx"); c != 0 {
+		t.Errorf("alice taking her own transactional id: code %d", c)
+	}
+	for _, tc := range []struct{ user, id string }{{"alice", "someone-elses"}, {"bob", "alice-tx"}} {
+		if c := init(tc.user, tc.id); c != kerr.TransactionalIDAuthorizationFailed.Code {
+			t.Errorf("%s taking %q: code %d, want TRANSACTIONAL_ID_AUTHORIZATION_FAILED", tc.user, tc.id, c)
+		}
+	}
+	// FindCoordinator for a transaction needs Describe on the id.
+	find := func(user, id string) int16 {
+		req := kmsg.NewPtrFindCoordinatorRequest()
+		req.CoordinatorKeys, req.CoordinatorType = []string{id}, 1
+		return ask(t, rawAs(t, addr, user), req, 4, kmsg.NewPtrFindCoordinatorResponse()).Coordinators[0].ErrorCode
+	}
+	if c := find("alice", "alice-tx"); c != 0 {
+		t.Errorf("alice finding the coordinator of her own id: code %d", c)
+	}
+	if c := find("bob", "alice-tx"); c != kerr.TransactionalIDAuthorizationFailed.Code {
+		t.Errorf("bob finding it: code %d", c)
+	}
+}

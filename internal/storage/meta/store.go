@@ -55,7 +55,8 @@ var (
 	bucketTopicsByID = []byte("topics_by_id") // uuid -> name
 	bucketOffsets    = []byte("offsets")      // group\0topic\0partition -> offsetRecord (JSON)
 	bucketMeta       = []byte("meta")         // singletons (producer-id counter, ...)
-	bucketACLs       = []byte("acls")         // acl key -> ACL (JSON); stored, never enforced.
+	bucketACLs       = []byte("acls")         // acl key -> ACL (JSON).
+	bucketTxns       = []byte("txns")         // transactional.id -> TxnRecord (JSON).
 	keyProducerID    = []byte("producer_id")
 )
 
@@ -110,6 +111,13 @@ type Store interface {
 	// RemoveACLs deletes exactly these entries (any that are not there are ignored).
 	RemoveACLs(acls []ACL) error
 
+	// PutTxn stores one transactional producer's coordinator state, durably. The
+	// state of a transaction is written before the broker acts on it, so a crash
+	// part-way through ending one is finished on the next start.
+	PutTxn(rec TxnRecord) error
+	// ListTxns returns every stored transactional state.
+	ListTxns() ([]TxnRecord, error)
+
 	NextProducerID() (int64, error)
 	// ReserveProducerIDs hands out a block of n consecutive producer ids in one
 	// transaction and returns the first. The block is durable before it is used,
@@ -133,7 +141,7 @@ func Open(path string) (Store, error) {
 		return nil, fmt.Errorf("meta: open %s: %w", path, err)
 	}
 	err = db.Update(func(tx *bbolt.Tx) error {
-		for _, name := range [][]byte{bucketTopics, bucketTopicsByID, bucketOffsets, bucketMeta, bucketACLs} {
+		for _, name := range [][]byte{bucketTopics, bucketTopicsByID, bucketOffsets, bucketMeta, bucketACLs, bucketTxns} {
 			if _, err := tx.CreateBucketIfNotExists(name); err != nil {
 				return err
 			}

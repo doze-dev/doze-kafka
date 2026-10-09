@@ -202,6 +202,50 @@ func authzCases() []authzCase {
 			req.Groups = []string{"cg"}
 			return ask(t, c, req, 0, kmsg.NewPtrConsumerGroupDescribeResponse()).Groups[0].ErrorCode
 		}},
+		{kmsg.AddPartitionsToTxn, kerr.TransactionalIDAuthorizationFailed.Code, func(t *testing.T, c *rawConn) int16 {
+			req := kmsg.NewPtrAddPartitionsToTxnRequest()
+			req.TransactionalID = "tx1"
+			rt := kmsg.NewAddPartitionsToTxnRequestTopic()
+			rt.Topic, rt.Partitions = T, []int32{0}
+			req.Topics = append(req.Topics, rt)
+			return ask(t, c, req, 3, kmsg.NewPtrAddPartitionsToTxnResponse()).Topics[0].Partitions[0].ErrorCode
+		}},
+		{kmsg.AddOffsetsToTxn, kerr.TransactionalIDAuthorizationFailed.Code, func(t *testing.T, c *rawConn) int16 {
+			req := kmsg.NewPtrAddOffsetsToTxnRequest()
+			req.TransactionalID, req.Group = "tx1", G
+			return ask(t, c, req, 3, kmsg.NewPtrAddOffsetsToTxnResponse()).ErrorCode
+		}},
+		{kmsg.EndTxn, kerr.TransactionalIDAuthorizationFailed.Code, func(t *testing.T, c *rawConn) int16 {
+			req := kmsg.NewPtrEndTxnRequest()
+			req.TransactionalID = "tx1"
+			return ask(t, c, req, 3, kmsg.NewPtrEndTxnResponse()).ErrorCode
+		}},
+		{kmsg.TxnOffsetCommit, kerr.TransactionalIDAuthorizationFailed.Code, func(t *testing.T, c *rawConn) int16 {
+			req := kmsg.NewPtrTxnOffsetCommitRequest()
+			req.TransactionalID, req.Group, req.Generation = "tx1", G, -1
+			rt := kmsg.NewTxnOffsetCommitRequestTopic()
+			rt.Topic = T
+			rp := kmsg.NewTxnOffsetCommitRequestTopicPartition()
+			rt.Partitions = append(rt.Partitions, rp)
+			req.Topics = append(req.Topics, rt)
+			return ask(t, c, req, 3, kmsg.NewPtrTxnOffsetCommitResponse()).Topics[0].Partitions[0].ErrorCode
+		}},
+		{kmsg.DescribeTransactions, kerr.TransactionalIDAuthorizationFailed.Code, func(t *testing.T, c *rawConn) int16 {
+			req := kmsg.NewPtrDescribeTransactionsRequest()
+			req.TransactionalIDs = []string{"tx1"}
+			return ask(t, c, req, 0, kmsg.NewPtrDescribeTransactionsResponse()).TransactionStates[0].ErrorCode
+		}},
+		{kmsg.ListTransactions, 0, func(t *testing.T, c *rawConn) int16 {
+			// Only the transactional ids that may be described are listed.
+			return int16(len(ask(t, c, kmsg.NewPtrListTransactionsRequest(), 0, kmsg.NewPtrListTransactionsResponse()).TransactionStates))
+		}},
+		{kmsg.DescribeProducers, kerr.TopicAuthorizationFailed.Code, func(t *testing.T, c *rawConn) int16 {
+			req := kmsg.NewPtrDescribeProducersRequest()
+			rt := kmsg.NewDescribeProducersRequestTopic()
+			rt.Topic, rt.Partitions = T, []int32{0}
+			req.Topics = append(req.Topics, rt)
+			return ask(t, c, req, 0, kmsg.NewPtrDescribeProducersResponse()).Topics[0].Partitions[0].ErrorCode
+		}},
 		{kmsg.InitProducerID, kerr.ClusterAuthorizationFailed.Code, func(t *testing.T, c *rawConn) int16 {
 			return ask(t, c, kmsg.NewPtrInitProducerIDRequest(), 4, kmsg.NewPtrInitProducerIDResponse()).ErrorCode
 		}},
@@ -237,6 +281,13 @@ func TestEveryServedAPIIsAuthorized(t *testing.T) {
 	defer cancel()
 	mustCreateTopic(t, ctx, admin, "t", 1)
 	commitOffset(t, ctx, admin, "g", "t", 0) // a group exists for the super user to list.
+	// A transactional id exists for the super user to list.
+	txid := "tx1"
+	ireq := kmsg.NewPtrInitProducerIDRequest()
+	ireq.TransactionalID, ireq.TransactionTimeoutMillis = &txid, 30000
+	if resp, err := ireq.RequestWith(ctx, admin); err != nil || resp.ErrorCode != 0 {
+		t.Fatalf("InitProducerId for a transactional id as the super user: %v %+v", err, resp)
+	}
 
 	covered := map[kmsg.Key]bool{}
 	for _, tc := range authzCases() {
@@ -247,9 +298,9 @@ func TestEveryServedAPIIsAuthorized(t *testing.T) {
 				t.Errorf("an unauthorized principal got %d, want %d (%s)", got, tc.want, kerr.ErrorForCode(tc.want))
 			}
 			// The super user must not be refused: the check is about the principal.
-			if ok := tc.ask(t, rawAs(t, addr, "admin")); tc.api == kmsg.ListGroups {
+			if ok := tc.ask(t, rawAs(t, addr, "admin")); tc.api == kmsg.ListGroups || tc.api == kmsg.ListTransactions {
 				if ok < 1 {
-					t.Errorf("the super user lists %d groups, want at least the one that exists", ok)
+					t.Errorf("the super user lists %d, want at least the one that exists", ok)
 				}
 			} else if ok == kerr.TopicAuthorizationFailed.Code || ok == kerr.GroupAuthorizationFailed.Code || ok == kerr.ClusterAuthorizationFailed.Code {
 				t.Errorf("the super user was refused: code %d", ok)

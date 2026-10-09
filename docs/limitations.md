@@ -22,13 +22,11 @@ implement it.
 
 ## Deliberately out of scope
 
-- **Transactions.** Idempotent producers are fully supported — sequence numbers are
-  deduplicated, so a retried batch won't duplicate — but there's no *transactional*
-  produce/commit (`AddPartitionsToTxn`, `EndTxn`, …), so there's no exactly-once
-  *processing* across a read-process-write cycle. One caveat on the idempotence: the
-  dedup state is in memory, so a batch that was in flight exactly across a broker
-  restart could still duplicate (rare, and `acks=all` makes it rarer still, since an
-  acked batch was fsynced and the producer won't resend it).
+- **Transactions: the classic protocol only.** Transactions work ([Transactions](transactions.md)),
+  but the newer "transaction v2" of KIP-890 (Produce v12+) is not offered, so clients use
+  the classic one. One caveat on idempotence: the sequence window is in memory, so a
+  non-transactional idempotent batch that was in flight exactly across a broker restart
+  could still duplicate (rare, and `acks=all` makes it rarer still).
 - **Log compaction.** Retention is delete-only (by size and age). `cleanup.policy=compact`
   is accepted and reported, because Kafka Connect and Schema Registry check for it on
   their own topics, but nothing is compacted: every record is kept until retention

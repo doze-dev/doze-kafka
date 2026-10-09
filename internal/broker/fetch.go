@@ -199,10 +199,19 @@ func (b *Broker) readPartition(topic string, part kmsg.FetchRequestTopicPartitio
 		maxBytes = 1 // nothing left: Read still reports offsets and errors; data is dropped below.
 	}
 
-	data, err := plog.Read(part.FetchOffset, maxBytes)
+	// Under read-committed (isolation level 1) a consumer is given nothing at or above
+	// the last stable offset, and with what it is given, the aborted transactions that
+	// touch it, so it can drop their records. Read-uncommitted sees everything.
+	committed := fr.IsolationLevel == 1
+	data, lso, aborted, err := plog.ReadIsolated(part.FetchOffset, maxBytes, committed)
 	rp.HighWatermark = plog.LogEndOffset()
-	rp.LastStableOffset = rp.HighWatermark
+	rp.LastStableOffset = lso
 	rp.LogStartOffset = plog.LogStartOffset()
+	for _, a := range aborted {
+		at := kmsg.NewFetchResponseTopicPartitionAbortedTransaction()
+		at.ProducerID, at.FirstOffset = a.ProducerID, a.FirstOffset
+		rp.AbortedTransactions = append(rp.AbortedTransactions, at)
+	}
 
 	switch {
 	case errors.Is(err, log.ErrOffsetOutOfRange):

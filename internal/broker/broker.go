@@ -27,6 +27,7 @@ type Broker struct {
 	alterMu sync.Mutex  // one topic-config change at a time (see alterTopic).
 	acls    aclState    // the stored ACLs' writers (acls.go).
 	authz   *authorizer // enforces them (authorizer.go).
+	txns    *txnManager // transactional producers (txn.go).
 	cfg     config.Config
 	log     *slog.Logger
 	logs    *log.Manager
@@ -69,8 +70,13 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 	if err != nil {
 		return nil, fmt.Errorf("broker: read the stored ACLs: %w", err)
 	}
+	txnRecs, err := m.ListTxns()
+	if err != nil {
+		return nil, fmt.Errorf("broker: read the stored transactions: %w", err)
+	}
 	return &Broker{
 		authz:  newAuthorizer(cfg, acls),
+		txns:   newTxnManager(txnRecs),
 		cfg:    cfg,
 		log:    logger,
 		logs:   logs,
@@ -121,6 +127,13 @@ func (b *Broker) handlers() map[protocol.APIKey]protocol.Handler {
 		kmsg.CreatePartitions:        typed(b.handleCreatePartitions),
 		kmsg.DeleteRecords:           typed(b.handleDeleteRecords),
 		kmsg.DescribeACLs:            typed(b.handleDescribeACLs),
+		kmsg.AddPartitionsToTxn:      typed(b.handleAddPartitionsToTxn),
+		kmsg.AddOffsetsToTxn:         typed(b.handleAddOffsetsToTxn),
+		kmsg.EndTxn:                  typed(b.handleEndTxn),
+		kmsg.TxnOffsetCommit:         typed(b.handleTxnOffsetCommit),
+		kmsg.DescribeTransactions:    typed(b.handleDescribeTransactions),
+		kmsg.ListTransactions:        typed(b.handleListTransactions),
+		kmsg.DescribeProducers:       typed(b.handleDescribeProducers),
 		kmsg.CreateACLs:              typed(b.handleCreateACLs),
 		kmsg.DeleteACLs:              typed(b.handleDeleteACLs),
 		kmsg.ListOffsets:             typed(b.handleListOffsets),
