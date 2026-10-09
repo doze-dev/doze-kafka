@@ -85,6 +85,9 @@ func checkBatchShape(b []byte) (batchInfo, error) {
 	return info, nil
 }
 
+// crcOf is the CRC32C of a complete batch from its attributes field on.
+func crcOf(b []byte) uint32 { return crc32.Checksum(b[batchAttributesOff:], crcTable) }
+
 // crcOK reports whether a complete batch's stored CRC matches its contents.
 func crcOK(b []byte) bool {
 	return crc32.Checksum(b[batchAttributesOff:], crcTable) == binary.BigEndian.Uint32(b[batchCRCOff:])
@@ -190,7 +193,9 @@ type BatchHeader struct {
 	ProducerEpoch int16
 	BaseSequence  int32
 	RecordCount   int32
-	TotalBytes    int // on-disk size of this batch.
+	TotalBytes    int  // on-disk size of this batch.
+	Transactional bool // the batch belongs to a transaction.
+	Control       bool // a transaction marker (only the broker writes these).
 }
 
 // ParseBatch reads the leading record batch's header from b, including the
@@ -207,6 +212,9 @@ func ParseBatch(b []byte) (BatchHeader, bool) {
 		h.ProducerID = int64(binary.BigEndian.Uint64(b[batchProducerIDOff:]))
 		h.ProducerEpoch = int16(binary.BigEndian.Uint16(b[batchProducerEpochOff:]))
 		h.BaseSequence = int32(binary.BigEndian.Uint32(b[batchBaseSequenceOff:]))
+		attrs := binary.BigEndian.Uint16(b[batchAttributesOff:])
+		h.Transactional = attrs&batchTransactionalBit != 0
+		h.Control = attrs&batchControlBit != 0
 	}
 	return h, true
 }

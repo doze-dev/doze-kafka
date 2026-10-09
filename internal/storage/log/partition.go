@@ -30,6 +30,7 @@ type Partition struct {
 	segments       []*Segment // sorted by base offset; last == active.
 	logEndOffset   int64
 	logStartOffset int64
+	txn            txnState // open and aborted transactions; see txn.go.
 
 	// Group commit. Every Append bumps appendSeq; syncedSeq is how far a completed
 	// fsync is known to cover. A caller that needs its write durable waits its turn
@@ -98,7 +99,11 @@ func (p *Partition) active() *Segment { return p.segments[len(p.segments)-1] }
 func (p *Partition) Append(records []byte) (int64, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	return p.appendLocked(records)
+}
 
+// appendLocked is Append for a caller holding p.mu.
+func (p *Partition) appendLocked(records []byte) (int64, error) {
 	firstOffset := p.logEndOffset
 	for pos := 0; pos < len(records); {
 		info, ok := parseHeader(records[pos:])
@@ -113,6 +118,18 @@ func (p *Partition) Append(records []byte) (int64, error) {
 		batch := records[pos : pos+int(info.totalBytes)]
 		offset := p.logEndOffset
 		stampBaseOffset(batch, offset)
+		// The first transactional batch a partition takes starts it keeping
+		// transaction state: the marker file says so for a later open, and the log so
+		// far is scanned now, before this batch is in it.
+		transactional := len(batch) >= batchFullHeaderBytes && attrsOf(batch)&(batchTransactionalBit|batchControlBit) != 0
+		if transactional {
+			if err := p.markTransactional(); err != nil {
+				return 0, err
+			}
+			if err := p.ensureTxn(); err != nil {
+				return 0, err
+			}
+		}
 
 		if p.active().sizeBytes > 0 && p.active().sizeBytes+int64(len(batch)) > p.segmentBytes {
 			// Durably seal the segment being rolled off before opening the next, so
@@ -132,6 +149,9 @@ func (p *Partition) Append(records []byte) (int64, error) {
 		}
 		p.appendSeq.Add(1)
 		p.logEndOffset = offset + int64(info.recordCount)
+		if transactional {
+			p.txn.observe(batch, offset)
+		}
 		pos += int(info.totalBytes)
 	}
 	return firstOffset, nil
@@ -149,7 +169,13 @@ func (p *Partition) Append(records []byte) (int64, error) {
 func (p *Partition) Read(fetchOffset, maxBytes int64) ([]byte, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	return p.readLocked(fetchOffset, maxBytes, -1)
+}
 
+// readLocked is Read for a caller holding p.mu. A limit of zero or more is an offset
+// at which to stop: no batch that begins at or past it is returned (the last stable
+// offset, for a read-committed fetch).
+func (p *Partition) readLocked(fetchOffset, maxBytes, limit int64) ([]byte, error) {
 	if fetchOffset < p.logStartOffset {
 		return nil, ErrOffsetOutOfRange
 	}
@@ -179,9 +205,12 @@ func (p *Partition) Read(fetchOffset, maxBytes int64) ([]byte, error) {
 			continue
 		}
 		n := seg.sizeBytes - pos
-		if maxBytes > 0 && maxBytes < n {
+		if limit >= 0 || (maxBytes > 0 && maxBytes < n) {
 			// Never split a batch: only trim to whole batches beyond the first.
-			n = alignToBatch(seg, pos, maxBytes)
+			n = alignToBatch(seg, pos, maxBytes, limit)
+			if n == 0 {
+				return []byte{}, nil // the first batch is past the limit.
+			}
 		}
 		return seg.readAt(pos, int(n))
 	}
@@ -190,7 +219,7 @@ func (p *Partition) Read(fetchOffset, maxBytes int64) ([]byte, error) {
 
 // alignToBatch returns a byte count starting at pos that ends on a batch boundary
 // and is ≤ maxBytes, but always includes at least the first batch.
-func alignToBatch(seg *Segment, pos, maxBytes int64) int64 {
+func alignToBatch(seg *Segment, pos, maxBytes, limit int64) int64 {
 	var total int64
 	for pos+total < seg.sizeBytes {
 		header, err := seg.readAt(pos+total, batchHeaderMinBytes)
@@ -201,12 +230,15 @@ func alignToBatch(seg *Segment, pos, maxBytes int64) int64 {
 		if !ok || pos+total+info.totalBytes > seg.sizeBytes {
 			break
 		}
-		if total > 0 && total+info.totalBytes > maxBytes {
+		if limit >= 0 && info.baseOffset >= limit {
+			break
+		}
+		if total > 0 && maxBytes > 0 && total+info.totalBytes > maxBytes {
 			break
 		}
 		total += info.totalBytes
 	}
-	if total == 0 {
+	if total == 0 && limit < 0 {
 		total = seg.sizeBytes - pos // pathological: return the remainder.
 	}
 	return total
@@ -286,6 +318,9 @@ func (p *Partition) dropOldestLocked() error {
 	}
 	p.segments = p.segments[1:]
 	p.logStartOffset = max(p.logStartOffset, p.segments[0].baseOffset)
+	if p.txn.ready {
+		p.txn.dropBelow(p.logStartOffset)
+	}
 	return nil
 }
 
