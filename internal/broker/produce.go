@@ -83,7 +83,7 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
 			default:
 				wrote := b.appendRecords(req.Conn, pr.TransactionID, name, topic.Config, part, &rp)
-				refused = refused || rp.ErrorCode == kerr.CorruptMessage.Code || rp.ErrorCode == kerr.MessageTooLarge.Code
+				refused = refused || rp.ErrorCode == kerr.CorruptMessage.Code || rp.ErrorCode == kerr.MessageTooLarge.Code || rp.ErrorCode == kerr.InvalidRecord.Code
 				if wrote {
 					producedTopics[name] = struct{}{}
 					tp := topicPartition{name, part.Partition}
@@ -163,6 +163,17 @@ func (b *Broker) appendRecords(conn *protocol.Conn, txnID *string, topic string,
 		if largest := log.LargestBatch(part.Records); largest > limit {
 			rp.ErrorCode = kerr.MessageTooLarge.Code
 			msg := fmt.Sprintf("a record batch of %d bytes is larger than this topic's max.message.bytes (%d)", largest, limit)
+			rp.ErrorMessage = &msg
+			rp.BaseOffset = -1
+			return false
+		}
+	}
+	// A compacted topic is keyed: a record with no key has nothing to replace, and is
+	// refused as Kafka refuses it.
+	if compacts(topicConfig) {
+		if err := log.RequireKeys(part.Records); err != nil {
+			rp.ErrorCode = kerr.InvalidRecord.Code
+			msg := err.Error()
 			rp.ErrorMessage = &msg
 			rp.BaseOffset = -1
 			return false

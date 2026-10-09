@@ -168,7 +168,7 @@ type settingView struct {
 type configView struct {
 	Settings []settingView
 	Others   []ConfigEntry // everything else the broker reports, for reading.
-	Compact  bool          // cleanup.policy asks for compaction, which is not done.
+	Compact  bool          // cleanup.policy asks for compaction: the broker cleans it in the background.
 }
 
 func newConfigView(entries []ConfigEntry) configView {

@@ -56,14 +56,44 @@ in both directions. `-1` means no limit, so one topic can keep everything on a b
 that otherwise trims, and one topic can be trimmed on a broker that otherwise keeps
 everything. A change applies at once, and survives a restart.
 
-Retention is **delete-only** — there's no log compaction. The active segment is never
-deleted, so a partition always keeps its most recent data. A background sweep enforces
+The active segment is never deleted, so a partition always keeps its most recent data. A background sweep enforces
 the bounds roughly once a second for partitions in use, and once a minute for those
 nothing has read or written since the broker started; because it only ever removes
 whole non-active
 segments, a partition can briefly sit a little above its byte bound (by up to one
 segment) before the next roll. Deleted data becomes unreadable and the partition's
 earliest offset advances.
+
+## Compaction
+
+A topic with `cleanup.policy=compact` (or `compact,delete`) keeps the latest record of each
+key and drops the older ones. A background cleaner does it, about once a second, for
+partitions in use, and it follows these rules:
+
+- It works on **sealed segments only**, never the active one, and only below the last
+  stable offset, so a record that could still be superseded by the active segment is kept,
+  and an open transaction is never touched.
+- It reads the uncleaned part of the log into a map of key → latest offset (a million keys
+  at a time, so a bigger log is cleaned over several passes), then **rewrites** every
+  eligible segment, keeping a record only if it is the latest for its key. A record with
+  no key is refused at produce, as in Kafka, and one that is somehow there is kept.
+- **Offsets never move.** A rewritten batch keeps its base offset and offset span; removed
+  records leave gaps, as on a real broker. A consumer positioned in a gap is given the
+  next record. The log-start offset does not move either: an emptied segment is deleted
+  except the first.
+- A **tombstone** (a null value) stays until its segment has been cleaned before and is
+  older than `delete.retention.ms` (24 hours unless the topic sets it), then goes.
+- Records of **aborted transactions** are dropped, and a commit or abort marker stays only
+  while a record of its transaction does.
+- `min.cleanable.dirty.ratio` (here 0: clean as soon as a segment has rolled, rather than
+  Kafka's 0.5), `min.compaction.lag.ms` and `max.compaction.lag.ms` decide when. Rewritten
+  batches are uncompressed unless the topic's `compression.type` names a codec.
+- A rewrite is swapped in without a moment when the log cannot be read, and a stop at any
+  point leaves a log that opens: a half-written file is discarded, and an index that no
+  longer matches its log is rebuilt from it. The segment keeps its original age, so a
+  rewrite does not postpone retention.
+
+For `compact,delete`, compaction runs first and retention after.
 
 ## Durability: restart vs crash
 

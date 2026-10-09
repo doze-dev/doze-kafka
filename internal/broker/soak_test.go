@@ -102,6 +102,7 @@ func runSoak(t *testing.T, duration time.Duration, chaos bool, every time.Durati
 	admin := newClient(t, sup.addr)
 	mustCreateTopic(t, ctx, admin, "soak", partitions)
 	mustCreateTopic(t, ctx, admin, "soak-tx", 2)
+	createCompacted(t, ctx, admin, "soak-compact", "compact", map[string]string{"delete.retention.ms": "1000"})
 	admin.Close()
 
 	wm := &watermark{hi: map[int]int64{}}
@@ -121,6 +122,11 @@ func runSoak(t *testing.T, duration time.Duration, chaos bool, every time.Durati
 	txOut := &txnOutcomes{byTxn: map[int]string{}}
 	wg.Add(1)
 	go runTxnProducer(t, &wg, sup.addr, txOut, done)
+	// A producer onto a compacted topic: the broker's cleaner is rewriting segments
+	// while it is killed, and the latest acknowledged value of each key must survive.
+	cmp := &compactAcks{latest: map[int]int{}}
+	wg.Add(1)
+	go runCompactProducer(t, &wg, sup.addr, cmp, done)
 
 	// Health monitor (RSS + goroutines).
 	health := &healthMonitor{sup: sup}
@@ -171,6 +177,7 @@ func runSoak(t *testing.T, duration time.Duration, chaos bool, every time.Durati
 	perPartition := drainAll(t, ctx, sup.addr, "soak", partitions)
 	verifySoak(t, perPartition, wm.snapshot(), producers, partitions, chaos, restarts)
 	verifyTxnSoak(t, ctx, sup.addr, txOut)
+	verifyCompactSoak(t, ctx, sup.addr, cmp)
 
 	// Health verdict.
 	health.report(t, chaos)
@@ -771,5 +778,91 @@ func verifyTxnSoak(t *testing.T, ctx context.Context, addr string, out *txnOutco
 	t.Logf("transactions: %d whole, %d absent, %d partial, %d in total", whole, absent, partial, len(out.byTxn))
 	if len(out.byTxn) == 0 {
 		t.Error("the transactional producer never completed a transaction, so the invariant was not exercised")
+	}
+}
+
+// --- compacted topic ---
+
+const compactKeys = 8
+
+type compactAcks struct {
+	mu     sync.Mutex
+	latest map[int]int // key → the highest sequence acknowledged for it.
+}
+
+func (c *compactAcks) set(key, seq int) {
+	c.mu.Lock()
+	if seq > c.latest[key] {
+		c.latest[key] = seq
+	}
+	c.mu.Unlock()
+}
+
+// runCompactProducer writes "K<key>:<seq>" to a compacted topic, a key per record in
+// turn, one idempotent producer, so acknowledgements arrive in sequence order.
+func runCompactProducer(t *testing.T, wg *sync.WaitGroup, addr string, acks *compactAcks, done <-chan struct{}) {
+	defer wg.Done()
+	cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.RecordPartitioner(kgo.ManualPartitioner()),
+		kgo.RecordRetries(1_000_000), kgo.RequestRetries(1_000_000), kgo.RetryTimeout(2*time.Minute), kgo.ProduceRequestTimeout(20*time.Second))
+	if err != nil {
+		t.Errorf("compacted producer: %v", err)
+		return
+	}
+	defer cl.Close()
+	pad := strings.Repeat("c", 60)
+	for seq := 1; ; seq++ {
+		select {
+		case <-done:
+			cl.Flush(context.Background())
+			return
+		default:
+		}
+		key, s := seq%compactKeys, seq
+		cl.Produce(context.Background(), &kgo.Record{Topic: "soak-compact", Partition: 0, Key: []byte(strconv.Itoa(key)), Value: []byte(fmt.Sprintf("K%d:%d:%s", key, s, pad))},
+			func(_ *kgo.Record, err error) {
+				if err == nil {
+					acks.set(key, s)
+				}
+			})
+		time.Sleep(2 * time.Millisecond)
+	}
+}
+
+// verifyCompactSoak reads the compacted topic back. Per key the values must run in
+// increasing order, and the last must be the latest acknowledged one or later: the cleaner
+// may drop older values and must never drop the newest.
+func verifyCompactSoak(t *testing.T, ctx context.Context, addr string, acks *compactAcks) {
+	t.Helper()
+	// Give the cleaner a moment to finish a pass the last restart interrupted.
+	time.Sleep(3 * time.Second)
+	rows := readAllRecords(t, addr, "soak-compact", false)
+	last := map[int]int{}
+	for _, r := range rows {
+		var key, seq int
+		if _, err := fmt.Sscanf(r.vl, "K%d:%d:", &key, &seq); err != nil {
+			t.Errorf("unreadable compacted value %q", r.vl)
+			continue
+		}
+		if prev, ok := last[key]; ok && seq <= prev {
+			t.Errorf("key %d: sequence %d after %d, out of order or duplicated", key, seq, prev)
+		}
+		last[key] = seq
+	}
+	acks.mu.Lock()
+	defer acks.mu.Unlock()
+	for key, want := range acks.latest {
+		if last[key] < want {
+			t.Errorf("key %d: the latest acknowledged value (%d) is gone; the newest left is %d", key, want, last[key])
+		}
+	}
+	t.Logf("compacted topic: %d records on disk for %d keys (the producer wrote about %d)", len(rows), len(last), func() int {
+		m := 0
+		for _, v := range acks.latest {
+			m = max(m, v)
+		}
+		return m
+	}())
+	if len(acks.latest) == 0 {
+		t.Error("the compacted-topic producer never had an acknowledgement, so the invariant was not exercised")
 	}
 }

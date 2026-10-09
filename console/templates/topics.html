@@ -162,7 +162,7 @@
   </div>
   <div class="tape-foot">
     <span>{{if .Messages}}offsets <b class="mono">{{.WindowFrom}}</b> – <b class="mono">{{.WindowLast}}</b> · {{end}}each mark is one record on disk, newest on the right</span>
-    <span class="mono" title="Records currently retained on this partition">{{.Count}} record{{if ne .Count 1}}s{{end}}</span>
+    <span class="mono" title="The offsets currently retained on this partition. A compacted topic and a transaction marker leave gaps, so this can be more than the number of records.">{{.Count}} record{{if ne .Count 1}}s{{end}}</span>
   </div>
   </div>
   {{end}}
@@ -319,7 +319,7 @@
 <details class="cfg" id="topic-config" {{if .Open}}open{{end}}>
   <summary>
     {{icon "info"}}
-    <span class="cfgsum"><b>Settings</b>{{range .Config.Settings}}{{if .Summary}} · {{.Label | lower}} <span class="mono"><b>{{.Effective}}</b></span>{{if .Own}} <span class="own">this topic</span>{{end}}{{end}}{{end}}{{if .Config.Compact}} · <span class="lag-some">compaction asked for, not applied</span>{{end}}</span>
+    <span class="cfgsum"><b>Settings</b>{{range .Config.Settings}}{{if .Summary}} · {{.Label | lower}} <span class="mono"><b>{{.Effective}}</b></span>{{if .Own}} <span class="own">this topic</span>{{end}}{{end}}{{end}}{{if .Config.Compact}} · <span class="own">compacted</span>{{end}}</span>
     <span class="twist">{{icon "chevron"}}</span>
   </summary>
   <form class="cfgform" hx-post="{{topicURL .Topic.Name}}/config" hx-target="#topic-config" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]">
@@ -332,7 +332,7 @@
   </form>
   <div class="cfgchips">
     {{range .Config.Others}}<span class="cfgchip {{if .Own}}own{{end}}" {{if .Own}}title="Set on this topic"{{end}}>{{.Name}} <b>{{.Value}}</b></span>{{end}}
-    <span class="cfgchip note">{{if .Config.Compact}}This topic asks for compaction. doze-kafka accepts the setting and does not compact: every record is kept until retention removes it. {{end}}Other Kafka topic settings are stored and reported, and change nothing here.</span>
+    <span class="cfgchip note">{{if .Config.Compact}}This topic is compacted: in the background the broker keeps the latest record of each key and drops the older ones, never touching the newest segment or an open transaction. The offsets of dropped records stay as gaps, so offset counts here can be more than the records. A record with no key is refused. {{end}}Other Kafka topic settings are stored and reported, and change nothing here.</span>
   </div>
 </details>
 {{end}}

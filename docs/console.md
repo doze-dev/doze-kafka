@@ -52,8 +52,8 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   broker. The largest record batch the topic accepts, and whether records take the
   producer's time or the broker's, are set there too. The same fields are on the
   create-topic form. Other Kafka topic
-  settings are listed for reading; a topic that asks for compaction is told it is not
-  compacted.
+  settings are listed for reading; a topic that is compacted says so, and that its offset
+  counts can exceed its records.
 - **Transactions** show on the tape. A record of a transaction that aborted is dimmed and
   badged *aborted*, and one whose transaction has not ended is badged *open* (a
   read-committed consumer cannot see either); a commit or abort marker takes an offset

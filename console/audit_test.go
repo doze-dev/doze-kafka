@@ -985,17 +985,17 @@ func TestATopicCanBeCreatedWithItsOwnRetentionAndChangedLater(t *testing.T) {
 	}
 }
 
-// A topic that asks for compaction is told plainly that it is not compacted.
-func TestCompactionIsShownAsNotApplied(t *testing.T) {
+// A compacted topic is said to be compacted, and to leave gaps in its offsets.
+func TestACompactedTopicIsShownAsCompacted(t *testing.T) {
 	c := newTestConsole(t)
 	if err := c.be.CreateTopic(context.Background(), "c", 1, map[string]string{"cleanup.policy": "compact"}); err != nil {
 		t.Fatal(err)
 	}
 	page := req(t, c, "GET", "/_console/topics/c", nil).Body.String()
-	if !strings.Contains(page, "compaction asked for, not applied") || !strings.Contains(page, "does not compact") {
-		t.Error("a compacted topic's page should say compaction is not applied")
+	if !strings.Contains(page, `<span class="own">compacted</span>`) || !strings.Contains(page, "This topic is compacted") || strings.Contains(page, "not applied") || strings.Contains(page, "does not compact") {
+		t.Error("a compacted topic's page should say it is compacted")
 	}
-	if plain := req(t, c, "GET", "/_console/new/topic", nil).Body.String(); strings.Contains(plain, "not applied") {
+	if plain := req(t, c, "GET", "/_console/new/topic", nil).Body.String(); strings.Contains(plain, "This topic is compacted") {
 		t.Error("the note should appear only where compaction was asked for")
 	}
 }

@@ -28,11 +28,11 @@ implement it.
   are read back from the last 16 MiB of the log, so a batch resent after a crash is
   recognised. (A producer idle for longer than that window loses the protection, as one idle
   past 15 minutes does in memory.)
-- **Log compaction.** Retention is delete-only (by size and age). `cleanup.policy=compact`
-  is accepted and reported, because Kafka Connect and Schema Registry check for it on
-  their own topics, but nothing is compacted: every record is kept until retention
-  removes it. A consumer reading a "compacted" topic from the start sees every value a
-  key ever had, not only the latest. (Committed offsets are stored in the metadata
+- **Log compaction runs in the background, on open partitions.** See
+  [Storage & durability](storage-and-durability.md#compaction). A partition nothing has
+  opened since the broker started is cleaned when it is first used. Offsets of removed
+  records stay as gaps, so a count of offsets can exceed the number of records. A compacted
+  topic refuses a record with no key. (Committed offsets are stored in the metadata
   database, not in a compacted `__consumer_offsets` topic.)
 - **Topic configuration: five settings act, the rest are kept.** A topic's own
   `retention.ms`, `retention.bytes` and `segment.bytes`, given at `CreateTopics` or

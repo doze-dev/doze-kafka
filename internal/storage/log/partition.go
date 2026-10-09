@@ -32,6 +32,13 @@ type Partition struct {
 	logStartOffset int64
 	txn            txnState // open and aborted transactions; see txn.go.
 
+	// The cleaner (compact.go): one pass at a time, the offset below which the log has
+	// been cleaned, and what the last pass did.
+	cleaning      sync.Mutex
+	cleanedTo     int64
+	cleanedLoaded bool
+	lastClean     CleanResult
+
 	// Group commit. Every Append bumps appendSeq; syncedSeq is how far a completed
 	// fsync is known to cover. A caller that needs its write durable waits its turn
 	// at syncMu and, if a concurrent caller's fsync already covered its write, is
@@ -53,6 +60,10 @@ func openPartition(dir string, opts ManagerOptions) (*Partition, error) {
 		syncDir(filepath.Dir(dir)) // persist the new directory's entry.
 	}
 	p := &Partition{dir: dir, segmentBytes: opts.SegmentBytes, indexInterval: opts.IndexIntervalBytes, beforeSync: opts.BeforeSync}
+	// Finish or undo a cleaner swap a crash interrupted, before any index is read.
+	if err := recoverSwaps(dir); err != nil {
+		return nil, err
+	}
 
 	bases, err := listSegmentBases(dir)
 	if err != nil {
@@ -186,21 +197,38 @@ func (p *Partition) readLocked(fetchOffset, maxBytes, limit int64) ([]byte, erro
 		return []byte{}, nil
 	}
 	seg := p.segmentFor(fetchOffset)
-	if seg == nil {
-		return []byte{}, nil
+	from := fetchOffset
+	for seg != nil {
+		if data, found, err := p.readSegment(seg, from, fetchOffset, maxBytes, limit); err != nil || found {
+			return data, err
+		}
+		// Nothing at or after the offset in this segment. Compaction can empty a
+		// segment's tail, or all of it, and the records that follow are in the next one:
+		// carry on there rather than telling the consumer it has caught up.
+		next := p.segmentAfter(seg)
+		if next == nil {
+			break
+		}
+		seg, from = next, next.baseOffset
 	}
+	return []byte{}, nil
+}
 
-	pos := seg.index.lookup(fetchOffset)
+// readSegment looks in one segment for the first batch holding an offset at or after from.
+// found is false when there is none; the request's own fetchOffset is kept only for the
+// "ends before it" test on the segment it started in.
+func (p *Partition) readSegment(seg *Segment, from, fetchOffset, maxBytes, limit int64) (data []byte, found bool, err error) {
+	pos := seg.index.lookup(from)
 	for pos < seg.sizeBytes {
 		header, err := seg.readAt(pos, batchHeaderMinBytes)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		info, ok := parseHeader(header)
 		if !ok || pos+info.totalBytes > seg.sizeBytes {
 			break
 		}
-		if info.baseOffset+int64(info.recordCount) <= fetchOffset {
+		if info.baseOffset+int64(info.recordCount) <= from {
 			pos += info.totalBytes // this batch ends before the requested offset.
 			continue
 		}
@@ -209,12 +237,23 @@ func (p *Partition) readLocked(fetchOffset, maxBytes, limit int64) ([]byte, erro
 			// Never split a batch: only trim to whole batches beyond the first.
 			n = alignToBatch(seg, pos, maxBytes, limit)
 			if n == 0 {
-				return []byte{}, nil // the first batch is past the limit.
+				return []byte{}, true, nil // the first batch is past the limit.
 			}
 		}
-		return seg.readAt(pos, int(n))
+		data, err = seg.readAt(pos, int(n))
+		return data, true, err
 	}
-	return []byte{}, nil
+	return nil, false, nil
+}
+
+// segmentAfter is the segment following seg, or nil if it is the last.
+func (p *Partition) segmentAfter(seg *Segment) *Segment {
+	for i, s := range p.segments {
+		if s == seg && i+1 < len(p.segments) {
+			return p.segments[i+1]
+		}
+	}
+	return nil
 }
 
 // alignToBatch returns a byte count starting at pos that ends on a batch boundary

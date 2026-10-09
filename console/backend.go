@@ -155,8 +155,8 @@ func saslMechanism(name, user, pass string) (sasl.Mechanism, error) {
 
 // TopicSummary is one row in the topics list. Msgs is the number of records
 // currently on disk across all partitions (Σ latest−earliest) — exact, not an
-// estimate, since doze-kafka has no compaction or transaction markers to
-// leave gaps in the offset space.
+// estimate for an ordinary topic. Compaction and transaction markers leave gaps in
+// the offset space, so for those it is an upper bound.
 type TopicSummary struct {
 	Name       string
 	Partitions int32
@@ -456,8 +456,8 @@ type PartitionBound struct {
 	Earliest, Latest int64
 }
 
-// Count is how many records the partition holds (latest minus earliest; there is
-// no compaction here to leave gaps). It is NOT the log-end offset, which is what
+// Count is how many offsets the partition holds (latest minus earliest): the number of
+// records unless compaction or a transaction marker left gaps. It is NOT the log-end offset, which is what
 // the tape used to label "total" — wrong as soon as retention trims the log.
 func (p PartitionBound) Count() int64 { return p.Latest - p.Earliest }
 

@@ -83,6 +83,7 @@ type Manager struct {
 type TopicLimits struct {
 	SegmentBytes int64
 	Retention    RetentionPolicy
+	Compaction   CompactionPolicy
 }
 
 // SetTopicLimits gives a topic its own segment size and retention, from now on:
@@ -135,6 +136,15 @@ func (m *Manager) retentionLocked(topic string) RetentionPolicy {
 		return l.Retention
 	}
 	return m.opts.Retention
+}
+
+// compactionLocked is the compaction policy in force for a topic: none unless the topic
+// asks for one. The caller holds mu.
+func (m *Manager) compactionLocked(topic string) CompactionPolicy {
+	if l, ok := m.limits[topic]; ok {
+		return l.Compaction
+	}
+	return CompactionPolicy{}
 }
 
 // anyRetentionLocked reports whether any retention is in force anywhere, which is
@@ -491,6 +501,33 @@ func (m *Manager) EnforceRetention() error {
 	return firstErr
 }
 
+// EnforceCompaction runs a cleaning pass on every open partition whose topic is
+// compacted, one at a time. It is called by the maintenance loop, ahead of retention (a
+// topic that both compacts and deletes is compacted first), and exported so tests can
+// trigger a pass deterministically. Partitions that are not open are cleaned when they are.
+func (m *Manager) EnforceCompaction() error {
+	var firstErr error
+	for _, p := range m.snapshot() {
+		m.mu.Lock()
+		pol := m.compactionLocked(p.topic)
+		m.mu.Unlock()
+		if !pol.Enabled {
+			continue
+		}
+		res, err := p.Compact(pol, time.Now())
+		if err != nil && firstErr == nil {
+			firstErr = err
+		}
+		if res.Ran && (res.RecordsRemoved > 0 || res.MarkersRemoved > 0 || res.SegmentsRemoved > 0) {
+			m.log.Info("compacted a partition", "topic", p.topic, "dir", filepath.Base(p.dir),
+				"records_removed", res.RecordsRemoved, "markers_removed", res.MarkersRemoved,
+				"segments_rewritten", res.SegmentsRewritten, "segments_removed", res.SegmentsRemoved,
+				"bytes_before", res.BytesBefore, "bytes_after", res.BytesAfter, "complete", res.Complete)
+		}
+	}
+	return firstErr
+}
+
 // maintain runs the coarse fsync and retention timers until Close. A disabled
 // timer leaves its channel nil, which blocks forever in the select.
 func (m *Manager) maintain() {
@@ -525,6 +562,9 @@ func (m *Manager) maintain() {
 				m.log.Warn("periodic fsync failed", "err", err)
 			}
 		case <-retentionC:
+			if err := m.EnforceCompaction(); err != nil {
+				m.log.Warn("compaction failed", "err", err)
+			}
 			if err := m.EnforceRetention(); err != nil {
 				m.log.Warn("retention enforcement failed", "err", err)
 			}

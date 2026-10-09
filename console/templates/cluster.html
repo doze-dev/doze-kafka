@@ -28,7 +28,7 @@
     {{end}}
     <div class="honest">
       {{icon "info"}}
-      <div>Log compaction isn't implemented. If a client asks for one of these, the connection closes cleanly on that call — everything else keeps working. See <a href="https://github.com/doze-dev/doze-kafka/blob/main/docs/limitations.md" target="_blank" rel="noopener">limitations</a>.</div>
+      <div>Every API the broker does not implement closes the connection cleanly on that call; everything else keeps working. See <a href="https://github.com/doze-dev/doze-kafka/blob/main/docs/limitations.md" target="_blank" rel="noopener">limitations</a>.</div>
     </div>
   </div></main>
 {{template "shell_bottom" .}}{{end}}

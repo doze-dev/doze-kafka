@@ -2,6 +2,7 @@ package broker
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
@@ -69,7 +70,43 @@ func TopicLimits(cfg config.Config, topicConfig map[string]string) (limits log.T
 		own = true
 		limits.SegmentBytes = n
 	}
+	if compacts(topicConfig) {
+		own = true
+		limits.Compaction = compactionPolicy(topicConfig)
+	}
 	return limits, own
+}
+
+// compacts reports whether a topic's cleanup.policy asks for compaction (compact, or
+// compact,delete).
+func compacts(topicConfig map[string]string) bool {
+	for _, p := range strings.Split(topicConfig["cleanup.policy"], ",") {
+		if strings.TrimSpace(p) == "compact" {
+			return true
+		}
+	}
+	return false
+}
+
+// compactionPolicy resolves a compacted topic's settings. Where Kafka's defaults are
+// tuned for a production cluster (a pass only when half the log is dirty) these are
+// tuned for development: a topic is cleaned as soon as a segment has rolled.
+func compactionPolicy(topicConfig map[string]string) log.CompactionPolicy {
+	pol := log.CompactionPolicy{Enabled: true, DeleteRetention: 24 * time.Hour}
+	if v, err := strconv.ParseFloat(topicConfig["min.cleanable.dirty.ratio"], 64); err == nil {
+		pol.MinDirtyRatio = v
+	}
+	if v, err := strconv.ParseInt(topicConfig["min.compaction.lag.ms"], 10, 64); err == nil && v > 0 {
+		pol.MinLag = time.Duration(v) * time.Millisecond
+	}
+	if v, err := strconv.ParseInt(topicConfig["max.compaction.lag.ms"], 10, 64); err == nil && v > 0 {
+		pol.MaxLag = time.Duration(v) * time.Millisecond
+	}
+	if v, err := strconv.ParseInt(topicConfig["delete.retention.ms"], 10, 64); err == nil && v >= 0 {
+		pol.DeleteRetention = time.Duration(v) * time.Millisecond
+	}
+	pol.Codec = log.CodecByName(topicConfig["compression.type"])
+	return pol
 }
 
 // InitialTopicLimits is the limits of every topic that has its own, for the log
