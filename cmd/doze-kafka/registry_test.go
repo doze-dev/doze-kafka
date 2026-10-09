@@ -3,12 +3,15 @@ package main
 import (
 	"context"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	names "github.com/doze-dev/doze-names"
 )
 
 // registryURL is the address the startup summary gives for the registry.
@@ -151,5 +154,35 @@ func TestEnvExportsTheRegistryAddress(t *testing.T) {
 	envTo(&b, st.cfg)
 	if strings.Contains(b.String(), "SCHEMA_REGISTRY") {
 		t.Errorf("the registry is off but env exports it:\n%s", b.String())
+	}
+}
+
+// The registry is reached by its own name, schema.<instance>.doze, which the front door
+// routes by Host to the address it bound: the same arrangement as the console's.
+func TestRegistryGetsItsOwnNameInTheZone(t *testing.T) {
+	reg := names.Open(t.TempDir(), "doze-kafka-test")
+	own, err := reg.Claim(names.Qualified("kafka", "shop"))
+	if err != nil {
+		t.Skipf("the zone registry cannot be used here: %v", err)
+	}
+	z := &zone{reg: reg, own: own}
+	defer z.close()
+
+	url := z.routeRegistry(slog.New(slog.NewTextHandler(io.Discard, nil)), "shop", "127.0.0.9:8081")
+	if !strings.Contains(url, "schema.shop.doze") {
+		t.Fatalf("the registry's URL = %q, want it to name schema.shop.doze", url)
+	}
+	e, ok := reg.Snapshot()["schema.shop.doze"]
+	if !ok || e.Target != "127.0.0.9:8081" {
+		t.Errorf("the zone's entry for the registry = %+v, want a route to 127.0.0.9:8081", e)
+	}
+	// A wildcard address is not dialable; the route aims at loopback.
+	z.routeRegistry(slog.New(slog.NewTextHandler(io.Discard, nil)), "shop", "0.0.0.0:8081")
+	if e := reg.Snapshot()["schema.shop.doze"]; e.Target != "127.0.0.1:8081" {
+		t.Errorf("a wildcard registry address was routed to %q, want 127.0.0.1:8081", e.Target)
+	}
+	z.close()
+	if _, ok := reg.Snapshot()["schema.shop.doze"]; ok {
+		t.Error("the registry's name outlived the instance")
 	}
 }

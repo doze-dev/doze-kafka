@@ -155,7 +155,7 @@ func (c *Console) searchTopic(ctx context.Context, topic string, partition, part
 	}
 	sv.Rows = make([]msgView, len(hits))
 	for i, m := range hits {
-		sv.Rows[i] = newMsgView(m)
+		sv.Rows[i] = c.msgView(ctx, topic, m)
 	}
 	return sv, nil
 }

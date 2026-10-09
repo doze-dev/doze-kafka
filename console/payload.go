@@ -39,6 +39,21 @@ type bytesView struct {
 	Truncated bool   // Text shows less than the whole value (or, for binary, the hex does).
 	HexCut    bool   // the hex dump shows less than the whole value.
 	Preview   string // one line, for the table.
+
+	// Schema is set when the bytes were written by a registry-aware serializer and
+	// Text/Preview are the JSON they decode to. Raw stays empty and B64 stays the
+	// stored bytes, so "Send again" and "Edit a copy" still carry the record exactly.
+	Schema *schemaTag
+}
+
+// schemaTag says which registered schema a value was decoded with.
+type schemaTag struct {
+	ID        int
+	Type      string // AVRO, JSON or PROTOBUF.
+	TypeLabel string
+	Subject   string
+	Version   int
+	URL       string
 }
 
 func newBytesView(b []byte, null bool) bytesView {

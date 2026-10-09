@@ -267,23 +267,8 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 	ready := readyInfo{version: version, kafka: cfg.Version, bootstrap: bootstrap, dataDir: absPath(cfg.DataDir),
 		auth: authSummary(cfg), configFile: st.configFile}
 
-	if cfg.Console {
-		if cfg.ConsoleAddr == "" {
-			cfg.ConsoleAddr = consoleAddrFor(z.ip())
-		}
-		closeConsole, consoleAddr, err := startConsole(ctx, cfg, bind.ln.Addr(), logger, consoleUser, consolePass, consoleMech)
-		if err != nil {
-			return err
-		}
-		defer closeConsole()
-		// A name's URL is port-less when the shared front door is up; where it is not
-		// (or this instance has no name) the address it actually bound is the URL.
-		ready.consoleURL = z.routeConsole(logger, consoleAddr)
-		if ready.consoleURL == "" {
-			ready.consoleURL = httpURL(consoleAddr)
-		}
-	}
-
+	// The registry starts first: the console shows what is in it.
+	registryForConsole := ""
 	if cfg.SchemaRegistry {
 		if cfg.SchemaRegistryAddr == "" {
 			cfg.SchemaRegistryAddr = registryAddrFor(z.ip())
@@ -296,6 +281,25 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 		ready.registryURL = z.routeRegistry(logger, cfg.InstanceName(), registryAddr)
 		if ready.registryURL == "" {
 			ready.registryURL = httpURL(registryAddr)
+		}
+		// The console reaches the registry directly, on the address it bound.
+		registryForConsole = httpURL(registryAddr)
+	}
+
+	if cfg.Console {
+		if cfg.ConsoleAddr == "" {
+			cfg.ConsoleAddr = consoleAddrFor(z.ip())
+		}
+		closeConsole, consoleAddr, err := startConsole(ctx, cfg, bind.ln.Addr(), logger, consoleUser, consolePass, consoleMech, registryForConsole)
+		if err != nil {
+			return err
+		}
+		defer closeConsole()
+		// A name's URL is port-less when the shared front door is up; where it is not
+		// (or this instance has no name) the address it actually bound is the URL.
+		ready.consoleURL = z.routeConsole(logger, consoleAddr)
+		if ready.consoleURL == "" {
+			ready.consoleURL = httpURL(consoleAddr)
 		}
 	}
 
@@ -448,7 +452,7 @@ func provisionConsoleCredential(cfg *config.Config) (user, pass, mech string, er
 // returns, so a port that is already taken is reported as the error it is. It
 // returns a func that shuts the console down (the caller defers it) and the
 // address the listener actually got.
-func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger *slog.Logger, user, pass, mech string) (func(), string, error) {
+func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger *slog.Logger, user, pass, mech, registryURL string) (func(), string, error) {
 	dialAddr, err := consoleDialAddr(cfg, bound)
 	if err != nil {
 		return nil, "", err
@@ -472,6 +476,8 @@ func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger
 	con, err := console.New(console.Options{
 		Addr: dialAddr, SASLUser: user, SASLPass: pass, SASLMechanism: mech, TLSConfig: tlsCfg,
 		AllowedHosts: consoleHosts(cfg),
+		// With SASL the console reaches the registry as the same user it reaches the broker.
+		RegistryURL: registryURL, RegistryUser: user, RegistryPass: pass,
 	})
 	if err != nil {
 		ln.Close()

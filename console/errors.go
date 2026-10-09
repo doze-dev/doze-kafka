@@ -156,6 +156,7 @@ func (c *Console) renderError(w http.ResponseWriter, r *http.Request, f failure,
 	w.WriteHeader(f.status)
 	data["Prefix"] = c.prefix
 	data["Endpoint"] = c.be.displayAddr()
+	data["HasRegistry"] = c.reg != nil
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := c.templates().ExecuteTemplate(w, "error_page", data); err != nil {
 		io.WriteString(w, template.HTMLEscapeString(f.message))
@@ -180,6 +181,16 @@ func (c *Console) suggest(ctx context.Context, kind, name string) []suggestion {
 			}
 		}
 	}
+	urlFor := c.topicURL
+	if kind == "group" {
+		urlFor = c.groupURL
+	}
+	return c.closeNames(names, name, urlFor)
+}
+
+// closeNames returns up to three of names that are close to name: those that contain
+// it (or it them), then those a couple of edits away, each with its link.
+func (c *Console) closeNames(names []string, name string, urlFor func(string) string) []suggestion {
 	lower := strings.ToLower(name)
 	type scored struct {
 		name  string
@@ -212,11 +223,7 @@ func (c *Console) suggest(ctx context.Context, kind, name string) []suggestion {
 		if len(out) == 3 {
 			break
 		}
-		u := c.topicURL(s.name)
-		if kind == "group" {
-			u = c.groupURL(s.name)
-		}
-		out = append(out, suggestion{s.name, u})
+		out = append(out, suggestion{s.name, urlFor(s.name)})
 	}
 	return out
 }

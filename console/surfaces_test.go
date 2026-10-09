@@ -23,12 +23,15 @@ func consoleRoutes(t *testing.T) []route {
 	if err != nil {
 		t.Fatal(err)
 	}
-	re := regexp.MustCompile(`m\.Handle(?:Func)?\("(GET|POST) "\+(?:p(?:\+"([^"]*)")?|newTopicPath\(p\))`)
+	re := regexp.MustCompile(`m\.Handle(?:Func)?\("(GET|POST) "\+(?:p(?:\+"([^"]*)")?|newTopicPath\(p\)|newSchemaPath\(p\))`)
 	var out []route
 	for _, m := range re.FindAllStringSubmatch(string(src), -1) {
 		path := m[2]
 		if strings.Contains(m[0], "newTopicPath") {
 			path = "/new/topic"
+		}
+		if strings.Contains(m[0], "newSchemaPath") {
+			path = "/new/schema"
 		}
 		out = append(out, route{m[1], path})
 	}
@@ -45,6 +48,7 @@ func consoleRoutes(t *testing.T) []route {
 func (r route) fill(topic, group string) string {
 	p := strings.ReplaceAll(r.path, "{name}", topic)
 	p = strings.ReplaceAll(p, "{id}", group)
+	p = strings.ReplaceAll(p, "{subject}", "orders-value")
 	return "/_console" + p
 }
 

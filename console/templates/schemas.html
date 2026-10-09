@@ -1,0 +1,124 @@
+{{define "schema_lp"}}
+{{template "lp_head" dict "Glyph" "braces" "Label" "Schemas" "NewURL" (newSchemaURL "")}}
+{{if not .List}}{{template "lp_empty" dict "Glyph" "braces" "Title" (t "schemas.none.title") "Hint" (t "schemas.none.hint")}}{{end}}
+{{range .List}}
+<a class="li {{if eq .Name $.Sel}}on{{end}}" href="{{schemaURL .Name}}" data-name="{{.Name}}" hx-target="#detail" hx-select="#detail"
+   x-data x-show="!$store.filter.q || $el.dataset.name.toLowerCase().includes($store.filter.q.toLowerCase())">
+  <span class="nm mono">{{.Name}}</span>
+  <span class="meta"><span class="badge schema-type">{{.TypeLabel}}</span> <span class="mono">v{{.Latest}}</span></span>
+</a>
+{{end}}
+{{template "lp_foot" dict "CanCreate" true}}
+{{end}}
+
+{{define "schemas_home"}}{{template "shell_top" .}}
+  {{template "schema_lp" (dict "List" .List "Sel" "")}}
+  {{template "empty_detail" dict "Glyph" "braces" "Hint" (t "schemas.pick") "CTA" "Register schema" "CTAURL" (newSchemaURL "")}}
+{{template "shell_bottom" .}}{{end}}
+
+{{define "schemas_off"}}{{template "shell_top" .}}
+  <main class="detail" id="detail"><div class="detail-inner clusterwrap">
+    <div class="idband"><div><h1 class="page-title">Schemas</h1><p class="lede">No schema registry is connected to this console.</p></div></div>
+    <div class="honest" role="note">{{icon "info"}}<div>doze-kafka serves a Confluent-compatible schema registry beside the broker (<code>--schema-registry</code>, on by default). Start it, or give the console one, to see subjects, versions and decoded messages here.</div></div>
+  </div></main>
+{{template "shell_bottom" .}}{{end}}
+
+{{define "schema_create"}}{{template "shell_top" .}}
+  {{template "schema_lp" (dict "List" .List "Sel" "")}}
+  <main class="detail" id="detail"><div class="detail-inner">
+    <div class="idband"><div><h1 class="page-title">Register schema</h1></div></div>
+    <form hx-post="{{newSchemaURL ""}}" hx-disabled-elt="find button[type=submit]">
+      <div class="panel form-sec"><div class="panel-h"><h2>Subject</h2></div><div class="form-b">
+        <div class="field"><label for="f-subject">Subject <span class="hint">a topic's value schema is <span class="mono">&lt;topic&gt;-value</span></span></label><input class="input mono" id="f-subject" name="subject" value="{{.Subject}}" placeholder="orders-value" required autocomplete="off" autofocus></div>
+        <div class="field narrow"><label for="f-type">Language</label>
+          <select class="input" id="f-type" name="type">{{range .Types}}<option value="{{.}}">{{.}}</option>{{end}}</select></div>
+        <div class="field"><label for="f-schema">Schema</label><textarea class="input mono schema-text" id="f-schema" name="schema" rows="14" required spellcheck="false" placeholder='{"type":"record","name":"Order","fields":[{"name":"id","type":"long"}]}'></textarea></div>
+      </div></div>
+      <div class="err form-err" data-err-slot hidden role="alert"></div>
+      <div class="det-foot">
+        <a class="btn btn-outline" href="{{prefix}}/schemas">Cancel</a>
+        <button class="btn primary" type="submit">Register</button>
+      </div>
+    </form>
+  </div></main>
+{{template "shell_bottom" .}}{{end}}
+
+{{define "schema_detail"}}{{template "shell_top" .}}
+  {{template "schema_lp" (dict "List" .List "Sel" .Sel)}}
+  <main class="detail" id="detail"><div class="detail-inner">
+    <div class="idband">
+      <div>
+        <h1>{{.Subject}}</h1>
+        <div class="idchips">
+          <span class="badge schema-type">{{.Cur.TypeLabel}}</span>
+          {{template "copychip" dict "Label" "id" "Value" .Cur.ID}}
+          <span class="chip mono">{{len .Versions}} version{{if ne (len .Versions) 1}}s{{end}}</span>
+          <span class="chip mono" title="{{if .CompatOwn}}set for this subject{{else}}the registry's default{{end}}">{{.Compat}}{{if not .CompatOwn}} · default{{end}}</span>
+        </div>
+      </div>
+      <div class="idband-acts">
+        <button class="btn danger" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" data-confirm-title="Delete subject" data-confirm-verb="Delete subject"
+          hx-confirm="Delete subject &quot;{{.Subject}}&quot; with all {{len .Versions}} of its versions? Messages already written with them stay on their topics, but nothing can decode them by id afterwards.">{{icon "trash"}} Delete</button>
+      </div>
+    </div>
+
+    <div class="secrow"><div class="sec-title flush">Versions</div></div>
+    <div class="ptabs" role="group" aria-label="Versions">
+      {{range .Versions}}<a class="ptab {{if eq . $.Cur.Version}}on{{end}}" href="{{schemaURL $.Subject}}?version={{.}}" {{if eq . $.Cur.Version}}aria-current="true"{{end}}>v{{.}}{{if eq . $.Latest}}<span class="pc">latest</span>{{end}}</a>{{end}}
+    </div>
+
+    <div x-data="{view: '{{if .Prev}}changes{{else}}schema{{end}}'}" class="schema-view">
+      <div class="secrow">
+        <div class="sec-title">Version {{.Cur.Version}}</div>
+        <div class="seg fmt" role="group" aria-label="View">
+          {{if .Prev}}<button type="button" :class="view==='changes'&&'on'" :aria-pressed="view==='changes'" @click="view='changes'">Changes from v{{.Prev.Version}}</button>{{end}}
+          <button type="button" :class="view==='schema'&&'on'" :aria-pressed="view==='schema'" @click="view='schema'">Schema</button>
+        </div>
+        <button type="button" class="copy-btn" data-copy="{{.Cur.Schema}}" title="Copy the schema" aria-label="Copy the schema">{{icon "copy"}}</button>
+        {{if gt (len .Versions) 1}}<button class="btn btn-outline sm" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" hx-vals='{"version":"{{.Cur.Version}}"}' data-confirm-title="Delete version" data-confirm-verb="Delete version"
+          hx-confirm="Delete version {{.Cur.Version}} of &quot;{{.Subject}}&quot;?">{{icon "trash"}} Delete v{{.Cur.Version}}</button>{{end}}
+      </div>
+      {{if .Prev}}
+      <div class="valuebox diff" x-show="view==='changes'" role="region" aria-label="Changes from version {{.Prev.Version}}">{{if eq .Changed 0}}<span class="dim">No change to the text: only its formatting differs.</span>{{else}}{{range .Diff}}<div class="dl {{.Op}}"><span class="dm" aria-hidden="true">{{if eq .Op "add"}}+{{else if eq .Op "del"}}−{{else}} {{end}}</span><span class="dt">{{.Text}}</span></div>{{end}}{{end}}</div>
+      {{end}}
+      <div class="valuebox" x-show="view==='schema'" {{if .Prev}}x-cloak{{end}}>{{if eq .Cur.Type "PROTOBUF"}}{{.Text}}{{else}}{{jsonTint .Text}}{{end}}</div>
+    </div>
+    {{if .Cur.References}}
+    <div class="sec-title">References</div>
+    <div class="cpanel">{{range .Cur.References}}<div class="crow2"><span class="k mono">{{.Name}}</span><span class="v mono"><a href="{{schemaURL .Subject}}?version={{.Version}}">{{.Subject}}</a> v{{.Version}}</span></div>{{end}}</div>
+    {{end}}
+
+    <div class="sec-title">Compatibility</div>
+    <form class="compat-form" hx-post="{{schemaURL .Subject}}/config">
+      <label class="scope"><span class="sr-only">Compatibility level for {{.Subject}}</span>
+        <select class="input" name="level">
+          <option value="default" {{if not .CompatOwn}}selected{{end}}>registry default ({{if .CompatOwn}}…{{else}}{{.Compat}}{{end}})</option>
+          {{range .Levels}}<option value="{{.}}" {{if and $.CompatOwn (eq . $.Compat)}}selected{{end}}>{{.}}</option>{{end}}
+        </select></label>
+      <button class="btn btn-outline" type="submit" hx-disabled-elt="this">Save</button>
+      <span class="hint">New versions are checked against {{if hasPrefix .Compat "BACKWARD"}}what consumers of the older versions read{{else if hasPrefix .Compat "FORWARD"}}what older consumers can still read{{else if hasPrefix .Compat "FULL"}}both directions{{else}}nothing{{end}}{{if and (ne .Compat "NONE") (hasSuffix .Compat "_TRANSITIVE")}}, against every earlier version{{else if ne .Compat "NONE"}}, against the latest version{{end}}.</span>
+    </form>
+
+    <div class="sec-title">New version</div>
+    <form class="panel form-sec" id="newver">
+      <div class="form-b">
+        <input type="hidden" name="type" value="{{.Cur.Type}}">
+        {{if .Cur.References}}<input type="hidden" name="references" value="{{refsJSON .Cur.References}}">{{end}}
+        <div class="field"><label for="f-schema">Schema <span class="hint">starts from the latest version</span></label><textarea class="input mono schema-text" id="f-schema" name="schema" rows="12" spellcheck="false">{{.LatestText}}</textarea></div>
+        <div id="check-result" aria-live="polite"></div>
+      </div>
+      <div class="det-foot">
+        <button type="button" class="btn btn-outline" hx-post="{{schemaURL .Subject}}/check" hx-include="#newver" hx-target="#check-result" hx-select="unset" hx-swap="innerHTML" hx-disabled-elt="this">Check compatibility</button>
+        <button type="button" class="btn primary" hx-post="{{schemaURL .Subject}}/register" hx-include="#newver" hx-disabled-elt="this">Register</button>
+      </div>
+    </form>
+  </div></main>
+{{template "shell_bottom" .}}{{end}}
+
+{{define "schema_check"}}
+{{if .Invalid}}<div class="honest bad" role="alert">{{icon "alert"}}<div><b>Not a valid schema.</b> {{.Invalid}}</div></div>
+{{else if .OK}}<div class="honest ok" role="status">{{icon "check"}}<div><b>Compatible.</b> This schema may be registered under the {{.Level}} rule.</div></div>
+{{else}}<div class="honest bad" role="alert">{{icon "alert"}}<div><b>Not compatible</b> with the {{.Level}} rule.
+  <ul class="reasons">{{range .Reasons}}<li class="mono">{{.}}</li>{{end}}</ul></div></div>
+{{end}}
+{{end}}

@@ -29,7 +29,7 @@ func newTestConsole(t testing.TB) *Console {
 
 // newTestConsoleAddr is newTestConsole that also returns the broker's address,
 // for tests that need to act as another Kafka client (join a group, say).
-func newTestConsoleAddr(t testing.TB) (*Console, string) {
+func newTestConsoleAddr(t testing.TB, mod ...func(*Options)) (*Console, string) {
 	t.Helper()
 	if testing.Short() {
 		t.Skip("boots a real broker; omit -short (or run `go tool task test:integration`)")
@@ -53,7 +53,11 @@ func newTestConsoleAddr(t testing.TB) (*Console, string) {
 	go func() { defer close(done); srv.Serve(ctx) }()
 	t.Cleanup(func() { cancel(); <-done })
 
-	con, err := New(Options{Addr: addr})
+	opts := Options{Addr: addr}
+	for _, m := range mod {
+		m(&opts)
+	}
+	con, err := New(opts)
 	if err != nil {
 		t.Fatalf("console.New: %v", err)
 	}

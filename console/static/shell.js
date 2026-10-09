@@ -239,6 +239,9 @@
     if (key) key.value = b.getAttribute("data-key") || "";
     var sel = form.querySelector('select[name="partition"]');
     if (sel) sel.value = b.getAttribute("data-partition");
+    // A record read through the registry is edited as JSON and sent encoded again.
+    var sp = form.querySelector('select[name="schema_subject"]');
+    if (sp) sp.value = b.getAttribute("data-schema") || "";
     var ta = form.querySelector('textarea[name="value"]');
     var val = b.getAttribute("data-value") || "";
     if (ta && window.dozeEditor) dozeEditor.set(ta, val); else if (ta) ta.value = val;

@@ -47,6 +47,11 @@ implement it.
 - **ACLs: users only; no quotas.** ACLs are enforced, with Kafka's rules (see
   [Authorization](authorization.md)), but principals are `User:` names only and hosts
   are matched as written. No throttling or quotas.
+- **Schema registry: the core API only.** Subjects, versions, ids, references, modes
+  `READWRITE` and `READONLY`, and compatibility for Avro, JSON Schema and Protobuf, all
+  checked against a real Confluent registry. Not offered: `IMPORT` mode, contexts, data
+  contracts (rules, metadata, tags), schema linking and exporters. The few places it
+  answers differently on purpose are listed in [Schema Registry](schema-registry.md).
 - **Some admin APIs.** `OffsetForLeaderEpoch`, `DescribeLogDirs`,
   and the client-metrics/telemetry APIs are not implemented. A Kafka UI that probes
   these will get a clean connection close on that call, not a hang — and generally

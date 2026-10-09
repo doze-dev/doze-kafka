@@ -16,6 +16,10 @@ var uiCopy = map[string]string{
 	"groups.none.hint":  "A group appears when a consumer with a group.id connects, and stays listed while it has committed offsets.",
 	"groups.pick":       "Select a consumer group to see its members and lag.",
 
+	"schemas.none.title": "No schemas yet",
+	"schemas.none.hint":  "A subject appears when a serializer registers a schema, or when you register one here.",
+	"schemas.pick":       "Select a subject to see its versions and how they differ, or register a schema.",
+
 	"list.nomatch": "No matches for “%s”",
 
 	"messages.none":      "No messages on this partition yet. Send one below, or write to the topic from your app and it will appear here.",

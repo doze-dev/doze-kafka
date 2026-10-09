@@ -88,7 +88,8 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 	partition := partitionParam(r, detail.Partitions)
 
 	data := map[string]any{
-		"List": list, "Topic": detail, "Page": "topics",
+		"Schemas": c.topicSchemas(r, name),
+		"List":    list, "Topic": detail, "Page": "topics",
 		"Partition": partition, "Title": name,
 		"Consumers": c.topicConsumers(ctx, name),
 		"Config":    newConfigView(detail.Config),
@@ -101,6 +102,7 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		data["Search"], data["PartitionRange"], data["Rows"] = found, partitionRange(detail.Partitions), found.Rows
+		c.composerSchemas(r, name, data)
 		c.render(w, r, "topic_detail", data)
 		return
 	}
@@ -119,6 +121,7 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	maps.Copy(data, tape)
+	c.composerSchemas(r, name, data)
 	if atNote != "" && tape["JumpNote"] == "" {
 		data["JumpNote"] = atNote
 	}
@@ -171,6 +174,22 @@ func (c *Console) topicProduce(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		c.fail(w, r, err)
 		return
+	}
+	if subject := strings.TrimSpace(r.FormValue("schema_subject")); subject != "" && in.Value != nil {
+		if c.reg == nil {
+			c.fail(w, r, badInput("there is no schema registry to encode the value with"))
+			return
+		}
+		if r.FormValue("value_enc") == "base64" {
+			c.fail(w, r, badInput("a base64 value is sent as raw bytes; choose “No schema” to send it, or untick b64 to write JSON for %s", subject))
+			return
+		}
+		encoded, err := c.reg.encode(ctx, subject, string(in.Value))
+		if err != nil {
+			c.fail(w, r, err)
+			return
+		}
+		in.Value = encoded
 	}
 	partition := in.Partition
 	if in.Auto {
@@ -239,9 +258,9 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	hdrs := headerViews(m.Headers)
-	valueV := newBytesView(m.Value, m.Value == nil)
-	keyV := newBytesView(m.Key, m.Key == nil)
-	c.partial(w, "message_drawer", map[string]any{
+	valueV := c.readThroughRegistry(r.Context(), name, newBytesView(m.Value, m.Value == nil), m.Value)
+	keyV := c.readThroughRegistry(r.Context(), name, newBytesView(m.Key, m.Key == nil), m.Key)
+	data := map[string]any{
 		"Topic": name, "Partition": partition, "Msg": m, "Older": older, "Newer": newer,
 		"TimeStr": m.Timestamp.Format(time.RFC3339), "Key": keyV, "Value": valueV, "Headers": hdrs,
 		// "Send again" is done by the server from the stored record, so it is exact
@@ -252,7 +271,14 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 		"EditValue": editField(valueV), "EditValueEnc": resendEnc(valueV),
 		"EditHeaders": resendHeaders(hdrs),
 		"CanEdit":     (valueV.Null || valueV.Empty || valueV.B64 != "") && (keyV.Null || keyV.Empty || keyV.B64 != ""),
-	})
+	}
+	// A value read through the registry is edited as the JSON it means, and the
+	// composer is told which subject to encode it with again. (Send again still
+	// carries the stored bytes.)
+	if valueV.Schema != nil {
+		data["EditValue"], data["EditValueEnc"], data["EditSchema"] = valueV.Text, "text", valueV.Schema.Subject
+	}
+	c.partial(w, "message_drawer", data)
 }
 
 // topicResend produces an exact copy of a stored record: the same key, value and
@@ -322,15 +348,15 @@ func editField(v bytesView) string {
 	switch {
 	case v.Null || v.Empty:
 		return ""
-	case v.Binary:
-		return v.B64
+	case v.Binary, v.Schema != nil:
+		return v.B64 // a decoded value is edited as JSON; that is arranged where the drawer is built.
 	default:
 		return v.Raw
 	}
 }
 
 func resendEnc(v bytesView) string {
-	if v.Binary {
+	if v.Binary || v.Schema != nil {
 		return "base64"
 	}
 	return "text"
@@ -505,7 +531,7 @@ func (c *Console) tapeData(ctx context.Context, topic, topicID string, partition
 	next := 0
 	for off := from; off < to; off++ {
 		if next < len(msgs) && msgs[next].Offset == off {
-			v := newMsgView(msgs[next])
+			v := c.msgView(ctx, topic, msgs[next])
 			v.Txn = status[off]
 			next++
 			if committedOnly && v.Txn != "" {

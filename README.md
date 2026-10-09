@@ -107,6 +107,10 @@ Full walkthrough: **[docs/getting-started.md](docs/getting-started.md)**.
   cluster. Enough for the CLI tools and most Kafka UIs.
 - **A web console** — topics, messages (binary-safe), consumer-group lag, a command
   palette. On by default, off with `--console=false`.
+- **A schema registry** — Confluent-compatible, built in: Avro, JSON Schema and
+  Protobuf, compatibility checks at every level, and the console decodes your
+  records with it. Stock serializers need only `schema.registry.url`.
+  ([Schema Registry](docs/schema-registry.md))
 - **Embeddable** — `server.New(...)` starts a broker inside a Go test, on a free
   port, with nothing to clean up. ([Embedding](docs/embedding.md))
 - **Durable** — messages and committed offsets survive a restart; with `acks=all` an

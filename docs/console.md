@@ -95,6 +95,42 @@ SASL is on (doze-kafka provisions it a private one at start-up).
 - All of these are for groups with no active members. A group that is running commits
   its own offsets, so changing them is refused, with the reason.
 
+## Schemas
+
+With the built-in [schema registry](schema-registry.md) running, the console grows a
+**Schemas** section (and a Schemas item in the command palette).
+
+- The list shows every subject with its language (Avro, JSON Schema, Protobuf) and
+  its newest version.
+- A subject's page has its **versions** as tabs, and for any version after the first
+  a **Changes from vN** view: the schema as text, compared with the version before,
+  added lines in green and removed lines in red. The compatibility level is shown, and
+  can be set for the subject or handed back to the registry's default.
+- **New version** starts from the latest schema. **Check compatibility** says
+  whether it may be registered under the level in force and, if not, why; **Register**
+  does it. A schema that does not parse is reported as such, beside the form.
+- **Delete** removes a version, or the whole subject, after asking.
+- **Register schema** (the list's *New*) creates a subject from a pasted schema.
+
+Where a topic has `<topic>-key` or `<topic>-value` subjects, its page links them.
+
+**Records written by a registry-aware serializer are shown as what they mean.** A value
+that starts with the registry's wire-format header (a zero byte and a schema id) is read
+with that schema, in the table and in the drawer, which names the schema and links its
+version. The Hex and Base64 views still show the stored bytes, *Send again* still
+resends them exactly, and a value whose schema the registry no longer has is shown as
+binary, as before. *Edit a copy* of a decoded record brings back the JSON and chooses
+the same subject.
+
+**Sending a message** can encode the value: the composer's value field has an
+*encode with* menu of subjects (the topic's own `-value` subject is chosen when it has
+one). Write the value as JSON; it is checked against the subject's latest schema and
+sent in the wire format, and a value the schema does not accept is refused with the
+reason instead of being sent. Choose *No schema* to send the text as it is.
+
+The console reaches the registry over HTTP, like any client, using the same
+credentials it uses for the broker when SASL is on.
+
 ## Cluster
 
 The single broker: its node id and advertised address, the cluster id, how *this*

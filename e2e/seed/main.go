@@ -6,34 +6,41 @@
 //	seed-empty    1 partition, no records.
 //	seed-txn      1 partition with one aborted transaction, one committed, and one left
 //	              open (producer "seed-open"; its timeout is long, so it outlasts a run).
+//	seed-events   1 partition of Avro records written through the schema registry (subject
+//	              seed-events-value, two versions); seed-proto is the same for Protobuf.
 //	g-lag         committed at offset 10 of seed-orders/0: a lag to look at.
 //	g-reset-*     one group per test that resets, sets or deletes, so tests that
 //	              change a group never share one.
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/doze-dev/doze-kafka/schemaregistry"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "usage: seed host:port")
+	if len(os.Args) != 3 {
+		fmt.Fprintln(os.Stderr, "usage: seed host:port registry-url")
 		os.Exit(2)
 	}
-	if err := run(os.Args[1]); err != nil {
+	if err := run(os.Args[1], os.Args[2]); err != nil {
 		fmt.Fprintln(os.Stderr, "seed:", err)
 		os.Exit(1)
 	}
 }
 
-func run(addr string) error {
+func run(addr, registryURL string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.RecordPartitioner(kgo.ManualPartitioner()))
@@ -42,7 +49,7 @@ func run(addr string) error {
 	}
 	defer cl.Close()
 
-	for name, parts := range map[string]int32{"seed-orders": 3, "seed-empty": 1, "seed-txn": 1} {
+	for name, parts := range map[string]int32{"seed-orders": 3, "seed-empty": 1, "seed-txn": 1, "seed-events": 1, "seed-proto": 1} {
 		req := kmsg.NewPtrCreateTopicsRequest()
 		rt := kmsg.NewCreateTopicsRequestTopic()
 		rt.Topic, rt.NumPartitions, rt.ReplicationFactor = name, parts, 1
@@ -52,6 +59,9 @@ func run(addr string) error {
 		}
 	}
 	if err := seedTransactions(ctx, addr); err != nil {
+		return err
+	}
+	if err := seedRegistry(ctx, cl, registryURL); err != nil {
 		return err
 	}
 	produce := func(part int32, key, value []byte, h ...kgo.RecordHeader) error {
@@ -141,4 +151,62 @@ func seedTransactions(ctx context.Context, addr string) error {
 		return err
 	}
 	return write(open, "txn-open-record")
+}
+
+// seedRegistry registers the schemas the registry specs read and writes records encoded
+// with them, through the registry's own REST API and wire format, as a serializer would.
+func seedRegistry(ctx context.Context, cl *kgo.Client, base string) error {
+	register := func(subject, typ, schema string) (int, error) {
+		body, _ := json.Marshal(map[string]string{"schema": schema, "schemaType": typ})
+		req, _ := http.NewRequestWithContext(ctx, "POST", base+"/subjects/"+subject+"/versions", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/vnd.schemaregistry.v1+json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return 0, err
+		}
+		defer resp.Body.Close()
+		raw, _ := io.ReadAll(resp.Body)
+		var out struct {
+			ID int `json:"id"`
+		}
+		if resp.StatusCode != 200 || json.Unmarshal(raw, &out) != nil {
+			return 0, fmt.Errorf("register %s: %d %s", subject, resp.StatusCode, raw)
+		}
+		return out.ID, nil
+	}
+	const (
+		v1 = `{"type":"record","name":"Event","namespace":"seed","fields":[{"name":"id","type":"long"},{"name":"kind","type":"string"}]}`
+		v2 = `{"type":"record","name":"Event","namespace":"seed","fields":[{"name":"id","type":"long"},{"name":"kind","type":"string"},{"name":"note","type":["null","string"],"default":null}]}`
+		pb = `syntax = "proto3"; package seed; message Reading { string sensor = 1; double celsius = 2; }`
+	)
+	id1, err := register("seed-events-value", "AVRO", v1)
+	if err != nil {
+		return err
+	}
+	id2, err := register("seed-events-value", "AVRO", v2)
+	if err != nil {
+		return err
+	}
+	pid, err := register("seed-proto-value", "PROTOBUF", pb)
+	if err != nil {
+		return err
+	}
+	write := func(topic, typ, schema string, id int, doc string) error {
+		codec, err := schemaregistry.NewCodec(typ, schema, nil)
+		if err != nil {
+			return err
+		}
+		value, err := codec.Encode(id, doc)
+		if err != nil {
+			return err
+		}
+		return cl.ProduceSync(ctx, &kgo.Record{Topic: topic, Partition: 0, Value: value}).FirstErr()
+	}
+	if err := write("seed-events", "AVRO", v1, id1, `{"id":1,"kind":"created"}`); err != nil {
+		return err
+	}
+	if err := write("seed-events", "AVRO", v2, id2, `{"id":2,"kind":"shipped","note":"left the warehouse"}`); err != nil {
+		return err
+	}
+	return write("seed-proto", "PROTOBUF", pb, pid, `{"sensor":"boiler-1","celsius":71.5}`)
 }

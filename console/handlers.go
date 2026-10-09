@@ -38,6 +38,14 @@ func (c *Console) apiPalette(w http.ResponseWriter, r *http.Request) {
 		{"views", "Access", c.prefix + "/access", "view"},
 		{"topics", "Create topic", c.newTopicURL(), "action"},
 	}
+	if c.reg != nil {
+		out = append(out, paletteEntry{"views", "Schemas", schemasPath(c.prefix), "view"}, paletteEntry{"schemas", "Register schema", newSchemaPath(c.prefix), "action"})
+		if subjects, err := c.reg.Subjects(ctx); err == nil {
+			for _, s := range subjects {
+				out = append(out, paletteEntry{"schemas", s.Name, c.schemaURL(s.Name), "schema"})
+			}
+		}
+	}
 	if topics, err := c.be.ListTopics(ctx); err == nil {
 		for _, t := range topics {
 			out = append(out, paletteEntry{"topics", t.Name, c.topicURL(t.Name), "topic"})
@@ -57,6 +65,11 @@ func (c *Console) apiCounts(w http.ResponseWriter, r *http.Request) {
 	counts := map[string]int{}
 	if topics, groups, err := c.be.Counts(r.Context()); err == nil {
 		counts["topics"], counts["groups"] = topics, groups
+	}
+	if c.reg != nil {
+		if names := c.reg.SubjectNames(r.Context()); names != nil {
+			counts["schemas"] = len(names)
+		}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(counts)

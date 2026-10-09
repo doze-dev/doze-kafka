@@ -6,6 +6,8 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = Number(process.env.E2E_PORT ?? 14092);
 export const KAFKA_ADDR = `127.0.0.1:${PORT}`;
 export const CONSOLE_PORT = PORT + 1;
+export const REGISTRY_PORT = PORT + 2;
+export const REGISTRY_URL = `http://127.0.0.1:${REGISTRY_PORT}`;
 export const BASE_URL = `http://127.0.0.1:${CONSOLE_PORT}/_console/`;
 
 export default defineConfig({
@@ -31,7 +33,7 @@ export default defineConfig({
     command:
       `sh -c "cd .. && GOWORK=off go build -o e2e/.tmp/bin/doze-kafka-${PORT} ./cmd/doze-kafka && ` +
       `cd e2e/.tmp && rm -rf data-${PORT} && mkdir -p data-${PORT} && ` +
-      `./bin/doze-kafka-${PORT} --listen ${KAFKA_ADDR} --console-addr 127.0.0.1:${CONSOLE_PORT} --data-dir data-${PORT}"`,
+      `./bin/doze-kafka-${PORT} --listen ${KAFKA_ADDR} --console-addr 127.0.0.1:${CONSOLE_PORT} --schema-registry-addr 127.0.0.1:${REGISTRY_PORT} --data-dir data-${PORT}"`,
     url: `http://127.0.0.1:${CONSOLE_PORT}/healthz`,
     reuseExistingServer: false, // a reused server keeps its state, and the wipe above never runs.
     timeout: 120_000,

@@ -118,7 +118,7 @@ func TestCorpus(t *testing.T) {
 			if err := json.Unmarshal(raw, &f); err != nil {
 				t.Fatal(err)
 			}
-			reg, err := Open(newMemStore())
+			reg, err := Open(NewMemoryStorage())
 			if err != nil {
 				t.Fatal(err)
 			}

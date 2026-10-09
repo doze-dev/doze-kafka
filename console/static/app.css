@@ -769,3 +769,30 @@ form.htmx-request .btn.primary::after { content: ""; width: 11px; height: 11px; 
 .tbl tr.txnmark td { padding-top: 1px; padding-bottom: 1px; font-size: var(--fs-xs); color: var(--dim); border-top: 1px dashed var(--border); border-bottom: 1px dashed var(--border); background: transparent; }
 .tbl tr.txnmark .txnmark-l { letter-spacing: .04em; text-transform: lowercase; }
 .txntoggle[aria-pressed="true"] { background: var(--accent-soft, var(--muted)); }
+
+/* ---- schemas ---- */
+.badge.schema-type { background: color-mix(in srgb, var(--violet) 12%, transparent); color: var(--violet-foreground); }
+.schema-text { width: 100%; min-height: 12em; resize: vertical; line-height: 1.5; font-size: var(--fs-sm); }
+.schema-view .secrow { display: flex; align-items: center; gap: 8px; }
+.schema-view .seg.fmt { margin-left: auto; }
+.diff { padding: 6px 0; }
+.diff .dl { display: flex; gap: 8px; padding: 0 12px; white-space: pre-wrap; }
+.diff .dm { flex: 0 0 1ch; color: var(--muted-foreground); user-select: none; }
+.diff .dl.add { background: color-mix(in srgb, var(--ok) 13%, transparent); }
+.diff .dl.add .dm { color: var(--ok-foreground); }
+.diff .dl.del { background: color-mix(in srgb, var(--bad) 13%, transparent); }
+.diff .dl.del .dm { color: var(--bad-foreground); }
+.compat-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.compat-form .hint { flex: 1 1 260px; color: var(--muted-foreground); font-size: var(--fs-sm); }
+.honest.ok { border-color: color-mix(in srgb, var(--ok) 40%, var(--border)); }
+.honest.ok svg { color: var(--ok-foreground); }
+.honest.bad { border-color: color-mix(in srgb, var(--bad) 40%, var(--border)); }
+.honest.bad svg { color: var(--bad-foreground); }
+.reasons { margin: 6px 0 0; padding-left: 18px; font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.schema-tag { margin-left: 8px; font-family: var(--mono); font-size: var(--fs-xs); color: var(--violet-foreground); }
+.schema-tag a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.schema-chip { display: inline-flex; align-items: center; gap: 4px; }
+.schema-chip svg { width: 12px; height: 12px; }
+.schema-pick { margin-left: auto; }
+.schema-pick .input { padding: 2px 6px; font-size: var(--fs-xs); font-family: var(--mono); max-width: 22ch; }
+.diff .dt { flex: 1; min-width: 0; overflow-wrap: anywhere; }

@@ -64,6 +64,13 @@ user names and passwords as HTTP basic authentication; a client sets
   `_schemas` topic. Nothing on the wire can tell, and there is nothing to keep in step
   with a topic. They survive restarts and move with the data directory.
 
+## In the console
+
+The [console](console.md) has a Schemas section: subjects, versions and the changes
+between them, the compatibility level, a "check before you register" form, decoded
+messages (an Avro, JSON Schema or Protobuf record is shown as JSON, with its schema
+named), and a composer that encodes JSON with a subject's schema.
+
 ## How faithful it is
 
 The answers are Confluent's because they were checked against Confluent's. The repository

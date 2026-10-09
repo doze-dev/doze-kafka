@@ -8,8 +8,9 @@ import (
 )
 
 type jsonSchema struct {
-	text string
-	node *jnode // the schema in the form compatibility compares.
+	text     string
+	node     *jnode             // the schema in the form compatibility compares.
+	compiled *jsonschema.Schema // for validating documents.
 }
 
 func (j *jsonSchema) Type() string { return TypeJSON }
@@ -43,7 +44,8 @@ func parseJSONSchema(text string, refs []resolvedRef) (parsedSchema, error) {
 	if err := compiler.AddResource(main, doc); err != nil {
 		return nil, err
 	}
-	if _, err := compiler.Compile(main); err != nil {
+	compiled, err := compiler.Compile(main)
+	if err != nil {
 		return nil, err
 	}
 	compact, err := compactJSON(text)
@@ -65,5 +67,5 @@ func parseJSONSchema(text string, refs []resolvedRef) (parsedSchema, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &jsonSchema{text: compact, node: node}, nil
+	return &jsonSchema{text: compact, node: node, compiled: compiled}, nil
 }

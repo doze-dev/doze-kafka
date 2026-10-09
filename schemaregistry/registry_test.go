@@ -12,9 +12,9 @@ import (
 	"testing"
 )
 
-func openReg(t *testing.T) (*Registry, *memStore) {
+func openReg(t *testing.T) (*Registry, *MemoryStorage) {
 	t.Helper()
-	st := newMemStore()
+	st := NewMemoryStorage()
 	r, err := Open(st)
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +99,7 @@ func TestEverythingSurvivesARestart(t *testing.T) {
 func TestAFailedWriteChangesNothing(t *testing.T) {
 	r, st := openReg(t)
 	mustRegister(t, r, "s", avroIn(avroUser1))
-	fail := &failingStore{memStore: st}
+	fail := &failingStore{MemoryStorage: st}
 	r.st = fail
 	fail.err = errors.New("disk full")
 	if _, e := r.Register("s", avroIn(avroUser2), false); e == nil || e.Code != codeStore {
@@ -115,7 +115,7 @@ func TestAFailedWriteChangesNothing(t *testing.T) {
 }
 
 type failingStore struct {
-	*memStore
+	*MemoryStorage
 	err error
 }
 
@@ -123,7 +123,7 @@ func (f *failingStore) Apply(puts map[string][]byte, deletes []string) error {
 	if f.err != nil {
 		return f.err
 	}
-	return f.memStore.Apply(puts, deletes)
+	return f.MemoryStorage.Apply(puts, deletes)
 }
 
 // Registration is serialized: the same schema from many clients at once is one id and

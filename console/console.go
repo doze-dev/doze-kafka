@@ -11,6 +11,7 @@ import (
 	"context"
 	"crypto/tls"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
@@ -32,6 +33,7 @@ var staticFS embed.FS
 // wire protocol can't share a port with HTTP.
 type Console struct {
 	be     *backend
+	reg    *registryClient // nil when there is no schema registry to talk to.
 	mux    *http.ServeMux
 	tmpl   *template.Template
 	dev    string // DOZE_KAFKA_CONSOLE_DEV: read templates and static files from this directory, live.
@@ -62,6 +64,13 @@ type Options struct {
 	// DNS-rebinding guard off, for an embedder that mounts the console under
 	// names it does not control.
 	AllowedHosts []string
+	// RegistryURL is the schema registry's base address. Set, the console grows a
+	// Schemas section, links a topic to its subjects, shows registry-encoded payloads
+	// as the JSON they mean and can produce them. Empty, none of that appears.
+	RegistryURL string
+	// RegistryUser and RegistryPass are HTTP basic credentials for the registry, when
+	// it requires them.
+	RegistryUser, RegistryPass string
 }
 
 // New builds a console with a real Kafka client dialed at opts.Addr.
@@ -89,6 +98,7 @@ func New(opts Options) (*Console, error) {
 		return nil, err
 	}
 	c.be, c.tmpl = be, tmpl
+	c.reg = newRegistryClient(opts.RegistryURL, opts.RegistryUser, opts.RegistryPass)
 	c.routes()
 	return c, nil
 }
@@ -211,6 +221,16 @@ func (c *Console) routes() {
 	m.HandleFunc("GET "+p+"/topics/{name}/message", c.topicMessage) // drawer partial
 	m.HandleFunc("GET "+p+"/topics/{name}/message/raw", c.topicMessageRaw)
 
+	// Schemas (the built-in registry).
+	m.HandleFunc("GET "+p+"/schemas", c.schemas)
+	m.HandleFunc("GET "+newSchemaPath(p), c.schemaCreatePage)
+	m.HandleFunc("POST "+newSchemaPath(p), c.schemaCreate)
+	m.HandleFunc("GET "+p+"/schemas/{subject}", c.schemaDetail)
+	m.HandleFunc("POST "+p+"/schemas/{subject}/check", c.schemaCheck)
+	m.HandleFunc("POST "+p+"/schemas/{subject}/register", c.schemaRegister)
+	m.HandleFunc("POST "+p+"/schemas/{subject}/config", c.schemaConfig)
+	m.HandleFunc("POST "+p+"/schemas/{subject}/delete", c.schemaDelete)
+
 	// Consumer groups.
 	m.HandleFunc("GET "+p+"/groups", c.groups)
 	m.HandleFunc("GET "+p+"/groups/{id}", c.groupDetail)
@@ -244,6 +264,7 @@ func (c *Console) render(w http.ResponseWriter, r *http.Request, page string, da
 		data["Page"] = page
 	}
 	data["Endpoint"] = c.be.displayAddr()
+	data["HasRegistry"] = c.reg != nil
 	if f := r.URL.Query().Get("flash"); f != "" {
 		data["Flash"] = f
 	}
@@ -301,7 +322,15 @@ func templateFuncs(prefix string) template.FuncMap {
 		"topicURL":    func(name string) string { return topicPath(prefix, name) },
 		"groupURL":    func(id string) string { return groupPath(prefix, id) },
 		"newTopicURL": func() string { return newTopicPath(prefix) },
-		"t":           uiText,
+		"schemaURL":   func(subject string) string { return schemaPath(prefix, subject) },
+		"newSchemaURL": func(subject string) string {
+			u := newSchemaPath(prefix)
+			if subject != "" {
+				u += "?subject=" + url.QueryEscape(subject)
+			}
+			return u
+		},
+		"t": uiText,
 		"dict": func(kv ...any) map[string]any {
 			m := make(map[string]any, len(kv)/2)
 			for i := 0; i+1 < len(kv); i += 2 {
@@ -315,8 +344,13 @@ func templateFuncs(prefix string) template.FuncMap {
 		"sub":       func(a, b int) int { return a - b },
 		"ago":       ago,
 		"hasPrefix": strings.HasPrefix,
-		"lower":     strings.ToLower,
-		"jsonTint":  jsonTint,
+		"hasSuffix": strings.HasSuffix,
+		"refsJSON": func(refs any) string {
+			b, _ := json.Marshal(refs)
+			return string(b)
+		},
+		"lower":    strings.ToLower,
+		"jsonTint": jsonTint,
 		"stateBadge": func(state string) string {
 			switch state {
 			case "Stable":

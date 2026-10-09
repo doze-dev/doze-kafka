@@ -47,6 +47,7 @@
         <div class="idchips">
           {{template "copychip" dict "Label" "id" "Value" .Topic.ID}}
           <span class="chip mono">{{.Topic.Partitions}} partition{{if ne .Topic.Partitions 1}}s{{end}}</span>
+          {{range .Schemas}}<a class="chip mono schema-chip" href="{{.URL}}" title="The {{.Label}} schema of this topic ({{.TypeLabel}})">{{icon "braces"}} {{.Label}} schema · v{{.Version}}</a>{{end}}
         </div>
       </div>
       <div class="idband-acts">
@@ -102,7 +103,9 @@
             <div class="field w-value" :class="tomb && 'dimmed'">
               <span class="lbl"><label for="f-value">Value</label>
                 <button type="button" class="b64tog" :class="valB64&&'on'" :aria-pressed="valB64" @click="valB64=!valB64" aria-label="Value is base64" title="The value is base64 for binary bytes">b64</button>
-                <label class="chk"><input type="checkbox" name="tombstone" value="1" x-model="tomb"> null value (tombstone)</label></span>
+                <label class="chk"><input type="checkbox" name="tombstone" value="1" x-model="tomb"> null value (tombstone)</label>
+                {{if .SchemaSubjects}}<label class="schema-pick"><span class="sr-only">Encode the value with a registered schema</span><select class="input" name="schema_subject" x-ref="schema" title="Write the value as JSON and send it encoded with this subject's latest schema">
+                  <option value="">No schema</option>{{range .SchemaSubjects}}<option value="{{.}}" {{if eq . $.DefaultSubject}}selected{{end}}>encode with {{.}}</option>{{end}}</select></label>{{end}}</span>
               <textarea class="input mono" id="f-value" name="value" x-ref="value" data-editor="json" rows="4" placeholder='{"orderId": "ord_8901"}'></textarea>
               <input type="hidden" name="value_enc" :value="valB64 ? 'base64' : 'text'">
             </div>
@@ -257,6 +260,7 @@
     <div class="sec-title flush row">Value
       {{if or .Value.Null .Value.Empty}}<span class="sz">{{if .Value.Null}}null — a tombstone{{else}}empty{{end}}</span>
       {{else}}<span class="sz">{{.Value.SizeText}}{{if .Value.Binary}} · binary{{else if .Value.Pretty}} · JSON{{end}}</span>
+      {{with .Value.Schema}}<span class="schema-tag" title="Decoded with the registered schema">{{.TypeLabel}} · schema {{.ID}}{{if .Subject}} · {{if .URL}}<a href="{{.URL}}">{{.Subject}} v{{.Version}}</a>{{else}}{{.Subject}}{{end}}{{end}}</span>{{end}}
       <span class="seg fmt" role="group" aria-label="Value format">
         {{if not .Value.Binary}}<button type="button" :class="f==='text'&&'on'" :aria-pressed="f==='text'" @click="f='text'">Text</button>{{end}}
         <button type="button" :class="f==='hex'&&'on'" :aria-pressed="f==='hex'" @click="f='hex'">Hex</button>
@@ -283,7 +287,7 @@
     {{if .CanEdit}}
     <button type="button" class="btn btn-outline" id="drawer-edit"
       data-key="{{.EditKey}}" data-key-enc="{{.EditKeyEnc}}" data-value="{{.EditValue}}" data-value-enc="{{.EditValueEnc}}"
-      data-headers="{{.EditHeaders}}" data-partition="{{.Partition}}" data-tombstone="{{if .Value.Null}}1{{end}}"
+      data-headers="{{.EditHeaders}}" data-schema="{{.EditSchema}}" data-partition="{{.Partition}}" data-tombstone="{{if .Value.Null}}1{{end}}"
       title="Open the composer with this record's contents, to change and send">Edit a copy…</button>
     {{else}}
     <span class="sz">Too large to edit in the browser.</span>

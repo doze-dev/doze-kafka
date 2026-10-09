@@ -24,7 +24,7 @@ func FuzzRegisterAndCompare(f *testing.F) {
 		default:
 			typ = "AVRO"
 		}
-		r, err := Open(newMemStore())
+		r, err := Open(NewMemoryStorage())
 		if err != nil {
 			t.Fatal(err)
 		}
