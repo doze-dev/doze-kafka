@@ -378,6 +378,12 @@ func (b *Broker) activeProducers(topic string, partition int32) []kmsg.DescribeP
 		}
 	}
 	var out []kmsg.DescribeProducersResponseTopicPartitionActiveProducer
+	if plog, err := b.logs.ExistingPartition(topic, partition); err == nil {
+		pp := b.idem.forPartition(topic, partition)
+		pp.mu.Lock()
+		_ = pp.loadFrom(plog) // a restart forgets nothing the log still holds.
+		pp.mu.Unlock()
+	}
 	for _, p := range b.idem.snapshot(topic, partition) {
 		a := kmsg.NewDescribeProducersResponseTopicPartitionActiveProducer()
 		a.ProducerID, a.ProducerEpoch, a.LastSequence, a.LastTimestamp = p.pid, int32(p.epoch), p.lastSeq, p.lastUsedMs

@@ -291,8 +291,9 @@ func TestTransactionOffsetsAreAppliedOnlyOnCommit(t *testing.T) {
 }
 
 // A stop in the middle of ending a transaction is finished on the next start: one whose
-// commit was decided and stored is carried out (markers and offsets), and one still open
-// belonged to a producer that is gone, so it is aborted and the id fenced.
+// commit was decided and stored is carried out (markers and offsets). One still open is
+// left open, because its producer may be alive and retrying across the restart, and it
+// can go on to commit.
 func TestTransactionsLeftHalfDoneAreFinishedAfterARestart(t *testing.T) {
 	skipShort(t)
 	dir := t.TempDir()
@@ -357,19 +358,91 @@ func TestTransactionsLeftHalfDoneAreFinishedAfterARestart(t *testing.T) {
 		t.Errorf("the decided transaction is %q after the restart, want CompleteCommit", s)
 	}
 	c.id = "abandoned"
-	if s := c.state(); s != "CompleteAbort" {
-		t.Errorf("the abandoned transaction is %q after the restart, want CompleteAbort", s)
+	if s := c.state(); s != "Ongoing" {
+		t.Errorf("the open transaction is %q after the restart, want it left Ongoing", s)
 	}
-	if got := values(reader(t, addr, "rec", true), 2*time.Second); !eq(got, []string{"the-decided-one"}) {
-		t.Errorf("read-committed saw %v, want only the transaction whose commit was decided", got)
+	// The decided transaction's record is below the open one, so it is readable; the open
+	// one's is not.
+	if got := values(reader(t, addr, "rec", true), 1500*time.Millisecond); !eq(got, []string{"the-decided-one"}) {
+		t.Errorf("read-committed saw %v while the other transaction is open, want only the decided one", got)
 	}
 	if off := committedOffset(t, ctx, admin, "rg", "rec"); off != 5 {
 		t.Errorf("the decided transaction's offset = %d, want 5", off)
 	}
-	// The abandoned producer is fenced: its id moved on.
-	abandonedAfter := &txnConn{t: t, c: openRaw(t, addr), id: "abandoned", pid: abandoned.pid, epoch: abandoned.epoch}
-	if got := abandonedAfter.add("rec", 0); got[0] != kerr.ProducerFenced.Code {
-		t.Errorf("the abandoned producer after the restart: %s, want PRODUCER_FENCED", code(got[0]))
+	// The producer that was open carries on across the restart, and commits.
+	resumed := &txnConn{t: t, c: openRaw(t, addr), id: "abandoned", pid: abandoned.pid, epoch: abandoned.epoch}
+	if c, _ := resumed.produce("rec", 0, resumed.epoch, 1, "the-resumed-one"); c != 0 {
+		t.Errorf("the open producer could not write after the restart: %s", code(c))
+	}
+	wantCode(t, "the open producer commits after the restart", resumed.end(resumed.pid, resumed.epoch, true), nil)
+	if got := values(reader(t, addr, "rec", true), 2*time.Second); !eq(got, []string{"the-decided-one", "the-abandoned-one", "the-resumed-one"}) {
+		t.Errorf("read-committed saw %v, want the decided transaction and the one that resumed", got)
 	}
 	_ = decided
+}
+
+// rawIdemBatch is rawTxBatch without the transactional bit: an idempotent producer's
+// ordinary batch.
+func rawIdemBatch(pid int64, epoch int16, seq int32, value string) []byte {
+	b := rawTxBatch(pid, epoch, seq, value)
+	binary.BigEndian.PutUint16(b[21:], 0)
+	binary.BigEndian.PutUint32(b[17:], crc32.Checksum(b[21:], crc32.MakeTable(crc32.Castagnoli)))
+	return b
+}
+
+// An idempotent producer whose acknowledgement was lost in a stop sends the batch again.
+// The broker has to know it already wrote it: the sequence numbers are in memory, and a
+// restart used to wipe them, so the retry was appended a second time. They are now read
+// back from the log.
+func TestARetriedBatchIsRecognisedAfterARestart(t *testing.T) {
+	skipShort(t)
+	dir := t.TempDir()
+	addr := "127.0.0.1:" + strconv.Itoa(freePort(t))
+	stop := runBrokerAt(t, addr, dir, 4)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	admin := newClient(t, addr)
+	mustCreateTopic(t, ctx, admin, "dedup", 1)
+
+	init := ask(t, openRaw(t, addr), kmsg.NewPtrInitProducerIDRequest(), 4, kmsg.NewPtrInitProducerIDResponse())
+	send := func(c *rawConn, seq int32, value string, b []byte) (code int16, offset int64) {
+		req := kmsg.NewPtrProduceRequest()
+		req.Acks, req.TimeoutMillis = -1, 1000
+		rt := kmsg.NewProduceRequestTopic()
+		rt.Topic = "dedup"
+		rp := kmsg.NewProduceRequestTopicPartition()
+		rp.Records = b
+		rt.Partitions = append(rt.Partitions, rp)
+		req.Topics = append(req.Topics, rt)
+		r := ask(t, c, req, 9, kmsg.NewPtrProduceResponse()).Topics[0].Partitions[0]
+		return r.ErrorCode, r.BaseOffset
+	}
+	b0, b1 := rawIdemBatch(init.ProducerID, init.ProducerEpoch, 0, "first"), rawIdemBatch(init.ProducerID, init.ProducerEpoch, 1, "second")
+	if c, off := send(openRaw(t, addr), 0, "first", b0); c != 0 || off != 0 {
+		t.Fatalf("first batch: %s at %d", code(c), off)
+	}
+	if c, off := send(openRaw(t, addr), 1, "second", b1); c != 0 || off != 1 {
+		t.Fatalf("second batch: %s at %d", code(c), off)
+	}
+	stop()
+	stop = runBrokerAt(t, addr, dir, 4)
+	defer stop()
+	admin = newClient(t, addr)
+
+	// The acknowledgement of the second batch was lost; the producer sends it again.
+	c := openRaw(t, addr)
+	if code, off := send(c, 1, "second", b1); code != 0 || off != 1 {
+		t.Errorf("the resent batch: %s at offset %d, want success at its original offset 1", kerr.ErrorForCode(code), off)
+	}
+	if end := listOffset(t, ctx, admin, "dedup", 0, -1); end != 2 {
+		t.Errorf("log end = %d after the resend, want 2: the batch was written twice", end)
+	}
+	// And the next batch carries on from where the producer was.
+	if code, off := send(c, 2, "third", rawIdemBatch(init.ProducerID, init.ProducerEpoch, 2, "third")); code != 0 || off != 2 {
+		t.Errorf("the next batch after the restart: %s at %d", kerr.ErrorForCode(code), off)
+	}
+	// A sequence that skips ahead is still out of order.
+	if code, _ := send(c, 9, "gap", rawIdemBatch(init.ProducerID, init.ProducerEpoch, 9, "gap")); code != kerr.OutOfOrderSequenceNumber.Code {
+		t.Errorf("a gap after the restart: %s, want OUT_OF_ORDER_SEQUENCE_NUMBER", kerr.ErrorForCode(code))
+	}
 }

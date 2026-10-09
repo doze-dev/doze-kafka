@@ -15,6 +15,11 @@
         <div class="apilist">{{range .Cluster.SupportedAPIs}}<span class="apichip" title="{{.Name}}: versions {{.Min}} to {{.Max}}">{{.Name}} <span class="apiv">v{{.Min}}–{{.Max}}</span></span>{{end}}</div>
       </div>
     </div>
+    <div class="sec-title">Open transactions <span class="sz">{{len .Cluster.Transactions}} in progress</span></div>
+    <div class="cpanel" id="open-transactions">
+      {{range .Cluster.Transactions}}<div class="crow2"><span class="k mono">{{.ID}}</span><span class="v">{{.State}} · producer {{.ProducerID}} epoch {{.Epoch}}{{if .Age}} · open {{.Age}} of {{.Timeout}}{{end}}{{if .Partitions}} · <span class="mono">{{range $i, $p := .Partitions}}{{if $i}}, {{end}}{{$p}}{{end}}</span>{{end}}</span></div>
+      {{else}}<div class="crow2"><span class="k">None</span><span class="v">No transaction is open. A producer with a <code>transactional.id</code> appears here from its first write until it commits or aborts.</span></div>{{end}}
+    </div>
     {{if .Cluster.BrokerConfig}}
     <div class="sec-title">Broker configuration <span class="sz">read-only — set with flags or the config file</span></div>
     <div class="cpanel">

@@ -757,3 +757,15 @@ form.htmx-request .btn.primary::after { content: ""; width: 11px; height: 11px; 
   :root[data-dock="open"] .dock { position: static; }
   :root[data-dock="open"] .dock-form { max-height: none; }
 }
+
+/* Transactions on the tape: records of a transaction that is open or aborted are dimmed
+   and badged, and a commit or abort marker is a thin divider, not a record. */
+.tbl tr.txn-aborted td { opacity: .55; }
+.tbl tr.txn-aborted .cell-val { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--bad) 60%, transparent); }
+.tbl tr.txn-open td { background: color-mix(in srgb, var(--warn) 6%, transparent); }
+.txnbadge { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: var(--fs-xs); line-height: 16px; font-family: var(--font-sans); border: 1px solid var(--border); color: var(--dim); }
+.txnbadge-open { color: var(--warn-foreground); border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
+.txnbadge-aborted { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--border)); }
+.tbl tr.txnmark td { padding-top: 1px; padding-bottom: 1px; font-size: var(--fs-xs); color: var(--dim); border-top: 1px dashed var(--border); border-bottom: 1px dashed var(--border); background: transparent; }
+.tbl tr.txnmark .txnmark-l { letter-spacing: .04em; text-transform: lowercase; }
+.txntoggle[aria-pressed="true"] { background: var(--accent-soft, var(--muted)); }

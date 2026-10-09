@@ -113,7 +113,7 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 	if atAsked {
 		jump = atJump
 	}
-	tape, err := c.tapeData(ctx, name, detail.ID, partition, detail.Partitions, fromParam(r), hlParam(r), jump)
+	tape, err := c.tapeData(ctx, name, detail.ID, partition, detail.Partitions, fromParam(r), hlParam(r), jump, committedParam(r))
 	if err != nil {
 		c.fail(w, r, err)
 		return
@@ -147,7 +147,7 @@ func (c *Console) topicTape(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tape, err := c.tapeData(ctx, name, id, partition, count, -1, -1, -1)
+	tape, err := c.tapeData(ctx, name, id, partition, count, -1, -1, -1, committedParam(r))
 	if err != nil {
 		c.fail(w, r, err)
 		return
@@ -199,7 +199,7 @@ func (c *Console) topicProduce(w http.ResponseWriter, r *http.Request) {
 		toast(w, "Sent to partition "+strconv.Itoa(int(result.Partition))+" · offset "+strconv.FormatInt(result.Offset, 10))
 	}
 
-	tape, err := c.tapeData(ctx, name, id, viewing, count, -1, -1, -1)
+	tape, err := c.tapeData(ctx, name, id, viewing, count, -1, -1, -1, committedParam(r))
 	if err != nil {
 		c.fail(w, r, err)
 		return
@@ -289,7 +289,7 @@ func (c *Console) topicResend(w http.ResponseWriter, r *http.Request) {
 		c.fail(w, r, err)
 		return
 	}
-	tape, err := c.tapeData(ctx, name, id, partition, count, -1, -1, -1)
+	tape, err := c.tapeData(ctx, name, id, partition, count, -1, -1, -1, committedParam(r))
 	if err != nil {
 		c.fail(w, r, err)
 		return
@@ -414,6 +414,12 @@ type msgView struct {
 	Headers    []MessageHeader
 	Hot        bool
 	TickHeight int
+	// Txn is "open" for a record of a transaction not yet decided and "aborted" for
+	// one that aborted; empty for a record a read-committed consumer would see.
+	Txn string
+	// Marker is a transaction's commit or abort marker. It takes an offset and is not
+	// a record: the row says so and is not a thing to open.
+	Marker bool
 }
 
 const tapeWindow = 60 // how many messages the tape/table show at once
@@ -444,7 +450,7 @@ func boundsHash(topicID string, bounds []PartitionBound) string {
 // the tail window live-polls: paging back pins the view, so the 2.5s
 // refresher can't yank the reader back to the newest messages. hl, when ≥0,
 // marks that offset's row for highlight-and-scroll (jump-to-offset).
-func (c *Console) tapeData(ctx context.Context, topic, topicID string, partition, partitionCount int32, from, hl, jump int64) (map[string]any, error) {
+func (c *Console) tapeData(ctx context.Context, topic, topicID string, partition, partitionCount int32, from, hl, jump int64, committedOnly bool) (map[string]any, error) {
 	bounds, err := c.be.PartitionBounds(ctx, topic, partitionCount)
 	if err != nil {
 		return nil, err
@@ -487,14 +493,40 @@ func (c *Console) tapeData(ctx context.Context, topic, topicID string, partition
 		}
 	}
 
-	asc := make([]msgView, len(msgs))
-	for i, m := range msgs {
-		asc[i] = newMsgView(m)
-		asc[i].Hot = atTail && i >= len(msgs)-3
+	// Transactions. A record is "open" at or above the last stable offset and "aborted"
+	// below it when a read-committed consumer would not be given it; the offsets with no
+	// record are transaction markers. Both are known only by comparing with what a
+	// read-committed read returns, so that read is made only when something in the window
+	// calls for it.
+	status, markers, hasTxn := c.txnStatus(ctx, topic, partition, from, to, latest, msgs)
+
+	asc := make([]msgView, 0, len(msgs))
+	rows := make([]msgView, 0, len(msgs)+len(markers))
+	next := 0
+	for off := from; off < to; off++ {
+		if next < len(msgs) && msgs[next].Offset == off {
+			v := newMsgView(msgs[next])
+			v.Txn = status[off]
+			next++
+			if committedOnly && v.Txn != "" {
+				continue
+			}
+			asc = append(asc, v)
+			rows = append(rows, v)
+		} else if markers[off] && !committedOnly {
+			rows = append(rows, msgView{Offset: off, Partition: partition, Marker: true})
+		}
 	}
-	desc := make([]msgView, len(asc))
-	for i, v := range asc {
-		desc[len(asc)-1-i] = v
+	for i := range asc {
+		asc[i].Hot = atTail && i >= len(asc)-3
+	}
+	desc := make([]msgView, len(rows))
+	for i, v := range rows {
+		desc[len(rows)-1-i] = v
+	}
+	committedQ := ""
+	if committedOnly {
+		committedQ = "&committed=1"
 	}
 
 	return map[string]any{
@@ -516,7 +548,60 @@ func (c *Console) tapeData(ctx context.Context, topic, topicID string, partition
 		"WindowFrom":     from,
 		"WindowLast":     max(to-1, from), // inclusive end, for display
 		"HL":             hl,
+		"HasTxn":         hasTxn,
+		"CommittedOnly":  committedOnly,
+		"CommittedQ":     committedQ,
 	}, nil
+}
+
+// committedParam reads ?committed=1, the tape's "committed only" view.
+func committedParam(r *http.Request) bool { return r.URL.Query().Get("committed") == "1" }
+
+// txnStatus works out which records in [from, to) belong to a transaction that has not
+// committed, and which offsets are markers. hasTxn says the partition has transactions
+// worth a toggle. It costs one request for the last stable offset, and a second read only
+// when the window has a marker or reaches the open part of the log.
+func (c *Console) txnStatus(ctx context.Context, topic string, partition int32, from, to, latest int64, msgs []Message) (status map[int64]string, markers map[int64]bool, hasTxn bool) {
+	status, markers = map[int64]string{}, map[int64]bool{}
+	if len(msgs) == 0 {
+		return
+	}
+	have := make(map[int64]bool, len(msgs))
+	for _, m := range msgs {
+		have[m.Offset] = true
+	}
+	for off := from; off < to; off++ {
+		if !have[off] {
+			markers[off] = true
+		}
+	}
+	lso, err := c.be.StableOffset(ctx, topic, partition)
+	if err != nil {
+		lso = latest // an older broker, or one that cannot say: nothing is open.
+	}
+	hasTxn = len(markers) > 0 || lso < latest
+	if !hasTxn {
+		return
+	}
+	committed := map[int64]bool{}
+	if len(markers) > 0 || lso < to {
+		if cm, err := c.be.FetchWindowCommitted(ctx, topic, partition, from, int(to-from)); err == nil {
+			for _, m := range cm {
+				committed[m.Offset] = true
+			}
+		} else {
+			committed = nil // cannot tell aborted from committed; mark only what is open.
+		}
+	}
+	for _, m := range msgs {
+		switch {
+		case m.Offset >= lso:
+			status[m.Offset] = "open"
+		case committed != nil && !committed[m.Offset]:
+			status[m.Offset] = "aborted"
+		}
+	}
+	return
 }
 
 func partitionRange(n int32) []int32 {

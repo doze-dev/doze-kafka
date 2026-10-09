@@ -101,6 +101,7 @@ func runSoak(t *testing.T, duration time.Duration, chaos bool, every time.Durati
 	// Create the topic up front.
 	admin := newClient(t, sup.addr)
 	mustCreateTopic(t, ctx, admin, "soak", partitions)
+	mustCreateTopic(t, ctx, admin, "soak-tx", 2)
 	admin.Close()
 
 	wm := &watermark{hi: map[int]int64{}}
@@ -115,6 +116,11 @@ func runSoak(t *testing.T, duration time.Duration, chaos bool, every time.Durati
 	// One live consumer group, for load and to exercise groups under chaos.
 	wg.Add(1)
 	go runLiveConsumer(t, &wg, sup.addr, done)
+	// A transactional producer: its transactions are all-or-nothing whatever the
+	// broker is doing.
+	txOut := &txnOutcomes{byTxn: map[int]string{}}
+	wg.Add(1)
+	go runTxnProducer(t, &wg, sup.addr, txOut, done)
 
 	// Health monitor (RSS + goroutines).
 	health := &healthMonitor{sup: sup}
@@ -164,6 +170,7 @@ func runSoak(t *testing.T, duration time.Duration, chaos bool, every time.Durati
 	// Authoritative verification: read the whole log back and check invariants.
 	perPartition := drainAll(t, ctx, sup.addr, "soak", partitions)
 	verifySoak(t, perPartition, wm.snapshot(), producers, partitions, chaos, restarts)
+	verifyTxnSoak(t, ctx, sup.addr, txOut)
 
 	// Health verdict.
 	health.report(t, chaos)
@@ -598,4 +605,171 @@ func maxDuration(a, b time.Duration) time.Duration {
 		return a
 	}
 	return b
+}
+
+// --- transactional load ---
+
+// A transactional producer writes transactions of txnSize records, "T<n>:<i>", to a
+// partition chosen by n, and ends each: every fourth is aborted on purpose, the rest
+// committed. What the broker is doing meanwhile (killed, restarted) can make a commit's
+// outcome unknown to the producer, and that is recorded as such. The invariant checked
+// afterwards, by a read-committed reader, is the one exactly-once rests on: a
+// transaction is all there or not there at all.
+const txnSize = 5
+
+const (
+	txnCommitted = "committed" // the commit was acknowledged.
+	txnAborted   = "aborted"   // aborted on purpose, and the abort acknowledged.
+	txnUnknown   = "unknown"   // the producer does not know how it ended.
+)
+
+type txnOutcomes struct {
+	mu    sync.Mutex
+	byTxn map[int]string
+}
+
+func (o *txnOutcomes) set(n int, how string) { o.mu.Lock(); o.byTxn[n] = how; o.mu.Unlock() }
+
+func runTxnProducer(t *testing.T, wg *sync.WaitGroup, addr string, out *txnOutcomes, done <-chan struct{}) {
+	defer wg.Done()
+	newClient := func() *kgo.Client {
+		cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.TransactionalID("soak-tx"), kgo.TransactionTimeout(20*time.Second),
+			kgo.RecordPartitioner(kgo.ManualPartitioner()), kgo.RecordRetries(1_000_000), kgo.RequestRetries(1_000_000),
+			kgo.RetryTimeout(time.Minute), kgo.ProduceRequestTimeout(10*time.Second), kgo.DialTimeout(3*time.Second))
+		if err != nil {
+			t.Errorf("transactional producer: %v", err)
+			return nil
+		}
+		return cl
+	}
+	cl := newClient()
+	if cl == nil {
+		return
+	}
+	defer func() { cl.Close() }()
+	for n := 0; ; n++ {
+		select {
+		case <-done:
+			return
+		default:
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ok := func() bool {
+			if err := cl.BeginTransaction(); err != nil {
+				return false
+			}
+			for i := 0; i < txnSize; i++ {
+				rec := &kgo.Record{Topic: "soak-tx", Partition: int32(n % 2), Value: []byte(fmt.Sprintf("T%d:%d", n, i))}
+				if err := cl.ProduceSync(ctx, rec).FirstErr(); err != nil {
+					return false
+				}
+			}
+			return true
+		}()
+		purposeful := n%4 == 3
+		switch {
+		case !ok:
+			out.set(n, txnUnknown)
+			_ = cl.EndTransaction(ctx, kgo.TryAbort)
+		case purposeful:
+			if err := cl.EndTransaction(ctx, kgo.TryAbort); err != nil {
+				out.set(n, txnUnknown)
+			} else {
+				out.set(n, txnAborted)
+			}
+		default:
+			if err := cl.EndTransaction(ctx, kgo.TryCommit); err != nil {
+				out.set(n, txnUnknown)
+			} else {
+				out.set(n, txnCommitted)
+			}
+		}
+		cancel()
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// verifyTxnSoak reads the transactional topic as a read-committed consumer and checks
+// that every transaction is whole or absent, in order, once, and that what the producer
+// was told matches what is there.
+func verifyTxnSoak(t *testing.T, ctx context.Context, addr string, out *txnOutcomes) {
+	t.Helper()
+	// Wait for the last stable offset to reach the end: nothing may still be open.
+	admin := newClient(t, addr)
+	defer admin.Close()
+	deadline := time.Now().Add(2 * time.Minute)
+	for {
+		settled := true
+		for p := int32(0); p < 2; p++ {
+			settled = settled && listOffsetIsoPart(t, ctx, admin, "soak-tx", p, -1, 1) == listOffset(t, ctx, admin, "soak-tx", p, -1)
+		}
+		if settled || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.ConsumeTopics("soak-tx"), kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
+		kgo.FetchIsolationLevel(kgo.ReadCommitted()), kgo.FetchMaxWait(500*time.Millisecond))
+	if err != nil {
+		t.Fatalf("read-committed drain: %v", err)
+	}
+	defer cl.Close()
+	perTxn := map[int][]int{}
+	lastPerPartition := map[int32][2]int{}
+	idle := 0
+	for idle < 3 {
+		pctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		fs := cl.PollFetches(pctx)
+		cancel()
+		n := 0
+		fs.EachRecord(func(r *kgo.Record) {
+			n++
+			var txn, i int
+			if _, err := fmt.Sscanf(string(r.Value), "T%d:%d", &txn, &i); err != nil {
+				t.Errorf("unreadable value %q", r.Value)
+				return
+			}
+			// Within a partition transactions arrive in order, each record after the one before it.
+			last, seen := lastPerPartition[r.Partition]
+			if seen && (txn < last[0] || (txn == last[0] && i != last[1]+1)) {
+				t.Errorf("partition %d: T%d:%d after T%d:%d is out of order", r.Partition, txn, i, last[0], last[1])
+			}
+			lastPerPartition[r.Partition] = [2]int{txn, i}
+			perTxn[txn] = append(perTxn[txn], i)
+		})
+		if n == 0 {
+			idle++
+		} else {
+			idle = 0
+		}
+	}
+
+	out.mu.Lock()
+	defer out.mu.Unlock()
+	whole, absent, partial := 0, 0, 0
+	for n, how := range out.byTxn {
+		got := len(perTxn[n])
+		switch {
+		case got != 0 && got != txnSize:
+			partial++
+			t.Errorf("transaction %d is partial: %d of %d records visible to a read-committed reader (%v)", n, got, txnSize, perTxn[n])
+		case got == txnSize && how == txnAborted:
+			t.Errorf("transaction %d was aborted on purpose and acknowledged, and is visible", n)
+		case got == 0 && how == txnCommitted:
+			t.Errorf("transaction %d was acknowledged as committed and is missing", n)
+		case got == txnSize:
+			whole++
+		default:
+			absent++
+		}
+	}
+	for n := range perTxn {
+		if _, ok := out.byTxn[n]; !ok {
+			t.Errorf("transaction %d is visible but the producer never finished it", n)
+		}
+	}
+	t.Logf("transactions: %d whole, %d absent, %d partial, %d in total", whole, absent, partial, len(out.byTxn))
+	if len(out.byTxn) == 0 {
+		t.Error("the transactional producer never completed a transaction, so the invariant was not exercised")
+	}
 }

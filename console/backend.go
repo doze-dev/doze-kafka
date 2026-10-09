@@ -560,6 +560,24 @@ type MessageHeader struct {
 // batches) means decompression and batch parsing are the same
 // battle-tested code path every real consumer uses.
 func (b *backend) FetchWindow(ctx context.Context, topic string, partition int32, fromOffset int64, limit int) ([]Message, error) {
+	return b.fetchWindow(ctx, topic, partition, fromOffset, limit, false)
+}
+
+// FetchWindowCommitted is FetchWindow as a read-committed consumer would see it: no
+// records of transactions that aborted or are still open.
+func (b *backend) FetchWindowCommitted(ctx context.Context, topic string, partition int32, fromOffset int64, limit int) ([]Message, error) {
+	return b.fetchWindow(ctx, topic, partition, fromOffset, limit, true)
+}
+
+// txnTail is how long a window that has records waits for more before it concludes
+// that what is left is transaction markers, which a consumer never sees as records.
+const txnTail = 400 * time.Millisecond
+
+// fetchWindow reads the records in the offsets [fromOffset, fromOffset+limit). The
+// bound is on OFFSETS, not on a count: a transaction's commit or abort marker takes an
+// offset and is not a record, so a window of sixty offsets can hold fewer than sixty
+// records, and counting would have waited for ones that do not exist.
+func (b *backend) fetchWindow(ctx context.Context, topic string, partition int32, fromOffset int64, limit int, committed bool) ([]Message, error) {
 	if limit <= 0 {
 		limit = 1
 	}
@@ -574,12 +592,14 @@ func (b *backend) FetchWindow(ctx context.Context, topic string, partition int32
 	if fromOffset < earliest || fromOffset >= latest {
 		return nil, nil
 	}
-	if int64(limit) > latest-fromOffset {
-		limit = int(latest - fromOffset)
+	end := min(fromOffset+int64(limit), latest) // exclusive.
+	iso := kgo.ReadUncommitted()
+	if committed {
+		iso = kgo.ReadCommitted()
 	}
 	kopts := append(seedOpts(b.addr), kgo.ClientID("doze-kafka-console-fetch"),
 		kgo.ConsumePartitions(map[string]map[int32]kgo.Offset{topic: {partition: kgo.NewOffset().At(fromOffset)}}),
-		kgo.FetchMaxBytes(4<<20),
+		kgo.FetchMaxBytes(4<<20), kgo.FetchIsolationLevel(iso),
 	)
 	if b.opts.SASLUser != "" {
 		mech, err := saslMechanism(b.opts.SASLMechanism, b.opts.SASLUser, b.opts.SASLPass)
@@ -603,17 +623,23 @@ func (b *backend) FetchWindow(ctx context.Context, topic string, partition int32
 	defer cancel()
 
 	var out []Message
-	for len(out) < limit {
-		fs := cl.PollFetches(fctx)
+	for {
+		pctx, pcancel := fctx, context.CancelFunc(func() {})
+		if len(out) > 0 {
+			pctx, pcancel = context.WithTimeout(fctx, txnTail)
+		}
+		fs := cl.PollFetches(pctx)
+		pcancel()
 		if fs.IsClientClosed() {
 			break
 		}
-		if err := fs.Err0(); err != nil && fctx.Err() == nil {
+		if err := fs.Err0(); err != nil && pctx.Err() == nil {
 			return nil, err
 		}
-		done := false
+		reached := false
 		fs.EachRecord(func(r *kgo.Record) {
-			if done || len(out) >= limit {
+			if r.Offset >= end {
+				reached = true
 				return
 			}
 			hdrs := make([]MessageHeader, len(r.Headers))
@@ -624,8 +650,9 @@ func (b *backend) FetchWindow(ctx context.Context, topic string, partition int32
 				Offset: r.Offset, Partition: r.Partition, Timestamp: r.Timestamp,
 				Key: r.Key, Value: r.Value, Headers: hdrs,
 			})
+			reached = reached || r.Offset >= end-1
 		})
-		if fctx.Err() != nil {
+		if reached || fctx.Err() != nil || (len(out) > 0 && pctx.Err() != nil) {
 			break
 		}
 	}
@@ -634,6 +661,31 @@ func (b *backend) FetchWindow(ctx context.Context, topic string, partition int32
 		return nil, fmt.Errorf("fetching %s partition %d from offset %d: %w", topic, partition, fromOffset, context.DeadlineExceeded)
 	}
 	return out, nil
+}
+
+// StableOffset is the partition's last stable offset: what a read-committed consumer
+// may read up to. Records at or above it belong to a transaction still open.
+func (b *backend) StableOffset(ctx context.Context, topic string, partition int32) (int64, error) {
+	req := kmsg.NewPtrListOffsetsRequest()
+	req.ReplicaID, req.IsolationLevel = -1, 1
+	rt := kmsg.NewListOffsetsRequestTopic()
+	rt.Topic = topic
+	rp := kmsg.NewListOffsetsRequestTopicPartition()
+	rp.Partition, rp.Timestamp = partition, -1
+	rt.Partitions = append(rt.Partitions, rp)
+	req.Topics = []kmsg.ListOffsetsRequestTopic{rt}
+	resp, err := req.RequestWith(ctx, b.cl)
+	if err != nil {
+		return 0, err
+	}
+	if len(resp.Topics) != 1 || len(resp.Topics[0].Partitions) != 1 {
+		return 0, fmt.Errorf("unexpected ListOffsets response shape")
+	}
+	p := resp.Topics[0].Partitions[0]
+	if e := kerr.ErrorForCode(p.ErrorCode); e != nil {
+		return 0, e
+	}
+	return p.Offset, nil
 }
 
 // ProduceResult reports where a message landed.

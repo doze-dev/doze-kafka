@@ -138,7 +138,7 @@
      together, so a new message appearing updates both from one partial. With
      .Search set it shows what a search found instead, and does not poll. */}}
 {{define "tape_and_table"}}
-<div class="tapetable" id="tape-and-table" {{if not .Search}}data-msg-base="{{topicURL .Topic.Name}}/message?partition={{.Partition}}" {{if .AtTail}}data-live="{{topicURL .Topic.Name}}/tape?partition={{.Partition}}" data-hash="{{.Hash}}" data-live-ms="2500"{{end}}{{end}}>
+<div class="tapetable" id="tape-and-table" {{if not .Search}}data-msg-base="{{topicURL .Topic.Name}}/message?partition={{.Partition}}" {{if .AtTail}}data-live="{{topicURL .Topic.Name}}/tape?partition={{.Partition}}{{.CommittedQ}}" data-hash="{{.Hash}}" data-live-ms="2500"{{end}}{{end}}>
   {{if not .Search}}
   <div class="tape-panel">
   <div class="tape-head">
@@ -189,6 +189,7 @@
       <input class="input mono" id="jump-at" name="at" placeholder="15m, 2h, or 2026-10-07 10:30 (UTC)" autocomplete="off">
       <button type="submit" class="btn btn-outline jump-go">Go</button>
     </form>
+    {{if or .HasTxn .CommittedOnly}}<a class="btn btn-outline jump-go txntoggle" href="{{topicURL .Topic.Name}}?partition={{.Partition}}{{if not .CommittedOnly}}&committed=1{{end}}" aria-pressed="{{.CommittedOnly}}" title="Hide records of transactions that aborted or have not ended, and the markers, as a read-committed consumer would see this partition">{{if .CommittedOnly}}Showing committed only · show all{{else}}Committed only{{end}}</a>{{end}}
     {{end}}
   </div>
   {{if .Search}}<div class="jumpnote" role="status">{{icon "info"}} <span>{{.Search.Note}}{{if .Search.OlderURL}} <a class="pagelink" href="{{.Search.OlderURL}}">Search older records</a>{{end}}</span></div>{{end}}
@@ -198,14 +199,21 @@
       <thead><tr>{{if .Search}}<th class="num">Partition</th>{{end}}<th class="num">Offset</th><th class="col-time">Time</th><th>Key</th><th>Value</th><th class="col-hdrs">Headers</th></tr></thead>
       <tbody>
         {{range .Rows}}
-        <tr id="{{if $.Search}}hit-{{.Partition}}-{{.Offset}}{{else}}msg-{{.Offset}}{{end}}" {{if and (not $.Search) (eq .Offset $.HL)}}class="hl" data-hl{{end}} tabindex="0" role="button" aria-label="Open {{if $.Search}}partition {{.Partition}} {{end}}offset {{.Offset}}" data-drawer-open hx-get="{{topicURL $.Topic.Name}}/message?partition={{.Partition}}&offset={{.Offset}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML">
-          {{if $.Search}}<td class="num mono">{{.Partition}}</td>{{end}}
+        {{if .Marker}}
+        <tr class="txnmark" id="mark-{{.Offset}}">
           <td class="cell-offset num">{{.Offset}}</td>
+          <td colspan="5" class="txnmark-l" title="A commit or abort ends a transaction here. It takes an offset and is not a record.">transaction marker</td>
+        </tr>
+        {{else}}
+        <tr id="{{if $.Search}}hit-{{.Partition}}-{{.Offset}}{{else}}msg-{{.Offset}}{{end}}" class="{{if and (not $.Search) (eq .Offset $.HL)}}hl{{end}}{{if .Txn}} txn-{{.Txn}}{{end}}" {{if and (not $.Search) (eq .Offset $.HL)}}data-hl{{end}} tabindex="0" role="button" aria-label="Open {{if $.Search}}partition {{.Partition}} {{end}}offset {{.Offset}}" data-drawer-open hx-get="{{topicURL $.Topic.Name}}/message?partition={{.Partition}}&offset={{.Offset}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML">
+          {{if $.Search}}<td class="num mono">{{.Partition}}</td>{{end}}
+          <td class="cell-offset num">{{.Offset}}{{if .Txn}} <span class="txnbadge txnbadge-{{.Txn}}" title="{{if eq .Txn "open"}}Part of a transaction that has not ended; a read-committed consumer cannot see it yet.{{else}}Part of a transaction that aborted; a read-committed consumer never sees it.{{end}}">{{.Txn}}</span>{{end}}</td>
           <td class="cell-time col-time" title="{{.TimeFull}}">{{.TimeStr}} <span class="dim ago" data-ts="{{.Timestamp.UnixMilli}}">· {{ago .Timestamp}}</span></td>
           <td class="cell-key {{if or .Key.Null .Key.Empty}}none{{end}}" title="{{if .Key.Null}}null key{{else}}{{.Key.Preview}} · {{.Key.SizeText}}{{end}}">{{if .Key.Null}}no key{{else}}{{.Key.Preview}}{{end}}</td>
           <td class="cell-val {{if .Value.Binary}}binary{{end}} {{if .Value.Null}}tomb{{end}}" title="{{.Value.SizeText}}">{{if or .Value.Binary .Value.Null .Value.Empty}}<span class="vspecial">{{.Value.Preview}}</span>{{else}}{{jsonTint .Value.Preview}}{{end}}</td>
           <td class="col-hdrs">{{if .Headers}}<span class="hdrct">{{len .Headers}}</span>{{else}}<span class="dim">—</span>{{end}}</td>
         </tr>
+        {{end}}
         {{else}}
         <tr><td colspan="6" class="empty">{{if .Search}}{{if .Search.Query}}Nothing in the records that were read contains “{{.Search.Query}}”.{{else}}No records.{{end}}{{else if gt .Earliest 0}}{{t "messages.retention" .Earliest}}{{else}}{{t "messages.none"}}{{end}}</td></tr>
         {{end}}
@@ -215,8 +223,8 @@
       <span>{{if .Rows}}{{len .Rows}} shown{{else}}No messages{{end}}</span>
       {{if not .Search}}
       <span class="pager">
-        {{if .HasOlder}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.OlderFrom}}">← Older</a>{{end}}
-        {{if .HasNewer}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.NewerFrom}}">Newer</a><a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}">Latest →</a>{{end}}
+        {{if .HasOlder}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.OlderFrom}}{{.CommittedQ}}">← Older</a>{{end}}
+        {{if .HasNewer}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.NewerFrom}}{{.CommittedQ}}">Newer</a><a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}{{.CommittedQ}}">Latest →</a>{{end}}
         <span title="The oldest retained offset, and the log-end offset (where the next message goes)">log start {{.Earliest}} · log end {{.Latest}}</span>
       </span>
       {{end}}

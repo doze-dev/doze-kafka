@@ -24,9 +24,10 @@ implement it.
 
 - **Transactions: the classic protocol only.** Transactions work ([Transactions](transactions.md)),
   but the newer "transaction v2" of KIP-890 (Produce v12+) is not offered, so clients use
-  the classic one. One caveat on idempotence: the sequence window is in memory, so a
-  non-transactional idempotent batch that was in flight exactly across a broker restart
-  could still duplicate (rare, and `acks=all` makes it rarer still).
+  the classic one. Idempotence survives a restart: each producer's recent sequence numbers
+  are read back from the last 16 MiB of the log, so a batch resent after a crash is
+  recognised. (A producer idle for longer than that window loses the protection, as one idle
+  past 15 minutes does in memory.)
 - **Log compaction.** Retention is delete-only (by size and age). `cleanup.policy=compact`
   is accepted and reported, because Kafka Connect and Schema Registry check for it on
   their own topics, but nothing is compacted: every record is kept until retention

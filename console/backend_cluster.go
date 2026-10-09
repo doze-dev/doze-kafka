@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kmsg"
@@ -30,6 +31,20 @@ type ClusterInfo struct {
 	// first-hand from its dial options, not read off the wire.
 	AuthMech string // SASL mechanism in use, "" when the broker runs open
 	TLS      bool
+
+	// Transactions is every transaction that is open or being ended.
+	Transactions []TxnRow
+}
+
+// TxnRow is one transaction in progress.
+type TxnRow struct {
+	ID         string
+	State      string
+	ProducerID int64
+	Epoch      int16
+	Age        string // since it began.
+	Timeout    string
+	Partitions []string // topic-partition, as the transaction has written to them.
 }
 
 // ClusterInfo describes the broker itself, via DescribeCluster + ApiVersions
@@ -90,5 +105,44 @@ func (b *backend) ClusterInfo(ctx context.Context) (*ClusterInfo, error) {
 			info.BrokerConfig = append(info.BrokerConfig, ConfigEntry{Name: c.Name, Value: v})
 		}
 	}
+	info.Transactions = b.openTransactions(ctx)
 	return info, nil
+}
+
+// openTransactions lists the transactions in progress, as `kafka-transactions list`
+// and `describe` would. Best effort, like the configuration: a broker that cannot say
+// has none to show.
+func (b *backend) openTransactions(ctx context.Context) []TxnRow {
+	lreq := kmsg.NewPtrListTransactionsRequest()
+	lreq.StateFilters = []string{"Ongoing", "PrepareCommit", "PrepareAbort"}
+	lresp, err := lreq.RequestWith(ctx, b.cl)
+	if err != nil || len(lresp.TransactionStates) == 0 {
+		return nil
+	}
+	dreq := kmsg.NewPtrDescribeTransactionsRequest()
+	for _, s := range lresp.TransactionStates {
+		dreq.TransactionalIDs = append(dreq.TransactionalIDs, s.TransactionalID)
+	}
+	dresp, err := dreq.RequestWith(ctx, b.cl)
+	if err != nil {
+		return nil
+	}
+	var rows []TxnRow
+	for _, s := range dresp.TransactionStates {
+		if s.ErrorCode != 0 {
+			continue
+		}
+		row := TxnRow{ID: s.TransactionalID, State: s.State, ProducerID: s.ProducerID, Epoch: s.ProducerEpoch,
+			Timeout: (time.Duration(s.TimeoutMillis) * time.Millisecond).String()}
+		if s.StartTimestamp > 0 {
+			row.Age = time.Since(time.UnixMilli(s.StartTimestamp)).Round(time.Second).String()
+		}
+		for _, t := range s.Topics {
+			for _, p := range t.Partitions {
+				row.Partitions = append(row.Partitions, fmt.Sprintf("%s-%d", t.Topic, p))
+			}
+		}
+		rows = append(rows, row)
+	}
+	return rows
 }

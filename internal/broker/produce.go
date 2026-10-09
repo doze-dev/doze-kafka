@@ -236,6 +236,10 @@ func (b *Broker) appendIdempotent(topic string, partition int32, plog *log.Parti
 	pp := b.idem.forPartition(topic, partition)
 	pp.mu.Lock()
 	defer pp.mu.Unlock()
+	if err := pp.loadFrom(plog); err != nil {
+		rp.ErrorCode = b.storageFault("produce: read the producers' history", err, "topic", topic, "partition", partition)
+		return false
+	}
 
 	var (
 		firstOffset int64 = -1

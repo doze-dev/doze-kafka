@@ -5,6 +5,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/doze-dev/doze-kafka/internal/storage/log"
 )
 
 // The idempotency tracker deduplicates an idempotent producer's retried batches.
@@ -14,11 +16,10 @@ import (
 // producer's recent sequence numbers per partition and, on a retry, returns the
 // batch's original offset instead of appending it again.
 //
-// State is per (partition, producerID), in memory. It survives for the life of the
-// broker process; it is not persisted, so a batch that was in flight exactly across
-// a broker restart is the one residual gap (and durable acks make even that rare —
-// an acked batch was fsynced, so the producer won't resend it). See
-// docs/limitations.md.
+// State is per (partition, producerID), in memory, and rebuilt from the log the first
+// time a partition is produced to after a restart (loadFrom): the log holds every batch
+// with its producer id and sequence, so a batch whose acknowledgement was lost in a
+// crash and is sent again is recognised rather than appended twice.
 
 // maxTrackedBatches is how many recent batches per producer we keep for dedup. It
 // matches Kafka's five-in-flight window for idempotent producers.
@@ -66,7 +67,33 @@ func (i *idempotency) dropPartitions(topic string, partitions int32) {
 type partitionProducers struct {
 	mu        sync.Mutex
 	producers map[int64]*producerSequence
-	sweepAt   int // producer count after the last idle sweep.
+	sweepAt   int  // producer count after the last idle sweep.
+	loaded    bool // the log's recent history has been read in (see loadFrom).
+}
+
+// historyBytes is how much of a partition's log is read to relearn its producers after a
+// restart: the last 16 MiB, by whole segments. A producer retries within its delivery
+// timeout, which is minutes, so what matters is what was written just before the stop.
+const historyBytes = 16 << 20
+
+// loadFrom reads the producers' recent sequence numbers back from the log, once. The
+// tracker lives in memory, and a restart used to wipe it: a producer retrying a batch
+// whose acknowledgement was lost in the stop was believed new and appended twice. The
+// log is the record of what was written, so the history is rebuilt from it. Callers
+// hold pp.mu.
+func (pp *partitionProducers) loadFrom(plog *log.Partition) error {
+	if pp.loaded {
+		return nil
+	}
+	history, err := plog.ProducerHistory(historyBytes)
+	if err != nil {
+		return err
+	}
+	for _, h := range history {
+		pp.record(h.ProducerID, h.Epoch, h.FirstSeq, h.LastSeq, h.BaseOffset)
+	}
+	pp.loaded = true
+	return nil
 }
 
 type producerSequence struct {

@@ -4,6 +4,8 @@
 //	seed-orders   3 partitions. Partition 0 holds 45 records: keyed JSON with headers,
 //	              a tombstone, a record with no key, a binary value, a very long key.
 //	seed-empty    1 partition, no records.
+//	seed-txn      1 partition with one aborted transaction, one committed, and one left
+//	              open (producer "seed-open"; its timeout is long, so it outlasts a run).
 //	g-lag         committed at offset 10 of seed-orders/0: a lag to look at.
 //	g-reset-*     one group per test that resets, sets or deletes, so tests that
 //	              change a group never share one.
@@ -40,7 +42,7 @@ func run(addr string) error {
 	}
 	defer cl.Close()
 
-	for name, parts := range map[string]int32{"seed-orders": 3, "seed-empty": 1} {
+	for name, parts := range map[string]int32{"seed-orders": 3, "seed-empty": 1, "seed-txn": 1} {
 		req := kmsg.NewPtrCreateTopicsRequest()
 		rt := kmsg.NewCreateTopicsRequestTopic()
 		rt.Topic, rt.NumPartitions, rt.ReplicationFactor = name, parts, 1
@@ -48,6 +50,9 @@ func run(addr string) error {
 		if resp, err := req.RequestWith(ctx, cl); err != nil || resp.Topics[0].ErrorCode != 0 {
 			return fmt.Errorf("create %s: %v %+v", name, err, resp)
 		}
+	}
+	if err := seedTransactions(ctx, addr); err != nil {
+		return err
 	}
 	produce := func(part int32, key, value []byte, h ...kgo.RecordHeader) error {
 		return cl.ProduceSync(ctx, &kgo.Record{Topic: "seed-orders", Partition: part, Key: key, Value: value, Headers: h}).FirstErr()
@@ -97,4 +102,43 @@ func run(addr string) error {
 		}
 	}
 	return nil
+}
+
+// seedTransactions writes seed-txn: an aborted transaction, a committed one and one that
+// is left open, each from the same producer except the open one.
+func seedTransactions(ctx context.Context, addr string) error {
+	newTx := func(id string) (*kgo.Client, error) {
+		return kgo.NewClient(kgo.SeedBrokers(addr), kgo.TransactionalID(id), kgo.TransactionTimeout(10*time.Minute), kgo.RecordPartitioner(kgo.ManualPartitioner()))
+	}
+	write := func(cl *kgo.Client, v string) error {
+		return cl.ProduceSync(ctx, &kgo.Record{Topic: "seed-txn", Partition: 0, Value: []byte(v)}).FirstErr()
+	}
+	p, err := newTx("seed-txn")
+	if err != nil {
+		return err
+	}
+	defer p.Close()
+	for _, step := range []struct {
+		value string
+		ok    bool
+	}{{"txn-aborted-record", false}, {"txn-committed-record", true}} {
+		if err := p.BeginTransaction(); err != nil {
+			return err
+		}
+		if err := write(p, step.value); err != nil {
+			return err
+		}
+		if err := p.EndTransaction(ctx, kgo.TransactionEndTry(step.ok)); err != nil {
+			return err
+		}
+	}
+	open, err := newTx("seed-open")
+	if err != nil {
+		return err
+	}
+	defer open.Close()
+	if err := open.BeginTransaction(); err != nil {
+		return err
+	}
+	return write(open, "txn-open-record")
 }

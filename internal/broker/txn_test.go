@@ -123,12 +123,18 @@ func TestTransactionsCommitAndAbort(t *testing.T) {
 // listOffsetIso is ListOffsets at an isolation level.
 func listOffsetIso(t *testing.T, ctx context.Context, cl *kgo.Client, topic string, ts int64, iso int8) int64 {
 	t.Helper()
+	return listOffsetIsoPart(t, ctx, cl, topic, 0, ts, iso)
+}
+
+// listOffsetIsoPart is listOffsetIso for any partition.
+func listOffsetIsoPart(t *testing.T, ctx context.Context, cl *kgo.Client, topic string, part int32, ts int64, iso int8) int64 {
+	t.Helper()
 	req := kmsg.NewPtrListOffsetsRequest()
 	req.ReplicaID, req.IsolationLevel = -1, iso
 	rt := kmsg.NewListOffsetsRequestTopic()
 	rt.Topic = topic
 	rp := kmsg.NewListOffsetsRequestTopicPartition()
-	rp.Timestamp = ts
+	rp.Partition, rp.Timestamp = part, ts
 	rt.Partitions = append(rt.Partitions, rp)
 	req.Topics = append(req.Topics, rt)
 	resp, err := req.RequestWith(ctx, cl)

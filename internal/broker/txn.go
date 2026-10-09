@@ -295,8 +295,11 @@ func (b *Broker) endTxn(id string, pid int64, epoch int16, commit bool) int16 {
 }
 
 // RecoverTransactions finishes what a stop left half done: a transaction whose decision
-// was stored is carried out, and one still open belonged to a producer that is gone, so
-// it is aborted and the id fenced.
+// was stored is carried out. One still open is left open, as in Kafka: its producer may
+// be alive and retrying across the restart, and aborting it would fence that producer for
+// good (a client treats being fenced as fatal), so every restart of the broker would kill
+// the application's producer. Its timeout starts again from now, and a producer that
+// really is gone is found by that.
 func (b *Broker) RecoverTransactions() {
 	for _, e := range b.txns.all() {
 		e.mu.Lock()
@@ -307,7 +310,7 @@ func (b *Broker) RecoverTransactions() {
 		case txnPrepareAbort:
 			code = b.finishTxn(e, false)
 		case txnOngoing:
-			code = b.abortFencing(e)
+			code = b.persistTxn(e) // stamps the time: the timeout counts from the restart.
 		}
 		if code != 0 {
 			b.log.Error("transactions: could not finish a transaction left from before the restart", "transactional_id", e.rec.ID, "code", code)

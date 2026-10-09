@@ -142,3 +142,30 @@ test('go to time lands on the first message at or after it, and explains an empt
   await page.locator('form.jump', { has: page.locator('#jump-at') }).getByRole('button', { name: 'Go' }).click();
   await expect(page.locator('.jumpnote')).toContainText('That is not a time');
 });
+
+test('transactions on the tape: aborted and open records are marked, markers are dividers, and committed-only hides them', async ({ page }) => {
+  await page.goto('topics/seed-txn');
+  const rows = page.locator('#tape-and-table tbody tr');
+  await expect(page.locator('.txnbadge-aborted')).toHaveCount(1);
+  await expect(page.locator('.txnbadge-open')).toHaveCount(1);
+  await expect(page.locator('tr.txnmark')).toHaveCount(2); // one abort, one commit.
+  await expect(page.locator('tr.txn-aborted')).toContainText('txn-aborted-record');
+  await expect(page.locator('tr.txn-open')).toContainText('txn-open-record');
+  await expect(rows.filter({ hasText: 'txn-committed-record' })).not.toHaveClass(/txn-/);
+
+  await page.getByRole('link', { name: 'Committed only' }).click();
+  await expect(page.locator('#tape-and-table tbody tr:not(.txnmark)')).toHaveCount(1);
+  await expect(page.locator('#tape-and-table')).toContainText('txn-committed-record');
+  await expect(page.locator('#tape-and-table')).not.toContainText('txn-aborted-record');
+  await expect(page.locator('tr.txnmark')).toHaveCount(0);
+  await page.getByRole('link', { name: /show all/ }).click();
+  await expect(page.locator('tr.txnmark')).toHaveCount(2);
+
+  // A marker is not a record: it does not open the drawer.
+  await page.locator('tr.txnmark').first().click();
+  await expect(page.locator('#drawer-overlay')).toBeHidden();
+
+  await page.goto('cluster');
+  await expect(page.locator('#open-transactions')).toContainText('seed-open');
+  await expect(page.locator('#open-transactions')).toContainText('Ongoing');
+});

@@ -54,6 +54,13 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   create-topic form. Other Kafka topic
   settings are listed for reading; a topic that asks for compaction is told it is not
   compacted.
+- **Transactions** show on the tape. A record of a transaction that aborted is dimmed and
+  badged *aborted*, and one whose transaction has not ended is badged *open* (a
+  read-committed consumer cannot see either); a commit or abort marker takes an offset
+  and is drawn as a thin divider, not a record. **Committed only** shows the partition as
+  a read-committed consumer would. The **Cluster** page lists the transactions in
+  progress: transactional id, state, producer, how long open, and the partitions touched.
+  See [Transactions](transactions.md).
 - **Access** lists the ACLs on the broker, read-only, under a banner that says they are
   enforced and how a resource with no ACL is treated (see
   [Authorization](authorization.md)). They are managed with `kafka-acls` or your

@@ -16,7 +16,7 @@ one by itself.
 
 | API | |
 |---|---|
-| InitProducerId (with a `transactional.id`) | Becomes the owner of the id, fencing whoever held it; a transaction the previous owner left open is aborted. |
+| InitProducerId (with a `transactional.id`) | Becomes the owner of the id, fencing whoever held it; a transaction the previous owner left open is aborted, and the epoch is raised. |
 | FindCoordinator (type transaction) | This node. |
 | AddPartitionsToTxn, AddOffsetsToTxn | What the transaction will touch. |
 | Produce (transactional batches) | Refused unless the producer owns the id and the partition was added. |
@@ -29,9 +29,12 @@ one by itself.
 Ending a transaction appends a **marker** (a control batch carrying the producer's id
 and epoch) to every partition the transaction wrote to, then, for a commit, applies the
 consumer offsets it carried. The decision is stored before the markers are written, so a
-stop in the middle is finished on the next start: a stored commit is carried out, and a
-transaction still open belonged to a producer that is gone, so it is aborted and the id
-fenced.
+stop in the middle is finished on the next start: a stored commit is carried out. A
+transaction still open is left open, as in Kafka: its producer may be alive and retrying,
+and can go on to commit. Its timeout starts again from the restart, and a producer that
+really is gone is found by that. (Aborting it at start-up would fence a live producer for
+good, since a client treats being fenced as fatal, and every restart of the broker would
+kill the application's producer.)
 
 A marker takes an offset, so a partition's offsets have gaps where transactions ended.
 Consumers skip them; the console shows them as dividers.
@@ -68,6 +71,6 @@ transactions, `Describe` to find its coordinator or describe it. See
 - Transaction state is a record per `transactional.id` in the metadata database, and
   per-partition state (open and aborted transactions) is rebuilt from the batch headers
   of the log. A partition that has never held a transactional batch is not scanned.
-- The idempotent-producer sequence window (the last five batches) is still held in
-  memory, so a batch in flight across a restart can in principle repeat. A transaction
-  is not affected: its outcome is decided by markers, not by sequences.
+- Exactly-once across a broker crash needs a resent batch to be recognised, so each
+  producer's recent sequence numbers are rebuilt from the last 16 MiB of the log on first
+  use after a restart. A producer idle for longer than that window loses the protection.
