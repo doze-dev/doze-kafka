@@ -157,11 +157,11 @@ func (r *rawConn) do(req kmsg.Request, resp kmsg.Response) (ok bool) {
 	if _, err := io.ReadFull(r.c, buf); err != nil {
 		return false
 	}
-	skip := 4 // correlation id.
+	resp.SetVersion(req.GetVersion()) // flexibility depends on the version.
+	skip := 4                         // correlation id.
 	if resp.IsFlexible() && resp.Key() != 18 {
 		skip++ // response header tagged fields.
 	}
-	resp.SetVersion(req.GetVersion())
 	if err := resp.ReadFrom(buf[skip:]); err != nil {
 		r.t.Fatalf("decode %T: %v", resp, err)
 	}

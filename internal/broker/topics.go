@@ -85,6 +85,7 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 	if validateOnly {
 		rt.NumPartitions = partitions
 		rt.ReplicationFactor = 1
+		rt.Configs = b.createdConfigs(meta.Topic{Name: t.Topic, Config: configMap(t.Configs)})
 		return rt
 	}
 
@@ -122,7 +123,26 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 	rt.TopicID = created.ID
 	rt.NumPartitions = created.Partitions
 	rt.ReplicationFactor = 1
+	rt.Configs = b.createdConfigs(created)
 	return rt
+}
+
+// createdConfigs is the topic's effective configuration as CreateTopics (v5+) returns
+// it. It is never null: the Java admin client reads it without a check, so a null here
+// was a NullPointerException inside every createTopics call (Schema Registry, Connect
+// and Streams all create their topics that way).
+func (b *Broker) createdConfigs(t meta.Topic) []kmsg.CreateTopicsResponseTopicConfig {
+	entries := b.topicConfigEntries(t, nil)
+	out := make([]kmsg.CreateTopicsResponseTopicConfig, 0, len(entries))
+	for _, e := range entries {
+		c := kmsg.NewCreateTopicsResponseTopicConfig()
+		c.Name = e.Name
+		c.Value = e.Value
+		c.ReadOnly = e.ReadOnly
+		c.Source = int8(e.Source)
+		out = append(out, c)
+	}
+	return out
 }
 
 // configMap flattens request topic configs into a plain map (nil values dropped).

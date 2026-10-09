@@ -2,6 +2,7 @@ package broker_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/twmb/franz-go/pkg/kmsg"
@@ -127,4 +128,43 @@ func deref(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// The Java admin client reads CreateTopics' Configs (v5+) without a null check, so a
+// null there was a NullPointerException inside every createTopics call. Found when
+// Confluent's Schema Registry would not start against this broker.
+func TestCreateTopicsReturnsTheTopicsConfigs(t *testing.T) {
+	c := openRaw(t, startBroker(t, 4))
+	for _, validateOnly := range []bool{false, true} {
+		ct := kmsg.NewPtrCreateTopicsRequest()
+		ct.SetVersion(7)
+		ct.TimeoutMillis = 5000
+		ct.ValidateOnly = validateOnly
+		rt := kmsg.NewCreateTopicsRequestTopic()
+		rt.Topic, rt.NumPartitions, rt.ReplicationFactor = fmt.Sprintf("withcfg-%v", validateOnly), 1, 1
+		rc := kmsg.NewCreateTopicsRequestTopicConfig()
+		rc.Name, rc.Value = "cleanup.policy", kmsg.StringPtr("compact")
+		rt.Configs = append(rt.Configs, rc)
+		ct.Topics = append(ct.Topics, rt)
+		var resp kmsg.CreateTopicsResponse
+		if !c.do(ct, &resp) {
+			t.Fatal("connection closed")
+		}
+		got := resp.Topics[0]
+		if got.ErrorCode != 0 {
+			t.Fatalf("validateOnly=%v: code %d", validateOnly, got.ErrorCode)
+		}
+		if got.Configs == nil {
+			t.Fatalf("validateOnly=%v: Configs is null; the Java admin client dereferences it", validateOnly)
+		}
+		var policy string
+		for _, e := range got.Configs {
+			if e.Name == "cleanup.policy" && e.Value != nil {
+				policy = *e.Value
+			}
+		}
+		if policy != "compact" {
+			t.Errorf("validateOnly=%v: cleanup.policy reported as %q, want compact", validateOnly, policy)
+		}
+	}
 }
