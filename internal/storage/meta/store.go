@@ -57,6 +57,7 @@ var (
 	bucketMeta       = []byte("meta")         // singletons (producer-id counter, ...)
 	bucketACLs       = []byte("acls")         // acl key -> ACL (JSON).
 	bucketTxns       = []byte("txns")         // transactional.id -> TxnRecord (JSON).
+	bucketRegistry   = []byte("registry")     // schema registry records, opaque to this package.
 	keyProducerID    = []byte("producer_id")
 )
 
@@ -118,6 +119,13 @@ type Store interface {
 	// ListTxns returns every stored transactional state.
 	ListTxns() ([]TxnRecord, error)
 
+	// RegistryAll returns every record the schema registry keeps. The registry owns
+	// the key space and the encoding; this package only stores bytes.
+	RegistryAll() (map[string][]byte, error)
+	// RegistryApply writes and deletes records in one transaction, so a registry
+	// operation that touches several (a schema and its version) is all or nothing.
+	RegistryApply(puts map[string][]byte, deletes []string) error
+
 	NextProducerID() (int64, error)
 	// ReserveProducerIDs hands out a block of n consecutive producer ids in one
 	// transaction and returns the first. The block is durable before it is used,
@@ -141,7 +149,7 @@ func Open(path string) (Store, error) {
 		return nil, fmt.Errorf("meta: open %s: %w", path, err)
 	}
 	err = db.Update(func(tx *bbolt.Tx) error {
-		for _, name := range [][]byte{bucketTopics, bucketTopicsByID, bucketOffsets, bucketMeta, bucketACLs, bucketTxns} {
+		for _, name := range [][]byte{bucketTopics, bucketTopicsByID, bucketOffsets, bucketMeta, bucketACLs, bucketTxns, bucketRegistry} {
 			if _, err := tx.CreateBucketIfNotExists(name); err != nil {
 				return err
 			}

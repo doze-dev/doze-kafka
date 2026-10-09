@@ -29,7 +29,7 @@ func TestTheSummaryIsOnStdoutAndTheLogsOnStderr(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	cmd := exec.Command(bin, "--listen", "127.0.0.1:0", "--console-addr", "127.0.0.1:0", "--data-dir", filepath.Join(dir, "data"))
+	cmd := exec.Command(bin, "--listen", "127.0.0.1:0", "--console-addr", "127.0.0.1:0", "--schema-registry-addr", "127.0.0.1:0", "--data-dir", filepath.Join(dir, "data"))
 	cmd.Dir = dir
 	var stdout, stderr lockedBuf
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr

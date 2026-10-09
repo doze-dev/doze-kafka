@@ -144,6 +144,7 @@ Start here → **[docs/](docs/README.md)**
 | [Consumer groups](docs/consumer-groups.md) | Classic vs KIP-848, offsets, rebalancing. |
 | [Auth & TLS](docs/auth-and-tls.md) | Turning on SASL and TLS, with client snippets. |
 | [Transactions](docs/transactions.md) | Exactly-once: transactional producers, read-committed consumers, what the broker does. |
+| [Schema Registry](docs/schema-registry.md) | The built-in Confluent-compatible registry: Avro, JSON Schema, Protobuf, compatibility checks. |
 | [Authorization](docs/authorization.md) | ACLs: who may do what, the rules, and what each API needs. |
 | [Storage & durability](docs/storage-and-durability.md) | Segments, retention, fsync, restart. |
 | [API support](docs/api-support.md) | The exact Kafka API/version matrix. |

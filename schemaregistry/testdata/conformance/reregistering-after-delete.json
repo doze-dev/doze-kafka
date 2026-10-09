@@ -1,0 +1,79 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/rd/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/rd/versions/1",
+    "status": 200,
+    "response": 1
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rd/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/rd/versions",
+    "status": 200,
+    "response": [
+      2
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/rd/versions?deleted=true",
+    "status": 200,
+    "response": [
+      2
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rd/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/rd/versions/latest",
+    "status": 200,
+    "response": {
+      "subject": "rd",
+      "version": 3,
+      "id": 2,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"},{\"name\":\"email\",\"type\":[\"null\",\"string\"],\"default\":null}]}"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/rd/versions/latest",
+    "status": 200,
+    "response": 3
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/rd/versions/latest",
+    "status": 200,
+    "response": {
+      "subject": "rd",
+      "version": 2,
+      "id": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  }
+]

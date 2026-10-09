@@ -1,0 +1,234 @@
+[
+  {
+    "method": "GET",
+    "path": "/",
+    "status": 200,
+    "response": {}
+  },
+  {
+    "method": "GET",
+    "path": "/subjects",
+    "status": 200,
+    "response": []
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rr/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rr/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rr/versions",
+    "body": "{\"schema\":\"{ \\\"type\\\" : \\\"record\\\", \\\"name\\\" : \\\"User\\\", \\\"fields\\\" : [ { \\\"name\\\" : \\\"id\\\", \\\"type\\\" : \\\"long\\\" } ] }\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects",
+    "status": 200,
+    "response": [
+      "rr"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/rr/versions",
+    "status": 200,
+    "response": [
+      1
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/rr/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "rr",
+      "version": 1,
+      "id": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/rr/versions/latest",
+    "status": 200,
+    "response": {
+      "subject": "rr",
+      "version": 1,
+      "id": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/rr/versions/-1",
+    "status": 200,
+    "response": {
+      "subject": "rr",
+      "version": 1,
+      "id": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/rr/versions/1/schema",
+    "status": 200,
+    "response": {
+      "type": "record",
+      "name": "User",
+      "fields": [
+        {
+          "name": "id",
+          "type": "long"
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@1",
+    "status": 200,
+    "response": {
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@1/schema",
+    "status": 200,
+    "response": {
+      "type": "record",
+      "name": "User",
+      "fields": [
+        {
+          "name": "id",
+          "type": "long"
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@1/subjects",
+    "status": 200,
+    "response": [
+      "rr"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@1/versions",
+    "status": 200,
+    "response": [
+      {
+        "subject": "rr",
+        "version": 1
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rr",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "subject": "rr",
+      "version": 1,
+      "id": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rr",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 404,
+    "response": {
+      "error_code": 40403,
+      "message": "Schema not found"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rr-nope",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 404,
+    "response": {
+      "error_code": 40401,
+      "message": "Subject 'rr-nope' not found."
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rr/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/rr/versions",
+    "status": 200,
+    "response": [
+      1,
+      2
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/rr/versions/latest",
+    "status": 200,
+    "response": {
+      "subject": "rr",
+      "version": 2,
+      "id": 2,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"},{\"name\":\"email\",\"type\":[\"null\",\"string\"],\"default\":null}]}"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@2",
+    "status": 200,
+    "response": {
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"},{\"name\":\"email\",\"type\":[\"null\",\"string\"],\"default\":null}]}"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@99",
+    "status": 404,
+    "response": {
+      "error_code": 40403,
+      "message": "Schema @99 not found"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/abc",
+    "status": 404,
+    "response": {
+      "error_code": 404,
+      "message": "HTTP 404 Not Found"
+    }
+  }
+]

@@ -1,0 +1,119 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/rf-address/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"Address\\\",\\\"namespace\\\":\\\"com.acme\\\",\\\"fields\\\":[{\\\"name\\\":\\\"city\\\",\\\"type\\\":\\\"string\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rf-person/versions",
+    "body": "{\"references\":[{\"name\":\"com.acme.Address\",\"subject\":\"rf-address\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"Person\\\",\\\"namespace\\\":\\\"com.acme\\\",\\\"fields\\\":[{\\\"name\\\":\\\"home\\\",\\\"type\\\":\\\"com.acme.Address\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/rf-person/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "rf-person",
+      "version": 1,
+      "id": 2,
+      "references": [
+        {
+          "name": "com.acme.Address",
+          "subject": "rf-address",
+          "version": 1
+        }
+      ],
+      "schema": "{\"type\":\"record\",\"name\":\"Person\",\"namespace\":\"com.acme\",\"fields\":[{\"name\":\"home\",\"type\":\"Address\"}]}"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/rf-address/versions/1/referencedby",
+    "status": 200,
+    "response": [
+      2
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@2",
+    "status": 200,
+    "response": {
+      "schema": "{\"type\":\"record\",\"name\":\"Person\",\"namespace\":\"com.acme\",\"fields\":[{\"name\":\"home\",\"type\":\"Address\"}]}",
+      "references": [
+        {
+          "name": "com.acme.Address",
+          "subject": "rf-address",
+          "version": 1
+        }
+      ]
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rf-bad/versions",
+    "body": "{\"references\":[{\"name\":\"com.acme.Address\",\"subject\":\"rf-missing\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"Person\\\",\\\"namespace\\\":\\\"com.acme\\\",\\\"fields\\\":[{\\\"name\\\":\\\"home\\\",\\\"type\\\":\\\"com.acme.Address\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42201,
+      "message": "Invalid schema {subject=rf-bad,version=0,id=-1,schemaType=AVRO,references=[{name='com.acme.Address', subject='rf-missing', version=1}],metadata=null,ruleSet=null,schema={\"type\":\"record\",\"name\":\"Person\",\"namespace\":\"com.acme\",\"fields\":[{\"name\":\"home\",\"type\":\"com.acme.Address\"}]},schemaTags=null} with refs [{name='com.acme.Address', subject='rf-missing', version=1}] of type AVRO, details: No schema reference found for subject \"rf-missing\" and version 1"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rf-bad/versions",
+    "body": "{\"references\":null,\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"Person\\\",\\\"namespace\\\":\\\"com.acme\\\",\\\"fields\\\":[{\\\"name\\\":\\\"home\\\",\\\"type\\\":\\\"com.acme.Address\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42201,
+      "message": "Invalid schema {subject=rf-bad,version=0,id=-1,schemaType=AVRO,references=[],metadata=null,ruleSet=null,schema={\"type\":\"record\",\"name\":\"Person\",\"namespace\":\"com.acme\",\"fields\":[{\"name\":\"home\",\"type\":\"com.acme.Address\"}]},schemaTags=null} with refs [] of type AVRO, details: \"com.acme.Address\" is not a defined name. The type of the \"home\" field must be a defined name or a {\"type\": ...} expression."
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/rf-address/versions/1",
+    "status": 422,
+    "response": {
+      "error_code": 42206,
+      "message": "One or more references exist to the schema {magic=1,keytype=SCHEMA,subject=rf-address,version=1}."
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/rf-address",
+    "status": 422,
+    "response": {
+      "error_code": 42206,
+      "message": "One or more references exist to the schema {magic=1,keytype=SCHEMA,subject=rf-address,version=1}."
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/rf-person",
+    "status": 200,
+    "response": [
+      1
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/rf-address/versions/1",
+    "status": 200,
+    "response": 1
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/rf-address/versions/1/referencedby",
+    "status": 200,
+    "response": []
+  }
+]

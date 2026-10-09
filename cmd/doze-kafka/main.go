@@ -280,7 +280,22 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 		// (or this instance has no name) the address it actually bound is the URL.
 		ready.consoleURL = z.routeConsole(logger, consoleAddr)
 		if ready.consoleURL == "" {
-			ready.consoleURL = "http://" + consoleAddr
+			ready.consoleURL = httpURL(consoleAddr)
+		}
+	}
+
+	if cfg.SchemaRegistry {
+		if cfg.SchemaRegistryAddr == "" {
+			cfg.SchemaRegistryAddr = registryAddrFor(z.ip())
+		}
+		closeRegistry, registryAddr, err := startRegistry(ctx, cfg, srv, logger)
+		if err != nil {
+			return err
+		}
+		defer closeRegistry()
+		ready.registryURL = z.routeRegistry(logger, cfg.InstanceName(), registryAddr)
+		if ready.registryURL == "" {
+			ready.registryURL = httpURL(registryAddr)
 		}
 	}
 
@@ -297,9 +312,9 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 
 // readyInfo is what the start-up summary reports.
 type readyInfo struct {
-	version, bootstrap, consoleURL string
-	kafka                          int
-	dataDir, auth, configFile      string
+	version, bootstrap, consoleURL, registryURL string
+	kafka                                       int
+	dataDir, auth, configFile                   string
 }
 
 // authSummary is one phrase for how the listener is protected.
@@ -328,7 +343,7 @@ func announce(out io.Writer, logger *slog.Logger, cfg config.Config, r readyInfo
 		return
 	}
 	if cfg.LogFormat == "json" {
-		logger.Info("ready", "bootstrap", r.bootstrap, "console", r.consoleURL,
+		logger.Info("ready", "bootstrap", r.bootstrap, "console", r.consoleURL, "schema_registry", r.registryURL,
 			"data_dir", r.dataDir, "auth", r.auth, "kafka_compat", r.kafka, "instance", cfg.InstanceName())
 		return
 	}
@@ -337,6 +352,9 @@ func announce(out io.Writer, logger *slog.Logger, cfg config.Config, r readyInfo
 	fmt.Fprintf(&b, "    kafka     %s\n", r.bootstrap)
 	if r.consoleURL != "" {
 		fmt.Fprintf(&b, "    console   %s   topics, messages and consumer groups, live\n", r.consoleURL)
+	}
+	if r.registryURL != "" {
+		fmt.Fprintf(&b, "    registry  %s   Confluent-compatible schema registry\n", r.registryURL)
 	}
 	fmt.Fprintf(&b, "    data      %s\n", r.dataDir)
 	fmt.Fprintf(&b, "    serving   Kafka %d protocol · %s\n", r.kafka, r.auth)
@@ -347,6 +365,20 @@ func announce(out io.Writer, logger *slog.Logger, cfg config.Config, r readyInfo
 	fmt.Fprintf(&b, "    %-24s point this shell at it\n", `eval "$(doze-kafka env)"`)
 	fmt.Fprintf(&b, "    %-24s when something looks wrong\n\n", "doze-kafka doctor")
 	io.WriteString(out, b.String()) //nolint:errcheck // a banner on stdout
+}
+
+// httpURL is the URL to open for an HTTP listener at addr. A wildcard listener's own
+// address ("[::]:8081") is where it listens, not somewhere to browse to; for that the
+// URL names localhost.
+func httpURL(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "http://" + addr
+	}
+	if ip := net.ParseIP(host); host == "" || (ip != nil && ip.IsUnspecified()) {
+		host = "localhost"
+	}
+	return "http://" + net.JoinHostPort(host, port)
 }
 
 // dialable is the bound address as something to paste into a client. A wildcard

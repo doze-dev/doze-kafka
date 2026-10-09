@@ -111,6 +111,7 @@ tasks:
       - go test ./internal/protocol/ -run '^$' -fuzz '^FuzzSkipTaggedFields$' -fuzztime {{.FUZZ_TIME}}
       - go test ./internal/protocol/ -run '^$' -fuzz '^FuzzReadFrame$' -fuzztime {{.FUZZ_TIME}}
       - go test ./internal/storage/log/ -run '^$' -fuzz '^FuzzDecodeRecords$' -fuzztime {{.FUZZ_TIME}}
+      - go test ./schemaregistry/ -run '^$' -fuzz '^FuzzRegisterAndCompare$' -fuzztime {{.FUZZ_TIME}}
 
   soak:
     desc: 'Leak-detection soak: sustained load, no faults (SOAK_DURATION, default 2m)'

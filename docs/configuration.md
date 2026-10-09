@@ -132,6 +132,13 @@ where this one says `kafka-version`; that spelling is still read.
 | `--console-addr` | *beside the broker* | `host:port` for the console's HTTP listener. Unset, it is port 9093 on the name's own address (and `http://kafka.<name>.doze`, port-less, through the shared front door); under `--listen`, `127.0.0.1:9093`. A taken port is an error naming this flag. |
 | `--console-allow-host` | *(none)* | Extra Host names the console answers to, besides `localhost`, IP addresses and `*.doze`. Comma-separated or repeated. A guard against DNS rebinding. |
 
+### Schema registry (see [Schema Registry](schema-registry.md))
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--schema-registry` | `true` | Serve the built-in Confluent-compatible schema registry. `--schema-registry=false` to turn it off. |
+| `--schema-registry-addr` | *beside the broker* | `host:port` for the registry's HTTP listener. Unset, it is port 8081 on the name's own address (and `http://schema.<name>.doze`, port-less, through the shared front door); under `--listen`, `127.0.0.1:8081`. A taken port is an error naming this flag. |
+
 ### Process
 
 | Flag | Default | Meaning |

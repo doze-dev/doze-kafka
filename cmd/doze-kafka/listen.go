@@ -38,6 +38,7 @@ import (
 	"time"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
+	names "github.com/doze-dev/doze-names"
 )
 
 // kafkaPort is the port the broker binds on the name's own address, and the one
@@ -177,6 +178,30 @@ func dialableHost(host string) string {
 		return ip.String()
 	}
 	return host
+}
+
+// registryURL is where a configuration says the schema registry answers, or "" when
+// it is off. By name it asks the zone's registry what the running instance published,
+// as instanceAddress does for the console.
+func registryURL(cfg config.Config) string {
+	if !cfg.SchemaRegistry {
+		return ""
+	}
+	if !cfg.ByName() {
+		if cfg.SchemaRegistryAddr == "" {
+			return ""
+		}
+		return httpURL(cfg.SchemaRegistryAddr)
+	}
+	host := names.Qualified("schema", cfg.InstanceName()).Host
+	target, u := registered(host)
+	if u == "" {
+		return "http://" + host // not running: where it will be.
+	}
+	if ip, _, err := net.SplitHostPort(target); err == nil && !resolvesHere(net.DefaultResolver.LookupHost, host, ip) {
+		return "http://" + target
+	}
+	return u
 }
 
 // instanceAddress is where a configuration says this instance answers: the broker's

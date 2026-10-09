@@ -1,0 +1,233 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/pc-a/versions",
+    "body": "{\"schema\":\"syntax = \\\"proto3\\\"; package a.b; import \\\"google/protobuf/timestamp.proto\\\"; import \\\"google/protobuf/duration.proto\\\"; option java_package = \\\"com.x\\\"; option java_multiple_files = true; message M { int64 id = 1; google.protobuf.Timestamp t = 2; }\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pc-a/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "pc-a",
+      "version": 1,
+      "id": 1,
+      "schemaType": "PROTOBUF",
+      "schema": "syntax = \"proto3\";\npackage a.b;\n\nimport \"google/protobuf/timestamp.proto\";\nimport \"google/protobuf/duration.proto\";\n\noption java_package = \"com.x\";\noption java_multiple_files = true;\n\nmessage M {\n  int64 id = 1;\n  google.protobuf.Timestamp t = 2;\n}\n"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pc-b/versions",
+    "body": "{\"schema\":\"syntax = \\\"proto3\\\"; message M { string name = 1 [deprecated = true]; repeated int32 xs = 2 [packed = true]; optional string o = 3; map\\u003cstring, int32\\u003e m = 4; oneof k { string a = 5; int32 b = 6; } reserved 7, 9 to 11; reserved \\\"x\\\", \\\"y\\\"; enum E { Z = 0; A = 1; } E e = 8; message Inner { int32 v = 1; } Inner i = 12; }\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pc-b/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "pc-b",
+      "version": 1,
+      "id": 2,
+      "schemaType": "PROTOBUF",
+      "schema": "syntax = \"proto3\";\n\nmessage M {\n  reserved 7, 9 to 11;\n  reserved \"x\", \"y\";\n\n  string name = 1 [deprecated = true];\n  repeated int32 xs = 2 [packed = true];\n  optional string o = 3;\n  map\u003cstring, int32\u003e m = 4;\n  E e = 8;\n  Inner i = 12;\n\n  oneof k {\n    string a = 5;\n    int32 b = 6;\n  }\n\n  message Inner {\n    int32 v = 1;\n  }\n  enum E {\n    Z = 0;\n    A = 1;\n  }\n}\n"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pc-c/versions",
+    "body": "{\"schema\":\"syntax = \\\"proto2\\\"; message M { required int32 a = 1; optional string b = 2 [default = \\\"x\\\"]; repeated bool c = 3; extensions 100 to 199; optional group G = 4 { optional int32 z = 1; } }\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 3
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pc-c/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "pc-c",
+      "version": 1,
+      "id": 3,
+      "schemaType": "PROTOBUF",
+      "schema": "syntax = \"proto2\";\n\nmessage M {\n  required int32 a = 1;\n  optional string b = 2 [default = \"x\"];\n  repeated bool c = 3;\n\n  optional group G = 4 {\n    optional int32 z = 1;\n  }\n\n  extensions 100 to 199;\n}\n"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pc-d/versions",
+    "body": "{\"schema\":\"syntax = \\\"proto3\\\"; message A { int32 x = 1; } message B { A a = 1; } enum Top { T0 = 0; T1 = 1; } service S { rpc Get(A) returns (B); rpc Stream(stream A) returns (stream B); }\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 4
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pc-d/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "pc-d",
+      "version": 1,
+      "id": 4,
+      "schemaType": "PROTOBUF",
+      "schema": "syntax = \"proto3\";\n\nmessage A {\n  int32 x = 1;\n}\nmessage B {\n  A a = 1;\n}\nenum Top {\n  T0 = 0;\n  T1 = 1;\n}\n\nservice S {\n  rpc Get (A) returns (B);\n  rpc Stream (stream A) returns (stream B);\n}\n"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pc-e/versions",
+    "body": "{\"schema\":\"// leading comment\\nsyntax = \\\"proto3\\\";\\n\\n// about M\\nmessage M { // trailing\\n  int32 x = 1; // x\\n  /* block */ string y = 2;\\n}\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 5
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pc-e/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "pc-e",
+      "version": 1,
+      "id": 5,
+      "schemaType": "PROTOBUF",
+      "schema": "syntax = \"proto3\";\n\nmessage M {\n  int32 x = 1;\n  string y = 2;\n}\n"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pc-f/versions",
+    "body": "{\"schema\":\"syntax = \\\"proto3\\\"; package p; message M { p.N n = 1; .p.N o = 2; } message N { int32 x = 1; }\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 6
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pc-f/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "pc-f",
+      "version": 1,
+      "id": 6,
+      "schemaType": "PROTOBUF",
+      "schema": "syntax = \"proto3\";\npackage p;\n\nmessage M {\n  p.N n = 1;\n  .p.N o = 2;\n}\nmessage N {\n  int32 x = 1;\n}\n"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pc-g/versions",
+    "body": "{\"schema\":\"syntax = \\\"proto3\\\"; enum E { option allow_alias = true; A = 0; B = 0; C = 1 [deprecated = true]; } message M { E e = 1; double d = 2 [json_name = \\\"dd\\\"]; }\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 7
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pc-g/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "pc-g",
+      "version": 1,
+      "id": 7,
+      "schemaType": "PROTOBUF",
+      "schema": "syntax = \"proto3\";\n\nmessage M {\n  E e = 1;\n  double d = 2 [json_name = \"dd\"];\n}\nenum E {\n  option allow_alias = true;\n  A = 0;\n  B = 0;\n  C = 1 [deprecated = true];\n}\n"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pc-h/versions",
+    "body": "{\"schema\":\"syntax = \\\"proto3\\\"; message Outer { message Mid { message Deep { int32 d = 1; } Deep deep = 1; } Mid mid = 1; enum K { K0 = 0; } message Second { int32 s = 1; } repeated Second seconds = 2; option deprecated = true; }\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 8
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pc-h/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "pc-h",
+      "version": 1,
+      "id": 8,
+      "schemaType": "PROTOBUF",
+      "schema": "syntax = \"proto3\";\n\nmessage Outer {\n  option deprecated = true;\n\n  Mid mid = 1;\n  repeated Second seconds = 2;\n\n  message Mid {\n    Deep deep = 1;\n  \n    message Deep {\n      int32 d = 1;\n    }\n  }\n  message Second {\n    int32 s = 1;\n  }\n  enum K {\n    K0 = 0;\n  }\n}\n"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pc-i/versions",
+    "body": "{\"schema\":\"syntax = \\\"proto3\\\"; message M { oneof a { int32 x = 1; string y = 2; } oneof b { bool z = 3; } int32 plain = 4; }\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 9
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pc-i/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "pc-i",
+      "version": 1,
+      "id": 9,
+      "schemaType": "PROTOBUF",
+      "schema": "syntax = \"proto3\";\n\nmessage M {\n  int32 plain = 4;\n\n  oneof a {\n    int32 x = 1;\n    string y = 2;\n  }\n  oneof b {\n    bool z = 3;\n  }\n}\n"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pc-k/versions",
+    "body": "{\"schema\":\"syntax = \\\"proto3\\\"; import public \\\"google/protobuf/any.proto\\\"; message M { google.protobuf.Any a = 1; reserved 2; }\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 10
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pc-k/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "pc-k",
+      "version": 1,
+      "id": 10,
+      "schemaType": "PROTOBUF",
+      "schema": "syntax = \"proto3\";\n\nimport public \"google/protobuf/any.proto\";\n\nmessage M {\n  reserved 2;\n\n  google.protobuf.Any a = 1;\n}\n"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pc-l/versions",
+    "body": "{\"schema\":\"syntax = \\\"proto3\\\"; message A { int32 x = 1; } service One { rpc First(A) returns (A); } service Two { rpc Second(A) returns (A); }\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 11
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pc-l/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "pc-l",
+      "version": 1,
+      "id": 11,
+      "schemaType": "PROTOBUF",
+      "schema": "syntax = \"proto3\";\n\nmessage A {\n  int32 x = 1;\n}\n\nservice One {\n  rpc First (A) returns (A);\n}\nservice Two {\n  rpc Second (A) returns (A);\n}\n"
+    }
+  }
+]

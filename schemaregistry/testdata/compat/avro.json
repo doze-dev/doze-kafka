@@ -1,0 +1,3141 @@
+{
+  "type": "AVRO",
+  "cases": [
+    {
+      "name": "identical",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "add field with default",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":\"int\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "add field without default",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":\"int\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "add nullable field with null default",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":[\"null\",\"string\"],\"default\":null}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "add union field without default",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":[\"null\",\"string\"]}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "remove field",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "remove field that had a default",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":\"int\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "rename field",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"z\",\"type\":\"string\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "rename field with alias",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"z\",\"type\":\"string\",\"aliases\":[\"a\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "rename field with alias and default",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"z\",\"type\":\"string\",\"aliases\":[\"a\"],\"default\":\"x\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "reorder fields",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":\"int\"},{\"name\":\"a\",\"type\":\"string\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "change field default",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"y\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "add default to field",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "remove default from field",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "promote int to long",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "promote long to int",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "promote int to float",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"float\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "promote int to double",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "promote long to float",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"float\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "promote long to double",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "promote float to double",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"float\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "promote double to float",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"float\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "promote string to bytes",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "promote bytes to string",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "promote int to string",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "promote string to int",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "promote boolean to int",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "promote int to boolean",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "promote float to long",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"float\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "primitive int to long",
+      "old": "\"int\"",
+      "new": "\"long\"",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "primitive long to int",
+      "old": "\"long\"",
+      "new": "\"int\"",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "primitive string to int",
+      "old": "\"string\"",
+      "new": "\"int\"",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "primitive string same",
+      "old": "\"string\"",
+      "new": "\"string\"",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "record to primitive",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "\"string\"",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "primitive to record",
+      "old": "\"string\"",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "widen to union",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "narrow from union",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "add union branch",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\",\"int\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "remove union branch",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\",\"int\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "reorder union",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"string\",\"null\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "union promote branch",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"int\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "union demote branch",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"int\"]}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "union to union disjoint",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"int\",\"string\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"boolean\",\"string\"]}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "top-level union add",
+      "old": "[\"null\",\"string\"]",
+      "new": "[\"null\",\"string\",\"int\"]",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "top-level union remove",
+      "old": "[\"null\",\"string\",\"int\"]",
+      "new": "[\"null\",\"string\"]",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "enum add symbol",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":{\"type\":\"enum\",\"name\":\"E\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":{\"type\":\"enum\",\"name\":\"E\",\"symbols\":[\"A\",\"B\",\"C\"]}}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "enum remove symbol",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":{\"type\":\"enum\",\"name\":\"E\",\"symbols\":[\"A\",\"B\",\"C\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":{\"type\":\"enum\",\"name\":\"E\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "enum add symbol with default",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":{\"type\":\"enum\",\"name\":\"E\",\"symbols\":[\"A\",\"B\"],\"default\":\"A\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":{\"type\":\"enum\",\"name\":\"E\",\"symbols\":[\"A\",\"B\",\"C\"],\"default\":\"A\"}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "enum remove symbol with default",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":{\"type\":\"enum\",\"name\":\"E\",\"symbols\":[\"A\",\"B\",\"C\"],\"default\":\"A\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":{\"type\":\"enum\",\"name\":\"E\",\"symbols\":[\"A\",\"B\"],\"default\":\"A\"}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "enum reorder symbols",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":{\"type\":\"enum\",\"name\":\"E\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":{\"type\":\"enum\",\"name\":\"E\",\"symbols\":[\"B\",\"A\"]}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "enum add default",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":{\"type\":\"enum\",\"name\":\"E\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":{\"type\":\"enum\",\"name\":\"E\",\"symbols\":[\"A\",\"B\"],\"default\":\"A\"}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "enum rename",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":{\"type\":\"enum\",\"name\":\"E\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":{\"type\":\"enum\",\"name\":\"F\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "enum to string",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":{\"type\":\"enum\",\"name\":\"E\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":\"string\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "string to enum",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"e\",\"type\":{\"type\":\"enum\",\"name\":\"E\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "top-level enum add",
+      "old": "{\"type\":\"enum\",\"name\":\"E\",\"symbols\":[\"A\",\"B\"]}",
+      "new": "{\"type\":\"enum\",\"name\":\"E\",\"symbols\":[\"A\",\"B\",\"C\"]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "array item promote",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"long\"}}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "array item demote",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"long\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"}}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "array to map",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "map value promote",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"}}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "map value change",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "fixed same",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"f\",\"type\":{\"type\":\"fixed\",\"name\":\"F\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"f\",\"type\":{\"type\":\"fixed\",\"name\":\"F\",\"size\":4}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "fixed size change",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"f\",\"type\":{\"type\":\"fixed\",\"name\":\"F\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"f\",\"type\":{\"type\":\"fixed\",\"name\":\"F\",\"size\":8}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "fixed rename",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"f\",\"type\":{\"type\":\"fixed\",\"name\":\"F\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"f\",\"type\":{\"type\":\"fixed\",\"name\":\"G\",\"size\":4}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "record rename",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "record rename with alias",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"aliases\":[\"R\"],\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "namespace change",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"namespace\":\"a.b\",\"fields\":[{\"name\":\"x\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"namespace\":\"c.d\",\"fields\":[{\"name\":\"x\",\"type\":\"int\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "namespace added",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"x\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"namespace\":\"a.b\",\"fields\":[{\"name\":\"x\",\"type\":\"int\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "namespace in name",
+      "old": "{\"type\":\"record\",\"name\":\"a.b.R\",\"fields\":[{\"name\":\"x\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"namespace\":\"a.b\",\"fields\":[{\"name\":\"x\",\"type\":\"int\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "nested add field with default",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"i\",\"type\":{\"type\":\"record\",\"name\":\"Inner\",\"fields\":[{\"name\":\"x\",\"type\":\"int\"}]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"i\",\"type\":{\"type\":\"record\",\"name\":\"Inner\",\"fields\":[{\"name\":\"x\",\"type\":\"int\"},{\"name\":\"y\",\"type\":\"int\",\"default\":0}]}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "nested add field without default",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"i\",\"type\":{\"type\":\"record\",\"name\":\"Inner\",\"fields\":[{\"name\":\"x\",\"type\":\"int\"}]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"i\",\"type\":{\"type\":\"record\",\"name\":\"Inner\",\"fields\":[{\"name\":\"x\",\"type\":\"int\"},{\"name\":\"y\",\"type\":\"int\"}]}}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "nested remove field",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"i\",\"type\":{\"type\":\"record\",\"name\":\"Inner\",\"fields\":[{\"name\":\"x\",\"type\":\"int\"},{\"name\":\"y\",\"type\":\"int\"}]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"i\",\"type\":{\"type\":\"record\",\"name\":\"Inner\",\"fields\":[{\"name\":\"x\",\"type\":\"int\"}]}}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "nested in array add field",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"i\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"Inner\",\"fields\":[{\"name\":\"x\",\"type\":\"int\"}]}}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"i\",\"type\":{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"Inner\",\"fields\":[{\"name\":\"x\",\"type\":\"int\"},{\"name\":\"y\",\"type\":\"int\"}]}}}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "nested record type change",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"i\",\"type\":{\"type\":\"record\",\"name\":\"Inner\",\"fields\":[{\"name\":\"x\",\"type\":\"int\"}]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"i\",\"type\":\"string\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "recursive same",
+      "old": "{\"type\":\"record\",\"name\":\"Tree\",\"fields\":[{\"name\":\"v\",\"type\":\"int\"},{\"name\":\"kids\",\"type\":{\"type\":\"array\",\"items\":\"Tree\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"Tree\",\"fields\":[{\"name\":\"v\",\"type\":\"int\"},{\"name\":\"kids\",\"type\":{\"type\":\"array\",\"items\":\"Tree\"}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "recursive add field with default",
+      "old": "{\"type\":\"record\",\"name\":\"Tree\",\"fields\":[{\"name\":\"v\",\"type\":\"int\"},{\"name\":\"kids\",\"type\":{\"type\":\"array\",\"items\":\"Tree\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"Tree\",\"fields\":[{\"name\":\"v\",\"type\":\"int\"},{\"name\":\"kids\",\"type\":{\"type\":\"array\",\"items\":\"Tree\"}},{\"name\":\"w\",\"type\":\"int\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "recursive add field without default",
+      "old": "{\"type\":\"record\",\"name\":\"Tree\",\"fields\":[{\"name\":\"v\",\"type\":\"int\"},{\"name\":\"kids\",\"type\":{\"type\":\"array\",\"items\":\"Tree\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"Tree\",\"fields\":[{\"name\":\"v\",\"type\":\"int\"},{\"name\":\"kids\",\"type\":{\"type\":\"array\",\"items\":\"Tree\"}},{\"name\":\"w\",\"type\":\"int\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "logical type added",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"t\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"t\",\"type\":{\"type\":\"long\",\"logicalType\":\"timestamp-millis\"}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "logical type removed",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"t\",\"type\":{\"type\":\"long\",\"logicalType\":\"timestamp-millis\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"t\",\"type\":\"long\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "logical type changed",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"t\",\"type\":{\"type\":\"long\",\"logicalType\":\"timestamp-millis\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"t\",\"type\":{\"type\":\"long\",\"logicalType\":\"timestamp-micros\"}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "decimal precision change",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"d\",\"type\":{\"type\":\"bytes\",\"logicalType\":\"decimal\",\"precision\":10,\"scale\":2}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"d\",\"type\":{\"type\":\"bytes\",\"logicalType\":\"decimal\",\"precision\":12,\"scale\":2}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "doc change",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"doc\":\"d\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"doc\":\"x\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "custom property change",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"p\":\"1\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"p\":\"2\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "field order attribute",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"order\":\"descending\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "add and remove field",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"c\",\"type\":\"int\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "swap field types",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"},{\"name\":\"b\",\"type\":\"string\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "null default for union first",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"b\",\"type\":[\"null\",\"int\"],\"default\":null}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "string default for non-first union branch",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":[\"null\",\"string\"],\"default\":\"x\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "bytes field add default",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":\"bytes\",\"default\":\"\\u0000\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "invalid new",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\"",
+      "backward": "invalid",
+      "forward": "invalid",
+      "full": "invalid"
+    },
+    {
+      "name": "invalid old",
+      "old": "{\"type\":\"record\"",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "backward": "invalid",
+      "forward": "invalid",
+      "full": "invalid"
+    },
+    {
+      "name": "empty record",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "empty record add field",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 000",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\",\"default\":false},{\"name\":\"b\",\"type\":\"long\",\"default\":0},{\"name\":\"c\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"d\",\"type\":\"double\",\"default\":0.0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"c\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"d\",\"type\":\"double\",\"default\":0.0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 001",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"c\",\"type\":\"bytes\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"c\",\"type\":\"bytes\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 002",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"},{\"name\":\"b2\",\"type\":\"double\",\"default\":0.0,\"aliases\":[\"b\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 003",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"int\"}},{\"name\":\"c\",\"type\":\"int\",\"default\":1}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"int\"}},{\"name\":\"c\",\"type\":\"int\",\"default\":1}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 004",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"b\",\"type\":\"boolean\",\"default\":false},{\"name\":\"c\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"d\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"d\",\"type\":\"long\"},{\"name\":\"b\",\"type\":\"boolean\"},{\"name\":\"c\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 005",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}},{\"name\":\"b\",\"type\":\"bytes\"},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"long\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}},{\"name\":\"b\",\"type\":\"bytes\"},{\"name\":\"c\",\"type\":\"long\",\"default\":0}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 006",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1},{\"name\":\"b\",\"type\":\"int\",\"default\":0},{\"name\":\"c\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"d\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1},{\"name\":\"b\",\"type\":\"int\",\"default\":0},{\"name\":\"c\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"d\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"m\",\"type\":\"int\",\"default\":0}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 007",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"b\",\"type\":\"int\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"b\",\"type\":\"int\",\"default\":0},{\"name\":\"o\",\"type\":\"int\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 008",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}}]}",
+      "backward": "invalid",
+      "forward": "invalid",
+      "full": "invalid"
+    },
+    {
+      "name": "random 009",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 010",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"z\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 011",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}},{\"name\":\"c\",\"type\":\"long\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"},{\"name\":\"c\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 012",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"long\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a2\",\"type\":\"bytes\",\"default\":\"\",\"aliases\":[\"a\"]},{\"name\":\"b\",\"type\":\"long\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 013",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"p\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"X\",\"Y\"]}}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 014",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\"]},\"default\":null}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 015",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"long\"}},{\"name\":\"c\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"d\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]},{\"name\":\"c\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 016",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"b\",\"type\":\"double\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"b\",\"type\":\"double\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 017",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"q\",\"type\":\"double\",\"default\":0.0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 018",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a2\",\"type\":[\"null\",\"string\"],\"default\":[],\"aliases\":[\"a\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 019",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"c\",\"type\":\"long\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"c2\",\"type\":\"long\",\"default\":0,\"aliases\":[\"c\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 020",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1},{\"name\":\"m\",\"type\":\"string\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 021",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"]},{\"name\":\"b\",\"type\":\"boolean\"},{\"name\":\"c\",\"type\":\"bytes\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"]},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0},{\"name\":\"c\",\"type\":\"bytes\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 022",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":0},{\"name\":\"b\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":0},{\"name\":\"b\",\"type\":\"long\"},{\"name\":\"o\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"X\",\"Y\"]}}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 023",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"b\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 024",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"a\",\"type\":\"int\",\"default\":1}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 025",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":[\"null\",\"long\"]},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"d\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":[\"null\",\"long\"]},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"d\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 026",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"X\",\"Y\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":0},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"X\",\"Y\"]}}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 027",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"c\",\"type\":\"boolean\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"p\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"c\",\"type\":\"boolean\"},{\"name\":\"a\",\"type\":\"double\",\"default\":0.0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 028",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"c\",\"type\":\"boolean\",\"default\":false},{\"name\":\"d\",\"type\":\"double\",\"default\":0.0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"c\",\"type\":\"boolean\",\"default\":false}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 029",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"},{\"name\":\"b\",\"type\":\"long\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"},\"default\":{}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 030",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"default\":[]},{\"name\":\"c\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"d\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"b\",\"type\":\"int\"},{\"name\":\"c\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"d\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 031",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\",\"default\":false}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"},{\"name\":\"n\",\"type\":\"boolean\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 032",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\",\"default\":false},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"c\",\"type\":{\"type\":\"map\",\"values\":\"string\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\",\"default\":false},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"c\",\"type\":{\"type\":\"map\",\"values\":\"string\"}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 033",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"c\",\"type\":\"int\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":{}},{\"name\":\"c\",\"type\":\"int\",\"default\":0},{\"name\":\"o\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 034",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 035",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]},{\"name\":\"c\",\"type\":[\"null\",\"string\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]},{\"name\":\"c\",\"type\":[\"null\",\"string\"]},{\"name\":\"o\",\"type\":\"long\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 036",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]},{\"name\":\"b\",\"type\":\"bytes\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 037",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"string\"}},{\"name\":\"c\",\"type\":\"double\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"c\",\"type\":\"double\"},{\"name\":\"b2\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"aliases\":[\"b\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 038",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 039",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":\"int\",\"default\":0},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"default\":[]},{\"name\":\"d\",\"type\":\"string\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":\"int\",\"default\":0},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"default\":[]},{\"name\":\"d2\",\"type\":\"string\",\"default\":\"\",\"aliases\":[\"d\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 040",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"},{\"name\":\"b\",\"type\":[\"null\",\"string\"]},{\"name\":\"c\",\"type\":[\"null\",\"long\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"},{\"name\":\"b\",\"type\":\"string\"},{\"name\":\"c\",\"type\":[\"null\",\"long\"]},{\"name\":\"n\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 041",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]},{\"name\":\"c\",\"type\":\"double\",\"default\":0.0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]},{\"name\":\"c\",\"type\":\"double\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 042",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b\",\"type\":\"long\",\"default\":0},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"X\",\"Y\"]}},{\"name\":\"d\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"X\",\"Y\"]}},{\"name\":\"d\",\"type\":\"long\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 043",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 044",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a2\",\"type\":\"double\",\"aliases\":[\"a\"]},{\"name\":\"n\",\"type\":{\"type\":\"array\",\"items\":\"int\"}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 045",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"b\",\"type\":[\"null\",\"string\"]},{\"name\":\"c\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"d\",\"type\":\"string\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"b\",\"type\":[\"null\",\"string\"]},{\"name\":\"c\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"d\",\"type\":\"boolean\",\"default\":false}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 046",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 047",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"b\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"b\",\"type\":[\"null\",\"string\"],\"default\":\"x\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 048",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"c\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"c\",\"type\":\"long\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 049",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"int\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a2\",\"type\":\"int\",\"default\":1,\"aliases\":[\"a\"]},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"int\"}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 050",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 051",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"c\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"c\",\"type\":\"string\"},{\"name\":\"p\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 052",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":[\"null\",\"string\"]},{\"name\":\"c\",\"type\":\"string\"},{\"name\":\"d\",\"type\":[\"null\",\"string\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"d\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"b\",\"type\":[\"null\",\"string\"]},{\"name\":\"c\",\"type\":\"string\"},{\"name\":\"a\",\"type\":\"string\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 053",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"boolean\",\"default\":false}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":\"boolean\"},{\"name\":\"a\",\"type\":\"string\",\"default\":\"\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 054",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b\",\"type\":\"bytes\"},{\"name\":\"c\",\"type\":\"double\",\"default\":0.0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b\",\"type\":\"bytes\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 055",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"boolean\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"b\",\"type\":\"boolean\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 056",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"long\"}},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"int\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"long\"}},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"q\",\"type\":[\"null\",\"long\"]}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 057",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"c\",\"type\":\"bytes\"},{\"name\":\"d\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"c2\",\"type\":\"bytes\",\"aliases\":[\"c\"]},{\"name\":\"d\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 058",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"]},{\"name\":\"b\",\"type\":\"long\"},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"X\",\"Y\"]}},{\"name\":\"d\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"]},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"X\",\"Y\"]}},{\"name\":\"d\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 059",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 060",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"m2\",\"type\":[\"null\",\"string\"],\"default\":null,\"aliases\":[\"m\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 061",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"c2\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8},\"aliases\":[\"c\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 062",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"c\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"d\",\"type\":{\"type\":\"array\",\"items\":\"string\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"c\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"d\",\"type\":{\"type\":\"array\",\"items\":\"string\"}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 063",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"b\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\",\"C\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"n\",\"type\":\"int\",\"default\":1}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 064",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 065",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 066",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"b\",\"type\":\"boolean\",\"default\":false}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":\"boolean\",\"default\":false},{\"name\":\"a\",\"type\":\"long\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 067",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b\",\"type\":\"boolean\",\"default\":false},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\",\"C\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b\",\"type\":\"boolean\",\"default\":false},{\"name\":\"c\",\"type\":\"long\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 068",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"z\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 069",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"long\"}},{\"name\":\"c\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a2\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"aliases\":[\"a\"]},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"long\"}},{\"name\":\"c\",\"type\":\"int\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 070",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"]},{\"name\":\"b\",\"type\":[\"null\",\"string\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"b\",\"type\":[\"null\",\"string\"],\"default\":null}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 071",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"b\",\"type\":\"bytes\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"b\",\"type\":\"bytes\"},{\"name\":\"p\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 072",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"},{\"name\":\"b\",\"type\":\"long\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a2\",\"type\":\"double\",\"aliases\":[\"a\"]},{\"name\":\"b\",\"type\":\"long\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 073",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 074",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 075",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 076",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"}},{\"name\":\"b\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"c\",\"type\":\"long\",\"default\":0},{\"name\":\"d\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"}},{\"name\":\"b\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"c\",\"type\":\"long\",\"default\":0},{\"name\":\"d2\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4},\"aliases\":[\"d\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 077",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}},{\"name\":\"p\",\"type\":\"double\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 078",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 079",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b\",\"type\":\"double\"},{\"name\":\"c\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b\",\"type\":\"double\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 080",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"b\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"c\",\"type\":\"bytes\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"b\",\"type\":\"string\",\"default\":null},{\"name\":\"c\",\"type\":\"int\",\"default\":0}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 081",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 082",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"},{\"name\":\"b\",\"type\":\"boolean\",\"default\":false},{\"name\":\"c\",\"type\":\"double\",\"default\":0.0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"},{\"name\":\"b2\",\"type\":\"boolean\",\"default\":false,\"aliases\":[\"b\"]},{\"name\":\"c\",\"type\":\"double\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 083",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1},{\"name\":\"b\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"b\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 084",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1},{\"name\":\"b\",\"type\":\"string\"},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"long\"}},{\"name\":\"d\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\",\"C\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"d\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":\"string\"},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"long\"}},{\"name\":\"a\",\"type\":\"int\",\"default\":1}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 085",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"b\",\"type\":\"bytes\"},{\"name\":\"c\",\"type\":\"boolean\",\"default\":false},{\"name\":\"d\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"c\",\"type\":\"boolean\",\"default\":false},{\"name\":\"d\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 086",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 087",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"]}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 088",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"c\",\"type\":{\"type\":\"map\",\"values\":\"int\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"c2\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8},\"aliases\":[\"c\"]}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 089",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"b\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"b\",\"type\":[\"null\",\"long\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 090",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a22\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{},\"aliases\":[\"a2\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 091",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"}},{\"name\":\"b\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"}},{\"name\":\"b\",\"type\":\"string\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 092",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"c\",\"type\":\"double\",\"default\":0.0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"c\",\"type\":\"double\",\"default\":0.0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 093",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"d\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\",\"C\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"},{\"name\":\"d\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 094",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"X\",\"Y\"]}},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"X\",\"Y\"]}},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 095",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 096",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\",\"C\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\",\"C\"]}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 097",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"b\",\"type\":\"double\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"b\",\"type\":\"double\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 098",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"X\",\"Y\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a2\",\"type\":\"long\",\"aliases\":[\"a\"]}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 099",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"long\"}},{\"name\":\"c\",\"type\":[\"null\",\"string\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a2\",\"type\":[\"null\",\"string\"],\"default\":null,\"aliases\":[\"a\"]},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"long\"}},{\"name\":\"c\",\"type\":[\"null\",\"string\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 100",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"b\",\"type\":\"int\",\"default\":0},{\"name\":\"c\",\"type\":\"double\",\"default\":0.0},{\"name\":\"d\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"d\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"c\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b\",\"type\":\"int\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 101",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 102",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]},{\"name\":\"b\",\"type\":\"boolean\"},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"long\"}},{\"name\":\"d\",\"type\":[\"null\",\"string\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]},{\"name\":\"b2\",\"type\":\"boolean\",\"aliases\":[\"b\"]},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"long\"}},{\"name\":\"d\",\"type\":[\"null\",\"string\"],\"default\":null}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 103",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 104",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"m\",\"type\":\"boolean\",\"default\":false}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 105",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"string\"},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 106",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 107",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"},\"default\":{}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"},\"default\":{}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"n\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 108",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"int\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"b2\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"aliases\":[\"b\"]},{\"name\":\"p\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 109",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"},{\"name\":\"b\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"b\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"a\",\"type\":\"int\"},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 110",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 111",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"b\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"c\",\"type\":\"long\"},{\"name\":\"d\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"b\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"c\",\"type\":\"long\"},{\"name\":\"d2\",\"type\":\"string\",\"default\":\"x\",\"aliases\":[\"d\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 112",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}},{\"name\":\"c\",\"type\":\"boolean\",\"default\":false},{\"name\":\"d\",\"type\":\"bytes\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b2\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4},\"aliases\":[\"b\"]},{\"name\":\"c\",\"type\":\"boolean\",\"default\":false},{\"name\":\"d2\",\"type\":\"bytes\",\"aliases\":[\"d\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 113",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}},{\"name\":\"c\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"d\",\"type\":\"bytes\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}},{\"name\":\"c\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"d\",\"type\":\"bytes\"},{\"name\":\"o\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 114",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":[\"null\",\"long\"]},{\"name\":\"c\",\"type\":\"boolean\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"c\",\"type\":\"boolean\"},{\"name\":\"q\",\"type\":\"boolean\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 115",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\",\"C\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a2\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\",\"C\"]},\"aliases\":[\"a\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 116",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"b\",\"type\":\"int\",\"default\":0},{\"name\":\"c\",\"type\":\"boolean\",\"default\":false}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"b\",\"type\":\"int\"},{\"name\":\"c\",\"type\":\"boolean\",\"default\":false}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 117",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"long\"}},{\"name\":\"c\",\"type\":\"long\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"long\"}},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"X\",\"Y\"]}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 118",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"b\",\"type\":\"bytes\"},{\"name\":\"c\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"b2\",\"type\":\"bytes\",\"aliases\":[\"b\"]},{\"name\":\"c\",\"type\":\"string\",\"default\":\"\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 119",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\",\"default\":false},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"long\"},\"default\":{}},{\"name\":\"c\",\"type\":\"boolean\"},{\"name\":\"d\",\"type\":\"bytes\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\",\"default\":false},{\"name\":\"d\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"long\"},\"default\":{}}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 120",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 121",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"}},{\"name\":\"b\",\"type\":\"string\"},{\"name\":\"c\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"d\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"}},{\"name\":\"b\",\"type\":\"string\"},{\"name\":\"c\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 122",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"b\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"d\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"b\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"d\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"m\",\"type\":\"long\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 123",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"c\",\"type\":\"boolean\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8},\"default\":{}},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"c\",\"type\":\"boolean\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 124",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 125",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"b\",\"type\":\"double\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a2\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\"]},\"aliases\":[\"a\"]},{\"name\":\"b2\",\"type\":\"double\",\"aliases\":[\"b\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 126",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":\"long\"},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":\"long\"},{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 127",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"},{\"name\":\"b\",\"type\":\"string\"},{\"name\":\"c\",\"type\":\"bytes\"},{\"name\":\"d\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"c\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":\"string\"},{\"name\":\"a\",\"type\":\"int\"},{\"name\":\"d\",\"type\":\"int\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 128",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 129",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"c\",\"type\":\"double\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"c\",\"type\":\"double\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 130",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"c\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"d\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"c\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"d\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 131",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a2\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"aliases\":[\"a\"]}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 132",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"int\"}},{\"name\":\"c\",\"type\":[\"null\",\"long\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"int\"}},{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}},{\"name\":\"c\",\"type\":[\"null\",\"long\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 133",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"boolean\"},{\"name\":\"c\",\"type\":\"long\"},{\"name\":\"d\",\"type\":{\"type\":\"array\",\"items\":\"long\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"c\",\"type\":\"int\"},{\"name\":\"b\",\"type\":\"boolean\"},{\"name\":\"d\",\"type\":{\"type\":\"array\",\"items\":\"long\"}}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 134",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 135",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a2\",\"type\":\"long\",\"aliases\":[\"a\"]},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}}]}",
+      "backward": "invalid",
+      "forward": "invalid",
+      "full": "invalid"
+    },
+    {
+      "name": "random 136",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"b\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"long\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"b\",\"type\":\"string\",\"default\":null},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"long\"}}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 137",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 138",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 139",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"p\",\"type\":\"long\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 140",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 141",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 142",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"},\"default\":{}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"},\"default\":{}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 143",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"b\",\"type\":\"int\"},{\"name\":\"c\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"d\",\"type\":\"int\",\"default\":1}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"b\",\"type\":\"int\"},{\"name\":\"c\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"d2\",\"type\":\"int\",\"default\":1,\"aliases\":[\"d\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 144",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":[\"null\",\"string\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"p\",\"type\":\"long\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 145",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"X\",\"Y\"]}},{\"name\":\"b\",\"type\":\"string\"},{\"name\":\"c\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"X\",\"Y\"]}},{\"name\":\"b\",\"type\":\"string\"},{\"name\":\"c\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 146",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"},{\"name\":\"b\",\"type\":\"int\"},{\"name\":\"c\",\"type\":\"double\",\"default\":0.0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"},{\"name\":\"b\",\"type\":\"int\"},{\"name\":\"c\",\"type\":\"double\",\"default\":0.0},{\"name\":\"o\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 147",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 148",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"},\"default\":{}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 149",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"},{\"name\":\"o\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 150",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"X\",\"Y\"]}},{\"name\":\"b\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"c\",\"type\":\"boolean\"},{\"name\":\"d\",\"type\":\"double\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"X\",\"Y\"]}},{\"name\":\"d\",\"type\":\"double\"},{\"name\":\"c\",\"type\":\"boolean\"},{\"name\":\"b\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 151",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\",\"C\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\",\"C\"]}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 152",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"long\",\"default\":0},{\"name\":\"c\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"b\",\"type\":\"long\",\"default\":0},{\"name\":\"a\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"c\",\"type\":\"long\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 153",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 154",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a2\",\"type\":\"string\",\"aliases\":[\"a\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 155",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"b\",\"type\":\"bytes\"},{\"name\":\"c\",\"type\":\"boolean\",\"default\":false},{\"name\":\"d\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"b\",\"type\":\"bytes\"},{\"name\":\"c\",\"type\":\"boolean\",\"default\":false},{\"name\":\"d\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 156",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"long\"}},{\"name\":\"b\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"d\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\",\"C\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"long\"}},{\"name\":\"b\",\"type\":\"string\"},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"d\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\",\"C\"]}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 157",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"long\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"long\"}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 158",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"default\":[]},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"X\",\"Y\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"default\":[]},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"X\",\"Y\"]}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 159",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"q\",\"type\":\"double\",\"default\":0.0},{\"name\":\"m\",\"type\":\"boolean\",\"default\":false}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 160",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"z\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 161",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"}},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"}},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 162",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\",\"default\":false}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 163",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"},{\"name\":\"b\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"X\",\"Y\"]}},{\"name\":\"c\",\"type\":[\"null\",\"string\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"},{\"name\":\"b\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"X\",\"Y\"]}},{\"name\":\"c\",\"type\":\"string\",\"default\":\"\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 164",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 165",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"d\",\"type\":[\"null\",\"string\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"d\",\"type\":[\"null\",\"string\"],\"default\":null}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 166",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"}},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"long\"},\"default\":{}},{\"name\":\"c\",\"type\":[\"null\",\"long\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"}},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"long\"},\"default\":{}},{\"name\":\"c\",\"type\":[\"null\",\"long\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 167",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"c\",\"type\":\"int\",\"default\":0},{\"name\":\"d\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"c\",\"type\":\"int\",\"default\":0},{\"name\":\"d\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 168",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 169",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"double\"},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}},{\"name\":\"d\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"double\"},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}},{\"name\":\"d\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"q\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 170",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"o\",\"type\":\"int\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 171",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"b\",\"type\":\"long\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"b\",\"type\":\"long\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 172",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 173",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"c2\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"aliases\":[\"c\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 174",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"}},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"int\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"}},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"int\"}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 175",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"long\"}},{\"name\":\"c\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"d\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"long\"}},{\"name\":\"c\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"d\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"o\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"p\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 176",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"c\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"c\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 177",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"b2\",\"type\":\"double\",\"default\":0.0,\"aliases\":[\"b\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 178",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]},{\"name\":\"b\",\"type\":\"int\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":\"int\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 179",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 180",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"int\"}},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"d\",\"type\":\"int\",\"default\":1}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"int\"}},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"d\",\"type\":\"int\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 181",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a2\",\"type\":\"string\",\"aliases\":[\"a\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 182",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}},{\"name\":\"d\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\",\"C\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}},{\"name\":\"d\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"n\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 183",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a2\",\"type\":\"double\",\"default\":0.0,\"aliases\":[\"a\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 184",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"c\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"d\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"},{\"name\":\"c\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"d\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 185",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"b\",\"type\":\"double\"},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a2\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"aliases\":[\"a\"]},{\"name\":\"b\",\"type\":\"double\"},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 186",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"string\"}},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"string\"}}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 187",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 188",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"c\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 189",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":\"boolean\",\"default\":false},{\"name\":\"c\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"d\",\"type\":\"string\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]},{\"name\":\"b\",\"type\":\"boolean\",\"default\":false},{\"name\":\"c\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"d\",\"type\":\"string\",\"default\":\"\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 190",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"},{\"name\":\"b\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 191",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}},{\"name\":\"b\",\"type\":[\"null\",\"string\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"},{\"name\":\"b\",\"type\":[\"null\",\"string\"]}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 192",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"},{\"name\":\"b\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"},{\"name\":\"b\",\"type\":\"string\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 193",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"]},{\"name\":\"b\",\"type\":[\"null\",\"long\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"]},{\"name\":\"b\",\"type\":[\"null\",\"long\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 194",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":0},{\"name\":\"b\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"c\",\"type\":\"bytes\"},{\"name\":\"d\",\"type\":\"double\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":0},{\"name\":\"b\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"c\",\"type\":\"bytes\"},{\"name\":\"d\",\"type\":\"double\"},{\"name\":\"q\",\"type\":\"double\",\"default\":0.0},{\"name\":\"p\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"A\",\"B\",\"C\"]}}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 195",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a2\",\"type\":\"int\",\"aliases\":[\"a\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 196",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":\"bytes\"},{\"name\":\"c\",\"type\":\"string\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":\"bytes\"},{\"name\":\"c\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"o\",\"type\":\"string\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 197",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\",\"default\":false}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\",\"default\":false}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 198",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"b\",\"type\":\"int\",\"default\":0},{\"name\":\"c\",\"type\":{\"type\":\"map\",\"values\":\"long\"}},{\"name\":\"d\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"b\",\"type\":\"int\",\"default\":0},{\"name\":\"c\",\"type\":{\"type\":\"map\",\"values\":\"long\"}},{\"name\":\"d\",\"type\":\"bytes\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 199",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"b\",\"type\":\"int\",\"default\":1},{\"name\":\"c\",\"type\":\"boolean\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"b\",\"type\":\"int\",\"default\":1},{\"name\":\"q\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"X\",\"Y\"]}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 200",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"b\",\"type\":[\"null\",\"string\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"b\",\"type\":[\"null\",\"string\"],\"default\":null}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 201",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"long\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"long\"}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 202",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 203",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"]},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"]},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 204",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"],\"default\":null}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 205",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"b\",\"type\":\"double\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]},{\"name\":\"b\",\"type\":\"double\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 206",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"default\":[]},{\"name\":\"b\",\"type\":\"int\",\"default\":0},{\"name\":\"c\",\"type\":\"double\",\"default\":0.0},{\"name\":\"d\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"long\"}},{\"name\":\"b\",\"type\":\"int\",\"default\":0},{\"name\":\"c\",\"type\":\"double\",\"default\":0.0},{\"name\":\"d\",\"type\":\"int\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 207",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"int\",\"default\":1},{\"name\":\"c\",\"type\":[\"null\",\"string\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a2\",\"type\":\"bytes\",\"default\":\"\",\"aliases\":[\"a\"]},{\"name\":\"b\",\"type\":\"int\",\"default\":1},{\"name\":\"c\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"default\":[]}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 208",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a2\",\"type\":\"string\",\"default\":\"\",\"aliases\":[\"a\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 209",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":\"boolean\"},{\"name\":\"c\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":\"boolean\"},{\"name\":\"c\",\"type\":\"long\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 210",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"b\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"c\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"d\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"b\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"c\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"d\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 211",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"b\",\"type\":\"long\",\"default\":0},{\"name\":\"c\",\"type\":[\"null\",\"long\"]},{\"name\":\"d\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"X\",\"Y\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"b\",\"type\":\"long\",\"default\":0},{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"c\",\"type\":[\"null\",\"long\"]},{\"name\":\"d\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"X\",\"Y\"]}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 212",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"b\",\"type\":\"double\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"b\",\"type\":\"double\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 213",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]},{\"name\":\"p\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"X\",\"Y\"]}}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 214",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"},\"default\":{}},{\"name\":\"b\",\"type\":[\"null\",\"long\"]},{\"name\":\"c\",\"type\":\"int\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"},\"default\":{}},{\"name\":\"b\",\"type\":[\"null\",\"long\"]},{\"name\":\"m\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"c\",\"type\":\"int\",\"default\":0}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 215",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"b\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"X\",\"Y\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"b\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"X\",\"Y\"]}},{\"name\":\"p\",\"type\":\"boolean\",\"default\":false}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 216",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"b\",\"type\":\"double\"},{\"name\":\"c\",\"type\":[\"null\",\"string\"]},{\"name\":\"d\",\"type\":\"int\",\"default\":1}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"b\",\"type\":\"double\"},{\"name\":\"c\",\"type\":[\"null\",\"string\"]},{\"name\":\"d\",\"type\":\"int\",\"default\":1}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 217",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 218",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"double\"},{\"name\":\"b\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":\"\"},{\"name\":\"b\",\"type\":[\"null\",\"long\"]}]}",
+      "backward": "invalid",
+      "forward": "invalid",
+      "full": "invalid"
+    },
+    {
+      "name": "random 219",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"X\",\"Y\"]}},{\"name\":\"b\",\"type\":\"boolean\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"X\",\"Y\"]}},{\"name\":\"b\",\"type\":\"bytes\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 220",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":\"string\"},{\"name\":\"c\",\"type\":\"int\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a2\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\",\"C\"]},\"aliases\":[\"a\"]},{\"name\":\"b\",\"type\":\"string\"},{\"name\":\"c\",\"type\":\"int\"},{\"name\":\"m\",\"type\":\"string\",\"default\":\"\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 221",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a2\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8},\"aliases\":[\"a\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 222",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"b\",\"type\":\"int\",\"default\":1}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"b\",\"type\":\"int\",\"default\":1}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 223",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"default\":[]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 224",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"n\",\"type\":[\"null\",\"long\"]}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 225",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 226",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"double\",\"default\":0.0},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"c\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"c\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 227",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"long\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"long\"}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 228",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 229",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":0},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0},{\"name\":\"c\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"c\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0},{\"name\":\"a\",\"type\":\"int\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 230",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"},{\"name\":\"b\",\"type\":\"long\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"},{\"name\":\"b\",\"type\":\"long\",\"default\":0}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 231",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"},{\"name\":\"b\",\"type\":\"double\"},{\"name\":\"c\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"d\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"},{\"name\":\"b\",\"type\":\"double\"},{\"name\":\"c\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"d\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"m\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 232",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a2\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8},\"aliases\":[\"a\"]},{\"name\":\"b2\",\"type\":\"string\",\"default\":\"\",\"aliases\":[\"b\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 233",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]},{\"name\":\"b\",\"type\":\"long\",\"default\":0},{\"name\":\"c\",\"type\":\"int\",\"default\":0},{\"name\":\"d\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":\"long\",\"default\":0},{\"name\":\"a\",\"type\":[\"null\",\"string\"]},{\"name\":\"c2\",\"type\":\"int\",\"default\":0,\"aliases\":[\"c\"]},{\"name\":\"d\",\"type\":\"long\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 234",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":\"long\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":\"long\",\"default\":0},{\"name\":\"p\",\"type\":\"boolean\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 235",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":\"bytes\"},{\"name\":\"c\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"d\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":\"bytes\"},{\"name\":\"c\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"d\",\"type\":\"long\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 236",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"]}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 237",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 238",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 239",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":0.0},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 240",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 241",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1},{\"name\":\"b\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"X\",\"Y\"]}},{\"name\":\"c\",\"type\":{\"type\":\"map\",\"values\":\"int\"}},{\"name\":\"d\",\"type\":\"double\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1},{\"name\":\"c\",\"type\":{\"type\":\"map\",\"values\":\"int\"}},{\"name\":\"d\",\"type\":\"double\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 242",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 243",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"long\"}},{\"name\":\"c\",\"type\":\"boolean\"},{\"name\":\"d\",\"type\":\"double\",\"default\":0.0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"long\"}},{\"name\":\"c\",\"type\":\"boolean\"},{\"name\":\"d2\",\"type\":\"double\",\"default\":0.0,\"aliases\":[\"d\"]},{\"name\":\"n\",\"type\":\"double\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 244",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"b\",\"type\":[\"null\",\"long\"]},{\"name\":\"c\",\"type\":\"long\",\"default\":0},{\"name\":\"d\",\"type\":\"boolean\",\"default\":false}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"d\",\"type\":\"boolean\",\"default\":false},{\"name\":\"b\",\"type\":[\"null\",\"long\"]},{\"name\":\"c\",\"type\":\"long\",\"default\":0},{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 245",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"},\"default\":{}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"long\"},\"default\":{}},{\"name\":\"b2\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"default\":[],\"aliases\":[\"b\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 246",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 247",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 248",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"b\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"b\",\"type\":[\"null\",\"string\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 249",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 250",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":\"double\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":\"double\"}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 251",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":null}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 252",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"}},{\"name\":\"b\",\"type\":\"bytes\"},{\"name\":\"c\",\"type\":\"boolean\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"}},{\"name\":\"b\",\"type\":\"bytes\"},{\"name\":\"c\",\"type\":\"boolean\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 253",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 254",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"b\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 255",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"b\",\"type\":\"boolean\",\"default\":false},{\"name\":\"c\",\"type\":\"string\"},{\"name\":\"d\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":\"boolean\",\"default\":false},{\"name\":\"c\",\"type\":\"string\"},{\"name\":\"d\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 256",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0},{\"name\":\"c\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0},{\"name\":\"c\",\"type\":\"bytes\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 257",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"long\"}},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"long\"}},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 258",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0},{\"name\":\"c\",\"type\":[\"null\",\"long\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0},{\"name\":\"c\",\"type\":[\"null\",\"long\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 259",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"},{\"name\":\"b\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"},{\"name\":\"b\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 260",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"b\",\"type\":\"long\",\"default\":0},{\"name\":\"c\",\"type\":[\"null\",\"string\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"c\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"b\",\"type\":\"long\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 261",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"c\",\"type\":\"double\"},{\"name\":\"d\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"c\",\"type\":\"double\",\"default\":{}},{\"name\":\"d\",\"type\":\"string\",\"default\":\"x\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 262",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"},{\"name\":\"b\",\"type\":\"boolean\"},{\"name\":\"c\",\"type\":\"boolean\",\"default\":false}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"int\"},{\"name\":\"b\",\"type\":\"boolean\"},{\"name\":\"c\",\"type\":\"boolean\",\"default\":false}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 263",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"long\",\"default\":0},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}},{\"name\":\"d\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":\"long\",\"default\":0},{\"name\":\"c\",\"type\":\"bytes\"},{\"name\":\"d\",\"type\":\"long\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 264",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"c\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"d\",\"type\":[\"null\",\"long\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"int\"},\"default\":{}},{\"name\":\"c\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"d\",\"type\":[\"null\",\"long\"]}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 265",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 266",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"b\",\"type\":\"double\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"b\",\"type\":\"double\"},{\"name\":\"q\",\"type\":\"int\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 267",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"c\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"default\":0},{\"name\":\"b2\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8},\"aliases\":[\"b\"]}]}",
+      "backward": "invalid",
+      "forward": "invalid",
+      "full": "invalid"
+    },
+    {
+      "name": "random 268",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1},{\"name\":\"b\",\"type\":\"double\"},{\"name\":\"c\",\"type\":\"double\"},{\"name\":\"d\",\"type\":[\"null\",\"long\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":\"double\"},{\"name\":\"a\",\"type\":\"int\",\"default\":1},{\"name\":\"c\",\"type\":\"double\",\"default\":[]},{\"name\":\"d\",\"type\":[\"null\",\"long\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 269",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"z\",\"type\":\"bytes\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 270",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 271",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]},{\"name\":\"o\",\"type\":{\"type\":\"enum\",\"name\":\"E2\",\"symbols\":[\"X\",\"Y\"]}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 272",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}},{\"name\":\"o\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"X\",\"Y\"]}}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 273",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"c\",\"type\":\"int\"},{\"name\":\"d\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"c\",\"type\":\"int\"},{\"name\":\"d\",\"type\":\"string\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 274",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 275",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":0},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"c\",\"type\":\"double\",\"default\":0.0},{\"name\":\"d\",\"type\":\"string\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"c\",\"type\":\"double\",\"default\":0.0},{\"name\":\"d\",\"type\":\"string\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 276",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]},{\"name\":\"b\",\"type\":\"long\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":\"int\",\"default\":0}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 277",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":\"boolean\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a2\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\",\"C\"]},\"aliases\":[\"a\"]},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 278",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0},{\"name\":\"c\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"d\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0},{\"name\":\"c\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"d\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\"]}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 279",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}},{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"b\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"default\":[]},{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 280",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"long\"}},{\"name\":\"b\",\"type\":\"long\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a2\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"aliases\":[\"a\"]},{\"name\":\"b\",\"type\":\"long\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 281",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"b\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 282",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"b\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"b\",\"type\":\"long\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 283",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"boolean\",\"default\":1}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 284",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]},{\"name\":\"b\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"c\",\"type\":[\"null\",\"long\"]},{\"name\":\"d\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"string\"]},{\"name\":\"b\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"c\",\"type\":[\"null\",\"long\"]},{\"name\":\"d\",\"type\":\"bytes\",\"default\":\"\"}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 285",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":\"long\"},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"d\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"},{\"name\":\"b\",\"type\":\"long\"},{\"name\":\"c\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"d\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":4}}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 286",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"n\",\"type\":[\"null\",\"long\"]}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 287",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"o\",\"type\":\"int\",\"default\":1}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 288",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"b\",\"type\":[\"null\",\"string\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"},\"default\":[]},{\"name\":\"b\",\"type\":[\"null\",\"string\"]}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 289",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"c\",\"type\":{\"type\":\"map\",\"values\":\"string\"}},{\"name\":\"d\",\"type\":\"boolean\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E1\",\"symbols\":[\"A\",\"B\",\"C\"]}},{\"name\":\"b\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"c\",\"type\":[\"null\",\"long\"]},{\"name\":\"d\",\"type\":\"boolean\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 290",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"b\",\"type\":\"double\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"b\",\"type\":\"double\"},{\"name\":\"q\",\"type\":\"long\"}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 291",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1},{\"name\":\"b\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"c\",\"type\":[\"null\",\"long\"],\"default\":null}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"default\":1},{\"name\":\"b\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"c\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"m\",\"type\":\"long\",\"default\":0},{\"name\":\"o\",\"type\":\"boolean\",\"default\":false}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 292",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":4}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 293",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"},{\"name\":\"b\",\"type\":\"double\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"long\"},{\"name\":\"b\",\"type\":\"double\"}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 294",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"c\",\"type\":\"long\"}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\",\"default\":\"\"},{\"name\":\"b\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"c\",\"type\":\"long\"},{\"name\":\"q\",\"type\":\"int\",\"default\":1}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 295",
+      "old": "{\"type\":\"record\",\"name\":\"S\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"b\",\"type\":{\"type\":\"map\",\"values\":\"long\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\",\"default\":\"x\"},{\"name\":\"b\",\"type\":{\"type\":\"fixed\",\"name\":\"F0\",\"size\":8}}]}",
+      "backward": "no",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 296",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0},{\"name\":\"c\",\"type\":\"double\"},{\"name\":\"d\",\"type\":\"int\",\"default\":0}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"bytes\"},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0},{\"name\":\"c\",\"type\":\"double\"},{\"name\":\"d\",\"type\":\"int\",\"default\":0}]}",
+      "backward": "yes",
+      "forward": "yes",
+      "full": "yes"
+    },
+    {
+      "name": "random 297",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"default\":{}},{\"name\":\"p2\",\"type\":{\"type\":\"array\",\"items\":\"long\"},\"aliases\":[\"p\"]}]}",
+      "backward": "no",
+      "forward": "yes",
+      "full": "no"
+    },
+    {
+      "name": "random 298",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"b\",\"type\":\"long\"},{\"name\":\"c\",\"type\":[\"null\",\"string\"]}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"enum\",\"name\":\"E0\",\"symbols\":[\"A\",\"B\"]}},{\"name\":\"b\",\"type\":\"double\",\"default\":0.0},{\"name\":\"c\",\"type\":[\"null\",\"string\"]}]}",
+      "backward": "yes",
+      "forward": "no",
+      "full": "no"
+    },
+    {
+      "name": "random 299",
+      "old": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"b\",\"type\":\"int\",\"default\":0},{\"name\":\"c\",\"type\":\"boolean\",\"default\":false},{\"name\":\"d\",\"type\":{\"type\":\"array\",\"items\":\"int\"}}]}",
+      "new": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":{\"type\":\"fixed\",\"name\":\"F1\",\"size\":8}},{\"name\":\"b\",\"type\":\"int\",\"default\":0},{\"name\":\"c\",\"type\":\"boolean\",\"default\":false},{\"name\":\"d\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"o\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"o\",\"type\":\"double\",\"default\":0.0}]}",
+      "backward": "invalid",
+      "forward": "invalid",
+      "full": "invalid"
+    }
+  ]
+}

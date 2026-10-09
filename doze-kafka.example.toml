@@ -59,6 +59,11 @@ console = true                   # serve the web console.
 # console-addr = "127.0.0.1:9093" # unset: beside the broker on the name's address (9093), or 127.0.0.1:9093 under listen.
 # console-allow-host = ["devbox.lan"] # extra Host names the console answers to.
 
+# --- schema registry ----------------------------------------------------------
+
+schema-registry = true                  # serve the built-in Confluent-compatible schema registry.
+# schema-registry-addr = "127.0.0.1:8081" # unset: beside the broker on the name's address (8081), or 127.0.0.1:8081 under listen.
+
 # --- process -------------------------------------------------------------------
 
 log-level = "info"               # debug (logs every request), info, warn or error.

@@ -42,6 +42,9 @@ func envTo(w io.Writer, cfg config.Config) {
 	if cfg.AuthEnabled() {
 		vars["KAFKA_SASL_MECHANISM"] = cfg.SASLMechanisms[0]
 	}
+	if u := registryURL(cfg); u != "" {
+		vars["SCHEMA_REGISTRY_URL"] = u
+	}
 	keys := make([]string, 0, len(vars))
 	for k := range vars {
 		keys = append(keys, k)

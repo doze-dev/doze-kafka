@@ -1,0 +1,142 @@
+[
+  {
+    "method": "PUT",
+    "path": "/config/rv",
+    "body": "{\"compatibility\":\"NONE\"}",
+    "status": 200,
+    "response": {
+      "compatibility": "NONE"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rv/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"R\\\",\\\"fields\\\":[{\\\"name\\\":\\\"a\\\",\\\"type\\\":\\\"string\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rv/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"R\\\",\\\"fields\\\":[{\\\"name\\\":\\\"a\\\",\\\"type\\\":\\\"string\\\"},{\\\"name\\\":\\\"b\\\",\\\"type\\\":\\\"int\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/rv",
+    "body": "{\"compatibility\":\"BACKWARD_TRANSITIVE\"}",
+    "status": 200,
+    "response": {
+      "compatibility": "BACKWARD_TRANSITIVE"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rv/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"R\\\",\\\"fields\\\":[{\\\"name\\\":\\\"a\\\",\\\"type\\\":\\\"string\\\"},{\\\"name\\\":\\\"b\\\",\\\"type\\\":\\\"int\\\"},{\\\"name\\\":\\\"c\\\",\\\"type\\\":\\\"int\\\",\\\"default\\\":0}]}\"}",
+    "status": 409,
+    "response": {
+      "error_code": 409,
+      "message": "Schema being registered is incompatible with an earlier schema for subject \"rv\", details: [{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'b'}, {oldSchemaVersion: 1}, {oldSchema: '{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}'}, {validateFields: 'false', compatibility: 'BACKWARD_TRANSITIVE'}]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/rv",
+    "body": "{\"compatibility\":\"BACKWARD\"}",
+    "status": 200,
+    "response": {
+      "compatibility": "BACKWARD"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rv/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"R\\\",\\\"fields\\\":[{\\\"name\\\":\\\"a\\\",\\\"type\\\":\\\"string\\\"},{\\\"name\\\":\\\"b\\\",\\\"type\\\":\\\"int\\\"},{\\\"name\\\":\\\"c\\\",\\\"type\\\":\\\"int\\\",\\\"default\\\":0}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 3
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/rv/versions",
+    "status": 200,
+    "response": [
+      1,
+      2,
+      3
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/config/rv",
+    "body": "{\"compatibility\":\"FORWARD_TRANSITIVE\"}",
+    "status": 200,
+    "response": {
+      "compatibility": "FORWARD_TRANSITIVE"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rv/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"R\\\",\\\"fields\\\":[{\\\"name\\\":\\\"a\\\",\\\"type\\\":\\\"string\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/rv",
+    "body": "{\"compatibility\":\"FULL\"}",
+    "status": 200,
+    "response": {
+      "compatibility": "FULL"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rv/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"R\\\",\\\"fields\\\":[{\\\"name\\\":\\\"a\\\",\\\"type\\\":\\\"string\\\"},{\\\"name\\\":\\\"b\\\",\\\"type\\\":\\\"int\\\"},{\\\"name\\\":\\\"c\\\",\\\"type\\\":\\\"int\\\",\\\"default\\\":0},{\\\"name\\\":\\\"d\\\",\\\"type\\\":\\\"int\\\",\\\"default\\\":0}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 4
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/rv",
+    "body": "{\"compatibility\":\"FULL_TRANSITIVE\"}",
+    "status": 200,
+    "response": {
+      "compatibility": "FULL_TRANSITIVE"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/rv/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"R\\\",\\\"fields\\\":[{\\\"name\\\":\\\"a\\\",\\\"type\\\":\\\"string\\\"},{\\\"name\\\":\\\"b\\\",\\\"type\\\":\\\"int\\\"},{\\\"name\\\":\\\"c\\\",\\\"type\\\":\\\"int\\\",\\\"default\\\":0},{\\\"name\\\":\\\"d\\\",\\\"type\\\":\\\"int\\\",\\\"default\\\":0},{\\\"name\\\":\\\"e\\\",\\\"type\\\":\\\"int\\\",\\\"default\\\":0}]}\"}",
+    "status": 409,
+    "response": {
+      "error_code": 409,
+      "message": "Schema being registered is incompatible with an earlier schema for subject \"rv\", details: [{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'b'}, {oldSchemaVersion: 1}, {oldSchema: '{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"a\",\"type\":\"string\"}]}'}, {validateFields: 'false', compatibility: 'FULL_TRANSITIVE'}]"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/rv/versions",
+    "status": 200,
+    "response": [
+      1,
+      2,
+      3,
+      4
+    ]
+  }
+]

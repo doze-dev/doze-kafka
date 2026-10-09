@@ -1,0 +1,155 @@
+[
+  {
+    "method": "GET",
+    "path": "/mode",
+    "status": 200,
+    "response": {
+      "mode": "READWRITE"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/mode/md",
+    "status": 404,
+    "response": {
+      "error_code": 40409,
+      "message": "Subject 'md' does not have subject-level mode configured"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/mode/md?defaultToGlobal=true",
+    "status": 200,
+    "response": {
+      "mode": "READWRITE"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/md/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/mode/md",
+    "body": "{\"mode\":\"READONLY\"}",
+    "status": 200,
+    "response": {
+      "mode": "READONLY"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/mode/md",
+    "status": 200,
+    "response": {
+      "mode": "READONLY"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/md/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42205,
+      "message": "Subject md is in read-only mode"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/md/versions/1",
+    "status": 422,
+    "response": {
+      "error_code": 42205,
+      "message": "Subject md is in read-only mode"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/md/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "md",
+      "version": 1,
+      "id": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/mode/md",
+    "body": "{\"mode\":\"BOGUS\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42204,
+      "message": "Invalid mode. Valid values are READWRITE, READONLY, and IMPORT."
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/mode/md",
+    "status": 200,
+    "response": {
+      "mode": "READONLY"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/mode/md",
+    "status": 404,
+    "response": {
+      "error_code": 40409,
+      "message": "Subject 'md' does not have subject-level mode configured"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/mode",
+    "body": "{\"mode\":\"READONLY\"}",
+    "status": 200,
+    "response": {
+      "mode": "READONLY"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/mode",
+    "status": 200,
+    "response": {
+      "mode": "READONLY"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/md2/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42205,
+      "message": "Subject md2 is in read-only mode"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/mode",
+    "body": "{\"mode\":\"READWRITE\"}",
+    "status": 200,
+    "response": {
+      "mode": "READWRITE"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/md2/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  }
+]

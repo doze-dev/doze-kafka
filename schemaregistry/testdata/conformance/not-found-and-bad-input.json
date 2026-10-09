@@ -1,0 +1,174 @@
+[
+  {
+    "method": "GET",
+    "path": "/subjects/nf/versions",
+    "status": 404,
+    "response": {
+      "error_code": 40401,
+      "message": "Subject 'nf' not found."
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/nf/versions/1",
+    "status": 404,
+    "response": {
+      "error_code": 40401,
+      "message": "Subject 'nf' not found."
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/nf/versions/latest",
+    "status": 404,
+    "response": {
+      "error_code": 40401,
+      "message": "Subject 'nf' not found."
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/nf/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/nf/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "nf",
+      "version": 1,
+      "id": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/nf/versions/2",
+    "status": 404,
+    "response": {
+      "error_code": 40402,
+      "message": "Version 2 not found."
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/nf/versions/0",
+    "status": 422,
+    "response": {
+      "error_code": 42202,
+      "message": "The specified version '0' is not a valid version id. Allowed values are between [1, 2^31-1] and the string \"latest\""
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/nf/versions/abc",
+    "status": 422,
+    "response": {
+      "error_code": 42202,
+      "message": "The specified version 'abc' is not a valid version id. Allowed values are between [1, 2^31-1] and the string \"latest\""
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/nf/versions/2147483648",
+    "status": 422,
+    "response": {
+      "error_code": 42202,
+      "message": "The specified version '2147483648' is not a valid version id. Allowed values are between [1, 2^31-1] and the string \"latest\""
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/nf/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\"\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42201,
+      "message": "Invalid schema {subject=nf,version=0,id=-1,schemaType=AVRO,references=[],metadata=null,ruleSet=null,schema={\"type\":\"record\",schemaTags=null} with refs [] of type AVRO, details: com.fasterxml.jackson.core.io.JsonEOFException: Unexpected end-of-input: expected close marker for Object (start marker at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 1])\n at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 17]"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/nf/versions",
+    "body": "{\"schema\":\"\"}",
+    "status": 200,
+    "response": {
+      "id": 1,
+      "version": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/nf/versions",
+    "body": "{\"schema\":\"x\",\"schemaType\":\"YAML\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42201,
+      "message": "Invalid schema type YAML"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/nf/versions",
+    "body": "not json",
+    "status": 400,
+    "response": {
+      "error_code": 400,
+      "message": "Unrecognized token 'not': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/nf/versions",
+    "body": "{}",
+    "status": 200,
+    "response": {
+      "id": 1,
+      "version": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/nope",
+    "status": 404,
+    "response": {
+      "error_code": 40401,
+      "message": "Subject 'nope' not found."
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/nf/versions/9",
+    "status": 404,
+    "response": {
+      "error_code": 40402,
+      "message": "Version 9 not found."
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/nothing/here",
+    "status": 404,
+    "response": {
+      "error_code": 404,
+      "message": "HTTP 404 Not Found"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/subjects",
+    "body": "{}",
+    "status": 405,
+    "response": {
+      "error_code": 405,
+      "message": "HTTP 405 Method Not Allowed"
+    }
+  }
+]

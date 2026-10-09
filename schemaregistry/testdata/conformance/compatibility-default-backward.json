@@ -1,0 +1,117 @@
+[
+  {
+    "method": "GET",
+    "path": "/config",
+    "status": 200,
+    "response": {
+      "compatibilityLevel": "BACKWARD"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cb/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cb/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":\\\"string\\\"}]}\"}",
+    "status": 409,
+    "response": {
+      "error_code": 409,
+      "message": "Schema being registered is incompatible with an earlier schema for subject \"cb\", details: [{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'email' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'email'}, {oldSchemaVersion: 1}, {oldSchema: '{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}'}, {validateFields: 'false', compatibility: 'BACKWARD'}]"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cb/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/cb/versions/latest",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":\\\"string\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "is_compatible": false
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/cb/versions/latest?verbose=true",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":\\\"string\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "is_compatible": false,
+      "messages": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}",
+        "{oldSchemaVersion: 2}",
+        "{oldSchema: '{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"},{\"name\":\"email\",\"type\":[\"null\",\"string\"],\"default\":null}]}'}",
+        "{validateFields: 'false', compatibility: 'BACKWARD'}"
+      ]
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/cb/versions/latest",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "is_compatible": true
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/cb/versions/1",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 200,
+    "response": {
+      "is_compatible": true
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/cb/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 200,
+    "response": {
+      "is_compatible": true
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/cb/versions/9",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 404,
+    "response": {
+      "error_code": 40402,
+      "message": "Version 9 not found."
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/cbnone/versions/latest",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 200,
+    "response": {
+      "is_compatible": true
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/cb/versions",
+    "status": 200,
+    "response": [
+      1,
+      2
+    ]
+  }
+]

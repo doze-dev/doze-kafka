@@ -1,0 +1,214 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/cf/versions",
+    "body": "{\"schema\":\"{\\\"fields\\\":[{\\\"type\\\":\\\"long\\\",\\\"name\\\":\\\"id\\\"},{\\\"name\\\":\\\"tags\\\",\\\"type\\\":{\\\"type\\\":\\\"array\\\",\\\"items\\\":\\\"string\\\"}}],\\\"name\\\":\\\"Rec\\\",\\\"namespace\\\":\\\"com.acme\\\",\\\"type\\\":\\\"record\\\",\\\"doc\\\":\\\"d\\\"}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/cf/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "cf",
+      "version": 1,
+      "id": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"Rec\",\"namespace\":\"com.acme\",\"doc\":\"d\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"},{\"name\":\"tags\",\"type\":{\"type\":\"array\",\"items\":\"string\"}}]}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cf/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"com.acme.Rec\\\",\\\"doc\\\":\\\"d\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"tags\\\",\\\"type\\\":{\\\"type\\\":\\\"array\\\",\\\"items\\\":\\\"string\\\"}}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cf-prim/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"string\\\"}\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/cf-prim/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "cf-prim",
+      "version": 1,
+      "id": 2,
+      "schema": "\"string\""
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cf-prim2/versions",
+    "body": "{\"schema\":\"\\\"string\\\"\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/cf-prim2/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "cf-prim2",
+      "version": 1,
+      "id": 2,
+      "schema": "\"string\""
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cf-enum/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"enum\\\",\\\"name\\\":\\\"Color\\\",\\\"symbols\\\":[\\\"RED\\\",\\\"GREEN\\\"],\\\"default\\\":\\\"RED\\\",\\\"namespace\\\":\\\"x.y\\\"}\"}",
+    "status": 200,
+    "response": {
+      "id": 3
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/cf-enum/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "cf-enum",
+      "version": 1,
+      "id": 3,
+      "schema": "{\"type\":\"enum\",\"name\":\"Color\",\"namespace\":\"x.y\",\"symbols\":[\"RED\",\"GREEN\"],\"default\":\"RED\"}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cf-def/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"D\\\",\\\"fields\\\":[{\\\"name\\\":\\\"a\\\",\\\"type\\\":\\\"int\\\",\\\"default\\\":1,\\\"doc\\\":\\\"x\\\"},{\\\"name\\\":\\\"b\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null},{\\\"name\\\":\\\"c\\\",\\\"type\\\":{\\\"type\\\":\\\"map\\\",\\\"values\\\":\\\"long\\\"},\\\"aliases\\\":[\\\"cc\\\"]}],\\\"custom\\\":\\\"prop\\\"}\"}",
+    "status": 200,
+    "response": {
+      "id": 4
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/cf-def/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "cf-def",
+      "version": 1,
+      "id": 4,
+      "schema": "{\"type\":\"record\",\"name\":\"D\",\"fields\":[{\"name\":\"a\",\"type\":\"int\",\"doc\":\"x\",\"default\":1},{\"name\":\"b\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"c\",\"type\":{\"type\":\"map\",\"values\":\"long\"},\"aliases\":[\"cc\"]}],\"custom\":\"prop\"}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cf-fixed/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"fixed\\\",\\\"size\\\":16,\\\"name\\\":\\\"F\\\",\\\"logicalType\\\":\\\"uuid\\\"}\"}",
+    "status": 200,
+    "response": {
+      "id": 5
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/cf-fixed/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "cf-fixed",
+      "version": 1,
+      "id": 5,
+      "schema": "{\"type\":\"fixed\",\"name\":\"F\",\"size\":16,\"logicalType\":\"uuid\"}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cf-nest/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"Outer\\\",\\\"namespace\\\":\\\"n\\\",\\\"fields\\\":[{\\\"name\\\":\\\"i\\\",\\\"type\\\":{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"Inner\\\",\\\"fields\\\":[{\\\"name\\\":\\\"x\\\",\\\"type\\\":\\\"int\\\"}]}},{\\\"name\\\":\\\"j\\\",\\\"type\\\":\\\"Inner\\\"},{\\\"name\\\":\\\"k\\\",\\\"type\\\":\\\"n.Inner\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 6
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/cf-nest/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "cf-nest",
+      "version": 1,
+      "id": 6,
+      "schema": "{\"type\":\"record\",\"name\":\"Outer\",\"namespace\":\"n\",\"fields\":[{\"name\":\"i\",\"type\":{\"type\":\"record\",\"name\":\"Inner\",\"fields\":[{\"name\":\"x\",\"type\":\"int\"}]}},{\"name\":\"j\",\"type\":\"Inner\"},{\"name\":\"k\",\"type\":\"Inner\"}]}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cf-json/versions",
+    "body": "{\"schema\":\"{ \\\"type\\\" : \\\"object\\\",\\n  \\\"properties\\\" : { \\\"a\\\" : { \\\"type\\\":\\\"string\\\" } } }\",\"schemaType\":\"JSON\"}",
+    "status": 200,
+    "response": {
+      "id": 7
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/cf-json/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "cf-json",
+      "version": 1,
+      "id": 7,
+      "schemaType": "JSON",
+      "schema": "{\"type\":\"object\",\"properties\":{\"a\":{\"type\":\"string\"}}}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cf-empty",
+    "body": "{\"schema\":\"\"}",
+    "status": 404,
+    "response": {
+      "error_code": 40401,
+      "message": "Subject 'cf-empty' not found."
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cf-empty/versions",
+    "body": "{\"schema\":\"\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42201,
+      "message": "Empty schema"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cf/versions",
+    "body": "{\"schema\":\"\"}",
+    "status": 200,
+    "response": {
+      "id": 1,
+      "version": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"Rec\",\"namespace\":\"com.acme\",\"doc\":\"d\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"},{\"name\":\"tags\",\"type\":{\"type\":\"array\",\"items\":\"string\"}}]}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cf/versions",
+    "body": "{\"schema\":\"\",\"schemaType\":\"JSON\"}",
+    "status": 200,
+    "response": {
+      "id": 1,
+      "version": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"Rec\",\"namespace\":\"com.acme\",\"doc\":\"d\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"},{\"name\":\"tags\",\"type\":{\"type\":\"array\",\"items\":\"string\"}}]}"
+    }
+  }
+]

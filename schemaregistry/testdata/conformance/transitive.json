@@ -1,0 +1,92 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/tr/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"R\\\",\\\"fields\\\":[{\\\"name\\\":\\\"a\\\",\\\"type\\\":\\\"string\\\",\\\"default\\\":\\\"x\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/tr",
+    "body": "{\"compatibility\":\"NONE\"}",
+    "status": 200,
+    "response": {
+      "compatibility": "NONE"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/tr/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"R\\\",\\\"fields\\\":[{\\\"name\\\":\\\"a\\\",\\\"type\\\":\\\"string\\\",\\\"default\\\":\\\"x\\\"},{\\\"name\\\":\\\"b\\\",\\\"type\\\":\\\"int\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/tr",
+    "body": "{\"compatibility\":\"BACKWARD\"}",
+    "status": 200,
+    "response": {
+      "compatibility": "BACKWARD"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/tr/versions/latest",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"R\\\",\\\"fields\\\":[{\\\"name\\\":\\\"a\\\",\\\"type\\\":\\\"string\\\",\\\"default\\\":\\\"x\\\"},{\\\"name\\\":\\\"b\\\",\\\"type\\\":\\\"int\\\"},{\\\"name\\\":\\\"c\\\",\\\"type\\\":\\\"int\\\",\\\"default\\\":0}]}\"}",
+    "status": 200,
+    "response": {
+      "is_compatible": true
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/tr",
+    "body": "{\"compatibility\":\"BACKWARD_TRANSITIVE\"}",
+    "status": 200,
+    "response": {
+      "compatibility": "BACKWARD_TRANSITIVE"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/tr/versions/latest",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"R\\\",\\\"fields\\\":[{\\\"name\\\":\\\"a\\\",\\\"type\\\":\\\"string\\\",\\\"default\\\":\\\"x\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "is_compatible": true
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/tr/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"R\\\",\\\"fields\\\":[{\\\"name\\\":\\\"a\\\",\\\"type\\\":\\\"string\\\"},{\\\"name\\\":\\\"b\\\",\\\"type\\\":\\\"int\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "is_compatible": false
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/tr",
+    "body": "{\"compatibility\":\"BACKWARD\"}",
+    "status": 200,
+    "response": {
+      "compatibility": "BACKWARD"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/tr/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"R\\\",\\\"fields\\\":[{\\\"name\\\":\\\"a\\\",\\\"type\\\":\\\"string\\\"},{\\\"name\\\":\\\"b\\\",\\\"type\\\":\\\"int\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "is_compatible": true
+    }
+  }
+]

@@ -1,0 +1,175 @@
+[
+  {
+    "method": "GET",
+    "path": "/schemas/types",
+    "status": 200,
+    "response": [
+      "JSON",
+      "PROTOBUF",
+      "AVRO"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ot-json/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"id\\\":{\\\"type\\\":\\\"integer\\\"}},\\\"required\\\":[\\\"id\\\"]}\",\"schemaType\":\"JSON\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ot-json/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"id\\\":{\\\"type\\\":\\\"integer\\\"}},\\\"required\\\":[\\\"id\\\"]}\",\"schemaType\":\"JSON\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ot-json2/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"id\\\":{\\\"type\\\":\\\"integer\\\"}},\\\"required\\\":[\\\"id\\\"]}\",\"schemaType\":\"JSON\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/ot-json/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "ot-json",
+      "version": 1,
+      "id": 1,
+      "schemaType": "JSON",
+      "schema": "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"}},\"required\":[\"id\"]}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ot-proto/versions",
+    "body": "{\"schema\":\"syntax = \\\"proto3\\\"; message User { int64 id = 1; }\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/ot-proto/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "ot-proto",
+      "version": 1,
+      "id": 2,
+      "schemaType": "PROTOBUF",
+      "schema": "syntax = \"proto3\";\n\nmessage User {\n  int64 id = 1;\n}\n"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/ot-proto/versions/1/schema",
+    "status": 200,
+    "response": "syntax = \"proto3\";\n\nmessage User {\n  int64 id = 1;\n}"
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ot-proto",
+    "body": "{\"schema\":\"syntax = \\\"proto3\\\"; message User { int64 id = 1; }\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "subject": "ot-proto",
+      "version": 1,
+      "id": 2,
+      "schemaType": "PROTOBUF",
+      "schema": "syntax = \"proto3\";\n\nmessage User {\n  int64 id = 1;\n}\n"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ot-json",
+    "body": "{\"schema\":\"syntax = \\\"proto3\\\"; message User { int64 id = 1; }\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 404,
+    "response": {
+      "error_code": 40403,
+      "message": "Schema not found"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ot-avro/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 3
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/ot-avro/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "ot-avro",
+      "version": 1,
+      "id": 3,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@1/subjects",
+    "status": 200,
+    "response": [
+      "ot-json",
+      "ot-json2"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@1/versions",
+    "status": 200,
+    "response": [
+      {
+        "subject": "ot-json",
+        "version": 1
+      },
+      {
+        "subject": "ot-json2",
+        "version": 1
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ot-proto/versions",
+    "body": "{\"schema\":\"syntax = \\\"proto3\\\"; message {\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42201,
+      "message": "Invalid schema {subject=ot-proto,version=0,id=-1,schemaType=PROTOBUF,references=[],metadata=null,ruleSet=null,schema=syntax = \"proto3\"; message {,schemaTags=null} with refs [] of type PROTOBUF, details: Could not parse Protobuf - Syntax error in :1:28: expected a word"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ot-json/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"nonsense\\\"}\",\"schemaType\":\"JSON\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42201,
+      "message": "Invalid schema {subject=ot-json,version=0,id=-1,schemaType=JSON,references=[],metadata=null,ruleSet=null,schema={\"type\":\"nonsense\"},schemaTags=null}, details: Invalid JSON Schema"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ot-json/versions",
+    "body": "{\"schema\":\"[1,2\",\"schemaType\":\"JSON\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42201,
+      "message": "Invalid schema {subject=ot-json,version=0,id=-1,schemaType=JSON,references=[],metadata=null,ruleSet=null,schema=[1,2,schemaTags=null} with refs [] of type JSON, details: Invalid JSON [1,2"
+    }
+  }
+]

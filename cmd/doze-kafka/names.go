@@ -54,7 +54,10 @@ import (
 type zone struct {
 	// own is kafka.<instance>.doze: this instance's identity in the zone, and the
 	// only name it claims.
-	own   *names.Lease
+	own *names.Lease
+	// extra are the other names this instance holds for its companions (the schema
+	// registry), released with it.
+	extra []*names.Lease
 	srv   *names.Server
 	front *names.Ingress
 	reg   *names.Registry
@@ -186,6 +189,9 @@ func (z *zone) routeConsole(logger *slog.Logger, consoleAddr string) string {
 func (z *zone) close() {
 	if z == nil {
 		return
+	}
+	for _, l := range z.extra {
+		_ = l.Release()
 	}
 	if z.own != nil {
 		_ = z.own.Release()

@@ -93,6 +93,7 @@ var helpGroups = []struct {
 	{"Topics and groups", []string{"kafka-version", "auto-create-topics", "default-partitions", "max-partitions", "consumer-session-timeout"}},
 	{"Security", []string{"sasl-mechanisms", "sasl-user", "tls-cert", "tls-key", "acl-default", "acl-super-user"}},
 	{"Console", []string{"console", "console-addr", "console-allow-host"}},
+	{"Schema registry", []string{"schema-registry", "schema-registry-addr"}},
 	{"Process", []string{"config", "log-level", "log-format", "pprof-addr"}},
 }
 
@@ -363,6 +364,8 @@ func registerFlags(fs *flag.FlagSet, cfg *config.Config) {
 
 	// Console.
 	fs.BoolVar(&cfg.Console, "console", cfg.Console, "serve the web console (topics, messages, consumer groups)")
+	fs.BoolVar(&cfg.SchemaRegistry, "schema-registry", cfg.SchemaRegistry, "serve a Confluent-compatible schema registry (Avro, JSON Schema, Protobuf)")
+	fs.StringVar(&cfg.SchemaRegistryAddr, "schema-registry-addr", cfg.SchemaRegistryAddr, "host:port for the schema registry (default: 8081 beside the broker, on its name's address or on loopback)")
 	fs.StringVar(&cfg.ConsoleAddr, "console-addr", cfg.ConsoleAddr, "host:port for the web console (Kafka's wire protocol cannot share a port with HTTP)")
 	fs.Var(&stringSliceFlag{vals: &cfg.ConsoleAllowHosts}, "console-allow-host", "extra host name the console answers to, besides localhost, IP addresses and *.doze (comma-separated or repeated); guards against DNS rebinding")
 

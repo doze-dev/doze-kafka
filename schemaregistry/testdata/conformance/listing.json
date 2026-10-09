@@ -1,0 +1,103 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/ls-b/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ls-a/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ls-a/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects",
+    "status": 200,
+    "response": [
+      "ls-a",
+      "ls-b"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects?subjectPrefix=ls-a",
+    "status": 200,
+    "response": [
+      "ls-a"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/schemas",
+    "status": 200,
+    "response": [
+      {
+        "subject": "ls-a",
+        "version": 1,
+        "id": 1,
+        "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+      },
+      {
+        "subject": "ls-a",
+        "version": 2,
+        "id": 2,
+        "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"},{\"name\":\"email\",\"type\":[\"null\",\"string\"],\"default\":null}]}"
+      },
+      {
+        "subject": "ls-b",
+        "version": 1,
+        "id": 1,
+        "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/schemas?latestOnly=true",
+    "status": 200,
+    "response": [
+      {
+        "subject": "ls-a",
+        "version": 2,
+        "id": 2,
+        "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"},{\"name\":\"email\",\"type\":[\"null\",\"string\"],\"default\":null}]}"
+      },
+      {
+        "subject": "ls-b",
+        "version": 1,
+        "id": 1,
+        "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/schemas?subjectPrefix=ls-b",
+    "status": 200,
+    "response": [
+      {
+        "subject": "ls-b",
+        "version": 1,
+        "id": 1,
+        "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+      }
+    ]
+  }
+]

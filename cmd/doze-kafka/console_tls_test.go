@@ -94,7 +94,7 @@ func TestConsoleClientTLSAcceptsOnlyTheBrokersCertificate(t *testing.T) {
 // configuration used to have its password replaced without a word.
 func TestTheConsoleUserNameIsReserved(t *testing.T) {
 	t.Chdir(t.TempDir())
-	st, err := loadConfig([]string{"--listen", "127.0.0.1:0", "--console-addr", "127.0.0.1:0", "--data-dir", t.TempDir(),
+	st, err := loadConfig([]string{"--listen", "127.0.0.1:0", "--console-addr", "127.0.0.1:0", "--schema-registry-addr", "127.0.0.1:0", "--data-dir", t.TempDir(),
 		"--sasl-mechanisms", "PLAIN", "--sasl-user", "__console:mine"})
 	if err == nil {
 		out := &safeBuf{}

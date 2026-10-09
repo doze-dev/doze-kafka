@@ -1,0 +1,171 @@
+[
+  {
+    "method": "GET",
+    "path": "/config",
+    "status": 200,
+    "response": {
+      "compatibilityLevel": "BACKWARD"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/config/cc",
+    "status": 404,
+    "response": {
+      "error_code": 40408,
+      "message": "Subject 'cc' does not have subject-level compatibility configured"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/config/cc?defaultToGlobal=true",
+    "status": 200,
+    "response": {
+      "compatibilityLevel": "BACKWARD"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cc/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/cc",
+    "body": "{\"compatibility\":\"NONE\"}",
+    "status": 200,
+    "response": {
+      "compatibility": "NONE"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/config/cc",
+    "status": 200,
+    "response": {
+      "compatibilityLevel": "NONE"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cc/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":\\\"string\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/cc",
+    "body": "{\"compatibility\":\"full\"}",
+    "status": 200,
+    "response": {
+      "compatibility": "full"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/config/cc",
+    "status": 200,
+    "response": {
+      "compatibilityLevel": "FULL"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/cc",
+    "body": "{\"compatibility\":\"SIDEWAYS\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42203,
+      "message": "Invalid compatibility level. Valid values are none, backward, forward, full, backward_transitive, forward_transitive, and full_transitive"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/cc",
+    "body": "{}",
+    "status": 200,
+    "response": {}
+  },
+  {
+    "method": "PUT",
+    "path": "/config",
+    "body": "{\"compatibility\":\"FORWARD\"}",
+    "status": 200,
+    "response": {
+      "compatibility": "FORWARD"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/config",
+    "status": 200,
+    "response": {
+      "compatibilityLevel": "FORWARD"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/config/cc",
+    "status": 200,
+    "response": {
+      "compatibilityLevel": "FULL"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/config/cc",
+    "status": 200,
+    "response": {
+      "compatibilityLevel": "FULL"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/config/cc",
+    "status": 404,
+    "response": {
+      "error_code": 40408,
+      "message": "Subject 'cc' does not have subject-level compatibility configured"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/config/cc?defaultToGlobal=true",
+    "status": 200,
+    "response": {
+      "compatibilityLevel": "FORWARD"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/config/cc",
+    "status": 404,
+    "response": {
+      "error_code": 40401,
+      "message": "Subject 'cc' not found."
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/config",
+    "status": 200,
+    "response": {
+      "compatibilityLevel": "FORWARD"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/config",
+    "status": 200,
+    "response": {
+      "compatibilityLevel": "BACKWARD"
+    }
+  }
+]

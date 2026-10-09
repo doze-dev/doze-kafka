@@ -86,6 +86,11 @@ type Config struct {
 	ConsoleAddr       string   // host:port for the console's HTTP listener.
 	ConsoleAllowHosts []string // extra Host names the console answers to (DNS-rebinding guard).
 
+	// SchemaRegistry: a Confluent-compatible schema registry, served over HTTP beside
+	// the broker. Its records live in the metadata database.
+	SchemaRegistry     bool   // serve the registry.
+	SchemaRegistryAddr string // host:port for the registry's HTTP listener.
+
 	// Name is this instance's name in the shared .doze zone. It answers on
 	// kafka.<name>.doze, so two projects on one machine are two instances that
 	// never contend for an address or a port. Empty means derive one from the
@@ -114,8 +119,11 @@ const (
 	// The console is HTTP, which cannot share the broker's port. In name mode it
 	// sits beside the broker on the name's own address, port 9093; under --listen
 	// it is on loopback unless --console-addr says otherwise.
-	defaultConsoleAddr  = ""
-	listenModeConsole   = "127.0.0.1:9093"
+	defaultConsoleAddr = ""
+	listenModeConsole  = "127.0.0.1:9093"
+	// The registry is HTTP too, on Confluent's own port, beside the broker on the
+	// name's address in name mode and on loopback under --listen.
+	listenModeRegistry  = "127.0.0.1:8081"
 	defaultSegmentBytes = 128 << 20 // 128 MiB
 	defaultIndexStride  = 4 << 10   // 4 KiB
 
@@ -149,6 +157,7 @@ func Default() Config {
 		DefaultPartitions:      1,
 		MaxPartitions:          defaultMaxPartitions,
 		Console:                true,
+		SchemaRegistry:         true,
 		ACLDefault:             ACLAllow,
 		ConsoleAddr:            defaultConsoleAddr,
 		LogLevel:               "info",
@@ -198,6 +207,9 @@ func (c Config) ByName() bool { return c.ListenAddr == "" }
 func (c *Config) ResolveConsoleAddr() {
 	if c.ConsoleAddr == "" && !c.ByName() {
 		c.ConsoleAddr = listenModeConsole
+	}
+	if c.SchemaRegistryAddr == "" && !c.ByName() {
+		c.SchemaRegistryAddr = listenModeRegistry
 	}
 }
 
@@ -297,6 +309,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: listen address %q is not host:port (for example 127.0.0.1:9092 or :9092)", c.ListenAddr)
 	case c.Console && c.ConsoleAddr != "" && !validHostPort(c.ConsoleAddr):
 		return fmt.Errorf("config: console address %q is not host:port (for example 127.0.0.1:9093)", c.ConsoleAddr)
+	case c.SchemaRegistry && c.SchemaRegistryAddr != "" && !validHostPort(c.SchemaRegistryAddr):
+		return fmt.Errorf("config: schema registry address %q is not host:port (for example 127.0.0.1:8081)", c.SchemaRegistryAddr)
 	case c.LogLevel != "debug" && c.LogLevel != "info" && c.LogLevel != "warn" && c.LogLevel != "error":
 		return fmt.Errorf("config: log level %q is not one of debug, info, warn, error", c.LogLevel)
 	case c.LogFormat != "text" && c.LogFormat != "json":

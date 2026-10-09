@@ -1,0 +1,43 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/nm/versions?normalize=true",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"U\\\",\\\"doc\\\":\\\"x\\\",\\\"fields\\\":[{\\\"name\\\":\\\"a\\\",\\\"type\\\":\\\"long\\\",\\\"doc\\\":\\\"y\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/nm/versions/1",
+    "status": 200,
+    "response": {
+      "subject": "nm",
+      "version": 1,
+      "id": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"U\",\"doc\":\"x\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"doc\":\"y\"}]}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/nm/versions?normalize=true",
+    "body": "{\"schema\":\"{\\\"fields\\\":[{\\\"type\\\":\\\"long\\\",\\\"name\\\":\\\"a\\\",\\\"doc\\\":\\\"y\\\"}],\\\"name\\\":\\\"U\\\",\\\"type\\\":\\\"record\\\",\\\"doc\\\":\\\"x\\\"}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/nm?normalize=true",
+    "body": "{\"schema\":\"{\\\"fields\\\":[{\\\"type\\\":\\\"long\\\",\\\"name\\\":\\\"a\\\",\\\"doc\\\":\\\"y\\\"}],\\\"name\\\":\\\"U\\\",\\\"type\\\":\\\"record\\\",\\\"doc\\\":\\\"x\\\"}\"}",
+    "status": 200,
+    "response": {
+      "subject": "nm",
+      "version": 1,
+      "id": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"U\",\"doc\":\"x\",\"fields\":[{\"name\":\"a\",\"type\":\"long\",\"doc\":\"y\"}]}"
+    }
+  }
+]

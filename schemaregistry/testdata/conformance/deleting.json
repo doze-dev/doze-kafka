@@ -1,0 +1,227 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/dl/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/dl/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/dl/versions/1?permanent=true",
+    "status": 404,
+    "response": {
+      "error_code": 40407,
+      "message": "Subject 'dl' Version 1 was not deleted first before being permanently deleted"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/dl/versions/1",
+    "status": 200,
+    "response": 1
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/dl/versions",
+    "status": 200,
+    "response": [
+      2
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/dl/versions?deleted=true",
+    "status": 200,
+    "response": [
+      1,
+      2
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/dl/versions/1",
+    "status": 404,
+    "response": {
+      "error_code": 40402,
+      "message": "Version 1 not found."
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/dl/versions/1?deleted=true",
+    "status": 200,
+    "response": {
+      "subject": "dl",
+      "version": 1,
+      "id": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/dl/versions/1",
+    "status": 404,
+    "response": {
+      "error_code": 40406,
+      "message": "Subject 'dl' Version 1 was soft deleted.Set permanent=true to delete permanently"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@1",
+    "status": 200,
+    "response": {
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@1/versions",
+    "status": 200,
+    "response": []
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@1/versions?deleted=true",
+    "status": 200,
+    "response": [
+      {
+        "subject": "dl",
+        "version": 1
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/dl",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 404,
+    "response": {
+      "error_code": 40403,
+      "message": "Schema not found"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/dl/versions/1?permanent=true",
+    "status": 200,
+    "response": 1
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/dl/versions?deleted=true",
+    "status": 200,
+    "response": [
+      2
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@1",
+    "status": 404,
+    "response": {
+      "error_code": 40403,
+      "message": "Schema @1 not found"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/dl",
+    "status": 200,
+    "response": [
+      2
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects",
+    "status": 200,
+    "response": []
+  },
+  {
+    "method": "GET",
+    "path": "/subjects?deleted=true",
+    "status": 200,
+    "response": [
+      "dl"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/dl/versions",
+    "status": 404,
+    "response": {
+      "error_code": 40401,
+      "message": "Subject 'dl' not found."
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/dl",
+    "status": 404,
+    "response": {
+      "error_code": 40404,
+      "message": "Subject 'dl' was soft deleted.Set permanent=true to delete permanently"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/dl/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/dl/versions?deleted=true",
+    "status": 200,
+    "response": [
+      3
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/dl",
+    "status": 200,
+    "response": [
+      3
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/dl?permanent=true",
+    "status": 200,
+    "response": [
+      3
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects?deleted=true",
+    "status": 200,
+    "response": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/dl?permanent=true",
+    "status": 404,
+    "response": {
+      "error_code": 40401,
+      "message": "Subject 'dl' not found."
+    }
+  }
+]

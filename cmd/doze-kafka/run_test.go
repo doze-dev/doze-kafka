@@ -26,7 +26,7 @@ func (s *safeBuf) String() string              { s.mu.Lock(); defer s.mu.Unlock(
 func start(t *testing.T, flags ...string) (out *safeBuf, stop func() error) {
 	t.Helper()
 	t.Chdir(t.TempDir())
-	args := append([]string{"--listen", "127.0.0.1:0", "--console-addr", "127.0.0.1:0", "--data-dir", t.TempDir()}, flags...)
+	args := append([]string{"--listen", "127.0.0.1:0", "--console-addr", "127.0.0.1:0", "--schema-registry-addr", "127.0.0.1:0", "--data-dir", t.TempDir()}, flags...)
 	st, err := loadConfig(args)
 	if err != nil {
 		t.Fatal(err)
