@@ -116,6 +116,16 @@ tasks:
     cmds:
       - scripts/coverage.sh record
 
+  lightness:
+    desc: 'Binary size, idle heap and module count against testdata/lightness.json (5% slack)'
+    cmds:
+      - scripts/lightness.sh
+
+  lightness:record:
+    desc: 'Record today''s weight as the budget (the commit message says why it grew)'
+    cmds:
+      - scripts/lightness.sh record
+
   fuzz:
     desc: 'Fuzz the wire-protocol decoder: each target for FUZZ_TIME (default 30s)'
     vars:
