@@ -1,9 +1,9 @@
 Vendored front-end libraries, embedded in the binary. No build step: to update one,
 replace the file and change the line here.
 
-htmx          2.0.4     htmx.min.js          https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js
-Alpine.js     3.14.8    alpine.min.js        https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js
-CodeMirror    5.65.19   cm/*.min.js, .css    https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.19/
+htmx          2.0.11    htmx.min.js          https://unpkg.com/htmx.org@2.0.11/dist/htmx.min.js
+Alpine.js     3.17.4    alpine.min.js        https://cdn.jsdelivr.net/npm/alpinejs@3.17.4/dist/cdn.min.js
+CodeMirror    5.65.21   cm/*.min.js, .css    https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.21/
               (codemirror, mode/javascript, addon/edit/closebrackets, addon/edit/matchbrackets)
 
 Fonts (SIL Open Font License 1.1, static/fonts/OFL.txt), Latin subset, from fontsource:
