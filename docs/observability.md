@@ -57,6 +57,39 @@ session keeps expiring (a handler slower than `max.poll.interval.ms`, a paused J
 or one that joins and leaves in a loop (a crash-looping app). The same events apply to
 both group protocols.
 
+## Message lineage: where did this message go?
+
+Open a record in the topic page's drawer. If it carries a trace id in its headers it
+offers **Follow this message**, which lists every record, in every topic, that carries
+the same id, in the order they were written: topic, partition and offset (linked to
+the record), the key, the span id (and the parent span id where the convention has
+one), and which consumer groups have **read** past it or **not yet**. A small time axis
+shows the gaps: a request that took 400 ms to turn into an event, an event that sat
+for a minute before its consumer wrote the next.
+
+The trace id is read from, in this order:
+
+- W3C **`traceparent`** (`00-<trace>-<span>-<flags>`),
+- B3, either the single **`b3`** header or **`X-B3-TraceId`** with `X-B3-SpanId` and
+  `X-B3-ParentSpanId` (a 64-bit B3 id matches the same trace's 128-bit form),
+- and the header named by **`--trace-header`** (`trace-header` in the file), whose whole
+  value is the id: a request id, a correlation id.
+
+How it is found, and its limits, which the page states too:
+
+- **By reading.** The broker keeps no index of headers. The console asks the broker,
+  by timestamp, which records were written within a span either side of the message
+  (1 minute, 5 minutes, 30 minutes or 3 hours; 5 by default), then reads those
+  records with an ordinary consumer and keeps the ones that match. The page shows
+  progress while it runs.
+- **It has a budget**: 50,000 records or 8 seconds. When it stops at either, the page
+  says *This is not everything*, says which budget, and lists the partitions it left
+  unread. Choose a narrower span to read less.
+- **It only sees what apps put in headers.** A message with no trace header is invisible
+  to it, and so is a service that receives a trace and does not pass it on.
+- It scans from the broker's current contents: records already deleted by retention or
+  compaction are not there to be found.
+
 ## Not available
 
 The console reaches the broker's traffic through the process it runs in. A console

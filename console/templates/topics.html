@@ -252,6 +252,7 @@
     {{else}}{{template "kvcopy" .Key.Text}}{{end}}
     {{if and (not .Key.Null) (not .Key.Empty)}}<span class="sz">{{.Key.SizeText}}</span>{{end}}</span></div>
 
+  {{with .Trace}}<div class="meta-row"><span class="k">Trace</span><span class="v"><a class="btn btn-outline" id="drawer-trace" href="{{$.TraceURL}}">{{icon "activity"}} Follow this message</a> <span class="sz mono" title="{{.Kind}}">{{.ID}}</span></span></div>{{end}}
   <div class="sec-title flush">Headers{{if .Headers}} · {{len .Headers}}{{end}}</div>
   {{if .Headers}}<div class="hdrlist">{{range .Headers}}<div class="hdrpair"><span class="hk">{{.Key}}</span><span class="dim">=</span><span class="hv">{{if .V.Null}}<span class="dim">null</span>{{else if .V.Empty}}<span class="dim">""</span>{{else if .V.Binary}}{{.V.Preview}}{{else}}{{.V.Text}}{{end}}</span></div>{{end}}</div>
   {{else}}<div class="note">No headers on this record.</div>{{end}}

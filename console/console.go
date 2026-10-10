@@ -32,14 +32,16 @@ var staticFS embed.FS
 // Console is the web-UI http.Handler. Mount it on its own listener — Kafka's
 // wire protocol can't share a port with HTTP.
 type Console struct {
-	be      *backend
-	reg     *registryClient // nil when there is no schema registry to talk to.
-	traffic TrafficSource   // nil when the broker's traffic is not available to this console.
-	mux     *http.ServeMux
-	tmpl    *template.Template
-	dev     string // DOZE_KAFKA_CONSOLE_DEV: read templates and static files from this directory, live.
-	prefix  string
-	hosts   []string // extra Host names to answer to (see hostguard.go).
+	be          *backend
+	reg         *registryClient // nil when there is no schema registry to talk to.
+	traffic     TrafficSource   // nil when the broker's traffic is not available to this console.
+	traces      traceJobs       // message-lineage scans, running and recent.
+	traceHeader string          // an extra record header that holds a trace id (Options.TraceHeader).
+	mux         *http.ServeMux
+	tmpl        *template.Template
+	dev         string // DOZE_KAFKA_CONSOLE_DEV: read templates and static files from this directory, live.
+	prefix      string
+	hosts       []string // extra Host names to answer to (see hostguard.go).
 }
 
 // Options configures the console.
@@ -76,6 +78,9 @@ type Options struct {
 	// membership changes. Nil, the Traffic section is not offered: the console cannot
 	// see the wire of a broker it is not part of.
 	Traffic TrafficSource
+	// TraceHeader is the name of a record header whose whole value is a trace id (a
+	// request id, a correlation id), found in addition to W3C traceparent and B3.
+	TraceHeader string
 }
 
 // New builds a console with a real Kafka client dialed at opts.Addr.
@@ -105,6 +110,7 @@ func New(opts Options) (*Console, error) {
 	c.be, c.tmpl = be, tmpl
 	c.reg = newRegistryClient(opts.RegistryURL, opts.RegistryUser, opts.RegistryPass)
 	c.traffic = opts.Traffic
+	c.traceHeader = strings.TrimSpace(opts.TraceHeader)
 	c.routes()
 	return c, nil
 }
@@ -226,6 +232,10 @@ func (c *Console) routes() {
 	m.HandleFunc("POST "+p+"/topics/{name}/resend", c.topicResend)  // an exact copy of a stored record
 	m.HandleFunc("GET "+p+"/topics/{name}/message", c.topicMessage) // drawer partial
 	m.HandleFunc("GET "+p+"/topics/{name}/message/raw", c.topicMessageRaw)
+
+	// Lineage: where else did the messages of one trace go.
+	m.HandleFunc("GET "+p+"/trace", c.tracePage)
+	m.HandleFunc("GET "+p+"/trace/live", c.traceLive) // HTMX partial (polled)
 
 	// Traffic (what clients asked the broker).
 	m.HandleFunc("GET "+p+"/traffic", c.trafficPage)

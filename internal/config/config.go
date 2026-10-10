@@ -85,6 +85,7 @@ type Config struct {
 	Console           bool     // serve the console.
 	ConsoleAddr       string   // host:port for the console's HTTP listener.
 	ConsoleAllowHosts []string // extra Host names the console answers to (DNS-rebinding guard).
+	TraceHeader       string   // a record header holding a trace id, for the console's message lineage.
 
 	// SchemaRegistry: a Confluent-compatible schema registry, served over HTTP beside
 	// the broker. Its records live in the metadata database.
@@ -299,6 +300,23 @@ func holdsPartitionData(dir string) bool {
 	return false
 }
 
+// validHeaderName reports whether s can be the name of a record header the console
+// looks a trace id up in: a short token, so a typo is caught rather than silently
+// matching nothing.
+func validHeaderName(s string) bool {
+	if s == "" || len(s) > 64 {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_', r == '.':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // Validate reports the first problem that would prevent the broker from starting.
 func (c Config) Validate() error {
 	if c.Version < MinKafkaMajor || c.Version > MaxKafkaMajor {
@@ -311,6 +329,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: console address %q is not host:port (for example 127.0.0.1:9093)", c.ConsoleAddr)
 	case c.SchemaRegistry && c.SchemaRegistryAddr != "" && !validHostPort(c.SchemaRegistryAddr):
 		return fmt.Errorf("config: schema registry address %q is not host:port (for example 127.0.0.1:8081)", c.SchemaRegistryAddr)
+	case c.TraceHeader != "" && !validHeaderName(c.TraceHeader):
+		return fmt.Errorf("config: trace header %q is not a header name (letters, digits and - _ . only, at most 64)", c.TraceHeader)
 	case c.LogLevel != "debug" && c.LogLevel != "info" && c.LogLevel != "warn" && c.LogLevel != "error":
 		return fmt.Errorf("config: log level %q is not one of debug, info, warn, error", c.LogLevel)
 	case c.LogFormat != "text" && c.LogFormat != "json":

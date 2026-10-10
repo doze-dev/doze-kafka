@@ -241,6 +241,7 @@ func TestFileKeysCoverTheProcessSettings(t *testing.T) {
 console = false
 console-addr = "127.0.0.1:19999"
 console-allow-host = ["devbox.lan"]
+trace-header = "x-request-id"
 name = "harbour"
 log-level = "debug"
 log-format = "json"
@@ -253,7 +254,7 @@ kafka-version = 3
 	}
 	c := st.cfg
 	if c.Console || c.ConsoleAddr != "127.0.0.1:19999" || !reflect.DeepEqual(c.ConsoleAllowHosts, []string{"devbox.lan"}) ||
-		c.Name != "harbour" || c.LogLevel != "debug" || c.LogFormat != "json" || c.PprofAddr != "127.0.0.1:6060" || c.Version != 3 {
+		c.Name != "harbour" || c.TraceHeader != "x-request-id" || c.LogLevel != "debug" || c.LogFormat != "json" || c.PprofAddr != "127.0.0.1:6060" || c.Version != 3 {
 		t.Errorf("file did not apply: %+v", c)
 	}
 	// The older `version` key keeps working, and a flag still wins over the file.
@@ -280,5 +281,23 @@ func TestConfigPrintShowsTheDerivedAdvertisedHost(t *testing.T) {
 		if code, out, errOut := run3(argv...); code != 0 || !strings.Contains(out, want) {
 			t.Errorf("config print %v: code %d, %q; want it to contain %q (%s)", argv, code, out, want, errOut)
 		}
+	}
+}
+
+// --trace-header names a record header the console follows as a trace id. A typo is
+// refused rather than silently matching nothing, and `config print` keeps it.
+func TestTraceHeaderFlagAndValidation(t *testing.T) {
+	t.Chdir(t.TempDir())
+	st, err := loadConfig([]string{"--trace-header", "X-Request-Id"})
+	if err != nil || st.cfg.TraceHeader != "X-Request-Id" {
+		t.Fatalf("--trace-header: %+v %v", st.cfg.TraceHeader, err)
+	}
+	for _, bad := range []string{"x request id", "x:request", strings.Repeat("a", 65)} {
+		if _, err := loadConfig([]string{"--trace-header", bad}); err == nil || !strings.Contains(err.Error(), "trace header") {
+			t.Errorf("--trace-header %q: %v, want a refusal naming the trace header", bad, err)
+		}
+	}
+	if code, out, _ := run3("config", "print", "--trace-header", "X-Request-Id"); code != 0 || !strings.Contains(out, `trace-header = "X-Request-Id"`) {
+		t.Errorf("config print lost the trace header (code %d):\n%s", code, out)
 	}
 }

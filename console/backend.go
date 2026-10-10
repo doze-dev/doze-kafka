@@ -663,6 +663,25 @@ func (b *backend) fetchWindow(ctx context.Context, topic string, partition int32
 	return out, nil
 }
 
+// newReader is a consumer of exactly the partitions given, from exactly the offsets
+// given, as the console's other short-lived readers are: no group, no commits. The
+// caller closes it.
+func (b *backend) newReader(assign map[string]map[int32]kgo.Offset) (*kgo.Client, error) {
+	kopts := append(seedOpts(b.addr), kgo.ClientID("doze-kafka-console-trace"),
+		kgo.ConsumePartitions(assign), kgo.FetchMaxBytes(8<<20), kgo.FetchIsolationLevel(kgo.ReadUncommitted()))
+	if b.opts.SASLUser != "" {
+		mech, err := saslMechanism(b.opts.SASLMechanism, b.opts.SASLUser, b.opts.SASLPass)
+		if err != nil {
+			return nil, err
+		}
+		kopts = append(kopts, kgo.SASL(mech))
+	}
+	if b.opts.TLSConfig != nil {
+		kopts = append(kopts, kgo.DialTLSConfig(b.opts.TLSConfig))
+	}
+	return kgo.NewClient(kopts...)
+}
+
 // StableOffset is the partition's last stable offset: what a read-committed consumer
 // may read up to. Records at or above it belong to a transaction still open.
 func (b *backend) StableOffset(ctx context.Context, topic string, partition int32) (int64, error) {

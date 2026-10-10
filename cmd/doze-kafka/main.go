@@ -478,7 +478,7 @@ func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger
 		AllowedHosts: consoleHosts(cfg),
 		// With SASL the console reaches the registry as the same user it reaches the broker.
 		RegistryURL: registryURL, RegistryUser: user, RegistryPass: pass,
-		Traffic: traffic,
+		Traffic: traffic, TraceHeader: cfg.TraceHeader,
 	})
 	if err != nil {
 		ln.Close()

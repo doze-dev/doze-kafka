@@ -1,0 +1,68 @@
+{{define "trace_detail"}}{{template "shell_top" .}}
+  <main class="detail" id="detail"><div class="detail-inner trafficwrap">
+    <div class="idband">
+      <div>
+        <h1 class="page-title">Trace</h1>
+        <div class="idchips">{{template "copychip" dict "Label" "trace id" "Value" .Trace}}</div>
+        <p class="lede">Every record, in every topic, that carries this trace id and was written within {{.WindowLabel}} of {{.AtStr}}.</p>
+      </div>
+      <div class="idband-acts">
+        <span class="dim">Look across</span>
+        <div class="seg" role="group" aria-label="How far either side of the message to look">
+          {{range .Windows}}<a class="seg-link {{if .On}}on{{end}}" href="{{.URL}}" {{if .On}}aria-current="true"{{end}}>{{.Label}}</a>{{end}}
+        </div>
+      </div>
+    </div>
+
+    {{template "trace_live" .}}
+
+    <div class="honest" role="note">
+      {{icon "info"}}
+      <div>This finds only messages whose producers wrote a trace header: <span class="mono">traceparent</span> (W3C), <span class="mono">b3</span> or <span class="mono">X-B3-TraceId</span> (B3){{if .TraceHeader}}, or <span class="mono">{{.TraceHeader}}</span>{{end}}. A message with no header is invisible here, and so is a service that does not pass the header on. It is found by reading the records written around this message's time, up to {{.MaxRecords}} records or {{.MaxSeconds}} seconds, and says so when it stops short.</div>
+    </div>
+  </div></main>
+{{template "shell_bottom" .}}{{end}}
+
+{{/* trace_live is the polled unit: progress while the scan runs, the trail when it is done. */}}
+{{define "trace_live"}}
+<div id="trace-live" data-job="{{.JobID}}" data-hash="{{.Hash}}" {{if .Running}}data-live="{{.Prefix}}/trace/live?job={{.JobID}}" data-live-ms="700"{{end}}>
+  {{if .Err}}
+  <div class="honest warn" role="alert">{{icon "alert"}}<div>The scan failed: {{.Err}}</div></div>
+  {{else if .Running}}
+  <div class="tr-status" role="status">
+    <span class="spinner" aria-hidden="true"></span>
+    {{if eq .Phase "planning"}}Working out which records were written around then…{{else}}Scanning {{.PartsDone}} of {{.PartsTotal}} partitions · {{.ScannedText}} of {{.PlannedText}} records{{end}}
+    {{if gt .Planned 0}}<progress class="tr-progress" max="{{.Planned}}" value="{{.Scanned}}" aria-label="Records scanned"></progress>{{end}}
+    {{if .Hits}}<span class="dim">{{len .Hits}} found so far</span>{{end}}
+  </div>
+  {{else}}
+  <div class="tr-status" role="status">
+    <b>{{len .Hits}} message{{if ne (len .Hits) 1}}s{{end}}</b> in {{.TopicCount}} topic{{if ne .TopicCount 1}}s{{end}}
+    <span class="dim">· scanned {{.ScannedText}} records in {{.Took}}</span>
+  </div>
+  {{end}}
+
+  {{if .Stopped}}
+  <div class="honest warn" role="note" id="trace-partial">
+    {{icon "alert"}}
+    <div><b>This is not everything.</b> The scan stopped at its {{if eq .Stopped "time"}}{{.MaxSeconds}}-second{{else}}{{.MaxRecords}}-record{{end}} budget, so records were left unread
+      {{if .Unread}}<ul class="tr-unread">{{range .Unread}}<li class="mono">{{.}}</li>{{end}}</ul>{{end}}
+      Choose a shorter span above to read less.</div>
+  </div>
+  {{end}}
+
+  {{if .Hits}}
+  <ol class="tracelist" id="trace-list">
+    {{range .Hits}}<li class="tr{{if .Anchor}} tr-anchor{{end}}">
+      <span class="tr-t mono">{{.TimeStr}} <span class="dim">{{.Delta}}</span></span>
+      <span class="tr-bar" aria-hidden="true" style="--at:{{.Left}}%"><i></i></span>
+      <span class="tr-loc mono"><a href="{{topicURL .Topic}}?partition={{.Partition}}&jump={{.Offset}}">{{.Topic}}</a> · P{{.Partition}} · offset {{.Offset}}{{if .Anchor}} <span class="badge state-stable">this message</span>{{end}}</span>
+      <span class="tr-meta mono">{{if .Key}}key {{.Key}}{{else}}<span class="dim">no key</span>{{end}}{{if .Ref.Span}} · span {{.Ref.Span}}{{end}}{{if .Ref.Parent}} · parent {{.Ref.Parent}}{{end}}</span>
+      <span class="tr-cons">{{range .Consumers}}<a class="chip mono {{if .Past}}lag-zero{{else}}lag-some{{end}}" href="{{groupURL .Group}}" title="{{if .Past}}{{.Group}} has committed past this record{{else}}{{.Group}} has not read this record yet{{end}}">{{.Group}} · {{if .Past}}read{{else}}not yet{{end}}</a>{{else}}<span class="dim">no group has committed on this partition</span>{{end}}</span>
+    </li>{{end}}
+  </ol>
+  {{else if not .Running}}
+  <div class="honest">{{icon "info"}}<div>No record with this trace id was found in that span. If the message is older, or was written some time after, choose a wider span above.</div></div>
+  {{end}}
+</div>
+{{end}}

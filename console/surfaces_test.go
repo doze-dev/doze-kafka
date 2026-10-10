@@ -93,6 +93,16 @@ func TestEverySurfaceRenders(t *testing.T) {
 			path += "?partition=0&offset=1"
 		case strings.HasSuffix(path, "/traffic/request"):
 			path += "?seq=8"
+		case strings.HasSuffix(path, "/trace"):
+			path += "?id=" + traceA
+		case strings.HasSuffix(path, "/trace/live"):
+			// A scan to ask about: the page names the one it started.
+			page := req(t, c, "GET", "/_console/trace?id="+traceA, nil).Body.String()
+			m := regexp.MustCompile(`data-job="([^"]+)"`).FindStringSubmatch(page)
+			if m == nil {
+				t.Fatalf("the trace page names no scan:\n%s", page)
+			}
+			path += "?job=" + m[1]
 		}
 		rec := req(t, c, "GET", path, nil)
 		if rec.Code != http.StatusOK {

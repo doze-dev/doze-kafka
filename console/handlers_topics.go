@@ -272,6 +272,9 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 		"EditHeaders": resendHeaders(hdrs),
 		"CanEdit":     (valueV.Null || valueV.Empty || valueV.B64 != "") && (keyV.Null || keyV.Empty || keyV.B64 != ""),
 	}
+	if ref := traceOf(m.Headers, c.traceHeader); ref != nil {
+		data["Trace"], data["TraceURL"] = ref, c.traceURL(ref.ID, m.Timestamp, name, partition, m.Offset, "")
+	}
 	// A value read through the registry is edited as the JSON it means, and the
 	// composer is told which subject to encode it with again. (Send again still
 	// carries the stored bytes.)

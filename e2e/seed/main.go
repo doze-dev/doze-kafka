@@ -8,6 +8,9 @@
 //	              open (producer "seed-open"; its timeout is long, so it outlasts a run).
 //	seed-events   1 partition of Avro records written through the schema registry (subject
 //	              seed-events-value, two versions); seed-proto is the same for Protobuf.
+//	seed-trace-a  one record that carries a traceparent, and seed-trace-b one that carries
+//	seed-trace-b  the same one a moment later: a trace across two topics. g-trace has read
+//	              the first and not the second.
 //	g-lag         committed at offset 10 of seed-orders/0: a lag to look at.
 //	g-timeline    a group whose one member joined, read and left, for its timeline.
 //	g-reset-*     one group per test that resets, sets or deletes, so tests that
@@ -50,7 +53,7 @@ func run(addr, registryURL string) error {
 	}
 	defer cl.Close()
 
-	for name, parts := range map[string]int32{"seed-orders": 3, "seed-empty": 1, "seed-txn": 1, "seed-events": 1, "seed-proto": 1} {
+	for name, parts := range map[string]int32{"seed-orders": 3, "seed-empty": 1, "seed-txn": 1, "seed-events": 1, "seed-proto": 1, "seed-trace-a": 1, "seed-trace-b": 1} {
 		req := kmsg.NewPtrCreateTopicsRequest()
 		rt := kmsg.NewCreateTopicsRequestTopic()
 		rt.Topic, rt.NumPartitions, rt.ReplicationFactor = name, parts, 1
@@ -95,6 +98,27 @@ func run(addr, registryURL string) error {
 		if err := produce(int32(1+i%2), []byte(fmt.Sprintf("p-%d", i)), []byte(fmt.Sprintf(`{"n":%d,"tier":"gold"}`, i))); err != nil {
 			return err
 		}
+	}
+
+	// One trace across two topics, the second record written a moment after the first.
+	traceHdr := kgo.RecordHeader{Key: "traceparent", Value: []byte("00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01")}
+	for _, topic := range []string{"seed-trace-a", "seed-trace-b"} {
+		if err := cl.ProduceSync(ctx, &kgo.Record{Topic: topic, Partition: 0, Key: []byte("checkout-1"), Value: []byte(`{"step":"` + topic + `"}`), Headers: []kgo.RecordHeader{traceHdr}}).FirstErr(); err != nil {
+			return err
+		}
+		time.Sleep(30 * time.Millisecond)
+	}
+	// A group that has read the first of them and not the second.
+	tc := kmsg.NewPtrOffsetCommitRequest()
+	tc.Group, tc.Generation = "g-trace", -1
+	tt := kmsg.NewOffsetCommitRequestTopic()
+	tt.Topic = "seed-trace-a"
+	tp := kmsg.NewOffsetCommitRequestTopicPartition()
+	tp.Partition, tp.Offset = 0, 1
+	tt.Partitions = append(tt.Partitions, tp)
+	tc.Topics = append(tc.Topics, tt)
+	if resp, err := tc.RequestWith(ctx, cl); err != nil || resp.Topics[0].Partitions[0].ErrorCode != 0 {
+		return fmt.Errorf("commit for g-trace: %v %+v", err, resp)
 	}
 
 	for _, g := range []string{"g-lag", "g-reset-earliest", "g-reset-latest", "g-set-offset", "g-delete", "g-remove-offset"} {

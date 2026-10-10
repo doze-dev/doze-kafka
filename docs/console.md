@@ -77,6 +77,11 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   its groups' committed offsets, so a group that had read everything carries on with
   the next record. **Delete** removes the topic. Both ask first, naming the action.
 
+- **Follow this message**, in the drawer of a record that carries a trace id
+  (`traceparent`, B3, or the header named by `--trace-header`): every record of the
+  same trace in every topic, in order, with the groups that have read each. See
+  [Observability](observability.md).
+
 ## Consumer groups
 
 - State (Stable, Rebalancing, Empty…), protocol (classic or KIP-848) and members.
