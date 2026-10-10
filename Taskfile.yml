@@ -95,6 +95,11 @@ tasks:
       - bunx playwright install chromium
       - bunx playwright test
 
+  test:compat:
+    desc: 'Real clients and frameworks against the binary (compat/): Java, Streams, Spring, Python, KafkaJS, kcat. Needs Docker for the JVM ones; missing toolchains are SKIPPED, not passed. Name clients to run only those: task test:compat -- java python'
+    cmds:
+      - compat/run.sh {{.CLI_ARGS}}
+
   test:kcat:
     desc: 'kcat (librdkafka) against the real binary; needs kcat installed'
     cmds:

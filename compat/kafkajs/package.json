@@ -1,0 +1,1 @@
+{ "name": "compat-kafkajs", "private": true, "type": "module", "dependencies": { "kafkajs": "2.2.4" } }

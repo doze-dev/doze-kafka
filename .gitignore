@@ -21,3 +21,8 @@ e2e/node_modules/
 e2e/.tmp/
 e2e/test-results/
 e2e/playwright-report/
+
+# Client-compatibility matrix: dependencies and build output.
+compat/**/node_modules/
+compat/**/target/
+compat/**/.venv/

@@ -1,0 +1,44 @@
+name: Compat
+
+# The client-compatibility matrix: the clients and frameworks teams actually develop with
+# (the Java client, Kafka Streams, Spring Kafka, librdkafka through Python and kcat, KafkaJS)
+# against the real binary, once without authentication and once over SASL/SCRAM and TLS.
+# See compat/README.md. A toolchain that is missing is reported as skipped, never as passed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 5 * * 1'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  compat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Install kcat
+        run: sudo apt-get update && sudo apt-get install -y kcat
+      - name: Build
+        run: go build -o doze-kafka ./cmd/doze-kafka
+      - name: Matrix
+        run: compat/run.sh -b "$PWD/doze-kafka" | tee matrix.txt
+      - name: A scheduled run that fails opens an issue
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "Compat matrix failed ($(date -u +%F))" \
+            --body "$(printf 'The scheduled client-compatibility run failed.\n\n```\n%s\n```\n\nRun: %s/%s/actions/runs/%s' "$(sed -n '/---- matrix/,$p' matrix.txt)" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
