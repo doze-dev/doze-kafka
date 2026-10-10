@@ -91,7 +91,7 @@ test('Send again produces an exact copy; Edit a copy fills the composer', async 
   await page.getByRole('button', { name: 'Edit a copy…' }).click();
   await expect(page.locator('#compose-head')).toHaveAttribute('aria-expanded', 'true');
   await expect(page.locator('#f-key')).toHaveValue('k');
-  await expect(page.locator('.dock .CodeMirror')).toContainText('"a":1');
+  await expect(page.locator('.dock .cm-editor')).toContainText('"a":1');
 });
 
 test('"go to offset" lands on the record, scrolled into view', async ({ page }) => {

@@ -26,3 +26,4 @@ e2e/playwright-report/
 compat/**/node_modules/
 compat/**/target/
 compat/**/.venv/
+console/cm6/node_modules/

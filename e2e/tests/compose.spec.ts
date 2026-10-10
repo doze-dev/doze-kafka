@@ -46,7 +46,7 @@ test('holding Cmd+Enter sends once', async ({ page, createTopic, uniqueName, set
   await createTopic(uniqueName('held'));
   await page.locator('#compose-head').click();
   await setEditor('held');
-  await page.locator('.dock .CodeMirror').click();
+  await page.locator('.dock .cm-editor').click();
   await page.keyboard.down('Meta');
   for (let i = 0; i < 8; i++) await page.keyboard.down('Enter');
   await page.keyboard.up('Enter');

@@ -474,7 +474,7 @@ textarea.input.mono { font-size: var(--fs-md); min-height: 96px; resize: vertica
 .b64tog.on { color: var(--brand-foreground); background: var(--brand); border-color: var(--ring); }
 .chk { margin-left: 10px; font-weight: 400; font-size: var(--fs-sm); color: var(--muted-foreground); cursor: pointer; white-space: nowrap; }
 .chk input { margin-right: 4px; accent-color: var(--foreground); }
-.field.dimmed textarea, .field.dimmed .CodeMirror { opacity: .4; pointer-events: none; }
+.field.dimmed textarea, .field.dimmed .cm-editor { opacity: .4; pointer-events: none; }
 
 /* ---------- table ---------- */
 .tbl-wrap { border: 1px solid var(--border); border-radius: var(--radius); overflow: auto; background: var(--card); }
@@ -642,42 +642,45 @@ td.rowacts { white-space: nowrap; text-align: right; }
 ::-webkit-scrollbar-thumb:hover { background: var(--input); border: 2px solid transparent; background-clip: content-box; }
 ::-webkit-scrollbar-track { background: transparent; }
 
-/* ---------- CodeMirror, themed with the console tokens ---------- */
-.CodeMirror {
-  height: auto; min-height: 84px; max-height: 260px;
+/* ---------- CodeMirror 6, themed with the console tokens ---------- */
+html .cm-editor {
+  min-height: 84px; max-height: 260px;
   font-family: var(--mono); font-size: var(--fs-md); line-height: 1.6; border: 1px solid var(--input);
   border-radius: var(--radius); background: var(--background); color: var(--foreground);
   transition: border-color .12s, box-shadow .12s;
 }
-.CodeMirror-focused { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 25%, transparent); }
-.CodeMirror-scroll { min-height: inherit; max-height: inherit; }
-.CodeMirror-gutters { background: var(--muted); border-right: 1px solid var(--border); }
-.CodeMirror-linenumber { color: var(--muted-foreground); font-size: var(--fs-xs); }
-.CodeMirror-cursor { border-left: 1.5px solid var(--foreground); }
-.CodeMirror-selected { background: color-mix(in srgb, var(--brand) 40%, transparent) !important; }
-.CodeMirror-placeholder { color: var(--muted-foreground) !important; }
-.CodeMirror-matchingbracket { color: var(--foreground) !important; background: var(--accent); font-weight: 700; text-decoration: none !important; }
-.cm-s-default .cm-string { color: var(--foreground); }
-.cm-s-default .cm-property, .cm-s-default .cm-string.cm-property { color: var(--info-foreground); }
-.cm-s-default .cm-atom, .cm-s-default .cm-keyword { color: var(--violet-foreground); }
-.cm-s-default .cm-number { color: var(--warn-foreground); }
-.cm-s-default .cm-comment { color: var(--muted-foreground); font-style: italic; }
-.cm-s-default .cm-error { color: var(--bad-foreground); background: color-mix(in srgb, var(--bad) 12%, transparent); }
+html .cm-editor.cm-focused { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 25%, transparent); }
+html .cm-editor .cm-scroller { font-family: inherit; line-height: inherit; min-height: inherit; max-height: inherit; overflow: auto; }
+html .cm-editor .cm-gutters { background: var(--muted); color: var(--muted-foreground); border: 0; border-right: 1px solid var(--border); }
+html .cm-editor .cm-lineNumbers .cm-gutterElement { font-size: var(--fs-xs); padding: 0 8px 0 6px; }
+html .cm-editor .cm-cursor { border-left: 1.5px solid var(--foreground); }
+html .cm-editor .cm-selectionBackground, .cm-editor.cm-focused .cm-selectionBackground { background: color-mix(in srgb, var(--brand) 40%, transparent); }
+html .cm-editor .cm-placeholder { color: var(--muted-foreground); }
+html .cm-editor .cm-matchingBracket { color: var(--foreground); background: var(--accent); font-weight: 700; }
+html .cm-editor .tok-string { color: var(--foreground); }
+html .cm-editor .tok-propertyName { color: var(--info-foreground); }
+html .cm-editor .tok-bool, .cm-editor .tok-null, .cm-editor .tok-keyword { color: var(--violet-foreground); }
+html .cm-editor .tok-number { color: var(--warn-foreground); }
+html .cm-editor .tok-comment { color: var(--muted-foreground); font-style: italic; }
+html .cm-editor .tok-invalid { color: var(--bad-foreground); background: color-mix(in srgb, var(--bad) 12%, transparent); }
 
 /* The JSON editor's bar: validity, Format, and the line a parse fails on. */
 .cm-jsonbar {
   display: flex; align-items: center; gap: 10px; padding: 4px 8px; border: 1px solid var(--input);
   border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; background: var(--muted);
 }
-.cm-jsonbar + .CodeMirror { border-top-left-radius: 0; border-top-right-radius: 0; }
+.cm-jsonbar + .cm-host .cm-editor { border-top-left-radius: 0; border-top-right-radius: 0; }
 .cm-valid { flex: 1; min-width: 0; font-family: var(--mono); font-size: var(--fs-xs); color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cm-valid.ok { color: var(--ok-foreground); }
 .cm-valid.bad { color: var(--bad-foreground); }
 .cm-fmt { flex: none; font-size: var(--fs-xs); padding: 2px 9px; border-radius: var(--radius-md); cursor: pointer; border: 1px solid var(--border); background: var(--card); color: var(--foreground); }
 .cm-fmt:hover { background: var(--background); border-color: var(--input); }
-.cm-json-gutter { width: 14px; }
-.cm-gutter-err { color: var(--bad); font-size: var(--fs-xs); padding-left: 3px; }
-.CodeMirror .cm-error-line { background: color-mix(in srgb, var(--bad) 8%, transparent); }
+/* The line a parse fails on: a marker in the gutter and a tint on the line. */
+html .cm-editor .cm-gutter-lint { width: 14px; }
+html .cm-editor .cm-lint-marker-error { content: none; color: var(--bad); font-size: var(--fs-xs); }
+html .cm-editor .cm-lint-marker-error::before { content: "●"; }
+html .cm-editor .cm-lint-marker-error > svg { display: none; }
+html .cm-editor .cm-lintRange-error { background: color-mix(in srgb, var(--bad) 12%, transparent); background-image: none; }
 
 /* ---------- in-shell error / not-found page ---------- */
 .errorwrap { display: flex; justify-content: center; padding-top: 12vh; }

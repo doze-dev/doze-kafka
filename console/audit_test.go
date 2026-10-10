@@ -433,7 +433,7 @@ func TestUnknownPathsAre404AndRootMountWorks(t *testing.T) {
 			t.Errorf("GET %s = %d, want 200", p, rec.Code)
 		}
 	}
-	for _, p := range []string{"/_console/static/", "/_console/static/cm/"} {
+	for _, p := range []string{"/_console/static/", "/_console/static/fonts/"} {
 		if rec := req(t, c, "GET", p, nil); rec.Code != 404 {
 			t.Errorf("GET %s = %d, want 404 (no directory listings)", p, rec.Code)
 		}

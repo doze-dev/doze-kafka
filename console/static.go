@@ -15,7 +15,7 @@ import (
 // The static files are embedded and unversioned in their URLs, so they cannot be
 // cached "forever". They are cached with revalidation instead: every file carries
 // an ETag derived from its content, and a repeat visit costs a 304, not the body
-// (CodeMirror alone is the better part of a megabyte).
+// (CodeMirror alone is a few hundred kilobytes).
 var (
 	etagOnce sync.Once
 	etags    map[string]string

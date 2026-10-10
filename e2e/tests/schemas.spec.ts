@@ -172,5 +172,5 @@ test('the composer writes a record encoded with the topic\'s schema, and says wh
   // Edit a copy brings the JSON back, with the subject chosen again.
   await page.locator('#drawer-edit').click();
   await expect(page.locator('select[name="schema_subject"]')).toHaveValue(`${topic}-value`);
-  await expect(page.locator('.dock .CodeMirror')).toContainText('"id"');
+  await expect(page.locator('.dock .cm-editor')).toContainText('"id"');
 });

@@ -1,7 +1,7 @@
-// editor.js — upgrades every textarea[data-editor] into a CodeMirror editor.
-// The mode follows the content: text that starts with '{' or '[' is highlighted
-// as JSON, anything else is plain text. Values sync back to the textarea before
-// any htmx request or native form submit.
+// editor.js — upgrades every textarea[data-editor] into a CodeMirror 6 editor.
+// The language follows the content: text that starts with '{' or '[' is highlighted
+// as JSON, anything else is plain text. Values sync back to the textarea on every
+// change, so htmx and a native form submit read what is on screen.
 //
 // data-editor="json" additionally gets a first-class JSON experience — a live
 // validity pill, a Format button, and an inline error marker at the line where
@@ -9,13 +9,15 @@
 // plain text, or base64 for binary bytes, is not an error, so it is not flagged
 // as one. The textarea's data-validate="off" (with data-why) switches validation
 // off and says why.
+//
+// CodeMirror 6 arrives as the window.CM6 global from static/cm6.min.js, which is
+// built from console/cm6/ (see static/VERSIONS).
 (function () {
   "use strict";
 
-  function detectMode(text) {
+  function looksLikeJSON(text) {
     var t = (text || "").trimStart();
-    if (t.startsWith("{") || t.startsWith("[")) return { name: "javascript", json: true };
-    return null; // plain text.
+    return t.startsWith("{") || t.startsWith("[");
   }
 
   // jsonError parses text and, on failure, returns {message, line}. The
@@ -41,77 +43,115 @@
     }
   }
 
-  var GUTTER = "cm-json-gutter";
-
-  // attachJsonChrome adds the validity toolbar and wires live linting.
-  function attachJsonChrome(cm, ta) {
-    var wrap = cm.getWrapperElement();
+  // attachJsonChrome adds the validity bar above the editor and wires live linting.
+  function attachJsonChrome(api, ta, host) {
+    var C = window.CM6;
     var bar = document.createElement("div");
     bar.className = "cm-jsonbar";
     bar.innerHTML = '<span class="cm-valid" aria-live="polite"></span>' +
       '<button type="button" class="cm-fmt" title="Prettify (2-space indent)">Format</button>';
-    wrap.parentNode.insertBefore(bar, wrap);
+    host.parentNode.insertBefore(bar, host);
     var pill = bar.querySelector(".cm-valid");
     bar.querySelector(".cm-fmt").addEventListener("click", function () {
-      try { cm.setValue(JSON.stringify(JSON.parse(cm.getValue()), null, 2)); }
+      try { api.setValue(JSON.stringify(JSON.parse(api.getValue()), null, 2)); }
       catch (e) { /* invalid — the pill already says why */ }
     });
 
-    var errLine = -1;
+    function parseErrorLine() {
+      var st = api.view.state;
+      var tree = C.ensureSyntaxTree(st, st.doc.length, 50);
+      var at = -1;
+      if (tree) tree.iterate({ enter: function (n) { if (at < 0 && n.type.isError) { at = n.from; return false; } } });
+      return at < 0 ? -1 : st.doc.lineAt(at).number - 1;
+    }
+    function mark(diags) { api.view.dispatch(C.setDiagnostics(api.view.state, diags)); }
     function validate() {
-      cm.clearGutter(GUTTER);
-      if (errLine >= 0) { cm.removeLineClass(errLine, "background", "cm-error-line"); errLine = -1; }
-      var text = cm.getValue();
+      var text = api.getValue();
       if (ta.getAttribute("data-validate") === "off") {
         pill.className = "cm-valid"; pill.textContent = ta.getAttribute("data-why") || "";
-        return;
+        mark([]); return;
       }
-      if (!text.trim()) { pill.className = "cm-valid"; pill.textContent = ""; return; }
-      if (!detectMode(text)) { pill.className = "cm-valid"; pill.textContent = "plain text"; return; }
+      if (!text.trim()) { pill.className = "cm-valid"; pill.textContent = ""; mark([]); return; }
+      if (!looksLikeJSON(text)) { pill.className = "cm-valid"; pill.textContent = "plain text"; mark([]); return; }
       var err = jsonError(text);
-      if (!err) { pill.className = "cm-valid ok"; pill.textContent = "✓ valid JSON"; return; }
+      // Newer engines name the token but not where it is; the editor's own parser
+      // knows, so ask it for the first error it found.
+      if (err && err.line < 0) err.line = parseErrorLine();
+      if (!err) { pill.className = "cm-valid ok"; pill.textContent = "✓ valid JSON"; mark([]); return; }
       pill.className = "cm-valid bad";
       pill.textContent = "✗ " + (err.line >= 0 ? "line " + (err.line + 1) + ": " : "") + err.message;
-      if (err.line >= 0 && err.line < cm.lineCount()) {
-        var mark = document.createElement("span");
-        mark.className = "cm-gutter-err"; mark.textContent = "●"; mark.title = err.message;
-        cm.setGutterMarker(err.line, GUTTER, mark);
-        cm.addLineClass(err.line, "background", "cm-error-line");
-        errLine = err.line;
-      }
+      var doc = api.view.state.doc;
+      if (err.line >= 0 && err.line < doc.lines) {
+        var ln = doc.line(err.line + 1);
+        mark([{ from: ln.from, to: Math.max(ln.to, Math.min(ln.from + 1, doc.length)), severity: "error", message: err.message }]);
+      } else mark([]);
     }
-    cm.on("change", validate);
-    cm.__revalidate = validate;
+    api.onChange = function () {
+      // A view update cannot start another one; validate once it has finished.
+      Promise.resolve().then(validate);
+    };
+    api.revalidate = validate;
     validate();
   }
 
   function upgrade(ta) {
-    if (ta.__cm || typeof CodeMirror === "undefined") return;
-    var hint = ta.getAttribute("data-editor");
-    var isJSON = hint === "json";
-    var opts = {
-      mode: detectMode(ta.value),
-      lineNumbers: true,
-      matchBrackets: true,
-      autoCloseBrackets: true,
-      viewportMargin: Infinity,
-      tabSize: 2,
-      indentWithTabs: false,
-      placeholder: ta.placeholder || "",
-    };
-    if (isJSON) opts.gutters = ["CodeMirror-linenumbers", GUTTER];
-    var cm = CodeMirror.fromTextArea(ta, opts);
-    ta.__cm = cm;
-    cm.on("change", function () {
-      cm.save();
-      var m = detectMode(cm.getValue());
-      var cur = cm.getOption("mode");
-      var curIsJSON = !!cur && typeof cur === "object" && cur.json;
-      var nextIsJSON = !!m;
-      if (curIsJSON !== nextIsJSON) cm.setOption("mode", m);
+    var C = window.CM6;
+    if (ta.__cm || !C) return;
+    var isJSON = ta.getAttribute("data-editor") === "json";
+    var host = document.createElement("div");
+    host.className = "cm-host";
+    ta.parentNode.insertBefore(host, ta.nextSibling);
+    ta.style.display = "none";
+
+    var lang = new C.Compartment();
+    var curJSON = looksLikeJSON(ta.value);
+    var api = { view: null, onChange: null, revalidate: null };
+
+    // Command-Enter belongs to the page (it sends the composer); the default
+    // keymap would use it to insert a blank line.
+    var keys = C.defaultKeymap.filter(function (k) { return k.key !== "Mod-Enter"; });
+    var extensions = [
+      C.lineNumbers(),
+      C.history(),
+      C.drawSelection(),
+      C.bracketMatching(),
+      C.closeBrackets(),
+      C.indentUnit.of("  "),
+      C.EditorState.tabSize.of(2),
+      C.syntaxHighlighting(C.classHighlighter),
+      C.keymap.of(C.closeBracketsKeymap.concat(keys, C.historyKeymap)),
+      C.placeholder(ta.placeholder || ""),
+      lang.of(curJSON ? C.json() : []),
+      C.EditorView.updateListener.of(function (u) {
+        if (!u.docChanged) return;
+        var text = u.state.doc.toString();
+        ta.value = text;
+        var next = looksLikeJSON(text);
+        if (next !== curJSON) {
+          curJSON = next;
+          Promise.resolve().then(function () {
+            api.view.dispatch({ effects: lang.reconfigure(next ? C.json() : []) });
+          });
+        }
+        if (api.onChange) api.onChange();
+      }),
+    ];
+    if (isJSON) extensions.push(C.lintGutter());
+
+    var view = new C.EditorView({
+      state: C.EditorState.create({ doc: ta.value, extensions: extensions }),
+      parent: host,
     });
-    cm.setSize("100%", null);
-    if (isJSON) attachJsonChrome(cm, ta);
+    api.view = view;
+    api.getValue = function () { return view.state.doc.toString(); };
+    api.setValue = function (v) {
+      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: v } });
+    };
+    api.save = function () { ta.value = api.getValue(); };
+    api.focus = function () { view.focus(); };
+    api.refresh = function () { view.requestMeasure(); };
+    ta.__cm = api;
+    if (isJSON) attachJsonChrome(api, ta, host);
   }
 
   function upgradeAll(root) {
@@ -133,7 +173,7 @@
   document.addEventListener("DOMContentLoaded", function () { upgradeAll(); });
   // For outerHTML swaps htmx reports the OLD (detached) node as e.detail.target,
   // so upgrading from it never reaches the swapped-in content. upgrade() is
-  // idempotent (skips textareas already carrying a CodeMirror), so a cheap
+  // idempotent (skips textareas already carrying an editor), so a cheap
   // document-wide pass correctly attaches editors to newly-swapped content.
   document.addEventListener("htmx:afterSwap", function () { upgradeAll(); });
 
@@ -143,7 +183,7 @@
     set: function (ta, value) {
       if (typeof ta === "string") ta = document.querySelector(ta);
       if (!ta) return;
-      if (ta.__cm) { ta.__cm.setValue(value); ta.__cm.save(); ta.__cm.refresh(); }
+      if (ta.__cm) { ta.__cm.setValue(value); ta.__cm.save(); }
       else ta.value = value;
     },
     refresh: function (root) {
@@ -158,7 +198,7 @@
       if (!ta) return;
       ta.setAttribute("data-validate", on ? "on" : "off");
       ta.setAttribute("data-why", on ? "" : (why || ""));
-      if (ta.__cm && ta.__cm.__revalidate) ta.__cm.__revalidate();
+      if (ta.__cm && ta.__cm.revalidate) ta.__cm.revalidate();
     },
   };
 })();

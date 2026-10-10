@@ -23,7 +23,7 @@ func TestTemplateClassesAreStyled(t *testing.T) {
 		"ago": "relative-time hook — shell.js rewrites its text as time passes",
 	}
 
-	css := readAll(t, "static/app.css") + readAll(t, filepath.Join("static", "cm", "codemirror.min.css"))
+	css := readAll(t, "static/app.css")
 
 	actionRe := regexp.MustCompile(`(?s){{.*?}}`)
 	// Whitespace before class= keeps Alpine's bound :class="expr" (a JS

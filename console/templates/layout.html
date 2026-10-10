@@ -14,13 +14,12 @@
 <meta name="htmx-config" content='{"historyCacheSize":0,"refreshOnHistoryMiss":true}'>
 <title>{{if .Title}}{{.Title}} — {{end}}doze-kafka</title>
 <link rel="icon" type="image/svg+xml" href="{{.Prefix}}/static/favicon.svg">
-<!-- Vendor CSS before app.css: app.css re-themes CodeMirror (background, syntax
-     colors) at equal specificity, so it must come later to win the cascade. -->
+<!-- CodeMirror 6 brings its own base styles when it starts; app.css themes it with
+     the console tokens and raises its selectors' specificity to win against them. -->
 {{/* The two faces every page uses, fetched with the stylesheet rather than after it
      has been parsed, so text is not drawn in a fallback font and then redrawn. */}}
 <link rel="preload" as="font" type="font/woff2" crossorigin href="{{.Prefix}}/static/fonts/ibm-plex-sans-latin-wght-normal.woff2">
 <link rel="preload" as="font" type="font/woff2" crossorigin href="{{.Prefix}}/static/fonts/ibm-plex-mono-latin-400-normal.woff2">
-<link rel="stylesheet" href="{{.Prefix}}/static/cm/codemirror.min.css">
 <link rel="stylesheet" href="{{.Prefix}}/static/app.css">
 {{/* Before first paint: the theme ("system" is resolved here, so the stylesheet
      defines each theme once) and the rail's width. */}}
@@ -37,10 +36,7 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
 });});</script>
 <script src="{{.Prefix}}/static/htmx.min.js"></script>
 <script defer src="{{.Prefix}}/static/alpine.min.js"></script>
-<script src="{{.Prefix}}/static/cm/codemirror.min.js"></script>
-<script src="{{.Prefix}}/static/cm/javascript.min.js"></script>
-<script src="{{.Prefix}}/static/cm/matchbrackets.min.js"></script>
-<script src="{{.Prefix}}/static/cm/closebrackets.min.js"></script>
+<script src="{{.Prefix}}/static/cm6.min.js"></script>
 <script src="{{.Prefix}}/static/editor.js"></script>
 <script src="{{.Prefix}}/static/shell.js" defer></script>
 </head>

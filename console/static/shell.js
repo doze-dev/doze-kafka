@@ -492,7 +492,7 @@
     // Once per press: a held key repeats, and each repeat used to send a record.
     if (mod && e.key === "Enter") {
       var form = active.closest ? active.closest("form") : null;
-      if (form && form.querySelector("textarea, .CodeMirror")) {
+      if (form && form.querySelector("textarea, .cm-editor")) {
         e.preventDefault();
         if (!e.repeat && !form.classList.contains("htmx-request")) form.requestSubmit();
       }
@@ -501,7 +501,7 @@
     // Single-key shortcuts are single keys. With a modifier held the key belongs
     // to the browser or the OS: ⌘C is copy, not "new topic".
     if (mod || e.altKey) return;
-    if (/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || active.isContentEditable || (active.closest && active.closest(".CodeMirror"))) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || active.isContentEditable || (active.closest && active.closest(".cm-editor"))) return;
     if (e.key === "/") {
       var f = document.querySelector(".listpane .filter input");
       if (f && f.offsetParent !== null) { f.focus(); e.preventDefault(); } else { openPalette(); e.preventDefault(); }
