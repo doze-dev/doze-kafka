@@ -33,7 +33,7 @@ start_broker() {
   local name=$1; shift
   local port; port=$(free_port)
   ADDR=127.0.0.1:$port
-  "$BIN" --listen "$ADDR" --console=false --data-dir "$WORK/$name" "$@" >"$WORK/$name.log" 2>&1 &
+  "$BIN" --listen "$ADDR" --console=false --schema-registry=false --data-dir "$WORK/$name" "$@" >"$WORK/$name.log" 2>&1 &
   PIDS+=($!)
   for _ in $(seq 1 100); do
     (echo >/dev/tcp/127.0.0.1/"$port") 2>/dev/null && return 0

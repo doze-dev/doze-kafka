@@ -230,7 +230,7 @@ func TestNameModeAdvertisesWhereTheBrokerIs(t *testing.T) {
 		z.close()
 		t.Skip("no name claimed")
 	}
-	ip := z.ip()
+	ip, host := z.ip(), z.own.Name.Host
 	z.close()
 	if l, err := net.Listen("tcp", net.JoinHostPort(ip, "9092")); err != nil {
 		t.Skipf("cannot bind %s:9092 (loopback pool not aliased, or in use): %v", ip, err)
@@ -269,8 +269,15 @@ func TestNameModeAdvertisesWhereTheBrokerIs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(resp.Brokers) != 1 || resp.Brokers[0].Host != ip || resp.Brokers[0].Port != 9092 {
-		t.Errorf("Metadata brokers = %+v, want one at %s:9092", resp.Brokers, ip)
+	// The broker tells clients the name where the name resolves here (a machine set
+	// up for .doze, as a CI runner is once something has run setup) and the address
+	// where it does not.
+	want := ip
+	if resolvesHere(net.DefaultResolver.LookupHost, host, ip) {
+		want = host
+	}
+	if len(resp.Brokers) != 1 || resp.Brokers[0].Host != want || resp.Brokers[0].Port != 9092 {
+		t.Errorf("Metadata brokers = %+v, want one at %s:9092", resp.Brokers, want)
 	}
 }
 
