@@ -82,6 +82,7 @@ public class Check {
     Set<String> sections = new HashSet<>(Arrays.asList(args));
     if (sections.contains("clients")) clients();
     if (sections.contains("streams")) streams();
+    if (sections.contains("serdes")) SerdeCheck.run();
     System.out.println("all good");
   }
 

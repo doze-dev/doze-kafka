@@ -38,6 +38,11 @@ func parseProtobuf(text string, refs []resolvedRef) (parsedSchema, error) {
 	}
 	files, err := c.Compile(context.Background(), protoMainName)
 	if err != nil {
+		// Confluent's registry reads a string that is not .proto text as a base64
+		// FileDescriptorProto, which is how confluent-kafka for Python registers a message.
+		if parsed, ok := parseDescriptor(text); ok {
+			return parsed, nil
+		}
 		return nil, err
 	}
 	canon, err := protoCanonical(text)

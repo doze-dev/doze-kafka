@@ -84,6 +84,13 @@ holds recordings of a real Confluent Schema Registry (7.7) answering:
   are random pairs generated from a fixed seed, so the rules are held to cases nobody
   chose.
 
+- **Protobuf registered as a descriptor** (`schemaregistry/testdata/conformance/protodesc.json`):
+  confluent-kafka for Python sends a Protobuf message as the base64 of its
+  `FileDescriptorProto`, which Confluent reads when the string is not `.proto` text. The
+  same descriptors were registered with the real registry and the text it stored is what
+  is stored here (type names keep their leading dot, a map is a nested `*Entry` message,
+  an empty message is `{}`).
+
 The tests replay both against this registry and require the same answer. To record
 again, run a Confluent registry beside doze-kafka and
 `SR_RECORD_URL=http://localhost:8081 go test ./schemaregistry -run 'TestRecord'`.

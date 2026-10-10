@@ -11,5 +11,5 @@ CA=""
 if [ "$SECURITY" = scram-tls ]; then CA="-v $CA_CERT:/ca.pem:ro"; fi
 # shellcheck disable=SC2086
 exec docker run --rm ${HOSTS_FLAG:-} $CA -v "$PWD":/work -v "$HOME/.m2":/root/.m2 -w /work \
-  -e BOOTSTRAP -e SECURITY -e SASL_USER -e SASL_PASS -e SASL_MECHANISM -e CA_CERT=/ca.pem -e REGISTRY_URL \
-  "$IMAGE" mvn -q -B ${EXTRA[@]+"${EXTRA[@]}"} compile exec:java -Dexec.args="${COMPAT_SECTIONS:-clients streams}"
+  -e BOOTSTRAP -e SECURITY -e SASL_USER -e SASL_PASS -e SASL_MECHANISM -e CA_CERT=/ca.pem -e REGISTRY_URL -e REGISTRY_USER -e REGISTRY_PASS \
+  "$IMAGE" mvn -q -B ${EXTRA[@]+"${EXTRA[@]}"} compile exec:java -Dexec.args="${COMPAT_SECTIONS:-clients streams serdes}"

@@ -1,0 +1,27 @@
+[
+ {
+  "name": "maps-and-oneof",
+  "descriptor": "CgdhLnByb3RvEgRkb3plIt8BCgVFdmVudBIMCgRuYW1lGAEgASgJEgwKBHRhZ3MYAyADKAkSHgoEa2luZBgEIAEoDjIQLmRvemUuRXZlbnQuS2luZBIlCgVhdHRycxgFIAMoCzIWLmRvemUuRXZlbnQuQXR0cnNFbnRyeRIaCgVvdGhlchgGIAEoCzILLmRvemUuT3RoZXISDAoCYXQYAiABKANIABosCgpBdHRyc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiEwoES2luZBILCgdVTktOT1dOEABCBgoEd2hlbiISCgVPdGhlchIJCgF4GAEgASgJYgZwcm90bzM=",
+  "canonical": "syntax = \"proto3\";\npackage doze;\n\nmessage Event {\n  string name = 1;\n  repeated string tags = 3;\n  .doze.Event.Kind kind = 4;\n  repeated .doze.Event.AttrsEntry attrs = 5;\n  .doze.Other other = 6;\n\n  oneof when {\n    int64 at = 2;\n  }\n\n  message AttrsEntry {\n    option map_entry = true;\n  \n    string key = 1;\n    string value = 2;\n  }\n  enum Kind {\n    UNKNOWN = 0;\n  }\n}\nmessage Other {\n  string x = 1;\n}\n"
+ },
+ {
+  "name": "no-package-top-enum",
+  "descriptor": "CgdlLnByb3RvIicKAU0SEQoBYxgBIAEoDjIGLkNvbG9yGg8KAkluEgkKAXYYASABKAUqGgoFQ29sb3ISBwoDUkVEEAASCAoEQkxVRRABYgZwcm90bzM=",
+  "canonical": "syntax = \"proto3\";\n\nmessage M {\n  .Color c = 1;\n\n  message In {\n    int32 v = 1;\n  }\n}\nenum Color {\n  RED = 0;\n  BLUE = 1;\n}\n"
+ },
+ {
+  "name": "proto2",
+  "descriptor": "CgdiLnByb3RvEgJwMiJsCgNSZXESCgoCaWQYASACKAkSEAoEbm90ZRgCIAEoCToCaGkSDQoBbhgDIAMoBUICEAESDwoDb2xkGAQgASgIQgIYASIVCgFFEgUKAUEQABIFCgFCEAAaAhABSgQIChAMSgQIFBAVUgRnb25lQhwKCGRldi5kb3plUAFaDmV4YW1wbGUuY29tL3Ay",
+  "canonical": "package p2;\n\noption java_package = \"dev.doze\";\noption java_multiple_files = true;\noption go_package = \"example.com/p2\";\n\nmessage Req {\n  reserved 10 to 11;\n  reserved 20;\n  reserved \"gone\";\n\n  required string id = 1;\n  optional string note = 2 [default = \"hi\"];\n  repeated int32 n = 3 [packed = true];\n  optional bool old = 4 [deprecated = true];\n\n  enum E {\n    option allow_alias = true;\n    A = 0;\n    B = 0;\n  }\n}\n"
+ },
+ {
+  "name": "proto3-optional-and-wkt",
+  "descriptor": "CgdjLnByb3RvEgF3Gh9nb29nbGUvcHJvdG9idWYvdGltZXN0YW1wLnByb3RvInoKAU0SEgoFbWF5YmUYASABKAlIAYgBARImCgJhdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASCwoDcmF3GAMgASgMEgsKAWEYBCABKAlIABILCgFiGAUgASgFSABCCAoGY2hvaWNlQggKBl9tYXliZWIGcHJvdG8z",
+  "canonical": "syntax = \"proto3\";\npackage w;\n\nimport \"google/protobuf/timestamp.proto\";\n\nmessage M {\n  optional string maybe = 1;\n  .google.protobuf.Timestamp at = 2;\n  bytes raw = 3;\n\n  oneof choice {\n    string a = 4;\n    int32 b = 5;\n  }\n}\n"
+ },
+ {
+  "name": "service",
+  "descriptor": "CgdkLnByb3RvEgFzIgMKAVEiAwoBUjIwCgNTdmMSEQoDT25lEgQucy5RGgQucy5SEhYKBE1hbnkSBC5zLlEaBC5zLlIoATABYgZwcm90bzM=",
+  "canonical": "syntax = \"proto3\";\npackage s;\n\nmessage Q {}\nmessage R {}\n\nservice Svc {\n  rpc One (.s.Q) returns (.s.R);\n  rpc Many (stream .s.Q) returns (stream .s.R);\n}\n"
+ }
+]

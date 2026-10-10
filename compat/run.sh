@@ -15,7 +15,7 @@
 #   SECURITY          plain | scram-tls
 #   SASL_USER, SASL_PASS, SASL_MECHANISM   (scram-tls) SCRAM-SHA-512 credentials
 #   CA_CERT           (scram-tls) PEM file that signed the broker's certificate
-#   REGISTRY_URL      the built-in schema registry (plain only)
+#   REGISTRY_URL      the built-in schema registry (REGISTRY_USER and REGISTRY_PASS under scram-tls)
 #   BROKER_BIN        the binary under test, for scripts that restart it
 #   WORK              a scratch directory the script may use
 set -uo pipefail
@@ -76,7 +76,7 @@ run_all() { # security docker(yes|no)
     local log="$WORK/$c-$sec.log"
     echo "== $c ($sec)"
     ( cd "$HERE/$c" && SECURITY=$sec BOOTSTRAP=$BOOTSTRAP REGISTRY_URL=$REGISTRY_URL BROKER_BIN=$BIN WORK=$WORK \
-        SASL_USER=${SASL_USER:-} SASL_PASS=${SASL_PASS:-} SASL_MECHANISM=${SASL_MECHANISM:-} CA_CERT=${CA_CERT:-} HOSTS_FLAG=${HOSTS_FLAG:-} \
+        REGISTRY_USER=${SASL_USER:-} REGISTRY_PASS=${SASL_PASS:-} SASL_USER=${SASL_USER:-} SASL_PASS=${SASL_PASS:-} SASL_MECHANISM=${SASL_MECHANISM:-} CA_CERT=${CA_CERT:-} HOSTS_FLAG=${HOSTS_FLAG:-} \
         bash ./run.sh ) 2>&1 | tee "$log" | sed 's/^/   /'
     local code=${PIPESTATUS[0]}
     case $code in
@@ -100,7 +100,8 @@ for dock in no yes; do
   any=no; for c in "${CLIENTS[@]}"; do [ -f "$HERE/$c/docker" ] && [ $dock = yes ] && any=yes; [ ! -f "$HERE/$c/docker" ] && [ $dock = no ] && any=yes; done
   [ $any = yes ] || continue
   start plain-$dock; REG=$REGISTRY_URL; run_all plain $dock
-  start secure-$dock "${SECURE[@]}"; REGISTRY_URL=""; run_all scram-tls $dock
+  # The registry takes the broker's SASL credentials as HTTP basic auth.
+  start secure-$dock "${SECURE[@]}"; run_all scram-tls $dock
 done
 
 echo; echo "---- matrix"

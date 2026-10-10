@@ -159,6 +159,10 @@ func (p *protoPrinter) mapField(f *ast.MapFieldNode, indent int) {
 }
 
 func (p *protoPrinter) message(m *ast.MessageNode, indent int) {
+	if len(m.Decls) == 0 { // Confluent prints an empty message on one line (recorded from a descriptor).
+		p.line(indent, "message %s {}", m.Name.Val)
+		return
+	}
 	p.line(indent, "message %s {", m.Name.Val)
 	p.messageBody(m.Decls, indent+1)
 	p.line(indent, "}")

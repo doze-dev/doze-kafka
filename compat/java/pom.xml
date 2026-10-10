@@ -9,8 +9,21 @@
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <kafka.version>4.0.0</kafka.version>
+    <confluent.version>8.0.0</confluent.version>
   </properties>
+  <dependencyManagement>
+    <dependencies>
+      <!-- the serializers pull Jackson modules at different versions; one set -->
+      <dependency><groupId>com.fasterxml.jackson</groupId><artifactId>jackson-bom</artifactId><version>2.18.2</version><type>pom</type><scope>import</scope></dependency>
+    </dependencies>
+  </dependencyManagement>
+  <repositories>
+    <repository><id>confluent</id><url>https://packages.confluent.io/maven/</url></repository>
+  </repositories>
   <dependencies>
+    <dependency><groupId>io.confluent</groupId><artifactId>kafka-avro-serializer</artifactId><version>${confluent.version}</version></dependency>
+    <dependency><groupId>io.confluent</groupId><artifactId>kafka-json-schema-serializer</artifactId><version>${confluent.version}</version></dependency>
+    <dependency><groupId>io.confluent</groupId><artifactId>kafka-protobuf-serializer</artifactId><version>${confluent.version}</version></dependency>
     <dependency><groupId>org.apache.kafka</groupId><artifactId>kafka-clients</artifactId><version>${kafka.version}</version></dependency>
     <dependency><groupId>org.apache.kafka</groupId><artifactId>kafka-streams</artifactId><version>${kafka.version}</version></dependency>
     <dependency><groupId>org.slf4j</groupId><artifactId>slf4j-nop</artifactId><version>2.0.16</version></dependency>
