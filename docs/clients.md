@@ -41,7 +41,7 @@ over SASL/SCRAM-SHA-512 and TLS**:
 | **kcat** (librdkafka) | 1.7 / 2.15 | metadata, keys and headers, a group that resumes |
 | **KafkaJS** | 2.2 | admin, idempotent producer, group consume and commit |
 
-Confluent's Java Avro, Protobuf and JSON Schema serializers (8.0) and confluent-kafka's Avro,
+Confluent's Java Avro, Protobuf and JSON Schema serializers (8.3) and confluent-kafka's Avro,
 Protobuf and JSON Schema serializers also run, against the [built-in registry](schema-registry.md).
 See [Frameworks and tools](frameworks.md) for Streams, Spring, Connect, schema registries
 and the UIs.
