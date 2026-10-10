@@ -46,6 +46,7 @@ type fileConfig struct {
 	ConsoleAllowHost       []string          `toml:"console-allow-host"`
 	TraceHeader            *string           `toml:"trace-header"`
 	ClientTelemetry        *bool             `toml:"client-telemetry"`
+	Zone                   *bool             `toml:"zone"`
 	SchemaRegistry         *bool             `toml:"schema-registry"`
 	SchemaRegistryAddr     *string           `toml:"schema-registry-addr"`
 	PprofAddr              *string           `toml:"pprof-addr"`
@@ -167,6 +168,9 @@ func (fc fileConfig) applyTo(cfg *Config) error {
 	if fc.ClientTelemetry != nil {
 		cfg.ClientTelemetry = *fc.ClientTelemetry
 	}
+	if fc.Zone != nil {
+		cfg.Zone = *fc.Zone
+	}
 	if fc.TraceHeader != nil {
 		cfg.TraceHeader = *fc.TraceHeader
 	}
@@ -220,6 +224,7 @@ func WriteTOML(w io.Writer, cfg Config) error {
 		ConsoleAddr:            &cfg.ConsoleAddr,
 		TraceHeader:            &cfg.TraceHeader,
 		ClientTelemetry:        &cfg.ClientTelemetry,
+		Zone:                   &cfg.Zone,
 		SchemaRegistry:         &cfg.SchemaRegistry,
 		SchemaRegistryAddr:     &cfg.SchemaRegistryAddr,
 		Name:                   &cfg.Name,

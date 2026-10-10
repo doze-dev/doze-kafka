@@ -113,6 +113,7 @@ where this one says `kafka-version`; that spelling is still read.
 | `--max-partitions` | `1000` | Most partitions one topic may have. Each is a directory and open files, so a typo like `--default-partitions 100000` is refused rather than taking the machine down. |
 | `--consumer-session-timeout` | `45s` | KIP-848 group session timeout: evict a member after this long without a heartbeat. (Classic groups use the timeout the client requests.) |
 | `--client-telemetry` | `true` | Accept the metrics clients push about themselves (KIP-714: Java 3.7+, librdkafka 2.5+) and show the last few minutes in the console. `--client-telemetry=false` stops advertising the two APIs, so clients stop sending. See [Observability](observability.md). |
+| `--zone` | `true` | Join the shared `.doze` zone: claim `kafka.<name>.doze` and route the console through the front door. `--zone=false` is the same as `DOZE_ZONE=off` and needs `--listen`, since there is then no name to listen on. |
 
 ### Authentication (all optional; see [Auth & TLS](auth-and-tls.md))
 

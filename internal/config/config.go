@@ -90,6 +90,9 @@ type Config struct {
 	// ClientTelemetry accepts the metrics clients push about themselves (KIP-714) and
 	// keeps the last few minutes in memory for the console.
 	ClientTelemetry bool
+	// Zone joins the shared .doze zone (names, the front door). False is the same
+	// switch as DOZE_ZONE=off, so a CI job or container can say it once.
+	Zone bool
 
 	// SchemaRegistry: a Confluent-compatible schema registry, served over HTTP beside
 	// the broker. Its records live in the metadata database.
@@ -163,6 +166,7 @@ func Default() Config {
 		MaxPartitions:          defaultMaxPartitions,
 		Console:                true,
 		ClientTelemetry:        true,
+		Zone:                   true,
 		SchemaRegistry:         true,
 		ACLDefault:             ACLAllow,
 		ConsoleAddr:            defaultConsoleAddr,

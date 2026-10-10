@@ -2,8 +2,11 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"flag"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -321,5 +324,34 @@ func TestClientTelemetryFlagAndFileKey(t *testing.T) {
 	}
 	if code, out, _ := run3("config", "print", "--client-telemetry=false"); code != 0 || !strings.Contains(out, "client-telemetry = false") {
 		t.Errorf("config print (code %d):\n%s", code, out)
+	}
+}
+
+func TestZoneFlagAndFileKey(t *testing.T) {
+	t.Parallel()
+	if st, err := loadConfig(nil); err != nil || !st.cfg.Zone {
+		t.Fatalf("by default the zone is joined: %+v %v", st.cfg.Zone, err)
+	}
+	if st, err := loadConfig([]string{"--zone=false"}); err != nil || st.cfg.Zone {
+		t.Errorf("--zone=false: %+v %v", st.cfg.Zone, err)
+	}
+	path := writeTOML(t, t.TempDir(), "zone = false\n")
+	if st, err := loadConfig([]string{"--config", path}); err != nil || st.cfg.Zone {
+		t.Errorf("zone = false in the file: %+v %v", st.cfg.Zone, err)
+	}
+	if st, _ := loadConfig([]string{"--config", path, "--zone=true"}); !st.cfg.Zone {
+		t.Error("the flag should beat the file")
+	}
+	if code, out, _ := run3("config", "print", "--zone=false"); code != 0 || !strings.Contains(out, "zone = false") {
+		t.Errorf("config print: %d %q", code, out)
+	}
+}
+
+func TestZoneOffWithoutAddressIsRefusedPlainly(t *testing.T) {
+	t.Parallel()
+	cfg := config.Default()
+	cfg.Zone = false
+	if _, err := prepareZone(context.Background(), cfg, slog.New(slog.NewTextHandler(io.Discard, nil))); !errors.Is(err, errNothingToListenOn) {
+		t.Errorf("zone off and no --listen: %v", err)
 	}
 }

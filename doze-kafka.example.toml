@@ -61,6 +61,7 @@ console = true                   # serve the web console.
 # trace-header = "x-request-id"         # a record header holding a trace id; the console follows it beside traceparent and B3.
 
 client-telemetry = true                 # accept the metrics clients push about themselves (KIP-714); the console shows them.
+zone = true                              # join the shared .doze zone (names and the console front door); false is the same as DOZE_ZONE=off.
 
 # --- schema registry ----------------------------------------------------------
 

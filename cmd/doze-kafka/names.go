@@ -106,7 +106,7 @@ func prepareZone(ctx context.Context, cfg config.Config, logger *slog.Logger) (*
 	if !cfg.ByName() {
 		return nil, nil
 	}
-	if names.Disabled() {
+	if !cfg.Zone || names.Disabled() {
 		// One switch for every doze binary. With names off and no address given there
 		// is nothing to listen on, and the answer is the one openListener gives.
 		return nil, errNothingToListenOn
