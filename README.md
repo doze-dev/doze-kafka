@@ -111,6 +111,10 @@ Full walkthrough: **[docs/getting-started.md](docs/getting-started.md)**.
   Protobuf, compatibility checks at every level, and the console decodes your
   records with it. Stock serializers need only `schema.registry.url`.
   ([Schema Registry](docs/schema-registry.md))
+- **Observability** — the console shows what your app just asked the broker (a live
+  tail with the Kafka error names), why a consumer group keeps rebalancing, where a
+  message went (by its trace header), and how each client says it is doing (KIP-714).
+  ([Observability](docs/observability.md))
 - **Embeddable** — `server.New(...)` starts a broker inside a Go test, on a free
   port, with nothing to clean up. ([Embedding](docs/embedding.md))
 - **Durable** — messages and committed offsets survive a restart; with `acks=all` an

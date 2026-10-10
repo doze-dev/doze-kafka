@@ -112,6 +112,7 @@ where this one says `kafka-version`; that spelling is still read.
 | `--default-partitions` | `1` | Partition count for auto-created topics. |
 | `--max-partitions` | `1000` | Most partitions one topic may have. Each is a directory and open files, so a typo like `--default-partitions 100000` is refused rather than taking the machine down. |
 | `--consumer-session-timeout` | `45s` | KIP-848 group session timeout: evict a member after this long without a heartbeat. (Classic groups use the timeout the client requests.) |
+| `--client-telemetry` | `true` | Accept the metrics clients push about themselves (KIP-714: Java 3.7+, librdkafka 2.5+) and show the last few minutes in the console. `--client-telemetry=false` stops advertising the two APIs, so clients stop sending. See [Observability](observability.md). |
 
 ### Authentication (all optional; see [Auth & TLS](auth-and-tls.md))
 

@@ -30,6 +30,7 @@ specifically testing an older client's paths.
 | OffsetCommit / OffsetFetch | 8 / 9 | Commit and read consumer-group offsets. |
 | ConsumerGroupHeartbeat | 68 | KIP-848 broker-driven group protocol (version 4 only). |
 | ConsumerGroupDescribe | 69 | Describe KIP-848 groups (version 4 only). |
+| GetTelemetrySubscriptions / PushTelemetry | 71 / 72 | Client telemetry (KIP-714, version 4 only): a client asks what to report and pushes its own metrics, which the console shows ([Observability](observability.md)). Off with `--client-telemetry=false`. |
 | ListGroups | 16 | List consumer groups. |
 | DescribeGroups | 15 | Describe classic consumer groups. |
 | DescribeConfigs | 32 | Read topic and broker configuration. |
@@ -100,6 +101,8 @@ the highest version both sides support; a request outside them is not served.
 | ListTransactions | 66 | — | — | 0–0 | 0–0 |
 | ConsumerGroupHeartbeat | 68 | — | — | — | 0–1 |
 | ConsumerGroupDescribe | 69 | — | — | — | 0–1 |
+| GetTelemetrySubscriptions | 71 | — | — | — | 0–0 |
+| PushTelemetry | 72 | — | — | — | 0–0 |
 <!-- api-table:end -->
 
 The hard floor is Kafka's record-batch format v2 (Kafka 0.11), so the oldest

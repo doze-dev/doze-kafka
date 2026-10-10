@@ -87,6 +87,10 @@ type Config struct {
 	ConsoleAllowHosts []string // extra Host names the console answers to (DNS-rebinding guard).
 	TraceHeader       string   // a record header holding a trace id, for the console's message lineage.
 
+	// ClientTelemetry accepts the metrics clients push about themselves (KIP-714) and
+	// keeps the last few minutes in memory for the console.
+	ClientTelemetry bool
+
 	// SchemaRegistry: a Confluent-compatible schema registry, served over HTTP beside
 	// the broker. Its records live in the metadata database.
 	SchemaRegistry     bool   // serve the registry.
@@ -158,6 +162,7 @@ func Default() Config {
 		DefaultPartitions:      1,
 		MaxPartitions:          defaultMaxPartitions,
 		Console:                true,
+		ClientTelemetry:        true,
 		SchemaRegistry:         true,
 		ACLDefault:             ACLAllow,
 		ConsoleAddr:            defaultConsoleAddr,

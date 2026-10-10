@@ -22,9 +22,11 @@ type authzCase struct {
 // authzExempt are the APIs that carry no authorization: they are how a client says who
 // it is and what the broker speaks, before it can be anyone.
 var authzExempt = map[kmsg.Key]string{
-	kmsg.ApiVersions:      "answered before authentication",
-	kmsg.SASLHandshake:    "part of authenticating",
-	kmsg.SASLAuthenticate: "part of authenticating",
+	kmsg.ApiVersions:               "answered before authentication",
+	kmsg.SASLHandshake:             "part of authenticating",
+	kmsg.SASLAuthenticate:          "part of authenticating",
+	kmsg.GetTelemetrySubscriptions: "KIP-714: any authenticated client may say how it is doing; Kafka requires no ACL for it",
+	kmsg.PushTelemetry:             "KIP-714: as above",
 }
 
 func authzCases() []authzCase {

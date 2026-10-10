@@ -40,6 +40,7 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/storage/log"
 	"github.com/doze-dev/doze-kafka/internal/storage/meta"
+	"github.com/doze-dev/doze-kafka/internal/telemetry"
 	"github.com/doze-dev/doze-kafka/internal/traffic"
 )
 
@@ -108,6 +109,10 @@ const trafficRows = 2000
 // nil when no console is running. It is for the console in this module; the type is
 // internal to it.
 func (s *Server) Traffic() *traffic.Recorder { return s.rec }
+
+// ClientMetrics is what clients have reported about themselves (KIP-714), or nil when
+// client telemetry is off. It is for the console in this module; the type is internal.
+func (s *Server) ClientMetrics() *telemetry.Store { return s.b.Telemetry() }
 
 // Server is an embedded broker. Construct with New, then Serve.
 type Server struct {

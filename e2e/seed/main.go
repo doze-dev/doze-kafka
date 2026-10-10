@@ -11,6 +11,8 @@
 //	seed-trace-a  one record that carries a traceparent, and seed-trace-b one that carries
 //	seed-trace-b  the same one a moment later: a trace across two topics. g-trace has read
 //	              the first and not the second.
+//	doze-seed-telemetry  a client that has reported metrics (KIP-714) three times, for the
+//	              Traffic page's client metrics.
 //	g-lag         committed at offset 10 of seed-orders/0: a lag to look at.
 //	g-timeline    a group whose one member joined, read and left, for its timeline.
 //	g-reset-*     one group per test that resets, sets or deletes, so tests that
@@ -19,6 +21,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -28,6 +31,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doze-dev/doze-kafka/internal/telemetry"
 	"github.com/doze-dev/doze-kafka/schemaregistry"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
@@ -137,6 +141,9 @@ func run(addr, registryURL string) error {
 		}
 	}
 	if err := seedGroupTimeline(ctx, addr); err != nil {
+		return err
+	}
+	if err := seedTelemetry(ctx, addr); err != nil {
 		return err
 	}
 	// One request the broker refuses, for the Traffic page's errors-only view.
@@ -270,4 +277,41 @@ func seedRegistry(ctx context.Context, cl *kgo.Client, base string) error {
 		return err
 	}
 	return write("seed-proto", "PROTOBUF", pb, pid, `{"sensor":"boiler-1","celsius":71.5}`)
+}
+
+// seedTelemetry plays a client that reports its own metrics (KIP-714): it subscribes and
+// pushes three reports, gzip-compressed, with a request latency that climbs, so the
+// Traffic page has a series to draw.
+func seedTelemetry(ctx context.Context, addr string) error {
+	cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.ClientID("doze-seed-telemetry"))
+	if err != nil {
+		return err
+	}
+	defer cl.Close()
+	sub := kmsg.NewPtrGetTelemetrySubscriptionsRequest()
+	subResp, err := sub.RequestWith(ctx, cl)
+	if err != nil || subResp.ErrorCode != 0 {
+		return fmt.Errorf("telemetry subscription: %v %+v", err, subResp)
+	}
+	for i, latency := range []float64{4.5, 6.25, 9.75} {
+		payload := telemetry.Encode(telemetry.Payload{
+			Resource: map[string]string{"client_rack": "seed-rack"},
+			Metrics: []telemetry.Metric{
+				{Name: "org.apache.kafka.producer.node.request.latency.avg", Unit: "ms", Kind: telemetry.Gauge,
+					Points: []telemetry.Point{{Attrs: "node_id=1", Time: time.Now(), Value: latency}}},
+				{Name: "org.apache.kafka.producer.connection.creation.total", Kind: telemetry.Sum,
+					Points: []telemetry.Point{{Time: time.Now(), Value: 1 + float64(i)}}},
+			},
+		})
+		var zipped bytes.Buffer
+		zw := gzip.NewWriter(&zipped)
+		zw.Write(payload)
+		zw.Close()
+		push := kmsg.NewPtrPushTelemetryRequest()
+		push.ClientInstanceID, push.SubscriptionID, push.CompressionType, push.Metrics = subResp.ClientInstanceID, subResp.SubscriptionID, 1, zipped.Bytes()
+		if resp, err := push.RequestWith(ctx, cl); err != nil || resp.ErrorCode != 0 {
+			return fmt.Errorf("telemetry push %d: %v %+v", i, err, resp)
+		}
+	}
+	return nil
 }

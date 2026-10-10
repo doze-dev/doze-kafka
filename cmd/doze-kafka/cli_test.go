@@ -301,3 +301,25 @@ func TestTraceHeaderFlagAndValidation(t *testing.T) {
 		t.Errorf("config print lost the trace header (code %d):\n%s", code, out)
 	}
 }
+
+// Client telemetry is on unless asked off, by flag or by file, and the printed
+// configuration keeps the answer.
+func TestClientTelemetryFlagAndFileKey(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if st, err := loadConfig(nil); err != nil || !st.cfg.ClientTelemetry {
+		t.Fatalf("by default: %+v %v", st.cfg.ClientTelemetry, err)
+	}
+	if st, err := loadConfig([]string{"--client-telemetry=false"}); err != nil || st.cfg.ClientTelemetry {
+		t.Errorf("--client-telemetry=false: %+v %v", st.cfg.ClientTelemetry, err)
+	}
+	path := writeTOML(t, t.TempDir(), "client-telemetry = false\n")
+	if st, err := loadConfig([]string{"--config", path}); err != nil || st.cfg.ClientTelemetry {
+		t.Errorf("client-telemetry = false in the file: %+v %v", st.cfg.ClientTelemetry, err)
+	}
+	if st, _ := loadConfig([]string{"--config", path, "--client-telemetry=true"}); !st.cfg.ClientTelemetry {
+		t.Error("the flag did not override the file")
+	}
+	if code, out, _ := run3("config", "print", "--client-telemetry=false"); code != 0 || !strings.Contains(out, "client-telemetry = false") {
+		t.Errorf("config print (code %d):\n%s", code, out)
+	}
+}

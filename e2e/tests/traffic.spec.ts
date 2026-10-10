@@ -94,3 +94,18 @@ test('Traffic is in the palette', async ({ page, openPalette }) => {
   await page.keyboard.type('Traffic');
   await expect(page.locator('.pal-item', { hasText: 'Traffic' })).toBeVisible();
 });
+
+test('a client that reports its own metrics shows them, drawn, and says they are not traces', async ({ page }) => {
+  await page.goto('traffic');
+  const card = page.getByRole('region', { name: 'Metrics from doze-seed-telemetry' });
+  await expect(card).toBeVisible();
+  await expect(page.locator('.sec-title', { hasText: 'Client metrics' })).toContainText('metrics, not traces');
+  await expect(card).toContainText('3 reports');
+  await expect(card).toContainText('client_rack=seed-rack');
+  const latency = card.locator('.mrow', { hasText: 'producer.node.request.latency.avg' });
+  await expect(latency).toContainText('node_id=1');
+  await expect(latency).toContainText('9.75 ms'); // the last of 4.5, 6.25, 9.75.
+  await expect(latency.locator('svg.spark polyline')).toHaveCount(1); // a history to draw.
+  // The reports are in the request tail too, folded into one counted row.
+  await expect(page.locator('#traffic-table tbody tr', { hasText: 'PushTelemetry' }).filter({ hasText: 'doze-seed-telemetry' })).toHaveCount(1);
+});

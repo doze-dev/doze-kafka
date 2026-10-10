@@ -57,6 +57,36 @@ session keeps expiring (a handler slower than `max.poll.interval.ms`, a paused J
 or one that joins and leaves in a loop (a crash-looping app). The same events apply to
 both group protocols.
 
+## Client metrics: how is each client doing?
+
+Kafka clients can report on themselves ([KIP-714](https://cwiki.apache.org/confluence/display/KAFKA/KIP-714%3A+Client+metrics+and+observability)):
+the Java client from 3.7 and librdkafka from 2.5 send their own metrics to the broker
+they are connected to, every few seconds, **by default**, as soon as the broker says it
+accepts them. doze-kafka does, and the **Traffic** page shows them under **Client
+metrics**, one card per client: who it is (client id, software, the id the broker gave
+it), when it last reported, and its metrics with the latest value and a small chart of
+the last ten minutes.
+
+These are **metrics, not traces**: numbers a client keeps about itself (a producer's
+`request.latency.avg` and `record.error.rate`, a consumer's `poll.idle.ratio.avg`,
+connection counts), not a record of what it did. The page lists the ones that say
+whether a client is healthy first (latency, send rate, queue time, an error or retry
+rate above zero), then the rest by name, folded away. A Java producer reports well over a
+hundred.
+
+- **Always subscribed.** Real Kafka sends a client nothing until an operator defines a
+  subscription. Here every client is asked for the standard set every five seconds,
+  because the only reader is the console on your machine.
+- **Memory only.** The last ten minutes of each client's series, for up to 200 clients; a
+  client that has not reported for ten minutes (one that said it was closing, for one)
+  is forgotten. Nothing is written to disk or exported.
+- **Off with `--client-telemetry=false`.** The broker then stops advertising the two APIs
+  (`GetTelemetrySubscriptions`, `PushTelemetry`), so clients stop sending, and the section
+  disappears. A client can also refuse by itself: `enable.metrics.push=false`.
+- Payloads are OpenTelemetry metrics, in any of the four compressions (gzip, snappy,
+  lz4, zstd), up to 512 KiB. Kafka 4 profile only; older profiles do not advertise the
+  APIs, as the clients that use them are Kafka 3.7 and later.
+
 ## Message lineage: where did this message go?
 
 Open a record in the topic page's drawer. If it carries a trace id in its headers it

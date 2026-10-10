@@ -37,6 +37,10 @@ const (
 // writes: the first eight bytes of its 16-byte header, then length-prefixed blocks.
 var xerialMagic = []byte{0x82, 'S', 'N', 'A', 'P', 'P', 'Y', 0}
 
+// zstdMinWindow is the least memory a zstd decoder is given, whatever the limit: enough for
+// the largest window a real compressor declares (zstd's default levels use up to 8 MiB).
+const zstdMinWindow = 64 << 20
+
 var errRecords = errors.New("log: cannot read the records of a batch")
 
 // batchRecords calls visit for each record of a complete batch with its offset and
@@ -89,7 +93,11 @@ func batchRecords(batch []byte, visit func(offset, timestamp int64) bool) error 
 
 // inflate returns the records section of a batch body, decompressed if the codec
 // says it is.
-func inflate(codec int, body []byte) ([]byte, error) {
+func inflate(codec int, body []byte) ([]byte, error) { return inflateMax(codec, body, maxDecompressed) }
+
+// inflateMax is inflate with a limit on how large the result may be: a compressed
+// payload can claim far more than it weighs.
+func inflateMax(codec int, body []byte, limit int) ([]byte, error) {
 	switch codec {
 	case codecNone:
 		return body, nil
@@ -98,9 +106,14 @@ func inflate(codec int, body []byte) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%w: gzip: %v", errRecords, err)
 		}
-		return readAllBounded(r)
+		return readAllBounded(r, limit)
 	case codecSnappy:
 		if !bytes.HasPrefix(body, xerialMagic) {
+			// The block's own header says how large it inflates to, and Decode allocates
+			// that before reading a byte: a few bytes can claim four gigabytes.
+			if n, err := snappy.DecodedLen(body); err != nil || n > limit {
+				return nil, fmt.Errorf("%w: snappy block claims to inflate past %d bytes", errRecords, limit)
+			}
 			out, err := snappy.Decode(nil, body)
 			if err != nil {
 				return nil, fmt.Errorf("%w: snappy: %v", errRecords, err)
@@ -117,21 +130,28 @@ func inflate(codec int, body []byte) ([]byte, error) {
 			if n < 0 || len(rest)-4 < n {
 				return nil, fmt.Errorf("%w: snappy block is cut short", errRecords)
 			}
+			if m, err := snappy.DecodedLen(rest[4 : 4+n]); err != nil || m > limit {
+				return nil, fmt.Errorf("%w: snappy block claims to inflate past %d bytes", errRecords, limit)
+			}
 			block, err := snappy.Decode(nil, rest[4:4+n])
 			if err != nil {
 				return nil, fmt.Errorf("%w: snappy: %v", errRecords, err)
 			}
-			if len(out)+len(block) > maxDecompressed {
-				return nil, fmt.Errorf("%w: inflates past %d bytes", errRecords, maxDecompressed)
+			if len(out)+len(block) > limit {
+				return nil, fmt.Errorf("%w: inflates past %d bytes", errRecords, limit)
 			}
 			out = append(out, block...)
 			rest = rest[4+n:]
 		}
 		return out, nil
 	case codecLZ4:
-		return readAllBounded(lz4.NewReader(bytes.NewReader(body)))
+		return readAllBounded(lz4.NewReader(bytes.NewReader(body)), limit)
 	case codecZstd:
-		d, err := zstd.NewReader(nil, zstd.WithDecoderMaxMemory(maxDecompressed))
+		// The decoder's memory cap is also the largest window it accepts, and a frame
+		// declares its window by what the compressor was set to, not by how little it
+		// compressed: librdkafka's, for a 12 KiB payload, asks for a megabyte. So the cap is
+		// kept generous and the size of what came out is checked against the limit after.
+		d, err := zstd.NewReader(nil, zstd.WithDecoderMaxMemory(max(uint64(limit), zstdMinWindow)))
 		if err != nil {
 			return nil, err
 		}
@@ -140,18 +160,29 @@ func inflate(codec int, body []byte) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%w: zstd: %v", errRecords, err)
 		}
+		if len(out) > limit {
+			return nil, fmt.Errorf("%w: inflates past %d bytes", errRecords, limit)
+		}
 		return out, nil
 	}
 	return nil, fmt.Errorf("%w: unknown compression codec %d", errRecords, codec)
 }
 
-func readAllBounded(r io.Reader) ([]byte, error) {
-	out, err := io.ReadAll(io.LimitReader(r, maxDecompressed+1))
+func readAllBounded(r io.Reader, limit int) ([]byte, error) {
+	out, err := io.ReadAll(io.LimitReader(r, int64(limit)+1))
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", errRecords, err)
 	}
-	if len(out) > maxDecompressed {
-		return nil, fmt.Errorf("%w: inflates past %d bytes", errRecords, maxDecompressed)
+	if len(out) > limit {
+		return nil, fmt.Errorf("%w: inflates past %d bytes", errRecords, limit)
 	}
 	return out, nil
+}
+
+// Decompress inflates a payload compressed with one of the record batch codecs (0 none,
+// 1 gzip, 2 snappy, 3 lz4, 4 zstd), refusing to produce more than limit bytes. Client
+// telemetry uses the same numbering and the same framings (a Java client's snappy is
+// xerial-framed, librdkafka's is a plain block; both are read).
+func Decompress(codec int, body []byte, limit int) ([]byte, error) {
+	return inflateMax(codec, body, limit)
 }

@@ -109,7 +109,10 @@ SASL is on (doze-kafka provisions it a private one at start-up).
 What clients have asked the broker, newest first, with the clients connected now: who
 sent each request, what it was about, how it went, and the Kafka error name when it
 failed. Repeats of idle requests fold into one row, and the tail filters by client,
-request type, topic, group and errors. See [Observability](observability.md).
+request type, topic, group and errors. Below the clients, **Client metrics** shows what
+each client reports about itself (KIP-714): the metrics that say whether it is healthy,
+with the latest value and a small chart. They are metrics, not traces. See
+[Observability](observability.md).
 
 ## Schemas
 

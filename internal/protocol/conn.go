@@ -63,6 +63,7 @@ type Conn struct {
 	closeAfter     bool      // close once the current response is written (a failed authentication).
 	saslMechanism  string
 	saslState      any    // opaque per-connection state owned by the SASL handler (e.g. SCRAM step).
+	software       string // the client's own name and version, from ApiVersions, e.g. "apache-kafka-java 3.7.0".
 	principal      string // who this connection authenticated as ("User:alice"); empty until it has.
 
 	observer Observer // told about this connection and its requests; nil = nobody is watching.
@@ -107,6 +108,22 @@ func (c *Conn) Principal() string {
 		return AnonymousPrincipal
 	}
 	return c.principal
+}
+
+// ClientSoftware is what the client said it is in ApiVersions ("apache-kafka-java
+// 3.7.0"), or "" if it has not said (or is too old to). A nil connection has none.
+func (c *Conn) ClientSoftware() string {
+	if c == nil {
+		return ""
+	}
+	return c.software
+}
+
+// SetClientSoftware records the client's name and version from its ApiVersions request.
+func (c *Conn) SetClientSoftware(s string) {
+	if c != nil {
+		c.software = s
+	}
 }
 
 // SetPrincipal records who the SASL exchange authenticated. An empty string clears it.

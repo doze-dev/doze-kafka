@@ -842,3 +842,21 @@ form.htmx-request .btn.primary::after { content: ""; width: 11px; height: 11px; 
 .tr-meta { color: var(--muted-foreground); font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .tr-cons { grid-column: 3 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
 @media (max-width: 900px) { .tr { grid-template-columns: 1fr; } .tr-cons { grid-column: auto; } }
+
+/* ---------- client metrics (KIP-714) ---------- */
+.mcard { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 10px 14px 12px; margin-bottom: 10px; }
+.mc-h { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.mc-who { font-weight: 600; }
+.mc-last { margin-left: auto; font-size: var(--fs-sm); }
+.mc-res { font-size: var(--fs-sm); margin-top: 4px; overflow-wrap: anywhere; }
+.mc-none { margin-top: 8px; font-size: var(--fs-md); }
+.mc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 2px 28px; margin-top: 8px; }
+.mrow { display: grid; grid-template-columns: minmax(0, 1fr) 120px 84px; align-items: center; gap: 10px; padding: 4px 0; border-top: 1px solid var(--border); font-size: var(--fs-sm); }
+.mr-n { overflow-wrap: anywhere; }
+.mr-a { color: var(--muted-foreground); }
+.mr-v { text-align: right; white-space: nowrap; }
+.mr-s { display: flex; align-items: center; }
+.spark { display: block; }
+.spark polyline { fill: none; stroke: var(--info); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.mc-more { margin-top: 8px; font-size: var(--fs-sm); }
+.mc-more summary { cursor: pointer; color: var(--muted-foreground); }

@@ -53,6 +53,36 @@
   <div class="honest">{{icon "info"}}<div>No client is connected. An app that uses the broker appears here for as long as its connection stays open.</div></div>
   {{end}}
 
+  {{if .HasClientMetrics}}
+  <div class="sec-title">Client metrics <span class="sz">reported by the clients themselves, every few seconds · metrics, not traces</span></div>
+  {{range .Metrics}}
+  <section class="mcard" aria-label="Metrics from {{.Who}}">
+    <div class="mc-h">
+      <span class="mc-who mono">{{.Who}}</span>
+      {{if .Software}}<span class="chip mono">{{.Software}}</span>{{end}}
+      <span class="chip mono" title="The id the broker gave this client instance">{{.IDShort}}…</span>
+      {{if .Closing}}<span class="badge state-empty">closing</span>{{end}}
+      <span class="mc-last dim">{{.Pushes}} report{{if ne .Pushes 1}}s{{end}} · last {{.Last.Format "15:04:05"}} <span class="ago" data-ts="{{.Last.UnixMilli}}">· {{ago .Last}}</span></span>
+    </div>
+    {{if .Resource}}<div class="mc-res mono dim">{{.Resource}}</div>{{end}}
+    {{if .Shown}}
+    <div class="mc-grid">
+      {{range .Shown}}{{template "metric_row" .}}{{end}}
+    </div>
+    {{if .More}}
+    <details class="mc-more"><summary>{{len .More}} more metrics</summary>
+      <div class="mc-grid">{{range .More}}{{template "metric_row" .}}{{end}}</div>
+    </details>
+    {{end}}
+    {{else}}
+    <div class="dim mc-none">It has reported no metrics yet.</div>
+    {{end}}
+  </section>
+  {{else}}
+  <div class="honest">{{icon "info"}}<div>No client has reported metrics yet. Clients that support KIP-714 (the Java client from 3.7, librdkafka from 2.5) send them on their own a few seconds after they connect; <span class="mono">enable.metrics.push=false</span> turns it off in the client.</div></div>
+  {{end}}
+  {{end}}
+
   <div class="sec-title">Requests <span class="sz">{{len .Rows}}{{if .Filtered}} matching{{end}}</span></div>
   {{if .Rows}}
   <div class="tbl-wrap">
@@ -100,5 +130,13 @@
   <div class="meta-row"><span class="k">Took</span><span class="v mono">{{.R.Dur}}</span></div>
   <div class="meta-row"><span class="k">Size</span><span class="v mono">{{.R.Sizes}}</span></div>
   {{end}}
+</div>
+{{end}}
+
+{{define "metric_row"}}
+<div class="mrow">
+  <span class="mr-n mono" title="{{.Name}}">{{.Short}}{{if .Attrs}} <span class="mr-a">{{.Attrs}}</span>{{end}}</span>
+  <span class="mr-s">{{.Spark}}</span>
+  <span class="mr-v mono">{{.Last}}</span>
 </div>
 {{end}}

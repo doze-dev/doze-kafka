@@ -60,6 +60,8 @@ console = true                   # serve the web console.
 # console-allow-host = ["devbox.lan"] # extra Host names the console answers to.
 # trace-header = "x-request-id"         # a record header holding a trace id; the console follows it beside traceparent and B3.
 
+client-telemetry = true                 # accept the metrics clients push about themselves (KIP-714); the console shows them.
+
 # --- schema registry ----------------------------------------------------------
 
 schema-registry = true                  # serve the built-in Confluent-compatible schema registry.

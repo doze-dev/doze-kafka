@@ -18,6 +18,7 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/storage/log"
 	"github.com/doze-dev/doze-kafka/internal/storage/meta"
+	"github.com/doze-dev/doze-kafka/internal/telemetry"
 
 	"github.com/twmb/franz-go/pkg/kerr"
 )
@@ -39,6 +40,12 @@ type Broker struct {
 	idem    *idempotency     // idempotent-producer sequence dedup.
 	profile protocol.Profile // version profile selected by cfg.Version.
 	produce *notifier        // wakes long-polling fetchers when data is produced.
+
+	// telemetry holds what clients report about themselves (KIP-714); nil when
+	// --client-telemetry is off. subscriptionID is handed to every client and checked
+	// on every push, so a push from before a restart is told to subscribe again.
+	telemetry      *telemetry.Store
+	subscriptionID int32
 
 	// boundPort is the port the TCP listener actually bound, learned after Bind.
 	// It is what Metadata must advertise when the configured address names no
@@ -74,7 +81,7 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 	if err != nil {
 		return nil, fmt.Errorf("broker: read the stored transactions: %w", err)
 	}
-	return &Broker{
+	b := &Broker{
 		authz:  newAuthorizer(cfg, acls),
 		txns:   newTxnManager(txnRecs),
 		cfg:    cfg,
@@ -91,7 +98,11 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 		idem:    newIdempotency(),
 		profile: profile,
 		produce: newNotifier(),
-	}, nil
+	}
+	if cfg.ClientTelemetry {
+		b.telemetry, b.subscriptionID = telemetry.NewStore(), newSubscriptionID()
+	}
+	return b, nil
 }
 
 // Register binds a handler to every API the active profile offers, and tells the
@@ -120,6 +131,9 @@ func (b *Broker) handlers() map[protocol.APIKey]protocol.Handler {
 		kmsg.ApiVersions: b.handleAPIVersions,
 		kmsg.Produce:     b.handleProduce,
 		kmsg.Fetch:       b.handleFetch,
+
+		kmsg.GetTelemetrySubscriptions: typed(b.handleGetTelemetrySubscriptions),
+		kmsg.PushTelemetry:             typed(b.handlePushTelemetry),
 
 		kmsg.Metadata:                typed(b.handleMetadata),
 		kmsg.CreateTopics:            typed(b.handleCreateTopics),
@@ -323,7 +337,7 @@ func (n *notifier) signal(topic string) {
 // auth is configured. ApiVersions and the router both read it, so what is offered
 // and what is accepted cannot differ.
 func (b *Broker) advertised() []protocol.AdvertisedAPI {
-	return b.profile.Advertised(b.auth != nil)
+	return b.profile.Advertised(b.auth != nil, b.telemetry != nil)
 }
 
 // Stop ends the coordinators' timers. The server calls it before closing storage:

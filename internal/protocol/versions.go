@@ -56,8 +56,9 @@ var none = Offered{}
 type Condition int
 
 const (
-	Always   Condition = iota
-	WhenSASL           // only when SASL authentication is configured.
+	Always        Condition = iota
+	WhenSASL                // only when SASL authentication is configured.
+	WhenTelemetry           // only when client telemetry is on (--client-telemetry).
 )
 
 // API is one row of the table below.
@@ -128,6 +129,8 @@ var APIs = []API{
 	{Key: kmsg.ListTransactions, Versions: [4]Offered{none, none, v(0, 0), v(0, 0)}, Summary: sumNothing},
 	{Key: kmsg.ConsumerGroupHeartbeat, Versions: [4]Offered{none, none, none, v(0, 1)}, Summary: sumGroupHeartbeat},
 	{Key: kmsg.ConsumerGroupDescribe, Versions: [4]Offered{none, none, none, v(0, 1)}, Summary: sumGroups},
+	{Key: kmsg.GetTelemetrySubscriptions, Versions: [4]Offered{none, none, none, v(0, 0)}, When: WhenTelemetry, Summary: sumTelemetry},
+	{Key: kmsg.PushTelemetry, Versions: [4]Offered{none, none, none, v(0, 0)}, When: WhenTelemetry, Summary: sumTelemetry},
 }
 
 // Profile is the behavioral envelope for a declared Kafka major version: the
@@ -195,12 +198,13 @@ type AdvertisedAPI struct {
 
 // Advertised returns what this profile offers, sorted by API key: the set that
 // ApiVersions reports and the router enforces. sasl says whether authentication
-// is configured, which is what the WhenSASL rows wait on.
-func (p Profile) Advertised(sasl bool) []AdvertisedAPI {
+// is configured, which is what the WhenSASL rows wait on; telemetry says whether
+// client telemetry is on, which the WhenTelemetry rows wait on.
+func (p Profile) Advertised(sasl, telemetry bool) []AdvertisedAPI {
 	var out []AdvertisedAPI
 	for _, a := range APIs {
 		o := a.Versions[p.KafkaMajor-firstMajor]
-		if !o.OK || (a.When == WhenSASL && !sasl) {
+		if !o.OK || (a.When == WhenSASL && !sasl) || (a.When == WhenTelemetry && !telemetry) {
 			continue
 		}
 		out = append(out, AdvertisedAPI{Key: a.Key, Min: o.Min, Max: o.Max})

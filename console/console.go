@@ -33,10 +33,11 @@ var staticFS embed.FS
 // wire protocol can't share a port with HTTP.
 type Console struct {
 	be          *backend
-	reg         *registryClient // nil when there is no schema registry to talk to.
-	traffic     TrafficSource   // nil when the broker's traffic is not available to this console.
-	traces      traceJobs       // message-lineage scans, running and recent.
-	traceHeader string          // an extra record header that holds a trace id (Options.TraceHeader).
+	reg         *registryClient     // nil when there is no schema registry to talk to.
+	traffic     TrafficSource       // nil when the broker's traffic is not available to this console.
+	metrics     ClientMetricsSource // nil when clients' own metrics are not available.
+	traces      traceJobs           // message-lineage scans, running and recent.
+	traceHeader string              // an extra record header that holds a trace id (Options.TraceHeader).
 	mux         *http.ServeMux
 	tmpl        *template.Template
 	dev         string // DOZE_KAFKA_CONSOLE_DEV: read templates and static files from this directory, live.
@@ -81,6 +82,9 @@ type Options struct {
 	// TraceHeader is the name of a record header whose whole value is a trace id (a
 	// request id, a correlation id), found in addition to W3C traceparent and B3.
 	TraceHeader string
+	// ClientMetrics is what clients have reported about themselves (KIP-714). Nil, the
+	// Traffic page has no client metrics section.
+	ClientMetrics ClientMetricsSource
 }
 
 // New builds a console with a real Kafka client dialed at opts.Addr.
@@ -110,6 +114,7 @@ func New(opts Options) (*Console, error) {
 	c.be, c.tmpl = be, tmpl
 	c.reg = newRegistryClient(opts.RegistryURL, opts.RegistryUser, opts.RegistryPass)
 	c.traffic = opts.Traffic
+	c.metrics = opts.ClientMetrics
 	c.traceHeader = strings.TrimSpace(opts.TraceHeader)
 	c.routes()
 	return c, nil

@@ -388,6 +388,25 @@ func sumGroupHeartbeat(q kmsg.Request, _ kmsg.Response) Summary {
 	return Summary{}
 }
 
+func sumTelemetry(q kmsg.Request, r kmsg.Response) Summary {
+	switch req := q.(type) {
+	case *kmsg.GetTelemetrySubscriptionsRequest:
+		if req.ClientInstanceID == ([16]byte{}) {
+			return Summary{Detail: "subscribes (a new client instance)"}
+		}
+		return Summary{Detail: "asks what to report"}
+	case *kmsg.PushTelemetryRequest:
+		s := Summary{Detail: bytesText(len(req.Metrics)) + " of metrics"}
+		if req.Terminating {
+			s.Detail += ", client is closing"
+		} else {
+			s.Idle = true // every few seconds for as long as the client lives: one row, counted.
+		}
+		return s
+	}
+	return Summary{}
+}
+
 func sumApiVersions(q kmsg.Request, _ kmsg.Response) Summary {
 	if req, ok := q.(*kmsg.ApiVersionsRequest); ok && req.ClientSoftwareName != "" {
 		sw := req.ClientSoftwareName

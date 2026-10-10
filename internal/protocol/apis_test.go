@@ -64,7 +64,7 @@ func TestAPITableIsWellFormed(t *testing.T) {
 		if (p.GroupProtocol == GroupClassicAndConsumer) != hasConsumer {
 			t.Errorf("Kafka %d: the group protocol and the ConsumerGroupHeartbeat row disagree", major)
 		}
-		plain, withSASL := p.Advertised(false), p.Advertised(true)
+		plain, withSASL := p.Advertised(false, true), p.Advertised(true, true)
 		if len(withSASL) != len(plain)+2 {
 			t.Errorf("Kafka %d: SASL adds %d APIs, want exactly SaslHandshake and SaslAuthenticate", major, len(withSASL)-len(plain))
 		}

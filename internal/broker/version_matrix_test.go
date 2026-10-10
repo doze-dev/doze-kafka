@@ -119,7 +119,7 @@ func TestVersionMatrix_EveryAdvertisedAPIAnswersAtEveryProfile(t *testing.T) {
 		t.Run(fmt.Sprintf("kafka%d", major), func(t *testing.T) {
 			addr := startBroker(t, major)
 			profile, _ := protocol.ProfileFor(major)
-			for _, a := range profile.Advertised(false) {
+			for _, a := range profile.Advertised(false, true) {
 				for _, v := range matrixVersions(protocol.VersionRange{Min: a.Min, Max: a.Max}) {
 					name := fmt.Sprintf("%s v%d", protocol.APIName(a.Key), v)
 					req := defaultRequest(int16(a.Key), v)
@@ -143,7 +143,7 @@ func TestVersionMatrix_SASLAPIsAnswerWhenConfigured(t *testing.T) {
 	addr := startAuthBroker(t, []string{"PLAIN"}, map[string]string{"u": "p"}, "", "")
 	profile, _ := protocol.ProfileFor(4)
 	var found int
-	for _, a := range profile.Advertised(true) {
+	for _, a := range profile.Advertised(true, true) {
 		if a.Key != protocol.APIKey(kmsg.SASLHandshake) && a.Key != protocol.APIKey(kmsg.SASLAuthenticate) {
 			continue
 		}
@@ -174,7 +174,7 @@ func TestVersionMatrix_ApiVersionsIsTheTableAndTheRestIsRefused(t *testing.T) {
 		addr := startBroker(t, major)
 		profile, _ := protocol.ProfileFor(major)
 		want := map[int16]protocol.VersionRange{}
-		for _, a := range profile.Advertised(false) {
+		for _, a := range profile.Advertised(false, true) {
 			want[int16(a.Key)] = protocol.VersionRange{Min: a.Min, Max: a.Max}
 		}
 

@@ -2,6 +2,7 @@ package broker
 
 import (
 	"context"
+	"strings"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
@@ -18,7 +19,13 @@ import (
 // UNSUPPORTED_VERSION with our supported ranges, after which it retries lower.
 func (b *Broker) handleAPIVersions(ctx context.Context, req *protocol.Request) ([]byte, error) {
 	resp := kmsg.NewPtrApiVersionsResponse()
-	_, _ = req.Decode() // kept for the observer: ApiVersions is where a client says what it is. A version we don't know fails to decode, and is answered all the same.
+	// ApiVersions is where a client says what it is, and a version we don't know fails to
+	// decode and is answered all the same.
+	if q, err := req.Decode(); err == nil {
+		if av, ok := q.(*kmsg.ApiVersionsRequest); ok && av.ClientSoftwareName != "" {
+			req.Conn.SetClientSoftware(strings.TrimSpace(av.ClientSoftwareName + " " + av.ClientSoftwareVersion))
+		}
+	}
 	for _, a := range b.advertised() {
 		k := kmsg.NewApiVersionsResponseApiKey()
 		k.ApiKey = int16(a.Key)

@@ -207,7 +207,12 @@ func (c *Console) trafficData(r *http.Request) map[string]any {
 		clients = append(clients, cr)
 		fmt.Fprint(h, cl.Conn, cl.Requests, cl.ClientID, cl.Software, ";")
 	}
+	cards := c.metricCards()
+	for _, card := range cards {
+		fmt.Fprint(h, card.ID, card.Pushes, card.Terminated, ";")
+	}
 	return map[string]any{
+		"HasClientMetrics": c.metrics != nil, "Metrics": cards,
 		"Rows": rows, "Clients": clients, "Filter": f, "FilterQ": f.query(),
 		"Filtered": f != (TrafficFilter{}), "Hash": fmt.Sprintf("%x", h.Sum64()),
 	}

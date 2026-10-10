@@ -52,8 +52,7 @@ implement it.
   checked against a real Confluent registry. Not offered: `IMPORT` mode, contexts, data
   contracts (rules, metadata, tags), schema linking and exporters. The few places it
   answers differently on purpose are listed in [Schema Registry](schema-registry.md).
-- **Some admin APIs.** `OffsetForLeaderEpoch`, `DescribeLogDirs`,
-  and the client-metrics/telemetry APIs are not implemented. A Kafka UI that probes
+- **Some admin APIs.** `OffsetForLeaderEpoch` and `DescribeLogDirs` are not implemented. A Kafka UI that probes
   these will get a clean connection close on that call, not a hang — and generally
   keeps working for everything else.
 

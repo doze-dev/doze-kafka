@@ -1,6 +1,8 @@
 package console
 
 import (
+	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"sync"
@@ -244,5 +246,165 @@ func TestSpanText(t *testing.T) {
 		if got := spanText(in); got != want {
 			t.Errorf("spanText(%v) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// ---- client metrics (KIP-714) ----
+
+type fakeMetrics struct{ instances []ClientInstance }
+
+func (f fakeMetrics) Instances() []ClientInstance { return f.instances }
+
+func ramp(n int, from, step float64) []MetricSample {
+	out := make([]MetricSample, n)
+	for i := range out {
+		out[i] = MetricSample{T: tt0.Add(time.Duration(i) * 5 * time.Second), V: from + float64(i)*step}
+	}
+	return out
+}
+
+func sampleMetrics() fakeMetrics {
+	// The ones worth looking at come LAST, so only sorting puts them first.
+	var series []MetricSeries
+	for i := 0; i < 10; i++ { // enough to need the fold.
+		series = append(series, MetricSeries{Name: fmt.Sprintf("org.apache.kafka.producer.filler.%02d", i), Kind: "gauge", Samples: ramp(5, 1, 1)})
+	}
+	series = append(series,
+		MetricSeries{Name: "org.apache.kafka.producer.node.request.latency.avg", Attrs: "node_id=1", Unit: "ms", Kind: "gauge", Samples: ramp(20, 4, 0.5)},
+		MetricSeries{Name: "org.apache.kafka.producer.connection.creation.total", Kind: "sum", Samples: ramp(20, 3, 0)},
+		MetricSeries{Name: "org.apache.kafka.producer.somethingelse.total", Kind: "sum", Samples: ramp(3, 1000, 1000)},
+	)
+	return fakeMetrics{[]ClientInstance{
+		{ID: "0d7a8e3c-1b1e-4c2f-9a77-3b7c2f6a9d10", ClientID: "billing", Software: "apache-kafka-java 3.7.1", Principal: "User:ANONYMOUS", Host: "/127.0.0.1",
+			First: tt0, Last: time.Now(), Pushes: 20, Resource: map[string]string{"client_rack": "r1"}, Series: series},
+		{ID: "11111111-2222-4333-8444-555555555555", ClientID: "audit", Last: time.Now(), Pushes: 1, Terminated: true},
+	}}
+}
+
+func TestTrafficPageShowsWhatClientsReportAboutThemselves(t *testing.T) {
+	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic(); o.ClientMetrics = sampleMetrics() })
+	body := req(t, c, "GET", "/_console/traffic", nil).Body.String()
+
+	for _, want := range []string{
+		"Client metrics", "metrics, not traces", // what it is, said on the page.
+		`aria-label="Metrics from billing"`, "apache-kafka-java 3.7.1", "0d7a8e3c…", "20 reports",
+		"producer.node.request.latency.avg", "node_id=1", // the short name, and the attributes it is for.
+		"13.5 ms",        // 4 + 19*0.5, with its unit and without float noise.
+		"3",              // the connection total.
+		"3,000",          // a thousands separator.
+		"client_rack=r1", // what the client said about itself.
+		"closing",        // the one whose last report said it was closing.
+		"It has reported no metrics yet",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the page does not show %q", want)
+		}
+	}
+	// A series with samples is drawn; one with a single sample is not.
+	if n := strings.Count(body, `<polyline points=`); n < 3 {
+		t.Errorf("%d sparklines, want one per series that has a history", n)
+	}
+	// The interesting ones come first, and the rest fold away.
+	lat, filler := strings.Index(body, "producer.node.request.latency.avg"), strings.Index(body, "producer.filler.00")
+	if !(lat > 0 && filler > lat) {
+		t.Errorf("the request latency (%d) does not come before filler (%d)", lat, filler)
+	}
+	// Three of the thirteen are folded: the interesting ones stayed up, so what is folded
+	// is filler, never the latency.
+	if folded := between(body, `class="mc-more"`, "</details>"); strings.Contains(folded, "request.latency") || !strings.Contains(folded, "filler") {
+		t.Errorf("the fold hides the wrong metrics:\n%s", folded)
+	}
+	if !strings.Contains(body, "<summary>3 more metrics</summary>") {
+		t.Errorf("a long list is not folded:\n%s", between(body, "mc-more", "</summary>"))
+	}
+}
+
+func TestClientMetricsSectionIsAbsentWithoutASourceAndSaysSoWhenThereAreNone(t *testing.T) {
+	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic() })
+	if body := req(t, c, "GET", "/_console/traffic", nil).Body.String(); strings.Contains(body, "Client metrics") {
+		t.Error("the page offers client metrics with nothing behind them")
+	}
+	c, _ = newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic(); o.ClientMetrics = fakeMetrics{} })
+	body := req(t, c, "GET", "/_console/traffic", nil).Body.String()
+	if !strings.Contains(body, "No client has reported metrics yet") || !strings.Contains(body, "enable.metrics.push") {
+		t.Error("with metrics on and none reported, the page does not explain why it is empty")
+	}
+}
+
+// A new report must refresh the polled region, or a quiet page would never move.
+func TestClientMetricsRefreshTheLiveRegion(t *testing.T) {
+	src := sampleMetrics()
+	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic(); o.ClientMetrics = src })
+	first := req(t, c, "GET", "/_console/traffic/live", nil)
+	hash := first.Header().Get("HX-Live-Hash")
+	if rec := req(t, c, "GET", "/_console/traffic/live?h="+hash, nil); rec.Code != 204 {
+		t.Fatalf("nothing changed, but the poll answered %d", rec.Code)
+	}
+	src.instances[0].Pushes++
+	if rec := req(t, c, "GET", "/_console/traffic/live?h="+hash, nil); rec.Code != 200 {
+		t.Errorf("a new report did not refresh the region: %d", rec.Code)
+	}
+}
+
+func TestFormatMetric(t *testing.T) {
+	for _, tc := range []struct {
+		v    float64
+		unit string
+		want string
+	}{
+		{12.500000000000002, "ms", "12.5 ms"}, {0.043123, "1", "0.0431"}, {8812.4, "", "8,812"}, {0, "ms", "0 ms"},
+		{250, "B", "250 B"}, {3, "1", "3"}, {1.0, "", "1"}, {math.NaN(), "", "—"}, {-4.25, "ms", "-4.25 ms"},
+	} {
+		if got := formatMetric(tc.v, tc.unit); got != tc.want {
+			t.Errorf("formatMetric(%v, %q) = %q, want %q", tc.v, tc.unit, got, tc.want)
+		}
+	}
+}
+
+func TestSparklineScalesTheLastSamplesAndDrawsNothingForOne(t *testing.T) {
+	if got := sparkline(ramp(1, 1, 1)); got != "" {
+		t.Errorf("one sample drew %q", got)
+	}
+	flat := string(sparkline(ramp(5, 7, 0)))
+	if !strings.Contains(flat, `points="1.0,12.0 `) {
+		t.Errorf("a flat series is not drawn along the middle: %s", flat)
+	}
+	rising := string(sparkline(ramp(5, 0, 1)))
+	// Oldest at the left and the bottom, newest at the right and the top.
+	if !strings.HasPrefix(between(rising, `points="`, `"/>`), `points="1.0,22.0 `) || !strings.HasSuffix(between(rising, `points="`, `"/>`), `119.0,2.0`) {
+		t.Errorf("a rising series does not run bottom-left to top-right: %s", rising)
+	}
+	long := string(sparkline(ramp(200, 0, 1)))
+	if n := strings.Count(between(long, `points="`, `"/>`), ","); n != sparkPoints {
+		t.Errorf("%d points drawn for 200 samples, want the last %d", n, sparkPoints)
+	}
+	if !strings.Contains(long, "the last 60 samples, from 140 to 199") {
+		t.Errorf("the chart's description is wrong: %s", long)
+	}
+}
+
+func TestMetricRankPutsWhatAnswersIsThisClientHealthyFirst(t *testing.T) {
+	order := []string{
+		"org.apache.kafka.producer.node.request.latency.avg",
+		"org.apache.kafka.producer.record.send.rate",
+		"org.apache.kafka.producer.record.error.rate", // zero: good news, after the throughput.
+		"org.apache.kafka.consumer.poll.idle.ratio.avg",
+		"org.apache.kafka.producer.connection.count",
+		"org.apache.kafka.producer.bufferpool.wait.ratio", // not in the list: last.
+	}
+	for i := 1; i < len(order); i++ {
+		if metricRank(order[i-1], 0) >= metricRank(order[i], 0) {
+			t.Errorf("%s (%d) should rank before %s (%d)", order[i-1], metricRank(order[i-1], 0), order[i], metricRank(order[i], 0))
+		}
+	}
+	if metricRank("org.apache.kafka.producer.batch.split.rate", 0) != metricRank("org.apache.kafka.producer.waiting.threads", 0) {
+		t.Error("metrics outside the list do not share the last place")
+	}
+	// An error or retry rate above zero is urgent, wherever it would otherwise sit.
+	if metricRank("org.apache.kafka.producer.record.error.rate", 0.5) >= metricRank("org.apache.kafka.producer.node.request.latency.avg", 99) {
+		t.Error("a non-zero error rate does not come first")
+	}
+	if metricRank("org.apache.kafka.producer.topic.record.retry.rate", 2) >= 0 {
+		t.Error("a non-zero retry rate does not come first")
 	}
 }
