@@ -30,8 +30,7 @@ func startRegistry(ctx context.Context, cfg config.Config, srv *server.Server, l
 	if err != nil {
 		return nil, "", err
 	}
-	var lc net.ListenConfig
-	ln, err := lc.Listen(ctx, "tcp", cfg.SchemaRegistryAddr)
+	ln, err := zoneListen(cfg.SchemaRegistryAddr)
 	if err != nil {
 		return nil, "", fmt.Errorf("schema registry: listen on %s: %w (choose another with --schema-registry-addr, or turn it off with --schema-registry=false)", cfg.SchemaRegistryAddr, err)
 	}

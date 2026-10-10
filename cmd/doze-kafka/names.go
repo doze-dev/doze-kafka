@@ -291,3 +291,11 @@ func parseDNSSetup(args []string) (mode string, print bool, err error) {
 	}
 	return "install", print, nil
 }
+
+// zoneListen opens a TCP listener for the registry or the console. On this
+// instance's own name that goes through doze-names, because on macOS a name's
+// address is translated by the zone's network daemon and cannot be bound; any
+// other address (--console-addr, --schema-registry-addr) is listened on as it is.
+func zoneListen(addr string) (net.Listener, error) {
+	return names.Open(names.Home(), "doze-kafka").Listen(addr)
+}

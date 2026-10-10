@@ -32,13 +32,19 @@ import (
 	"github.com/doze-dev/doze-kafka/console"
 	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/server"
+	names "github.com/doze-dev/doze-names"
 )
 
 // version is the build version, injected by the release tooling
 // (-ldflags "-X main.version=..."). It defaults to "dev" for local builds.
 var version = "dev"
 
-func main() { os.Exit(realMain(os.Args[1:], os.Stdout, os.Stderr)) }
+func main() {
+	// On a Mac, dns-setup installs a copy of this program as the .doze zone's
+	// network daemon; this is where that copy becomes it.
+	names.Helper()
+	os.Exit(realMain(os.Args[1:], os.Stdout, os.Stderr))
+}
 
 // Exit codes: 0 success, 1 the broker failed while running, 2 it was started wrong
 // (a bad flag, a bad config file, an invalid setting).
@@ -467,8 +473,7 @@ func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger
 		tlsCfg = consoleClientTLS(serverTLS)
 	}
 
-	var lc net.ListenConfig
-	ln, err := lc.Listen(ctx, "tcp", cfg.ConsoleAddr)
+	ln, err := zoneListen(cfg.ConsoleAddr)
 	if err != nil {
 		return nil, "", fmt.Errorf("console: listen on %s: %w (choose another with --console-addr, or turn the console off with --console=false)", cfg.ConsoleAddr, err)
 	}

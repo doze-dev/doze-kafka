@@ -131,11 +131,14 @@ func openListener(cfg config.Config, z *zone, logger interface{ Info(string, ...
 	}
 
 	addr := net.JoinHostPort(z.ip(), strconv.Itoa(kafkaPort))
-	ln, err := net.Listen("tcp", addr)
+	// Through the lease, not net.Listen: on macOS the name's address is not one a
+	// process can bind, and the zone's network daemon translates it to a private
+	// port. The listener reports the public address either way.
+	ln, err := z.own.Listen(kafkaPort)
 	if err != nil {
 		// Both causes leave the name resolving to an address that answers nothing, so
 		// say which one it is: the remedies are opposites.
-		hint := "run `doze-kafka dns-setup` once to alias the loopback pool"
+		hint := "run `doze-kafka dns-setup` once, so each name has an address of its own"
 		if errors.Is(err, syscall.EADDRINUSE) {
 			hint = "something else already holds " + addr + "; free it, or name this instance differently (--name)"
 		}

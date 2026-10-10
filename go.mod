@@ -5,13 +5,17 @@ go 1.26.0
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/IBM/sarama v1.50.3
-	github.com/doze-dev/doze-names v0.1.1-0.20261004130222-a18b816af589
+	github.com/bufbuild/protocompile v0.14.1
+	github.com/doze-dev/doze-names v0.1.1-0.20261010112057-fcf6a9e32a36
 	github.com/golang/snappy v1.0.0
+	github.com/hamba/avro/v2 v2.31.0
 	github.com/klauspost/compress v1.18.7
 	github.com/pierrec/lz4/v4 v4.1.27
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/twmb/franz-go v1.21.5
 	github.com/twmb/franz-go/pkg/kmsg v1.13.1
 	go.etcd.io/bbolt v1.5.0
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
@@ -52,7 +56,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.43.4 // indirect
 	github.com/aws/smithy-go v1.27.3 // indirect
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
-	github.com/bufbuild/protocompile v0.14.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chainguard-dev/git-urls v1.0.2 // indirect
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
@@ -86,7 +89,6 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.17 // indirect
 	github.com/googleapis/gax-go/v2 v2.22.0 // indirect
-	github.com/hamba/avro/v2 v2.31.0 // indirect
 	github.com/hashicorp/aws-sdk-go-base/v2 v2.0.0-beta.73 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-getter v1.8.6 // indirect
@@ -116,7 +118,6 @@ require (
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sajari/fuzzy v1.0.0 // indirect
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.8.1 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
@@ -140,7 +141,7 @@ require (
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/term v0.44.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
@@ -149,7 +150,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20260630182238-925bb5da69e7 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260630182238-925bb5da69e7 // indirect
 	google.golang.org/grpc v1.82.0 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	mvdan.cc/sh/moreinterp v0.0.0-20260120230322-19def062a997 // indirect
 	mvdan.cc/sh/v3 v3.13.2-0.20260613075524-2255122b577b // indirect
