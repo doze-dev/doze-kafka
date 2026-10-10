@@ -69,3 +69,6 @@ jobs:
         with:
           name: coverage
           path: cover.out
+      - name: Coverage floor
+        if: matrix.os == 'ubuntu-latest'
+        run: scripts/coverage.sh

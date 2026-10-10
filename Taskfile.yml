@@ -106,6 +106,16 @@ tasks:
       - go build -o bin/doze-kafka ./cmd/doze-kafka
       - scripts/kcat-check.sh bin/doze-kafka
 
+  coverage:
+    desc: 'Statement coverage per package against the committed floor (testdata/coverage.txt); fails if one fell by more than 0.1 point'
+    cmds:
+      - scripts/coverage.sh
+
+  coverage:record:
+    desc: 'Raise the coverage floor to the current numbers (never lowers one unless ALLOW_LOWER=1)'
+    cmds:
+      - scripts/coverage.sh record
+
   fuzz:
     desc: 'Fuzz the wire-protocol decoder: each target for FUZZ_TIME (default 30s)'
     vars:
