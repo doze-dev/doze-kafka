@@ -3,12 +3,11 @@
 # A version bump in module/module.yaml is the release intent. The plugin is a pure-Go
 # cross-compile, so one runner builds every platform. It is published as a rolling
 # release tagged "kafka" with an index.yaml + per-platform archives, and doze-registry
-# is told to sign it. The doze-kafka product releases (v*) are separate and untouched:
+# picks it up on its next hourly run (publish.yml there pulls from the repo named in
+# registry/doze/<name>/source). The doze-kafka product releases (v*) are separate and untouched:
 # this release is never marked Latest, so install.sh keeps finding the broker.
 #
-# Needs one secret, REGISTRY_DISPATCH_TOKEN (a fine-grained token with contents:write
-# on doze-dev/doze-registry). Without it the release assets still publish and the
-# registry step is skipped with a notice; re-run this workflow once it is set.
+# No token is needed here: the registry pulls, so this workflow only uploads the release.
 name: module
 
 on:
@@ -98,14 +97,3 @@ jobs:
             sleep 15
           done
 
-      - name: Ask the registry to sign it
-        env: { GH_TOKEN: '${{ secrets.REGISTRY_DISPATCH_TOKEN }}' }
-        run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "::notice::REGISTRY_DISPATCH_TOKEN is not set: the release is published, the registry is not told. Set it and re-run."
-            exit 0
-          fi
-          version=$(cd module && go run ./release version)
-          jq -n --arg n "$NAME" --arg v "$version" --arg r "${{ github.repository }}" \
-            '{event_type: "modules-published", client_payload: {modules: [$n], versions: {($n): $v}, sources: {($n): $r}}}' \
-          | gh api repos/doze-dev/doze-registry/dispatches --input -
