@@ -40,6 +40,7 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/storage/log"
 	"github.com/doze-dev/doze-kafka/internal/storage/meta"
+	"github.com/doze-dev/doze-kafka/internal/traffic"
 )
 
 // Options configures an embedded broker. Zero values pick doze-kafka's
@@ -99,6 +100,15 @@ type Options struct {
 	Logger *slog.Logger
 }
 
+// trafficRows is how many requests (and group events) the console's traffic view
+// remembers: a few minutes of a busy laptop, a few hundred KiB.
+const trafficRows = 2000
+
+// Traffic is what clients have asked this broker and what its groups have done, or
+// nil when no console is running. It is for the console in this module; the type is
+// internal to it.
+func (s *Server) Traffic() *traffic.Recorder { return s.rec }
+
 // Server is an embedded broker. Construct with New, then Serve.
 type Server struct {
 	cfg  config.Config
@@ -107,7 +117,8 @@ type Server struct {
 	logs *log.Manager
 	srv  *protocol.Server
 	b    *broker.Broker
-	tls  bool // the listener terminates TLS, from cert files or Options.TLSConfig.
+	rec  *traffic.Recorder // what clients asked and what groups did; nil unless the console is on.
+	tls  bool              // the listener terminates TLS, from cert files or Options.TLSConfig.
 
 	mu      sync.Mutex
 	bound   net.Addr // set by Bind.
@@ -134,6 +145,7 @@ func New(opts Options) (*Server, error) {
 		cfg.Version = opts.Version
 	}
 	cfg.DataDir = opts.DataDir
+	cfg.Console = false      // an embedded broker runs no console, so keeps no record for one.
 	cfg.MetaDB = opts.MetaDB // empty is resolved to <DataDir>/meta.db by NewFromConfig.
 	// An embedder asked for no particular address; the CLI default (port 9092) is
 	// the wrong answer for a library, which would fight over a fixed port with
@@ -278,7 +290,15 @@ func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	if cfg.AuthEnabled() {
 		srv.RequireAuth()
 	}
-	return &Server{cfg: cfg, log: logger, meta: metaStore, logs: logs, srv: srv, b: b, tls: cfg.TLSEnabled(), dirLock: dirLock, ready: make(chan struct{})}, nil
+	// The recorder exists to be looked at, so only a server with a console keeps one:
+	// everyone else pays nothing per request.
+	var rec *traffic.Recorder
+	if cfg.Console {
+		rec = traffic.New(trafficRows, b.TopicName)
+		srv.SetObserver(rec)
+		b.SetGroupEvents(rec)
+	}
+	return &Server{cfg: cfg, log: logger, meta: metaStore, logs: logs, srv: srv, b: b, rec: rec, tls: cfg.TLSEnabled(), dirLock: dirLock, ready: make(chan struct{})}, nil
 }
 
 // reconcileDisk makes the data directory and the registry agree at start-up.

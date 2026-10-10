@@ -133,6 +133,7 @@
       <div>This group has members but has not committed any offsets yet, so there is no lag to show. Offsets appear after a consumer's first commit (with <span class="mono">enable.auto.commit</span> that is a few seconds after it starts polling).</div>
     </div>
     {{end}}
+    {{template "group_timeline" .}}
 </div>
 {{end}}
 
@@ -143,4 +144,20 @@
   <span class="dim">Consumed by</span>
   {{range .Consumers}}<a class="tg" href="{{.URL}}"><span class="mono">{{.Group}}</span> <span class="badge {{stateBadge .State}}">{{.State}}</span> <span class="mono {{if eq .Lag 0}}lag-zero{{else}}lag-some{{end}}">{{if eq .Lag 0}}caught up{{else}}lag {{.Lag}}{{end}}</span></a>{{else}}<span class="tg none">no consumer group has committed an offset here</span>{{end}}
 </div>
+{{end}}
+
+{{/* group_timeline: what the coordinator did, newest first. It is the direct answer
+     to "why does my consumer keep rebalancing": who joined, whose session ran out,
+     when each generation began. Kept in memory for the life of the broker only. */}}
+{{define "group_timeline"}}
+{{if .HasTimeline}}
+<div class="sec-title">Timeline <span class="sz">since the broker started</span></div>
+{{if .Timeline}}
+<ol class="timeline" id="group-timeline">
+  {{range .Timeline}}<li class="tl tl-{{.Tone}}"><span class="tl-t mono">{{.TimeStr}}</span><span class="tl-k">{{.Label}}</span>{{if .Member}}<span class="tl-m mono" title="{{.Member}}">{{.Member}}</span>{{end}}<span class="tl-d">{{.Detail}}</span>{{if .Generation}}<span class="tl-g mono">gen {{.Generation}}</span>{{end}}</li>{{end}}
+</ol>
+{{else}}
+<div class="honest">{{icon "info"}}<div>Nothing has happened in this group since the broker started. Members joining, leaving or timing out, and each new generation, appear here as they happen.</div></div>
+{{end}}
+{{end}}
 {{end}}

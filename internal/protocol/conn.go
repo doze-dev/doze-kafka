@@ -64,6 +64,9 @@ type Conn struct {
 	saslMechanism  string
 	saslState      any    // opaque per-connection state owned by the SASL handler (e.g. SCRAM step).
 	principal      string // who this connection authenticated as ("User:alice"); empty until it has.
+
+	observer Observer // told about this connection and its requests; nil = nobody is watching.
+	id       uint64   // this connection's number, for the observer.
 }
 
 func newConn(raw net.Conn, router *Router, logger *slog.Logger, authRequired bool) *Conn {
@@ -163,6 +166,10 @@ func preAuthAllowed(key APIKey) bool {
 // ctx is cancelled.
 func (c *Conn) serve(ctx context.Context) {
 	defer c.raw.Close()
+	if c.observer != nil {
+		c.observer.ConnOpened(c.id, c.raw.RemoteAddr().String())
+		defer c.observer.ConnClosed(c.id)
+	}
 	for {
 		if ctx.Err() != nil {
 			return
@@ -231,6 +238,7 @@ func (c *Conn) serve(ctx context.Context) {
 		}
 
 		req := &Request{Header: header, Body: frame[bodyOffset:], Conn: c}
+		began := time.Now()
 		resp, err := c.route(ctx, req)
 		var pe *handlerPanic
 		if errors.As(err, &pe) {
@@ -250,6 +258,9 @@ func (c *Conn) serve(ctx context.Context) {
 			return
 		}
 		if resp == nil {
+			if c.observer != nil {
+				c.observe(req, began, len(frame), 0)
+			}
 			continue
 		}
 
@@ -262,10 +273,23 @@ func (c *Conn) serve(ctx context.Context) {
 			c.log.Debug("flush failed", "err", err)
 			return
 		}
+		if c.observer != nil {
+			c.observe(req, began, len(frame), len(resp))
+		}
 		if c.closeAfter {
 			return
 		}
 	}
+}
+
+// observe tells the observer about an answered request.
+func (c *Conn) observe(req *Request, began time.Time, reqBytes, respBytes int) {
+	c.observer.Request(Observation{
+		Conn: c.id, Remote: c.raw.RemoteAddr().String(), Principal: c.Principal(),
+		ClientID: req.Header.ClientID, API: req.Header.APIKey, Version: req.Header.APIVersion,
+		Start: began, Duration: time.Since(began), ReqBytes: reqBytes, RespBytes: respBytes,
+		Summary: req.Describe(),
+	})
 }
 
 // handlerPanic is a recovered panic from a request handler.

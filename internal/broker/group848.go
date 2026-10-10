@@ -128,7 +128,8 @@ type cg848Manager struct {
 	log            *slog.Logger
 	sessionTimeout time.Duration
 	claims         *groupClaims
-	stopped        bool // the broker is shutting down: timers do nothing.
+	stopped        bool           // the broker is shutting down: timers do nothing.
+	sink           GroupEventSink // told what happens in groups; nil = nobody is watching.
 }
 
 func newCG848Manager(m meta.Store, logger *slog.Logger, sessionTimeout time.Duration, claims *groupClaims) *cg848Manager {
@@ -242,8 +243,9 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 			m.resetSession(g, mem)
 			return cg848Result{memberID: r.MemberID, memberEpoch: r.MemberEpoch}
 		}
+		m.emit(g.id, "left", r.MemberID, g.epoch, "a member left the group")
 		m.removeMember(g, r.MemberID)
-		m.bumpAndReassign(g)
+		m.bumpAndReassign(g, "a member left")
 		return cg848Result{memberID: r.MemberID, memberEpoch: r.MemberEpoch}
 	}
 
@@ -325,6 +327,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 			mem = &cg848Member{id: r.MemberID, target: tpSet{}, assigned: tpSet{}}
 			g.members[r.MemberID] = mem
 			changed = true
+			m.emit(g.id, "joined", r.MemberID, g.epoch, "client "+who.clientID)
 		case mem.sent != nil && !mem.left:
 			// A known member rejoining at epoch 0 has dropped everything it held.
 			mem.assigned, mem.revoking = tpSet{}, nil
@@ -365,7 +368,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 	}
 	m.resetSession(g, mem)
 	if changed {
-		m.bumpAndReassign(g)
+		m.bumpAndReassign(g, "a member joined or changed its subscription")
 	}
 
 	var reported tpSet // nil = the member did not report what it owns this time.
@@ -463,17 +466,19 @@ func (m *cg848Manager) revokeExpired(g *cg848Group, mem *cg848Member, gen uint64
 	}
 	m.log.Info("KIP-848 member did not give up revoked partitions within its rebalance timeout; removing it",
 		"group", g.id, "member", mem.id)
+	m.emit(g.id, "expired", mem.id, g.epoch, "a member did not acknowledge a revocation within its rebalance timeout")
 	m.removeMember(g, mem.id)
-	m.bumpAndReassign(g)
+	m.bumpAndReassign(g, "a member was removed")
 }
 
 // bumpAndReassign advances the group epoch and recomputes every member's target.
-func (m *cg848Manager) bumpAndReassign(g *cg848Group) {
+func (m *cg848Manager) bumpAndReassign(g *cg848Group, why string) {
 	if len(g.members) == 0 {
 		return
 	}
 	g.epoch++
 	m.assign(g)
+	m.emit(g.id, "epoch", "", g.epoch, why+"; "+plural(len(g.members), "member")+" reassigned")
 }
 
 func (m *cg848Manager) resetSession(g *cg848Group, mem *cg848Member) {
@@ -488,8 +493,9 @@ func (m *cg848Manager) sessionExpired(g *cg848Group, mem *cg848Member, gen uint6
 	if m.stopped || g.members[mem.id] != mem || !mem.session.current(gen) {
 		return
 	}
+	m.emit(g.id, "expired", mem.id, g.epoch, "a member sent no heartbeat within its session timeout")
 	m.removeMember(g, mem.id)
-	m.bumpAndReassign(g)
+	m.bumpAndReassign(g, "a member's session expired")
 	m.log.Info("KIP-848 member session expired", "group", g.id, "member", mem.id)
 }
 
@@ -544,6 +550,7 @@ func (m *cg848Manager) topicChanged(topic string) {
 		for id, mem := range g.members {
 			if !before[id].equal(mem.target) {
 				g.epoch++
+				m.emit(g.id, "epoch", "", g.epoch, "topic "+topic+" changed")
 				break
 			}
 		}

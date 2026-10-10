@@ -28,7 +28,7 @@ import (
 //     an acknowledged record is on disk, not merely in the OS page cache. acks=1 is
 //     the fast path (page cache); acks=0 asks for no reply, so we send none.
 func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
+	kreq, err := req.Decode()
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 			}
 			resp.Topics = append(resp.Topics, rt)
 		}
-		return protocol.EncodeResponse(req.Header, resp), nil
+		return req.Reply(resp), nil
 	}
 
 	producedTopics := map[string]struct{}{}
@@ -127,7 +127,7 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 			}
 		}
 	}
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return req.Reply(resp), nil
 }
 
 // appendRecords appends one partition's records and fills rp. A non-idempotent

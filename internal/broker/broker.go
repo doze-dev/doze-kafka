@@ -174,7 +174,7 @@ func (b *Broker) handlers() map[protocol.APIKey]protocol.Handler {
 // is the preamble and the last line every handler used to repeat.
 func typed[Q kmsg.Request, R kmsg.Response](fn func(ctx context.Context, req *protocol.Request, q Q, resp R) error) protocol.Handler {
 	return func(ctx context.Context, req *protocol.Request) ([]byte, error) {
-		kreq, err := protocol.DecodeRequest(req.Header, req.Body)
+		kreq, err := req.Decode()
 		if err != nil {
 			return nil, err
 		}
@@ -189,7 +189,7 @@ func typed[Q kmsg.Request, R kmsg.Response](fn func(ctx context.Context, req *pr
 		if err := fn(ctx, req, q, resp); err != nil {
 			return nil, err
 		}
-		return protocol.EncodeResponse(req.Header, resp), nil
+		return req.Reply(resp), nil
 	}
 }
 
@@ -251,6 +251,12 @@ func (b *Broker) resolveTopic(name string, id [16]byte) (string, meta.Topic, boo
 		return "", meta.Topic{}, false
 	}
 	return t.Name, t, true
+}
+
+// TopicName is the name of the topic with this id, or "" if there is none now.
+func (b *Broker) TopicName(id [16]byte) string {
+	name, _, _ := b.resolveTopic("", id)
+	return name
 }
 
 // notifier is a broadcast wakeup: signal() wakes everyone currently waiting on

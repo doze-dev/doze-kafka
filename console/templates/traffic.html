@@ -1,0 +1,104 @@
+{{define "traffic_detail"}}{{template "shell_top" .}}
+  <main class="detail" id="detail"><div class="detail-inner trafficwrap">
+    <div class="idband">
+      <div>
+        <h1 class="page-title">Traffic</h1>
+        <p class="lede">What clients have asked this broker, newest first. The console's own requests are left out.</p>
+      </div>
+    </div>
+
+    {{/* The filter is a plain GET form outside the polled region, so what is typed
+         is not thrown away by a refresh. */}}
+    <form class="tf-filters" method="get" action="{{.Prefix}}/traffic" role="search" aria-label="Filter requests">
+      <label class="tf-f"><span class="sr-only">Client</span><input class="input" name="client" value="{{.Filter.Client}}" placeholder="Client, software or address" spellcheck="false"></label>
+      <label class="tf-f"><span class="sr-only">Request</span><input class="input" name="api" value="{{.Filter.API}}" placeholder="Request (Fetch, Heartbeat…)" spellcheck="false"></label>
+      <label class="tf-f"><span class="sr-only">Topic</span><input class="input" name="topic" value="{{.Filter.Topic}}" placeholder="Topic" spellcheck="false"></label>
+      <label class="tf-f"><span class="sr-only">Group</span><input class="input" name="group" value="{{.Filter.Group}}" placeholder="Group" spellcheck="false"></label>
+      <label class="tf-chk"><input type="checkbox" name="errors" value="1" {{if .Filter.ErrorsOnly}}checked{{end}}> errors only</label>
+      <button type="submit" class="btn btn-outline">Filter</button>
+      {{if .Filtered}}<a class="btn" href="{{.Prefix}}/traffic">Clear</a>{{end}}
+    </form>
+
+    {{template "traffic_live" .}}
+
+    <div class="honest" role="note">
+      {{icon "info"}}
+      <div>The last couple of thousand requests, kept in memory only: a restart starts empty. Heartbeats and fetches that returned nothing fold into one row with a count, so a quiet consumer does not bury the rest.</div>
+    </div>
+  </div></main>
+{{template "shell_bottom" .}}{{end}}
+
+{{/* traffic_live is the polled unit: connected clients and the request tail. */}}
+{{define "traffic_live"}}
+<div id="traffic-live" data-live="{{.Prefix}}/traffic/live{{if .FilterQ}}?{{.FilterQ}}{{end}}" data-hash="{{.Hash}}" data-live-ms="2500">
+  <div class="sec-title">Connected clients <span class="sz">{{len .Clients}} open</span>
+    <button type="button" class="livetoggle" data-live-toggle aria-pressed="false" title="Pause live updates"><span class="livedot" aria-hidden="true"></span><span class="livetoggle-l">Live</span></button>
+  </div>
+  {{if .Clients}}
+  <div class="tbl-wrap gap">
+    <table class="tbl" id="clients-table"><thead><tr><th>Client</th><th>Software</th><th>Address</th><th>Principal</th><th class="num">Open for</th><th class="num">Last request</th><th class="num">Requests</th><th>Groups</th></tr></thead>
+      <tbody>{{range .Clients}}<tr>
+        <td class="mono"><a href="{{$.Prefix}}/traffic?{{.Filter}}" title="Show only this client's requests">{{.Who}}</a></td>
+        <td class="mono">{{if .Software}}{{.Software}}{{else}}<span class="dim">—</span>{{end}}</td>
+        <td class="mono nw">{{.Remote}}</td>
+        <td class="mono nw">{{.Principal}}</td>
+        <td class="num mono">{{.Age}}</td>
+        <td class="num mono">{{.Idle}}</td>
+        <td class="num mono">{{.Requests}}</td>
+        <td class="mono">{{range $i, $g := .Groups}}{{if $i}}, {{end}}<a href="{{groupURL $g}}">{{$g}}</a>{{else}}<span class="dim">—</span>{{end}}</td>
+      </tr>{{end}}</tbody>
+    </table>
+  </div>
+  {{else}}
+  <div class="honest">{{icon "info"}}<div>No client is connected. An app that uses the broker appears here for as long as its connection stays open.</div></div>
+  {{end}}
+
+  <div class="sec-title">Requests <span class="sz">{{len .Rows}}{{if .Filtered}} matching{{end}}</span></div>
+  {{if .Rows}}
+  <div class="tbl-wrap">
+    <table class="tbl tf-table" id="traffic-table"><thead><tr><th>Time</th><th>Client</th><th>Request</th><th>Topic or group</th><th>Detail</th><th>Result</th><th class="num">Took</th></tr></thead>
+      <tbody>{{range .Rows}}<tr id="rq-{{.Seq}}" tabindex="0" role="button" aria-label="Open {{.API}} from {{.Who}} at {{.TimeStr}}" data-drawer-open
+          hx-get="{{$.Prefix}}/traffic/request?{{.DrawerQ}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML">
+        <td class="mono nw">{{.TimeStr}}{{if .Folded}} <span class="tf-count" title="{{.Count}} identical requests, {{.SameSpan}}">×{{.Count}}</span>{{end}}</td>
+        <td class="mono nw" title="{{.Remote}}{{if .Software}} · {{.Software}}{{end}}">{{.Who}}</td>
+        <td class="mono nw">{{.API}} <span class="dim">v{{.Version}}</span></td>
+        <td class="mono">{{if .Target}}{{.Target}}{{else}}<span class="dim">—</span>{{end}}</td>
+        <td class="dim">{{.Detail}}</td>
+        <td>{{if .Error}}<span class="badge state-dead" title="The response carried this error">{{.Error}}</span>{{else}}<span class="dim">ok</span>{{end}}</td>
+        <td class="num mono nw">{{.Dur}}</td>
+      </tr>{{end}}</tbody>
+    </table>
+  </div>
+  {{else if .Filtered}}
+  <div class="honest">{{icon "info"}}<div>No request matches the filter. <a href="{{.Prefix}}/traffic">Clear it</a> to see everything.</div></div>
+  {{else}}
+  <div class="honest">{{icon "info"}}<div>Nothing has reached the broker yet. Point an app at it and its requests appear here as they happen.</div></div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "traffic_drawer"}}
+<div class="drawer-h">
+  <div>{{if .Gone}}<span class="t" id="drawer-title">Request</span>{{else}}<span class="t" id="drawer-title">{{.R.API}} v{{.R.Version}}</span><span class="drawer-sub mono">{{.R.Who}}</span>{{end}}</div>
+  <div class="drawer-nav"><button type="button" class="icon-btn" aria-label="Close" data-drawer-close>{{icon "x"}}</button></div>
+</div>
+<div class="drawer-b">
+  {{if .Gone}}
+  <div class="note">This row has changed or aged out since the page was drawn. A repeated request keeps moving to the front as it happens again; close this and open it again.</div>
+  {{else}}
+  <div class="meta-row"><span class="k">Time</span><span class="v mono">{{.R.TimeStr}}</span></div>
+  {{if .R.Folded}}<div class="meta-row"><span class="k">Repeats</span><span class="v">{{.R.Count}} identical requests, {{.R.SameSpan}}, first at <span class="mono">{{.R.First.Format "15:04:05.000"}}</span></span></div>{{end}}
+  <div class="meta-row"><span class="k">Client</span><span class="v mono">{{if .R.ClientID}}{{.R.ClientID}}{{else}}<span class="dim">no client id</span>{{end}}</span></div>
+  <div class="meta-row"><span class="k">Software</span><span class="v mono">{{if .R.Software}}{{.R.Software}}{{else}}<span class="dim">not reported</span>{{end}}</span></div>
+  <div class="meta-row"><span class="k">Address</span><span class="v mono">{{.R.Remote}}</span></div>
+  <div class="meta-row"><span class="k">Principal</span><span class="v mono">{{.R.Principal}}</span></div>
+  <div class="meta-row"><span class="k">Request</span><span class="v mono">{{.R.API}} version {{.R.Version}}</span></div>
+  {{if .R.Topics}}<div class="meta-row"><span class="k">Topics</span><span class="v mono">{{range $i, $t := .R.Topics}}{{if $i}}, {{end}}<a href="{{topicURL $t}}">{{$t}}</a>{{end}}</span></div>{{end}}
+  {{if .R.Group}}<div class="meta-row"><span class="k">Group</span><span class="v mono"><a href="{{groupURL .R.Group}}">{{.R.Group}}</a></span></div>{{end}}
+  {{if .R.Detail}}<div class="meta-row"><span class="k">Detail</span><span class="v">{{.R.Detail}}</span></div>{{end}}
+  <div class="meta-row"><span class="k">Result</span><span class="v">{{if .R.Error}}<span class="badge state-dead">{{.R.Error}}</span>{{else}}<span class="dim">ok</span>{{end}}</span></div>
+  <div class="meta-row"><span class="k">Took</span><span class="v mono">{{.R.Dur}}</span></div>
+  <div class="meta-row"><span class="k">Size</span><span class="v mono">{{.R.Sizes}}</span></div>
+  {{end}}
+</div>
+{{end}}

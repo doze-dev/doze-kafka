@@ -15,6 +15,7 @@ import (
 
 	"github.com/twmb/franz-go/pkg/kgo"
 
+	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/server"
 )
 
@@ -442,5 +443,38 @@ func TestSegmentOptionRolls(t *testing.T) {
 	logs, _ := filepath.Glob(filepath.Join(dir, "roll-0", "*.log"))
 	if len(logs) < 3 {
 		t.Errorf("20 x 1 KB records with SegmentBytes=4096 left %d segment file(s), want several", len(logs))
+	}
+}
+
+// What clients asked is remembered only for a console to show. An embedded broker has
+// none, and so pays nothing per request; the command line's, with its console on, does.
+func TestOnlyABrokerWithAConsoleKeepsATrafficRecord(t *testing.T) {
+	embedded, err := server.New(server.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer embedded.Close()
+	if embedded.Traffic() != nil {
+		t.Error("an embedded broker keeps a traffic record nobody will read")
+	}
+
+	cfg := config.Default()
+	cfg.DataDir, cfg.ListenAddr = t.TempDir(), "127.0.0.1:0"
+	withConsole, err := server.NewFromConfig(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer withConsole.Close()
+	if withConsole.Traffic() == nil {
+		t.Error("a broker with a console keeps no traffic record")
+	}
+	cfg.Console, cfg.DataDir = false, t.TempDir()
+	without, err := server.NewFromConfig(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer without.Close()
+	if without.Traffic() != nil {
+		t.Error("--console=false still keeps a traffic record")
 	}
 }

@@ -23,6 +23,9 @@ type Server struct {
 	ln     net.Listener
 	extra  []net.Listener // more addresses answering as the same broker (see AlsoListen).
 
+	observer Observer      // told about every connection and request; nil = nobody is watching.
+	connSeq  atomic.Uint64 // connection ids, for the observer.
+
 	tlsConfig    *tls.Config // when set, the listener terminates TLS.
 	authRequired bool        // when true, connections must complete SASL before other APIs.
 
@@ -267,6 +270,8 @@ func (s *Server) acceptLoop(ctx context.Context, ln net.Listener) error {
 			continue
 		}
 		conn := newConn(raw, s.router, s.log, s.authRequired)
+		conn.observer = s.observer
+		conn.id = s.connSeq.Add(1)
 		conn.preAuthTimeout, conn.idleTimeout, conn.frameTimeout = s.preAuthTimeout, s.idleTimeout, s.frameTimeout
 		s.mu.Lock()
 		conn.writeTimeout = s.writeTimeout

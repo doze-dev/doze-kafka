@@ -95,6 +95,17 @@ SASL is on (doze-kafka provisions it a private one at start-up).
 - All of these are for groups with no active members. A group that is running commits
   its own offsets, so changing them is refused, with the reason.
 
+- A **Timeline** of what the group's coordinator did (joins, rebalances, expiries,
+  generations), newest first: the answer to "why does my consumer keep rebalancing".
+  See [Observability](observability.md).
+
+## Traffic
+
+What clients have asked the broker, newest first, with the clients connected now: who
+sent each request, what it was about, how it went, and the Kafka error name when it
+failed. Repeats of idle requests fold into one row, and the tail filters by client,
+request type, topic, group and errors. See [Observability](observability.md).
+
 ## Schemas
 
 With the built-in [schema registry](schema-registry.md) running, the console grows a

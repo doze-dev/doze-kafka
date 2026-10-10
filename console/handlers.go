@@ -38,6 +38,9 @@ func (c *Console) apiPalette(w http.ResponseWriter, r *http.Request) {
 		{"views", "Access", c.prefix + "/access", "view"},
 		{"topics", "Create topic", c.newTopicURL(), "action"},
 	}
+	if c.traffic != nil {
+		out = append(out, paletteEntry{"views", "Traffic", c.prefix + "/traffic", "view"})
+	}
 	if c.reg != nil {
 		out = append(out, paletteEntry{"views", "Schemas", schemasPath(c.prefix), "view"}, paletteEntry{"schemas", "Register schema", newSchemaPath(c.prefix), "action"})
 		if subjects, err := c.reg.Subjects(ctx); err == nil {

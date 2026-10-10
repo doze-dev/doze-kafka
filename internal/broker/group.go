@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"slices"
+	"strconv"
 	"sync"
 	"time"
 
@@ -100,6 +101,8 @@ type groupManager struct {
 	pending map[string]map[string]time.Time
 
 	stopped bool // the broker is shutting down: timers do nothing.
+
+	sink GroupEventSink // told what happens in groups; nil = nobody is watching.
 }
 
 // stop makes every timer a no-op. After shutdown a session timer would otherwise
@@ -375,6 +378,7 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 		m = &groupMember{id: r.MemberID}
 		g.members[r.MemberID] = m
 		gm.redeem(r.Group, r.MemberID)
+		gm.emit(g.id, "joined", m.id, g.generation, "client "+who.clientID)
 	}
 	// A retried JoinGroup replaces one still parked: the old request's client is
 	// waiting on an answer that this one supersedes, so release it (Kafka answers
@@ -395,6 +399,11 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 	if g.state != statePreparingRebalance {
 		wasEmpty := g.state == stateEmpty
 		g.beginRebalance()
+		if m.rejoined || wasEmpty {
+			gm.emit(g.id, "rebalance", m.id, g.generation, "a member joined")
+		} else {
+			gm.emit(g.id, "rebalance", m.id, g.generation, "a member rejoined")
+		}
 		g.holding = wasEmpty && initialRebalanceDelay > 0
 	}
 	m.rejoined = true
@@ -554,6 +563,7 @@ func (gm *groupManager) sync(ctx context.Context, r *kmsg.SyncGroupRequest) (syn
 			}
 		}
 		g.state = stateStable
+		gm.emit(g.id, "assigned", r.MemberID, g.generation, plural(len(r.GroupAssignment), "member")+" given an assignment by the leader")
 		for id, ch := range g.pendingSync {
 			ch <- syncResult{assignment: g.members[id].assignment}
 			gm.resetSession(g, g.members[id]) // it has been parked; its session restarts now.
@@ -643,6 +653,7 @@ func (gm *groupManager) leave(r *kmsg.LeaveGroupRequest) []leaveResult {
 				}
 			}
 			if id != "" && g.members[id] != nil {
+				gm.emit(g.id, "left", id, g.generation, "client "+g.members[id].client.clientID+" left the group")
 				gm.removeMember(g, id)
 				res.memberID, res.errorCode = id, errNone
 				removed = true
@@ -651,7 +662,7 @@ func (gm *groupManager) leave(r *kmsg.LeaveGroupRequest) []leaveResult {
 		results = append(results, res)
 	}
 	if g != nil && removed {
-		gm.rebalanceAfterChange(g)
+		gm.rebalanceAfterChange(g, "a member left")
 	}
 	return results
 }
@@ -770,19 +781,20 @@ func (g *group) allRejoined() bool {
 // completeJoin closes the rebalance: drop members that never rejoined, bump the
 // generation, elect a leader, pick a common protocol, and deliver every waiting
 // JoinGroup response.
-func (g *group) completeJoin() {
+func (g *group) completeJoin() (dropped []string) {
 	g.join.stop()
 	g.holding = false
 	for id, m := range g.members {
 		if !m.rejoined {
 			m.session.stop()
 			delete(g.members, id)
+			dropped = append(dropped, id)
 		}
 	}
 	if len(g.members) == 0 {
 		g.state = stateEmpty
 		g.leader = ""
-		return
+		return dropped
 	}
 	for inst, id := range g.static {
 		if g.members[id] == nil {
@@ -816,15 +828,20 @@ func (g *group) completeJoin() {
 		m.joinResult <- res
 		m.awaitingJoin = false
 	}
+	return dropped
 }
 
 // completeJoin closes the rebalance and forgets the group if nobody was left.
 func (gm *groupManager) completeJoin(g *group) {
-	g.completeJoin()
+	for _, id := range g.completeJoin() {
+		gm.emit(g.id, "dropped", id, g.generation, "did not rejoin before the rebalance timeout")
+	}
 	if g.state == stateEmpty {
 		gm.dropIfUnused(g)
 		return
 	}
+	gm.emit(g.id, "generation", g.leader, g.generation,
+		plural(len(g.members), "member")+", leader "+g.leader+", protocol "+g.protocol)
 	// Every member's session starts afresh with the new generation. A member was
 	// last heard from when it sent its JoinGroup, possibly a whole rebalance ago;
 	// without this its timer could fire in the moment between its join being
@@ -901,8 +918,9 @@ func (gm *groupManager) sessionExpired(g *group, m *groupMember, gen uint64) {
 		gm.resetSession(g, m)
 		return
 	}
+	gm.emit(g.id, "expired", id, g.generation, "client "+m.client.clientID+" sent no heartbeat within its session timeout")
 	gm.removeMember(g, id)
-	gm.rebalanceAfterChange(g)
+	gm.rebalanceAfterChange(g, "a member's session expired")
 }
 
 func (gm *groupManager) removeMember(g *group, id string) {
@@ -923,7 +941,7 @@ func (gm *groupManager) removeMember(g *group, id string) {
 // rebalanceAfterChange nudges the group after a membership change (leave/expire):
 // empty → Empty; otherwise start a rebalance so survivors rejoin, or finish an
 // in-flight one if the departure made everyone-left rejoined.
-func (gm *groupManager) rebalanceAfterChange(g *group) {
+func (gm *groupManager) rebalanceAfterChange(g *group, why string) {
 	if len(g.members) == 0 {
 		g.join.stop()
 		g.state = stateEmpty
@@ -933,6 +951,7 @@ func (gm *groupManager) rebalanceAfterChange(g *group) {
 	}
 	if g.state != statePreparingRebalance {
 		g.beginRebalance()
+		gm.emit(g.id, "rebalance", "", g.generation, why)
 		gm.armJoinTimer(g)
 	} else if g.allRejoined() && !g.holding {
 		gm.completeJoin(g)
@@ -1048,4 +1067,11 @@ func generateMemberID(instanceID *string) string {
 		return *instanceID + "-" + id
 	}
 	return id
+}
+
+func plural(n int, one string) string {
+	if n == 1 {
+		return "1 " + one
+	}
+	return strconv.Itoa(n) + " " + one + "s"
 }

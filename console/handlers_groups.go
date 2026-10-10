@@ -164,6 +164,8 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 		rows = append(rows, row)
 	}
 
+	timeline := c.groupTimeline(id)
+
 	h := fnv.New64a()
 	fmt.Fprint(h, detail.State, "|")
 	for _, m := range members {
@@ -175,8 +177,12 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 		fmt.Fprint(h, o.Topic, o.Partition, o.Committed, o.Latest, o.Trimmed, o.Deleted, o.Ahead, o.Owner, ",")
 	}
 
+	for _, e := range timeline {
+		fmt.Fprint(h, e.Seq, ";")
+	}
+
 	return map[string]any{
-		"Group": detail, "Members": members, "Offsets": rows, "TotalLag": totalLag, "AnyAhead": anyAhead,
+		"Timeline": timeline, "HasTimeline": c.traffic != nil, "Group": detail, "Members": members, "Offsets": rows, "TotalLag": totalLag, "AnyAhead": anyAhead,
 		"Topics":    offsetTopics(rows),
 		"CanAct":    detail.State == "Empty" && len(detail.Members) == 0,
 		"NoCommits": len(offsets) == 0,

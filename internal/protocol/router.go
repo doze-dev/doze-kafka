@@ -14,6 +14,10 @@ type Request struct {
 	Header RequestHeader
 	Body   []byte
 	Conn   *Conn
+
+	// What the handler decoded and answered, kept for the observer (see observe.go).
+	decoded  kmsg.Request
+	answered kmsg.Response
 }
 
 // Handler processes one request and returns the full response payload to be

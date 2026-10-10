@@ -32,13 +32,14 @@ var staticFS embed.FS
 // Console is the web-UI http.Handler. Mount it on its own listener — Kafka's
 // wire protocol can't share a port with HTTP.
 type Console struct {
-	be     *backend
-	reg    *registryClient // nil when there is no schema registry to talk to.
-	mux    *http.ServeMux
-	tmpl   *template.Template
-	dev    string // DOZE_KAFKA_CONSOLE_DEV: read templates and static files from this directory, live.
-	prefix string
-	hosts  []string // extra Host names to answer to (see hostguard.go).
+	be      *backend
+	reg     *registryClient // nil when there is no schema registry to talk to.
+	traffic TrafficSource   // nil when the broker's traffic is not available to this console.
+	mux     *http.ServeMux
+	tmpl    *template.Template
+	dev     string // DOZE_KAFKA_CONSOLE_DEV: read templates and static files from this directory, live.
+	prefix  string
+	hosts   []string // extra Host names to answer to (see hostguard.go).
 }
 
 // Options configures the console.
@@ -71,6 +72,10 @@ type Options struct {
 	// RegistryUser and RegistryPass are HTTP basic credentials for the registry, when
 	// it requires them.
 	RegistryUser, RegistryPass string
+	// Traffic is what the broker remembers of its clients' requests and its groups'
+	// membership changes. Nil, the Traffic section is not offered: the console cannot
+	// see the wire of a broker it is not part of.
+	Traffic TrafficSource
 }
 
 // New builds a console with a real Kafka client dialed at opts.Addr.
@@ -99,6 +104,7 @@ func New(opts Options) (*Console, error) {
 	}
 	c.be, c.tmpl = be, tmpl
 	c.reg = newRegistryClient(opts.RegistryURL, opts.RegistryUser, opts.RegistryPass)
+	c.traffic = opts.Traffic
 	c.routes()
 	return c, nil
 }
@@ -221,6 +227,11 @@ func (c *Console) routes() {
 	m.HandleFunc("GET "+p+"/topics/{name}/message", c.topicMessage) // drawer partial
 	m.HandleFunc("GET "+p+"/topics/{name}/message/raw", c.topicMessageRaw)
 
+	// Traffic (what clients asked the broker).
+	m.HandleFunc("GET "+p+"/traffic", c.trafficPage)
+	m.HandleFunc("GET "+p+"/traffic/live", c.trafficLive)       // HTMX partial (polled)
+	m.HandleFunc("GET "+p+"/traffic/request", c.trafficRequest) // drawer partial
+
 	// Schemas (the built-in registry).
 	m.HandleFunc("GET "+p+"/schemas", c.schemas)
 	m.HandleFunc("GET "+newSchemaPath(p), c.schemaCreatePage)
@@ -265,6 +276,7 @@ func (c *Console) render(w http.ResponseWriter, r *http.Request, page string, da
 	}
 	data["Endpoint"] = c.be.displayAddr()
 	data["HasRegistry"] = c.reg != nil
+	data["HasTraffic"] = c.traffic != nil
 	if f := r.URL.Query().Get("flash"); f != "" {
 		data["Flash"] = f
 	}

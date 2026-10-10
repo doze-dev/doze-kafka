@@ -18,6 +18,7 @@ import (
 // UNSUPPORTED_VERSION with our supported ranges, after which it retries lower.
 func (b *Broker) handleAPIVersions(ctx context.Context, req *protocol.Request) ([]byte, error) {
 	resp := kmsg.NewPtrApiVersionsResponse()
+	_, _ = req.Decode() // kept for the observer: ApiVersions is where a client says what it is. A version we don't know fails to decode, and is answered all the same.
 	for _, a := range b.advertised() {
 		k := kmsg.NewApiVersionsResponseApiKey()
 		k.ApiKey = int16(a.Key)
@@ -36,10 +37,10 @@ func (b *Broker) handleAPIVersions(ctx context.Context, req *protocol.Request) (
 		// error and our ranges. The client retries at a version we support.
 		resp.SetVersion(0)
 		resp.ErrorCode = kerr.UnsupportedVersion.Code
-		return protocol.EncodeResponse(req.Header, resp), nil
+		return req.Reply(resp), nil
 	}
 
 	resp.SetVersion(req.Header.APIVersion)
 	resp.ErrorCode = errNone
-	return protocol.EncodeResponse(req.Header, resp), nil
+	return req.Reply(resp), nil
 }

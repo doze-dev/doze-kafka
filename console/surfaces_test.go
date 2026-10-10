@@ -79,7 +79,7 @@ var emptyHeading = regexp.MustCompile(`<h[12][^>]*>\s*</h[12]>`)
 // Every page and partial renders, with data and with nothing: a topic that has
 // messages, a group that has commits, and a brand-new broker.
 func TestEverySurfaceRenders(t *testing.T) {
-	c, addr := newTestConsoleAddr(t)
+	c, addr := newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic() })
 	topicWith(t, c, "orders", 2, 4)
 	commitFor(t, addr, "billing", "orders", map[int32]int64{0: 1})
 
@@ -91,6 +91,8 @@ func TestEverySurfaceRenders(t *testing.T) {
 		switch {
 		case strings.HasSuffix(path, "/message"), strings.HasSuffix(path, "/message/raw"):
 			path += "?partition=0&offset=1"
+		case strings.HasSuffix(path, "/traffic/request"):
+			path += "?seq=8"
 		}
 		rec := req(t, c, "GET", path, nil)
 		if rec.Code != http.StatusOK {

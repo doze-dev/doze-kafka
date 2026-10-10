@@ -87,6 +87,15 @@ see) and lets it run in the same process (the CLI) or against a unix socket (the
 module). Pages are plain HTML; live views poll a partial that answers `204` when
 nothing changed. See [Console](console.md).
 
+The one thing a Kafka client cannot see is the broker's own view of its traffic, so that
+is handed to the console rather than reached into: the connection loop tells an
+`Observer` about every request (decoded and described by a per-API summariser in the
+one API table), the group coordinators tell a sink what they did, and `internal/traffic`
+keeps both in a bounded in-memory ring. `cmd/doze-kafka` adapts that to an interface
+the console defines, so `console/` still imports nothing from `internal/`. With no
+console there is no observer, and the connection loop pays a nil check.
+See [Observability](observability.md).
+
 ## Embedding and the CLI — `server/`, `cmd/doze-kafka`
 
 `server` is the public, embeddable seam: `server.New(Options)` wires storage, broker,

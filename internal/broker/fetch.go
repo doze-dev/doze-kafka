@@ -29,7 +29,7 @@ var maxFetchWait = 30 * time.Second
 // whatever accumulated. highWatermark and logStartOffset come straight from the
 // partition (single-node: highWatermark == LEO).
 func (b *Broker) handleFetch(ctx context.Context, req *protocol.Request) ([]byte, error) {
-	kreq, err := protocol.DecodeRequest(req.Header, req.Body)
+	kreq, err := req.Decode()
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (b *Broker) handleFetch(ctx context.Context, req *protocol.Request) ([]byte
 		resp := kmsg.NewPtrFetchResponse()
 		resp.SetVersion(req.Header.APIVersion)
 		resp.ErrorCode = kerr.FetchSessionIDNotFound.Code
-		return protocol.EncodeResponse(req.Header, resp), nil
+		return req.Reply(resp), nil
 	}
 
 	minBytes := max(int(fr.MinBytes), 1)
@@ -63,14 +63,14 @@ func (b *Broker) handleFetch(ctx context.Context, req *protocol.Request) ([]byte
 		// refresh metadata), and making it wait MaxWait first cost every consumer
 		// offset reset a full fetch.max.wait.ms.
 		if failed || total >= minBytes || wait <= 0 || !time.Now().Before(deadline) {
-			return encodeFetchResponse(req.Header, resp, total), nil
+			return encodeFetchResponse(req, resp, total), nil
 		}
 		// Wait for a produce to one of these topics or the deadline, then re-read.
 		select {
 		case <-sub.C:
 		case <-time.After(time.Until(deadline)):
 		case <-ctx.Done():
-			return encodeFetchResponse(req.Header, resp, total), nil
+			return encodeFetchResponse(req, resp, total), nil
 		}
 	}
 }
@@ -95,12 +95,12 @@ func (b *Broker) fetchTopics(fr *kmsg.FetchRequest) []string {
 // encodeFetchResponse frames a fetch response into a buffer sized for it. The
 // default starts at 128 bytes and grows by doubling, copying a multi-megabyte
 // record payload several times over on its way to the socket.
-func encodeFetchResponse(header protocol.RequestHeader, resp *kmsg.FetchResponse, recordBytes int) []byte {
+func encodeFetchResponse(req *protocol.Request, resp *kmsg.FetchResponse, recordBytes int) []byte {
 	parts := 0
 	for _, t := range resp.Topics {
 		parts += len(t.Partitions)
 	}
-	return protocol.EncodeResponseSized(header, resp, recordBytes+256+96*parts)
+	return req.ReplySized(resp, recordBytes+256+96*parts)
 }
 
 // buildFetchResponse reads every requested partition once and returns the response

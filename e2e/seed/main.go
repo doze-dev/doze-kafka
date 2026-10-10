@@ -9,6 +9,7 @@
 //	seed-events   1 partition of Avro records written through the schema registry (subject
 //	              seed-events-value, two versions); seed-proto is the same for Protobuf.
 //	g-lag         committed at offset 10 of seed-orders/0: a lag to look at.
+//	g-timeline    a group whose one member joined, read and left, for its timeline.
 //	g-reset-*     one group per test that resets, sets or deletes, so tests that
 //	              change a group never share one.
 package main
@@ -43,7 +44,7 @@ func main() {
 func run(addr, registryURL string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.RecordPartitioner(kgo.ManualPartitioner()))
+	cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.ClientID("doze-seed"), kgo.RecordPartitioner(kgo.ManualPartitioner()))
 	if err != nil {
 		return err
 	}
@@ -111,6 +112,42 @@ func run(addr, registryURL string) error {
 			return fmt.Errorf("commit for %s: %v %+v", g, err, resp)
 		}
 	}
+	if err := seedGroupTimeline(ctx, addr); err != nil {
+		return err
+	}
+	// One request the broker refuses, for the Traffic page's errors-only view.
+	again := kmsg.NewPtrCreateTopicsRequest()
+	rt := kmsg.NewCreateTopicsRequestTopic()
+	rt.Topic, rt.NumPartitions, rt.ReplicationFactor = "seed-empty", 1, 1
+	again.Topics = append(again.Topics, rt)
+	if resp, err := again.RequestWith(ctx, cl); err != nil || resp.Topics[0].ErrorCode == 0 {
+		return fmt.Errorf("creating seed-empty twice should be refused: %v %+v", err, resp)
+	}
+	return nil
+}
+
+// seedGroupTimeline has one consumer join g-timeline, read a record, commit and leave,
+// so the group's page has a timeline to show: a join, a generation, an assignment, a leave.
+func seedGroupTimeline(ctx context.Context, addr string) error {
+	cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.ClientID("doze-seed-consumer"), kgo.ConsumerGroup("g-timeline"),
+		kgo.ConsumeTopics("seed-events"), kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()), kgo.DisableAutoCommit())
+	if err != nil {
+		return err
+	}
+	for {
+		if cl.PollFetches(ctx).NumRecords() > 0 {
+			break
+		}
+		if ctx.Err() != nil {
+			cl.Close()
+			return fmt.Errorf("g-timeline: no record before the deadline: %w", ctx.Err())
+		}
+	}
+	if err := cl.CommitUncommittedOffsets(ctx); err != nil {
+		cl.Close()
+		return fmt.Errorf("g-timeline commit: %w", err)
+	}
+	cl.Close() // leaves the group.
 	return nil
 }
 
