@@ -54,7 +54,7 @@ handling), answering "does it work when someone actually runs it."
   (`kcat.yml`); locally it is `go tool task test:kcat`. It found that a broker on
   127.0.0.1 advertised "localhost", which kcat could not follow on a machine where that
   name resolves to ::1 first.
-- **The client-compatibility matrix**: `compat/` runs the Java client 4.0, Kafka Streams
+- **The client-compatibility matrix**: `compat/` runs the Java client 4.3, Kafka Streams
   (exactly-once, restoring from compacted changelogs), Spring Kafka, confluent-kafka, kcat,
   KafkaJS, Kafka Connect, Confluent's and Apicurio's registries and the Kafbat and Redpanda
   UIs against the built binary, each with no authentication and over SASL/SCRAM and TLS

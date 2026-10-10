@@ -33,7 +33,7 @@ listeners=http://0.0.0.0:8083
 plugin.path=/opt/kafka/libs
 $SEC"
 # shellcheck disable=SC2086
-docker run -d --name "$CONTAINER" ${HOSTS_FLAG:-} -p 127.0.0.1::8083 ${MOUNT[@]+"${MOUNT[@]}"} -e CONF="$CONF" --entrypoint sh apache/kafka:4.0.0 \
+docker run -d --name "$CONTAINER" ${HOSTS_FLAG:-} -p 127.0.0.1::8083 ${MOUNT[@]+"${MOUNT[@]}"} -e CONF="$CONF" --entrypoint sh apache/kafka:4.3.1 \
   -c 'printf "%s\n" "$CONF" > /tmp/worker.properties; exec /opt/kafka/bin/connect-distributed.sh /tmp/worker.properties' >/dev/null
 PORT=$(publish_port "$CONTAINER" 8083)
 URL=http://127.0.0.1:$PORT

@@ -25,5 +25,5 @@ kafka_tool() {
     [ "$tool" = kafka-console-consumer.sh ] && cfgarg=(--consumer.config /tools.properties)
   fi
   # shellcheck disable=SC2086
-  docker run --rm -i ${HOSTS_FLAG:-} ${mount[@]+"${mount[@]}"} apache/kafka:4.0.0 "/opt/kafka/bin/$tool" --bootstrap-server "$BOOTSTRAP" ${cfgarg[@]+"${cfgarg[@]}"} "$@"
+  docker run --rm -i ${HOSTS_FLAG:-} ${mount[@]+"${mount[@]}"} apache/kafka:4.3.1 "/opt/kafka/bin/$tool" --bootstrap-server "$BOOTSTRAP" ${cfgarg[@]+"${cfgarg[@]}"} "$@"
 }

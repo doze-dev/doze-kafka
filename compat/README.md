@@ -18,13 +18,13 @@ prints a matrix.
 
 | Client | Toolchain | Covers |
 |---|---|---|
-| `java` | Docker | Java client 4.0: admin (create with config, describe, alter configs, grow, list, delete, delete records, groups), `offsetsForTimes`, idempotent and transactional producers, `read_committed`, consume-transform-produce, classic groups and `group.protocol=consumer` (KIP-848); **Kafka Streams** word count with `exactly_once_v2`, its compacted changelog, and a fresh instance restoring from it |
+| `java` | Docker | Java client 4.3: admin (create with config, describe, alter configs, grow, list, delete, delete records, groups), `offsetsForTimes`, idempotent and transactional producers, `read_committed`, consume-transform-produce, classic groups and `group.protocol=consumer` (KIP-848); **Kafka Streams** word count with `exactly_once_v2`, its compacted changelog, and a fresh instance restoring from it |
 | `spring` | Docker | Spring Boot 3.4 / Spring Kafka: `KafkaAdmin` creating `NewTopic` beans and growing one on the next start; a transactional `@KafkaListener` whose aborted delivery is redelivered with exactly-once output |
 | `python` | `uv` | `confluent-kafka` (librdkafka): admin, idempotent producer, groups that commit and resume, KIP-848, transactions with `read_committed` and `read_uncommitted` |
 | `kcat` | `kcat` | librdkafka's command line: metadata, keys and headers, a group that resumes |
 | `kafkajs` | `bun` or `node` | KafkaJS: admin, idempotent producer, group consume and commit |
 | `connect` | Docker | Kafka Connect (distributed): the worker creates and verifies its three compacted internal topics; a file source into a topic and a file sink out of it; after a restart the connectors and the source's offset come back from those topics |
-| `confluent-sr` | Docker | Confluent's Schema Registry 7.7 against the broker: it keeps its state in a `_schemas` topic, completes an Avro round trip and replays after a restart |
+| `confluent-sr` | Docker | Confluent's Schema Registry 8.3 against the broker: it keeps its state in a `_schemas` topic, completes an Avro round trip and replays after a restart |
 | `apicurio` | Docker | Apicurio Registry (Kafka SQL storage): the same |
 | `kafbat-ui`, `redpanda-console` | Docker | the UIs connect and list topics, consumer groups and brokers |
 
