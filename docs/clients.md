@@ -34,8 +34,8 @@ over SASL/SCRAM-SHA-512 and TLS**:
 
 | Client | Version tested | What it does against the broker |
 |---|---|---|
-| Apache Kafka **Java** client | 4.0.0 | admin (create with config, describe, alter configs, add partitions, delete records, list, delete topics and groups), `offsetsForTimes`, idempotent and transactional producers, `read_committed` and `read_uncommitted`, consume-transform-produce with offsets in the transaction, classic groups and `group.protocol=consumer` |
-| **Kafka Streams** | 4.0.0 | a word count with `exactly_once_v2`; its repartition and compacted changelog topics; a new instance restoring its state from the changelog |
+| Apache Kafka **Java** client | 4.3.1 | admin (create with config, describe, alter configs, add partitions, delete records, list, delete topics and groups), `offsetsForTimes`, idempotent and transactional producers, `read_committed` and `read_uncommitted`, consume-transform-produce with offsets in the transaction, classic groups and `group.protocol=consumer` |
+| **Kafka Streams** | 4.3.1 | a word count with `exactly_once_v2`; its repartition and compacted changelog topics; a new instance restoring its state from the changelog |
 | **Spring Kafka** | Spring Boot 3.4 | `KafkaAdmin` creating `NewTopic` beans and growing one; a transactional `@KafkaListener` whose aborted delivery is redelivered with exactly-once output |
 | **confluent-kafka** (Python, librdkafka) | 2.16 | admin, idempotent producer, groups that commit and resume, `group.protocol=consumer`, transactions |
 | **kcat** (librdkafka) | 1.7 / 2.15 | metadata, keys and headers, a group that resumes |
