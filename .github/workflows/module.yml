@@ -1,0 +1,111 @@
+# The kafka doze module (module/), built and published beside the broker it embeds.
+#
+# A version bump in module/module.yaml is the release intent. The plugin is a pure-Go
+# cross-compile, so one runner builds every platform. It is published as a rolling
+# release tagged "kafka" with an index.yaml + per-platform archives, and doze-registry
+# is told to sign it. The doze-kafka product releases (v*) are separate and untouched:
+# this release is never marked Latest, so install.sh keeps finding the broker.
+#
+# Needs one secret, REGISTRY_DISPATCH_TOKEN (a fine-grained token with contents:write
+# on doze-dev/doze-registry). Without it the release assets still publish and the
+# registry step is skipped with a notice; re-run this workflow once it is set.
+name: module
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [module/**, .github/workflows/module.yml]
+
+permissions:
+  contents: write
+
+env:
+  NAME: kafka
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: module
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: module/go.mod
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  bumped:
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.diff.outputs.release }}
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 2 }
+      - id: diff
+        run: |
+          cur=$(yq '.version' module/module.yaml)
+          prev=$(git show HEAD^:module/module.yaml 2>/dev/null | yq '.version' || true)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$cur" != "$prev" ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    needs: [test, bumped]
+    if: needs.bumped.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: module/go.mod
+
+      # Published (version, platform) artifacts are immutable, so the build starts from
+      # the index already published: this repo's own release, or, the first time,
+      # what the registry has signed from the doze-modules repo this module came from
+      # (those entries keep their absolute URLs there).
+      - name: Seed the index
+        run: |
+          mkdir -p module/dist/$NAME
+          idx=module/dist/$NAME/index.yaml
+          if ! curl -sfL "https://github.com/${{ github.repository }}/releases/download/$NAME/index.yaml" -o "$idx"; then
+            curl -sfL "https://raw.githubusercontent.com/doze-dev/doze-registry/main/registry/doze/$NAME/index.yaml" -o "$idx" \
+              && yq -i 'del(.signature) | del(.releases[].artifacts[].sig)' "$idx" \
+              || rm -f "$idx"
+          fi
+
+      - name: Build
+        working-directory: module
+        run: go run ./release --out dist
+
+      - name: Publish the release
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          gh release view "$NAME" >/dev/null 2>&1 || \
+            gh release create "$NAME" --latest=false --title "$NAME module" --notes "doze $NAME plugin module"
+          for attempt in 1 2 3; do
+            gh release upload "$NAME" module/dist/$NAME/* --clobber && break
+            [ "$attempt" = 3 ] && exit 1
+            echo "upload failed (attempt $attempt), retrying in 15s…"
+            sleep 15
+          done
+
+      - name: Ask the registry to sign it
+        env: { GH_TOKEN: '${{ secrets.REGISTRY_DISPATCH_TOKEN }}' }
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::REGISTRY_DISPATCH_TOKEN is not set: the release is published, the registry is not told. Set it and re-run."
+            exit 0
+          fi
+          version=$(cd module && go run ./release version)
+          jq -n --arg n "$NAME" --arg v "$version" --arg r "${{ github.repository }}" \
+            '{event_type: "modules-published", client_payload: {modules: [$n], versions: {($n): $v}, sources: {($n): $r}}}' \
+          | gh api repos/doze-dev/doze-registry/dispatches --input -

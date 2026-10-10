@@ -1,0 +1,3 @@
+# The kafka module's release version (the MODULE, not Kafka). Bumping it is the
+# release intent: .github/workflows/module.yml builds, tests and publishes it.
+version: "0.1.2"
