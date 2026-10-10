@@ -39,7 +39,9 @@ at a local broker. If you just want to get going, read
 12. **[Troubleshooting](troubleshooting.md)** — fixes for the usual "my client won't
     connect" situations.
 13. **[Embedding](embedding.md)** — start a broker from Go code, for tests.
-14. **[Observability](observability.md)** — the console's traffic tail and group
+14. **[Frameworks and tools](frameworks.md)** — Kafka Streams, Spring Kafka, Connect, schema
+    registries and UIs against doze-kafka, as run in CI.
+15. **[Observability](observability.md)** — the console's traffic tail and group
     timeline: what your app asked the broker, and why a group rebalances.
 
 ## Development history

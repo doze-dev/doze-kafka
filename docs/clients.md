@@ -20,32 +20,41 @@ the highest version you both support for each request. You don't configure any o
 this; it's automatic. If a client needs an API the broker doesn't advertise, it
 simply won't use it.
 
-## Verified in CI
+## Tested in CI
 
-These are exercised end-to-end on every test run:
+Two suites run on every change.
 
-- **[franz-go](https://github.com/twmb/franz-go)** (Go) — the primary reference. Uses
-  topic IDs and modern versions aggressively, and supports both group protocols.
-- **[Sarama](https://github.com/IBM/sarama)** (Go) — an independent implementation
-  that speaks older, non-flexible request versions.
+**The Go suite** runs [franz-go](https://github.com/twmb/franz-go) (the primary reference:
+topic IDs, modern versions, both group protocols) and [Sarama](https://github.com/IBM/sarama)
+(an independent implementation that speaks older, non-flexible request versions).
 
-## Confirmed by hand, not in CI
+**The compatibility matrix** (`compat/`, see its [README](../compat/README.md)) runs real
+clients and frameworks against the built binary, each **twice: with no authentication, and
+over SASL/SCRAM-SHA-512 and TLS**:
 
-- **[kafkajs](https://kafka.js.org/)** (Node) — produce/consume via a consumer group
-  was run against the real binary and works; it just isn't part of the automated
-  suite (to keep Node out of the Go test dependencies).
+| Client | Version tested | What it does against the broker |
+|---|---|---|
+| Apache Kafka **Java** client | 4.0.0 | admin (create with config, describe, alter configs, add partitions, delete records, list, delete topics and groups), `offsetsForTimes`, idempotent and transactional producers, `read_committed` and `read_uncommitted`, consume-transform-produce with offsets in the transaction, classic groups and `group.protocol=consumer` |
+| **Kafka Streams** | 4.0.0 | a word count with `exactly_once_v2`; its repartition and compacted changelog topics; a new instance restoring its state from the changelog |
+| **Spring Kafka** | Spring Boot 3.4 | `KafkaAdmin` creating `NewTopic` beans and growing one; a transactional `@KafkaListener` whose aborted delivery is redelivered with exactly-once output |
+| **confluent-kafka** (Python, librdkafka) | 2.16 | admin, idempotent producer, groups that commit and resume, `group.protocol=consumer`, transactions |
+| **kcat** (librdkafka) | 1.7 / 2.15 | metadata, keys and headers, a group that resumes |
+| **KafkaJS** | 2.2 | admin, idempotent producer, group consume and commit |
 
-## Expected to work
+Confluent's Java Avro, Protobuf and JSON Schema serializers (8.0) and confluent-kafka's Avro,
+Protobuf and JSON Schema serializers also run, against the [built-in registry](schema-registry.md).
+See [Frameworks and tools](frameworks.md) for Streams, Spring, Connect, schema registries
+and the UIs.
 
-These use the same standard wire protocol and the APIs doze-kafka advertises. They
-haven't been run here, but nothing about them is special:
+Both the Java client and librdkafka also push **client metrics** (KIP-714) to the broker by
+default; the console shows them ([Observability](observability.md)).
 
-- **librdkafka** and everything built on it — **kcat**, **confluent-kafka-python**,
-  **confluent-kafka-go**, **node-rdkafka**, **librdkafka** C/C++.
-- The **Apache Kafka Java client** and tools (`kafka-console-*`,
-  `kafka-consumer-groups`), and frameworks on top (Spring Kafka, Alpakka).
+## Expected to work, not run here
 
-If you hit a compatibility problem with any of these, it's a bug worth reporting.
+These use the same wire protocol and the same APIs: **confluent-kafka-go**,
+**node-rdkafka**, **librdkafka** from C/C++, the Java client at other versions, and the
+Kafka command-line tools. If you hit a compatibility problem with any of them, it's a bug
+worth reporting.
 
 ## Connection snippets
 

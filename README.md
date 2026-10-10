@@ -12,9 +12,9 @@ data on disk, and shuts down cleanly. No JVM. No ZooKeeper. No KRaft quorum. No
 Docker.
 
 It is not a re-implementation of Apache Kafka's internals. It is a broker that
-**is built to behave like Kafka to any client on the socket**: franz-go and Sarama
-are tested in CI, and kafkajs, librdkafka (kcat, confluent-kafka) and the Java client
-speak the same protocol. If your app can't tell the difference through
+**is built to behave like Kafka to any client on the socket**: franz-go, Sarama, the
+Java client and Kafka Streams, Spring Kafka, librdkafka (kcat, confluent-kafka) and
+KafkaJS are tested in CI. If your app can't tell the difference through
 `bootstrap.servers`, it has done its job.
 
 doze-kafka is part of the [doze](https://github.com/doze-dev) family, but it needs
@@ -148,7 +148,8 @@ Start here → **[docs/](docs/README.md)**
 | [Configuration](docs/configuration.md) | Every flag and TOML config-file key, defaults, and worked examples. |
 | [Endpoints](docs/endpoints.md) | Every port and file it opens, the `.doze` names, containers. |
 | [Embedding](docs/embedding.md) | Starting a broker from Go code, for tests. |
-| [Clients](docs/clients.md) | Connecting franz-go, Sarama, kafkajs, librdkafka/kcat, Java. |
+| [Clients](docs/clients.md) | Connecting franz-go, Sarama, kafkajs, librdkafka/kcat, Java, and what is tested in CI. |
+| [Frameworks and tools](docs/frameworks.md) | Kafka Streams, Spring Kafka, Kafka Connect, schema registries and Kafka UIs. |
 | [Consumer groups](docs/consumer-groups.md) | Classic vs KIP-848, offsets, rebalancing. |
 | [Auth & TLS](docs/auth-and-tls.md) | Turning on SASL and TLS, with client snippets. |
 | [Transactions](docs/transactions.md) | Exactly-once: transactional producers, read-committed consumers, what the broker does. |
@@ -172,12 +173,16 @@ Kafka 5 would be a normal minor release of doze-kafka, not "doze-kafka 5".
 ## Status
 
 Built for local development. The automated suite verifies it end-to-end against
-**franz-go** and **Sarama** (two independent client implementations) plus the real
-compiled binary. kafkajs, librdkafka (kcat) and the Java client speak the same wire
-protocol and are expected to work, but are not yet exercised in CI; if one doesn't,
-that is a bug worth reporting. Not production software and not trying to be: see
-[Limitations](docs/limitations.md) for what is deliberately out of scope.
-Development history and acceptance notes live in [docs/reports/](docs/reports/history/).
+**franz-go** and **Sarama**, and a compatibility matrix runs the clients and frameworks
+teams develop with against the real binary, with no authentication and over SASL/SCRAM and
+TLS: the **Java client** (admin, transactions, both group protocols), **Kafka Streams**
+(exactly-once, restoring from compacted changelogs), **Spring Kafka**, **confluent-kafka**
+(librdkafka), **kcat**, **KafkaJS**, **Kafka Connect**, Confluent's and Apicurio's schema
+registries, and the **Kafbat** and **Redpanda** UIs ([Frameworks and tools](docs/frameworks.md)).
+Anything else on the Kafka protocol is expected to work; if it doesn't, that is a bug worth
+reporting. Not production software and not trying to be: see [Limitations](docs/limitations.md)
+for what is deliberately out of scope. Development history and acceptance notes live in
+[docs/reports/](docs/reports/history/).
 
 ## License
 

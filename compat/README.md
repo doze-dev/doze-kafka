@@ -23,6 +23,13 @@ prints a matrix.
 | `python` | `uv` | `confluent-kafka` (librdkafka): admin, idempotent producer, groups that commit and resume, KIP-848, transactions with `read_committed` and `read_uncommitted` |
 | `kcat` | `kcat` | librdkafka's command line: metadata, keys and headers, a group that resumes |
 | `kafkajs` | `bun` or `node` | KafkaJS: admin, idempotent producer, group consume and commit |
+| `connect` | Docker | Kafka Connect (distributed): the worker creates and verifies its three compacted internal topics; a file source into a topic and a file sink out of it; after a restart the connectors and the source's offset come back from those topics |
+| `confluent-sr` | Docker | Confluent's Schema Registry 7.7 against the broker: it keeps its state in a `_schemas` topic, completes an Avro round trip and replays after a restart |
+| `apicurio` | Docker | Apicurio Registry (Kafka SQL storage): the same |
+| `kafbat-ui`, `redpanda-console` | Docker | the UIs connect and list topics, consumer groups and brokers |
+
+The `java` and `python` clients also run Confluent's serializers (Avro, Protobuf, JSON Schema)
+against the built-in schema registry.
 
 Go clients (franz-go, Sarama) are covered by the Go test suite.
 
