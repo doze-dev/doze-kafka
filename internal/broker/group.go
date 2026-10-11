@@ -26,6 +26,18 @@ const defaultSessionTimeout = 30 * time.Second
 // it must wait long enough for the rest of one process's consumers to arrive.
 var initialRebalanceDelay = 200 * time.Millisecond
 
+// The bounds on a classic member's session.timeout.ms: Apache Kafka's defaults of
+// group.min.session.timeout.ms (6 s) and group.max.session.timeout.ms (30 min),
+// recorded against apache/kafka (conformance/recordings/joingroup-session-timeout.json).
+// A session outside them is INVALID_SESSION_TIMEOUT, checked before anything
+// else about the request. A client developed here with a 1 s session would
+// otherwise ship a setting every real broker refuses. Variables so a test of
+// the expiry machinery can use a short one.
+var (
+	minSessionTimeout = 6 * time.Second
+	maxSessionTimeout = 30 * time.Minute
+)
+
 // pendingMemberTTL is how long a member id issued with MEMBER_ID_REQUIRED stays
 // valid for the join that should follow it.
 const pendingMemberTTL = 5 * time.Minute
@@ -289,6 +301,11 @@ func (gm *groupManager) forget(group string) bool {
 func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who clientRef) (joinResult, error) {
 	refuse := func(code int16) (joinResult, error) {
 		return joinResult{errorCode: int16(code), memberID: r.MemberID, generation: -1}, nil
+	}
+	// Kafka checks the session timeout first of all, before it hands out a member
+	// id or looks at protocols.
+	if session := time.Duration(r.SessionTimeoutMillis) * time.Millisecond; session < minSessionTimeout || session > maxSessionTimeout {
+		return refuse(kerr.InvalidSessionTimeout.Code)
 	}
 	// A member with no protocols has nothing the group could agree on.
 	if len(r.Protocols) == 0 {

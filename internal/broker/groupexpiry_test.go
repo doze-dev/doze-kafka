@@ -3,6 +3,7 @@ package broker_test
 import (
 	"context"
 	"fmt"
+	"github.com/doze-dev/doze-kafka/internal/broker"
 	"path/filepath"
 	"testing"
 	"time"
@@ -20,6 +21,7 @@ import (
 // TestGroupSessionExpiry_Classic: a classic member joins with a short session
 // timeout, then goes silent. The coordinator's session timer must evict it.
 func TestGroupSessionExpiry_Classic(t *testing.T) {
+	t.Cleanup(broker.SetMinSessionTimeoutForTest(0)) // a 1 s session is below Kafka's 6 s minimum; the test is about the timer.
 	addr := startBroker(t, 4)
 	cl := newClient(t, addr)
 	defer cl.Close()
