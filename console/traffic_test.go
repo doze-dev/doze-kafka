@@ -16,6 +16,7 @@ type fakeTraffic struct {
 	events  []TrafficEvent
 	clients []TrafficClient
 	groups  map[string][]TrafficGroupEvent
+	story   TrafficStory
 	asked   []TrafficFilter
 }
 
@@ -28,7 +29,7 @@ func (f *fakeTraffic) Events(flt TrafficFilter, limit int) []TrafficEvent {
 		if flt.Topic != "" && !slices.Contains(e.Topics, flt.Topic) {
 			continue
 		}
-		if flt.ErrorsOnly && e.Error == "" {
+		if flt.ErrorsOnly && (e.Class == "" || e.Class == "expected") && !(e.Error != "" && e.Class == "") {
 			continue
 		}
 		out = append(out, e)
@@ -58,7 +59,12 @@ func (f *fakeTraffic) NewSince(flt TrafficFilter, t time.Time) (int, bool) {
 	return n, false
 }
 
-func (f *fakeTraffic) Story(group string) TrafficStory { return TrafficStory{Group: group} }
+func (f *fakeTraffic) Story(group string) TrafficStory {
+	if f.story.Group == group {
+		return f.story
+	}
+	return TrafficStory{Group: group}
+}
 
 func (f *fakeTraffic) Window(d time.Duration) TrafficWindow {
 	f.mu.Lock()

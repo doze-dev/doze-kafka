@@ -602,11 +602,6 @@ func (c *Console) ringText(now time.Time) (short, long string) {
 		"Written by is counted from " + kept + ". It reaches back " + age + ": a client that wrote earlier, or whose requests have been pushed out, is not listed. It does not survive a restart."
 }
 
-// capacityOf is how many rows the source keeps, when it says.
-func capacityOf(src TrafficSource) int { return src.Capacity() }
-
-func plainNumber(n int) string { return groupDigits(int64(n)) }
-
 // trafficData is everything the Traffic page, and its poll, draw.
 func (c *Console) trafficData(r *http.Request) map[string]any {
 	v := trafficViewFrom(r)

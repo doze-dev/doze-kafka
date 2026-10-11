@@ -30,7 +30,7 @@ specifically testing an older client's paths.
 | OffsetCommit / OffsetFetch | 8 / 9 | Commit and read consumer-group offsets. |
 | ConsumerGroupHeartbeat | 68 | KIP-848 broker-driven group protocol (version 4 only). |
 | ConsumerGroupDescribe | 69 | Describe KIP-848 groups (version 4 only). |
-| GetTelemetrySubscriptions / PushTelemetry | 71 / 72 | Client telemetry (KIP-714, version 4 only): a client asks what to report and pushes its own metrics, which the console shows ([Observability](observability.md)). Off with `--client-telemetry=false`. |
+| GetTelemetrySubscriptions / PushTelemetry | 71 / 72 | Client telemetry (KIP-714, version 4 only): a client asks what to report and pushes its own metrics, which the console shows ([Observability](observability.md)). Offered only with the console on and not `--client-telemetry=false`. |
 | ListGroups | 16 | List consumer groups. |
 | DescribeGroups | 15 | Describe classic consumer groups. |
 | DescribeConfigs | 32 | Read topic and broker configuration. |
@@ -197,8 +197,8 @@ configs) are listed in [Limitations](limitations.md), not here.
 | ConsumerGroupHeartbeat | 68 | F | Kafka 4 profile only. |
 | ConsumerGroupDescribe | 69 | F | Kafka 4 profile only. |
 | ControllerRegistration | 70 | S | Broker registration with a controller; there is no controller to register with. |
-| GetTelemetrySubscriptions | 71 | F | Kafka 4 profile only; off with `--client-telemetry=false`. |
-| PushTelemetry | 72 | F | Kafka 4 profile only; off with `--client-telemetry=false`. |
+| GetTelemetrySubscriptions | 71 | F | Kafka 4 profile only; offered with the console on and not `--client-telemetry=false`. Answers a fixed subscription (every `org.apache.kafka.` metric, every 5 s, cumulative: C, there is no `CLIENT_METRICS` resource); `INVALID_REQUEST` when one connection already holds 8 instances. |
+| PushTelemetry | 72 | F | Kafka 4 profile only; same condition. Codes: `INVALID_REQUEST` (no instance id, an undecodable or cut-off payload, another principal's instance), `UNKNOWN_SUBSCRIPTION_ID`, `UNSUPPORTED_COMPRESSION_TYPE`, `TELEMETRY_TOO_LARGE`. A push faster than the interval allows is answered 0 and counted, not read. |
 | AssignReplicasToDirs | 73 | S | Replica-to-directory assignment between a broker and the controller; one directory. |
 | ListConfigResources | 74 | S | Not implemented; Metadata and DescribeConfigs cover what a client needs. |
 | DescribeTopicPartitions | 75 | S | Not implemented; Metadata serves the same answer, and clients fall back to it. |

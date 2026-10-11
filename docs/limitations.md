@@ -46,6 +46,21 @@ implement it.
   `conformance/recordings/joingroup-session-timeout.json`). The bounds are not
   settable here; a broker run with different bounds would differ.
 
+## Client telemetry and the Traffic page
+
+- **No `CLIENT_METRICS` resource.** Real Kafka subscribes a client (KIP-714) to nothing
+  until an operator defines one and runs a plugin to take the metrics. Here every client
+  that speaks it is subscribed to the standard set every five seconds, the only reader
+  being the console; the setting round-trips nowhere and nothing is exported.
+- **Telemetry is on with the console.** A broker without a console (`--console=false`, or
+  embedded) does not advertise `GetTelemetrySubscriptions` and `PushTelemetry`.
+- **Unrecorded.** What real Kafka answers to a push that comes early, to another
+  client's instance id and to a push it cannot decode is not recorded against a real
+  broker; this broker's answers are its own (recording queue R1, R3, R4).
+- **Memory only.** The Traffic page keeps the last 2,000 requests and 200 events per
+  group, and a restart empties it: it is the last few minutes of a laptop's traffic, not
+  an audit log.
+
 ## Deliberately out of scope
 
 - **Transactions: the classic protocol only.** Transactions work ([Transactions](transactions.md)),

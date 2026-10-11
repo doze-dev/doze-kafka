@@ -37,10 +37,10 @@
       "survivors": []
     },
     "internal/protocol": {
-      "killed": 161,
+      "killed": 320,
       "timedOut": 0,
       "lived": 0,
-      "notCovered": 48,
+      "notCovered": 76,
       "survivors": []
     },
     "internal/storage/log": {
@@ -58,17 +58,17 @@
       "survivors": []
     },
     "internal/telemetry": {
-      "killed": 63,
+      "killed": 139,
       "timedOut": 0,
       "lived": 0,
-      "notCovered": 38,
+      "notCovered": 33,
       "survivors": []
     },
     "internal/traffic": {
-      "killed": 55,
+      "killed": 177,
       "timedOut": 0,
       "lived": 0,
-      "notCovered": 9,
+      "notCovered": 16,
       "survivors": []
     },
     "schemaregistry": {

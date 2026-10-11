@@ -6,6 +6,37 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Traffic: everything a client says about itself is clipped before it is kept (a
+  900 KiB join reason was kept whole in each of 2,000 rows); zstd telemetry and record
+  payloads are read through their limit instead of being inflated first (a 6 KB frame
+  allocated 60 MiB); a telemetry instance's resource attributes, names and series are
+  bounded (200 pushes left 20 MB in one instance) (TRF-1, 2, 4). A cut-off snappy
+  header is an error, not a panic (TRF-3).
+- Traffic: `MEMBER_ID_REQUIRED` and `REBALANCE_IN_PROGRESS` are normal flow, not errors:
+  *errors only*, the error count and a client's error rate leave them out; every error
+  the broker returns has a class (refused, denied, not implemented, failed), a cause and a
+  fix in one table, which the console's Refused, Denied, Not implemented and Failed also
+  read (TRF-8).
+- Traffic: a transactional id is no longer listed as a consumer group (TRF-10); a request
+  that ended its connection is a row with the reason (TRF-11); a row keeps its id when
+  it folds, and a folded count survives a busy broker (TRF-12, 13); a group's rows
+  include its members' fetches (TRF-18); the console's own client ids are matched
+  exactly (TRF-21); a connection that has sent nothing is not listed as a client
+  (TRF-30); errors nested deeper than six levels (`OffsetFetch` v8+) are found (TRF-7).
+- Traffic: the page is the design's Main and Traf-02 to Traf-12: filter pills and "N of M
+  requests match", errors with what each means and what to do, a request with its
+  partitions and decoded fields, folded rows with ticks, a Clients view, a client's own
+  metrics and why one has none, a paused page that counts what it missed, a lost broker
+  that says when it was last heard, and a group's rebalance told in order. Keys `e`,
+  `u`, `m` and `c` act on it.
+- telemetry: APIs 71 and 72 are offered only with the console on and not
+  `--client-telemetry=false`; an embedded broker advertised them and kept a store nobody
+  read (TRF-14). The store is bounded at 100 instances, 150 series and 60 points (under
+  32 MB), pushes past a burst are counted and not read (TRF-5, 6), a cut-off point is
+  refused (TRF-24), a timestamp far from now is the broker's (TRF-25), and another
+  principal cannot take an instance over (TRF-27).
+- The embedding surface of `server/` is unchanged by this: no export appeared or
+  vanished (`task api` passes).
 - durability: a retry of an idempotent `acks=all` batch that the log already holds is
   now fsynced before it is acknowledged; it was acknowledged straight from the page
   cache (BAD-1).

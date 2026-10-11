@@ -106,13 +106,16 @@ SASL is on (doze-kafka provisions it a private one at start-up).
 
 ## Traffic
 
-What clients have asked the broker, newest first, with the clients connected now: who
-sent each request, what it was about, how it went, and the Kafka error name when it
-failed. Repeats of idle requests fold into one row, and the tail filters by client,
-request type, topic, group and errors. Below the clients, **Client metrics** shows what
-each client reports about itself (KIP-714): the metrics that say whether it is healthy,
-with the latest value and a small chart. They are metrics, not traces. See
-[Observability](observability.md).
+What clients have asked the broker, newest first: who sent each request, what it was
+about, how it went, and the Kafka error name when it did not. Repeats of idle requests
+fold into one row, and the tail filters by client, topic, group, request and kind.
+Select a row for the request in full (how each partition went, its decoded fields, why
+a refusal happened and what to do), a folded row for its ticks, or a client for its own
+page, with what it reports about itself (KIP-714: metrics, not traces). **Clients**
+(`?view=clients`) lists who is connected and how each is behaving; a group filter tells
+the group's rebalances in order. Pausing keeps the list still and counts what it
+missed. See [Observability](observability.md) for what each number is counted over and
+what is kept.
 
 ## Schemas
 
@@ -208,6 +211,8 @@ matter on the page you are on.
 | `[` / `]` | Previous or next tab |
 | `c` | New topic, or register a schema |
 | `p` | Produce, on a topic; otherwise pause or resume live updates |
+| `e` | On Traffic: errors only, and back |
+| `u` / `m` / `c` | On Traffic, with a request or client open: unfold a folded row, all of a client's metrics, copy a request's decoded fields |
 | `⌘Enter` / `Ctrl+Enter` | Send, from the composer |
 | `Esc` | Close a dialog or the inspector, or clear the filter |
 

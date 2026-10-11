@@ -27,16 +27,6 @@ func refusalWhy(name string) string {
 	return ""
 }
 
-// codeFor finds the code of a Kafka error name in the table.
-func codeFor(name string) (int16, bool) {
-	for _, code := range protocol.ErrorCodes() {
-		if protocol.ErrorName(code) == name {
-			return code, true
-		}
-	}
-	return 0, false
-}
-
 // nearestTopic is the existing topic whose name is closest to name, when it is close
 // enough to be what was meant: a third of the name's length at most, and never the same.
 func nearestTopic(name string, topics []TopicSummary) (string, bool) {
