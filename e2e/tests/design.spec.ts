@@ -152,8 +152,32 @@ test('a fresh empty broker lands on "Your broker is up", with the three steps', 
     await expect(page.locator('nav.rail a[href$="/topics"] .n')).toHaveText('0');
     await expect(page.locator('nav.rail a[href$="/groups"] .n')).toHaveText('0');
     await expect(page.locator('nav.rail a[href$="/traffic"] .n')).toHaveText('0 open');
-    // Creating a topic ends it.
+    // Tp-01: the empty Topics page says nothing exists, what it is not, and the shell command.
+    await page.goto(`${base}topics`);
+    await expect(page.locator('.list .list-note').first()).toContainText('No topics');
+    await expect(page.locator('.list .list-note').first()).toContainText('Nothing exists on this broker yet.');
+    await expect(page.locator('#topics-none')).toContainText('This broker has no topics.');
+    await expect(page.locator('#topics-none')).toContainText('This is not a filter and not a permissions problem.');
+    await expect(page.locator('#topics-none pre.code')).toContainText(/kafka-topics\.sh --bootstrap-server 127\.0\.0\.1:\d+ \\\n\s+--create --topic orders\.created/);
+    await expect(page.locator('#topics-none')).toContainText('The console makes exactly the same CreateTopics request.');
+    // Tp-02: the create form has the replication factor, the shell command that follows it, and what happens next.
+    await page.goto(base);
     await page.getByRole('link', { name: 'Or create it here' }).click();
+    await expect(page.locator('#f-replication')).toBeDisabled();
+    await expect(page.locator('#f-replication-teach')).toContainText('Always 1. This is one broker with no followers to copy to.');
+    await expect(page.locator('#f-partitions-teach')).toContainText(/^1 to \d+\. This is the broker's cap\. Partitions can be added later and never removed/);
+    // No raw record fields in any field's help.
+    const help = await page.locator('.teach, .hint').allInnerTexts();
+    for (const h of help) expect(h, 'help text').not.toMatch(/unit:|range:|; applied/);
+    await expect(page.getByText('What happens next')).toBeVisible();
+    await expect(page.locator('#shell-preview')).toContainText('--partitions 1 --replication-factor 1');
+    await page.locator('#f-name').fill('first-topic');
+    await page.locator('#f-partitions').fill('3');
+    await page.locator('#cfg-segment\\.bytes').fill('1MB');
+    await expect(page.locator('#shell-preview')).toContainText('--create --topic first-topic');
+    await expect(page.locator('#shell-preview')).toContainText('--partitions 3 --replication-factor 1');
+    await expect(page.locator('#shell-preview')).toContainText('--config segment.bytes=1048576');
+    // Creating a topic ends it.
     await page.locator('#f-name').fill('first-topic');
     await page.getByRole('button', { name: 'Create topic' }).click();
     await expect(page).toHaveURL(/topics\/first-topic/);
@@ -504,4 +528,18 @@ test('at 390 the Traffic requests are cards: time, request, what it was about, a
   const res = row.locator('td.cell-result');
   await expect(res).toBeVisible();
   expect(await res.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+});
+
+// Tp-02: the form says a name is taken before it is sent.
+test('the create form says a name already exists before anything is sent', async ({ page }) => {
+  await page.goto('new/topic');
+  await expect(page.getByText('Names that already exist')).toBeVisible();
+  await expect(page.getByText(/are taken\. The form says so before you send, and the broker would answer TOPIC_ALREADY_EXISTS/)).toBeVisible();
+  const warn = page.locator('#f-name-taken');
+  await expect(warn).toBeHidden();
+  await page.locator('#f-name').fill('seed-orders');
+  await expect(warn).toBeVisible();
+  await expect(warn).toContainText('already exists on this broker');
+  await page.locator('#f-name').fill('seed-orders-new');
+  await expect(warn).toBeHidden();
 });

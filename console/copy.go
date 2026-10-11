@@ -8,8 +8,8 @@ import "fmt"
 // and "your filter matched nothing" call for different next steps and used to
 // share one line.
 var uiCopy = map[string]string{
-	"topics.none.title": "No topics yet",
-	"topics.none.hint":  "Create one to start producing — or point a client at the broker and let it auto-create the topic on first use.",
+	"topics.none.title": "No topics",
+	"topics.none.hint":  "Nothing exists on this broker yet.",
 	"topics.pick":       "Select a topic to browse its messages, or create a new one.",
 
 	"groups.none.title": "No consumer groups yet",

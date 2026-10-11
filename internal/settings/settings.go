@@ -496,6 +496,9 @@ func brokerSettings() []Setting {
 	}
 	flags[0].Name = "max-partitions"
 	out = append(out, flags...)
+	// Not a flag: what the create form says about the replication factor.
+	out = append(out, Setting{Name: "replication-factor", Kind: Broker, Unit: "replicas", Range: "1", Effect: Informational, Source: Doc,
+		Enforcer: "CreateTopics (any factor above 0 is accepted; docs/limitations.md)", Meaning: "copies of each partition: this is one broker, so there is one"})
 	return out
 }
 

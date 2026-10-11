@@ -126,6 +126,9 @@ type BrokerFacts struct {
 	// makes it, with DefaultPartitions partitions.
 	AutoCreateTopics  bool
 	DefaultPartitions int
+	// MaxPartitions is the most partitions one topic may have (--max-partitions); zero
+	// when the console was not told, and the forms then name no cap.
+	MaxPartitions int
 }
 
 // New builds a console with a real Kafka client dialed at opts.Addr.
@@ -167,7 +170,7 @@ func New(opts Options) (*Console, error) {
 // parseTemplates loads the page templates: embedded in the binary, or from disk in
 // dev mode.
 func (c *Console) parseTemplates() (*template.Template, error) {
-	t := template.New("").Funcs(templateFuncs(c.prefix))
+	t := template.New("").Funcs(templateFuncs(c.prefix, c.teach))
 	if c.dev != "" {
 		return t.ParseFS(os.DirFS(c.dev), "templates/*.html")
 	}
@@ -358,7 +361,7 @@ func toast(w http.ResponseWriter, msg string) {
 	w.Header().Set("HX-Trigger", `{"toast":`+strconv.QuoteToASCII(msg)+`}`)
 }
 
-func templateFuncs(prefix string) template.FuncMap {
+func templateFuncs(prefix string, teach func(kind, name string) string) template.FuncMap {
 	return template.FuncMap{
 		"prefix": func() string { return prefix },
 		"icon":   icon,
@@ -385,7 +388,7 @@ func templateFuncs(prefix string) template.FuncMap {
 		"needsLook": func(name string, msgs int64) bool { return isDeadLetterName(name) && msgs > 0 },
 		// teach is the line under a field, read from the settings table by the
 		// record's kind and name (teaching.go).
-		"teach": teachLine,
+		"teach": teach,
 		// confirmOffset is the confirm of one row's Remove (confirms.go).
 		"confirmOffset": offsetDeleteConfirm,
 		"confirmURL":    func(id string, kv ...any) string { return confirmURLFor(prefix, id, kv...) },

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/internal/settings"
 	"github.com/doze-dev/doze-kafka/schemaregistry"
 )
@@ -19,16 +20,19 @@ func TestTopicFormFieldsAreInTheSettingsTable(t *testing.T) {
 			continue
 		}
 		hint := settingHint(ts.Key, ts.Hint)
-		if !strings.Contains(hint, s.Rule()) {
-			t.Errorf("%s: hint %q does not carry the table's rule %q", ts.Key, hint, s.Rule())
+		if say := s.Say(config.Config{}); !strings.Contains(hint, say) {
+			t.Errorf("%s: hint %q does not carry what the table says %q", ts.Key, hint, say)
+		}
+		if strings.Contains(hint, "unit:") || strings.Contains(hint, "range:") || strings.Contains(hint, "; applied") {
+			t.Errorf("%s: raw record fields leak into the field help: %q", ts.Key, hint)
 		}
 		if len(s.Choices) > 0 && strings.Join(s.Choices, ",") != strings.Join(ts.Options, ",") {
 			t.Errorf("%s: console options %v differ from the table's %v", ts.Key, ts.Options, s.Choices)
 		}
 	}
-	// The broker's defaults that differ from Kafka's are stated, not implied.
-	if h := settingHint("retention.ms", ""); !strings.Contains(h, "604800000") {
-		t.Errorf("retention.ms hint does not say Kafka's default differs: %q", h)
+	// The seven days is written the way the board writes it.
+	if h := settingHint("retention.ms", ""); !strings.Contains(h, "7 d is 604800000") {
+		t.Errorf("retention.ms hint does not teach what 7 d is: %q", h)
 	}
 }
 

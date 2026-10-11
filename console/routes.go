@@ -104,6 +104,7 @@ func (c *Console) routeTable() []routeRow {
 		// Topics.
 		get("/topics", specTopics, "the list", c.topics),
 		get("/new/topic", specTopics, "the create form", c.topicCreatePage),
+		get("/new/topic/shell", specDesign, "the create form's shell command, as typed", c.topicShell),
 		post("/new/topic", specTopics, "create a topic", c.topicCreate),
 		get("/topics/{name}", specTopics, "one topic", c.topicDetail),
 		post("/topics/{name}/delete", specTopics, "delete the topic", c.topicDelete),

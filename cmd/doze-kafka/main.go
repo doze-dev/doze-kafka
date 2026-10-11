@@ -488,7 +488,7 @@ func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger
 		Facts: console.BrokerFacts{
 			Workspace: cfg.InstanceName(), KafkaMajor: cfg.Version,
 			DataDir: cfg.DataDir, SASLMechanisms: cfg.SASLMechanisms, RegistryURL: registryPublic,
-			AutoCreateTopics: cfg.AutoCreateTopics, DefaultPartitions: cfg.DefaultPartitions,
+			AutoCreateTopics: cfg.AutoCreateTopics, DefaultPartitions: cfg.DefaultPartitions, MaxPartitions: cfg.MaxPartitions,
 			Version: version, Started: time.Now(),
 		},
 	})

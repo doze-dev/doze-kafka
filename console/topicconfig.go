@@ -32,11 +32,11 @@ type topicSetting struct {
 }
 
 var topicSettings = []topicSetting{
-	{Key: "retention.ms", Label: "Keep records for", Hint: "7d, 12h, 30m, 90s, or forever", parse: parseDuration, show: showDuration, Always: true},
-	{Key: "retention.bytes", Label: "Keep at most", Hint: "per partition: 1GB, 500MB, or unlimited", parse: parseSize, show: showSize, Always: true},
-	{Key: "segment.bytes", Label: "Segment size", Hint: "64MB, 1GB; retention removes whole segments", parse: parseSegment, show: showSize, Always: true},
-	{Key: "max.message.bytes", Label: "Largest batch", Hint: "refuse a record batch bigger than this: 1MB, 64KB", parse: parseSegment, show: showSize},
-	{Key: "message.timestamp.type", Label: "Record time", Hint: "LogAppendTime stamps records with the broker's clock", parse: parseChoice("CreateTime", "LogAppendTime"), show: func(v string) string { return v },
+	{Key: "retention.ms", Label: "Keep records for", Hint: "7d, 12h, 30m, 90s or forever", parse: parseDuration, show: showDuration, Always: true},
+	{Key: "retention.bytes", Label: "Keep at most", Hint: "1GB, 500MB or unlimited", parse: parseSize, show: showSize, Always: true},
+	{Key: "segment.bytes", Label: "Segment size", Hint: "64MB or 1GB", parse: parseSegment, show: showSize, Always: true},
+	{Key: "max.message.bytes", Label: "Largest batch", Hint: "1MB or 64KB", parse: parseSegment, show: showSize},
+	{Key: "message.timestamp.type", Label: "Record time", Hint: "", parse: parseChoice("CreateTime", "LogAppendTime"), show: func(v string) string { return v },
 		Options: []string{"CreateTime", "LogAppendTime"}},
 }
 
