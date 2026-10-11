@@ -624,8 +624,12 @@ test('the shell is the board\'s: the top bar, the brand, the page padding and th
     // The brand is as wide as its words ("width: auto" on every board), never a fixed 182.
     const brand = page.locator('header.topbar .brand');
     const w = (await brand.boundingBox())!.width;
-    expect(w).toBeLessThan(182);
-    expect(parseFloat(await brand.evaluate((el) => getComputedStyle(el).width))).toBeCloseTo(w, 1);
+    // "width: auto": exactly as wide as its logo, its name and its label, whatever the label is.
+    const content = await brand.evaluate((el) => {
+      const kids = Array.from(el.children) as HTMLElement[];
+      return kids[kids.length - 1].getBoundingClientRect().right - el.getBoundingClientRect().left;
+    });
+    expect(w).toBeCloseTo(content, 0);
   }
 });
 
