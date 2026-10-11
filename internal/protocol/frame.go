@@ -28,6 +28,11 @@ const (
 	// less a hostile one can cost.
 	maxControlFrameBytes = 1 << 20
 
+	// maxPushTelemetryFrameBytes is PushTelemetry's: the 1 MiB of metrics a client was
+	// told it may send (telemetry.max.bytes, Kafka's default and what is advertised), and
+	// room for the header and the instance id around it.
+	maxPushTelemetryFrameBytes = 1<<20 + 4096
+
 	// frameChunk is how much of a frame is trusted up front. A frame bigger than
 	// this is read as the bytes arrive, so memory follows what the peer actually
 	// sends rather than what its length prefix claims.

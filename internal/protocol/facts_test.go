@@ -3,6 +3,7 @@ package protocol
 import (
 	"bytes"
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -34,8 +35,8 @@ func TestFactsOfAProduceNameEachPartitionsResult(t *testing.T) {
 	if len(f.Partitions) != 1 || f.Partitions[0] != (PartResult{Topic: "orders", Partition: 1, Offset: 4812, HasOffset: true, Records: 1, Bytes: 81}) {
 		t.Errorf("partitions = %+v", f.Partitions)
 	}
-	if !json.Valid([]byte(f.Decoded)) || !strings.Contains(f.Decoded, `"transaction_id": "checkout-1"`) ||
-		!strings.Contains(f.Decoded, `"records": "1 batch, 1 record, 81 B"`) || !strings.Contains(f.Decoded, `"acks": -1`) {
+	if !json.Valid([]byte(f.Decoded)) || !strings.Contains(f.Decoded, `"TransactionalId": "checkout-1"`) ||
+		!strings.Contains(f.Decoded, `"Records": "1 batch, 1 record, 81 B"`) || !strings.Contains(f.Decoded, `"Acks": -1`) {
 		t.Errorf("decoded = %s", f.Decoded)
 	}
 }
@@ -105,13 +106,44 @@ func TestFactsAreBounded(t *testing.T) {
 	}
 }
 
-func TestFactsSnakeCase(t *testing.T) {
-	for in, want := range map[string]string{
-		"TransactionID": "transaction_id", "TimeoutMillis": "timeout_millis", "Topics": "topics",
-		"ClientInstanceID": "client_instance_id", "SASLAuthBytes": "sasl_auth_bytes", "Acks": "acks",
+// The decoded fields carry the names Apache Kafka's own specification of the message
+// has (conformance: testdata/kafka-spec, kafka-clients 4.3.1), not the client library's.
+func TestFactsUseTheSpecificationsNames(t *testing.T) {
+	for _, c := range []struct {
+		typ         any
+		field, want string
+	}{
+		{kmsg.ProduceRequest{}, "TransactionID", "TransactionalId"},
+		{kmsg.ProduceRequest{}, "TimeoutMillis", "TimeoutMs"},
+		{kmsg.ProduceRequest{}, "Topics", "TopicData"},
+		{kmsg.ProduceRequestTopic{}, "Topic", "Name"},
+		{kmsg.ProduceRequestTopic{}, "Partitions", "PartitionData"},
+		{kmsg.ProduceRequestTopicPartition{}, "Partition", "Index"},
+		{kmsg.ProduceRequest{}, "Acks", "Acks"},
+		{kmsg.PushTelemetryRequest{}, "ClientInstanceID", "ClientInstanceId"},
+		{kmsg.InitProducerIDRequest{}, "TransactionalID", "TransactionalId"},
 	} {
-		if got := snake(in); got != want {
-			t.Errorf("snake(%q) = %q, want %q", in, got, want)
+		if got := specFieldName(reflect.TypeOf(c.typ), c.field); got != c.want {
+			t.Errorf("%T.%s is %q, want %q", c.typ, c.field, got, c.want)
+		}
+	}
+	q := kmsg.NewPtrProduceRequest()
+	q.Acks, q.TransactionID, q.TimeoutMillis = -1, str("checkout-1"), 1500
+	tp := kmsg.NewProduceRequestTopic()
+	tp.Topic = "orders"
+	pp := kmsg.NewProduceRequestTopicPartition()
+	pp.Partition = 3
+	tp.Partitions = append(tp.Partitions, pp)
+	q.Topics = append(q.Topics, tp)
+	d := DescribeFacts(q, nil).Decoded
+	for _, want := range []string{`"TransactionalId": "checkout-1"`, `"TimeoutMs": 1500`, `"Acks": -1`, `"TopicData": [{"Name": "orders", "PartitionData": [{"Index": 3`} {
+		if !strings.Contains(d, want) {
+			t.Errorf("decoded = %s, want it to contain %s", d, want)
+		}
+	}
+	for _, old := range []string{"transaction_id", "timeout_millis", `"topics"`, `"partition"`} {
+		if strings.Contains(d, old) {
+			t.Errorf("decoded = %s, still has the library's %s", d, old)
 		}
 	}
 }

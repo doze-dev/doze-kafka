@@ -49,14 +49,30 @@ implement it.
 ## Client telemetry and the Traffic page
 
 - **No `CLIENT_METRICS` resource.** Real Kafka subscribes a client (KIP-714) to nothing
-  until an operator defines one and runs a plugin to take the metrics. Here every client
-  that speaks it is subscribed to the standard set every five seconds, the only reader
-  being the console; the setting round-trips nowhere and nothing is exported.
+  until an operator defines one and runs a plugin to take the metrics; the resource can be
+  set with `IncrementalAlterConfigs` and read back. Here the resource is not kept: the
+  setting round-trips nowhere and nothing is exported.
+- **A subscription is the same for every client: the standard metric set, every five seconds, cumulative.**
+  Kafka with nothing configured answers a client's subscription request with no metrics, an
+  interval of five minutes and delta temporality, so that a client pushes nothing (recorded:
+  `conformance/recordings/telemetry-empty-subscription.json`). Here every client that speaks
+  KIP-714 is subscribed to the `org.apache.kafka.` metrics every five seconds, the only reader
+  being the console, and the interval it was told is the interval a push is throttled by.
 - **Telemetry is on with the console.** A broker without a console (`--console=false`, or
-  embedded) does not advertise `GetTelemetrySubscriptions` and `PushTelemetry`.
-- **Unrecorded.** What real Kafka answers to a push that comes early, to another
-  client's instance id and to a push it cannot decode is not recorded against a real
-  broker; this broker's answers are its own (recording queue R1, R3, R4).
+  embedded) does not advertise `GetTelemetrySubscriptions` and `PushTelemetry`. With one,
+  they are advertised by default, which Apache Kafka 4.3.1 does not do: it lists them in
+  `ApiVersions` only when a broker plugin that implements `ClientTelemetry` is configured,
+  and until then a client never subscribes (recorded:
+  `conformance/recordings/client-telemetry.json`). The point of the page is that clients do.
+- **Answered as Kafka does, recorded.** A push before its interval has passed, a second
+  subscription request within it, the push after a terminating one, a push for an
+  instance the broker has not seen (it is made, and a push that holds the subscription id
+  it would have given is taken, which is what a client finds after a restart), a push from
+  another connection or principal, an unsupported compression type, a payload over
+  1 MiB, a body that does not inflate, and a body that is not OpenTelemetry metrics: each is
+  answered as `conformance/recordings/telemetry-*.json` show Apache Kafka 4.3.1 doing.
+  Two bounds are this broker's own: at most 8 instances per connection (a connection that
+  makes more loses its own oldest, never another client's) and 100 instances in all.
 - **Memory only.** The Traffic page keeps the last 2,000 requests and 200 events per
   group, and a restart empties it: it is the last few minutes of a laptop's traffic, not
   an audit log.
@@ -115,7 +131,9 @@ implement it.
   do not tell the two apart. (Kafka's own rule, that `a.b` and `a_b` collide, applies too.)
 - **Validation messages are doze-kafka's own words.** For a refused topic name, partition
   count, topic config value and a broker config change, the error code is Kafka's and the
-  `error_message` text is this broker's (it names what to do about it). Match on the code.
+  `error_message` text is this broker's (it names what to do about it). A Produce batch
+  that is too large or corrupt is refused with Kafka's code and, here, a text where Kafka
+  sends none. Match on the code.
 - **A partition named twice in one ListOffsets request is answered twice.** Kafka answers
   such an entry once, with `INVALID_REQUEST`. The console asks for a partition's earliest
   and latest offset as two entries of one request, so this stays until it asks differently.

@@ -15,6 +15,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/doze-dev/doze-kafka/internal/config"
+
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
@@ -43,20 +45,42 @@ type Scenario struct {
 	// difference that is not here, and fails on an entry here that no longer
 	// differs, so the list cannot go stale.
 	Known []Known
+	// KafkaEnv are extra environment settings for the real broker's container
+	// (KAFKA_...): a scenario about authorization turns the authorizer on.
+	KafkaEnv []string
+	// Users, when set, make both brokers serve SASL/PLAIN with these users
+	// (name to password); Admin names the one that is a super user. The raw
+	// connection then logs in with Env.Open.
+	Users map[string]string
+	Admin string
+	// NoReplay, when it says why, makes the scenario evidence only: it is
+	// recorded against Apache Kafka and not replayed against doze-kafka.
+	NoReplay string
+	// Doze changes the replay broker's configuration for the scenario, to do
+	// what KafkaEnv did to the real one.
+	Doze func(*config.Config)
 }
 
 // Known is one written-down difference.
 type Known struct {
-	Step string // the step's label.
+	Step string // the step's label; one ending in * is a prefix.
 	Path string // the dotted path of the response field; "" is any in the step.
 	// Limitation is a sentence of docs/limitations.md that explains it (a
 	// substring; a test checks it is there).
 	Limitation string
 }
 
+func (k Known) matches(step string) bool {
+	if p, ok := strings.CutSuffix(k.Step, "*"); ok {
+		return strings.HasPrefix(step, p)
+	}
+	return k.Step == step
+}
+
 // Step is one request and its response, normalised.
 type Step struct {
 	Label    string `json:"label"`
+	Conn     string `json:"conn,omitempty"` // the named connection the request went over.
 	API      string `json:"api"`
 	Version  int16  `json:"version"`
 	Request  any    `json:"request,omitempty"`
@@ -78,6 +102,14 @@ type Env struct {
 	norm   *normalizer
 	steps  []Step
 	fail   func(format string, args ...any)
+	// Named connections (Open, Use): the current one is w, cur is its name.
+	cur   string
+	conns map[string]*connSlot
+}
+
+type connSlot struct {
+	w          *wire
+	user, pass string
 }
 
 // NewEnv connects to the target. fail is how a script reports a broken run
@@ -87,10 +119,67 @@ func NewEnv(target Target, fail func(string, ...any)) (*Env, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Env{target: target, w: w, norm: newNormalizer(), fail: fail}, nil
+	e := &Env{target: target, w: w, norm: newNormalizer(), fail: fail, conns: map[string]*connSlot{"": {w: w}}}
+	return e, nil
 }
 
-func (e *Env) Close() { e.w.close() }
+func (e *Env) Close() {
+	e.Use(e.cur)
+	for _, c := range e.conns {
+		if c.w != nil {
+			c.w.close()
+		}
+	}
+}
+
+// Open makes a connection of its own under name, logged in as user over
+// SASL/PLAIN when user is not empty. The script sends over it after Use(name).
+func (e *Env) Open(name, user, pass string) {
+	if _, ok := e.conns[name]; ok {
+		e.fail("connection %q is open already", name)
+		return
+	}
+	e.conns[name] = &connSlot{user: user, pass: pass}
+	e.connect(e.conns[name])
+}
+
+func (e *Env) connect(c *connSlot) {
+	w, err := dial(e.target.Addr())
+	if err != nil {
+		e.fail("connect: %v", err)
+		return
+	}
+	if c.user != "" {
+		if err := w.saslPlain(c.user, c.pass); err != nil {
+			e.fail("login as %s: %v", c.user, err)
+			return
+		}
+	}
+	c.w = w
+}
+
+// Use makes name the connection the next requests go over ("" is the first).
+func (e *Env) Use(name string) {
+	e.conns[e.cur].w = e.w
+	c, ok := e.conns[name]
+	if !ok {
+		e.fail("no connection %q", name)
+		return
+	}
+	if c.w == nil {
+		e.connect(c)
+	}
+	e.cur, e.w = name, c.w
+}
+
+// Reconnect drops the current connection and makes a new one under the same name.
+func (e *Env) Reconnect() {
+	e.w.close()
+	c := e.conns[e.cur]
+	c.w = nil
+	e.connect(c)
+	e.w = c.w
+}
 
 // Steps are the recorded steps so far.
 func (e *Env) Steps() []Step { return e.steps }
@@ -110,7 +199,7 @@ func (e *Env) DoUntil(label string, req kmsg.Request, version int16, done func(k
 	if err != nil {
 		e.fail("%s: %v", label, err)
 	}
-	step := Step{Label: label, API: kmsg.NameForKey(req.Key()), Version: version, Request: nreq}
+	step := Step{Label: label, Conn: e.cur, API: kmsg.NameForKey(req.Key()), Version: version, Request: nreq}
 	var resp kmsg.Response
 	// A coordinator that is still loading (or an internal topic that is still
 	// being created) is not what a script is about: ask again until it settles.
@@ -125,13 +214,11 @@ func (e *Env) DoUntil(label string, req kmsg.Request, version int16, done func(k
 				return nil
 			}
 			step.Response = map[string]any{"(connection)": "closed by the broker"}
-			e.w.close()
-			if e.w, err = dial(e.target.Addr()); err != nil {
-				e.fail("%s: reconnect: %v", label, err)
-			}
+			e.Reconnect()
 			e.steps = append(e.steps, step)
 			return req.ResponseKind()
 		}
+		sortProduceResponse(resp)
 		nresp, err := e.norm.normalize(resp)
 		if err != nil {
 			e.fail("%s: %v", label, err)
@@ -147,6 +234,22 @@ func (e *Env) DoUntil(label string, req kmsg.Request, version int16, done func(k
 	}
 	e.steps = append(e.steps, step)
 	return resp
+}
+
+// sortProduceResponse puts a Produce response's topics and partitions in name
+// and number order. Apache Kafka answers them in the order of a hash map, not
+// the order of the request (recorded: produce-mixed-partition-errors), which is
+// nothing a client can rely on, so the order is not what is compared.
+func sortProduceResponse(r kmsg.Response) {
+	p, ok := r.(*kmsg.ProduceResponse)
+	if !ok {
+		return
+	}
+	sort.SliceStable(p.Topics, func(i, j int) bool { return p.Topics[i].Topic < p.Topics[j].Topic })
+	for i := range p.Topics {
+		ps := p.Topics[i].Partitions
+		sort.SliceStable(ps, func(a, b int) bool { return ps[a].Partition < ps[b].Partition })
+	}
 }
 
 // onlyRequestedConfigs trims a CreateTopics response's echo of every topic
@@ -241,17 +344,20 @@ func (e *Env) fail2(label string) {
 // Restart stops the broker and starts it again over the same data.
 func (e *Env) Restart(label string) {
 	e.fail2(label)
-	e.w.close()
+	e.Use(e.cur)
+	for _, c := range e.conns {
+		if c.w != nil {
+			c.w.close()
+			c.w = nil
+		}
+	}
 	if err := e.target.Restart(); err != nil {
 		e.fail("%s: restart: %v", label, err)
 		return
 	}
-	w, err := dial(e.target.Addr())
-	if err != nil {
-		e.fail("%s: reconnect: %v", label, err)
-		return
-	}
-	e.w = w
+	cur := e.conns[e.cur]
+	e.connect(cur)
+	e.w = cur.w
 	e.steps = append(e.steps, Step{Label: label, API: "(restart)"})
 }
 
@@ -395,7 +501,7 @@ func (s Scenario) Unexplained(diffs []StepDiff) (unknown []string, stale []Known
 		for _, d := range sd.Diffs {
 			matched := false
 			for i, k := range s.Known {
-				if k.Step == sd.Step && (k.Path == "" || k.Path == d.Path || strings.HasPrefix(d.Path, k.Path+".") || strings.HasPrefix(d.Path, k.Path+"[")) {
+				if k.matches(sd.Step) && (k.Path == "" || k.Path == d.Path || strings.HasPrefix(d.Path, k.Path+".") || strings.HasPrefix(d.Path, k.Path+"[")) {
 					used[i], matched = true, true
 				}
 			}
@@ -439,4 +545,49 @@ func Load(dir, name string) (Recording, error) {
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.UseNumber()
 	return r, dec.Decode(&r)
+}
+
+// Pending is a request sent whose answer has not been read: a JoinGroup that
+// waits for the rest of the group is sent, others are sent over other
+// connections, and the answer is taken when it has come (Finish).
+type Pending struct {
+	label   string
+	conn    string
+	req     kmsg.Request
+	version int16
+	nreq    any
+	done    chan struct{}
+	resp    kmsg.Response
+	err     error
+}
+
+// Start sends req over the current connection and returns at once.
+func (e *Env) Start(label string, req kmsg.Request, version int16) *Pending {
+	e.fail2(label)
+	nreq, err := e.norm.normalize(req)
+	if err != nil {
+		e.fail("%s: %v", label, err)
+	}
+	p := &Pending{label: label, conn: e.cur, req: req, version: version, nreq: nreq, done: make(chan struct{})}
+	w := e.w
+	go func() {
+		p.resp, p.err = w.roundTrip(req, version)
+		close(p.done)
+	}()
+	return p
+}
+
+// Finish waits for the answer to Start and records the step.
+func (e *Env) Finish(p *Pending) kmsg.Response {
+	<-p.done
+	if p.err != nil {
+		e.fail("%s: %v", p.label, p.err)
+		return nil
+	}
+	nresp, err := e.norm.normalize(p.resp)
+	if err != nil {
+		e.fail("%s: %v", p.label, err)
+	}
+	e.steps = append(e.steps, Step{Label: p.label, Conn: p.conn, API: kmsg.NameForKey(p.req.Key()), Version: p.version, Request: p.nreq, Response: nresp})
+	return p.resp
 }

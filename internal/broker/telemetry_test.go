@@ -28,7 +28,7 @@ import (
 // What the broker tells a client to do (see telemetry.go).
 const (
 	pushMillis = 5000
-	maxBytes   = 512 << 10
+	maxBytes   = 1 << 20
 )
 
 // bootServer is boot that also hands back the server, for a test that looks inside.
@@ -159,15 +159,16 @@ func TestClientTelemetrySubscribeGivesAnIdAndWhatToReport(t *testing.T) {
 		len(first.RequestedMetrics) != 1 || first.RequestedMetrics[0] != "org.apache.kafka." {
 		t.Errorf("what to report = %+v", first)
 	}
-	if len(first.AcceptedCompressionTypes) != 5 {
-		t.Errorf("accepted compression = %v, want all five", first.AcceptedCompressionTypes)
+	if got := first.AcceptedCompressionTypes; len(got) != 4 || got[0] != 4 || got[1] != 3 || got[2] != 1 || got[3] != 2 {
+		t.Errorf("accepted compression = %v, want zstd, lz4, gzip, snappy as Apache Kafka lists them", got)
 	}
-	// Asking again with the id it was given keeps it; a client with an id the broker has
-	// not heard of (it survived a restart) is adopted, not refused.
-	again := subscribe(t, c, first.ClientInstanceID)
-	if again.ClientInstanceID != first.ClientInstanceID || again.SubscriptionID != first.SubscriptionID {
-		t.Errorf("a second subscription changed the id: %+v", again)
+	// Asking again at once is early, as it is on Apache Kafka (recorded:
+	// telemetry-empty-subscription): THROTTLING_QUOTA_EXCEEDED and nothing else.
+	if again := subscribe(t, c, first.ClientInstanceID); again.ErrorCode != kerr.ThrottlingQuotaExceeded.Code || again.ClientInstanceID != ([16]byte{}) {
+		t.Errorf("a second subscription at once: %+v, want THROTTLING_QUOTA_EXCEEDED", again)
 	}
+	// A client with an id the broker has not heard of (it survived a restart) is adopted,
+	// not refused.
 	other := [16]byte{9, 9, 9}
 	if got := subscribe(t, c, other); got.ClientInstanceID != other {
 		t.Errorf("an id the client brought was replaced: %x", got.ClientInstanceID)
@@ -180,64 +181,89 @@ func TestClientTelemetrySubscribeGivesAnIdAndWhatToReport(t *testing.T) {
 func TestClientTelemetryPushIsDecodedInEveryCompression(t *testing.T) {
 	srv, addr := bootServer(t, config.Default())
 	c := openRaw(t, addr)
-	sub := subscribe(t, c, [16]byte{})
 
+	// One instance for each codec: a second push from one is early, and refused.
+	ids := map[int8][16]byte{}
 	for codec := int8(0); codec <= 4; codec++ {
+		sub := subscribe(t, c, [16]byte{})
+		ids[codec] = sub.ClientInstanceID
 		if code := push(t, c, sub.ClientInstanceID, sub.SubscriptionID, codec, compressFor(t, codec, metricsPayload(float64(10+codec))), false); code != 0 {
 			t.Fatalf("compression %d: error %d (%s)", codec, code, kerr.ErrorForCode(code))
 		}
 	}
-	got := serverhook.ClientMetrics(srv).Instances()
-	if len(got) != 1 || got[0].Pushes != 5 {
-		t.Fatalf("instances = %+v, want one with five pushes", got)
-	}
-	in := got[0]
-	if in.Resource["service.name"] != "billing" || len(in.Series) != 1 {
-		t.Fatalf("resource %v, series %+v", in.Resource, in.Series)
-	}
-	ser := in.Series[0]
-	if ser.Name != "org.apache.kafka.producer.node.request.latency.avg" || ser.Attrs != "node_id=1" || ser.Unit != "ms" || len(ser.Samples) != 5 {
-		t.Fatalf("series = %+v", ser)
-	}
-	for i, want := range []float64{10, 11, 12, 13, 14} {
-		if ser.Samples[i].V != want {
-			t.Errorf("sample %d (compression %d) = %v, want %v", i, i, ser.Samples[i].V, want)
+	for codec := int8(0); codec <= 4; codec++ {
+		in, ok := serverhook.ClientMetrics(srv).Instance(ids[codec])
+		if !ok || in.Pushes != 1 {
+			t.Fatalf("compression %d: instance %+v, want one push", codec, in)
 		}
-	}
-	if in.Principal != "User:ANONYMOUS" || in.Host == "" {
-		t.Errorf("who it was: principal %q host %q", in.Principal, in.Host)
+		if in.Resource["service.name"] != "billing" || len(in.Series) != 1 {
+			t.Fatalf("compression %d: resource %v, series %+v", codec, in.Resource, in.Series)
+		}
+		ser := in.Series[0]
+		if ser.Name != "org.apache.kafka.producer.node.request.latency.avg" || ser.Attrs != "node_id=1" || ser.Unit != "ms" || len(ser.Samples) != 1 {
+			t.Fatalf("compression %d: series = %+v", codec, ser)
+		}
+		if want := float64(10 + codec); ser.Samples[0].V != want {
+			t.Errorf("compression %d: sample = %v, want %v", codec, ser.Samples[0].V, want)
+		}
+		if in.Principal != "User:ANONYMOUS" || in.Host == "" {
+			t.Errorf("who it was: principal %q host %q", in.Principal, in.Host)
+		}
 	}
 }
 
+// Every refusal, with what Apache Kafka 4.3.1 answered the same push
+// (conformance/recordings/telemetry-errors.json); each case is its own instance, because
+// a second push from one is early.
 func TestClientTelemetryPushErrors(t *testing.T) {
-	_, addr := bootServer(t, config.Default())
+	srv, addr := bootServer(t, config.Default())
 	c := openRaw(t, addr)
-	sub := subscribe(t, c, [16]byte{})
-	good := metricsPayload(1) // valid OTLP, and valid however many times it is repeated: so only the cap refuses the repeat.
+	good := metricsPayload(1)
 
-	for name, tc := range map[string]struct {
-		id       [16]byte
-		sub      int32
+	for _, tc := range []struct {
+		name     string
+		id       func(sub *kmsg.GetTelemetrySubscriptionsResponse) [16]byte
+		sub      func(sub *kmsg.GetTelemetrySubscriptionsResponse) int32
 		codec    int8
 		payload  []byte
 		wantCode int16
+		stored   bool
 	}{
-		"a client that never subscribed":       {[16]byte{5}, sub.SubscriptionID, 0, good, kerr.UnknownSubscriptionID.Code},
-		"an out-of-date subscription id":       {sub.ClientInstanceID, sub.SubscriptionID + 1, 0, good, kerr.UnknownSubscriptionID.Code},
-		"no client instance id":                {[16]byte{}, sub.SubscriptionID, 0, good, kerr.InvalidRequest.Code},
-		"a compression type nobody defined":    {sub.ClientInstanceID, sub.SubscriptionID, 9, good, kerr.UnsupportedCompressionType.Code},
-		"more than the broker will take":       {sub.ClientInstanceID, sub.SubscriptionID, 0, bytes.Repeat([]byte{0}, maxBytes+1), kerr.TelemetryTooLarge.Code},
-		"not OTLP":                             {sub.ClientInstanceID, sub.SubscriptionID, 0, []byte("this is not protobuf at all, just text"), kerr.InvalidRequest.Code},
-		"gzip that is not gzip":                {sub.ClientInstanceID, sub.SubscriptionID, 1, good, kerr.InvalidRequest.Code},
-		"a payload that inflates past the cap": {sub.ClientInstanceID, sub.SubscriptionID, 4, compressFor(t, 4, bytes.Repeat(good, 30000)), kerr.InvalidRequest.Code},
+		{"no client instance id", nil, nil, 0, good, kerr.InvalidRequest.Code, false},
+		{"an instance the broker never saw, with another's subscription id", func(*kmsg.GetTelemetrySubscriptionsResponse) [16]byte { return [16]byte{5} }, nil, 0, good, kerr.UnknownSubscriptionID.Code, false},
+		{"an out-of-date subscription id", nil, func(s *kmsg.GetTelemetrySubscriptionsResponse) int32 { return s.SubscriptionID + 1 }, 0, good, kerr.UnknownSubscriptionID.Code, false},
+		{"a compression type nobody defined", nil, nil, 9, good, kerr.UnsupportedCompressionType.Code, false},
+		{"a negative compression type", nil, nil, -1, good, kerr.UnsupportedCompressionType.Code, false},
+		{"more than the broker will take", nil, nil, 0, bytes.Repeat([]byte{0}, maxBytes+1), kerr.TelemetryTooLarge.Code, false},
+		{"exactly what the broker will take", nil, nil, 0, bytes.Repeat([]byte{0}, maxBytes), 0, false},
+		{"gzip that is not gzip", nil, nil, 1, good, kerr.InvalidRecord.Code, false},
+		{"snappy that is not snappy", nil, nil, 2, good, kerr.InvalidRecord.Code, false},
+		{"lz4 that is not lz4", nil, nil, 3, good, kerr.InvalidRecord.Code, false},
+		{"zstd that is not zstd", nil, nil, 4, good, kerr.InvalidRecord.Code, false},
+		{"a payload that inflates past the cap", nil, nil, 4, compressFor(t, 4, bytes.Repeat(good, 30000)), kerr.InvalidRecord.Code, false},
+		// A broker with no plugin to take the metrics does not read them.
+		{"not OTLP", nil, nil, 0, []byte("this is not protobuf at all, just text"), 0, false},
+		{"gzip of text", nil, nil, 1, compressFor(t, 1, []byte("this is not protobuf at all, just text")), 0, false},
+		{"an empty push", nil, nil, 0, nil, 0, false},
+		{"a good push", nil, nil, 1, compressFor(t, 1, good), 0, true},
 	} {
-		if got := push(t, c, tc.id, tc.sub, tc.codec, tc.payload, false); got != tc.wantCode {
-			t.Errorf("%s: error %d (%s), want %d (%s)", name, got, kerr.ErrorForCode(got), tc.wantCode, kerr.ErrorForCode(tc.wantCode))
+		sub := subscribe(t, c, [16]byte{})
+		id, subID := sub.ClientInstanceID, sub.SubscriptionID
+		if tc.id != nil {
+			id = tc.id(sub)
+		} else if tc.name == "no client instance id" {
+			id = [16]byte{}
 		}
-	}
-	// An empty push is a valid, empty report: a client may have nothing to say.
-	if got := push(t, c, sub.ClientInstanceID, sub.SubscriptionID, 0, nil, false); got != 0 {
-		t.Errorf("an empty push: error %d", got)
+		if tc.sub != nil {
+			subID = tc.sub(sub)
+		}
+		if got := push(t, c, id, subID, tc.codec, tc.payload, false); got != tc.wantCode {
+			t.Errorf("%s: error %d (%s), want %d (%s)", tc.name, got, kerr.ErrorForCode(got), tc.wantCode, kerr.ErrorForCode(tc.wantCode))
+		}
+		in, _ := serverhook.ClientMetrics(srv).Instance(sub.ClientInstanceID)
+		if has := len(in.Series) > 0; has != tc.stored {
+			t.Errorf("%s: series stored = %v, want %v", tc.name, has, tc.stored)
+		}
 	}
 }
 
@@ -266,27 +292,35 @@ func TestClientTelemetryRemembersWhoItIsAndThatItIsClosing(t *testing.T) {
 	}
 }
 
-// A broker that did not issue a subscription (a restarted one has forgotten them all)
-// tells the client to subscribe again, which is what the Java client does on that error.
-func TestClientTelemetryFromAnotherBrokersSubscriptionAsksTheClientToSubscribeAgain(t *testing.T) {
+// A broker that restarted has forgotten every subscription and every instance, and a
+// client's push that holds the subscription id it was given before is taken all the same:
+// Apache Kafka's subscription id is a function of the instance id and what it subscribes
+// to, not a number it keeps (recorded: telemetry-broker-restart). The instance is made by
+// the push, and the client's next request for its subscription is early, as it is after
+// any push taken.
+func TestClientTelemetryPushHoldingAnIdFromBeforeARestartIsTaken(t *testing.T) {
 	_, addr := bootServer(t, config.Default())
 	c := openRaw(t, addr)
 	sub := subscribe(t, c, [16]byte{})
 
-	_, addr2 := bootServer(t, config.Default()) // a different process's broker: its own subscription ids.
+	srv2, addr2 := bootServer(t, config.Default()) // a different process's broker: it has never seen the instance.
 	c2 := openRaw(t, addr2)
-	if code := push(t, c2, sub.ClientInstanceID, sub.SubscriptionID, 0, metricsPayload(1), false); code != kerr.UnknownSubscriptionID.Code {
-		t.Errorf("a push to a broker that never subscribed it: %d, want UNKNOWN_SUBSCRIPTION_ID", code)
+	if code := push(t, c2, sub.ClientInstanceID, sub.SubscriptionID, 0, metricsPayload(1), false); code != 0 {
+		t.Errorf("a push to a broker that has not seen the instance: %d, want it taken", code)
 	}
-	// What the client does next: it asks again, with the instance id it had. The restarted
-	// broker (an empty store) takes the id as its own and the client's pushes are stored
-	// again, over a new connection and for the same principal: it resumes, and does not stop.
+	if in, ok := serverhook.ClientMetrics(srv2).Instance(sub.ClientInstanceID); !ok || in.Pushes != 1 {
+		t.Errorf("instance = %+v %v, want the push stored", in, ok)
+	}
 	again := subscribe(t, c2, sub.ClientInstanceID)
-	if again.ErrorCode != 0 || again.ClientInstanceID != sub.ClientInstanceID {
-		t.Fatalf("subscribing again with the old instance id: code %d, id %x (was %x)", again.ErrorCode, again.ClientInstanceID, sub.ClientInstanceID)
+	if again.ErrorCode != kerr.ThrottlingQuotaExceeded.Code {
+		t.Errorf("subscribing right after the push: code %d, want THROTTLING_QUOTA_EXCEEDED", again.ErrorCode)
 	}
-	if code := push(t, c2, again.ClientInstanceID, again.SubscriptionID, 0, metricsPayload(1), false); code != 0 {
-		t.Errorf("the push after subscribing again: %d, want none", code)
+	// A client that asks first gets the id it had: the subscription is the same.
+	_, addr3 := bootServer(t, config.Default())
+	c3 := openRaw(t, addr3)
+	first := subscribe(t, c3, sub.ClientInstanceID)
+	if first.ErrorCode != 0 || first.ClientInstanceID != sub.ClientInstanceID || first.SubscriptionID != sub.SubscriptionID {
+		t.Errorf("subscribing with the old instance id: %+v, want the same instance and subscription id", first)
 	}
 }
 

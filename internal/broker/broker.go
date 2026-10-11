@@ -47,10 +47,8 @@ type Broker struct {
 	produce *notifier        // wakes long-polling fetchers when data is produced.
 
 	// telemetry holds what clients report about themselves (KIP-714); nil when
-	// --client-telemetry is off. subscriptionID is handed to every client and checked
-	// on every push, so a push from before a restart is told to subscribe again.
-	telemetry      *telemetry.Store
-	subscriptionID int32
+	// --client-telemetry is off.
+	telemetry *telemetry.Store
 
 	// boundPort is the port the TCP listener actually bound, learned after Bind.
 	// It is what Metadata must advertise when the configured address names no
@@ -107,7 +105,7 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 	// Only a broker with a console keeps what clients report: the console is its one
 	// reader, and a broker without one advertises nothing for clients to push into.
 	if cfg.ClientTelemetry && cfg.Console {
-		b.telemetry, b.subscriptionID = telemetry.NewStore(), newSubscriptionID()
+		b.telemetry = telemetry.NewStore()
 		b.telemetry.SetPushInterval(telemetryPushMillis * time.Millisecond)
 	}
 	return b, nil

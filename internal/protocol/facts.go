@@ -18,7 +18,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
@@ -51,8 +50,9 @@ type Facts struct {
 	// Partitions are the per-partition results, at most MaxFactPartitions.
 	Partitions     []PartResult
 	PartitionsMore int
-	// Decoded is the request's fields as JSON, in the library's names, with bytes
-	// reduced to their size. At most about a kilobyte.
+	// Decoded is the request's fields as JSON, in the names of Apache Kafka's JSON
+	// specification of the message ("TransactionalId", "TopicData"), with bytes reduced
+	// to their size. At most about a kilobyte.
 	Decoded string
 }
 
@@ -178,21 +178,15 @@ func jsonString(b *strings.Builder, s string) {
 	b.Write(out)
 }
 
-// snake turns a library field name into the style Kafka's own JSON uses:
-// "TransactionID" -> "transaction_id", "TimeoutMillis" -> "timeout_millis".
-func snake(name string) string {
-	rs := []rune(name)
-	var b strings.Builder
-	for i, r := range rs {
-		if unicode.IsUpper(r) {
-			if i > 0 && (unicode.IsLower(rs[i-1]) || (i+1 < len(rs) && unicode.IsLower(rs[i+1]) && unicode.IsUpper(rs[i-1]))) {
-				b.WriteByte('_')
-			}
-			r = unicode.ToLower(r)
-		}
-		b.WriteRune(r)
+// specFieldName is the name a field has in Apache Kafka's JSON specification of the
+// message (specnames.go): "TransactionalId" for the library's TransactionID, "TimeoutMs"
+// for TimeoutMillis, "TopicData" for Topics. A field the two name alike is its own name;
+// "" is a field the specification does not have (one for a version no longer offered).
+func specFieldName(t reflect.Type, field string) string {
+	if n, ok := specNames[t.Name()+"."+field]; ok {
+		return n
 	}
-	return b.String()
+	return field
 }
 
 func writeValue(b *strings.Builder, v reflect.Value, items, depth int) {
@@ -284,11 +278,15 @@ func writeValue(b *strings.Builder, v reflect.Value, items, depth int) {
 			if fv.Kind() == reflect.Array && fv.Len() == 16 && fv.Type().Elem().Kind() == reflect.Uint8 && fv.IsZero() {
 				continue
 			}
+			name := specFieldName(t, f.Name)
+			if name == "" {
+				continue
+			}
 			if !first {
 				b.WriteString(", ")
 			}
 			first = false
-			b.WriteString(strconv.Quote(snake(f.Name)))
+			b.WriteString(strconv.Quote(name))
 			b.WriteString(": ")
 			switch {
 			case hidden && f.Name == "Value":

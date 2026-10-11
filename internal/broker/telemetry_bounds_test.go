@@ -54,10 +54,10 @@ func TestARecordedJoinReasonIsClipped(t *testing.T) {
 func TestPushOfACutShortXerialStreamIsRefusedAndTheConnectionLives(t *testing.T) {
 	_, addr := bootServer(t, config.Default())
 	c := openRaw(t, addr)
-	sub := subscribe(t, c, [16]byte{})
-
+	// Each push is its own instance: a second from one is early.
 	xerial := []byte{0x82, 'S', 'N', 'A', 'P', 'P', 'Y', 0}
 	for n := 8; n < 16; n++ {
+		sub := subscribe(t, c, [16]byte{})
 		body := append(append([]byte{}, xerial...), make([]byte, n-8)...)
 		req := kmsg.NewPtrPushTelemetryRequest()
 		req.ClientInstanceID, req.SubscriptionID, req.CompressionType, req.Metrics = sub.ClientInstanceID, sub.SubscriptionID, 2, body
@@ -66,11 +66,12 @@ func TestPushOfACutShortXerialStreamIsRefusedAndTheConnectionLives(t *testing.T)
 		if !c.do(req, resp) {
 			t.Fatalf("a %d byte snappy stream closed the connection", n)
 		}
-		if resp.ErrorCode != kerr.InvalidRequest.Code {
-			t.Errorf("a %d byte snappy stream: error %d (%s), want INVALID_REQUEST", n, resp.ErrorCode, kerr.ErrorForCode(resp.ErrorCode))
+		if resp.ErrorCode != kerr.InvalidRecord.Code {
+			t.Errorf("a %d byte snappy stream: error %d (%s), want INVALID_RECORD", n, resp.ErrorCode, kerr.ErrorForCode(resp.ErrorCode))
 		}
 	}
-	if code := push(t, c, sub.ClientInstanceID, sub.SubscriptionID, 0, metricsPayload(1), false); code != 0 {
+	next := subscribe(t, c, [16]byte{})
+	if code := push(t, c, next.ClientInstanceID, next.SubscriptionID, 0, metricsPayload(1), false); code != 0 {
 		t.Errorf("the connection's next push: error %d", code)
 	}
 }
@@ -95,8 +96,8 @@ func TestPushOfAZstdBombIsRefusedWithoutInflatingIt(t *testing.T) {
 	runtime.ReadMemStats(&before)
 	code := push(t, c, sub.ClientInstanceID, sub.SubscriptionID, 4, bomb, false)
 	runtime.ReadMemStats(&after)
-	if code != kerr.InvalidRequest.Code {
-		t.Errorf("error %d (%s), want INVALID_REQUEST", code, kerr.ErrorForCode(code))
+	if code != kerr.InvalidRecord.Code {
+		t.Errorf("error %d (%s), want INVALID_RECORD", code, kerr.ErrorForCode(code))
 	}
 	// This process also runs the client side and the test's own garbage; the bomb alone
 	// was 60 MiB.
@@ -105,21 +106,23 @@ func TestPushOfAZstdBombIsRefusedWithoutInflatingIt(t *testing.T) {
 	}
 }
 
-// TRF-4, on the wire: 200 pushes, each adding a key of 1 KiB and a value of 100 KiB to
-// the instance's resource.
+// TRF-4, on the wire: one push that adds 40 keys of 1 KiB and a value of 20 KiB each to the
+// instance's resource.
 func TestAResourceBurstDoesNotGrowTheStore(t *testing.T) {
 	srv, addr := bootServer(t, config.Default())
 	c := openRaw(t, addr)
 	sub := subscribe(t, c, [16]byte{})
-	for i := 0; i < 200; i++ {
-		payload := telemetry.Encode(telemetry.Payload{
-			Resource: map[string]string{fmt.Sprintf("k%03d-%s", i, strings.Repeat("k", 1024)): strings.Repeat("v", 100<<10)},
-			Metrics: []telemetry.Metric{{Name: "org.apache.kafka.producer.x", Kind: telemetry.Gauge,
-				Points: []telemetry.Point{{Time: time.Now(), Value: 1}}}},
-		})
-		if code := push(t, c, sub.ClientInstanceID, sub.SubscriptionID, 0, payload, false); code != 0 {
-			t.Fatalf("push %d: error %d", i, code)
-		}
+	resource := map[string]string{}
+	for i := 0; i < 40; i++ {
+		resource[fmt.Sprintf("k%03d-%s", i, strings.Repeat("k", 1024))] = strings.Repeat("v", 20<<10)
+	}
+	payload := telemetry.Encode(telemetry.Payload{
+		Resource: resource,
+		Metrics: []telemetry.Metric{{Name: "org.apache.kafka.producer.x", Kind: telemetry.Gauge,
+			Points: []telemetry.Point{{Time: time.Now(), Value: 1}}}},
+	})
+	if code := push(t, c, sub.ClientInstanceID, sub.SubscriptionID, 0, payload, false); code != 0 {
+		t.Fatalf("push: error %d", code)
 	}
 	in := serverhook.ClientMetrics(srv).Instances()[0]
 	total := 0
@@ -127,6 +130,6 @@ func TestAResourceBurstDoesNotGrowTheStore(t *testing.T) {
 		total += len(k) + len(v)
 	}
 	if total > 64<<10 {
-		t.Errorf("the instance's resource holds %d bytes after 200 pushes, want under 64 KiB", total)
+		t.Errorf("the instance's resource holds %d bytes, want under 64 KiB", total)
 	}
 }

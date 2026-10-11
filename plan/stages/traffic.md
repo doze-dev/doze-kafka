@@ -75,8 +75,8 @@ exists for every row of the table), and it owns two:
 
 | API | Key | Now | Target | Note |
 |---|---|---|---|---|
-| GetTelemetrySubscriptions | 71 | F | F | KIP-714. v0 only, Kafka 4 profile only, advertised only with `--client-telemetry` (default on). The subscription is fixed: every metric whose name starts `org.apache.kafka.`, every 5 s, cumulative. Real Kafka subscribes a client to nothing until an operator defines a `CLIENT_METRICS` config resource, which this broker does not have (C: the setting round trips nowhere). Say so in `docs/limitations.md`. See TRF-5, TRF-14. |
-| PushTelemetry | 72 | F | F | Accepts OTLP metrics in the five codecs, up to 512 KiB compressed and 512 KiB inflated. Error codes today: `INVALID_REQUEST`, `UNKNOWN_SUBSCRIPTION_ID`, `UNSUPPORTED_COMPRESSION_TYPE`, `TELEMETRY_TOO_LARGE`. Not rate limited (TRF-5). Corrupt snappy panics (TRF-3). |
+| GetTelemetrySubscriptions | 71 | F | F | KIP-714. v0 only, Kafka 4 profile only, advertised only with `--client-telemetry` (default on) and a console. The subscription is fixed: every metric whose name starts `org.apache.kafka.`, every 5 s, cumulative. Real Kafka (recorded, R5) advertises the API only with a `ClientTelemetry` plugin and subscribes a client to nothing, every 300 s, with deltas, until an operator defines a `CLIENT_METRICS` config resource, which this broker does not have (C: the setting round trips nowhere; `docs/limitations.md`). A second request inside the interval is `THROTTLING_QUOTA_EXCEEDED`, as recorded (R1). See TRF-5, TRF-14. |
+| PushTelemetry | 72 | F | F | Accepts OTLP metrics in the five codecs, up to 1 MiB compressed and 1 MiB inflated (Kafka's `telemetry.max.bytes`, advertised). Codes, in the order Apache Kafka 4.3.1 applies them (R1, R3, recorded): `INVALID_REQUEST` (no instance id; the push after a terminating one), `THROTTLING_QUOTA_EXCEEDED` (before the interval; never for a terminating push), `UNKNOWN_SUBSCRIPTION_ID`, `UNSUPPORTED_COMPRESSION_TYPE`, `TELEMETRY_TOO_LARGE`, `INVALID_RECORD` (a body that does not decompress or inflates past the cap). A body that is not OTLP is answered 0 and not read, as Kafka does with no plugin. An instance is tied to no connection and no principal (R4). |
 | ApiVersions | 18 | F | F | Carries the client's software name and version, which is where the Software column comes from. A newer-than-known version is answered `UNSUPPORTED_VERSION` and is deliberately not shown as an error (`observe.go:117`). Owned by [cluster](cluster.md); listed because Traffic reads it. |
 | all others | | | | Observed only. The summariser per API is a Traffic contract: section 6 and TRF-17. |
 
@@ -202,7 +202,7 @@ not on the recording queue.
 - `Recorder` locking: `Request`, `Events`, `Clients`, `GroupEvent` take one mutex and hold it for O(1) work except `Events` (copies the ring under the lock, sorts after); `go test -race` for `internal/traffic` and `internal/telemetry` is part of `task check` and passes. `resolve` (the topic id lookup) runs under the recorder's lock; it takes the broker's metadata read lock, and no broker path calls the recorder while holding that lock (checked: `emit` sites in `group.go` and `group848.go` hold only group locks). Written down as a rule in section 5.
 - `ConnClosed` removes the connection and its fold map; `recent` entries are deleted when their row is evicted (tested by `TestFoldingDoesNotOutliveTheRow`). No goroutine or fd is created by the recorder or the store.
 - Telemetry decode: depth is bounded by the schema (no recursion), `FuzzDecode` exists and is in `task fuzz`.
-- Frame limits: a non-Produce request is capped at 1 MiB (`maxControlFrameBytes`), so the 512 KiB telemetry cap and the inflated cap sit under it as the comment says.
+- Frame limits: a non-Produce request is capped at 1 MiB (`maxControlFrameBytes`); PushTelemetry alone is given 1 MiB and a header (`maxPushTelemetryFrameBytes`), because the 1 MiB `telemetry.max.bytes` that Kafka advertises, and accepts a payload of exactly, must arrive.
 - `PushTelemetry` and `GetTelemetrySubscriptions` are not reachable before authentication (`preAuthAllowed`).
 - Windows: nothing in these packages touches paths or signals.
 
@@ -270,7 +270,7 @@ Statuses: `real` (exists), `buildable` (data exists, screen or small query does 
 **Raw kmsg (`internal/broker`)**
 
 - JoinGroup v9 with a 900 KiB reason, then the recorder's row is clipped (TRF-1).
-- PushTelemetry: codec 2 with an 11-byte xerial body -> `INVALID_REQUEST`, connection alive (TRF-3); the 200-push burst (TRF-4, TRF-5); a zstd bomb answered in under 5 MiB of allocation (TRF-2).
+- PushTelemetry: codec 2 with an 11-byte xerial body -> `INVALID_RECORD` (recorded: R3), connection alive (TRF-3); one push with 40 oversized resource attributes (TRF-4); a second push inside the interval -> `THROTTLING_QUOTA_EXCEEDED` (TRF-5, R1); a zstd bomb answered in under 5 MiB of allocation (TRF-2).
 - ApiVersions on `--console=false` and on an embedded broker has no 71/72 (TRF-14).
 - Unadvertised API -> an observation with `Class=failed` and the connection closed (TRF-11).
 - OffsetFetch v8 with a partition error, AddPartitionsToTxn v3: the recorded `Error` is that code (TRF-7).
@@ -302,19 +302,21 @@ Statuses: `real` (exists), `buildable` (data exists, screen or small query does 
 
 ## 8. Recording queue
 
-Claims about real Kafka that are `doze-kafka` behaviour today or board text, and that nobody has recorded. Scenarios run against `apache/kafka:4.0.0` in Docker (and `confluentinc/cp-schema-registry:7.7.1` is not involved in this stage).
+Claims about real Kafka that are `doze-kafka` behaviour today or board text, and that nobody has recorded. Scenarios run against `apache/kafka:4.3.1` in Docker (the image the compat matrix uses). Every row is now recorded; the evidence file and what the recording showed are in `conformance/claims/traffic.md`, which is the claims table of this stage.
 
-| # | Claim | Source now | Scenario that would record it |
+| # | Claim | Source now | Evidence |
 |---|---|---|---|
-| R1 | What the broker answers when a client pushes before its interval has passed (and the code for a push that arrives with an old subscription id after a subscription change). | memory | `telemetry-throttle`: raw kmsg against a broker with a `CLIENT_METRICS` resource (`kafka-configs.sh --entity-type client-metrics`), GetTelemetrySubscriptions, then PushTelemetry twice within 100 ms; record both codes. |
-| R2 | `GetTelemetrySubscriptions`/`PushTelemetry` need no ACL (`authz_apis_test.go:28` says "Kafka requires no ACL for it"). | memory | `telemetry-acl`: authorizer on, a user with no ACLs, both calls; record codes. |
-| R3 | Error codes for: zero instance id on push, unknown subscription id, unsupported compression, payload larger than `TelemetryMaxBytes`, inflated larger than the cap, corrupt compressed body. | doc (KIP-714) | `telemetry-errors`: raw kmsg, one case each. |
-| R4 | A push with another client's instance id from a different connection or principal. | memory | `telemetry-instance-binding`. |
-| R5 | What real Kafka returns with no `CLIENT_METRICS` configured (subscription id, push interval, requested metrics empty), to state the deliberate difference. | doc | `telemetry-empty-subscription`. |
-| R6 | `MEMBER_ID_REQUIRED` on a first `JoinGroup` v4+ and `REBALANCE_IN_PROGRESS` on heartbeats, as the expected flow; the class table cites it. | doc (KIP-394) | `classic-join-flow`: three consumers join one after another; record every code of Join, Sync, Heartbeat, OffsetCommit. |
-| R7 | The first error a real broker reports where a response has several (Produce with partition errors in a different order than ours). Only matters for "first error" display. | memory | `produce-mixed-partition-errors`. |
-| R8 | "Any join in the classic protocol makes everyone rejoin" (Traf-12 copy) and the generation numbers across a join, a leave and an expiry. | doc | `classic-rebalance-generations`: record generation and member count per round. |
-| R9 | The client versions that push by default (Java 3.7, librdkafka 2.5), the property `enable.metrics.push`, and that franz-go and Sarama do not. | doc / memory | Run each client against the recorded broker and observe whether `GetTelemetrySubscriptions` arrives (the compat cells TRF-16 make this a test). |
+| R1 | A push before its interval is `THROTTLING_QUOTA_EXCEEDED` (89), a subscription request too; the interval is looked at first; terminating never early; the push after it is `INVALID_REQUEST` once; a stale subscription id after a change is `UNKNOWN_SUBSCRIPTION_ID`. | recorded | `telemetry-throttle` (replayed), `telemetry-interval` (not replayed: needs `CLIENT_METRICS`) |
+| R2 | The two APIs need no ACL. | recorded | `telemetry-acl` |
+| R3 | The refusal codes, in order: instance id 42, interval 89, subscription 117, compression 76, size 118, inflation 87; a body that is not OTLP is 0. | recorded | `telemetry-errors` |
+| R4 | An instance is tied to no connection and no principal. | recorded | `telemetry-instance-binding`, `telemetry-instance-binding-spaced` |
+| R5 | No `CLIENT_METRICS`: no metrics, 300 s, delta, compression 4 3 1 2, 1 MiB; the APIs are not advertised without a plugin. | recorded | `telemetry-empty-subscription`, `client-telemetry` |
+| R6 | `MEMBER_ID_REQUIRED` (79) and `REBALANCE_IN_PROGRESS` (27) as the normal flow. | recorded | `classic-join-flow` |
+| R7 | A Produce response with several errors lists them in no order a client can use; codes 10, 2, 3, BaseOffset -1. | recorded | `produce-mixed-partition-errors` |
+| R8 | Generations 1, 2, 3, 4, 5 across join, join, leave, join, expiry; an expired member's heartbeat is 25. | recorded | `classic-rebalance-generations` |
+| R9 | Java 3.7.0 and 4.3.1, franz-go 1.22.1 and librdkafka 2.15.1 push by default once subscribed; none pushes with nothing configured. "Java 3.7 and librdkafka 2.5 are the first" is `spec` (KIP-714). | recorded / spec | `client-telemetry` |
+| C1 | franz-go subscribes and pushes on different connections; Java and librdkafka, in a one-broker cluster, on one. The plan's "Java uses two" was not what was recorded. | recorded | `client-telemetry` |
+| C2 | After a restart a push with the old subscription id is taken (the id is a function of the instance id), not 117. | recorded | `telemetry-broker-restart` |
 | R10 | The wording of the explainer for each error code's meaning. | spec (the `kerr` descriptions) | None; the table cites the description from `kerr`. |
 
 ## 9. Owed to integration
@@ -364,7 +366,7 @@ On top of the common list in [01-protocol.md](../01-protocol.md).
 **Real clients**
 
 - [ ] Compat cells `java-telemetry`, `kcat-telemetry`, `kcat-traffic` pass, plain and SCRAM over TLS where applicable; the existing 20 cells still pass.
-- [ ] Recording scenarios R1 to R9 are recorded and replayed with zero "answered differently", or each difference is in `docs/limitations.md`; the count at `doc` or `memory` is written here: ____.
+- [ ] Recording scenarios R1 to R9 are recorded and replayed with zero "answered differently", or each difference is in `docs/limitations.md`; the count at `doc` or `memory` is written here: 0 (R9b, the first release of each client to push, is `spec` from KIP-714 and the release notes).
 
 **Boards**
 
@@ -423,7 +425,7 @@ on the code before the fix and was run again with the fix reverted by hand.
 | TRF-2 | fixed, red | `TestDecompressZstdNeverAllocatesPastTheLimit`, `TestPushOfAZstdBombIsRefusedWithoutInflatingIt`. The decoder allocates the window a frame declares, so the window is capped at four times the limit (2 MiB for telemetry: a default-level compressor asks for exactly that) and a frame declaring more is refused. The "under 4 MiB" of the plan is 6 MiB at the 2 MiB window. |
 | TRF-3 | already fixed by B12 | `TestDecompressShortXerialHeaderIsAnError`, and the on-the-wire test that the connection lives was added |
 | TRF-4 | fixed, red | `TestResourceIsBounded`, `TestAResourceBurstDoesNotGrowTheStore` |
-| TRF-5 | safeguard built; the answer is not changed | a token bucket (a burst of 20, then one per third of the interval) skips decoding and counts a push (`Instance.Skipped`), answering 0 as before. What real Kafka answers is `memory` (R1): `TestEarlyPushIsAnsweredAsRecorded` is written and skipped. |
+| TRF-5 | fixed, red, recorded (R1) | an early push is `THROTTLING_QUOTA_EXCEEDED`, a second subscription request too, as `apache/kafka:4.3.1` answers (`telemetry-throttle`, replayed). `TestEarlyPushIsThrottledAsKafkaDoes`, `TestPushesBeforeTheIntervalAreEarlyAndCounted`; the token bucket (a burst of 20) is gone: Kafka allows no burst. The skipped test is a real one. |
 | TRF-6 | fixed | caps 100 x 150 x 60, 12 bytes a sample, `TestStoreWorstCaseIsUnderBudget` (24.7 MB estimated, under 32 MiB measured); `Summaries`, `Instance`, `ForConn` copy only what is asked |
 | TRF-7 | fixed, red | `TestFirstErrorFindsEveryErrorCodeOfEveryResponse` (failed for exactly the five keys listed) |
 | TRF-8 | fixed, red | `TestExpectedFlowIsNotAnError`, the class table, the console's refusals read it |
@@ -442,7 +444,7 @@ on the code before the fix and was run again with the fix reverted by hand.
 | TRF-22 | fixed | the client's chart copy says what it covers and "one point per report" (`TestClientInspectorShowsWhatItReportsAboutItself`) |
 | TRF-23 | fixed | `TestFactsNeverHoldRecordBytesOrSecrets`, the fields held are listed in `observability.md` |
 | TRF-24, 25, 26 | fixed, red | `TestTruncatedPointIsMalformed`, `TestPastTimestampsAreClamped`, `TestDroppedSeriesAreCounted` |
-| TRF-27 | **narrowed** | an instance is a principal's: another principal is refused; another connection of the same principal is not, and the instance follows the connection that pushed. The plan's rule (refuse a push from another open connection) acted on `memory` (R4) and broke the Java client, which subscribes on its bootstrap connection and pushes on the one metadata gave it (found by the held-consumer browser spec). On a listener with no authentication every client is `User:ANONYMOUS`, so the principal does not tell clients apart there and only the random instance id (which the broker gives out and a client has to quote) protects an instance. |
+| TRF-27 | **dropped, recorded (R4)** | an instance is tied to no connection and no principal: Apache Kafka 4.3.1 lets another connection and another user push it and ask for its subscription (`telemetry-instance-binding-spaced`), so the principal rule this stage added was stricter than Kafka and is removed (`TestAnyConnectionAndPrincipalMaySpeakForAnInstance`). What stays is a bound, not a rule: a connection keeps at most 8 instances, losing its own oldest, and the store 100. |
 | TRF-28 | fixed | metrics are off the request region; the hash is from counters (`TestClientMetricsDoNotRefreshTheRequestRegion`) |
 | TRF-29 | done by the foundation (E11) | `task api` |
 | TRF-30 | fixed, red | a connection that has not sent a request is not a client |
@@ -450,15 +452,18 @@ on the code before the fix and was run again with the fix reverted by hand.
 
 **Not done, with the reason.**
 
-- **R1 to R9 are not recorded.** The scenarios need the foundation's recorder run
-  against `apache/kafka`; Docker is present, but the evidence standard asks for a
-  scenario each and this pass built the console and the backend. Every claim of the pass
-  that rests on them is `doc` or `memory` and is listed above (R1 the early push, R4 the
-  other connection, R6 `MEMBER_ID_REQUIRED` as expected flow with KIP-394, R8 "any join
-  makes everyone rejoin"). Count at `doc` or `memory`: 9 of 9.
+- **R1 to R9, C1 and C2 are recorded** against `apache/kafka:4.3.1`; none is left at
+  `doc` or `memory`. Three of the claims were wrong as the plan wrote them: the broker
+  does not advertise the two APIs without a plugin (R5), a restart does not make a push
+  `UNKNOWN_SUBSCRIPTION_ID` (C2), and the Java client uses one connection in a one-broker
+  cluster (C1). `telemetry-interval` and `telemetry-instance-binding-spaced` are evidence
+  only, because they define a `CLIENT_METRICS` resource.
 - **The dock endpoint** is the existing `/dock`, which now pages by the recorder's row ids
   (the contract's cursor); no `/traffic/dock` was added.
 - **Per (client, topic, direction) totals** for the map (W5) were not built; the map stage
   owns them.
-- **Decoded fields use the library's names**, not Kafka's JSON spec names (see the
-  deviations).
+- **Decoded fields use Kafka's JSON specification names** ("TransactionalId",
+  "TopicData", "PartitionData", "Index"), from the `kafka-clients` 4.3.1 specifications
+  kept in `internal/protocol/testdata/kafka-spec`; `specnames.go` is generated from them
+  and a test fails when it is stale or a served request has a field it does not name
+  (`TestSpecNamesMatchTheSpecification`, `TestDecodedFieldsUseTheSpecificationNames`).

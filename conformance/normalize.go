@@ -2,6 +2,8 @@ package conformance
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -19,10 +21,13 @@ type normalizer struct {
 	topicIDs map[string]string
 	members  map[string]string
 	producer map[int64]string
+	// instances and subscriptions are the ids KIP-714 has the broker make up.
+	instances     map[string]string
+	subscriptions map[string]string
 }
 
 func newNormalizer() *normalizer {
-	return &normalizer{topicIDs: map[string]string{}, members: map[string]string{}, producer: map[int64]string{}}
+	return &normalizer{topicIDs: map[string]string{}, members: map[string]string{}, producer: map[int64]string{}, instances: map[string]string{}, subscriptions: map[string]string{}}
 }
 
 // nodeKeys hold a broker id; nodeListKeys hold a list of them.
@@ -60,6 +65,19 @@ func (n *normalizer) walk(v any, key string) any {
 		}
 		return out
 	case []any:
+		if key == "ClientInstanceID" && len(x) == 16 {
+			if id, ok := uuidOf(x); ok {
+				if id == "00000000000000000000000000000000" {
+					return "<zero-id>"
+				}
+				if p, ok := n.instances[id]; ok {
+					return p
+				}
+				p := fmt.Sprintf("<instance:%d>", len(n.instances)+1)
+				n.instances[id] = p
+				return p
+			}
+		}
 		if key == "TopicID" || key == "ID" && len(x) == 16 {
 			if id, ok := uuidOf(x); ok {
 				return n.topicID(id)
@@ -73,6 +91,9 @@ func (n *normalizer) walk(v any, key string) any {
 			}
 			out[i] = n.walk(e, key)
 		}
+		if key == "Members" {
+			sortMembers(out)
+		}
 		return dropInternalAndSort(out)
 	case json.Number:
 		switch {
@@ -80,6 +101,15 @@ func (n *normalizer) walk(v any, key string) any {
 			return "<node>"
 		case key == "Port":
 			return "<port>"
+		case key == "SubscriptionID":
+			// Kafka makes it up from the subscription's content, a client of this
+			// repository from a random number: only whether two are the same matters.
+			if p, ok := n.subscriptions[x.String()]; ok {
+				return p
+			}
+			p := fmt.Sprintf("<subscription:%d>", len(n.subscriptions)+1)
+			n.subscriptions[x.String()] = p
+			return p
 		case key == "ProducerID" && x.String() != "-1":
 			i, _ := x.Int64()
 			if p, ok := n.producer[i]; ok {
@@ -94,6 +124,15 @@ func (n *normalizer) walk(v any, key string) any {
 		switch {
 		case key == "Host":
 			return "<host>"
+		case key == "Metrics" && len(x) > 512:
+			// A pushed payload that is a megabyte of something: kept as its size and
+			// a digest, so a recording stays a file one can read.
+			raw, err := base64.StdEncoding.DecodeString(x)
+			if err != nil {
+				return x
+			}
+			sum := sha256.Sum256(raw)
+			return fmt.Sprintf("<%d bytes, sha256 %x>", len(raw), sum[:6])
 		case key == "ClusterID":
 			return "<cluster>"
 		case memberKeys[key] && x != "":
@@ -243,4 +282,23 @@ func (d Diff) String() string {
 	w, _ := json.Marshal(d.Want)
 	g, _ := json.Marshal(d.Got)
 	return fmt.Sprintf("%s: kafka %s, doze %s", d.Path, w, g)
+}
+
+// sortMembers puts a group's members in the order of their placeholders: a broker
+// lists them in the order of a hash map, which is not something a client can use.
+func sortMembers(list []any) {
+	for _, e := range list {
+		m, ok := e.(map[string]any)
+		if !ok {
+			return
+		}
+		if _, ok := m["MemberID"].(string); !ok {
+			return
+		}
+	}
+	sort.SliceStable(list, func(i, j int) bool {
+		a, _ := list[i].(map[string]any)["MemberID"].(string)
+		b, _ := list[j].(map[string]any)["MemberID"].(string)
+		return a < b
+	})
 }

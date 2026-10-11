@@ -225,6 +225,9 @@ func (c *Conn) serve(ctx context.Context) {
 				return maxPreAuthFrameBytes
 			case key == kmsg.Produce:
 				return maxFrameBytes
+			case key == kmsg.PushTelemetry:
+				// A payload up to telemetry.max.bytes (1 MiB, advertised) and its header.
+				return maxPushTelemetryFrameBytes
 			default:
 				return maxControlFrameBytes
 			}

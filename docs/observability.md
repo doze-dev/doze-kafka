@@ -165,14 +165,16 @@ too old, or `enable.metrics.push=false`.
   has not reported for ten minutes (one that said it was closing, for one) is forgotten.
   Series past the cap are counted (`N not kept`). A resource has at most 32 attributes
   of 128 bytes and 1 KiB; a metric name and its attributes are cut at 256 bytes.
-- **Rate.** Past a burst of 20, pushes faster than a third of the advised interval are
-  not decoded and are counted, and the answer is the one a client always gets. What
-  real Kafka answers to an early push is not recorded (it is on the recording queue).
+- **Rate.** A push before the interval (five seconds) has passed since the last one taken
+  is answered `THROTTLING_QUOTA_EXCEEDED`, is not read and is counted, as Apache Kafka
+  does (recorded: `conformance/recordings/telemetry-throttle.json`). The first push after
+  a subscription and a client's last (terminating) push are never early.
 - **An instance follows its connection.** A Java client subscribes on one connection and
-  pushes on another; the instance is the principal's, follows the connection that last
-  pushed, and is refused only to another principal.
+  pushes on another; Kafka ties an instance to neither a connection nor a principal, and
+  here it follows the connection that last spoke for it. At most 8 instances per
+  connection are kept: one that makes more loses its own oldest.
 - Payloads are OpenTelemetry metrics, in any of the four compressions (gzip, snappy,
-  lz4, zstd), up to 512 KiB compressed and inflated; a zstd frame may declare a window of
+  lz4, zstd), up to 1 MiB compressed and inflated (Kafka's `telemetry.max.bytes`); a zstd frame may declare a window of
   at most four times that (2 MiB, which is what a default-level compressor asks for), and
   the broker reads it through the limit, never inflating more than it. A cut-off payload
   is refused. Kafka 4 profile only; older profiles do not advertise the APIs, as the
