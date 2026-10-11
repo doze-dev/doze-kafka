@@ -134,6 +134,30 @@ records survive every crash, with no loss and no gaps.
 Tighten the `acks=1` window by lowering `--fsync-interval` (at some throughput cost),
 or set it to `0` to rely purely on `acks=all` fsyncs plus the flush-on-shutdown.
 
+An `acks=all` acknowledgement is also given for a **duplicate** of a batch the log
+already holds (an idempotent producer's retry): the retry is answered with the
+original offset only after the partition has been fsynced, because the first send may
+have reached the page cache and no further. An earlier version acknowledged that retry
+without a sync (BAD-1).
+
+### When the disk misbehaves
+
+- **A full or failing disk** answers every write `KAFKA_STORAGE_ERROR`, which clients
+  treat as retriable; `acks=0` produces get the connection closed instead. Reads and
+  group traffic carry on and writes resume when space is freed. Nothing acknowledged
+  is lost and a refused write leaves no offset behind.
+- **A failed fsync** (as opposed to a failed write) is not retried. The kernel may
+  have thrown the unflushed pages away and reported the error once, so a second
+  `fsync` returning success would acknowledge data that is gone. The partition's log
+  segment goes offline: appends and syncs answer `KAFKA_STORAGE_ERROR` until the
+  broker is restarted, and recovery then keeps exactly what reached the disk. The
+  batch whose fsync failed was already appended, so a consumer may read a record its
+  producer was told failed; retry it idempotently.
+- **Power loss** is modelled by the test `TestPowerCutKeepsEveryAcksAllRecord`: it
+  keeps only what was fsynced (three variants for the unsynced tail: dropped, zeroed,
+  partly kept), reopens, and requires every `acks=all` record to be there. `SIGKILL`
+  keeps the page cache and cannot tell whether `acks=all` fsyncs; this test can.
+
 ## Committed offsets
 
 Consumer-group offsets are the other durable thing. They're written to `meta.db`,

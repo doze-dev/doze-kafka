@@ -19,6 +19,32 @@ implement it.
   caveat on volatile-cache hardware); with `acks=1` a power loss can lose the last
   sub-second (see [storage & durability](storage-and-durability.md)). But a lost
   *disk* is a lost broker either way — there is no replica.
+- **A failed disk refuses writes; it does not take the broker down.** When the data
+  directory's disk is full or failing, every request that writes answers
+  `KAFKA_STORAGE_ERROR` (retriable), as Apache Kafka does (recorded against
+  `apache/kafka:4.3.1`: `conformance/recordings/full-disk.json`), at `acks=1` and at
+  `acks=all`; at `acks=0`, which has no response to carry it, the connection is closed.
+  Reads, Metadata and group traffic keep working, and freeing space lets writes resume
+  without a restart. Kafka goes further: with its only log directory failed the broker
+  shuts down (the recording's last two steps are a closed connection); this one stays
+  up, which is kinder to a development machine and not what a production broker does.
+- **After a failed `fsync` the partition refuses writes until the broker restarts.**
+  On Linux a failed `fsync` can drop the unflushed pages and clear the error, so a
+  retry that "succeeds" proves nothing about the bytes that were lost. Kafka does not
+  retry, it takes the log directory offline; doze-kafka does the same for the one
+  partition, answering `KAFKA_STORAGE_ERROR` to every write (and every `acks=all`
+  acknowledgement) until a restart, when recovery decides from what is really on disk.
+- **A batch whose `acks=all` fsync failed stays in the log.** The producer is told
+  `KAFKA_STORAGE_ERROR` with no offset, but the batch was already appended: a consumer
+  can read it, and a non-idempotent retry stores it again (an idempotent retry is
+  deduplicated). This is the same shape as Kafka's `NOT_ENOUGH_REPLICAS_AFTER_APPEND`,
+  and it is pinned by `TestFsyncFailedBatchIsEitherRolledBackOrDocumented`.
+- **Session timeouts are bounded as Kafka's defaults bound them.** A classic group
+  member asking for a `session.timeout.ms` below 6000 or above 1800000 is refused with
+  `INVALID_SESSION_TIMEOUT` on every JoinGroup version, as a stock broker's
+  `group.min.session.timeout.ms` and `group.max.session.timeout.ms` do (recorded:
+  `conformance/recordings/joingroup-session-timeout.json`). The bounds are not
+  settable here; a broker run with different bounds would differ.
 
 ## Deliberately out of scope
 

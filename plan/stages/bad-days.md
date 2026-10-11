@@ -137,6 +137,36 @@ definition, `doc` = a named doc, `memory` = recollection (goes on the recording
 queue, section 8), `code` = the claim is about doze-kafka itself and the code is
 the authority.
 
+**Stage 1 ("Durability first") closed BAD-1, 2, 3, 4, 13 and 29.** What was done and
+what moved from the text below:
+
+- **BAD-1** fixed. `appendIdempotent` now reports that it answered from data the log
+  already holds, and `handleProduce` syncs such a partition at `acks=all`.
+  `TestDuplicateRetryAtAcksAllIsSyncedBeforeTheAck`.
+- **BAD-2** decided: the batch stays and the producer is told (document and show), the
+  same shape as `NOT_ENOUGH_REPLICAS_AFTER_APPEND`. A rollback was rejected: other
+  producers' unsynced batches may follow the failed one before its sync, and a truncate
+  would take them too. `TestFsyncFailedBatchIsEitherRolledBackOrDocumented` pins it
+  (a characterisation test, green on main as well; the board text "was not appended"
+  is still wrong for a failed sync and belongs to the console stage).
+- **BAD-3** fixed by taking the segment offline after a failed fsync (not by
+  truncating to the last synced length, which would remove records a consumer may
+  already have read). `TestFsyncFailureDoesNotFalselySucceed` and, through the binary,
+  `TestFaultSeam_AFailedFsyncTakesThePartitionOffline` (new seam point `log.fsync`).
+- **BAD-4**: the foundation had already mapped I/O errors in Produce, Fetch,
+  OffsetCommit and DeleteRecords. Stage 1 closed the rest (CreateTopics,
+  CreatePartitions, IncrementalAlterConfigs, DeleteGroups, OffsetDelete) and `acks=0`,
+  where Kafka closes the connection for any refused partition (recorded, Q9).
+  Q2 is recorded: code 56 at `acks=all` and `acks=1`, and Kafka's broker then goes
+  away, which this one does not (a deliberate, documented difference).
+- **BAD-13** `TestPowerCutKeepsEveryAcksAllRecord` (three tail variants), in
+  `internal/broker`. The chaos harness (`soak_test.go`) is unchanged: still SIGKILL
+  only, to be given the power-cut and acks=1 modes by the Bad days stage.
+- **BAD-29** fixed with Kafka's default bounds (6 s, 30 min), recorded as Q5. The same
+  fix is GRP-1 of the Groups stage, which should now be read as done.
+- Q1 stays a design choice, not a Kafka claim; Q2, Q5 and the new Q9 are recorded
+  (`conformance/claims/bad-days.md`).
+
 | ID | Sev | Finding | Where | Ev. | Src | Test to write first |
 |---|---|---|---|---|---|---|
 | BAD-1 | P0 | A retry of an idempotent `acks=all` batch that the log already holds (`seqDuplicate`) is acknowledged **without an fsync**. `appendIdempotent` returns `wrote=false` for a duplicate, so the partition is never put in `written`, and only `written` partitions are synced (`produce.go:75-79`, `:110-113`, `:282`). Sequence: the first send is appended, the fsync fails or the connection drops before the sync, the producer retries, the duplicate is answered with the original offset and `ErrorCode 0` while the bytes are still in the page cache. Acknowledged and not durable. | `internal/broker/produce.go:75-79,110,262-290` | read | code | Broker internal test `TestDuplicateRetryAtAcksAllIsSyncedBeforeTheAck`: idempotent batch at `acks=all` with `BeforeSync` failing (gets `KAFKA_STORAGE_ERROR`); `BeforeSync` healed; resend the same sequence; assert `SyncOps` rose by 1 and the reply is `0`. Then revert the fix and watch it fail. |

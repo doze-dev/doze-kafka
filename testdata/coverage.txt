@@ -1,12 +1,12 @@
 cmd/doze-kafka 79.8
-conformance 83.5
+conformance 85.2
 console 87.8
-internal/broker 89.4
+internal/broker 89.9
 internal/config 61.9
 internal/protocol 71.9
-internal/storage/log 80.4
+internal/storage/log 81.0
 internal/storage/meta 81.4
 internal/telemetry 92.0
 internal/traffic 96.7
 schemaregistry 88.4
-server 79.0
+server 79.2

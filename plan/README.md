@@ -119,7 +119,7 @@ Updated when a stage meets its criteria, in the same commit as the work.
 | Stage | Contract | Findings fixed | Proved | Console | Docs | Done | Actual days |
 |---|---|---|---|---|---|---|---|
 | Foundation | – | | | | – | | |
-| Durability first | | | | – | | | |
+| Durability first | no new API; `KAFKA_STORAGE_ERROR` on 5 more write APIs, `INVALID_SESSION_TIMEOUT` on JoinGroup, `acks=0` closes on any refused partition | 6 of 6: BAD-1, 3, 4, 13, 29 fixed; BAD-2 decided and pinned (batch stays, as Kafka's `NOT_ENOUGH_REPLICAS_AFTER_APPEND`) | red test and hand mutation per finding; `task check`, coverage (broker 89.9, log 81.0, server 79.2, conformance 85.2), lightness, conformance replay green; 3 new recordings against `apache/kafka:4.3.1` (Q2, Q5, Q9) | – | `limitations.md`, `storage-and-durability.md`, `CHANGELOG.md`, claims | committed on branch, not pushed, CI not run; `internal/traffic` was already 95.9 against a floor of 96.7 on this base | one session, not measured in days (estimate 3) |
 | Traffic | | | | | | | |
 | Topics | | | | | | | |
 | Groups | | | | | | | |
