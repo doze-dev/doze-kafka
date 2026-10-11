@@ -97,7 +97,7 @@ const DRIVERS: Record<string, (page: Page, size: Size) => Promise<void>> = {
     await open(p, 'topics/seed-orders');
     await p.locator('#palette-open').click();
     await expect(p.locator('#pal-q')).toBeFocused();
-    await p.keyboard.type('ord');
+    await p.keyboard.type('e');
     await expect(p.locator('.pal-item').first()).toBeVisible();
   },
   'Sy-06': async (p) => {
@@ -339,7 +339,7 @@ test('reference: the boards rendered as the design draws them', async ({ browser
 
 // ---- the index ---------------------------------------------------------------------
 
-const FIELDS = ['w', 'h', 'padding', 'font', 'family', 'radius', 'color', 'background'] as const; // family: h1 only
+const FIELDS = ['w', 'h', 'padding', 'gap', 'font', 'family', 'radius', 'color', 'background'] as const; // family: h1 only, gap: main only
 // Widths that follow the window are not facts of the board.
 const FLUID_W = new Set(['top bar', 'main', 'h1', 'table header row', 'first table row', 'keys strip', 'callout', 'segment', 'dialog', 'tab', 'primary button', 'pill']);
 

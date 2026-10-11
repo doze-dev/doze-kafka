@@ -60,6 +60,7 @@ export async function measure(page: Page, side: 'ref' | 'live'): Promise<Measure
         color: sty.color, radius: cs.borderRadius, padding: cs.padding,
         background: isRow && cs.backgroundColor === 'rgba(0, 0, 0, 0)' ? sty.backgroundColor : cs.backgroundColor,
       };
+      if (p.name === 'main') entry.gap = cs.rowGap;
       if (p.name === 'h1') entry.family = cs.fontFamily.split(',')[0].replace(/["']/g, '').replace(/ Variable$/, '').trim();
       if (isRow) {
         entry.columns = Array.from(el.children).map((c) => r1(c.getBoundingClientRect().width));
