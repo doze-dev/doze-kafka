@@ -392,6 +392,78 @@ brackets.
 These do not change any "done when" above; they enlarge what A1, A2, A4 to A7
 and B2 to B14 must hold.
 
+## Additions to the design
+
+What the console has that the boards do not draw. Each is built, tested in
+`e2e/tests/design.spec.ts` or the Go suite, and written down here for the owner to
+add to the boards. None of them contradicts a board.
+
+| # | Addition | Where | Why it is there |
+|---|---|---|---|
+| AD1 | A **filter field** at the top of every list pane ("Filter topics", "Filter groups", "Filter subjects"), narrowing the list as you type; `/` focuses it; Esc clears it. Sy-06 lists `/` as "filter" but no board draws the field. | Sy-01 part 2, Sy-05, Sy-06 | `/` has to put focus somewhere, and a broker with 40 topics needs it. |
+| AD2 | **`[` and `]`** step to the previous and next tab of the page (Lag, Members, Timeline, Offsets; Messages, Partitions, Readers, Config). | Sy-06, Gr-02 | Gr-02's key strip draws `1`-`4` for the tabs and `r` for reset; the console binds `[` and `]` instead (they work on every page with tabs, whatever its count) and does not bind the digits or `r`. The group's reset is in the palette. |
+| AD3 | **`?tab=`** in the address of a group or topic selects its tab, so a tab survives reload, Back and a pasted link; an unknown value falls back to the first tab. | Gr-02..Gr-08, Tp-05, Tp-16, Tp-18, Tp-23 | The boards link between tabs as separate screens; in the console they are one page, so the address has to say which. |
+| AD4 | The Traffic summary says its window in words: "313 requests and 3 errors in the last minute", "at least" where a folded row began earlier. A client's "N of its kept requests refused" says its count is over the recorder's ring. | Main, Traf-06 | The board's "412 requests in the last minute · 3 errors" does not say what the errors are counted over; counted over the whole ring it was false. |
+| AD5 | A long result name (`UNKNOWN_TOPIC_OR_PARTITION`) **wraps** in the Result column and is never cut; Request, Topic and Detail carry their full text as a tooltip. | Main, Traf-03 | Time, Result and Took must be whole; at 1440 beside the inspector there is no room for 26 characters on one line. |
+| AD6 | **Sub-millisecond durations** read `0.4 ms`, not `0 ms`. | Main | A cached `Metadata` is 0.1 ms; "0 ms" is not what happened. |
+| AD7 | At 390 a Traffic request is a **card**: request and how long, what it is about and how it went, the detail, then the time and the client. The connected-clients summary is not drawn until a row is selected. | Sy-04 | Sy-04 draws only Topics; this is the same rule (cards, one screen at a time) applied to Traffic. |
+| AD8 | **No keys strip** at 390 (Sy-04 draws none); whole at 960 and 1440. | Sy-01, Sy-04 | A phone has no keys; at 390 the strip was cut off mid-word. |
+| AD9 | The create-topic form **says a name is taken** while it is typed ("Names that already exist" names the first and how many others), and its shell command is rebuilt on the server as the form changes (it knows how `7d` and `1MB` are written for Kafka). | Tp-02 | Tp-02 draws the sentence; the live check and the server-built command are how it is made true. |
+| AD10 | A topic's **neighbours** carry a note saying where "Written by" comes from (the recent-requests ring, and how old its oldest row is) and what "Read by" counts (groups that have committed; a consumer that assigns partitions itself has no group). The Topics table's "Read by" column says **"no group has committed"**, not "nobody". | Tp-Home, Tp-05, Tc-01 | "Nobody" was false for an `assign()` consumer, and "written by" was a number of unknown reach. |
+| AD11 | The **replication factor** row says what this broker does with a factor above 1: accepts it and makes the topic with its one replica (`docs/limitations.md`); a single Apache Kafka broker would answer `INVALID_REPLICATION_FACTOR`. | Tp-02 | Tp-02 says the broker refuses it; it does not, deliberately, so an app written for a cluster starts unchanged. |
+| AD12 | A group's neighbours name its **members** (client ids from the coordinator) and the subjects of the topics it reads. | Gr-02 | Gr-02 draws three wells; the console had one. |
+
+## Deviations from the boards
+
+Where the console is not the board, and who owns closing the gap. Three verdicts:
+**MATCHES**, **DEVIATES** (what differs, and the stage that owns it) and **CUT** (not
+built, because the board shows something this broker does not know, or a board of
+notes). The verdicts come from the known gaps and from what `design.spec.ts` holds;
+a board with no known gap is marked MATCHES and has not been compared line by line
+in this pass: that comparison is the board review in
+[90-integration.md](90-integration.md), section 2.
+
+Not built because the broker lacks the data: **topic size and segments** (Tp-16,
+Tp-18, Tp-30), the **Traffic Clients tab** (Traf-06), the **registry wire dock** (the
+dock under every Schemas board), **Copy as curl** (Tp-06, Sy-02, Sy-04) and the
+**tape lanes** (Tp-21). Owned by later stages: **Create ACL and the checker** to
+[access](stages/access.md), the **Cluster sub-pages** to [cluster](stages/cluster.md),
+**Cn-02 to Cn-07** to [connect](stages/connect.md), the **Trace recent-messages
+table** to [trace](stages/trace.md), and the **Tp-02 extras** (cleanup policy and the
+"new" tags in Tp-03) to [topics](stages/topics.md).
+
+| Board | Verdict | Note |
+|---|---|---|
+| Sy-01 Anatomy, Sy-02 Dark, Sy-03 Tablet, Sy-04 Phone, Sy-05 Palette, Sy-06 Keys, Sy-07 Themes, Sy-08 First run | MATCHES | The palette has Topics, Groups, Subjects and Actions and no "Go to"; AD1 to AD3 and AD8 are additions. Sy-02 and Sy-04 draw "Copy as curl" on the message: CUT there (below). |
+| Main Traffic | MATCHES | Columns at the board's 12 px; AD4 to AD6. The board's own 1fr column is 10 px wide at 1440, so topic and detail give way where it cannot. |
+| Traf-02 Filtered, Traf-03 Errors, Traf-04 Request, Traf-05 Folded, Traf-07 Client, Traf-08 Paused, Traf-09 Empty, Traf-10 Disconnected, Traf-11 No metrics, Traf-12 Rebalance story | MATCHES | |
+| Traf-06 Clients | CUT | The Clients tab: the open connections are the inspector's summary instead. Broker lacks the per-client history the tab draws. |
+| Tp-Home, Tp-01 None | MATCHES | Tp-01 reads "This broker has no topics." and says what the data directory holds; it does not say "This is a new data directory", which the console cannot know. |
+| Tp-02 Create, Tp-03 Create settings | DEVIATES | Settings are always open, not behind "Set…"; no `cleanup.policy` field and no "new" tags; the replication row differs (AD11). Owner: topics. |
+| Tp-04 Create refused | MATCHES | |
+| Tp-05 Messages, Tp-26 Live paused, Tp-27 Empty topic | DEVIATES | The tape draws without lanes. Owner: topics, once the broker can say per-partition rate. |
+| Tp-06 Message | DEVIATES | No "Copy as curl". CUT, not owned: a REST-shaped call has no meaning here. |
+| Tp-07 Binary, Tp-08 Schema, Tp-09 Tombstone, Tp-10 to Tp-15 produce, resend, jumps | MATCHES | |
+| Tp-16 Partitions | DEVIATES | Offsets and leaders; size and segments are CUT (broker lacks the data). Owner: topics. |
+| Tp-17 Add partitions | DEVIATES | The form and the refusals; not the p0 p1 p2 → p3 diagram or the "who picks them up" prose. Owner: topics. |
+| Tp-18 Config, Tp-19 Edit a key | DEVIATES | A form per setting; no before/after and no "what it affects" panel. Segment and size columns CUT. Owner: topics. |
+| Tp-20 Refused, Tp-22 Txn, Tp-23 Readers, Tp-24 Confirms, Tp-25 Denied, Tp-28 to Tp-30 | MATCHES | Tp-30 loses the segment line (CUT). |
+| Tp-21 Compacted | DEVIATES | Compact is a pill and a note; the lane drawing is CUT. |
+| Gr-Home, Gr-01, Gr-02 Lag, Gr-03 Members, Gr-04 Timeline, Gr-05 Rebalancing, Gr-06 to Gr-11, Gr-15, Gr-16, Gr-18 | MATCHES | Gr-02 has Try it and the three neighbours (AD12); its key strip's `1`-`4` and `r` are not bound (AD2). |
+| Gr-12 KIP-848, Gr-13 Classic, Gr-14 Read committed, Gr-17 Flapping | DEVIATES | The protocol is a pill and the timeline tells the story; the board's side-by-side explanation of the two protocols and of read-committed lag is not built. Owner: groups. |
+| Sc-Home, Sc-01 to Sc-04, Sc-05 to Sc-11, Sc-13 to Sc-18 | DEVIATES | Everything but the dock: **the registry wire dock is CUT** (the registry's requests are not in the recorder). Owner: schemas, with the E4 dock contract. |
+| Sc-12 Confirms | MATCHES | |
+| Tc-Home | DEVIATES | No recent-messages table under the field. Owner: trace. |
+| Tc-01 to Tc-08 | MATCHES | |
+| Ac-Home, Ac-01 None, Ac-02 ACLs, Ac-07 Principals | MATCHES | Type, operation and permission as the board writes them. |
+| Ac-03 Create, Ac-04 Create refused, Ac-05 Checker, Ac-06 Denied log, Ac-08 Default, Ac-09 Confirms | DEVIATES | Not built: the console reads ACLs and does not write them. Owner: access. |
+| Cl-Home, Cl-01 to Cl-09 | DEVIATES | One Cluster page with its sections; the board's sub-pages (config, APIs, limits, storage, transactions, compaction, `.doze` names, listeners) are not separate pages. Owner: cluster. |
+| Cn-01 Bootstrap | MATCHES | |
+| Cn-02 to Cn-07 | DEVIATES | Not built. Owner: connect. |
+| Bad-Auth, Bad-Disk, Bad-Down, Bad-Fenced, Bad-Lock, Bad-Port, Bad-Rebalance-Storm, Bad-Recovered, Bad-Slow | DEVIATES | The disconnected state (A7) is built; the nine bad-day pages are not. Owner: bad-days. |
+| Map, Map-Large | DEVIATES | Not built. Owner: map. |
+| Grounding | CUT | A board of notes about what is real, new and removed; there is no page to build. |
+
 ## Acceptance criteria for stage 0
 
 - [ ] A1 to A12 each meet their "done when", with the test named in the commit.
