@@ -111,6 +111,7 @@ const trafficRows = 2000
 // part of the embedding API: they are internal types, and are reached through
 // internal/serverhook by this module's own commands.
 func init() {
+	serverhook.New = func(cfg config.Config, logger *slog.Logger) (any, error) { return newFromConfig(cfg, logger) }
 	serverhook.Traffic = func(srv any) *traffic.Recorder { return srv.(*Server).rec }
 	serverhook.ClientMetrics = func(srv any) *telemetry.Store { return srv.(*Server).b.Telemetry() }
 }
@@ -152,7 +153,7 @@ func New(opts Options) (*Server, error) {
 	}
 	cfg.DataDir = opts.DataDir
 	cfg.Console = false      // an embedded broker runs no console, so keeps no record for one.
-	cfg.MetaDB = opts.MetaDB // empty is resolved to <DataDir>/meta.db by NewFromConfig.
+	cfg.MetaDB = opts.MetaDB // empty is resolved to <DataDir>/meta.db by newFromConfig.
 	// An embedder asked for no particular address; the CLI default (port 9092) is
 	// the wrong answer for a library, which would fight over a fixed port with
 	// every other test run. Loopback on an ephemeral port is always free and
@@ -191,12 +192,12 @@ func New(opts Options) (*Server, error) {
 	cfg.SASLMechanisms = opts.SASLMechanisms
 	cfg.Credentials = opts.Credentials
 
-	s, err := NewFromConfig(cfg, opts.Logger)
+	s, err := newFromConfig(cfg, opts.Logger)
 	if err != nil {
 		return nil, err
 	}
 	// A caller-supplied *tls.Config (rather than cert file paths) is the one
-	// thing NewFromConfig can't see, so apply it here.
+	// thing newFromConfig can't see, so apply it here.
 	if opts.TLSConfig != nil {
 		s.srv.UseTLS(opts.TLSConfig)
 		s.tls = true
@@ -204,11 +205,12 @@ func New(opts Options) (*Server, error) {
 	return s, nil
 }
 
-// NewFromConfig builds a Server from an already-resolved config.Config — the
+// newFromConfig builds a Server from an already-resolved config.Config — the
 // seam cmd/doze-kafka uses so the CLI and the embed API share one wiring path.
-// (config.Config is an internal type, so only in-module callers can use this;
-// external embedders use New(Options).)
-func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
+// It is not exported: config.Config is an internal type, so an embedder could
+// never call it. In-module callers reach it through internal/embed; embedders
+// use New(Options).
+func newFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}

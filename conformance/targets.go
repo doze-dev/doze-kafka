@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
-	"github.com/doze-dev/doze-kafka/server"
+	"github.com/doze-dev/doze-kafka/internal/embed"
 )
 
 // --- Apache Kafka in Docker (the recorder) ---
@@ -209,7 +209,7 @@ func (t *dozeTarget) start() error {
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
-	srv, err := server.NewFromConfig(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	srv, err := embed.NewFromConfig(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		return err
 	}

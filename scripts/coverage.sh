@@ -12,16 +12,28 @@ floor=testdata/coverage.txt
 mode=${1:-check}
 
 now=$(mktemp)
-trap 'rm -f "$now"' EXIT
+raw=$(mktemp)
+trap 'rm -f "$now" "$raw"' EXIT
 # -short is not used: the floor is for the full suite. Packages with no test
-# files print "[no test files]" and are skipped.
-go test -cover ./... 2>&1 | awk '
+# files print "[no test files]" and are skipped. The output is kept whole: a
+# failing test is named below rather than summarised as "no numbers".
+test_status=0
+go test -cover ./... > "$raw" 2>&1 || test_status=$?
+awk '
   /^ok / && /coverage:/ {
     for (i = 1; i <= NF; i++) if ($i == "coverage:") { pct = $(i+1); sub(/%/, "", pct) }
     if (pct !~ /^[0-9.]+$/) next   # "[no statements]": a package that is only tests or a build-tagged seam.
     pkg = $2; sub(/^github.com\/doze-dev\/doze-kafka\/?/, "", pkg); if (pkg == "") pkg = "."
     printf "%s %s\n", pkg, pct
-  }' | sort > "$now"
+  }' "$raw" | sort > "$now"
+
+if [ "$test_status" -ne 0 ]; then
+  echo "go test failed (exit $test_status). Failing packages and tests:" >&2
+  grep -E '^(FAIL|--- FAIL|panic:)' "$raw" | sed 's/^/  /' >&2 || true
+  echo "---- tail of the test output ----" >&2
+  tail -n 60 "$raw" >&2
+  exit 1
+fi
 
 if [ ! -s "$now" ]; then echo "no coverage numbers produced (did the tests fail?)" >&2; exit 1; fi
 

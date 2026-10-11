@@ -18,7 +18,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
-	"github.com/doze-dev/doze-kafka/server"
+	"github.com/doze-dev/doze-kafka/internal/embed"
 )
 
 // bootWorld starts a broker and its registry in this process and returns where they
@@ -33,7 +33,7 @@ func bootWorld(t *testing.T) (addr, registryURL string) {
 	if err := cfg.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	srv, err := server.NewFromConfig(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	srv, err := embed.NewFromConfig(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}

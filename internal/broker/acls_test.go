@@ -16,7 +16,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
-	"github.com/doze-dev/doze-kafka/server"
+	"github.com/doze-dev/doze-kafka/internal/embed"
 )
 
 func sp(s string) *string { return &s }
@@ -225,18 +225,20 @@ func TestACLsPersistAndAreEnforcedAfterARestart(t *testing.T) {
 	skipShort(t)
 	dir := t.TempDir()
 	cfg := config.Default()
-	cfg.ListenAddr = "127.0.0.1:" + strconv.Itoa(freePort(t))
+	cfg.ListenAddr = "127.0.0.1:0"
 	cfg.DataDir, cfg.MetaDB = filepath.Join(dir, "data"), filepath.Join(dir, "meta.db")
 
 	start := func(logs io.Writer) (stop func()) {
-		srv, err := server.NewFromConfig(cfg, slog.New(slog.NewTextHandler(logs, nil)))
+		srv, err := embed.NewFromConfig(cfg, slog.New(slog.NewTextHandler(logs, nil)))
 		if err != nil {
 			t.Fatal(err)
 		}
 		ctx, cancel := context.WithCancel(context.Background())
-		if _, err := srv.Bind(ctx); err != nil {
+		bound, err := srv.Bind(ctx)
+		if err != nil {
 			t.Fatal(err)
 		}
+		cfg.ListenAddr = bound.String() // the restart binds the same address.
 		done := make(chan struct{})
 		go func() { srv.Serve(ctx); close(done) }()
 		return func() { cancel(); <-done }

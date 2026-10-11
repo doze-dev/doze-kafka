@@ -33,17 +33,17 @@ import (
 func startAuthBroker(t *testing.T, mechs []string, creds map[string]string, certFile, keyFile string) string {
 	t.Helper()
 	dir := t.TempDir()
-	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
 	cfg := config.Default()
 	cfg.Version = 4
-	cfg.ListenAddr = addr
+	cfg.ListenAddr = "127.0.0.1:0"
 	cfg.DataDir = filepath.Join(dir, "data")
 	cfg.MetaDB = filepath.Join(dir, "meta.db")
 	cfg.SASLMechanisms = mechs
 	cfg.Credentials = creds
 	cfg.TLSCertFile = certFile
 	cfg.TLSKeyFile = keyFile
-	t.Cleanup(runBroker(t, cfg))
+	addr, stop := boot(t, cfg)
+	t.Cleanup(stop)
 	return addr
 }
 

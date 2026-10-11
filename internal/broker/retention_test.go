@@ -18,18 +18,17 @@ import (
 // still within retention is lost.
 func TestRetention_TrimsUnderLoadAndSurvivesRestart(t *testing.T) {
 	dir := t.TempDir()
-	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
-
 	cfg := config.Default()
 	cfg.Version = 4
-	cfg.ListenAddr = addr
+	cfg.ListenAddr = "127.0.0.1:0"
 	cfg.DataDir = filepath.Join(dir, "data")
 	cfg.MetaDB = filepath.Join(dir, "meta.db")
 	cfg.SegmentBytes = 4 << 10    // 4 KiB segments → frequent rolls.
 	cfg.RetentionBytes = 16 << 10 // keep ~16 KiB per partition.
 	cfg.FsyncInterval = 25 * time.Millisecond
 
-	stop := runBroker(t, cfg)
+	addr, stop := boot(t, cfg)
+	cfg.ListenAddr = addr // the restart below binds the same address.
 
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()

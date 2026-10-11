@@ -25,7 +25,6 @@ field Options.SegmentBytes int64
 field Options.TLSConfig *tls.Config
 field Options.Version int
 func New(opts Options) (*Server, error)
-func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error)
 method (*Server) Addr() net.Addr
 method (*Server) AlsoListen(ctx context.Context, addr string) (net.Addr, error)
 method (*Server) Bind(ctx context.Context) (net.Addr, error)

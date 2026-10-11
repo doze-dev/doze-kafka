@@ -17,6 +17,7 @@ import (
 	"github.com/pierrec/lz4/v4"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
+	"github.com/doze-dev/doze-kafka/internal/embed"
 	"github.com/doze-dev/doze-kafka/internal/serverhook"
 	"github.com/doze-dev/doze-kafka/internal/telemetry"
 	"github.com/doze-dev/doze-kafka/server"
@@ -41,7 +42,7 @@ func bootServer(t *testing.T, cfg config.Config) (*server.Server, string) {
 	if err := cfg.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	srv, err := server.NewFromConfig(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	srv, err := embed.NewFromConfig(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}

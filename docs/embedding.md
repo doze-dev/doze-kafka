@@ -95,4 +95,9 @@ client would; embedding it is optional.
 and fails when the code and the file differ, or when the commit that changed the
 file has no `CHANGELOG.md` line containing "server API". `Server.Traffic()` and
 `Server.ClientMetrics()` are not on it: they returned internal types that only
-this module's own commands could use.
+this module's own commands could use. `NewFromConfig` is not on it either: it
+took `internal/config.Config`, which an embedder cannot name, so it was never callable
+from outside. `server.New(server.Options{...})` is the one constructor (Options carries
+`SegmentBytes`, `IndexIntervalBytes`, `ConsumerSessionTimeout` and `FsyncInterval`);
+`Config()` returns the public `server.Config`. This module's commands build from the
+internal config through `internal/embed`.
