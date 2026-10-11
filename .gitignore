@@ -11,7 +11,7 @@
 # Go test / coverage artifacts.
 *.test
 *.out
-coverage.*
+/coverage.*
 
 # Editor / OS noise.
 .DS_Store
