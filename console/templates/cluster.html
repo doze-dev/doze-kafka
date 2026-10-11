@@ -1,35 +1,62 @@
+{{/* Cluster (Cl-Home): one broker. What it is, what it holds, and the pages under it
+     that the console can draw from what the broker reports. */}}
 {{define "cluster_detail"}}{{template "shell_top" .}}
-  <main class="detail" id="detail"><div class="detail-inner clusterwrap">
-    <div class="idband">
-      <div>
-        <h1 class="page-title">Cluster</h1>
-        <p class="lede">One broker. No replication, no controller quorum — that's the whole point.</p>
+  <aside class="list narrow" aria-label="Cluster pages">
+    {{range .Views}}
+    <a class="li {{if .On}}on{{end}}" href="{{.URL}}"{{if .On}} aria-current="page"{{end}}>{{.Label}}<span class="grow"></span>{{if .Count}}<span class="m {{if .Warn}}warn{{else}}mut{{end}}">{{.Count}}</span>{{end}}</a>
+    {{end}}
+  </aside>
+  <main class="main" id="detail">
+    <div class="row sb ce idband">
+      <div class="col"><h1 class="h1">Cluster</h1><span class="note">One broker. No replication, no controller quorum. That is the whole point.</span></div>
+      <div class="row g8 ce"><a class="btn pri" href="{{prefix}}/connect">Connect an app</a></div>
+    </div>
+
+    {{if eq .ClusterView "overview"}}
+    <div class="card pad cluster-sentence" id="cluster-sentence">Node <span class="m b">{{.Cluster.NodeID}}</span>{{if .UpFor}} has been up <span class="m b">{{.UpFor}}</span>{{end}}{{if .Declares}} serving <span class="m b">{{.Declares}}</span>{{end}} on <span class="m b">{{.Cluster.Host}}:{{.Cluster.Port}}</span>, with <span class="m b">{{.TopicCount}}</span> topic{{if ne .TopicCount 1}}s{{end}} in <span class="m b">{{.PartitionCount}}</span> partition{{if ne .PartitionCount 1}}s{{end}}, <span class="m b">{{.GroupCount}}</span> group{{if ne .GroupCount 1}}s{{end}} and <span class="m b {{if .Cluster.Transactions}}warn{{end}}">{{len .Cluster.Transactions}}</span> open transaction{{if ne (len .Cluster.Transactions) 1}}s{{end}}{{if .DataDirText}}, in <span class="m b">{{.DataDirText}}</span>{{end}}.</div>
+
+    <div class="row g12 wrap steps">
+      <div class="card grow" id="cluster-identity">
+        <div class="r h" style="--c: 130px 1fr"><span>Identity</span><span></span></div>
+        <div class="r" style="--c: 130px 1fr"><span class="mut">Broker</span><span class="m">node {{.Cluster.NodeID}} · {{.Cluster.Host}}:{{.Cluster.Port}}</span></div>
+        <div class="r" style="--c: 130px 1fr"><span class="mut">Cluster ID</span><span class="m">{{.Cluster.ClusterID}}</span></div>
+        {{if .Version}}<div class="r" style="--c: 130px 1fr"><span class="mut">doze-kafka</span><span class="m">{{.Version}}{{if .Declares}} · declares {{.Declares}}{{end}}</span></div>{{end}}
+        <div class="r" style="--c: 130px 1fr"><span class="mut">Listener</span><span class="m">{{.Facts.Protocol}}{{if .Facts.Mechanisms}} · {{range $i, $m := .Facts.Mechanisms}}{{if $i}}, {{end}}{{$m}}{{end}}{{end}}</span></div>
+        {{if .DataDirText}}<div class="r" style="--c: 130px 1fr"><span class="mut">Data directory</span><span class="m">{{.DataDirText}}</span></div>{{end}}
+        <div class="r" style="--c: 130px 1fr"><span class="mut">Console</span><span class="m">{{.Facts.Console}}</span></div>
+        {{if .Facts.Registry}}<div class="r" style="--c: 130px 1fr"><span class="mut">Schema registry</span><span class="m">{{.Facts.Registry}} · built in</span></div>{{end}}
+        <div class="r" style="--c: 130px 1fr"><span class="mut">This connection</span><span class="m">{{if .Cluster.AuthMech}}SASL {{.Cluster.AuthMech}}{{else}}no authentication{{end}} · {{if .Cluster.TLS}}TLS{{else}}plaintext{{end}}</span></div>
+      </div>
+      <div class="card side" id="cluster-counts">
+        <div class="r h" style="--c: 1fr 70px"><span>Counts</span><span class="ra"></span></div>
+        <a class="r" style="--c: 1fr 70px" href="{{prefix}}/topics"><span>Topics</span><span class="m ra b">{{.TopicCount}}</span></a>
+        <a class="r" style="--c: 1fr 70px" href="{{prefix}}/topics"><span>Partitions</span><span class="m ra b">{{.PartitionCount}}</span></a>
+        <a class="r" style="--c: 1fr 70px" href="{{prefix}}/groups"><span>Consumer groups</span><span class="m ra b">{{.GroupCount}}</span></a>
+        <a class="r" style="--c: 1fr 70px" href="{{prefix}}/cluster?view=transactions"><span>Open transactions</span><span class="m ra b {{if .Cluster.Transactions}}warn{{end}}">{{len .Cluster.Transactions}}</span></a>
+        {{if .HasTraffic}}<a class="r" style="--c: 1fr 70px" href="{{prefix}}/traffic"><span>Open connections</span><span class="m ra b">{{.OpenConnections}}</span></a>{{end}}
       </div>
     </div>
-    <div class="cpanel">
-      <div class="crow2"><span class="k">Broker</span><span class="v">node {{.Cluster.NodeID}} · {{.Cluster.Host}}:{{.Cluster.Port}}</span></div>
-      <div class="crow2"><span class="k">Cluster ID</span><span class="v">{{.Cluster.ClusterID}}</span></div>
-      <div class="crow2"><span class="k">This connection</span><span class="v">{{if .Cluster.AuthMech}}SASL {{.Cluster.AuthMech}}{{else}}no authentication{{end}} · {{if .Cluster.TLS}}TLS{{else}}plaintext{{end}}</span></div>
-      <div class="crow2 stack">
-        <span class="k">Supported APIs · {{len .Cluster.SupportedAPIs}}</span>
-        <div class="apilist">{{range .Cluster.SupportedAPIs}}<span class="apichip" title="{{.Name}}: versions {{.Min}} to {{.Max}}">{{.Name}} <span class="apiv">v{{.Min}}–{{.Max}}</span></span>{{end}}</div>
-      </div>
+    <div class="note">Replication factor 1 is what every topic here reports, because there is nowhere to put a second copy. Every API the broker does not implement closes the connection cleanly on that call; everything else keeps working. See <a href="https://github.com/doze-dev/doze-kafka/blob/main/docs/limitations.md" target="_blank" rel="noopener">limitations</a>.</div>
+
+    {{else if eq .ClusterView "apis"}}
+    <div class="callout"><span class="b">Supported APIs · {{len .Cluster.SupportedAPIs}}</span>
+      <div class="apilist">{{range .Cluster.SupportedAPIs}}<span class="apichip" title="{{.Name}}: versions {{.Min}} to {{.Max}}">{{.Name}} <span class="apiv">v{{.Min}}–{{.Max}}</span></span>{{end}}</div></div>
+    <div class="note">What ApiVersions returns. A request for an API that is not here closes the connection on that call; everything else keeps working.</div>
+
+    {{else if eq .ClusterView "transactions"}}
+    <div class="row ce g8"><span class="h2">Open transactions</span><span class="note">{{len .Cluster.Transactions}} in progress</span></div>
+    <div class="card" id="open-transactions">
+      {{range .Cluster.Transactions}}<div class="r" style="--c: 180px 1fr" id="tx-{{.ID}}" tabindex="0" role="button" data-inspector-open
+        hx-get="{{prefix}}/inspect/transaction?key={{txnKey .ID}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"><span class="m b">{{.ID}}</span><span class="m el">{{.State}} · producer {{.ProducerID}} epoch {{.Epoch}}{{if not .Began.IsZero}} · open {{when .Began "since"}} of {{.Timeout}}{{end}}{{if .Partitions}} · {{range $i, $p := .Partitions}}{{if $i}}, {{end}}{{$p}}{{end}}{{end}}</span></div>
+      {{else}}<div class="pad"><span class="b">None.</span> <span class="note">No transaction is open. A producer with a <code>transactional.id</code> appears here from its first write until it commits or aborts.</span></div>{{end}}
     </div>
-    <div class="sec-title">Open transactions <span class="sz">{{len .Cluster.Transactions}} in progress</span></div>
-    <div class="cpanel" id="open-transactions">
-      {{range .Cluster.Transactions}}<div class="crow2" id="tx-{{.ID}}" tabindex="0" role="button" data-inspector-open
-        hx-get="{{prefix}}/inspect/transaction?key={{txnKey .ID}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"><span class="k mono">{{.ID}}</span><span class="v">{{.State}} · producer {{.ProducerID}} epoch {{.Epoch}}{{if not .Began.IsZero}} · open {{when .Began "since"}} of {{.Timeout}}{{end}}{{if .Partitions}} · <span class="mono">{{range $i, $p := .Partitions}}{{if $i}}, {{end}}{{$p}}{{end}}</span>{{end}}</span></div>
-      {{else}}<div class="crow2"><span class="k">None</span><span class="v">No transaction is open. A producer with a <code>transactional.id</code> appears here from its first write until it commits or aborts.</span></div>{{end}}
-    </div>
-    {{if .Cluster.BrokerConfig}}
-    <div class="sec-title">Broker configuration <span class="sz">read-only — set with flags or the config file</span></div>
-    <div class="cpanel">
-      {{range .Cluster.BrokerConfig}}<div class="crow2"><span class="k mono">{{.Name}}</span><span class="v mono">{{.Value}}</span></div>{{end}}
+
+    {{else if eq .ClusterView "config"}}
+    <div class="row ce g8"><span class="h2">Broker configuration</span><span class="note">read-only: set with flags or the config file</span></div>
+    <div class="card" id="broker-config" style="--c: minmax(0, 280px) minmax(0, 1fr)">
+      <div class="r h"><span>Key</span><span>Value</span></div>
+      {{range .Cluster.BrokerConfig}}<div class="r"><span class="m b">{{.Name}}</span><span class="m">{{.Value}}</span></div>{{end}}
     </div>
     {{end}}
-    <div class="honest">
-      {{icon "info"}}
-      <div>Every API the broker does not implement closes the connection cleanly on that call; everything else keeps working. See <a href="https://github.com/doze-dev/doze-kafka/blob/main/docs/limitations.md" target="_blank" rel="noopener">limitations</a>.</div>
-    </div>
-  </div></main>
+  </main>
 {{template "shell_bottom" .}}{{end}}

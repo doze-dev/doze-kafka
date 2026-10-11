@@ -54,6 +54,7 @@ test('Back and Forward leave the dialogs, palette and live updates working', asy
   await page.waitForLoadState('networkidle');
   await page.goBack();
   await expect(page.locator('.idband h1')).toHaveText('seed-orders');
+  await page.getByRole('button', { name: 'More actions' }).click();
   await page.getByRole('button', { name: 'Delete' }).first().click();
   await expect(page.locator('#confirm')).toBeVisible();
   await page.locator('#confirm-no').click();

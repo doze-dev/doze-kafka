@@ -1,21 +1,42 @@
+{{/* Access (Ac-Home): the ACLs the broker holds, and the rule that applies where there
+     is none. Read-only: ACLs are managed through the Kafka API (kafka-acls,
+     Terraform), as the page says. The board's create form and the "could a principal
+     do this" checker are not built here; the console has no write path for ACLs. */}}
 {{define "access_detail"}}{{template "shell_top" .}}
-  <main class="detail" id="detail"><div class="detail-inner clusterwrap">
-    <div class="idband">
-      <div>
-        <h1 class="page-title">Access</h1>
-        <p class="lede">The ACLs on this broker, read-only.</p>
-      </div>
-    </div>
-    <div class="honest" role="note">
-      {{icon "info"}}
-      <div><b>These are enforced.</b> {{if .OpenByDefault}}A topic, group or the cluster that no ACL is about is open to everyone; one that has ACLs allows only what they allow, and a DENY always wins.{{else}}Anything an ACL does not allow is refused (<code>--acl-default deny</code>); a DENY always wins.{{end}}{{if .SuperUsers}} Super users, never refused: <span class="mono">{{.SuperUsers}}</span>.{{end}} Without authentication every client is <span class="mono">User:ANONYMOUS</span>. Manage them with <code>kafka-acls</code> or your provisioning tool. See <a href="https://github.com/doze-dev/doze-kafka/blob/main/docs/authorization.md" target="_blank" rel="noopener">authorization</a>.</div>
-    </div>
-    {{if .ACLs}}
-    <div class="cpanel">
-      {{range .ACLs}}<div class="crow2"><span class="k mono">{{.Permission}} · {{.Operation}}</span><span class="v mono">{{.Principal}} from {{.Host}} on {{.Resource}} <b>{{.Name}}</b> ({{.Pattern}})</span></div>{{end}}
-    </div>
-    {{else}}
-    <div class="cpanel"><div class="crow2"><span class="k">None stored</span><span class="v">Create some with <code>kafka-acls.sh --add</code> or your provisioning tool; they take effect at once and appear here.</span></div></div>
+  <aside class="list" aria-label="Principals">
+    <a class="li {{if not .Principal}}on{{end}}" href="{{prefix}}/access"><span class="grow">All ACLs</span><span class="m mut">{{len .AllACLs}}</span></a>
+    {{range .Principals}}
+    <a class="li {{if eq .Name $.Principal}}on{{end}}" href="{{prefix}}/access?principal={{.Name}}"><span class="m grow el">{{.Name}}</span><span class="m {{if .Denies}}deny{{else}}mut{{end}}">{{if .Denies}}{{.Denies}} deny{{else}}{{.Count}}{{end}}</span></a>
     {{end}}
-  </div></main>
+    {{range .SuperUserList}}<div class="li"><span class="m grow el">{{.}}</span><span class="note">super user</span></div>{{end}}
+  </aside>
+  <main class="main" id="detail">
+    <div class="row sb ce idband">
+      <div class="col"><h1 class="h1">Access</h1><span class="note">The ACLs on this broker. They are enforced on every request.</span></div>
+    </div>
+
+    <div class="callout" role="note"><span><span class="b">These are enforced.</span> {{if .OpenByDefault}}A topic, group or the cluster that no ACL is about is open to everyone (the default is <span class="m">allow</span>); one that has ACLs allows only what they allow, and a DENY always wins.{{else}}Anything an ACL does not allow is refused (<span class="m">--acl-default deny</span>); a DENY always wins.{{end}}{{if .SuperUsers}} Super users, never refused: <span class="m">{{.SuperUsers}}</span>.{{end}} Without authentication every client is <span class="m">User:ANONYMOUS</span>.</span>
+      <span class="note">Manage them with <span class="m">kafka-acls.sh</span> or your provisioning tool. See <a href="https://github.com/doze-dev/doze-kafka/blob/main/docs/authorization.md" target="_blank" rel="noopener">authorization</a>.</span></div>
+
+    <div class="row ce g8 wrap" id="access-summary">
+      <span class="m">{{len .AllACLs}} ACL{{if ne (len .AllACLs) 1}}s{{end}}</span><span class="mut">·</span>
+      <span class="m">default <span class="b">{{if .OpenByDefault}}allow{{else}}deny{{end}}</span> (<span class="m">--acl-default</span>)</span>
+      {{if .SuperUserList}}<span class="mut">·</span><span class="m">{{len .SuperUserList}} super user{{if ne (len .SuperUserList) 1}}s{{end}}</span>{{end}}
+    </div>
+
+    {{if .ACLs}}
+    <div class="card" id="acl-table" style="--c: minmax(0, 1.1fr) 80px minmax(0, 1.6fr) 84px 100px 96px 44px">
+      <div class="r h"><span>Principal</span><span>Type</span><span>Name</span><span>Pattern</span><span>Operation</span><span>Permission</span><span>Host</span></div>
+      {{range .ACLs}}
+      <div class="r{{if eq .Permission "deny"}} denyrow{{end}}">
+        <span class="m">{{.Principal}}</span><span class="m">{{.Resource}}</span><span class="m">{{.Name}}</span><span class="m">{{.Pattern}}</span><span class="m">{{.Operation}}</span>
+        <span class="m {{if eq .Permission "deny"}}deny b{{else}}ok{{end}}">{{.Permission}}</span><span class="m">{{.Host}}</span>
+      </div>
+      {{end}}
+    </div>
+    <div class="note">The list is what <span class="m">DescribeAcls</span> returns.</div>
+    {{else}}
+    <div class="callout"><span class="b">None stored</span><span class="note">Create some with <span class="m">kafka-acls.sh --add</span> or your provisioning tool; they take effect at once and appear here.</span></div>
+    {{end}}
+  </main>
 {{template "shell_bottom" .}}{{end}}

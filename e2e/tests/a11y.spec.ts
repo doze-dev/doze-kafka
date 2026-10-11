@@ -16,9 +16,15 @@ const TRACE = '0af7651916cd43dd8448eb211c80319c';
 // ones whose shape matters. Everything else is found by following links.
 const SEEDS = [
   '', 'topics', 'topics/seed-orders', 'topics/seed-orders?partition=1', 'topics/seed-orders?q=ord&all=1', 'topics/seed-empty', 'topics/seed-txn',
-  'new/topic', 'groups', 'groups/g-lag', 'groups/g-timeline', 'cluster', 'access', 'traffic', 'traffic?errors=1',
+  'new/topic', 'groups', 'groups/g-lag', 'groups/g-timeline', 'cluster', 'access', 'traffic', 'traffic?kind=errors',
   'schemas', 'schemas/seed-events-value', 'new/schema',
-  `trace?id=${TRACE}`,
+  `trace?id=${TRACE}`, 'trace', 'connect',
+  // The tabs and views under a page.
+  'topics/seed-orders?tab=partitions', 'topics/seed-orders?tab=readers', 'topics/seed-orders?tab=config', 'topics/seed-events?tab=schema',
+  'groups/g-lag?tab=members', 'groups/g-lag?tab=timeline', 'groups/g-reset-latest?tab=offsets',
+  'cluster?view=apis', 'cluster?view=config', 'cluster?view=transactions',
+  'schemas/seed-events-value?tab=compat', 'schemas/seed-events-value?tab=register',
+  'access?principal=User:ANONYMOUS',
   // The inspector open on each kind (the address carries it).
   'topics/seed-orders?open=5', 'traffic?open=request:no-such-row', 'cluster?open=transaction:seed-open', 'topics/seed-events?open=subject:seed-events-value',
   // Pages that are errors still have to be accessible.
@@ -28,7 +34,7 @@ const SEEDS = [
 function shape(path: string): string {
   const u = new URL(path, 'http://x/');
   const segs = u.pathname.split('/').filter(Boolean).map((s, i) => (i === 0 ? s : '*'));
-  const q = [...u.searchParams.keys()].filter((k) => ['open', 'errors', 'all', 'q', 'partition'].includes(k)).sort();
+  const q = [...u.searchParams.keys()].filter((k) => ['open', 'errors', 'all', 'q', 'partition', 'tab', 'view', 'kind'].includes(k)).sort();
   return segs.join('/') + (q.length ? '?' + q.join('&') : '');
 }
 
@@ -94,6 +100,7 @@ test('the palette, the help overlay and a confirm are accessible too', async ({ 
   await page.waitForTimeout(400);
   problems.push(...(await axe(page)).map((v) => `help: ${v}`));
   await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'More actions' }).click();
   await page.getByRole('button', { name: 'Purge' }).first().click();
   await expect(page.locator('#confirm')).toBeVisible();
   await page.waitForTimeout(400);

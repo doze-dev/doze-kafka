@@ -1,27 +1,29 @@
 {{/* refusal is the one partial every console error is rendered through: its kind
      (Refused, Denied, Not implemented, Failed), the name of what said no, the
-     message and the rule. It keeps the .err class so a control's error slot and
-     the toast read it the same way they always did. */}}
-{{define "refusal"}}<div class="err refusal refusal-{{.Refusal.Kind}}" role="alert" data-refusal-kind="{{.Refusal.Kind}}" data-refusal-source="{{.Refusal.Source}}"{{if .Refusal.Name}} data-refusal-name="{{.Refusal.Name}}"{{end}}><span class="refusal-kind">{{.Refusal.Kind.Word}}</span>{{if .Refusal.Name}} <span class="refusal-name mono">{{.Refusal.Name}}</span>{{else if eq .Refusal.Source "console"}} <span class="refusal-name">by the console</span>{{end}} <span class="refusal-msg">{{.Refusal.Message}}</span>{{if .Refusal.Rule}} <span class="refusal-rule dim">{{.Refusal.Rule}}</span>{{end}}</div>{{end}}
+     message and the rule. It is drawn as the boards' callout (Tp-04: "Refused" in
+     bold, the Kafka error name in mono, the message, then the rule). It keeps the
+     .err class so a control's error slot and the toast read it the same way. */}}
+{{define "refusal"}}<div class="err refusal callout refusal-{{.Refusal.Kind}}" role="alert" data-refusal-kind="{{.Refusal.Kind}}" data-refusal-source="{{.Refusal.Source}}"{{if .Refusal.Name}} data-refusal-name="{{.Refusal.Name}}"{{end}}><span class="refusal-head"><span class="refusal-kind b">{{.Refusal.Kind.Word}}</span>{{if .Refusal.Name}} <span class="refusal-name m">{{.Refusal.Name}}</span>{{else if eq .Refusal.Source "console"}} <span class="refusal-name">by the console</span>{{end}}</span> <span class="refusal-msg m">{{.Refusal.Message}}</span>{{if .Refusal.Rule}} <span class="refusal-rule note">{{.Refusal.Rule}}</span>{{end}}</div>{{end}}
 
 {{define "error_page"}}{{template "shell_top" .}}
-  <main class="detail" id="detail"><div class="detail-inner errorwrap">
-    <div class="errorpanel {{.Kind}}" role="alert" data-refusal-kind="{{.Refusal.Kind}}"{{if .Refusal.Name}} data-refusal-name="{{.Refusal.Name}}"{{end}}>
-      <div class="err-ic">{{if .Refusal.NotFound}}{{icon "search"}}{{else}}{{icon "info"}}{{end}}</div>
-      <h1>{{.Heading}}</h1>
-      <p class="refusal-line"><span class="refusal-kind refusal-{{.Refusal.Kind}}">{{.Refusal.Kind.Word}}</span>{{if .Refusal.Name}} <span class="refusal-name mono">{{.Refusal.Name}}</span>{{else if eq .Refusal.Source "console"}} <span class="refusal-name">by the console</span>{{end}}</p>
-      <p>{{.Message}}</p>
-      {{if .Refusal.Rule}}<p class="refusal-rule">{{.Refusal.Rule}}</p>{{end}}
-      {{if .Suggestions}}
-      <div class="didyoumean">
-        <span class="dim">Did you mean</span>
-        {{range .Suggestions}}<a class="btn mono" href="{{.URL}}">{{.Name}}</a>{{end}}
-      </div>
-      {{end}}
-      <div class="err-acts">
-        {{if .Back}}<a class="btn" href="{{.Back}}">← Back to the list</a>{{end}}
-        {{if .Retry}}<button type="button" class="btn pri" onclick="location.reload()">Try again</button>{{end}}
-      </div>
+  <main class="main" id="detail">
+    <div class="row sb ce idband"><div class="col"><h1 class="h1">{{.Heading}}</h1></div></div>
+    <div class="callout refusal refusal-{{.Refusal.Kind}} errorpanel {{.Kind}}" role="alert" data-refusal-kind="{{.Refusal.Kind}}"{{if .Refusal.Name}} data-refusal-name="{{.Refusal.Name}}"{{end}}>
+      <div class="row g8 ce"><span class="b refusal-kind refusal-{{.Refusal.Kind}}">{{.Refusal.Kind.Word}}</span>{{if .Refusal.Name}}<span class="m refusal-name">{{.Refusal.Name}}</span>{{else if eq .Refusal.Source "console"}}<span class="refusal-name">by the console</span>{{end}}</div>
+      <span class="m">{{.Message}}</span>
+      {{if .Refusal.Rule}}<span class="note refusal-rule">{{.Refusal.Rule}}</span>{{end}}
     </div>
-  </div></main>
+    {{if .Suggestions}}
+    <section class="card pad col g8" aria-label="Did you mean">
+      <h2 class="h2">Did you mean</h2>
+      <div class="didyoumean col g8">
+        {{range .Suggestions}}<a class="well row ce g8 sb suggestion" href="{{.URL}}"><span class="m b">{{.Name}}</span></a>{{end}}
+      </div>
+    </section>
+    {{end}}
+    <div class="err-acts row g8">
+      {{if .Back}}<a class="btn" href="{{.Back}}">← Back to the list</a>{{end}}
+      {{if .Retry}}<button type="button" class="btn pri" onclick="location.reload()">Try again</button>{{end}}
+    </div>
+  </main>
 {{template "shell_bottom" .}}{{end}}

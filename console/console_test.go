@@ -144,10 +144,13 @@ func TestTopicLifecycle(t *testing.T) {
 		t.Fatalf("detail: status %d: %s", rec.Code, rec.Body)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"orders.created", "3 partition", "Save settings", "No messages on this partition yet"} {
+	for _, want := range []string{"orders.created", "3 partition", "No messages on this partition yet", "Produce a message"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("detail missing %q", want)
 		}
+	}
+	if conf := req(t, c, "GET", "/_console/topics/orders.created?tab=config", nil).Body.String(); !strings.Contains(conf, "Save settings") {
+		t.Error("the Config tab does not offer to save settings")
 	}
 
 	// Delete.
@@ -318,7 +321,7 @@ func TestConsumerGroup(t *testing.T) {
 		t.Fatalf("group detail: status %d: %s", rec.Code, rec.Body)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"workers", "classic", "No members connected", "events", "lagnum zero"} {
+	for _, want := range []string{"workers", "classic", "No members", "caught up"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("group detail missing %q:\n%s", want, body)
 		}
@@ -331,7 +334,7 @@ func TestClusterInfo(t *testing.T) {
 	if rec.Code != 200 {
 		t.Fatalf("cluster: status %d: %s", rec.Code, rec.Body)
 	}
-	body := rec.Body.String()
+	body := rec.Body.String() + req(t, c, "GET", "/_console/cluster?view=apis", nil).Body.String()
 	for _, want := range []string{"doze-kafka", "node 1", "Produce", "ApiVersions"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("cluster page missing %q:\n%s", want, body)
@@ -435,7 +438,7 @@ func TestAddPartitions(t *testing.T) {
 	c := newTestConsole(t)
 	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"grow"}, "partitions": {"2"}})
 
-	page := req(t, c, "GET", "/_console/topics/grow", nil).Body.String()
+	page := req(t, c, "GET", "/_console/topics/grow?tab=partitions", nil).Body.String()
 	for _, want := range []string{`id="topic-addparts"`, "/topics/grow/partitions", "cannot be removed", "stop being ordered"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the topic page is missing %q", want)
@@ -484,7 +487,7 @@ func TestAccessPageListsACLsUnderTheEnforcedBanner(t *testing.T) {
 		t.Fatalf("create an ACL: %v %+v", err, resp)
 	}
 	page := req(t, c, "GET", "/_console/access", nil).Body.String()
-	for _, want := range []string{"These are enforced", "allow · read", "User:alice", "orders", "literal"} {
+	for _, want := range []string{"These are enforced", ">allow<", ">read<", "User:alice", "orders", "literal"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the Access page is missing %q after one ACL was stored", want)
 		}

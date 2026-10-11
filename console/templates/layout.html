@@ -26,13 +26,6 @@
 <script>(function(){var d=document.documentElement,g=function(k){try{return localStorage.getItem(k);}catch(e){return null;}};
 var t=g("theme");d.setAttribute("data-theme",t==="light"||t==="dark"||t==="contrast"?t:(matchMedia("(prefers-contrast: more)").matches?"contrast":matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
 window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").replace(/^\/+|\/+$/g,"").split("/");var v=(p[0]===""||((p[0]==="topics"||p[0]==="groups")&&!p[1]))?"list":"detail";d.setAttribute("data-view",v);};window.dozeView();})();</script>
-<script>document.addEventListener("alpine:init",function(){window.Alpine.store("filter",{
-  q:"",
-  // True when a filter is set and no row in root matches it, so the list can say
-  // "no matches" instead of just going blank. Rows carry their name in data-name.
-  none:function(root){var q=this.q.toLowerCase();if(!q||!root)return false;var rows=root.querySelectorAll(".li");
-    if(!rows.length)return false;return !Array.prototype.some.call(rows,function(r){return (r.getAttribute("data-name")||"").toLowerCase().indexOf(q)>=0;});}
-});});</script>
 <script src="{{.Prefix}}/static/htmx.min.js"></script>
 <script defer src="{{.Prefix}}/static/alpine.min.js"></script>
 <script src="{{.Prefix}}/static/cm6.min.js"></script>
@@ -87,14 +80,16 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
         <button type="button" class="icon-btn sm" aria-label="Dismiss" onclick="this.closest('.flash').remove()">{{icon "x"}}</button>
       </div>
       {{end}}
-      {{if or (hasPrefix .Page "topics") (hasPrefix .Page "groups") (hasPrefix .Page "schemas")}}<a class="backbar" href="{{.Prefix}}/{{if hasPrefix .Page "topics"}}topics{{else if hasPrefix .Page "groups"}}groups{{else}}schemas{{end}}">‹ {{if hasPrefix .Page "topics"}}Topics{{else if hasPrefix .Page "groups"}}Consumer groups{{else}}Schemas{{end}}</a>{{end}}
       <div class="panes">
 {{end}}
 
 {{define "shell_bottom"}}
+      {{template "inspector_aside" .}}
       </div><!-- /panes -->
     </div><!-- /workspace -->
   </div>
+
+  {{template "keys_strip" .}}
 
   <!-- command palette (vanilla — survives every swap since it's outside #workspace) -->
   <div class="overlay palette-overlay" id="palette" hidden>
@@ -119,27 +114,25 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
     </div>
   </div>
 
-  <!-- the keys: generated from the declared key map (keys.go), never typed here -->
+  <!-- the keys (Sy-06): generated from the declared key map (keys.go), never typed here -->
   <div class="overlay" id="help" hidden>
     <div class="dialog help anim" role="dialog" aria-modal="true" aria-labelledby="help-title">
-      <div class="dialog-h"><h3 id="help-title">Keyboard shortcuts</h3></div>
+      <div class="help-h row sb ce">
+        <div class="col"><h2 class="h2" id="help-title">Keyboard shortcuts</h2><span class="note">Single keys work when no text field has focus. They never act on data without asking first.</span></div>
+        <button type="button" class="btn sm" id="help-close" aria-label="esc, close the shortcuts">esc</button>
+      </div>
       <div class="help-b" tabindex="0" role="region" aria-label="Keys">
         {{range keyGroups}}
-        <div class="help-g">
-          <div class="help-gh">{{.Scope}}</div>
-          {{range .Keys}}<div class="help-r"><span class="kbd">{{.Show}}</span><span class="help-l">{{.Label}}</span></div>{{end}}
+        <div class="help-g col g8 grow">
+          <span class="cap">{{.Scope}}</span>
+          {{range .Keys}}{{if or (ne .Target "/traffic") $.HasTraffic}}<div class="help-r row sb ce"><span class="help-l">{{.Label}}</span><span class="help-k">{{range $i, $k := keyCaps .Show}}<span class="kbd">{{$k}}</span>{{end}}</span></div>{{end}}{{end}}
         </div>
         {{end}}
       </div>
-      <div class="dialog-f"><button type="button" class="btn" id="help-close">Close</button></div>
+      <div class="help-f row ce g8"><span class="note"><span class="m">p</span> means pause on a page that tails and produce on a topic, never both on one page. <span class="m">g</span> then a letter goes to a section.</span></div>
     </div>
   </div>
   <script type="application/json" id="keymap">{{keymapJSON}}</script>
-
-  <!-- message inspector (topic detail's table rows open here) -->
-  <div class="overlay" id="inspector-overlay" hidden data-inspector-backdrop>
-    <div class="inspector anim" id="inspector" role="dialog" aria-modal="true" aria-labelledby="inspector-title"></div>
-  </div>
 
   <div class="toasts" id="toasts"></div>
 </div>
@@ -157,17 +150,27 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
 
 {{define "kvcopy"}}<span class="kv-copy"><span class="kv">{{.}}</span><button type="button" class="copy-btn" data-copy="{{.}}" title="Copy" aria-label="Copy">{{icon "copy"}}</button></span>{{end}}
 
-{{define "empty_detail"}}
-<main class="detail" id="detail">
-  <div class="empty-detail">
-    {{icon .Glyph}}
-    <p>{{.Hint}}</p>
-    {{if .CTA}}<a class="btn pri" href="{{.CTAURL}}">{{icon "plus"}} {{.CTA}}</a>{{end}}
-  </div>
-</main>
-{{end}}
-
 {{/* neighbours: "Written by checkout-api, read by g-order-validator, schema subject
      orders-value." One sentence of links, rendered from the neighbours graph
      (graph.go). A subject opens in the inspector; the rest go to their pages. */}}
-{{define "neighbours"}}{{if .Neighbours}}<p class="neighbours" id="neighbours">{{range $i, $c := .Neighbours}}{{if $i}}, {{end}}{{$c.Verb}} {{range $c.Links}}{{.Sep}}<a class="mono" href="{{.URL}}"{{if .Open}} data-inspector-open hx-get="{{.Open}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"{{end}}>{{.Name}}</a>{{end}}{{end}}.</p>{{end}}{{end}}
+{{define "neighbours"}}{{if .Neighbours}}<div class="neighbours" id="neighbours">{{range $c := .Neighbours}}{{range $c.Links}}<a class="well" href="{{.URL}}"{{if .Open}} data-inspector-open hx-get="{{.Open}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"{{end}}>{{if eq .Kind "group"}}<span class="sv sm c-gr" aria-hidden="true">GR</span><span class="note">{{lower $c.Verb}}</span>{{else if eq .Kind "topic"}}<span class="sv sm c-tp" aria-hidden="true">TP</span><span class="note">{{lower $c.Verb}}</span>{{else if eq .Kind "subject"}}<span class="sv sm c-sc" aria-hidden="true">SC</span>{{else}}<span class="note">{{lower $c.Verb}}</span>{{end}}<span class="m">{{.Name}}</span></a>{{end}}{{end}}</div>{{end}}{{end}}
+
+{{/* The inspector (Sy-01, part of the page): the right-hand panel, in flow beside the
+     content, never over it. A selection (a message, a request, a client, a member, a
+     subject, a transaction, a group event) replaces what is in it; Esc puts the
+     page's own summary back (a page that has one: Traffic's open connections), or
+     closes the panel. #inspector is where a selection is fetched into. */}}
+{{define "inspector_aside"}}
+<aside class="insp" id="inspector-panel" aria-label="Details"{{if not .InspDefault}} hidden{{end}}>
+  {{if .InspDefault}}<div class="insp-default" id="insp-default">{{template "insp_default" .}}</div>{{end}}
+  <div class="insp-sel" id="inspector" hidden></div>
+</aside>
+{{end}}
+
+{{define "insp_default"}}{{if eq .InspDefault "traffic"}}{{template "traffic_clients" .}}{{end}}{{end}}
+
+{{/* The keys strip: what the keys do on this page, one line at the foot (Sy-01).
+     The hints come from keys.go, per page; a hint is a key the page really has. */}}
+{{define "keys_strip"}}
+<div class="keys" id="keys" hx-swap-oob="true" role="note" aria-label="Keys on this page">{{range .Hints}}<span>{{range .Keys}}<span class="kbd">{{.}}</span>{{end}}{{.Label}}</span>{{end}}</div>
+{{end}}

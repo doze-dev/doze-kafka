@@ -3,9 +3,9 @@ import { test, expect } from '../fixtures/console';
 test('a topic is created with its partitions and shows them', async ({ page, createTopic, uniqueName }) => {
   const name = uniqueName('made');
   await createTopic(name, 3);
-  await expect(page.locator('.idchips')).toContainText('3 partitions');
+  await expect(page.locator('#topic-facts')).toContainText('3 partitions');
   await expect(page.locator('.ptab')).toHaveCount(3);
-  await expect(page.locator('.listpane .li.on')).toHaveAttribute('data-name', name);
+  await expect(page.locator('.list .li.on')).toHaveAttribute('data-name', name);
   await expect(page.locator('#flashbar')).toContainText('Topic created');
   expect(page.url()).not.toContain('flash='); // the one-shot banner is not left in the address bar to replay.
 });
@@ -25,7 +25,7 @@ test('a bad name or partition count is explained beside the form, and nothing is
   await page.getByRole('button', { name: 'Create topic' }).click();
   await expect(page.locator('[data-err-slot]')).toContainText('not a number of partitions');
   await page.goto('topics');
-  await expect(page.locator('.listpane .li[data-name="fine-name"]')).toHaveCount(0);
+  await expect(page.locator('.list .li[data-name="fine-name"]')).toHaveCount(0);
 });
 
 test('a sent message appears, and the live tape stays one region', async ({ page, createTopic, uniqueName, send, waitForToast, waitForLive }) => {
@@ -69,40 +69,47 @@ test('a poll that cannot reach the console is shown as "not updating", once, wit
 test('Purge empties a topic but keeps its settings; Delete removes it', async ({ page, createTopic, uniqueName, send, waitForToast, confirmDialog, waitForLive }) => {
   const name = uniqueName('doomed');
   await createTopic(name);
-  await page.locator('#topic-config summary').click();
+  await page.getByRole('link', { name: 'Config' }).click();
   await page.locator('[id="cfg-retention.ms"]').fill('3d');
   await page.locator('#topic-config').getByRole('button', { name: 'Save settings' }).click();
   await waitForToast();
+  await page.getByRole('link', { name: 'Messages' }).click();
   await send('to be purged');
   await waitForLive((t) => t.includes('to be purged'));
+  await page.getByRole('button', { name: 'More actions' }).click();
   await page.getByRole('button', { name: 'Purge', exact: true }).click();
   // The page was drawn before the send; the dialog is measured when the button is pressed.
   await expect(page.locator('#confirm-msg')).toContainText('deletes its 1 record');
   await confirmDialog('accept');
   await expect(page.locator('.tape-empty')).toBeVisible();
-  await expect(page.locator('#topic-config .cfgsum')).toContainText('3d'); // a purge used to drop the topic's own settings.
+  await expect(page.locator('#topic-facts')).toContainText('kept 3 d'); // a purge used to drop the topic's own settings.
+  await page.getByRole('button', { name: 'More actions' }).click();
   await page.getByRole('button', { name: 'Delete' }).first().click();
   await confirmDialog('accept');
   await expect(page).toHaveURL(/\/topics$/);
-  await expect(page.locator(`.listpane .li[data-name="${name}"]`)).toHaveCount(0);
+  await expect(page.locator(`.list .li[data-name="${name}"]`)).toHaveCount(0);
 });
 
-test('moving between topics replaces only the detail, and nothing moves after it appears', async ({ page }) => {
+test('moving between topics keeps the list where it was, and nothing moves after it appears', async ({ page }) => {
   await page.goto('topics/seed-orders');
   await page.evaluate(() => {
     (window as any).__shifts = [];
     new PerformanceObserver((l) => { for (const e of l.getEntries() as any[]) if (!e.hadRecentInput) (window as any).__shifts.push(e.value); }).observe({ type: 'layout-shift' });
-    document.querySelector('.listpane')!.setAttribute('data-same', '1');
-    document.querySelector('.lp-scroll')!.scrollTop = 20;
+    const sc = document.querySelector('.list-scroll')!;
+    sc.scrollTop = Math.min(20, sc.scrollHeight - sc.clientHeight);
   });
+  const before = await page.evaluate(() => document.querySelector('.list-scroll')!.scrollTop);
   for (const name of ['seed-empty', 'seed-orders', 'seed-empty']) {
-    await page.locator(`.listpane .li[data-name="${name}"]`).click();
+    // click() without Playwright's own scrolling the row into view: the list's position is what is measured.
+    await page.locator(`.list .li[data-name="${name}"]`).evaluate((el: HTMLElement) => el.click());
     await expect(page.locator('.idband h1')).toHaveText(name);
-    await expect(page.locator('.listpane .li.on')).toHaveAttribute('data-name', name);
+    await expect(page.locator('.list .li.on')).toHaveAttribute('data-name', name);
     await page.waitForTimeout(400);
   }
   expect(await page.evaluate(() => (window as any).__shifts)).toEqual([]);
-  await expect(page.locator('.listpane')).toHaveAttribute('data-same', '1'); // the list was not redrawn.
+  // The workspace is replaced (the dock and the inspector are the page's), and the
+  // list's scroll position is put back on the list that arrives.
+  expect(await page.evaluate(() => document.querySelector('.list-scroll')!.scrollTop)).toBe(before);
   expect(await page.evaluate(() => document.querySelectorAll('[hx-trigger="load"]').length)).toBe(0);
 });
 
@@ -111,13 +118,14 @@ test('partitions are added after a warning, the tabs grow, and a bad number is e
   await createTopic(name, 2);
   await expect(page.locator('.ptab')).toHaveCount(2);
 
+  await page.getByRole('link', { name: /Partitions/ }).click();
   await page.locator('#topic-addparts summary').click();
   await page.locator('#f-addparts').evaluate((el: HTMLInputElement) => { el.type = 'text'; }); // past the browser's own check.
   await page.locator('#f-addparts').fill('x');
   await page.locator('#topic-addparts').getByRole('button', { name: 'Add partitions' }).click();
   await confirmDialog('accept');
   await expect(page.locator('#topic-addparts [data-err-slot]')).toContainText('how many partitions to add');
-  await expect(page.locator('.ptab')).toHaveCount(2);
+  await expect(page.locator('#partitions-table a.r')).toHaveCount(2);
 
   await page.locator('#f-addparts').evaluate((el: HTMLInputElement) => { el.type = 'number'; });
   await page.locator('#f-addparts').fill('2');
@@ -125,7 +133,7 @@ test('partitions are added after a warning, the tabs grow, and a bad number is e
   await expect(page.locator('#confirm')).toContainText('cannot be removed'); // the cost is said before it is paid.
   await confirmDialog('accept');
   await expect(page.locator('#flashbar')).toContainText('Topic now has 4 partitions');
-  await expect(page.locator('.idchips')).toContainText('4 partitions');
+  await expect(page.locator('#topic-facts')).toContainText('4 partitions');
   await expect(page.locator('.ptab')).toHaveCount(4);
 });
 
@@ -165,9 +173,9 @@ test('transactions on the tape: aborted and open records are marked, markers are
 
   // A marker is not a record: it does not open the inspector.
   await page.locator('tr.txnmark').first().click();
-  await expect(page.locator('#inspector-overlay')).toBeHidden();
+  await expect(page.locator('#inspector')).toBeHidden();
 
-  await page.goto('cluster');
+  await page.goto('cluster?view=transactions');
   await expect(page.locator('#open-transactions')).toContainText('seed-open');
   await expect(page.locator('#open-transactions')).toContainText('Ongoing');
 });

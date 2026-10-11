@@ -78,7 +78,7 @@ func TestTrafficPageShowsRequestsAndClients(t *testing.T) {
 		"Produce", "orders", "1 partition, 2.0 KiB", "12 ms",
 		"UNKNOWN_TOPIC_OR_PARTITION", // the failed fetch, named.
 		"apache-kafka-java 3.7.0",    // in the clients table.
-		`id="clients-table"`, `id="traffic-table"`,
+		`id="clients-list"`, `id="traffic-table"`,
 		`data-live="/_console/traffic/live"`, // the tail polls itself.
 		`hx-get="/_console/inspect/request?key=`,
 	} {
@@ -189,7 +189,7 @@ func TestGroupPageShowsItsTimelineNewestFirst(t *testing.T) {
 	topicWith(t, c, "orders", 1, 1)
 	commitFor(t, addr, "billing-workers", "orders", map[int32]int64{0: 1})
 
-	rec := req(t, c, "GET", "/_console/groups/billing-workers", nil)
+	rec := req(t, c, "GET", "/_console/groups/billing-workers?tab=timeline", nil)
 	if rec.Code != 200 {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
 	}
@@ -206,7 +206,7 @@ func TestGroupPageShowsItsTimelineNewestFirst(t *testing.T) {
 
 	// A group the coordinator has said nothing about says so, rather than showing a blank.
 	commitFor(t, addr, "quiet", "orders", map[int32]int64{0: 1})
-	if q := req(t, c, "GET", "/_console/groups/quiet", nil); !strings.Contains(q.Body.String(), "Nothing has happened in this group since the broker started") {
+	if q := req(t, c, "GET", "/_console/groups/quiet?tab=timeline", nil); !strings.Contains(q.Body.String(), "Nothing has happened in this group since the broker started") {
 		t.Error("a group with no events does not say so")
 	}
 }

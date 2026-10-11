@@ -94,7 +94,7 @@ func TestShellMarkupIsLabelled(t *testing.T) {
 		`role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-msg"`,
 		`class="nav on" aria-current="page"`, // the name is the text: the narrow rail clips it, it does not remove it.
 		`<nav class="rail" aria-label="Sections"`,
-		`<main class="detail`,
+		`<main class="main`,
 		`aria-label="Filter Topics"`,
 		`data-confirm-title="Delete topic"`,
 	} {

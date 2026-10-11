@@ -100,18 +100,18 @@ func TestSchemaSubjectLifecycle(t *testing.T) {
 		}
 	}
 	rec = req(t, c, "GET", "/_console/schemas/orders-value?version=1", nil)
-	if strings.Contains(rec.Body.String(), "email") && !strings.Contains(rec.Body.String(), "New version") {
+	if strings.Contains(rec.Body.String(), "email") {
 		t.Error("version 1 page shows version 2's field")
 	}
 
 	// Compatibility: the registry's default, then the subject's own, then back.
-	if body := req(t, c, "GET", "/_console/schemas/orders-value", nil).Body.String(); !strings.Contains(body, "BACKWARD · default") {
+	if body := req(t, c, "GET", "/_console/schemas/orders-value", nil).Body.String(); !strings.Contains(body, "level BACKWARD (global)") {
 		t.Error("the page does not say BACKWARD is the registry default")
 	}
 	if rec := req(t, c, "POST", "/_console/schemas/orders-value/config", url.Values{"level": {"FULL"}}); rec.Code != http.StatusSeeOther {
 		t.Fatalf("set level: %d %s", rec.Code, rec.Body)
 	}
-	if body := req(t, c, "GET", "/_console/schemas/orders-value", nil).Body.String(); !strings.Contains(body, "FULL") || strings.Contains(body, "FULL · default") {
+	if body := req(t, c, "GET", "/_console/schemas/orders-value", nil).Body.String(); !strings.Contains(body, "level FULL") || strings.Contains(body, "level FULL (global)") {
 		t.Error("the subject's own level is not shown")
 	}
 	if rec := req(t, c, "POST", "/_console/schemas/orders-value/config", url.Values{"level": {"default"}}); rec.Code != http.StatusSeeOther {
@@ -170,7 +170,7 @@ func TestSubjectNamesRoundTripThroughLinks(t *testing.T) {
 		register(t, c, name, userV1)
 		link := schemaPath("/_console", name)
 		rec := req(t, c, "GET", link, nil)
-		if rec.Code != 200 || !strings.Contains(rec.Body.String(), "version 1") && !strings.Contains(rec.Body.String(), "Version 1") {
+		if rec.Code != 200 || !strings.Contains(rec.Body.String(), "1 version") {
 			t.Errorf("%q: GET %s = %d", name, link, rec.Code)
 		}
 	}

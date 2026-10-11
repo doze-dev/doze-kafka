@@ -35,7 +35,7 @@ func TestEverySelectionRendersThroughTheInspectorContract(t *testing.T) {
 	cancel()
 	var memberID string
 	for deadline := time.Now().Add(8 * time.Second); time.Now().Before(deadline) && memberID == ""; time.Sleep(150 * time.Millisecond) {
-		page := req(t, c, "GET", "/_console/groups/billing", nil).Body.String()
+		page := req(t, c, "GET", "/_console/groups/billing?tab=members", nil).Body.String()
 		if m := regexp.MustCompile(`id="mb-([^"]+)"`).FindStringSubmatch(page); m != nil {
 			memberID = m[1]
 		}

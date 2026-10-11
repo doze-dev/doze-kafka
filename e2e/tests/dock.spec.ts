@@ -8,13 +8,13 @@ test('a topic ends with the requests that touched it, and only those', async ({ 
   await page.goto('topics/seed-orders');
   const dock = page.locator('#wire-dock');
   await expect(dock).toBeVisible();
-  await expect(dock.locator('tbody tr', { hasText: 'Produce' }).first()).toContainText('doze-seed');
-  for (const row of await dock.locator('tbody tr').all()) {
+  await expect(dock.locator('.r').first()).toContainText('doze-seed');
+  for (const row of await dock.locator('.r').all()) {
     await expect(row).not.toContainText('seed-txn');
   }
   // A row opens its request in the inspector.
-  await dock.locator('tbody tr', { hasText: 'Produce' }).first().click();
-  await expect(page.locator('#inspector-overlay')).toBeVisible();
+  await dock.locator('.r').first().click();
+  await expect(page.locator('#inspector')).toBeVisible();
   await expect(page.locator('#inspector .inspector-h')).toHaveAttribute('data-inspector-kind', 'request');
   await page.keyboard.press('Escape');
 });

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -38,6 +39,7 @@ type TrafficFilter struct {
 // TrafficEvent is one row: a request, or a run of identical idle ones folded together.
 type TrafficEvent struct {
 	Seq                                   uint64
+	Conn                                  uint64 // the connection it came over (a TrafficClient's Conn, while it is open).
 	First, Time                           time.Time
 	Count                                 int
 	Remote, ClientID, Software, Principal string
@@ -81,6 +83,86 @@ func trafficFilterFrom(r *http.Request) TrafficFilter {
 	}
 }
 
+// trafficView is what the Traffic page was asked for: the source's own filter, the one
+// field of the board ("client, topic, group or request", matched by the console over
+// every field at once) and the kind of request.
+type trafficView struct {
+	TrafficFilter
+	Q    string
+	Kind string // "", "errors", "produce", "fetch", "groups" or "admin".
+}
+
+func trafficViewFrom(r *http.Request) trafficView {
+	v := trafficView{TrafficFilter: trafficFilterFrom(r), Q: strings.TrimSpace(r.URL.Query().Get("q")), Kind: r.URL.Query().Get("kind")}
+	switch v.Kind {
+	case "errors", "produce", "fetch", "groups", "admin":
+	default:
+		v.Kind = ""
+	}
+	return v
+}
+
+func (v trafficView) query() string {
+	s := v.TrafficFilter.query()
+	add := func(k, val string) {
+		if val == "" {
+			return
+		}
+		if s != "" {
+			s += "&"
+		}
+		s += k + "=" + queryEscape(val)
+	}
+	add("q", v.Q)
+	add("kind", v.Kind)
+	return s
+}
+
+func (v trafficView) empty() bool { return v == trafficView{} }
+
+// trafficKinds are the board's segmented control, in its order.
+var trafficKinds = []struct{ Key, Label string }{
+	{"", "all"}, {"errors", "errors"}, {"produce", "produce"}, {"fetch", "fetch"}, {"groups", "groups"}, {"admin", "admin"},
+}
+
+// requestKind says which of the board's kinds an API belongs to. An API that is none
+// of them (Metadata, ApiVersions, InitProducerId...) is listed only under "all".
+func requestKind(api string) string {
+	switch api {
+	case "Produce":
+		return "produce"
+	case "Fetch", "ShareFetch":
+		return "fetch"
+	case "JoinGroup", "SyncGroup", "Heartbeat", "LeaveGroup", "OffsetCommit", "OffsetFetch", "OffsetDelete", "FindCoordinator",
+		"ConsumerGroupHeartbeat", "ConsumerGroupDescribe", "DescribeGroups", "ListGroups", "DeleteGroups", "TxnOffsetCommit":
+		return "groups"
+	case "CreateTopics", "DeleteTopics", "CreatePartitions", "AlterConfigs", "IncrementalAlterConfigs", "DescribeConfigs",
+		"CreateAcls", "DeleteAcls", "DescribeAcls", "DeleteRecords", "DescribeCluster", "DescribeLogDirs", "ListTransactions":
+		return "admin"
+	}
+	return ""
+}
+
+// matches is the board's one field: any of the client, its software, the address, the
+// request, a topic or the group contains what was typed.
+func (v trafficView) matches(e TrafficEvent) bool {
+	if v.Kind != "" && v.Kind != "errors" && requestKind(e.API) != v.Kind {
+		return false
+	}
+	if v.Q == "" {
+		return true
+	}
+	q := strings.ToLower(v.Q)
+	hay := []string{e.ClientID, e.Software, e.Remote, e.API, e.Group, e.Principal}
+	hay = append(hay, e.Topics...)
+	for _, h := range hay {
+		if strings.Contains(strings.ToLower(h), q) {
+			return true
+		}
+	}
+	return false
+}
+
 // query is the filter as a URL query (without the leading "?"), so the live poll and
 // the inspector links keep what the person asked for.
 func (f TrafficFilter) query() string {
@@ -116,6 +198,7 @@ func queryEscape(s string) string {
 // trafficRow is a request, ready to show.
 type trafficRow struct {
 	TrafficEvent
+	ConnKey  string // the open connection it came over, to open that client; "" when it has closed.
 	Target   string // the topics, or the group.
 	Who      string // the client id, else the address.
 	Dur      string
@@ -181,39 +264,151 @@ type clientRow struct {
 	Age    string
 	Idle   string
 	Filter string // the query that shows only this client's requests.
+	// Doing is what its requests in the tail say it is: producing, consuming, in which
+	// groups. Refused is how many of its kept requests the broker answered with an error.
+	Doing   string
+	Refused int
+}
+
+// capacityOf is how many rows the source keeps, when it says.
+func capacityOf(src TrafficSource) int {
+	if c, ok := src.(interface{ Capacity() int }); ok {
+		return c.Capacity()
+	}
+	return 0
 }
 
 func (c *Console) trafficData(r *http.Request) map[string]any {
-	f := trafficFilterFrom(r)
-	events := c.traffic.Events(f, trafficRows)
-	rows := make([]trafficRow, 0, len(events))
+	v := trafficViewFrom(r)
+	// Everything the recorder holds, newest first: the summary counts it all, and the
+	// table is what is left after the page's filter.
+	all := c.traffic.Events(TrafficFilter{}, 0)
+	src := v.TrafficFilter
+	if v.Kind == "errors" {
+		src.ErrorsOnly = true
+	}
+	events := c.traffic.Events(src, 0)
+	now := time.Now()
+	clients := c.traffic.Clients()
+	open := map[uint64]bool{}
+	for _, cl := range clients {
+		open[cl.Conn] = true
+	}
+
+	rows := make([]trafficRow, 0, trafficRows)
 	h := fnv.New64a()
 	for _, e := range events {
+		if !v.matches(e) {
+			continue
+		}
+		if len(rows) == trafficRows {
+			break
+		}
 		row := c.trafficRow(e)
 		row.OpenKey = requestKey(e)
+		if open[e.Conn] {
+			row.ConnKey = strconv.FormatUint(e.Conn, 10)
+		}
 		rows = append(rows, row)
 		fmt.Fprint(h, e.Seq, e.Count, ",")
 	}
-	now := time.Now()
-	var clients []clientRow
-	for _, cl := range c.traffic.Clients() {
+
+	// The summary: what each number is counted over is in its words. A row that folded
+	// repeats counts them all; one that began before the minute counts only its latest
+	// request in it, so the number is then "at least".
+	var lastMinute, errs int
+	lower := false
+	byRemote := map[string]*remoteActivity{}
+	for _, e := range all {
+		if e.Error != "" {
+			errs += max(e.Count, 1)
+		}
+		switch {
+		case !e.First.Before(now.Add(-time.Minute)):
+			lastMinute += max(e.Count, 1)
+		case !e.Time.Before(now.Add(-time.Minute)):
+			lastMinute++
+			if e.Count > 1 {
+				lower = true
+			}
+		}
+		a := byRemote[e.Remote]
+		if a == nil {
+			a = &remoteActivity{}
+			byRemote[e.Remote] = a
+		}
+		switch requestKind(e.API) {
+		case "produce":
+			a.produces = true
+		case "fetch":
+			a.fetches = true
+		}
+		if e.Error != "" {
+			a.refused += max(e.Count, 1)
+		}
+	}
+
+	var crows []clientRow
+	for _, cl := range clients {
 		cr := clientRow{TrafficClient: cl, Who: cl.ClientID, Age: spanText(now.Sub(cl.Opened)), Idle: spanText(now.Sub(cl.Last))}
 		if cr.Who == "" {
 			cr.Who = cl.Remote
 		}
 		cr.Filter = TrafficFilter{Client: cr.Who}.query()
-		clients = append(clients, cr)
+		var does []string
+		if a := byRemote[cl.Remote]; a != nil {
+			if a.produces {
+				does = append(does, "producer")
+			}
+			if a.fetches {
+				does = append(does, "consumer")
+			}
+			cr.Refused = a.refused
+		}
+		for _, g := range cl.Groups {
+			does = append(does, g)
+		}
+		cr.Doing = strings.Join(does, " · ")
+		crows = append(crows, cr)
 		fmt.Fprint(h, cl.Conn, cl.Requests, cl.ClientID, cl.Software, ";")
 	}
 	cards := c.metricCards()
 	for _, card := range cards {
 		fmt.Fprint(h, card.ID, card.Pushes, card.Terminated, ";")
 	}
+	fmt.Fprint(h, "|", lastMinute, errs, len(all))
+
+	kept := ""
+	if n := capacityOf(c.traffic); n > 0 {
+		kept = groupDigits(int64(n))
+	} else {
+		kept = "few thousand requests"
+	}
+	var kinds []map[string]any
+	for _, k := range trafficKinds {
+		kv := v
+		kv.Kind = k.Key
+		kv.ErrorsOnly = false // the segmented control says it; an old ?errors=1 does not stay beside it.
+		qs := kv.query()
+		u := c.prefix + "/traffic"
+		if qs != "" {
+			u += "?" + qs
+		}
+		kinds = append(kinds, map[string]any{"Key": k.Key, "Label": k.Label, "URL": u, "On": v.Kind == k.Key})
+	}
 	return map[string]any{
 		"HasClientMetrics": c.metrics != nil, "Metrics": cards,
-		"Rows": rows, "Clients": clients, "Filter": f, "FilterQ": f.query(),
-		"Filtered": f != (TrafficFilter{}), "Hash": fmt.Sprintf("%x", h.Sum64()),
+		"Rows": rows, "Clients": crows, "Filter": v, "FilterQ": v.query(), "Kinds": kinds,
+		"Filtered": !v.empty(), "Hash": fmt.Sprintf("%x", h.Sum64()),
+		"LastMinute": lastMinute, "LastMinuteLowerBound": lower, "ErrorCount": errs, "KeptText": kept,
+		"InspDefault": "traffic",
 	}
+}
+
+// remoteActivity is what one connection's kept requests say it does.
+type remoteActivity struct {
+	produces, fetches bool
+	refused           int
 }
 
 func (c *Console) trafficPage(w http.ResponseWriter, r *http.Request) {
@@ -236,6 +431,9 @@ func (c *Console) trafficLive(w http.ResponseWriter, r *http.Request) {
 	if liveUnchanged(w, r, data["Hash"].(string)) {
 		return
 	}
+	// The summary line and the open connections are outside this region: they come
+	// back with it, out of band.
+	data["OOB"] = true
 	c.partial(w, "traffic_live", data)
 }
 

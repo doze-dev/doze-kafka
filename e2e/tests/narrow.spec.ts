@@ -59,18 +59,20 @@ for (const width of [420, 360]) {
 test('a topic opened on a phone is its own screen, with a way back to the list', async ({ page }) => {
   await page.setViewportSize({ width: 420, height: 800 });
   await page.goto('topics');
-  await expect(page.locator('.listpane')).toBeVisible();
-  await page.locator('.listpane .li[data-name="seed-orders"]').click();
+  // The list is one tap away (Sy-03): the home page's table is the list here.
+  await expect(page.locator('.list')).toBeHidden();
+  await page.locator('#topics-table a.r', { hasText: 'seed-orders' }).first().click();
   await expect(page.locator('.idband h1')).toHaveText('seed-orders');
-  await expect(page.locator('.listpane')).toBeHidden();
-  await page.locator('.backbar').click();
-  await expect(page.locator('.listpane')).toBeVisible();
+  await expect(page.locator('.list')).toBeHidden();
+  await page.locator('.backrow a').click();
+  await expect(page).toHaveURL(/\/topics$/);
+  await expect(page.locator('#topics-table')).toBeVisible();
 });
 
 test('an open composer joins the page instead of covering a small screen', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 700 });
   await page.goto('topics/seed-orders');
   await page.locator('#compose-head').click();
-  const dock = await page.locator('.dock').evaluate((el) => getComputedStyle(el).position);
+  const dock = await page.locator('#compose-panel').evaluate((el) => getComputedStyle(el).position);
   expect(dock).toBe('static');
 });

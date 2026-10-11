@@ -1,61 +1,77 @@
+{{/* Traffic (Main, "the home page"): what the apps have asked the broker, newest
+     first. The requests table comes first, with one filter field and one segmented
+     control; the open connections are the inspector's summary, on the right, until a
+     row or a client is selected. */}}
 {{define "traffic_detail"}}{{template "shell_top" .}}
-  <main class="detail" id="detail"><div class="detail-inner trafficwrap">
-    <div class="idband">
-      <div>
-        <h1 class="page-title">Traffic</h1>
-        <p class="lede">What clients have asked this broker, newest first. The console's own requests are left out.</p>
-      </div>
+  <main class="main" id="detail">
+    <div class="row sb ce idband">
+      <div class="col"><h1 class="h1">Traffic</h1><span class="note">What your apps have asked this broker, newest first. The console's own requests are left out.</span></div>
+      <div class="row g8 ce"><span class="pill ok" data-live-state><span class="dot" aria-hidden="true"></span><span data-live-state-l>live</span></span><button type="button" class="btn" data-live-toggle aria-pressed="false" data-label-off="Pause" data-label-on="Resume" title="Pause live updates (p)">Pause</button></div>
     </div>
+
+    {{template "traffic_summary" .}}
 
     {{/* The filter is a plain GET form outside the polled region, so what is typed
          is not thrown away by a refresh. */}}
-    <form class="tf-filters" method="get" action="{{.Prefix}}/traffic" role="search" aria-label="Filter requests">
-      <label class="tf-f"><span class="sr-only">Client</span><input class="input" name="client" value="{{.Filter.Client}}" placeholder="Client, software or address" spellcheck="false"></label>
-      <label class="tf-f"><span class="sr-only">Request</span><input class="input" name="api" value="{{.Filter.API}}" placeholder="Request (Fetch, Heartbeat…)" spellcheck="false"></label>
-      <label class="tf-f"><span class="sr-only">Topic</span><input class="input" name="topic" value="{{.Filter.Topic}}" placeholder="Topic" spellcheck="false"></label>
-      <label class="tf-f"><span class="sr-only">Group</span><input class="input" name="group" value="{{.Filter.Group}}" placeholder="Group" spellcheck="false"></label>
-      <label class="tf-chk"><input type="checkbox" name="errors" value="1" {{if .Filter.ErrorsOnly}}checked{{end}}> errors only</label>
-      <button type="submit" class="btn">Filter</button>
-      {{if .Filtered}}<a class="btn" href="{{.Prefix}}/traffic">Clear</a>{{end}}
-    </form>
+    <div class="filterrow">
+      <form method="get" action="{{.Prefix}}/traffic" role="search" aria-label="Filter requests">
+        <input class="inp m" name="q" value="{{.Filter.Q}}" placeholder="Client, topic, group or request" aria-label="Filter requests" spellcheck="false" autocomplete="off" data-filter-target="requests">
+        {{if .Filter.Kind}}<input type="hidden" name="kind" value="{{.Filter.Kind}}">{{end}}
+      </form>
+      <div class="seg" role="group" aria-label="Kind of request">
+        {{range .Kinds}}<a class="{{if .On}}on{{end}}" href="{{.URL}}" {{if .On}}aria-current="true"{{end}}>{{.Label}}</a>{{end}}
+      </div>
+      <div class="grow"></div>
+      <span class="note">idle heartbeats and empty fetches fold into one row</span>
+    </div>
 
     {{template "traffic_live" .}}
 
-    <div class="honest" role="note">
-      {{icon "info"}}
-      <div>The last couple of thousand requests, kept in memory only: a restart starts empty. Heartbeats and fetches that returned nothing fold into one row with a count, so a quiet consumer does not bury the rest.</div>
-    </div>
-  </div></main>
+    <div class="tablenote">Select a row to open it on the right. A client name opens that client. Nothing here is written to disk.</div>
+  </main>
 {{template "shell_bottom" .}}{{end}}
 
-{{/* traffic_live is the polled unit: connected clients and the request tail. */}}
+{{/* The summary line: counted from what the recorder keeps, so each number says what
+     it is counted over. It is outside the polled region and is replaced out of band
+     with it. */}}
+{{define "traffic_summary"}}
+<div class="row ce g8 wrap" id="traffic-summary"{{if .OOB}} hx-swap-oob="true"{{end}}>
+  <span class="m">{{len .Clients}} client{{if ne (len .Clients) 1}}s{{end}} connected</span><span class="mut">·</span>
+  <span class="m">{{if .LastMinuteLowerBound}}at least {{end}}{{.LastMinute}} request{{if ne .LastMinute 1}}s{{end}} in the last minute</span><span class="mut">·</span>
+  <span class="m {{if .ErrorCount}}bad{{else}}mut{{end}}">{{.ErrorCount}} error{{if ne .ErrorCount 1}}s{{end}}</span><span class="mut">·</span>
+  <span class="m mut">kept: the last {{.KeptText}}, in memory only</span>
+</div>
+{{end}}
+
+{{/* traffic_live is the polled unit: the request tail and its metrics. The open
+     connections and the summary line ride along out of band. */}}
 {{define "traffic_live"}}
 <div id="traffic-live" data-live="{{.Prefix}}/traffic/live{{if .FilterQ}}?{{.FilterQ}}{{end}}" data-hash="{{.Hash}}" data-live-ms="2500">
-  <div class="sec-title">Connected clients <span class="sz">{{len .Clients}} open</span>
-    <button type="button" class="livetoggle" data-live-toggle aria-pressed="false" title="Pause live updates"><span class="livedot" aria-hidden="true"></span><span class="livetoggle-l">Live</span></button>
-  </div>
-  {{if .Clients}}
-  <div class="tbl-wrap gap">
-    <table class="tbl" id="clients-table"><thead><tr><th>Client</th><th>Software</th><th>Address</th><th>Principal</th><th class="num">Open for</th><th class="num">Last request</th><th class="num">Requests</th><th>Groups</th></tr></thead>
-      <tbody>{{range .Clients}}<tr id="cl-{{.Conn}}" tabindex="0" role="button" data-inspector-open
-          hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
-        <td class="mono">{{.Who}}</td>
-        <td class="mono">{{if .Software}}{{.Software}}{{else}}<span class="dim">—</span>{{end}}</td>
-        <td class="mono nw">{{.Remote}}</td>
-        <td class="mono nw">{{.Principal}}</td>
-        <td class="num mono">{{when .Opened "since"}}</td>
-        <td class="num mono">{{when .Last "since"}}</td>
-        <td class="num mono">{{.Requests}}</td>
-        <td class="mono">{{range $i, $g := .Groups}}{{if $i}}, {{end}}{{$g}}{{else}}<span class="dim">—</span>{{end}}</td>
+  {{if .OOB}}{{template "traffic_summary" .}}
+  <div class="insp-default" id="insp-default" hx-swap-oob="true"{{if .DefaultHidden}} hidden{{end}}>{{template "traffic_clients" .}}</div>{{end}}
+  {{if .Rows}}
+  <div class="tbl-wrap">
+    <table class="tbl tf-table" id="traffic-table"><thead><tr><th>Time</th><th>Client</th><th>Request</th><th>Topic or group</th><th>Detail</th><th>Result</th><th class="num">Took</th></tr></thead>
+      <tbody>{{range .Rows}}<tr id="rq-{{.OpenKey}}" class="{{if .Error}}errrow{{end}}" tabindex="0" data-inspector-open
+          hx-get="{{$.Prefix}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
+        <td class="m nw">{{when .Time "clockms"}}</td>
+        <td class="m nw" title="{{.Remote}}{{if .Software}} · {{.Software}}{{end}}">{{if .ConnKey}}<a href="{{$.Prefix}}/traffic?q={{.Who}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.ConnKey}}" hx-trigger="click consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false">{{.Who}}</a>{{else}}{{.Who}}{{end}}</td>
+        <td class="m nw"><span class="b">{{.API}}</span> <span class="mut">v{{.Version}}</span>{{if .Folded}} <span class="tag tf-count" title="{{.Count}} identical requests, {{.SameSpan}}">×{{.Count}}</span>{{end}}</td>
+        <td class="m">{{if .Target}}{{.Target}}{{else}}<span class="mut">—</span>{{end}}</td>
+        <td class="mut">{{.Detail}}</td>
+        <td class="m nw">{{if .Error}}<span class="bad" title="The response carried this error">{{.Error}}</span>{{else}}<span class="ok">ok</span>{{end}}</td>
+        <td class="m num nw">{{.Dur}}</td>
       </tr>{{end}}</tbody>
     </table>
   </div>
+  {{else if .Filtered}}
+  <div class="honest">{{icon "info"}}<div>No request matches the filter. <a href="{{.Prefix}}/traffic">Clear it</a> to see everything.</div></div>
   {{else}}
-  <div class="honest">{{icon "info"}}<div>No client is connected. An app that uses the broker appears here for as long as its connection stays open.</div></div>
+  <div class="honest">{{icon "info"}}<div>Nothing has reached the broker yet. Point an app at it and its requests appear here as they happen.</div></div>
   {{end}}
 
   {{if .HasClientMetrics}}
-  <div class="sec-title">Client metrics <span class="sz">reported by the clients themselves, every few seconds · metrics, not traces</span></div>
+  <div class="cap metrics-cap">Client metrics <span class="sz">reported by the clients themselves, every few seconds · metrics, not traces</span></div>
   {{range .Metrics}}
   <section class="mcard" aria-label="Metrics from {{.Who}}">
     <div class="mc-h">
@@ -83,28 +99,26 @@
   <div class="honest">{{icon "info"}}<div>No client has reported metrics yet. Clients that support KIP-714 (the Java client from 3.7, librdkafka from 2.5) send them on their own a few seconds after they connect; <span class="mono">enable.metrics.push=false</span> turns it off in the client.</div></div>
   {{end}}
   {{end}}
+</div>
+{{end}}
 
-  <div class="sec-title">Requests <span class="sz">{{len .Rows}}{{if .Filtered}} matching{{end}}</span></div>
-  {{if .Rows}}
-  <div class="tbl-wrap">
-    <table class="tbl tf-table" id="traffic-table"><thead><tr><th>Time</th><th>Client</th><th>Request</th><th>Topic or group</th><th>Detail</th><th>Result</th><th class="num">Took</th></tr></thead>
-      <tbody>{{range .Rows}}<tr id="rq-{{.OpenKey}}" tabindex="0" role="button" data-inspector-open
-          hx-get="{{$.Prefix}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
-        <td class="mono nw">{{when .Time "clockms"}}{{if .Folded}} <span class="tf-count" title="{{.Count}} identical requests, {{.SameSpan}}">×{{.Count}}</span>{{end}}</td>
-        <td class="mono nw" title="{{.Remote}}{{if .Software}} · {{.Software}}{{end}}">{{.Who}}</td>
-        <td class="mono nw">{{.API}} <span class="dim">v{{.Version}}</span></td>
-        <td class="mono">{{if .Target}}{{.Target}}{{else}}<span class="dim">—</span>{{end}}</td>
-        <td class="dim">{{.Detail}}</td>
-        <td>{{if .Error}}<span class="badge state-dead" title="The response carried this error">{{.Error}}</span>{{else}}<span class="dim">ok</span>{{end}}</td>
-        <td class="num mono nw">{{.Dur}}</td>
-      </tr>{{end}}</tbody>
-    </table>
+{{/* The open connections: the inspector's summary on the Traffic page (Main). A name
+     opens that client in the panel, which replaces this until Esc. */}}
+{{define "traffic_clients"}}
+<div class="hd"><span class="cap">Connected clients</span><span class="h2">{{len .Clients}} open connection{{if ne (len .Clients) 1}}s{{end}}</span></div>
+<div class="bd flush" id="clients-list">
+  <div class="r h" style="--c: 1fr 70px 56px"><span>Client</span><span>Open for</span><span class="ra">Idle</span></div>
+  {{range .Clients}}
+  <div class="insp-client" id="cl-{{.Conn}}" data-row>
+    <a class="insp-client-open" href="{{$.Prefix}}/traffic?q={{.Who}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"><span class="b el">{{.Who}}</span><span class="m mut">{{when .Opened "since"}}</span><span class="m mut ra">{{when .Last "since"}}</span></a>
+    <span class="m mut">{{if .Software}}{{.Software}}{{else}}software not reported{{end}} · {{.Principal}} · {{.Remote}}</span>
+    <span class="note">{{if .Doing}}{{.Doing}}{{else}}no requests kept{{end}}{{if .Refused}} · <span class="bad">{{.Refused}} request{{if ne .Refused 1}}s{{end}} refused</span>{{end}}</span>
   </div>
-  {{else if .Filtered}}
-  <div class="honest">{{icon "info"}}<div>No request matches the filter. <a href="{{.Prefix}}/traffic">Clear it</a> to see everything.</div></div>
   {{else}}
-  <div class="honest">{{icon "info"}}<div>Nothing has reached the broker yet. Point an app at it and its requests appear here as they happen.</div></div>
+  <div class="callout spaced"><span class="b">No client is connected</span><span class="note">An app that uses the broker appears here for as long as its connection stays open.</span></div>
   {{end}}
+  <div class="grow"></div>
+  {{if .HasClientMetrics}}<div class="callout"><span class="b">Clients that report their own metrics</span><span class="note">Java 3.7+ and librdkafka 2.5+ send request latency and poll idle ratio every few seconds. They are listed under the requests.</span></div>{{end}}
 </div>
 {{end}}
 

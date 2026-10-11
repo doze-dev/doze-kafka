@@ -90,7 +90,7 @@ hundred.
 ## Message lineage: where did this message go?
 
 Open a record in the topic page's drawer. If it carries a trace id in its headers it
-offers **Follow this message**, which lists every record, in every topic, that carries
+offers **Follow this trace**, which lists every record, in every topic, that carries
 the same id, in the order they were written: topic, partition and offset (linked to
 the record), the key, the span id (and the parent span id where the convention has
 one), and which consumer groups have **read** past it or **not yet**. A small time axis

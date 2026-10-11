@@ -144,7 +144,7 @@ func (f connectFacts) ConsoleHost() string {
 // firstRunPage is Sy-08: "Your broker is up", with the three steps that get a
 // message through, each a command that is real for this broker.
 func (c *Console) firstRunPage(w http.ResponseWriter, r *http.Request) {
-	data := map[string]any{"Facts": c.connectFacts(r), "Title": "Your broker is up", "Page": c.homeSection(), "HasTrafficLink": c.traffic != nil}
+	data := map[string]any{"Facts": c.connectFacts(r), "Title": "Your broker is up", "Page": c.homeSection(), "View": "first_run", "HasTrafficLink": c.traffic != nil}
 	c.render(w, r, "first_run", data)
 }
 
@@ -164,7 +164,7 @@ func (c *Console) connectPage(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, connectRow{Key: "schema.registry.url", Value: f.Registry, Copy: true})
 	}
 	rows = append(rows, connectRow{Key: "console", Value: f.Console, Copy: true})
-	c.render(w, r, "connect_detail", map[string]any{"Facts": f, "Rows": rows, "Page": "connect", "Title": "Connect an app"})
+	c.render(w, r, "connect_detail", map[string]any{"Facts": f, "Rows": rows, "Page": "connect", "View": "connect", "Title": "Connect an app"})
 }
 
 // connectRow is one setting on the Connect page: a value to copy, or a note where

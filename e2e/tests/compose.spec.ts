@@ -37,7 +37,7 @@ test('a bad header is reported next to the composer and nothing is sent', async 
   await page.getByRole('button', { name: 'Header value is base64' }).click();
   await setEditor('x');
   await page.getByRole('button', { name: 'Send message' }).click();
-  await expect(page.locator('.dock [data-err-slot]')).toBeVisible();
+  await expect(page.locator('#compose-panel [data-err-slot]')).toBeVisible();
   await expect(page.locator('tr[id^="msg-"]')).toHaveCount(0);
 });
 
@@ -46,7 +46,7 @@ test('holding Cmd+Enter sends once', async ({ page, createTopic, uniqueName, set
   await createTopic(uniqueName('held'));
   await page.locator('#compose-head').click();
   await setEditor('held');
-  await page.locator('.dock .cm-editor').click();
+  await page.locator('#compose-panel .cm-editor').click();
   await page.keyboard.down('Meta');
   for (let i = 0; i < 8; i++) await page.keyboard.down('Enter');
   await page.keyboard.up('Enter');
@@ -65,7 +65,7 @@ test('the composer stays open across a change of partition and closes on another
   await page.locator('.ptab', { hasText: 'P1' }).click();
   await expect(page).toHaveURL(/partition=1/);
   await expect(page.locator('.dock-form')).toBeVisible();
-  await page.locator(`.listpane .li[data-name="${b}"]`).click();
+  await page.locator(`.list .li[data-name="${b}"]`).click();
   await expect(page.locator('.idband h1')).toHaveText(b);
   await expect(page.locator('.dock-form')).toBeHidden();
   await expect(page.locator('#compose-head')).toHaveAttribute('aria-expanded', 'false');
@@ -77,12 +77,13 @@ test('an open composer never covers the messages', async ({ page }) => {
     await page.goto('topics/seed-orders');
     await page.locator('#compose-head').click();
     const r = await page.evaluate(() => {
-      const wb = document.querySelector('.detail.workbench')!;
+      const wb = document.querySelector('main.workbench')!;
       wb.scrollTop = wb.scrollHeight;
-      const t = document.querySelector('.tbl-wrap')!.getBoundingClientRect(), d = document.querySelector('.dock')!.getBoundingClientRect();
-      return { visible: Math.min(t.bottom, d.top) - t.top, overlap: t.bottom - d.top };
+      // The composer is in the page's flow (Try it, Sy-01 part 7): the table is above it.
+      const t = document.querySelector('.tbl-wrap')!.getBoundingClientRect(), d = document.querySelector('#compose-panel')!.getBoundingClientRect();
+      return { tableHeight: t.height, overlap: t.bottom - d.top };
     });
-    expect(r.visible, `rows visible at ${height}px`).toBeGreaterThan(100);
+    expect(r.tableHeight, `the table keeps its rows at ${height}px`).toBeGreaterThan(100);
     expect(r.overlap, `table under the composer at ${height}px`).toBeLessThanOrEqual(1);
   }
 });
@@ -97,5 +98,5 @@ test('sending to another partition keeps the view and says where it went', async
   expect(toast).toContain('partition 2');
   expect(toast).toContain('you are viewing partition 0');
   await expect(page.locator('.ptab.on')).toContainText('P0');
-  await expect(page.locator('.secrow .sec-title')).toContainText('partition 0');
+  await expect(page.locator('.secrow .cap')).toContainText('partition 0');
 });

@@ -165,3 +165,190 @@ test('a fresh empty broker lands on "Your broker is up", with the three steps', 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------------------
+// Sy-01 and Sy-02: the inspector is part of the page, in flow, beside the content.
+
+test('the inspector is in flow: it takes room from the page, covers nothing, and has no scrim', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('topics/seed-orders?partition=0');
+  const main = page.locator('main#detail');
+  const before = await main.boundingBox();
+  await page.locator('#msg-5').click();
+  const panel = page.locator('#inspector-panel');
+  await expect(panel).toBeVisible();
+  await expect(page.locator('#inspector #inspector-title')).toHaveAttribute('data-offset', '5');
+  const after = await main.boundingBox();
+  const box = await panel.boundingBox();
+  expect(after!.width).toBeLessThan(before!.width); // it took room from the page,
+  expect(after!.x + after!.width).toBeLessThanOrEqual(box!.x + 1); // and does not overlap it,
+  expect(box!.width).toBe(420); // at the width Sy-02 draws it,
+  expect(await panel.evaluate((el) => getComputedStyle(el).position)).not.toMatch(/fixed|absolute/);
+  // Nothing is drawn over the content: no overlay, no scrim, no dialog.
+  await expect(page.locator('#inspector-overlay, .scrim')).toHaveCount(0);
+  expect(await page.locator('.overlay:visible').count()).toBe(0);
+  await expect(page.locator('#inspector')).not.toHaveAttribute('aria-modal', 'true');
+  // It holds the board's parts: the kind, the title, the key, the value as code, the headers.
+  await expect(panel.locator('.inspector-h .cap')).toHaveText('Message');
+  await expect(panel.locator('.kv').first()).toContainText('Key');
+  await expect(panel.locator('pre.code').first()).toBeVisible();
+  await expect(panel.getByRole('link', { name: 'Follow this trace' })).toBeVisible();
+  // Esc puts the page back as it was.
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
+  const back = await main.boundingBox();
+  expect(back!.width).toBe(before!.width);
+});
+
+test('on Traffic the inspector lists the open connections until a row replaces them, and Esc puts them back', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('traffic');
+  const panel = page.locator('#inspector-panel');
+  await expect(panel).toBeVisible();
+  await expect(panel.locator('.cap').first()).toHaveText('Connected clients');
+  await expect(panel.locator('.h2')).toHaveText(/\d+ open connections?/);
+  await expect(panel.locator('.r.h')).toContainText('Client');
+  const row = page.locator('#traffic-table tbody tr').first();
+  await row.click();
+  await expect(page.locator('#inspector #inspector-title')).toBeVisible();
+  await expect(page.locator('#insp-default')).toBeHidden(); // replaced, not stacked.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#insp-default')).toBeVisible();
+  // The requests table comes first, then one field and one segmented control above it.
+  const order = await page.evaluate(() => {
+    const m = document.querySelector('main#detail')!;
+    const y = (sel: string) => (m.querySelector(sel) as HTMLElement | null)?.getBoundingClientRect().top ?? -1;
+    return { summary: y('#traffic-summary'), filter: y('.filterrow'), table: y('#traffic-table') };
+  });
+  expect(order.summary).toBeGreaterThan(0);
+  expect(order.summary).toBeLessThan(order.filter);
+  expect(order.filter).toBeLessThan(order.table);
+  await expect(page.locator('.filterrow input[name=q]')).toHaveAttribute('placeholder', 'Client, topic, group or request');
+  await expect(page.locator('.filterrow .seg a')).toHaveText(['all', 'errors', 'produce', 'fetch', 'groups', 'admin']);
+  await expect(page.locator('#traffic-table thead th')).toHaveText(['Time', 'Client', 'Request', 'Topic or group', 'Detail', 'Result', 'Took']);
+  await expect(page.locator('#traffic-summary')).toContainText('kept: the last');
+  await expect(page.locator('main#detail')).toContainText("The console's own requests are left out");
+});
+
+// Sy-01: the anatomy of a detail page.
+test('a topic page is the board: one sentence, one action and ···, neighbours, tabs, try it, the wire', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('topics/seed-orders?partition=0');
+  const head = page.locator('main#detail .idband').first();
+  await expect(head.locator('h1')).toHaveText('seed-orders');
+  // One solid primary button, and the destructive actions are under ···.
+  await expect(head.locator('.btn.pri')).toHaveCount(1);
+  await expect(head.locator('.btn.pri')).toHaveText('Produce a message');
+  await expect(page.getByRole('button', { name: 'Delete', exact: true })).toBeHidden();
+  await page.getByRole('button', { name: 'More actions' }).click();
+  await expect(page.getByRole('button', { name: 'Purge' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Delete', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Delete', exact: true })).toBeHidden();
+  // Facts: a sentence, not a strip of boxes.
+  const facts = page.locator('#topic-facts');
+  await expect(facts).toHaveText(/^3 partitions, [\d,]+ messages?, .*\.$/);
+  expect(await facts.evaluate((el) => el.tagName)).toBe('P');
+  // Neighbours: linked wells.
+  await expect(page.locator('#neighbours a.well').first()).toBeVisible();
+  // Tabs, in the board's order.
+  await expect(page.locator('main .tabs .tab')).toHaveText([/^Messages/, /^Partitions/, /^Readers/, /^Config/]);
+  await expect(page.locator('main .tabs .tab.on')).toHaveText(/^Messages/);
+  // Try it, and the wire underneath with its live pill, below the page and beside the inspector.
+  await expect(page.locator('#compose-panel .t')).toHaveText('Try it: produce');
+  const dock = page.locator('#wire-dock');
+  await expect(dock.locator('.dh .b')).toHaveText('The wire');
+  await expect(dock.locator('.dh .livetoggle, .dh .pill.ok').first()).toContainText(/live/i);
+  const m = await page.locator('main#detail').boundingBox();
+  const d = await dock.boundingBox();
+  expect(d!.y).toBeGreaterThanOrEqual(m!.y + m!.height - 1);
+  expect(d!.x).toBeCloseTo(m!.x, 0);
+  // The list is on the left, 248 px, with the number that matters.
+  const list = await page.locator('aside.list').boundingBox();
+  expect(list!.width).toBe(248);
+  await expect(page.locator('aside.list .li[data-name="seed-orders"]')).toHaveClass(/on/);
+});
+
+test('the keys strip is at the foot of every page and says keys the page has', async ({ page }) => {
+  for (const [path, want] of [
+    ['traffic', ['pause']], ['topics', ['create topic']], ['topics/seed-orders', ['close panel', 'topics', 'produce']],
+    ['groups', ['filter']], ['schemas', ['register schema']], ['cluster', ['cluster']], ['access', ['open']], ['trace', ['trace id']], ['connect', ['jump or act']],
+  ] as const) {
+    await page.goto(path);
+    const strip = page.locator('#keys');
+    await expect(strip, path).toBeVisible();
+    for (const w of want) await expect(strip, `${path} says ${w}`).toContainText(w);
+    expect(await strip.locator('.kbd').count(), path).toBeGreaterThan(1);
+  }
+  // It follows the page when it is navigated to by the rail.
+  await page.goto('topics');
+  await page.locator('nav.rail a.nav', { hasText: 'Traffic' }).click();
+  await expect(page.locator('#keys')).toContainText('pause');
+});
+
+test('every section has the board\'s home: its title, its summary line and its table', async ({ page }) => {
+  await page.goto('topics');
+  await expect(page.locator('#topics-summary')).toContainText(/\d+ topics?/);
+  await expect(page.locator('#topics-table .r.h span')).toHaveText(['Topic', 'Partitions', 'Messages', 'Retention', 'Read by', 'Compact', 'Schema subject']);
+  await page.goto('groups');
+  await expect(page.locator('#groups-summary')).toContainText('records behind in total');
+  await expect(page.locator('#groups-table .r.h span')).toHaveText(['Group', 'Protocol', 'State', 'Members', 'Topics', 'Lag', 'Generation']);
+  await expect(page.locator('.filterrow .seg button')).toHaveText(['all', 'with members', 'empty', 'behind']);
+  await page.goto('schemas');
+  await expect(page.locator('#schemas-summary')).toContainText('subjects');
+  await expect(page.locator('#schemas-table .r.h span')).toHaveText(['Subject', 'Type', 'Versions', 'Latest id', 'Level', 'Topics using it']);
+  await page.goto('cluster');
+  await expect(page.locator('#cluster-sentence')).toContainText(/^Node \d+/);
+  await expect(page.locator('#cluster-identity .r.h')).toContainText('Identity');
+  await expect(page.locator('#cluster-counts .r.h')).toContainText('Counts');
+  await expect(page.locator('aside.list .li').first()).toHaveText(/Overview/);
+  await page.goto('access');
+  await expect(page.locator('#acl-table .r.h span')).toHaveText(['Principal', 'Type', 'Name', 'Pattern', 'Operation', 'Permission', 'Host']);
+  await expect(page.locator('main .callout').first()).toContainText('These are enforced');
+});
+
+test('the groups segmented control narrows the table', async ({ page }) => {
+  await page.goto('groups');
+  const all = await page.locator('#groups-table > a.r:not([hidden])').count();
+  await page.getByRole('button', { name: 'behind', exact: true }).click();
+  const behind = await page.locator('#groups-table > a.r:not([hidden])').count();
+  expect(behind).toBeGreaterThan(0);
+  expect(behind).toBeLessThan(all);
+  await page.getByRole('button', { name: 'all', exact: true }).click();
+  expect(await page.locator('#groups-table > a.r:not([hidden])').count()).toBe(all);
+  await page.locator('main input[data-filter-target]').first().fill('g-lag');
+  await expect(page.locator('#groups-table > a.r:not([hidden])')).toHaveCount(1);
+});
+
+// Sy-03 and Sy-04: the same page at 960 and at 390.
+test('at 960 the rail is chips, the list is one tap away and the inspector is a card between the page and its dock', async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 760 });
+  await page.goto('topics/seed-orders?partition=0');
+  expect(await page.locator('nav.rail').evaluate((el) => el.getBoundingClientRect().width)).toBe(48);
+  await expect(page.locator('aside.list')).toBeHidden();
+  await expect(page.locator('.backrow a')).toContainText('‹ Topics');
+  await expect(page.locator('#compat-pill')).toBeHidden();
+  await page.locator('#msg-5').click();
+  const panel = page.locator('#inspector-panel');
+  await expect(panel).toBeVisible();
+  const p = await panel.boundingBox();
+  const dock = await page.locator('#wire-dock').boundingBox();
+  const main = await page.locator('main#detail').boundingBox();
+  expect(p!.y).toBeGreaterThanOrEqual(main!.y + main!.height - 1); // below the page,
+  expect(p!.y + p!.height).toBeLessThanOrEqual(dock!.y + 1); // above its dock: stacked, in flow.
+  expect(await panel.evaluate((el) => getComputedStyle(el).position)).toBe('static');
+});
+
+// Sy-07: three token sets, and a text control for them.
+test('the theme control is words: system, light, dark, high contrast', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('topics');
+  await expect(page.locator('#theme-seg button')).toHaveText(['system', 'light', 'dark', 'high contrast']);
+  await page.locator('#theme-seg [data-mode="contrast"]').click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'contrast');
+  // Selection is drawn with a 2 px outline as well, so it does not depend on a fill.
+  const on = page.locator('nav.rail a.nav.on');
+  await expect(on).toHaveCSS('outline-width', '2px');
+  await expect(on).toHaveCSS('outline-style', 'solid');
+  await page.locator('#theme-seg [data-mode="light"]').click();
+});

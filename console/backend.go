@@ -454,6 +454,9 @@ func topicIDString(id [16]byte) string { return base64.RawURLEncoding.EncodeToSt
 type PartitionBound struct {
 	Partition        int32
 	Earliest, Latest int64
+	// Newest is the timestamp of the partition's newest record (its max timestamp), and
+	// zero for an empty partition.
+	Newest time.Time
 }
 
 // Count is how many offsets the partition holds (latest minus earliest): the number of
@@ -469,7 +472,7 @@ func (b *backend) PartitionBounds(ctx context.Context, topic string, partitions 
 	rt := kmsg.NewListOffsetsRequestTopic()
 	rt.Topic = topic
 	for p := int32(0); p < partitions; p++ {
-		for _, ts := range []int64{-2, -1} { // earliest, latest
+		for _, ts := range []int64{-2, -1, -3} { // earliest, latest, max timestamp
 			rp := kmsg.NewListOffsetsRequestTopicPartition()
 			rp.Partition, rp.Timestamp = p, ts
 			rt.Partitions = append(rt.Partitions, rp)
@@ -489,19 +492,27 @@ func (b *backend) PartitionBounds(ctx context.Context, topic string, partitions 
 	}
 	seen := make([]int, partitions)
 	for _, p := range resp.Topics[0].Partitions {
-		if p.ErrorCode != 0 {
-			return nil, kerr.ErrorForCode(p.ErrorCode)
-		}
 		if p.Partition < 0 || p.Partition >= partitions {
 			continue
 		}
-		// Each partition was asked for twice, earliest first.
-		if seen[p.Partition] == 0 {
+		// Each partition was asked for three times, in the order above. The newest
+		// timestamp is a nicety: a broker that cannot say leaves it zero.
+		i := seen[p.Partition]
+		seen[p.Partition]++
+		if i == 2 {
+			if p.ErrorCode == 0 && p.Timestamp > 0 {
+				out[p.Partition].Newest = time.UnixMilli(p.Timestamp)
+			}
+			continue
+		}
+		if p.ErrorCode != 0 {
+			return nil, kerr.ErrorForCode(p.ErrorCode)
+		}
+		if i == 0 {
 			out[p.Partition].Earliest = p.Offset
 		} else {
 			out[p.Partition].Latest = p.Offset
 		}
-		seen[p.Partition]++
 	}
 	return out, nil
 }

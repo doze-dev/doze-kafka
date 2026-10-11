@@ -165,6 +165,18 @@ func typeLabel(t string) string {
 type SubjectRow struct {
 	Name, Type, TypeLabel string
 	Latest                int
+	ID                    int // the latest version's schema id.
+}
+
+// TypeShort is the language as the list's pill writes it: AVRO, PROTO, JSON.
+func (r SubjectRow) TypeShort() string {
+	switch r.Type {
+	case schemaregistry.TypeJSON:
+		return "JSON"
+	case schemaregistry.TypeProtobuf:
+		return "PROTO"
+	}
+	return "AVRO"
 }
 
 func (rc *registryClient) Subjects(ctx context.Context) ([]SubjectRow, error) {
@@ -174,7 +186,7 @@ func (rc *registryClient) Subjects(ctx context.Context) ([]SubjectRow, error) {
 	}
 	out := make([]SubjectRow, 0, len(latest))
 	for _, v := range latest {
-		out = append(out, SubjectRow{Name: v.Subject, Type: v.Type(), TypeLabel: v.TypeLabel(), Latest: v.Version})
+		out = append(out, SubjectRow{Name: v.Subject, Type: v.Type(), TypeLabel: v.TypeLabel(), Latest: v.Version, ID: v.ID})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
@@ -211,6 +223,16 @@ func (rc *registryClient) Compat(ctx context.Context, subject string) (level str
 		return out.Level, false, err
 	}
 	return "", false, err
+}
+
+// GlobalCompat is the registry's default compatibility level, which a subject
+// without its own level follows.
+func (rc *registryClient) GlobalCompat(ctx context.Context) (string, error) {
+	var out struct {
+		Level string `json:"compatibilityLevel"`
+	}
+	err := rc.call(ctx, "GET", "/config", nil, &out)
+	return out.Level, err
 }
 
 func (rc *registryClient) SetCompat(ctx context.Context, subject, level string) error {

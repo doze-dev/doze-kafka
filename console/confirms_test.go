@@ -151,7 +151,7 @@ func TestEveryConfirmIsTrueOfWhatTheActionDoes(t *testing.T) {
 
 	t.Run("topic.partitions", func(t *testing.T) {
 		req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"grow"}, "partitions": {"3"}})
-		say := confirmOn(t, req(t, c, "GET", "/_console/topics/grow", nil).Body.String(), "/_console/topics/grow/partitions")
+		say := confirmOn(t, req(t, c, "GET", "/_console/topics/grow?tab=partitions", nil).Body.String(), "/_console/topics/grow/partitions")
 		now := numberBefore(t, say, "partitions now")
 		if now != 3 {
 			t.Errorf("says it has %d: %s", now, say)
@@ -199,11 +199,11 @@ func TestEveryConfirmIsTrueOfWhatTheActionDoes(t *testing.T) {
 		// Committed at 2, at the start (0), and at the end (6): moving to earliest changes two, to latest two.
 		commitFor(t, addr, group, topic, map[int32]int64{0: 2, 1: 0, 2: 6})
 		before := offsetsOf(t, c, group)
-		say := confirmOn(t, req(t, c, "GET", "/_console/groups/"+group, nil).Body.String(), "/_console/groups/"+group+"/reset")
+		say := confirmOn(t, req(t, c, "GET", "/_console/groups/"+group+"?tab=offsets", nil).Body.String(), "/_console/groups/"+group+"/reset")
 		_ = say
 		var found string
-		for _, m := range regexp.MustCompile(`(?s)<button[^>]*>`).FindAllString(req(t, c, "GET", "/_console/groups/"+group, nil).Body.String(), -1) {
-			if strings.Contains(m, `hx-vals='{"to":"`+to+`"}'`) {
+		for _, m := range regexp.MustCompile(`(?s)<button[^>]*>`).FindAllString(req(t, c, "GET", "/_console/groups/"+group+"?tab=offsets", nil).Body.String(), -1) {
+			if strings.Contains(m, `hx-vals='{"to":"`+to+`"`) {
 				found = html.UnescapeString(regexp.MustCompile(`hx-confirm="([^"]*)"`).FindStringSubmatch(m)[1])
 			}
 		}
@@ -246,7 +246,7 @@ func TestEveryConfirmIsTrueOfWhatTheActionDoes(t *testing.T) {
 		produceTo(t, c, "od", 0, 5)
 		commitFor(t, addr, "od-g", "od", map[int32]int64{0: 3, 1: 0})
 		var say string
-		for _, m := range regexp.MustCompile(`(?s)<button[^>]*>`).FindAllString(req(t, c, "GET", "/_console/groups/od-g", nil).Body.String(), -1) {
+		for _, m := range regexp.MustCompile(`(?s)<button[^>]*>`).FindAllString(req(t, c, "GET", "/_console/groups/od-g?tab=offsets", nil).Body.String(), -1) {
 			if strings.Contains(m, `/offset/delete"`) && strings.Contains(m, `"partition":"0"`) {
 				say = html.UnescapeString(regexp.MustCompile(`hx-confirm="([^"]*)"`).FindStringSubmatch(m)[1])
 			}

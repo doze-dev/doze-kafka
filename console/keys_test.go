@@ -21,6 +21,9 @@ func TestEveryKeyShellJSHandlesIsInTheDeclaredMap(t *testing.T) {
 	declared := map[string]bool{}
 	for _, k := range keyMap {
 		declared[strings.TrimPrefix(k.Key, "Mod+")] = true
+		if f, _, ok := strings.Cut(k.Key, " "); ok {
+			declared[f] = true // a chord is armed by its first key.
+		}
 	}
 	lit := regexp.MustCompile(`\.key\s*===?\s*(?:"([^"]+)"|'([^']+)')`)
 	found := 0
@@ -41,8 +44,8 @@ func TestEveryKeyShellJSHandlesIsInTheDeclaredMap(t *testing.T) {
 		t.Fatal("pageActions not found in shell.js")
 	}
 	have := map[string]bool{}
-	for _, m := range regexp.MustCompile(`(?m)^    (\w+):`).FindAllStringSubmatch(acts[1], -1) {
-		have[m[1]] = true
+	for _, m := range regexp.MustCompile(`(?m)^    ("?[\w-]+"?):`).FindAllStringSubmatch(acts[1], -1) {
+		have[strings.Trim(m[1], `"`)] = true
 	}
 	for _, k := range keyMap {
 		if k.Scope == ScopeDialogs || strings.HasPrefix(k.Key, "Mod+") {
@@ -66,12 +69,14 @@ func TestEveryKeyShellJSHandlesIsInTheDeclaredMap(t *testing.T) {
 }
 
 func TestTheKeyMapHasNoDuplicatesAndTheHelpOverlayListsEveryKey(t *testing.T) {
+	// A key may mean two things where the pages differ (p is pause on a page that tails
+	// and produce on a topic), so a binding is its key and its words.
 	seen := map[string]bool{}
 	for _, k := range keyMap {
-		if seen[k.Key] {
+		if seen[k.Key+"|"+k.Label] {
 			t.Errorf("key %q is declared twice", k.Key)
 		}
-		seen[k.Key] = true
+		seen[k.Key+"|"+k.Label] = true
 		if k.Show == "" || k.Label == "" || k.Action == "" {
 			t.Errorf("%q is incomplete: %+v", k.Key, k)
 		}
@@ -79,8 +84,20 @@ func TestTheKeyMapHasNoDuplicatesAndTheHelpOverlayListsEveryKey(t *testing.T) {
 	c := newTestConsole(t)
 	page := req(t, c, "GET", "/_console/topics", nil).Body.String()
 	help := between(page, `id="help"`, `id="keymap"`)
+	// Sy-06 lists three columns: where to go, what a list does, what a page does. The
+	// dialogs' own keys are bound by the dialogs and are not in it.
 	for _, k := range keyMap {
-		if !strings.Contains(help, `<span class="kbd">`+k.Show+`</span>`) || !strings.Contains(help, k.Label) {
+		if k.Scope == ScopeDialogs {
+			continue
+		}
+		if k.Target == "/traffic" {
+			continue // only where there is traffic; the plain test console has none.
+		}
+		caps := ""
+		for _, f := range strings.Fields(k.Show) {
+			caps += `<span class="kbd">` + f + `</span>`
+		}
+		if !strings.Contains(help, caps) || !strings.Contains(help, k.Label) {
 			t.Errorf("the help overlay does not list %q (%s)", k.Show, k.Label)
 		}
 	}

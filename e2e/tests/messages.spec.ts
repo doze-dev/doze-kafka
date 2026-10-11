@@ -19,7 +19,7 @@ test('a record opens in the inspector, with its place in the URL, and Esc closes
   await expect(page.locator('#inspector #inspector-title')).toBeFocused({ timeout: 100 }).catch(() => {});
   expect(page.url()).toContain('open=5');
   await page.keyboard.press('Escape');
-  await expect(page.locator('#inspector-overlay')).toBeHidden();
+  await expect(page.locator('#inspector')).toBeHidden();
   expect(page.url()).not.toContain('open=');
   await expect(row(page, 5)).toBeFocused(); // focus goes back to where it came from.
 });
@@ -48,7 +48,7 @@ test('a inspector that cannot load says why, and still closes', async ({ page })
   await expect(page.locator('#inspector [role="alert"]')).toContainText('could not get an answer');
   await expect(page.locator('#inspector #inspector-title')).toBeVisible(); // it is still a dialog, with a title and a close button.
   await page.keyboard.press('Escape');
-  await expect(page.locator('#inspector-overlay')).toBeHidden();
+  await expect(page.locator('#inspector')).toBeHidden();
 });
 
 test('binary, empty and null values are labelled, with hex and base64 to read', async ({ page }) => {
@@ -81,7 +81,7 @@ test('Send again produces an exact copy; Edit a copy fills the composer', async 
   await page.goto(`topics/${name}`);
   await row(page, 0).click();
   await page.getByRole('button', { name: 'Send again' }).click();
-  await expect(page.locator('#inspector-overlay')).toBeHidden(); // closes once the broker has taken the copy.
+  await expect(page.locator('#inspector')).toBeHidden(); // closes once the broker has taken the copy.
   await expect(row(page, 1)).toBeVisible();
   await settled(page); // a row only answers a click once htmx has processed it.
   await row(page, 1).click();
@@ -91,7 +91,7 @@ test('Send again produces an exact copy; Edit a copy fills the composer', async 
   await page.getByRole('button', { name: 'Edit a copy…' }).click();
   await expect(page.locator('#compose-head')).toHaveAttribute('aria-expanded', 'true');
   await expect(page.locator('#f-key')).toHaveValue('k');
-  await expect(page.locator('.dock .cm-editor')).toContainText('"a":1');
+  await expect(page.locator('#compose-panel .cm-editor')).toContainText('"a":1');
 });
 
 test('"go to offset" lands on the record, scrolled into view', async ({ page }) => {

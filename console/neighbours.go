@@ -11,6 +11,9 @@ type neighbourLink struct {
 	// the subject in place, and URL is where it goes without scripts.
 	Open string
 	Sep  string
+	// Kind is what the name is: "client", "group", "subject" or "topic". The page draws
+	// a group and a subject with their section's chip (Sy-01 part 5).
+	Kind string
 }
 
 // neighbourClause is one clause of the sentence.
@@ -37,13 +40,13 @@ func (c *Console) neighbourClauses(g *Graph, kind NodeKind, name string) []neigh
 			}
 			switch n.Kind {
 			case NodeTopic:
-				l.URL = c.topicURL(n.Name)
+				l.URL, l.Kind = c.topicURL(n.Name), "topic"
 			case NodeGroup:
-				l.URL = c.groupURL(n.Name)
+				l.URL, l.Kind = c.groupURL(n.Name), "group"
 			case NodeClient:
-				l.URL = c.prefix + "/traffic?" + TrafficFilter{Client: n.Name}.query()
+				l.URL, l.Kind = c.prefix+"/traffic?"+TrafficFilter{Client: n.Name}.query(), "client"
 			case NodeSubject:
-				l.URL = c.schemaURL(n.Name)
+				l.URL, l.Kind = c.schemaURL(n.Name), "subject"
 				l.Open = c.inspectURL(KindSubject, n.Name)
 			}
 			cl.Links = append(cl.Links, l)

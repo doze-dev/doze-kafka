@@ -21,38 +21,42 @@ test('the rail lists Traffic, and the page shows what the seed asked, who asked 
 
 test('the filters narrow the tail, and the narrowing survives a refresh of it', async ({ page }) => {
   await page.goto('traffic');
-  await page.locator('input[name=topic]').fill('seed-orders');
-  await page.getByRole('button', { name: 'Filter', exact: true }).click();
-  await expect(page).toHaveURL(/topic=seed-orders/);
+  // One field (Main): a client, a topic, a group or a request.
+  await page.locator('input[name=q]').fill('seed-orders');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/q=seed-orders/);
   const rows = page.locator('#traffic-table tbody tr');
   await expect(rows.first()).toBeVisible();
   for (const row of await rows.all()) await expect(row).toContainText('seed-orders');
 
   // The region polls with the filter in its address.
-  await expect(page.locator('#traffic-live')).toHaveAttribute('data-live', /topic=seed-orders/);
-  const polled = page.waitForResponse((r) => r.url().includes('/traffic/live') && r.url().includes('topic=seed-orders'));
+  await expect(page.locator('#traffic-live')).toHaveAttribute('data-live', /q=seed-orders/);
+  const polled = page.waitForResponse((r) => r.url().includes('/traffic/live') && r.url().includes('q=seed-orders'));
   await polled;
   await expect(page.locator('#traffic-live')).toHaveCount(1); // one region, however many polls.
 
-  await page.getByRole('link', { name: 'Clear' }).click();
-  await expect(page.locator('input[name=topic]')).toHaveValue('');
+  await page.locator('input[name=q]').fill('');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('input[name=q]')).toHaveValue('');
 
-  await page.locator('input[name=errors]').check();
-  await page.getByRole('button', { name: 'Filter', exact: true }).click();
+  // The segmented control: errors only.
+  await page.locator('.seg').getByRole('link', { name: 'errors', exact: true }).click();
+  await expect(page).toHaveURL(/kind=errors/);
   // Other specs share this broker and fail requests of their own, so assert on the
   // seed's refusal being there and on nothing that went well being there.
   await expect(page.locator('#traffic-table tbody tr', { hasText: 'TOPIC_ALREADY_EXISTS' })).toHaveCount(1);
-  await expect(page.locator('#traffic-table tbody tr:not(:has(.badge))')).toHaveCount(0);
+  await expect(page.locator('#traffic-table tbody tr:not(.errrow)')).toHaveCount(0);
 
-  await page.locator('input[name=errors]').uncheck();
-  await page.locator('input[name=client]').fill('nobody-by-this-name');
-  await page.getByRole('button', { name: 'Filter', exact: true }).click();
+  await page.locator('.seg').getByRole('link', { name: 'all', exact: true }).click();
+  await expect(page).not.toHaveURL(/kind=/);
+  await page.locator('input[name=q]').fill('nobody-by-this-name');
+  await page.keyboard.press('Enter');
   await expect(page.locator('.honest', { hasText: 'No request matches the filter' })).toBeVisible();
 });
 
 test('a row opens its request in the inspector, and Escape closes it', async ({ page }) => {
-  await page.goto('traffic?errors=1&client=doze-seed&api=CreateTopics');
-  const row = page.locator('#traffic-table tbody tr').first();
+  await page.goto('traffic?kind=errors&q=doze-seed');
+  const row = page.locator('#traffic-table tbody tr', { hasText: 'CreateTopics' }).first();
   await row.click();
   const inspector = page.locator('#inspector');
   await expect(inspector).toBeVisible();
@@ -76,7 +80,7 @@ test('the live toggle pauses the tail', async ({ page }) => {
 });
 
 test('a group page shows its timeline, newest first', async ({ page }) => {
-  await page.goto('groups/g-timeline');
+  await page.goto('groups/g-timeline?tab=timeline');
   const timeline = page.locator('#group-timeline');
   await expect(timeline).toBeVisible();
   const kinds = (await timeline.locator('.tl-k').allInnerTexts()).map((s) => s.trim());
@@ -99,7 +103,7 @@ test('a client that reports its own metrics shows them, drawn, and says they are
   await page.goto('traffic');
   const card = page.getByRole('region', { name: 'Metrics from doze-seed-telemetry' });
   await expect(card).toBeVisible();
-  await expect(page.locator('.sec-title', { hasText: 'Client metrics' })).toContainText('metrics, not traces');
+  await expect(page.locator('.metrics-cap', { hasText: 'Client metrics' })).toContainText('metrics, not traces');
   await expect(card).toContainText('3 reports');
   await expect(card).toContainText('client_rack=seed-rack');
   const latency = card.locator('.mrow', { hasText: 'producer.node.request.latency.avg' });

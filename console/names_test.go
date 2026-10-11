@@ -92,20 +92,11 @@ func TestHostileGroupIDsCannotReachScriptContext(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	exprs := xShowAttr.FindAllStringSubmatch(body, -1)
-	if len(exprs) < len(ids) {
-		t.Fatalf("expected an x-show per group row, found %d", len(exprs))
-	}
-	// The only x-show expressions are these fixed ones: none may ever be built
-	// from a resource name.
-	fixed := map[string]bool{
-		`!$store.filter.q || $el.dataset.name.toLowerCase().includes($store.filter.q.toLowerCase())`: true,
-		`$store.filter.none($el.parentElement)`:                                                      true,
-	}
-	for _, m := range exprs {
-		if !fixed[html.UnescapeString(m[1])] {
-			t.Errorf("x-show carries something other than a fixed expression: %q", m[1])
-		}
+	// The lists narrow themselves from data-* attributes by a script that is not in the
+	// markup: no expression of any kind is built from a resource name. (They once were
+	// Alpine x-show expressions, which is how a quote in an id became script.)
+	for _, m := range xShowAttr.FindAllStringSubmatch(body, -1) {
+		t.Errorf("an x-show expression is in the group list: %q", m[1])
 	}
 	if strings.Contains(body, "x'+(window") {
 		t.Error("a hostile id appears unescaped in the page")
@@ -126,7 +117,7 @@ func TestHostileGroupIDsCannotReachScriptContext(t *testing.T) {
 			t.Errorf("GET %s = %d, want 200 (dead link)", link, rec.Code)
 			continue
 		}
-		if !strings.Contains(rec.Body.String(), "<h1>") {
+		if !strings.Contains(rec.Body.String(), `<h1 class="h1 m">`) {
 			t.Errorf("GET %s did not render a group page", link)
 		}
 	}
@@ -160,7 +151,7 @@ func TestATopicNamedCreateIsReachable(t *testing.T) {
 		t.Fatalf("creating a topic named create: %d %s", rec.Code, rec.Body.String())
 	}
 	rec := req(t, c, "GET", "/_console/topics/create", nil)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "<h1>create</h1>") {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `<h1 class="h1 m">create</h1>`) {
 		t.Fatalf("GET /topics/create = %d; want the topic's page", rec.Code)
 	}
 	form := req(t, c, "GET", "/_console/new/topic", nil)
@@ -218,7 +209,7 @@ func TestGroupKnownOnlyByOffsetsIsShown(t *testing.T) {
 	if page.Code != http.StatusOK {
 		t.Fatalf("GET /groups/retired = %d: %s", page.Code, page.Body.String())
 	}
-	if body := page.Body.String(); !strings.Contains(body, "lag 1") || !strings.Contains(body, "Empty") {
+	if body := page.Body.String(); !strings.Contains(body, `>1</span> record behind`) || !strings.Contains(body, "Empty") {
 		t.Errorf("the group page should show it Empty with lag 1:\n%s", body)
 	}
 }

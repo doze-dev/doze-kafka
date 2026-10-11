@@ -39,12 +39,50 @@ func (c *Console) schemas(w http.ResponseWriter, r *http.Request) {
 	if c.registryOff(w, r) {
 		return
 	}
-	list, err := c.reg.Subjects(r.Context())
+	ctx := r.Context()
+	list, err := c.reg.Subjects(ctx)
 	if err != nil {
 		c.fail(w, r, err)
 		return
 	}
-	c.render(w, r, "schemas_home", map[string]any{"List": list, "Page": "schemas", "Title": "Schemas"})
+	// The home table (Sc-Home): each subject's versions, latest id, level and the topic
+	// its name says it is for. One request or two per subject: it is a handful.
+	topicSet := map[string]bool{}
+	if ts, err := c.be.ListTopics(ctx); err == nil {
+		for _, t := range ts {
+			topicSet[t.Name] = true
+		}
+	}
+	type row struct {
+		SubjectRow
+		Versions int
+		Level    string
+		OwnLevel bool
+		Topic    string
+	}
+	rows := make([]row, 0, len(list))
+	var versions int
+	for _, s := range list {
+		r := row{SubjectRow: s}
+		if vs, err := c.reg.Versions(ctx, s.Name); err == nil {
+			r.Versions = len(vs)
+		}
+		versions += r.Versions
+		r.Level, r.OwnLevel, _ = c.reg.Compat(ctx, s.Name)
+		if t := subjectTopic(s.Name); t != "" && topicSet[t] {
+			r.Topic = t
+		}
+		rows = append(rows, r)
+	}
+	global, _ := c.reg.GlobalCompat(ctx)
+	regURL := c.facts.RegistryURL
+	if regURL == "" {
+		regURL = c.reg.base
+	}
+	host := strings.TrimPrefix(strings.TrimPrefix(regURL, "http://"), "https://")
+	c.render(w, r, "schemas_home", map[string]any{"List": list, "Rows": rows, "Page": "schemas", "Title": "Schemas",
+		"VersionCount": versions, "GlobalLevel": global, "RegistryURL": regURL, "RegistryHost": host,
+		"SASL": len(c.facts.SASLMechanisms) > 0 || c.be.opts.SASLUser != ""})
 }
 
 func (c *Console) schemaCreatePage(w http.ResponseWriter, r *http.Request) {
@@ -123,11 +161,69 @@ func (c *Console) schemaDetail(w http.ResponseWriter, r *http.Request) {
 	list, _ := c.reg.Subjects(ctx)
 	level, own, _ := c.reg.Compat(ctx, subject)
 
+	tab := r.URL.Query().Get("tab")
+	if tab != "compat" && tab != "register" {
+		tab = "versions"
+	}
+	tabURL := func(key string) string {
+		if key == "versions" {
+			return c.schemaURL(subject)
+		}
+		return c.schemaURL(subject) + "?tab=" + key
+	}
+	latestV := versions[len(versions)-1]
 	data := map[string]any{
-		"List": list, "Sel": subject, "Subject": subject, "Page": "schemas", "Title": subject,
-		"Versions": versions, "Cur": cur, "Text": cur.Pretty(), "Latest": versions[len(versions)-1],
+		"List": list, "Sel": subject, "Subject": subject, "Page": "schemas", "View": "schema", "Title": subject,
+		"Versions": versions, "Cur": cur, "Text": cur.Pretty(), "Latest": latestV,
 		"Compat": level, "CompatOwn": own, "Levels": compatLevels(),
-		"IsLatest": cur.Version == versions[len(versions)-1],
+		"IsLatest": cur.Version == latestV, "Tab": tab,
+		"Tabs": []tabLink{
+			{Key: "versions", Label: "Versions", URL: tabURL("versions"), On: tab == "versions"},
+			{Key: "compat", Label: "Compatibility", URL: tabURL("compat"), On: tab == "compat"},
+			{Key: "register", Label: "Register", URL: tabURL("register"), On: tab == "register"},
+		},
+	}
+	// The versions table: each version, its id and what it changed from the one before.
+	if tab == "versions" {
+		type vrow struct {
+			Version, ID int
+			Latest      bool
+			Changed     string
+		}
+		var vrows []vrow
+		var prevText string
+		for i, v := range versions {
+			sv, err := c.reg.Version(ctx, subject, v)
+			if err != nil {
+				continue
+			}
+			vr := vrow{Version: v, ID: sv.ID, Latest: v == latestV}
+			if i == 0 {
+				vr.Changed = "first version"
+			} else {
+				changed := 0
+				for _, l := range diffLines(prevText, sv.Pretty()) {
+					if l.Op != "same" {
+						changed++
+					}
+				}
+				if changed == 0 {
+					vr.Changed = "no change to the text"
+				} else {
+					vr.Changed = fmt.Sprintf("%d line%s changed from v%d", changed, plural(changed), versions[i-1])
+				}
+			}
+			prevText = sv.Pretty()
+			vrows = append(vrows, vr)
+		}
+		// Newest first, as the board lists them.
+		for i, j := 0, len(vrows)-1; i < j; i, j = i+1, j-1 {
+			vrows[i], vrows[j] = vrows[j], vrows[i]
+		}
+		data["VersionRows"] = vrows
+	}
+	if lv, err := c.reg.Version(ctx, subject, 0); err == nil {
+		data["LatestID"] = lv.ID
 	}
 	// The editor for a new version starts from the latest, whichever is on show.
 	if latest, err := c.reg.Version(ctx, subject, 0); err == nil {

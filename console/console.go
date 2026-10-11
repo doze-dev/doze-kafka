@@ -114,6 +114,9 @@ type BrokerFacts struct {
 	DataDir string
 	// SASLMechanisms are the mechanisms the listener serves; empty when it is open.
 	SASLMechanisms []string
+	// Version is this doze-kafka's version, and Started when it began serving.
+	Version string
+	Started time.Time
 	// RegistryURL is where clients reach the schema registry, which is not always
 	// where the console does (a name the zone routes, against the loopback port).
 	RegistryURL string
@@ -298,6 +301,15 @@ func (c *Console) shellData(r *http.Request, data map[string]any) {
 		data["KafkaCompat"] = fmt.Sprintf("Kafka %d.0 compat", m)
 	}
 	data["HasTraffic"] = c.traffic != nil
+	// What the keys strip at the foot of the page says: the page's own hints, by its
+	// view (a topic's page is "topic", though its section is "topics").
+	if _, ok := data["Hints"]; !ok {
+		view, _ := data["View"].(string)
+		if view == "" {
+			view, _ = data["Page"].(string)
+		}
+		data["Hints"] = pageHints(view)
+	}
 }
 
 // partial renders a single named template (for HTMX swaps).
@@ -357,6 +369,13 @@ func templateFuncs(prefix string) template.FuncMap {
 			return u
 		},
 		"t": uiText,
+		// keyCaps splits how a key is drawn into its caps: "g r" is two keys.
+		"keyCaps": func(show string) []string { return strings.Fields(show) },
+		// num writes a count with thousands separators (14,407), as the boards do.
+		"num": num,
+		// needsLook is whether a topic's number is coloured in the list: a dead-letter
+		// topic that has records in it.
+		"needsLook": func(name string, msgs int64) bool { return isDeadLetterName(name) && msgs > 0 },
 		// teach is the line under a field, read from the settings table by the
 		// record's kind and name (teaching.go).
 		"teach": teachLine,

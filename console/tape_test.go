@@ -29,7 +29,7 @@ func itoa(n int) string { return strconv.Itoa(n) }
 func TestTopicIDIsPrintedTheWayKafkaPrintsIt(t *testing.T) {
 	c := newTestConsole(t)
 	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"t"}, "partitions": {"1"}})
-	body := req(t, c, "GET", "/_console/topics/t", nil).Body.String()
+	body := req(t, c, "GET", "/_console/topics/t?tab=config", nil).Body.String()
 	m := regexp.MustCompile(`class="cc-val" title="([^"]+)"`).FindStringSubmatch(body)
 	if m == nil {
 		t.Fatal("no topic id chip on the page")
@@ -140,9 +140,16 @@ func TestInspectorIsADialogWithNeighbours(t *testing.T) {
 	produceTo(t, c, "m", 0, 3)
 
 	page := req(t, c, "GET", "/_console/topics/m", nil).Body.String()
-	for _, want := range []string{`role="dialog"`, `aria-modal="true"`, `aria-labelledby="inspector-title"`, `data-inspector-open`, `tabindex="0"`} {
+	// The inspector is part of the page, beside it (Sy-01): a region in flow, not a dialog
+	// over it, and nothing draws a scrim.
+	for _, want := range []string{`<aside class="insp" id="inspector-panel"`, `id="inspector"`, `data-inspector-open`, `tabindex="0"`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the page is missing %s", want)
+		}
+	}
+	for _, bad := range []string{`inspector-overlay`, `id="inspector" role="dialog"`, `aria-modal="true" aria-labelledby="inspector-title"`} {
+		if strings.Contains(page, bad) {
+			t.Errorf("the page still draws the inspector as a dialog: %s", bad)
 		}
 	}
 	if !strings.Contains(page, `id="compose-head" data-dock-toggle aria-expanded="false"`) {

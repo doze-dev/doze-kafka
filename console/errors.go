@@ -96,7 +96,7 @@ func (c *Console) renderError(w http.ResponseWriter, r *http.Request, f Refusal,
 	data := f.data(map[string]any{
 		"Title": f.Heading, "Heading": f.Heading, "Message": f.Message, "Kind": string(f.Kind),
 		"Status": f.Status, "Suggestions": p.Suggestions, "Back": p.Back, "Retry": f.Retry,
-		"Page": p.Section,
+		"Page": p.Section, "View": "error",
 	})
 	if p.Section == "" {
 		data["Page"] = "topics"

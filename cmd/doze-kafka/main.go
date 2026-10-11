@@ -505,6 +505,7 @@ func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger
 			Workspace: workspaceLabel(absPath(cfg.DataDir)), KafkaMajor: cfg.Version,
 			DataDir: cfg.DataDir, SASLMechanisms: cfg.SASLMechanisms, RegistryURL: registryPublic,
 			AutoCreateTopics: cfg.AutoCreateTopics, DefaultPartitions: cfg.DefaultPartitions,
+			Version: version, Started: time.Now(),
 		},
 	})
 	if err != nil {

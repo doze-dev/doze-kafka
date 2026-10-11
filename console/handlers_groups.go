@@ -11,13 +11,30 @@ import (
 	"strings"
 )
 
+// groups is the Groups home (Gr-Home): every group, how far behind each is, and which
+// need a look.
 func (c *Console) groups(w http.ResponseWriter, r *http.Request) {
 	list, err := c.be.ListGroups(r.Context())
 	if err != nil {
 		c.fail(w, r, err)
 		return
 	}
-	c.render(w, r, "groups_home", map[string]any{"List": list, "Page": "groups"})
+	rows := c.groupRows(r.Context(), list)
+	var withMembers, members int
+	var lag int64
+	var need []groupRow
+	for _, g := range rows {
+		members += g.Members
+		if g.Members > 0 {
+			withMembers++
+		}
+		lag += g.Lag
+		if g.Members == 0 && g.Lag > 0 {
+			need = append(need, g)
+		}
+	}
+	c.render(w, r, "groups_home", map[string]any{"Groups": rows, "Page": "groups", "Title": "Groups",
+		"WithMembers": withMembers, "MemberCount": members, "TotalLag": lag, "NeedALook": need})
 }
 
 // groupLagRow is one topic-partition's committed-vs-latest offset, dressed
@@ -103,6 +120,12 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 		return nil, err
 	}
 
+	tab := r.FormValue("tab")
+	switch tab {
+	case "members", "timeline", "offsets":
+	default:
+		tab = "lag"
+	}
 	owner := map[string]string{} // "topic/partition" -> member label.
 	members := make([]memberView, 0, len(detail.Members))
 	for _, m := range detail.Members {
@@ -125,8 +148,9 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 	}
 
 	rows := make([]groupLagRow, 0, len(offsets))
-	var totalLag int64
+	var totalLag, totalCommitted, totalLogEnd int64
 	var anyAhead bool
+	var largest *groupLagRow
 	bounds := map[string][]PartitionBound{}
 	for _, o := range offsets {
 		row := groupLagRow{Topic: o.Topic, TopicURL: c.topicURL(o.Topic), Partition: o.Partition, Committed: o.Committed,
@@ -156,6 +180,12 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 		}
 		row.Trimmed = o.Committed < b[o.Partition].Earliest
 		totalLag += row.Lag
+		totalCommitted += row.Committed
+		totalLogEnd += row.Latest
+		if row.Lag > 0 && (largest == nil || row.Lag > largest.Lag) {
+			cp := row
+			largest = &cp
+		}
 		if row.Latest > 0 {
 			row.LagPercent = int(row.Lag * 100 / row.Latest)
 			if row.Lag > 0 && row.LagPercent < 6 {
@@ -182,14 +212,48 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 		fmt.Fprint(h, e.Seq, ";")
 	}
 
-	return map[string]any{
+	var generation int32
+	if c.traffic != nil {
+		evs := c.traffic.GroupEvents(id, 0)
+		for i := len(evs) - 1; i >= 0; i-- {
+			if evs[i].Generation > 0 {
+				generation = evs[i].Generation
+				break
+			}
+		}
+	}
+	topics := offsetTopics(rows)
+	g := NewGraph()
+	g.AddGroupReads(id, topics)
+	if c.traffic != nil {
+		g.AddTraffic(c.traffic.Events(TrafficFilter{Group: id}, 0))
+	}
+	fmt.Fprint(h, "|", tab, generation)
+
+	tl := func(key, label, count string) tabLink {
+		u := c.groupURL(id)
+		if key != "lag" {
+			u += "?tab=" + key
+		}
+		return tabLink{Key: key, Label: label, URL: u, On: tab == key, Count: count}
+	}
+	tabs := []tabLink{tl("lag", "Lag", ""), tl("members", "Members", strconv.Itoa(len(members))), tl("timeline", "Timeline", ""), tl("offsets", "Offsets", "")}
+
+	out := map[string]any{
 		"Timeline": timeline, "HasTimeline": c.traffic != nil, "Group": detail, "Members": members, "Offsets": rows, "TotalLag": totalLag, "AnyAhead": anyAhead,
-		"Topics":    offsetTopics(rows),
+		"TotalCommitted": totalCommitted, "TotalLogEnd": totalLogEnd, "Generation": generation,
+		"Topics":    topics,
 		"Confirm":   groupConfirms(id, rows),
 		"CanAct":    detail.State == "Empty" && len(detail.Members) == 0,
 		"NoCommits": len(offsets) == 0,
 		"Hash":      fmt.Sprintf("%x", h.Sum64()),
-	}, nil
+		"Tab":       tab, "Tabs": tabs, "View": "group",
+		"Neighbours": c.neighbourClauses(g, NodeGroup, id),
+	}
+	if largest != nil {
+		out["Largest"] = largest
+	}
+	return out, nil
 }
 
 func (c *Console) groupDetail(w http.ResponseWriter, r *http.Request) {
@@ -200,12 +264,9 @@ func (c *Console) groupDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	list, _ := c.be.ListGroups(r.Context())
-	data["List"], data["Page"], data["Title"] = list, "groups", id
+	data["Groups"], data["Page"], data["Title"] = c.groupRows(r.Context(), list), "groups", id
 	maps.Copy(data, c.dockData(DockFilter{Group: id}))
 	data["DockToggle"] = true // the group page has no pause control of its own.
-	g := NewGraph()
-	g.AddGroupReads(id, data["Topics"].([]string))
-	data["Neighbours"] = c.neighbourClauses(g, NodeGroup, id)
 	c.render(w, r, "group_detail", data)
 }
 

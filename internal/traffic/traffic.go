@@ -110,6 +110,9 @@ type Recorder struct {
 	groupEvents []GroupEvent
 }
 
+// Capacity is how many rows the recorder keeps.
+func (r *Recorder) Capacity() int { return r.limit }
+
 // New returns a recorder holding at most capacity rows (and as many group events).
 // resolve turns a topic id into its name, for the requests that carry only the id;
 // it may be nil.

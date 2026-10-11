@@ -7,10 +7,10 @@ test('the Access page says the ACLs are enforced, and is in the rail and the pal
   await page.locator('.rail a.nav', { hasText: 'Access' }).click();
   await expect(page).toHaveURL(/\/access$/);
   await expect(page.locator('.rail a.nav.on')).toHaveText(/Access/);
-  await expect(page.locator('.honest')).toContainText('These are enforced');
-  await expect(page.locator('.honest')).toContainText('open to everyone');
+  await expect(page.locator('main .callout').first()).toContainText('These are enforced');
+  await expect(page.locator('main .callout').first()).toContainText('open to everyone');
   // The harbour world stores ACLs (seed/harbour.go); their count is asserted in harbour.spec.ts.
-  await expect(page.locator('.cpanel .crow2').first()).toBeVisible();
+  await expect(page.locator('#acl-table .r:not(.h)').first()).toBeVisible();
 
   await page.goto('topics');
   await openPalette();

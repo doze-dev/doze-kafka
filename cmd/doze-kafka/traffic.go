@@ -27,7 +27,7 @@ func (s trafficSource) Events(f console.TrafficFilter, limit int) []console.Traf
 	out := make([]console.TrafficEvent, len(evs))
 	for i, e := range evs {
 		out[i] = console.TrafficEvent{
-			Seq: e.Seq, First: e.First, Time: e.Time, Count: e.Count,
+			Seq: e.Seq, First: e.First, Time: e.Time, Count: e.Count, Conn: e.Conn,
 			Remote: e.Remote, ClientID: e.ClientID, Software: e.Software, Principal: e.Principal,
 			API: e.API, Version: e.Version, Topics: e.Topics, Group: e.Group, Detail: e.Detail, Error: e.Error,
 			Duration: e.Duration, ReqBytes: e.ReqBytes, RespBytes: e.RespBytes,
@@ -35,6 +35,10 @@ func (s trafficSource) Events(f console.TrafficFilter, limit int) []console.Traf
 	}
 	return out
 }
+
+// Capacity is how many request rows the recorder keeps (console.TrafficSource's
+// optional Capacity), so the Traffic page can say what its tail is kept over.
+func (s trafficSource) Capacity() int { return s.rec.Capacity() }
 
 func (s trafficSource) Clients() []console.TrafficClient {
 	cs := s.rec.Clients()

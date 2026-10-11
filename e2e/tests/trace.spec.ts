@@ -12,7 +12,7 @@ test('a record that carries a trace offers to follow it, and the trail crosses t
   await page.locator('#tape-and-table tbody tr').first().click();
   const inspector = page.locator('#inspector');
   await expect(inspector).toBeVisible();
-  const follow = inspector.getByRole('link', { name: /Follow this message/ });
+  const follow = inspector.getByRole('link', { name: /Follow this trace/ });
   await expect(follow).toBeVisible();
   await expect(inspector).toContainText(TRACE);
   await follow.click();

@@ -151,7 +151,7 @@ func TestUnreachableBrokerIsAPageWithRetry(t *testing.T) {
 func TestEmptyListsSayWhy(t *testing.T) {
 	c := newTestConsole(t)
 	body := req(t, c, "GET", "/_console/topics", nil).Body.String()
-	for _, want := range []string{"No topics yet", "auto-create the topic", "Select a topic to browse"} {
+	for _, want := range []string{"No topics yet", "auto-create the topic", "Nothing selected"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("an empty broker's topic list is missing %q", want)
 		}
@@ -161,11 +161,11 @@ func TestEmptyListsSayWhy(t *testing.T) {
 		t.Error("an empty broker's group list should explain how a group appears")
 	}
 	// Groups cannot be created from the console, so the footer must not offer it.
-	if strings.Contains(groups, `<span class="kbd">c</span> new`) {
-		t.Error("the groups pane advertises a 'c' (new) shortcut that does nothing there")
+	if strings.Contains(groups, `data-create`) {
+		t.Error("the groups page advertises a create control that does nothing there")
 	}
-	if !strings.Contains(body, `<span class="kbd">c</span> new`) {
-		t.Error("the topics pane should still offer 'c' for a new topic")
+	if !strings.Contains(body, `data-create`) {
+		t.Error("the topics page should still offer 'c' for a new topic")
 	}
 
 	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"orders"}, "partitions": {"1"}})
@@ -173,7 +173,7 @@ func TestEmptyListsSayWhy(t *testing.T) {
 	if strings.Contains(body, "No topics yet") {
 		t.Error("the empty-list message is shown although a topic exists")
 	}
-	if !strings.Contains(body, "lp-nomatch") {
+	if !strings.Contains(body, `id="list-none"`) {
 		t.Error("the list should carry a no-matches state for when a filter hides everything")
 	}
 }

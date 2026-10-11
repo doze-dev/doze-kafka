@@ -86,8 +86,6 @@ var formFields = map[string]formField{
 	"jump":           {Not: "an offset to jump to"},
 	"at":             {Not: "a time to jump to or trace from"},
 	"id":             {Not: "a trace id, or a pasted trace header, to follow"},
-	"group":          {Not: "a filter on the traffic page"},
-	"client":         {Not: "a filter on the traffic page"},
-	"api":            {Not: "a filter on the traffic page"},
-	"errors":         {Not: "a filter on the traffic page"},
+	"kind":           {Not: "which kind of request the Traffic page shows"},
+	"tab":            {Not: "which tab of a page a form belongs to, so its answer is the same tab"},
 }

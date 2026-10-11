@@ -301,7 +301,7 @@ func TestGroupsNamedDotAndDotDotAreReachable(t *testing.T) {
 			t.Fatalf("the link to group %q is %s, which a browser resolves away", id, u)
 		}
 		page := req(t, c, "GET", u, nil)
-		if page.Code != 200 || !strings.Contains(page.Body.String(), "Offsets &amp; lag") {
+		if page.Code != 200 || !strings.Contains(page.Body.String(), `id="group-live"`) {
 			t.Errorf("group %q at %s: %d", id, u, page.Code)
 			continue
 		}
@@ -575,7 +575,7 @@ func TestOneOffsetCanBeSetOrRemoved(t *testing.T) {
 	}
 
 	// The page offers it, per row, and names the range.
-	page := req(t, c, "GET", "/_console/groups/g", nil).Body.String()
+	page := req(t, c, "GET", "/_console/groups/g?tab=offsets", nil).Body.String()
 	for _, want := range []string{`hx-post="/_console/groups/g/offset"`, `hx-post="/_console/groups/g/offset/delete"`, `aria-label="New offset, from 0 to 10"`, `<option value="b">b</option>`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the group page is missing %q", want)
@@ -770,10 +770,11 @@ func (c *Console) scanForTest(t *testing.T, topic string, n int) (int, error) {
 
 // ---- moving between topics ----
 
-// A click in the list replaces the detail pane only, and nothing on the page
-// arrives after it. Replacing the whole workspace redrew the list under the
-// pointer and put its scroll position back to the top.
-func TestListLinksReplaceOnlyTheDetailPane(t *testing.T) {
+// The list, the page, the wire dock and the inspector are one workspace now (the dock
+// and the inspector belong to the page, and sit beside it), so a click in the list
+// replaces the whole workspace, and the script puts the list's scroll position back.
+// Each page has exactly one page (#detail), and the list's links are plain links.
+func TestListLinksAreWholeWorkspaceLinksAndPageIsOne(t *testing.T) {
 	c, addr := newTestConsoleAddr(t)
 	topicWith(t, c, "t", 1, 1)
 	commitFor(t, addr, "g", "t", map[int32]int64{0: 1})
@@ -783,10 +784,13 @@ func TestListLinksReplaceOnlyTheDetailPane(t *testing.T) {
 			t.Errorf("%s has %d elements with id=\"detail\", want 1", path, n)
 		}
 		for _, m := range regexp.MustCompile(`<a class="li[^>]*>`).FindAllString(page, -1) {
-			if !strings.Contains(m, `hx-target="#detail"`) || !strings.Contains(m, `hx-select="#detail"`) {
-				t.Errorf("%s: a list link replaces more than the detail pane: %s", path, m)
+			if strings.Contains(m, `hx-target="#detail"`) {
+				t.Errorf("%s: a list link replaces the page only, and leaves the dock and the inspector of the old page: %s", path, m)
 			}
 		}
+	}
+	if js := readAll(t, "static/shell.js"); !strings.Contains(js, "listScroll") {
+		t.Error("the list's scroll position is not put back after the workspace is replaced")
 	}
 	// The composer's state is not remembered across pages.
 	if js := readAll(t, "static/shell.js"); strings.Contains(js, `store("dock"`) || !strings.Contains(js, "setDock(false);") {
@@ -855,8 +859,8 @@ func TestATopicCanBeCreatedWithItsOwnRetentionAndChangedLater(t *testing.T) {
 	if err != nil || len(own) != 2 || own["retention.ms"] != "604800000" || own["segment.bytes"] != "67108864" {
 		t.Fatalf("the topic's own config after creating it: %v %v", own, err)
 	}
-	page := req(t, c, "GET", "/_console/topics/t", nil).Body.String()
-	for _, want := range []string{`name="retention.ms" value="7d"`, `name="segment.bytes" value="64MB"`, `name="retention.bytes" value=""`, "unlimited (broker default)", "this topic"} {
+	page := req(t, c, "GET", "/_console/topics/t?tab=config", nil).Body.String()
+	for _, want := range []string{`name="retention.ms" value="7d"`, `name="segment.bytes" value="64MB"`, `name="retention.bytes" value=""`, "unlimited (broker default)", "override"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the topic page is missing %q", want)
 		}
@@ -864,7 +868,7 @@ func TestATopicCanBeCreatedWithItsOwnRetentionAndChangedLater(t *testing.T) {
 
 	// Change one, set one, clear one.
 	rec = req(t, c, "POST", "/_console/topics/t/config", url.Values{"retention.ms": {"12h"}, "retention.bytes": {"1GB"}, "segment.bytes": {""}})
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `value="12h"`) || !strings.Contains(rec.Body.String(), "<details") {
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `value="12h"`) || !strings.Contains(rec.Body.String(), `id="topic-config"`) {
 		t.Fatalf("save: %d %.200s", rec.Code, rec.Body)
 	}
 	own, _ = c.be.topicOverrides(context.Background(), "t")
@@ -874,7 +878,7 @@ func TestATopicCanBeCreatedWithItsOwnRetentionAndChangedLater(t *testing.T) {
 
 	// The two that have no broker-wide counterpart: a size and a choice.
 	rec = req(t, c, "POST", "/_console/topics/t/config", url.Values{"retention.ms": {"12h"}, "retention.bytes": {"1GB"}, "max.message.bytes": {"1MB"}, "message.timestamp.type": {"LogAppendTime"}})
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `<option value="LogAppendTime" selected>`) || !strings.Contains(rec.Body.String(), "largest batch") {
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `<option value="LogAppendTime" selected>`) || !strings.Contains(rec.Body.String(), `name="max.message.bytes" value="1MB"`) {
 		t.Fatalf("save of the batch limit and timestamp type: %d %.300s", rec.Code, rec.Body)
 	}
 	if got, _ := c.be.topicOverrides(context.Background(), "t"); got["max.message.bytes"] != "1048576" || got["message.timestamp.type"] != "LogAppendTime" {
@@ -920,7 +924,8 @@ func TestACompactedTopicIsShownAsCompacted(t *testing.T) {
 		t.Fatal(err)
 	}
 	page := req(t, c, "GET", "/_console/topics/c", nil).Body.String()
-	if !strings.Contains(page, `<span class="own">compacted</span>`) || !strings.Contains(page, "This topic is compacted") || strings.Contains(page, "not applied") || strings.Contains(page, "does not compact") {
+	conf := req(t, c, "GET", "/_console/topics/c?tab=config", nil).Body.String()
+	if !strings.Contains(between(page, `id="topic-facts"`, `</p>`), ", compacted") || !strings.Contains(conf, "This topic is compacted") || strings.Contains(conf, "not applied") || strings.Contains(conf, "does not compact") {
 		t.Error("a compacted topic's page should say it is compacted")
 	}
 	if plain := req(t, c, "GET", "/_console/new/topic", nil).Body.String(); strings.Contains(plain, "This topic is compacted") {

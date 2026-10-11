@@ -77,28 +77,35 @@ func TestGroupPageShowsMembersOwnersAndLinks(t *testing.T) {
 	deadline := time.Now().Add(8 * time.Second)
 	for time.Now().Before(deadline) {
 		body = req(t, c, "GET", "/_console/groups/billing", nil).Body.String()
-		if strings.Contains(body, "billing-service") && strings.Contains(body, "Offsets &amp; lag") {
+		if strings.Contains(body, "billing-service") && strings.Contains(body, `id="lag-table"`) {
 			break
 		}
 		time.Sleep(150 * time.Millisecond)
 	}
+	members := req(t, c, "GET", "/_console/groups/billing?tab=members", nil).Body.String()
 	for _, want := range []string{
 		"billing-service", // the client id.
 		"127.0.0.1",       // the host it connected from.
-		`orders 0–1`,      // a readable assignment (its topic link is in the member's inspector, not in the row that opens it).
-		"Offsets &amp; lag", "caught up",
-		`data-live="/_console/groups/billing/live"`, // the lag is live.
+		`orders:0–1`,      // a readable assignment (its topic link is in the member's inspector, not in the row that opens it).
+	} {
+		if !strings.Contains(members, want) {
+			t.Errorf("the members tab is missing %q", want)
+		}
+	}
+	for _, want := range []string{
+		"billing-service", // each partition's owner.
+		"caught up",
+		`data-live="/_console/groups/billing/live?tab=lag"`, // the lag is live.
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the group page is missing %q", want)
 		}
 	}
-	if strings.Contains(body, "[0 1]") {
+	if strings.Contains(body+members, "[0 1]") {
 		t.Error("the assignment is printed as a Go slice")
 	}
-	// The member's client id is in the Client column, and again as the owner of
-	// each partition it holds.
-	if strings.Count(body, ">billing-service</td>") < 2 {
+	// The owner of each partition is shown beside it.
+	if strings.Count(body, `<span class="m el">billing-service</span>`) < 1 {
 		t.Error("each partition's owner should be shown")
 	}
 }
@@ -110,15 +117,15 @@ func TestGroupLivePollAnswers204UntilSomethingChanges(t *testing.T) {
 
 	first := doReq(t, c, "GET", "/_console/groups/g/live", map[string]string{"HX-Request": "true"})
 	hash := first.Header().Get("HX-Live-Hash")
-	if first.Code != 200 || hash == "" || !strings.Contains(first.Body.String(), "lag 3") {
-		t.Fatalf("first poll: %d, hash %q, lag shown: %v", first.Code, hash, strings.Contains(first.Body.String(), "lag 3"))
+	if first.Code != 200 || hash == "" || !strings.Contains(first.Body.String(), `>3</span> records behind`) {
+		t.Fatalf("first poll: %d, hash %q, lag shown: %v", first.Code, hash, strings.Contains(first.Body.String(), `>3</span> records behind`))
 	}
 	if rec := doReq(t, c, "GET", "/_console/groups/g/live?h="+hash, map[string]string{"HX-Request": "true"}); rec.Code != http.StatusNoContent {
 		t.Fatalf("an unchanged group should answer 204, got %d", rec.Code)
 	}
 	produceTo(t, c, "t", 0, 2) // the lag grows.
 	rec := doReq(t, c, "GET", "/_console/groups/g/live?h="+hash, map[string]string{"HX-Request": "true"})
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "lag 5") {
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `>5</span> records behind`) {
 		t.Fatalf("lag changed from 3 to 5 but the poll said %d", rec.Code)
 	}
 }
@@ -147,7 +154,7 @@ func TestGroupEdgeStatesAreExplained(t *testing.T) {
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		body = req(t, c, "GET", "/_console/groups/fresh", nil).Body.String()
-		if strings.Contains(body, "has not committed any offsets yet") {
+		if strings.Contains(body, "No committed offsets yet") {
 			return
 		}
 		time.Sleep(150 * time.Millisecond)
@@ -219,22 +226,26 @@ func TestTopicPageListsItsConsumers(t *testing.T) {
 	topicWith(t, c, "t", 1, 4)
 	topicWith(t, c, "unread", 1, 1)
 	commitFor(t, addr, "reader", "t", map[int32]int64{0: 1})
-	page := req(t, c, "GET", "/_console/topics/t", nil).Body.String()
-	if !strings.Contains(page, "Consumed by") || !strings.Contains(page, `href="/_console/groups/reader"`) || !strings.Contains(page, "lag 3") {
-		t.Error("the topic page should name its consumer and its lag")
+	page := req(t, c, "GET", "/_console/topics/t?tab=readers", nil).Body.String()
+	if !strings.Contains(page, "Groups reading this topic") || !strings.Contains(page, `href="/_console/groups/reader"`) || !strings.Contains(page, `warn">3</td>`) {
+		t.Error("the Readers tab should name its consumer and its lag")
 	}
 	if strings.Contains(page, `hx-trigger="load"`) {
 		t.Error("something on the topic page is still loaded after it is shown")
 	}
-	// A topic nobody reads keeps the line, so every topic's page has the same shape.
-	if other := req(t, c, "GET", "/_console/topics/unread", nil).Body.String(); !strings.Contains(other, "Consumed by") || !strings.Contains(other, "no consumer group") {
+	// The tab's number, and the neighbours well, are on every tab.
+	if main := req(t, c, "GET", "/_console/topics/t", nil).Body.String(); !strings.Contains(main, `read by</span><span class="m">reader</span>`) && !strings.Contains(main, ">reader</span>") {
+		t.Error("the topic page should name the group that reads it among its neighbours")
+	}
+	// A topic nobody reads says so in the same place.
+	if other := req(t, c, "GET", "/_console/topics/unread?tab=readers", nil).Body.String(); !strings.Contains(other, "No group has committed an offset here") {
 		t.Error("a topic with no consumers should say so in the same place")
 	}
 }
 
 func TestClusterPageShowsRealAPIsAndConfig(t *testing.T) {
 	c := newTestConsole(t)
-	body := req(t, c, "GET", "/_console/cluster", nil).Body.String()
+	body := req(t, c, "GET", "/_console/cluster?view=apis", nil).Body.String() + req(t, c, "GET", "/_console/cluster?view=config", nil).Body.String() + req(t, c, "GET", "/_console/cluster", nil).Body.String()
 	for _, want := range []string{"DeleteGroups", "OffsetDelete", "ConsumerGroupHeartbeat", "Produce <span class=\"apiv\">v3–", "Broker configuration", "log.retention.bytes", "auto.create.topics.enable", "limitations</a>"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the cluster page is missing %q", want)

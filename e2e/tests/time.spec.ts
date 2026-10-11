@@ -54,7 +54,7 @@ test('the request table and the group timeline use the same zone', async ({ page
   const traffic = page.locator('#traffic-table tbody tr').first().locator('time.when');
   await expect(traffic).toHaveAttribute('title', /\(UTC[+-]\d\d:\d\d\) · \d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3} UTC$/);
   const zone = (await traffic.getAttribute('title'))!.match(/\(UTC[+-]\d\d:\d\d\)/)![0];
-  await page.goto('groups/g-timeline');
+  await page.goto('groups/g-timeline?tab=timeline');
   const tl = page.locator('#group-timeline li').first().locator('time.when');
   await expect(tl).toHaveAttribute('title', /\(UTC[+-]\d\d:\d\d\)/);
   expect((await tl.getAttribute('title'))!).toContain(zone);

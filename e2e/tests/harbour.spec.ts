@@ -9,26 +9,26 @@ const TRACE = '5bd66ef5095369c7b0d1f8f4bd33716a';
 
 test('Topics: seven harbour topics, one of them with three partitions', async ({ page }) => {
   await page.goto('topics');
-  await expect(page.locator('.listpane .li[data-name^="harbour-"]')).toHaveCount(7);
+  await expect(page.locator('.list .li[data-name^="harbour-"]')).toHaveCount(7);
   await page.goto('topics/harbour-arrivals');
   await expect(page.locator('.idband h1')).toHaveText('harbour-arrivals');
 });
 
 test('Groups: four harbour groups', async ({ page }) => {
   await page.goto('groups');
-  await expect(page.locator('.listpane .li[data-name^="harbour-"]')).toHaveCount(4);
+  await expect(page.locator('.list .li[data-name^="harbour-"]')).toHaveCount(4);
 });
 
 test('Schemas: five subjects, and the soft-deleted one is not listed', async ({ page }) => {
   await page.goto('schemas');
-  const rows = page.locator('.listpane .li[data-name^="harbour-"]');
+  const rows = page.locator('.list .li[data-name^="harbour-"]');
   await expect(rows).toHaveCount(5);
-  await expect(page.locator('.listpane .li[data-name="harbour-retired-value"]')).toHaveCount(0);
+  await expect(page.locator('.list .li[data-name="harbour-retired-value"]')).toHaveCount(0);
 });
 
 test('Access: six ACLs', async ({ page }) => {
   await page.goto('access');
-  await expect(page.locator('.cpanel .crow2')).toHaveCount(6);
+  await expect(page.locator('#acl-table .r:not(.h)')).toHaveCount(6);
 });
 
 test('Traffic: five harbour clients are in the requests', async ({ page }) => {

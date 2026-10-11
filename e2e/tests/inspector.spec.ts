@@ -25,7 +25,7 @@ test.beforeAll(async () => {
 
 test.afterAll(() => { hold?.kill('SIGTERM'); });
 
-const overlay = (page: Page) => page.locator('#inspector-overlay');
+const overlay = (page: Page) => page.locator('#inspector');
 const title = (page: Page) => page.locator('#inspector #inspector-title');
 
 /** Opens `row`, then runs the three checks the brief names. */
@@ -69,7 +69,7 @@ test('a request is selected, closed, refreshed and left with Back', async ({ pag
 
 test('a client is selected, closed, refreshed and left with Back', async ({ page }) => {
   await page.goto('traffic');
-  const row = page.locator('#clients-table tbody tr', { hasText: 'inspect-hold' }).first();
+  const row = page.locator('#clients-list .insp-client', { hasText: 'inspect-hold' }).first().locator('a.insp-client-open');
   await expect(row).toBeVisible();
   await row.click();
   await expect(title(page)).toContainText('inspect-hold');
@@ -79,8 +79,8 @@ test('a client is selected, closed, refreshed and left with Back', async ({ page
 });
 
 test('a member is selected, closed, refreshed and left with Back', async ({ page }) => {
-  await page.goto('groups/inspect-hold-group');
-  const row = page.locator('tr[id^="mb-"]').first();
+  await page.goto('groups/inspect-hold-group?tab=members');
+  const row = page.locator('[id^="mb-"]').first();
   await expect(row).toContainText('inspect-hold');
   await cycle(page, row, 'member');
   await row.click();
@@ -88,12 +88,12 @@ test('a member is selected, closed, refreshed and left with Back', async ({ page
 });
 
 test('a transaction is selected, closed, refreshed and left with Back', async ({ page }) => {
-  await page.goto('cluster');
+  await page.goto('cluster?view=transactions');
   await cycle(page, page.locator('#tx-seed-open'), 'transaction');
 });
 
 test('a group event is selected, closed, refreshed and left with Back', async ({ page }) => {
-  await page.goto('groups/g-timeline');
+  await page.goto('groups/g-timeline?tab=timeline');
   await cycle(page, page.locator('#group-timeline .tl-row').first(), 'event');
 });
 

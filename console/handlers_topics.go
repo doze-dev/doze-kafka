@@ -6,6 +6,7 @@ import (
 	"maps"
 	"math"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -16,14 +17,71 @@ import (
 // on every 2.5s tick.
 type topicRef struct{ Name string }
 
-// topics is the home surface: every topic, no selection.
+// topics is the Topics home (Tp-Home): every topic, the table of them and what needs a
+// look. Nothing is selected.
 func (c *Console) topics(w http.ResponseWriter, r *http.Request) {
-	list, err := c.be.ListTopics(r.Context())
+	ctx := r.Context()
+	list, err := c.be.ListTopics(ctx)
 	if err != nil {
 		c.fail(w, r, err)
 		return
 	}
-	c.render(w, r, "topics_home", map[string]any{"List": list, "Page": "topics"})
+	groups := c.groupRows(ctx, c.listGroupsQuiet(ctx))
+	rows := c.topicRows(ctx, list, groups, true)
+
+	var partitions int
+	var messages int64
+	var compacted, dead int
+	readers := map[string]bool{}
+	var deadNames []string
+	var deadUnread []string
+	for _, t := range rows {
+		partitions += int(t.Partitions)
+		messages += t.Msgs
+		if t.Compact {
+			compacted++
+		}
+		if t.DeadLetter {
+			dead++
+			deadNames = append(deadNames, t.Name)
+			if t.ReadByCount == 0 {
+				deadUnread = append(deadUnread, t.Name)
+			}
+		}
+		for _, g := range t.ReadBy {
+			readers[g] = true
+		}
+	}
+	data := map[string]any{
+		"List": list, "Rows": rows, "Page": "topics", "Title": "Topics", "Groups": groups,
+		"Partitions": partitions, "Messages": messages, "ReaderCount": len(readers),
+		"Compacted": compacted, "DeadLetters": dead, "DeadNames": deadNames, "DeadUnread": deadUnread,
+		"AutoCreate": c.facts.AutoCreateTopics, "AutoParts": c.facts.DefaultPartitions, "KnowsAuto": c.facts.KafkaMajor > 0,
+	}
+	if c.traffic != nil {
+		writers := map[string]bool{}
+		for _, e := range c.traffic.Events(TrafficFilter{API: "Produce"}, 0) {
+			if e.API == "Produce" && len(e.Topics) > 0 {
+				who := e.ClientID
+				if who == "" {
+					who = e.Remote
+				}
+				writers[who] = true
+			}
+		}
+		data["Writers"], data["HasWriters"] = len(writers), true
+	}
+	c.render(w, r, "topics_home", data)
+}
+
+// listGroupsQuiet is ListGroups for a page that can do without it: a broker that does
+// not answer is no groups, and the page's own request has already said so.
+func (c *Console) listGroupsQuiet(ctx context.Context) []GroupSummary {
+	gs, err := c.be.ListGroups(ctx)
+	if err != nil {
+		return nil
+	}
+	return gs
 }
 
 func (c *Console) topicCreatePage(w http.ResponseWriter, r *http.Request) {
@@ -75,6 +133,10 @@ func (c *Console) topicPurge(w http.ResponseWriter, r *http.Request) {
 	c.redirect(w, r, c.topicURL(name), "Topic purged — all messages deleted")
 }
 
+// topicTabs are the tabs of a topic's page, in the order Sy-01 draws them. Schema is
+// there only for a topic the registry has a subject for.
+var topicTabs = []string{"messages", "partitions", "readers", "config", "schema"}
+
 func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	ctx := r.Context()
@@ -86,10 +148,20 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	partition := partitionParam(r, detail.Partitions)
+	schemas := c.topicSchemas(r, name)
+
+	tab := r.URL.Query().Get("tab")
+	valid := false
+	for _, t := range topicTabs {
+		valid = valid || t == tab
+	}
+	if !valid || (tab == "schema" && len(schemas) == 0) {
+		tab = "messages"
+	}
 
 	data := map[string]any{
-		"Schemas": c.topicSchemas(r, name),
-		"List":    list, "Topic": detail, "Page": "topics",
+		"Schemas": schemas,
+		"List":    list, "Topic": detail, "Page": "topics", "View": "topic", "Tab": tab,
 		"Partition": partition, "Title": name,
 		"Consumers": c.topicConsumers(ctx, name),
 		"Config":    newConfigView(detail.Config),
@@ -97,6 +169,31 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 	data["Confirm"] = c.topicConfirms(ctx, name, int(detail.Partitions))
 	maps.Copy(data, c.dockData(DockFilter{Topic: name}))
 	data["Neighbours"] = c.neighbourClauses(c.topicGraph(ctx, name, data["Consumers"].([]consumerRow)), NodeTopic, name)
+	data["Tabs"] = c.topicTabLinks(name, partition, tab, len(schemas) > 0, int(detail.Partitions), len(data["Consumers"].([]consumerRow)))
+	data["ListCount"] = len(list)
+
+	if tab != "messages" {
+		bounds, err := c.be.PartitionBounds(ctx, name, detail.Partitions)
+		if err != nil {
+			c.fail(w, r, err)
+			return
+		}
+		data["Bounds"] = bounds
+		data["Facts"] = c.topicSummary(detail, bounds, schemas)
+		data["PartitionRange"] = partitionRange(detail.Partitions)
+		switch tab {
+		case "partitions":
+			data["PartitionRows"] = c.partitionRows(ctx, name, bounds)
+		case "readers":
+			data["Readers"] = c.topicReaders(ctx, name, bounds)
+			data["Writers"] = c.topicWriters(name)
+			data["HasTraffic"] = c.traffic != nil
+		}
+		c.composerSchemas(r, name, data)
+		c.render(w, r, "topic_detail", data)
+		return
+	}
+
 	if q, all, before, asked := searchParams(r); asked {
 		// A search replaces the tape and the live table with what it found.
 		found, err := c.searchTopic(ctx, name, partition, detail.Partitions, q, all, before)
@@ -105,6 +202,9 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		data["Search"], data["PartitionRange"], data["Rows"] = found, partitionRange(detail.Partitions), found.Rows
+		if bounds, err := c.be.PartitionBounds(ctx, name, detail.Partitions); err == nil {
+			data["Facts"] = c.topicSummary(detail, bounds, schemas)
+		}
 		c.composerSchemas(r, name, data)
 		c.render(w, r, "topic_detail", data)
 		return
@@ -124,11 +224,196 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	maps.Copy(data, tape)
+	if bounds, ok := tape["Bounds"].([]PartitionBound); ok {
+		data["Facts"] = c.topicSummary(detail, bounds, schemas)
+	}
 	c.composerSchemas(r, name, data)
 	if atNote != "" && tape["JumpNote"] == "" {
 		data["JumpNote"] = atNote
 	}
 	c.render(w, r, "topic_detail", data)
+}
+
+// topicFactsView is the one sentence under a topic's name (Sy-01 part 4): partitions,
+// messages, how long they are kept, the schema, and when the newest was written.
+type topicFactsView struct {
+	Partitions  int32
+	Messages    int64
+	Retention   string
+	Compact     bool
+	SchemaType  string // "Avro", "JSON Schema" or "Protobuf" for the value subject, or "".
+	SchemaVer   int
+	Newest      time.Time
+	HasNewest   bool
+	Subject     string
+	SubjectURL  string
+	SchemaLabel string
+}
+
+func (c *Console) topicSummary(d *TopicDetail, bounds []PartitionBound, schemas []topicSchema) topicFactsView {
+	f := topicFactsView{Partitions: d.Partitions}
+	for _, b := range bounds {
+		f.Messages += b.Count()
+		if b.Newest.After(f.Newest) {
+			f.Newest, f.HasNewest = b.Newest, true
+		}
+	}
+	policy, retention := "", ""
+	for _, e := range d.Config {
+		switch e.Name {
+		case "cleanup.policy":
+			policy = e.Value
+		case "retention.ms":
+			retention = e.Value
+		}
+	}
+	f.Compact = strings.Contains(policy, "compact")
+	switch {
+	case f.Compact && !strings.Contains(policy, "delete"):
+		f.Retention = "per key"
+	default:
+		f.Retention = retentionText(retention)
+	}
+	for _, s := range schemas {
+		if s.Label == "value" || f.Subject == "" {
+			f.SchemaType, f.SchemaVer, f.Subject, f.SubjectURL, f.SchemaLabel = s.TypeLabel, s.Version, s.Subject, s.URL, s.Label
+		}
+	}
+	return f
+}
+
+// tabLink is one tab of a topic's page.
+type tabLink struct {
+	Key, Label, URL string
+	On              bool
+	Count           string
+}
+
+func (c *Console) topicTabLinks(name string, partition int32, tab string, hasSchema bool, partitions, readers int) []tabLink {
+	mk := func(key, label, count string) tabLink {
+		u := c.topicURL(name)
+		q := url.Values{}
+		if key != "messages" {
+			q.Set("tab", key)
+		} else if partition != 0 {
+			q.Set("partition", strconv.Itoa(int(partition)))
+		}
+		if len(q) > 0 {
+			u += "?" + q.Encode()
+		}
+		return tabLink{Key: key, Label: label, URL: u, On: tab == key, Count: count}
+	}
+	out := []tabLink{
+		mk("messages", "Messages", ""),
+		mk("partitions", "Partitions", strconv.Itoa(partitions)),
+		mk("readers", "Readers", strconv.Itoa(readers)),
+		mk("config", "Config", ""),
+	}
+	if hasSchema {
+		out = append(out, mk("schema", "Schema", ""))
+	}
+	return out
+}
+
+// partitionRow is one partition on the Partitions tab: what the broker reports about
+// where its log starts and ends and how far a read-committed consumer may read.
+type partitionRow struct {
+	Partition int32
+	Start     int64
+	End       int64
+	Count     int64
+	Stable    int64 // the last stable offset.
+	Held      bool  // an open transaction holds it behind the end.
+	Newest    time.Time
+	HasNewest bool
+}
+
+func (c *Console) partitionRows(ctx context.Context, topic string, bounds []PartitionBound) []partitionRow {
+	rows := make([]partitionRow, len(bounds))
+	for i, b := range bounds {
+		r := partitionRow{Partition: b.Partition, Start: b.Earliest, End: b.Latest, Count: b.Count(), Stable: b.Latest, Newest: b.Newest, HasNewest: !b.Newest.IsZero()}
+		if st, err := c.be.StableOffset(ctx, topic, b.Partition); err == nil && st >= 0 && st < b.Latest {
+			r.Stable, r.Held = st, true
+		}
+		rows[i] = r
+	}
+	return rows
+}
+
+// readerRow is a group reading a topic, with its lag on each partition.
+type readerRow struct {
+	Group, URL, State, Protocol string
+	Members                     int
+	PartLag                     []int64 // by partition; -1 where the group has no offset.
+	Total                       int64
+}
+
+func (c *Console) topicReaders(ctx context.Context, topic string, bounds []PartitionBound) []readerRow {
+	groups, err := c.be.ListGroups(ctx)
+	if err != nil {
+		return nil
+	}
+	var out []readerRow
+	for _, g := range groups {
+		offs, err := c.be.GroupOffsets(ctx, g.ID)
+		if err != nil {
+			continue
+		}
+		row := readerRow{Group: g.ID, URL: c.groupURL(g.ID), State: g.State, Protocol: protoLabelOf(g.Protocol), Members: g.Members}
+		row.PartLag = make([]int64, len(bounds))
+		for i := range row.PartLag {
+			row.PartLag[i] = -1
+		}
+		on := false
+		for _, o := range offs {
+			if o.Topic != topic || o.Partition < 0 || int(o.Partition) >= len(bounds) {
+				continue
+			}
+			on = true
+			lag := max(bounds[o.Partition].Latest-o.Committed, 0)
+			row.PartLag[o.Partition] = lag
+			row.Total += lag
+		}
+		if on {
+			out = append(out, row)
+		}
+	}
+	return out
+}
+
+// writerRow is a client the recorder saw produce to a topic.
+type writerRow struct {
+	Client, Principal, Detail string
+	Last                      time.Time
+	Error                     string
+	Count                     int
+}
+
+// topicWriters are the clients whose Produce requests to this topic are among the
+// recorder's last rows. A client that has not produced since then is not listed.
+func (c *Console) topicWriters(topic string) []writerRow {
+	if c.traffic == nil {
+		return nil
+	}
+	idx := map[string]int{}
+	var out []writerRow
+	for _, e := range c.traffic.Events(TrafficFilter{Topic: topic, API: "Produce"}, 0) {
+		if e.API != "Produce" {
+			continue
+		}
+		who := e.ClientID
+		if who == "" {
+			who = e.Remote
+		}
+		i, ok := idx[who]
+		if !ok {
+			idx[who] = len(out)
+			out = append(out, writerRow{Client: who, Principal: e.Principal, Detail: e.Detail, Last: e.Time, Error: e.Error})
+			i = len(out) - 1
+		}
+		out[i].Count += max(e.Count, 1)
+	}
+	return out
 }
 
 // topicTape is the live-polled partial backing the tape + message table.

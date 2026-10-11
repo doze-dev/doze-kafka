@@ -67,5 +67,47 @@ func (c *Console) access(w http.ResponseWriter, r *http.Request) {
 			supers = e.Value
 		}
 	}
-	c.render(w, r, "access_detail", map[string]any{"ACLs": rows, "OpenByDefault": openByDefault, "SuperUsers": supers, "Page": "access", "Title": "Access"})
+	// The principals the ACLs name, with how many each has and how many of them deny
+	// (Ac-Home's list); the super users are listed beside them.
+	type principalRow struct {
+		Name          string
+		Count, Denies int
+	}
+	var principals []principalRow
+	at := map[string]int{}
+	for _, a := range rows {
+		i, ok := at[a.Principal]
+		if !ok {
+			at[a.Principal] = len(principals)
+			principals = append(principals, principalRow{Name: a.Principal})
+			i = len(principals) - 1
+		}
+		principals[i].Count++
+		if a.Permission == "deny" {
+			principals[i].Denies++
+		}
+	}
+	var supersList []string
+	for _, s := range strings.Split(supers, ";") {
+		if s = strings.TrimSpace(s); s != "" {
+			supersList = append(supersList, s)
+		}
+	}
+	for _, s := range strings.Split(supers, ",") {
+		if s = strings.TrimSpace(s); s != "" && len(supersList) == 0 {
+			supersList = append(supersList, s)
+		}
+	}
+	shown := rows
+	selected := r.URL.Query().Get("principal")
+	if selected != "" {
+		shown = nil
+		for _, a := range rows {
+			if a.Principal == selected {
+				shown = append(shown, a)
+			}
+		}
+	}
+	c.render(w, r, "access_detail", map[string]any{"ACLs": shown, "AllACLs": rows, "Principals": principals, "Principal": selected,
+		"SuperUserList": supersList, "OpenByDefault": openByDefault, "SuperUsers": supers, "Page": "access", "Title": "Access"})
 }

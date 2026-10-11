@@ -40,6 +40,13 @@ const (
 // documentation lists them.
 var inspectorKinds = []string{KindMessage, KindRequest, KindClient, KindMember, KindSubject, KindTransaction, KindEvent}
 
+// inspectorKindLabels are the words above a selection's title (Sy-01: "Message",
+// "Request", "Client").
+var inspectorKindLabels = map[string]string{
+	KindMessage: "Message", KindRequest: "Request", KindClient: "Client", KindMember: "Member",
+	KindSubject: "Subject", KindTransaction: "Transaction", KindEvent: "Event",
+}
+
 // inspectorNav is one of the previous and next controls in the inspector's header.
 type inspectorNav struct {
 	Label    string // aria-label: "Older record".
@@ -129,6 +136,7 @@ func (c *Console) inspect(w http.ResponseWriter, v inspectorView) {
 	// Prefixed: a body's own data (a record has a Key and a Title of its own) must
 	// not be overwritten by the contract's.
 	data["InspKind"], data["InspKey"], data["InspTitle"], data["InspSub"] = v.Kind, v.Key, v.Title, v.Sub
+	data["InspKindLabel"] = inspectorKindLabels[v.Kind]
 	data["InspNav"], data["InspGone"], data["InspGoneMsg"], data["InspOpen"] = v.Nav, v.Gone, v.GoneMsg, open
 	c.partial(w, "inspector", data)
 }

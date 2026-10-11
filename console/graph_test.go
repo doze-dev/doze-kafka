@@ -105,11 +105,11 @@ func TestTheNeighboursSentenceRendersFromTheGraph(t *testing.T) {
 	commitFor(t, addr, "g-order-validator", "orders", map[int32]int64{0: 1})
 
 	page := req(t, c, "GET", "/_console/topics/orders", nil).Body.String()
-	sentence := between(page, `id="neighbours"`, `</p>`)
+	sentence := between(page, `id="neighbours"`, `<nav class="tabs"`)
 	for _, want := range []string{
-		"Written by ", `href="/_console/traffic?client=billing"`, ">billing</a>",
-		", read by ", `href="/_console/groups/g-order-validator"`,
-		", schema subject ", `hx-get="/_console/inspect/subject?key=orders-value"`, `data-inspector-open`, `href="/_console/schemas/orders-value"`,
+		"written by", `href="/_console/traffic?client=billing"`, ">billing</span>",
+		"read by", `href="/_console/groups/g-order-validator"`,
+		`hx-get="/_console/inspect/subject?key=orders-value"`, `data-inspector-open`, `href="/_console/schemas/orders-value"`,
 	} {
 		if !strings.Contains(sentence, want) {
 			t.Errorf("the sentence is missing %q:\n%s", want, sentence)
@@ -122,11 +122,11 @@ func TestTheNeighboursSentenceRendersFromTheGraph(t *testing.T) {
 	}
 	// A group says what it reads, and a subject which topic it describes.
 	grp := req(t, c, "GET", "/_console/groups/g-order-validator", nil).Body.String()
-	if s := between(grp, `id="neighbours"`, `</p>`); !strings.Contains(s, "Reads") || !strings.Contains(s, `href="/_console/topics/orders"`) {
+	if s := between(grp, `id="neighbours"`, `</div>`); !strings.Contains(s, "reads") || !strings.Contains(s, `href="/_console/topics/orders"`) {
 		t.Errorf("the group's sentence: %s", s)
 	}
 	sub := req(t, c, "GET", "/_console/schemas/orders-value", nil).Body.String()
-	if s := between(sub, `id="neighbours"`, `</p>`); !strings.Contains(s, "Describes topic") || !strings.Contains(s, `href="/_console/topics/orders"`) {
+	if s := between(sub, `id="neighbours"`, `</div>`); !strings.Contains(s, "describes topic") || !strings.Contains(s, `href="/_console/topics/orders"`) {
 		t.Errorf("the subject's sentence: %s", s)
 	}
 }

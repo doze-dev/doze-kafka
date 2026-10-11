@@ -1,13 +1,20 @@
 {{define "trace_detail"}}{{template "shell_top" .}}
-  <main class="detail" id="detail" data-trace-id="{{.Trace}}"><div class="detail-inner trafficwrap">
-    <div class="idband">
-      <div>
-        <h1 class="page-title">Trace</h1>
+  <aside class="list" aria-label="Traces you opened">
+    <div class="row sb ce list-h"><span class="cap">Recent traces</span></div>
+    <div id="trace-recents" data-trace-recents></div>
+    <div class="grow"></div>
+    <div class="note list-note">Ones you opened, newest first. Kept in this tab only.</div>
+  </aside>
+  <main class="main" id="detail" data-trace-id="{{.Trace}}">
+    <div class="backrow"><a class="btn sm" href="{{prefix}}/trace">‹ Trace</a></div>
+    <div class="row sb ce idband">
+      <div class="col">
+        <h1 class="h1">Trace</h1>
         <div class="idchips">{{template "copychip" dict "Label" "trace id" "Value" .Trace}}</div>
-        <p class="lede">Every record, in every topic, that carries this trace id and was written within {{.WindowLabel}} of {{when .At "clock"}}.</p>
+        <span class="note">Every record, in every topic, that carries this trace id and was written within {{.WindowLabel}} of {{when .At "clock"}}.</span>
       </div>
-      <div class="idband-acts">
-        <span class="dim">Look across</span>
+      <div class="row g8 ce idband-acts">
+        <span class="note">Look across</span>
         <div class="seg" role="group" aria-label="How far either side of the message to look">
           {{range .Windows}}<a class="seg-link {{if .On}}on{{end}}" href="{{.URL}}" {{if .On}}aria-current="true"{{end}}>{{.Label}}</a>{{end}}
         </div>
@@ -20,7 +27,7 @@
       {{icon "info"}}
       <div>This finds only messages whose producers wrote a trace header: <span class="mono">traceparent</span> (W3C), <span class="mono">b3</span> or <span class="mono">X-B3-TraceId</span> (B3){{if .TraceHeader}}, or <span class="mono">{{.TraceHeader}}</span>{{end}}. A message with no header is invisible here, and so is a service that does not pass the header on. It is found by reading the records written around this message's time, up to {{.MaxRecords}} records or {{.MaxSeconds}} seconds, and says so when it stops short.</div>
     </div>
-  </div></main>
+  </main>
 {{template "shell_bottom" .}}{{end}}
 
 {{/* trace_live is the polled unit: progress while the scan runs, the trail when it is done. */}}

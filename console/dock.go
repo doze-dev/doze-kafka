@@ -62,7 +62,7 @@ type DockSource interface {
 }
 
 // dockRows is how many rows a dock shows.
-const dockRows = 12
+const dockRows = 8
 
 // trafficDock is a DockSource over the traffic source the console already has.
 type trafficDock struct {

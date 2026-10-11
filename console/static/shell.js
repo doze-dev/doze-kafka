@@ -325,13 +325,14 @@
 
   // ---------- dialogs ----------
   // Three things open over the page: the confirm dialog, the command palette and
-  // the message inspector. Only one is open at a time, and while one is, the page's
-  // single-key shortcuts are off.
+  // the key help. Only one is open at a time, and while one is, the page's
+  // single-key shortcuts are off. (The inspector is not one of them: it is part of
+  // the page, and its keys are the page's.)
   var FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
   function isOpen(id) { var el = document.getElementById(id); return !!el && !el.hidden; }
   function confirmOpen() { return isOpen("confirm"); }
   function paletteOpen() { return isOpen("palette"); }
-  function inspectorIsOpen() { return isOpen("inspector-overlay"); }
+  function inspectorIsOpen() { return isOpen("inspector"); }
   function helpOpen() { return isOpen("help"); }
   // Tab stays inside an open dialog.
   function trapTab(box, ev) {
@@ -418,7 +419,6 @@
 
   function openPalette() {
     if (!pal || confirmOpen()) return;
-    if (inspectorIsOpen()) closeInspector(false);
     if (!paletteOpen()) palOpener = document.activeElement;
     pal.hidden = false; palQ.value = ""; palSel = 0;
     var here = location.pathname;
@@ -522,16 +522,7 @@
     });
     // A filter typed in one section means nothing in the next (topic names do
     // not filter groups), and used to carry over and hide everything.
-    if (section !== currentSection) {
-      currentSection = section;
-      if (window.Alpine && Alpine.store("filter")) Alpine.store("filter").q = "";
-    }
-    // A click in the list replaces only the detail pane, so the list itself (its
-    // scroll position, the row under the pointer) stays put; its highlight is
-    // moved here.
-    document.querySelectorAll(".listpane .li[href]").forEach(function (a) {
-      a.classList.toggle("on", new URL(a.href, location.origin).pathname === location.pathname);
-    });
+    if (section !== currentSection) currentSection = section;
     // Pausing, and an open composer, belong to the page they were on. A pause used
     // to follow you to a group page (which has no pause control) and freeze it;
     // an open composer followed you to the next topic and covered its messages.
@@ -547,10 +538,16 @@
 
   // ---------- keyboard ----------
   // The cursor is a row, not an index: filtering changes which rows are visible,
-  // and an index into the old list pointed at the wrong (or a hidden) one.
+  // and an index into the old list pointed at the wrong (or a hidden) one. j and k
+  // move over the page's own rows (a table's, the home table's) and, on a page that
+  // has none, over the list.
   var cursorEl = null;
+  var ROW_SEL = 'main tr[data-inspector-open], main a.r[href], main [data-row]';
+  function visible(el) { return el.offsetParent !== null; }
   function listRows() {
-    return Array.prototype.filter.call(document.querySelectorAll(".listpane .li[href]"), function (r) { return r.offsetParent !== null; });
+    var rows = Array.prototype.filter.call(document.querySelectorAll(ROW_SEL), visible);
+    if (rows.length) return rows;
+    return Array.prototype.filter.call(document.querySelectorAll(".list .li[href]"), visible);
   }
   function resetListCursor() { cursorEl = null; }
   function moveCursor(d) {
@@ -558,7 +555,7 @@
     if (!rows.length) return;
     var at = rows.indexOf(cursorEl);
     var next = at < 0 ? (d > 0 ? 0 : rows.length - 1) : Math.min(rows.length - 1, Math.max(0, at + d));
-    document.querySelectorAll(".listpane .li.cursor").forEach(function (r) { r.classList.remove("cursor"); });
+    document.querySelectorAll(".cursor").forEach(function (r) { r.classList.remove("cursor"); });
     cursorEl = rows[next];
     cursorEl.classList.add("cursor");
     cursorEl.scrollIntoView({ block: "nearest" });
@@ -571,6 +568,9 @@
       if (ta && ta.__cm) ta.__cm.focus(); else if (ta) ta.focus();
     });
   }
+  // g, then a letter, goes to a section (Sy-06's "Go to"). The chord is armed for a
+  // moment and lapses; any other key disarms it.
+  var chord = 0;
   document.addEventListener("keydown", function (e) {
     if (confirmOpen()) return; // the dialog has its own keys, and nothing else gets any.
     var mod = e.metaKey || e.ctrlKey;
@@ -584,7 +584,6 @@
       return;
     }
     if (mod && !e.altKey && !e.shiftKey && e.key === "k") { e.preventDefault(); openPalette(); return; }
-    if (inspectorIsOpen()) return; // the inspector's keys are handled where the inspector is.
     var active = document.activeElement || document.body;
     // ⌘⏎ sends from the composer, from a plain field or from inside the editor.
     // Once per press: a held key repeats, and each repeat used to send a record.
@@ -599,28 +598,61 @@
     // Single-key shortcuts are single keys. With a modifier held the key belongs
     // to the browser or the OS: ⌘C is copy, not "new topic".
     if (mod || e.altKey) return;
-    if (/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || active.isContentEditable || (active.closest && active.closest(".cm-editor"))) return;
+    var typing = /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || active.isContentEditable || (active.closest && active.closest(".cm-editor"));
+    // Esc is the one key that works from a field: it clears the field's filter, or
+    // leaves the field, and only then closes the panel.
+    if (typing) {
+      if (e.key === "Escape" && active.hasAttribute && active.hasAttribute("data-filter-target") && active.value) {
+        active.value = ""; active.dispatchEvent(new Event("input", { bubbles: true })); e.preventDefault();
+      } else if (e.key === "Escape" && !active.closest(".cm-editor")) {
+        active.blur();
+      }
+      chord = 0;
+      return;
+    }
     // The key map is declared once, on the server (keys.go), and arrives as JSON:
     // what a key does is looked up there, so a key cannot be bound here and left out
     // of the help overlay.
-    var act = pageKey(e.key);
-    if (act && pageActions[act]) pageActions[act](e, active);
+    if (chord && Date.now() < chord) {
+      chord = 0;
+      var b = bindingFor("g " + e.key);
+      if (b) { goToSection(b.target); e.preventDefault(); return; }
+    }
+    chord = 0;
+    if (e.key === "g" && !e.repeat) { chord = Date.now() + 1500; return; }
+    var acts = pageKeys(e.key);
+    for (var i = 0; i < acts.length; i++) {
+      if (pageActions[acts[i]] && pageActions[acts[i]](e, active) !== false) return;
+    }
   });
+  function goToSection(target) {
+    // A section this console does not have (no recorder, no registry) is not a place to go.
+    var link = document.querySelector('.rail a.nav[href$="' + target + '"]');
+    if (link) link.click();
+  }
 
   // ---------- the key map ----------
   var KEYMAP = [];
   try { KEYMAP = JSON.parse(document.getElementById("keymap").textContent) || []; } catch (err) {}
-  function pageKey(key) {
+  function bindingFor(key) {
+    for (var i = 0; i < KEYMAP.length; i++) if (KEYMAP[i].key === key) return KEYMAP[i];
+    return null;
+  }
+  // Every action a single key stands for, in the order they are declared: "p" is
+  // produce on a topic and pause on a page that tails, and the page decides.
+  function pageKeys(key) {
+    var out = [];
     for (var i = 0; i < KEYMAP.length; i++) {
       var b = KEYMAP[i];
-      if (b.key === key && b.scope !== "In a dialog") return b.action;
+      if (b.key === key && b.scope !== "In a dialog") out.push(b.action);
     }
-    return "";
+    return out;
   }
   var pageActions = {
     filter: function (e) {
-      var f = document.querySelector(".listpane .filter input");
-      if (f && f.offsetParent !== null) f.focus(); else openPalette();
+      var f = document.querySelector("main input[data-filter-target]") || document.querySelector(".list input[data-filter-target]");
+      if (f && visible(f)) { f.focus(); e.preventDefault(); return; }
+      openPalette();
       e.preventDefault();
     },
     next: function () { moveCursor(1); },
@@ -628,22 +660,51 @@
     open: function (e, active) {
       // Enter on a focused button or link is that control's own. The list cursor
       // is opened only when nothing else has the keyboard.
-      if (active !== document.body && active.matches && active.matches(FOCUSABLE + ", summary")) return;
-      if (cursorEl && document.contains(cursorEl) && cursorEl.offsetParent !== null) cursorEl.click();
+      if (active !== document.body && active.matches && active.matches(FOCUSABLE + ", summary")) return false;
+      if (cursorEl && document.contains(cursorEl) && visible(cursorEl)) cursorEl.click();
     },
-    create: function () { var nb = document.querySelector(".listpane .new-link"); if (nb) nb.click(); },
-    compose: function (e) {
-      if (document.getElementById("compose-panel")) { e.preventDefault(); setDock(true); focusComposer(); }
+    create: function () {
+      var nb = document.querySelector("[data-create]");
+      if (nb) nb.click(); else return false;
     },
-    pause: function () { if (document.querySelector("[data-live-toggle]")) setPaused(!livePaused); },
+    // On a topic, p is produce: the composer opens and takes focus.
+    produce: function (e) {
+      if (!document.getElementById("compose-panel")) return false;
+      e.preventDefault(); setDock(true); focusComposer();
+    },
+    // Anywhere else that tails, p pauses.
+    pause: function () {
+      if (document.getElementById("compose-panel")) return false;
+      if (!document.querySelector("[data-live-toggle]")) return false;
+      setPaused(!livePaused);
+    },
     help: function (e) { e.preventDefault(); openHelp(); },
+    // ] and [ move along the page's tabs.
+    "tab-next": function () { return stepTab(1); },
+    "tab-prev": function () { return stepTab(-1); },
+    // Esc closes the panel; with none open it clears the page's own filter.
+    close: function (e) {
+      if (inspectorIsOpen()) { closeInspector(); e.preventDefault(); return; }
+      var f = document.querySelector("input[data-filter-target]");
+      if (f && f.value) { f.value = ""; f.dispatchEvent(new Event("input", { bubbles: true })); e.preventDefault(); return; }
+      return false;
+    },
+    // The chord's own binding is handled where the chord is; these have no key alone.
+    goto: function () { return false; },
   };
+  function stepTab(d) {
+    var tabs = Array.prototype.filter.call(document.querySelectorAll("main .tabs a.tab"), visible);
+    if (tabs.length < 2) return false;
+    var at = -1;
+    tabs.forEach(function (t, i) { if (t.classList.contains("on")) at = i; });
+    var to = tabs[(at + d + tabs.length) % tabs.length];
+    if (to) to.click();
+  }
 
   // ---------- help: the keys, listed from the declared map ----------
   var helpBox = document.getElementById("help"), helpOpener = null;
   function openHelp() {
     if (!helpBox || confirmOpen()) return;
-    if (inspectorIsOpen()) closeInspector(false);
     if (paletteOpen()) closePalette();
     if (!helpOpen()) helpOpener = document.activeElement;
     helpBox.hidden = false;
@@ -666,12 +727,14 @@
     trapTab(helpBox, e);
   }, true);
 
-  // ---------- the message inspector ----------
-  // A real dialog in every state (loading, a record, an error): it has a title
-  // and a close button, takes focus when it opens, keeps Tab inside, closes on
-  // Esc or a click outside, and hands focus back to the row that opened it. Its
-  // record is in the URL (?open=OFFSET), so a refresh or a shared link reopens it.
-  var inspectorOverlay = document.getElementById("inspector-overlay");
+  // ---------- the inspector ----------
+  // The right-hand panel (Sy-01), in flow beside the page: nothing slides over the
+  // content and there is no scrim. A selection fills #inspector; closing it puts the
+  // page's own summary back (Traffic's open connections), or hides the panel. It has
+  // a title and a close button in every state (loading, a record, an error), takes
+  // focus when it opens, closes on Esc, and hands focus back to the row that opened
+  // it. Its selection is in the URL (?open=), so a refresh or a shared link reopens it.
+  var inspectorPanel = document.getElementById("inspector-panel");
   var inspector = document.getElementById("inspector");
   var inspectorOpener = null, inspectorXhr = null, inspectorRefocus = null;
   // The selection is in the address as ?open=. Opening one pushes an entry (so
@@ -689,16 +752,29 @@
       else history.replaceState(history.state, "", next);
     } catch (e) {}
   }
+  function currentInspector() {
+    // The page is swapped under the script; the panel and its body are looked up when
+    // they are needed, never held.
+    inspectorPanel = document.getElementById("inspector-panel");
+    inspector = document.getElementById("inspector");
+  }
   function openInspector(from) {
-    if (!inspectorOverlay || confirmOpen()) return;
+    currentInspector();
+    if (!inspector || confirmOpen()) return;
     if (!inspectorIsOpen()) inspectorOpener = from || document.activeElement;
-    inspectorOverlay.hidden = false;
+    inspector.hidden = false;
+    inspectorPanel.hidden = false;
+    var def = document.getElementById("insp-default");
+    if (def) def.hidden = true;
   }
   // closeInspector(restoreFocus, keepURL): the URL loses ?open= unless the close
   // is the answer to the URL having already lost it (Back).
   function closeInspector(restoreFocus, keepURL) {
+    currentInspector();
     if (!inspectorIsOpen()) return;
-    inspectorOverlay.hidden = true;
+    inspector.hidden = true;
+    var def = document.getElementById("insp-default");
+    if (def) def.hidden = false; else inspectorPanel.hidden = true;
     // A request still on its way is for an inspector that is no longer open. Left
     // alone, its answer filled the closed inspector and put ?open= back in the URL.
     if (inspectorXhr) { inspectorXhr.dozeDropped = true; inspectorXhr.abort(); inspectorXhr = null; }
@@ -716,10 +792,11 @@
   // message fills the inspector with a titled state that is not a selection:
   // loading, or what went wrong.
   function inspectorMessage(title, text, isError) {
+    currentInspector();
     inspector.textContent = "";
     var h = document.createElement("div");
     h.className = "inspector-h";
-    h.innerHTML = '<div><span class="t" id="inspector-title"></span></div><div class="inspector-nav"><button type="button" class="icon-btn" aria-label="Close" data-inspector-close>✕</button></div>';
+    h.innerHTML = '<div><span class="cap">Details</span><span class="t h2" id="inspector-title"></span></div><div class="inspector-nav"><button type="button" class="icon-btn" aria-label="Close" data-inspector-close>✕</button></div>';
     h.querySelector("#inspector-title").textContent = title;
     var b = document.createElement("div");
     if (isError) { b.className = "err inspector-err"; b.setAttribute("role", "alert"); b.textContent = text; }
@@ -729,9 +806,8 @@
     h.querySelector("[data-inspector-close]").focus();
   }
   function inspectorRequestStarted(xhr, from) {
+    currentInspector();
     if (!inspector) return;
-    // htmx hears the click on a row before the document does, so the request can
-    // start while the inspector is still hidden, and a hidden dialog cannot take focus.
     openInspector(from);
     if (inspectorXhr) { inspectorXhr.dozeDropped = true; inspectorXhr.abort(); } // the newer click wins.
     inspectorXhr = xhr;
@@ -755,15 +831,11 @@
     var row = e.target.closest("[data-inspector-open]");
     if (row) { openInspector(row); return; }
     if (e.target.closest("[data-inspector-close]")) { closeInspector(); return; }
-    if (e.target === inspectorOverlay) closeInspector();
   });
   document.addEventListener("keydown", function (e) {
     if (confirmOpen() || paletteOpen() || helpOpen()) return;
     var row = e.target.closest && e.target.closest("[data-inspector-open]");
     if (row && (e.key === "Enter" || e.key === " ")) { openInspector(row); return; } // htmx fires the request.
-    if (!inspectorIsOpen()) return;
-    if (e.key === "Escape") { closeInspector(); e.preventDefault(); e.stopPropagation(); return; }
-    trapTab(inspectorOverlay, e);
   }, true);
   // A selection landed in the inspector: put it in the URL and move focus in, to
   // the button that asked when it was Older or Newer, so stepping keeps its place.
@@ -773,6 +845,8 @@
     if (!inspectorIsOpen()) { t.textContent = ""; return; }
     var title = t.querySelector("#inspector-title[data-open]");
     var open = title ? title.getAttribute("data-open") : "";
+    var kind = t.querySelector("[data-inspector-kind]");
+    if (inspectorPanel && kind) inspectorPanel.setAttribute("data-kind", kind.getAttribute("data-inspector-kind"));
     // A record is named by an offset on the partition in view; a search across
     // partitions has no single partition, and so no address for it.
     var region = document.getElementById("tape-and-table");
@@ -802,6 +876,7 @@
     if (open == null) { closeInspector(true, true); return; }
     var url = inspectorFetchURL(open);
     if (!url || !window.htmx) return;
+    currentInspector();
     var title = inspectorIsOpen() && inspector.querySelector("#inspector-title[data-open]");
     if (title && title.getAttribute("data-open") === open) return;
     openInspector(inspectorOpenRow(open));
@@ -837,6 +912,127 @@
   });
   document.addEventListener("DOMContentLoaded", syncDock);
   document.addEventListener("htmx:afterSettle", syncDock);
+
+  // ---------- filters ----------
+  // A text field with data-filter-target="<selector>" narrows the elements that match
+  // the selector to those whose name (data-name, or else their text) contains what is
+  // typed; a segmented control with data-seg-for="<same selector>" narrows them to
+  // those that carry its value in data-seg. data-filter-none names the element that
+  // says nothing matched. Both are reapplied after a swap, so a poll does not undo them.
+  function applyFilters() {
+    var done = {};
+    document.querySelectorAll("input[data-filter-target]").forEach(function (inp) {
+      var sel = inp.getAttribute("data-filter-target");
+      if (!sel || done[sel]) return;
+      done[sel] = true;
+      runFilter(sel, inp);
+    });
+    document.querySelectorAll(".seg[data-seg-for]").forEach(function (seg) {
+      var sel = seg.getAttribute("data-seg-for");
+      if (done[sel]) return;
+      done[sel] = true;
+      runFilter(sel, null);
+    });
+  }
+  function runFilter(sel, inp) {
+    var q = inp ? inp.value.toLowerCase().trim() : "";
+    var seg = document.querySelector('.seg[data-seg-for="' + sel + '"] .on');
+    var segVal = seg ? (seg.getAttribute("data-seg-value") || "") : "";
+    var rows;
+    try { rows = document.querySelectorAll(sel); } catch (e) { return; }
+    var shown = 0;
+    rows.forEach(function (row) {
+      var hay = ((row.getAttribute("data-name") || "") + " " + (row.getAttribute("data-text") || "") + " " + (row.getAttribute("data-name") ? "" : row.textContent)).toLowerCase();
+      var ok = (!q || hay.indexOf(q) >= 0) && (!segVal || (row.getAttribute("data-seg") || "").split(" ").indexOf(segVal) >= 0);
+      row.hidden = !ok;
+      if (ok) shown++;
+    });
+    var noneSel = inp && inp.getAttribute("data-filter-none");
+    var none = noneSel && document.querySelector(noneSel);
+    if (none) none.hidden = !(rows.length && shown === 0);
+  }
+  document.addEventListener("input", function (e) {
+    if (e.target && e.target.matches && e.target.matches("input[data-filter-target]")) applyFilters();
+  });
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest && e.target.closest(".seg[data-seg-for] [data-seg-value]");
+    if (!b) return;
+    var seg = b.closest(".seg");
+    seg.querySelectorAll("[data-seg-value]").forEach(function (x) {
+      var on = x === b;
+      x.classList.toggle("on", on);
+      x.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    applyFilters();
+  });
+  document.addEventListener("htmx:afterSettle", applyFilters);
+  document.addEventListener("DOMContentLoaded", applyFilters);
+
+  // ---------- the list keeps its place ----------
+  // A click in the list replaces the whole page (the inspector and the dock belong to
+  // it), so the list's scroll position is put back on the list that arrives.
+  var listScroll = 0;
+  document.addEventListener("htmx:beforeSwap", function (e) {
+    var t = e.detail.target;
+    if (!t || t.id !== "workspace") return;
+    var sc = document.querySelector(".list .list-scroll");
+    listScroll = sc ? sc.scrollTop : 0;
+  });
+  document.addEventListener("htmx:afterSettle", function (e) {
+    var t = e.detail.target;
+    if (!t || t.id !== "workspace" || !listScroll) return;
+    var sc = document.querySelector(".list .list-scroll");
+    if (sc) sc.scrollTop = listScroll;
+    listScroll = 0;
+  });
+
+  // ---------- the page's own summary comes back ----------
+  // The open connections are replaced out of band with the Traffic page's poll. While
+  // a selection is open they stay hidden behind it, and are visible again when it
+  // closes.
+  document.addEventListener("htmx:oobAfterSwap", function () {
+    var def = document.getElementById("insp-default");
+    if (def && inspectorIsOpen()) def.hidden = true;
+  });
+
+  // ---------- the ··· menu ----------
+  // Closes when a click lands elsewhere, and on Esc.
+  function closeMenus(except) {
+    document.querySelectorAll(".more > [data-more][aria-expanded=true]").forEach(function (b) {
+      if (b === except) return;
+      b.setAttribute("aria-expanded", "false");
+      var m = b.parentNode.querySelector(".menu");
+      if (m) m.hidden = true;
+    });
+  }
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest && e.target.closest(".more > [data-more]");
+    if (btn) {
+      var menu = btn.parentNode.querySelector(".menu"), open = btn.getAttribute("aria-expanded") === "true";
+      closeMenus(btn);
+      btn.setAttribute("aria-expanded", open ? "false" : "true");
+      if (menu) menu.hidden = open;
+      return;
+    }
+    // A menu action is done: the menu closes (a confirm may follow); a click elsewhere closes it too.
+    closeMenus(null);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    var open = document.querySelector(".more > [data-more][aria-expanded=true]");
+    if (open) { closeMenus(null); open.focus(); e.stopPropagation(); e.preventDefault(); }
+  }, true);
+
+  // ---------- the produce button ----------
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest && e.target.closest("[data-compose-open]");
+    if (!b || !document.getElementById("compose-panel")) return;
+    e.preventDefault();
+    setDock(true);
+    focusComposer();
+    var panel = document.getElementById("compose-panel");
+    if (panel && panel.scrollIntoView) panel.scrollIntoView({ block: "nearest" });
+  });
 
   // ---------- time ----------
   // One formatter. The server writes every moment as <time datetime="UTC" data-style>
@@ -953,6 +1149,16 @@
       b.setAttribute("aria-pressed", p ? "true" : "false");
       b.classList.toggle("on", p);
       b.title = p ? "Resume live updates" : "Pause live updates";
+      // The Traffic page's toggle is a button that says what it will do (Main).
+      var off = b.getAttribute("data-label-off"), on = b.getAttribute("data-label-on");
+      if (off && on) b.textContent = p ? on : off;
+    });
+    document.querySelectorAll("[data-live-state]").forEach(function (el) {
+      el.classList.toggle("ok", !p);
+      var l = el.querySelector("[data-live-state-l]");
+      if (l) l.textContent = p ? "paused" : "live";
+      var d = el.querySelector(".dot");
+      if (d) d.classList.toggle("off", p);
     });
   }
   document.addEventListener("click", function (e) {
