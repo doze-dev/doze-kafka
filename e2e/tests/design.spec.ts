@@ -402,7 +402,7 @@ test('the palette is grouped under Topics, Groups, Subjects and Actions, says wh
   await expect(first.locator('.pal-detail')).toContainText(/\d+ partitions? · [\d,]+ messages?/);
   await expect(first.locator('.sv')).toHaveText('TP');
   await expect(first.locator('.kbd')).toHaveText('↵'); // the selected row says what Enter does.
-  await expect(page.locator('#pal-count')).toContainText(/\d+ results?/);
+  await expect(page.locator('#pal-count')).toHaveText(/^\d+ groups? of results$/); // the board counts groups.
   // Groups say their state, members and lag.
   await page.locator('#pal-q').fill('g-lag');
   await expect(page.locator('#pal-list .pal-cap').first()).toHaveText('Groups');
@@ -661,3 +661,32 @@ test('the Traffic columns are the board\'s: 92 150 118 1fr 190 84 52, with its 1
   await expect(strip.locator('> .mut:not(.m)').first()).toHaveCSS('color', 'rgb(86, 91, 99)');
 });
 
+test('the palette offers Produce to and Reset offsets for what the query matched, with the section chords', async ({ page, openPalette }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('traffic');
+  await openPalette();
+  // The first row that is not the selected one in a group says the chord to its section.
+  const groups = page.locator('#pal-list .pal-cap', { hasText: 'Groups' });
+  await expect(groups).toBeVisible();
+  const chords = await page.locator('#pal-list .pal-item .kbd').allTextContents();
+  expect(chords).toEqual(expect.arrayContaining(['g g']));
+  // No theme row: the theme is the top bar's control, and Sy-05 lists none.
+  await page.locator('#pal-q').fill('theme');
+  await expect(page.locator('#pal-list .pal-item', { hasText: /theme/i })).toHaveCount(0);
+  // Typing a name offers to produce to the topic it matched, from a page that is not that topic.
+  await page.locator('#pal-q').fill('seed-orders');
+  const produce = page.locator('#pal-list .pal-item', { hasText: 'Produce to seed-orders' });
+  await expect(produce).toBeVisible();
+  await expect(produce.locator('.kbd')).toHaveText('p');
+  await produce.click();
+  await expect(page).toHaveURL(/topics\/seed-orders/);
+  await expect(page.locator('html')).toHaveAttribute('data-dock', 'open');
+  // And the group it matched can have its offsets reset, which says it asks first.
+  await openPalette();
+  await page.locator('#pal-q').fill('g-lag');
+  const reset = page.locator('#pal-list .pal-item', { hasText: 'Reset offsets for g-lag' });
+  await expect(reset).toBeVisible();
+  await expect(reset.getByText('asks first', { exact: true })).toBeVisible();
+  await reset.click();
+  await expect(page).toHaveURL(/groups\/g-lag\?tab=offsets/);
+});

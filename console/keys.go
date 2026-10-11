@@ -150,10 +150,6 @@ type clientAction struct {
 }
 
 var clientActions = []clientAction{
-	{"theme:light", "Use the light theme"},
-	{"theme:dark", "Use the dark theme"},
-	{"theme:contrast", "Use the high-contrast theme"},
-	{"theme:system", "Match the system theme"},
 	{"pause", "Pause or resume live updates"},
 	{"help", "Show the keyboard shortcuts"},
 }

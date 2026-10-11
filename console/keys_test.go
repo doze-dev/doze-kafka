@@ -133,7 +133,13 @@ func TestThePaletteCatalogueHasActionsAndEveryTheme(t *testing.T) {
 			navs++
 		}
 	}
-	for _, want := range []string{"theme:light", "theme:dark", "theme:contrast", "theme:system", "pause", "help"} {
+	// Sy-05 lists no theme actions: the theme is the top bar's control, not a palette row.
+	for id := range acts {
+		if strings.HasPrefix(id, "theme:") {
+			t.Errorf("the palette offers %q, which Sy-05 does not list", id)
+		}
+	}
+	for _, want := range []string{"pause", "help"} {
 		if !acts[want] {
 			t.Errorf("the palette has no action %q", want)
 		}
@@ -144,7 +150,7 @@ func TestThePaletteCatalogueHasActionsAndEveryTheme(t *testing.T) {
 	css := readAll(t, "static/app.css")
 	for _, theme := range []string{"dark", "contrast"} {
 		if !strings.Contains(css, `:root[data-theme="`+theme+`"]`) {
-			t.Errorf("the palette offers the %s theme and the stylesheet has no block for it", theme)
+			t.Errorf("the top bar offers the %s theme and the stylesheet has no block for it", theme)
 		}
 	}
 	// The three themes define the same tokens, so none falls back to another's.

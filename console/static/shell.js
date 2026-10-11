@@ -439,6 +439,30 @@
     }
     return out;
   }
+  // Sy-05's Actions: with something typed, the first topic that matched can be
+  // produced to and the first group that matched can have its offsets reset (which
+  // asks first, on its own page). The page's own are already in contextActions.
+  var PAL_CHORD = { topics: "g t", groups: "g g", schemas: "g s" };
+  function matchActions(rows, q) {
+    var out = [];
+    if (!q) return out;
+    var t = rows.filter(function (it) { return bucketOf(it) === "topics" && it.k !== "recent"; })[0];
+    var g = rows.filter(function (it) { return bucketOf(it) === "groups" && it.k !== "recent"; })[0];
+    if (t) out.push({ s: "actions", n: "Produce to " + t.n, k: "action", a: "produce-to", u: t.u, glyph: "+", h: "p", ctx: true, match: true });
+    if (g) out.push({ s: "actions", n: "Reset offsets for " + g.n, k: "action", u: g.u + "?tab=offsets#reset", h: "asks first", glyph: "↺", ctx: true, match: true });
+    return out;
+  }
+  // A "Produce to" on another topic: go there, and open the composer when it is up.
+  function produceTo(u) {
+    if (location.pathname === u && document.getElementById("compose-panel")) { setDock(true); focusComposer(); return; }
+    try { sessionStorage.setItem("composeOn", u); } catch (e) {}
+    location.href = u;
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    var u = null;
+    try { u = sessionStorage.getItem("composeOn"); sessionStorage.removeItem("composeOn"); } catch (e) {}
+    if (u && u === location.pathname && document.getElementById("compose-panel")) { setDock(true); focusComposer(); }
+  });
 
   function openPalette() {
     if (!pal || confirmOpen()) return;
@@ -482,8 +506,8 @@
     if (!it.a) { location.href = it.u; return; }
     closePalette();
     var act = it.a;
-    if (act.indexOf("theme:") === 0) applyTheme(act.slice(6));
-    else if (act === "pause") { if (document.querySelector("[data-live-toggle]")) setPaused(!livePaused); }
+    if (act === "produce-to") { produceTo(it.u); return; }
+    if (act === "pause") { if (document.querySelector("[data-live-toggle]")) setPaused(!livePaused); }
     else if (act === "help") openHelp();
     else if (act === "produce") { setDock(true); focusComposer(); }
   }
@@ -495,6 +519,8 @@
     });
     // In groups, in the board's order; recents lead their own group.
     var out = [], per = q ? 6 : 5;
+    var extra = matchActions(rows, q).filter(function (m) { return !rows.some(function (r) { return r.n === m.n; }); });
+    rows = rows.concat(extra);
     PAL_GROUPS.forEach(function (g) {
       var inG = rows.filter(function (it) { return bucketOf(it) === g[0]; });
       inG.sort(function (a, b) { return (a.k === "recent" ? 0 : 1) - (b.k === "recent" ? 0 : 1); });
@@ -519,9 +545,13 @@
     if (palSel >= items.length) palSel = Math.max(0, items.length - 1);
     palList.innerHTML = "";
     var count = document.getElementById("pal-count");
-    if (count) count.textContent = items.length ? items.length + " result" + (items.length === 1 ? "" : "s") : "";
+    // The board counts the groups: "4 groups of results".
+    var ngroups = {};
+    items.forEach(function (it) { ngroups[bucketOf(it)] = 1; });
+    var gn = Object.keys(ngroups).length;
+    if (count) count.textContent = gn ? gn + " group" + (gn === 1 ? "" : "s") + " of results" : "";
     if (!items.length) { palList.innerHTML = '<div class="pal-empty">Nothing matches</div>'; palQ.removeAttribute("aria-activedescendant"); return; }
-    var lastGroup = "";
+    var lastGroup = "", chorded = {};
     items.forEach(function (it, i) {
       var g = bucketOf(it);
       if (g !== lastGroup) {
@@ -553,6 +583,15 @@
         hint.className = it.h.length > 3 ? "note" : "kbd";
         hint.textContent = it.h;
         a.appendChild(hint);
+      }
+      // The first row of a group that is not the selected one says the chord that goes
+      // to its section (Sy-05: the selected row says what Enter does instead).
+      if (!it.h && i !== palSel && PAL_CHORD[g] && !chorded[g]) {
+        chorded[g] = true;
+        var chord = document.createElement("span");
+        chord.className = "kbd";
+        chord.textContent = PAL_CHORD[g];
+        a.appendChild(chord);
       }
       if (i === palSel) {
         var enter = document.createElement("span");
