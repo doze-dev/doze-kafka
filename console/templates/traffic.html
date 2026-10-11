@@ -45,8 +45,10 @@
         {{range .Kinds}}<a class="{{if .On}}on{{end}}" href="{{.URL}}" {{if .On}}aria-current="true"{{end}}>{{.Label}}</a>{{end}}
       </div>
       {{if .HasStory}}
+      <span class="row ce g8 nw">
       {{range .Pills}}<span class="pill"><span class="mut">{{.Name}}</span><span class="m">{{.Value}}</span><a class="btn ghost sm pill-x" href="{{.URL}}" aria-label="Remove {{.Name}} filter">×</a></span>{{end}}
       <a href="{{.Prefix}}/traffic" class="b">clear</a>
+      </span>
       {{end}}
       <div class="grow"></div>
       {{if .HasStory}}{{template "story_count" .}}{{else}}
