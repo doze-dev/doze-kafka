@@ -431,11 +431,18 @@ func firstError(resp kmsg.Response) int16 {
 	if v.Kind() == reflect.Pointer && v.IsNil() {
 		return 0
 	}
-	return walkErrors(v, 0)
+	budget := maxErrorWalk
+	return walkErrors(v, &budget)
 }
 
-func walkErrors(v reflect.Value, depth int) int16 {
-	if depth > 6 {
+// maxErrorWalk is how many values firstError looks at in one response. The types are
+// finite trees, so there is no depth to cap (a cap of six hid the codes of OffsetFetch
+// v8, AddPartitionsToTxn v4 and others: TRF-7); what grows is the response, and a
+// response with more than this many values is not searched past it.
+const maxErrorWalk = 1 << 18
+
+func walkErrors(v reflect.Value, budget *int) int16 {
+	if *budget--; *budget < 0 {
 		return 0
 	}
 	switch v.Kind() {
@@ -443,7 +450,7 @@ func walkErrors(v reflect.Value, depth int) int16 {
 		if v.IsNil() {
 			return 0
 		}
-		return walkErrors(v.Elem(), depth+1)
+		return walkErrors(v.Elem(), budget)
 	case reflect.Struct:
 		t := v.Type()
 		// The top-level error comes before the nested ones: it is the one that
@@ -460,14 +467,14 @@ func walkErrors(v reflect.Value, depth int) int16 {
 				if f.Kind() == reflect.Slice && f.Type().Elem().Kind() != reflect.Struct {
 					continue // a []byte of records, a []int32: no errors in there.
 				}
-				if code := walkErrors(f, depth+1); code != 0 {
+				if code := walkErrors(f, budget); code != 0 {
 					return code
 				}
 			}
 		}
 	case reflect.Slice:
 		for i := 0; i < v.Len(); i++ {
-			if code := walkErrors(v.Index(i), depth+1); code != 0 {
+			if code := walkErrors(v.Index(i), budget); code != 0 {
 				return code
 			}
 		}
