@@ -57,10 +57,12 @@ func TestDroppedSeriesAreCounted(t *testing.T) {
 	}
 }
 
-// Anyone could claim any instance id: an unknown one was adopted, a push from another
-// connection replaced the principal and host, and 200 fresh ids evicted real clients
-// (TRF-27). Real Kafka's answer to this is unrecorded (queue R4).
-func TestInstanceIsBoundToItsConnection(t *testing.T) {
+// An instance is a principal's: another principal cannot take it over or replace its
+// who. Another connection of the same principal can speak for it, and the instance then
+// follows that connection: the Java client subscribes on its bootstrap connection and
+// pushes on the one the metadata gave it. What real Kafka does about the rest is
+// unrecorded (queue R4).
+func TestInstanceBelongsToItsPrincipalAndFollowsItsConnection(t *testing.T) {
 	s := NewStore()
 	s.now = func() time.Time { return t0 }
 	open := true
@@ -68,28 +70,24 @@ func TestInstanceIsBoundToItsConnection(t *testing.T) {
 	if !s.Touch(id(1), a) {
 		t.Fatal("the first claim was refused")
 	}
-	b := Who{ClientID: "evil", Principal: "User:a", Conn: 2, Open: func() bool { return true }}
-	if s.Touch(id(1), b) || s.Push(id(1), b, gauge("m", t0, 1), false) {
-		t.Error("another open connection took the instance")
+	b := Who{ClientID: "a", Principal: "User:a", Conn: 2, Open: func() bool { return true }}
+	if !s.Push(id(1), b, gauge("m", t0, 1), false) {
+		t.Fatal("the same principal's other connection was refused")
 	}
-	if !s.Owned(id(1), b) || s.Owned(id(1), a) || s.Owned(id(5), b) {
-		t.Error("Owned does not say who the instance belongs to")
+	if in := s.Instances()[0]; in.Conn != 2 || in.Pushes != 1 {
+		t.Errorf("the instance did not follow the connection that spoke: %+v", in)
 	}
-	if in := s.Instances()[0]; in.ClientID != "a" || in.Pushes != 0 || in.Conn != 1 {
-		t.Errorf("the refused claim changed the instance: %+v", in)
-	}
-	// Another principal is refused even when the owner has gone.
-	open = false
-	if s.Touch(id(1), Who{Principal: "User:evil", Conn: 3}) {
+	evil := Who{ClientID: "evil", Principal: "User:evil", Conn: 3, Open: func() bool { return true }}
+	if s.Touch(id(1), evil) || s.Push(id(1), evil, gauge("m", t0, 1), false) {
 		t.Error("another principal took the instance")
 	}
-	// The same client reconnecting, its old connection closed, takes it over.
-	if !s.Push(id(1), Who{ClientID: "a", Principal: "User:a", Conn: 4, Open: func() bool { return true }}, gauge("m", t0, 1), false) {
-		t.Fatal("a reconnect was refused")
+	if !s.Owned(id(1), evil) || s.Owned(id(1), a) || s.Owned(id(5), evil) {
+		t.Error("Owned does not say who the instance belongs to")
 	}
-	if in := s.Instances()[0]; in.Conn != 4 || in.Pushes != 1 {
-		t.Errorf("after the reconnect: %+v", in)
+	if in := s.Instances()[0]; in.ClientID != "a" || in.Principal != "User:a" {
+		t.Errorf("the refused claim changed the instance: %+v", in)
 	}
+	_ = open
 }
 
 func TestOneConnectionCannotFillTheStoreAndFreshIDsEvictTheClosedFirst(t *testing.T) {

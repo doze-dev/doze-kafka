@@ -1194,8 +1194,8 @@ html[data-paused] .live-only { display: none; }
 #paused-banner { flex-direction: row; align-items: center; justify-content: space-between; }
 html[data-connection-lost] .lost-only { display: inline-flex; }
 html[data-connection-lost] .callout.lost-only { display: flex; }
-html[data-connection-lost] tr.frozen-line.lost-only { display: table-row; }
-tr.frozen-line td { background: var(--well); color: var(--mut); text-align: center; }
+html[data-connection-lost] div.frozen-line.lost-only { display: block; }
+.frozen-line { background: var(--well); color: var(--mut); text-align: center; padding: 5px 12px; border-bottom: 1px solid var(--line2); }
 html[data-connection-lost] #traffic-controls [data-live-state],
 html[data-connection-lost] #traffic-controls [data-live-toggle]:not(.lost-only) { display: none; }
 html[data-paused] #traffic-controls [data-live-toggle] { display: none; }

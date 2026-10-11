@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/doze-dev/doze-kafka/console"
@@ -186,10 +188,16 @@ func (s clientMetricsSource) Summaries() []console.ClientInstance {
 	return out
 }
 
-// ForConn is the instance that reports over one connection, with its series: the one
-// the inspector asked for, and only that one is copied.
-func (s clientMetricsSource) ForConn(conn uint64) (console.ClientInstance, bool) {
-	in, ok := s.store.ForConn(conn)
+// ByID is one instance, with its series: the one the inspector asked for, and only that
+// one is copied.
+func (s clientMetricsSource) ByID(id string) (console.ClientInstance, bool) {
+	raw, err := hex.DecodeString(strings.ReplaceAll(id, "-", ""))
+	if err != nil || len(raw) != 16 {
+		return console.ClientInstance{}, false
+	}
+	var key [16]byte
+	copy(key[:], raw)
+	in, ok := s.store.Instance(key)
 	if !ok {
 		return console.ClientInstance{}, false
 	}

@@ -118,7 +118,7 @@
   <span class="cap">The rest</span>
   <div class="metric-list rest">{{range .Rest}}{{template "metric_row" .}}{{end}}</div>
   {{end}}
-  <div class="note">{{if .Span}}Sparklines cover {{.Span}}, one point per report.{{end}}{{if .More}} {{.More}} more metric{{if ne .More 1}}s{{end}} {{if eq .More 1}}is{{else}}are{{end}} in the full list.{{end}}</div>
+  <div class="note">{{if .Span}}Sparklines cover {{.Span}}, one point per report.{{else}}Sparklines draw one point per report.{{end}}{{if .More}} {{.More}} more metric{{if ne .More 1}}s{{end}} {{if eq .More 1}}is{{else}}are{{end}} in the full list.{{end}}</div>
   {{if .Resource}}<div class="m mut mc-res">{{.Resource}}</div>{{end}}
   {{end}}
   {{else if .NoMetrics}}

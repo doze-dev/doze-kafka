@@ -99,9 +99,11 @@ func (c *Console) topicCreatePage(w http.ResponseWriter, r *http.Request) {
 		taken = append(taken, t.Name)
 	}
 	b, _ := json.Marshal(taken)
+	prefill := strings.TrimSpace(r.URL.Query().Get("name"))
+	pj, _ := json.Marshal(prefill)
 	c.render(w, r, "topic_create", map[string]any{
 		"List": list, "Page": "topics", "Title": "Create topic", "Config": newConfigView(nil),
-		"Taken": taken, "TakenJSON": string(b), "Prefill": strings.TrimSpace(r.URL.Query().Get("name")), "HasRegistry": c.reg != nil, "MaxParts": c.facts.MaxPartitions,
+		"Taken": taken, "TakenJSON": string(b), "Prefill": prefill, "PrefillJSON": string(pj), "HasRegistry": c.reg != nil, "MaxParts": c.facts.MaxPartitions,
 		"Command": createCommand(c.connectFacts(r), "", "", nil),
 	})
 }

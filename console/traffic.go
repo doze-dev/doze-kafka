@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"html/template"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -286,7 +287,7 @@ func (v trafficView) matches(e TrafficEvent) bool {
 		return true
 	}
 	q := strings.ToLower(v.Q)
-	hay := []string{e.ClientID, e.Software, e.Remote, e.API, e.Group, e.ViaGroup, e.TxnID, e.Principal}
+	hay := []string{e.ClientID, e.Software, e.Remote, e.API, e.Group, e.ViaGroup, e.TxnID, e.Principal, e.Error}
 	hay = append(hay, e.Topics...)
 	for _, h := range hay {
 		if strings.Contains(strings.ToLower(h), q) {
@@ -354,6 +355,9 @@ type trafficRow struct {
 	// repeat its rhythm ("every 3 s, since 14:34:15").
 	DetailText string
 	Interval   string
+	// Rhythm says the detail is the row's rhythm ("every 3 s, since 14:34:15"), the time
+	// being drawn by the template so that it is in the browser's zone.
+	Rhythm bool
 }
 
 // resultTone maps an error class to the board's four colours: purple for what real
@@ -418,6 +422,7 @@ func (c *Console) trafficRow(e TrafficEvent) trafficRow {
 		row.Interval = intervalText(e)
 		if periodic[e.API] && row.Interval != "" {
 			row.DetailText = row.Interval + ", since " + whenText(e.First, StyleClock)
+			row.Rhythm = true
 		}
 	}
 	row.Tone = resultTone(e.Class)
@@ -457,8 +462,8 @@ func intervalText(e TrafficEvent) string {
 		return "every " + strconv.Itoa(int(each.Milliseconds())) + " ms"
 	case each < time.Minute:
 		s := each.Seconds()
-		if s == float64(int(s)) || s >= 10 {
-			return "every " + strconv.Itoa(int(s+0.5)) + " s"
+		if math.Abs(s-math.Round(s)) < 0.05 || s >= 10 {
+			return "every " + strconv.Itoa(int(math.Round(s))) + " s"
 		}
 		return "every " + strconv.FormatFloat(s, 'f', 1, 64) + " s"
 	}

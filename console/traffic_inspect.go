@@ -315,22 +315,51 @@ type clientMetrics struct {
 
 const restShown = 4
 
+// instanceFor finds the instance that reports for a connection: the one that pushed over
+// it, else the one a connection of the same client id and principal pushed over (a
+// client may subscribe and push on different connections, and each of its connections
+// is a row of the clients table). ok is false when none has reported.
+func instanceFor(cl TrafficClient, ins []ClientInstance) (ClientInstance, bool) {
+	var byClient *ClientInstance
+	for i, in := range ins {
+		if in.Pushes == 0 {
+			continue
+		}
+		if in.Conn != 0 && in.Conn == cl.Conn {
+			return in, true
+		}
+		if byClient == nil && cl.ClientID != "" && in.ClientID == cl.ClientID && (in.Principal == "" || in.Principal == cl.Principal) {
+			byClient = &ins[i]
+		}
+	}
+	if byClient != nil {
+		return *byClient, true
+	}
+	return ClientInstance{}, false
+}
+
 func (c *Console) metricsFor(cl TrafficClient) (ClientInstance, bool) {
 	if c.metrics == nil {
 		return ClientInstance{}, false
 	}
-	if src, ok := c.metrics.(interface {
-		ForConn(uint64) (ClientInstance, bool)
-	}); ok {
-		in, found := src.ForConn(cl.Conn)
-		return in, found && in.Pushes > 0
+	// Who reports is known from the summaries (no series copied); the one found is then
+	// fetched whole, which is the one the inspector asked for.
+	idx := c.metrics.Instances
+	if src, ok := c.metrics.(interface{ Summaries() []ClientInstance }); ok {
+		idx = src.Summaries
 	}
-	for _, in := range c.metrics.Instances() {
-		if (in.Conn != 0 && in.Conn == cl.Conn) || (in.Conn == 0 && cl.ClientID != "" && in.ClientID == cl.ClientID) {
-			return in, in.Pushes > 0
+	sum, found := instanceFor(cl, idx())
+	if !found {
+		return ClientInstance{}, false
+	}
+	if src, ok := c.metrics.(interface {
+		ByID(string) (ClientInstance, bool)
+	}); ok && len(sum.Series) == 0 {
+		if full, ok := src.ByID(sum.ID); ok {
+			return full, true
 		}
 	}
-	return ClientInstance{}, false
+	return sum, true
 }
 
 // hasMetrics says a client has reported (without copying its series).
@@ -338,15 +367,11 @@ func (c *Console) hasMetrics(cl TrafficClient) bool {
 	if c.metrics == nil {
 		return false
 	}
+	idx := c.metrics.Instances
 	if src, ok := c.metrics.(interface{ Summaries() []ClientInstance }); ok {
-		for _, in := range src.Summaries() {
-			if in.Conn == cl.Conn && in.Pushes > 0 {
-				return true
-			}
-		}
-		return false
+		idx = src.Summaries
 	}
-	_, ok := c.metricsFor(cl)
+	_, ok := instanceFor(cl, idx())
 	return ok
 }
 
@@ -441,14 +466,6 @@ func (c *Console) inspectClient(w http.ResponseWriter, r *http.Request, key stri
 		in, ok := c.metricsFor(cl)
 		all := r.URL.Query().Get("all") != ""
 		if ok {
-			if in.Series == nil && len(in.Series) == 0 {
-				// A source that offers a summary first: fetch the series for this one.
-				if src, has := c.metrics.(interface {
-					ForConn(uint64) (ClientInstance, bool)
-				}); has {
-					in, _ = src.ForConn(cl.Conn)
-				}
-			}
 			m := c.clientMetricsView(in, all)
 			m.Who = who
 			body["M"] = m

@@ -239,9 +239,10 @@ func (s *Store) mayClaim(in *instance, who Who) bool {
 	if who.Principal != "" && in.Principal != "" && who.Principal != in.Principal {
 		return false
 	}
-	if in.Conn != who.Conn && in.owner != nil && in.owner() {
-		return false
-	}
+	// Not the connection: a client may speak to the broker over more than one (the Java
+	// client subscribes on its bootstrap connection and pushes on the one metadata gave
+	// it), and what real Kafka does about another connection's push is unrecorded (queue
+	// R4). The instance follows whichever connection last spoke for it.
 	return true
 }
 

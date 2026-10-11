@@ -108,8 +108,9 @@
 {{define "traffic_rows"}}
   {{if .Cut}}<div class="note tf-cut" id="rows-cut">Showing the newest {{.Shown}} of {{.MatchedRows}} matching rows.</div>{{end}}
   <div class="tbl-wrap">
+    <div class="frozen-line lost-only m">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</div>
     <table class="tbl tf-table" id="traffic-table"><thead><tr><th>Time</th><th>Client</th><th>Request</th><th>Topic or group</th><th>Detail</th><th>Result</th><th class="num">Took</th></tr></thead>
-      <tbody><tr class="frozen-line lost-only"><td colspan="7" class="m">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</td></tr>{{range .Rows}}{{template "traffic_row" dict "R" . "P" $.Prefix}}{{end}}</tbody>
+      <tbody>{{range .Rows}}{{template "traffic_row" dict "R" . "P" $.Prefix}}{{end}}</tbody>
     </table>
   </div>
 {{end}}
@@ -122,7 +123,7 @@
         <td class="m nw cell-client" title="{{.Remote}}{{if .Software}} · {{.Software}}{{end}}">{{if .ConnKey}}<a href="{{$.P}}/traffic?client={{.Who}}" data-inspector-open hx-get="{{$.P}}/inspect/client?key={{.ConnKey}}" hx-trigger="click consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false">{{.Who}}</a>{{else}}{{.Who}}{{end}}</td>
         <td class="m nw cell-req" title="{{.API}} v{{.Version}}{{if .Correlation}} · correlation {{.Correlation}}{{end}}"><span class="b">{{.API}}</span> <span class="mut">v{{.Version}}</span>{{if .Folded}} <span class="tag tf-count" title="{{.Count}} identical requests, {{.SameSpan}}">×{{.Count}}</span>{{end}}</td>
         <td class="m cell-topic"{{if .Target}} title="{{.Target}}"{{end}}>{{if .Target}}{{.Target}}{{else}}<span class="mut">—</span>{{end}}</td>
-        <td class="mut cell-detail" title="{{.DetailText}}">{{.DetailText}}</td>
+        <td class="mut cell-detail" title="{{.DetailText}}">{{if .Rhythm}}{{.Interval}}, since {{when .First "clock"}}{{else}}{{.DetailText}}{{end}}</td>
         <td class="m cell-result"><span class="{{.Tone}}" title="{{.ResultTitle}}">{{.Result}}</span></td>
         <td class="m num nw cell-took">{{.Dur}}</td>
       </tr>{{end}}{{end}}
