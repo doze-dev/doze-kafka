@@ -108,6 +108,119 @@ the highest version both sides support; a request outside them is not served.
 The hard floor is Kafka's record-batch format v2 (Kafka 0.11), so the oldest
 emulated major is 1; the pre-0.11 message-set format is not supported.
 
+## Every Kafka API, by tier
+
+One row for every API key in the Kafka 4.x protocol specification (the protocol
+library's key table, which a test walks). Nothing is absent from this table.
+
+- **F, functional.** It works locally and its effect is observable.
+- **C, cosmetic.** Accepted and round-tripped with no local effect.
+- **S, stub.** Not served: it is not advertised, and a request for it closes the
+  connection. Every S row says why.
+
+An API row is F when the broker advertises it (see the version table above) and S
+when it does not; the notes are written by hand and a test fails for an S row
+without a reason. Settings that are accepted and stored without acting (most topic
+configs) are listed in [Limitations](limitations.md), not here.
+
+<!-- api-tiers:begin (generated from the protocol library's key table and internal/protocol/versions.go; do not edit by hand) -->
+| API | Key | Tier | Note |
+|---|---|---|---|
+| Produce | 0 | F | `acks=all` fsyncs before the reply. |
+| Fetch | 1 | F | Long-poll capped at 30 s; no fetch sessions. |
+| ListOffsets | 2 | F |  |
+| Metadata | 3 | F |  |
+| LeaderAndISR | 4 | S | Broker-to-broker traffic; there is one node and no peer sends it or waits for it. |
+| StopReplica | 5 | S | Broker-to-broker traffic; there is one node and no peer sends it or waits for it. |
+| UpdateMetadata | 6 | S | Broker-to-broker traffic; there is one node and no peer sends it or waits for it. |
+| ControlledShutdown | 7 | S | The controller's shutdown handshake; there is no controller. |
+| OffsetCommit | 8 | F |  |
+| OffsetFetch | 9 | F |  |
+| FindCoordinator | 10 | F | Always this node. |
+| JoinGroup | 11 | F |  |
+| Heartbeat | 12 | F |  |
+| LeaveGroup | 13 | F |  |
+| SyncGroup | 14 | F |  |
+| DescribeGroups | 15 | F |  |
+| ListGroups | 16 | F |  |
+| SASLHandshake | 17 | F | Only when SASL is configured. |
+| ApiVersions | 18 | F |  |
+| CreateTopics | 19 | F | A replication factor above 1 is not honoured (one node). |
+| DeleteTopics | 20 | F |  |
+| DeleteRecords | 21 | F |  |
+| InitProducerID | 22 | F |  |
+| OffsetForLeaderEpoch | 23 | S | Replica truncation after a leader change; there are no leader changes. A client falls back to ListOffsets. |
+| AddPartitionsToTxn | 24 | F |  |
+| AddOffsetsToTxn | 25 | F |  |
+| EndTxn | 26 | F |  |
+| WriteTxnMarkers | 27 | S | A transaction coordinator writing markers to other brokers' partitions; the coordinator here writes its own log directly. |
+| TxnOffsetCommit | 28 | F |  |
+| DescribeACLs | 29 | F |  |
+| CreateACLs | 30 | F |  |
+| DeleteACLs | 31 | F |  |
+| DescribeConfigs | 32 | F | Topic configs; broker configs read-only. |
+| AlterConfigs | 33 | F | Five topic settings act, the rest are stored (see [Limitations](limitations.md)). |
+| AlterReplicaLogDirs | 34 | S | Moves a replica between log directories; there is one data directory. |
+| DescribeLogDirs | 35 | S | Not implemented yet: per-partition sizes are planned (the topics stage). A UI that probes it gets the connection closed. |
+| SASLAuthenticate | 36 | F | Only when SASL is configured. |
+| CreatePartitions | 37 | F |  |
+| CreateDelegationToken | 38 | S | Delegation tokens are not implemented; authentication is SASL/PLAIN and SASL/SCRAM. |
+| RenewDelegationToken | 39 | S | Delegation tokens are not implemented; authentication is SASL/PLAIN and SASL/SCRAM. |
+| ExpireDelegationToken | 40 | S | Delegation tokens are not implemented; authentication is SASL/PLAIN and SASL/SCRAM. |
+| DescribeDelegationToken | 41 | S | Delegation tokens are not implemented; authentication is SASL/PLAIN and SASL/SCRAM. |
+| DeleteGroups | 42 | F |  |
+| ElectLeaders | 43 | S | There is one replica and it is always the leader. |
+| IncrementalAlterConfigs | 44 | F | As AlterConfigs. |
+| AlterPartitionAssignments | 45 | S | Replica placement and reassignment; every partition has one replica on this node. |
+| ListPartitionReassignments | 46 | S | Replica placement and reassignment; every partition has one replica on this node. |
+| OffsetDelete | 47 | F |  |
+| DescribeClientQuotas | 48 | S | Quotas are not implemented: nothing is throttled, so there is nothing to describe. |
+| AlterClientQuotas | 49 | S | Quotas are not implemented: nothing is throttled. |
+| DescribeUserSCRAMCredentials | 50 | S | SCRAM users come from the configuration file and flags; they cannot be managed over the wire. |
+| AlterUserSCRAMCredentials | 51 | S | SCRAM users come from the configuration file and flags; they cannot be managed over the wire. |
+| Vote | 52 | S | KRaft controller-quorum management; there is no controller quorum, the one node is its own metadata store. |
+| BeginQuorumEpoch | 53 | S | KRaft controller-quorum management; there is no controller quorum, the one node is its own metadata store. |
+| EndQuorumEpoch | 54 | S | KRaft controller-quorum management; there is no controller quorum, the one node is its own metadata store. |
+| DescribeQuorum | 55 | S | KRaft controller-quorum management; there is no controller quorum, the one node is its own metadata store. |
+| AlterPartition | 56 | S | ISR changes sent to the controller; there is no ISR to change. |
+| UpdateFeatures | 57 | S | Cluster feature levels are not tracked; the broker emulates one Kafka major (`--kafka-version`). |
+| Envelope | 58 | S | Forwarding a request from a broker to the controller; there is no controller to forward to. |
+| FetchSnapshot | 59 | S | KRaft metadata snapshots; there is no metadata log to snapshot. |
+| DescribeCluster | 60 | F | This single node. |
+| DescribeProducers | 61 | F |  |
+| BrokerRegistration | 62 | S | Broker registration with a controller; there is no controller to register with. |
+| BrokerHeartbeat | 63 | S | Broker registration with a controller; there is no controller to register with. |
+| UnregisterBroker | 64 | S | Broker registration with a controller; there is no controller to register with. |
+| DescribeTransactions | 65 | F |  |
+| ListTransactions | 66 | F |  |
+| AllocateProducerIDs | 67 | S | A broker asking the controller for a block of producer ids; this node allocates its own. |
+| ConsumerGroupHeartbeat | 68 | F | Kafka 4 profile only. |
+| ConsumerGroupDescribe | 69 | F | Kafka 4 profile only. |
+| ControllerRegistration | 70 | S | Broker registration with a controller; there is no controller to register with. |
+| GetTelemetrySubscriptions | 71 | F | Kafka 4 profile only; off with `--client-telemetry=false`. |
+| PushTelemetry | 72 | F | Kafka 4 profile only; off with `--client-telemetry=false`. |
+| AssignReplicasToDirs | 73 | S | Replica-to-directory assignment between a broker and the controller; one directory. |
+| ListConfigResources | 74 | S | Not implemented; Metadata and DescribeConfigs cover what a client needs. |
+| DescribeTopicPartitions | 75 | S | Not implemented; Metadata serves the same answer, and clients fall back to it. |
+| ShareGroupHeartbeat | 76 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| ShareGroupDescribe | 77 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| ShareFetch | 78 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| ShareAcknowledge | 79 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| AddRaftVoter | 80 | S | KRaft controller-quorum management; there is no controller quorum, the one node is its own metadata store. |
+| RemoveRaftVoter | 81 | S | KRaft controller-quorum management; there is no controller quorum, the one node is its own metadata store. |
+| UpdateRaftVoter | 82 | S | KRaft controller-quorum management; there is no controller quorum, the one node is its own metadata store. |
+| InitializeShareGroupState | 83 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| ReadShareGroupState | 84 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| WriteShareGroupState | 85 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| DeleteShareGroupState | 86 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| ReadShareGroupStateSummary | 87 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| StreamsGroupHeartbeat | 88 | S | Streams groups (KIP-1071) are not implemented; Kafka Streams uses the classic group protocol. |
+| StreamsGroupDescribe | 89 | S | Streams groups (KIP-1071) are not implemented; Kafka Streams uses the classic group protocol. |
+| DescribeShareGroupOffsets | 90 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| AlterShareGroupOffsets | 91 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| DeleteShareGroupOffsets | 92 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+<!-- api-tiers:end -->
+
 ## Not implemented (by design)
 
 `OffsetForLeaderEpoch`, `DescribeLogDirs`, quota APIs, and
