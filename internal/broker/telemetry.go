@@ -118,7 +118,7 @@ func (b *Broker) handlePushTelemetry(ctx context.Context, req *protocol.Request,
 			return nil
 		}
 		if !b.telemetry.Push(q.ClientInstanceID, telemetryWho(req), payload, q.Terminating) {
-			// The instance is another connection's or another principal's (queue R4:
+			// The instance belongs to another principal (queue R4:
 			// what real Kafka answers is not recorded).
 			resp.ErrorCode = kerr.InvalidRequest.Code
 		}
