@@ -119,16 +119,20 @@ func TestConfirmFocusesCancel(t *testing.T) {
 	}
 }
 
-// The palette's catalogue comes from the server, views and actions included.
-func TestPaletteCatalogueIsServedWithViewsAndActions(t *testing.T) {
+// The palette's catalogue comes from the server: actions and every topic, group and
+// subject. Sy-05 has four groups (Topics, Groups, Subjects, Actions) and no "Go to":
+// the sections are reached by the g chords and the rail, so the catalogue has no view.
+func TestPaletteCatalogueIsServedWithActionsAndNoViews(t *testing.T) {
 	c := newTestConsole(t)
 	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"a"}, "partitions": {"1"}})
 	body := req(t, c, "GET", "/_console/api/palette", nil).Body.String()
-	for _, want := range []string{`"n":"Topics","u":"/_console/topics","k":"view"`, `"n":"Groups"`, `"n":"Cluster"`,
-		`"n":"Create topic","u":"/_console/new/topic","k":"action"`, `"n":"a","u":"/_console/topics/a","k":"topic"`} {
+	for _, want := range []string{`"n":"Create topic","u":"/_console/new/topic","k":"action"`, `"n":"a","u":"/_console/topics/a","k":"topic"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the palette catalogue is missing %s in %s", want, body)
 		}
+	}
+	if strings.Contains(body, `"k":"view"`) {
+		t.Errorf("the palette catalogue still lists the sections as a Go to group: %s", body)
 	}
 	js, _ := staticFS.ReadFile("static/shell.js")
 	if strings.Contains(string(js), `"Create topic"`) {

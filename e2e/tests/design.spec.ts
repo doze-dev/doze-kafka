@@ -407,6 +407,12 @@ test('the palette is grouped under Topics, Groups, Subjects and Actions, says wh
   await expect(page.locator('#pal-list .pal-item', { hasText: 'Produce to seed-orders' })).toBeVisible();
   await page.locator('#pal-q').fill('create topic');
   await expect(page.locator('#pal-list .pal-item', { hasText: 'Create topic' }).locator('.kbd').first()).toHaveText('c');
+  // No Go to group: the sections are the rail's and the g chords'.
+  await page.locator('#pal-q').fill('a');
+  await expect(page.locator('#pal-list .pal-cap', { hasText: 'Go to' })).toHaveCount(0);
+  for (const cap of await page.locator('#pal-list .pal-cap').allTextContents()) expect(['Topics', 'Groups', 'Subjects', 'Actions']).toContain(cap);
+  await page.locator('#pal-q').fill('cluster');
+  await expect(page.locator('#pal-list .pal-item', { hasText: /^Cluster$/ })).toHaveCount(0);
   // The foot: Connect an app, and the keys.
   const foot = page.locator('#palette .pal-foot');
   await expect(foot).toContainText('Connect an app');

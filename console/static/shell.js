@@ -400,11 +400,11 @@
   // ---------- command palette (Sy-05) ----------
   // Jump or act: results are grouped under Topics, Groups, Subjects and Actions, each
   // row has what it is beside its name, the part of the name that matched is bold, and
-  // the foot has Connect an app and the keys. The sections themselves are one more
-  // group ("Go to"), because they are reached by name too.
+  // the foot has Connect an app and the keys. There is no "Go to" group: the sections
+  // are the rail's and the g chords'.
   var pal = document.getElementById("palette"), palQ = document.getElementById("pal-q"), palList = document.getElementById("pal-list");
   var palItems = [], palSel = 0, palOpener = null, palShown = [];
-  var PAL_GROUPS = [["topics", "Topics"], ["groups", "Groups"], ["schemas", "Subjects"], ["actions", "Actions"], ["views", "Go to"]];
+  var PAL_GROUPS = [["topics", "Topics"], ["groups", "Groups"], ["schemas", "Subjects"], ["actions", "Actions"]];
   var PAL_CHIP = { topics: ["TP", "c-tp"], groups: ["GR", "c-gr"], schemas: ["SC", "c-sc"] };
 
   // The palette lists the last few topics and groups you opened first: the one
@@ -425,7 +425,6 @@
 
   function bucketOf(it) {
     if (it.k === "action") return "actions";
-    if (it.k === "view") return "views";
     if (it.s === "schemas") return "schemas";
     return it.s;
   }
@@ -433,10 +432,10 @@
   function contextActions() {
     var out = [], rest = location.pathname.indexOf(PREFIX + "/") === 0 ? location.pathname.slice(PREFIX.length + 1).split("/") : [];
     if (rest[0] === "topics" && rest[1] && document.getElementById("compose-panel")) {
-      out.push({ s: "views", n: "Produce to " + decodeURIComponent(rest[1]), k: "action", a: "produce", h: "p", glyph: "+", ctx: true });
+      out.push({ s: "actions", n: "Produce to " + decodeURIComponent(rest[1]), k: "action", a: "produce", h: "p", glyph: "+", ctx: true });
     }
     if (rest[0] === "groups" && rest[1]) {
-      out.push({ s: "views", n: "Reset offsets for " + decodeURIComponent(rest[1]), k: "action", u: location.pathname + "?tab=offsets#reset", h: "asks first", glyph: "↺", ctx: true });
+      out.push({ s: "actions", n: "Reset offsets for " + decodeURIComponent(rest[1]), k: "action", u: location.pathname + "?tab=offsets#reset", h: "asks first", glyph: "↺", ctx: true });
     }
     return out;
   }
@@ -456,14 +455,14 @@
     palItems = recents.concat(contextActions());
     renderPal();
     palQ.focus();
-    // The catalogue (views, actions, every topic, group and subject) comes from the
+    // The catalogue (actions, every topic, group and subject) comes from the
     // server, so the palette cannot drift from the console's real routes.
     fetch(PREFIX + "/api/palette").then(function (r) { return r.json(); }).then(function (all) {
       var live = {}, fixed = [], resources = [], detail = {};
       (all || []).forEach(function (x) {
         if (x.u) live[x.u] = 1;
         if (x.d) detail[x.u] = x.d;
-        (x.k === "view" || x.k === "action" ? fixed : resources).push(x);
+        (x.k === "action" ? fixed : resources).push(x);
       });
       // A recent that no longer exists (a deleted topic) would be a dead link:
       // drop it here and from storage.
