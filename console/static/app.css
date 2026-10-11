@@ -349,7 +349,7 @@ span.num {
 .insp .bd { padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
 .insp .bd.flush { padding: 0; gap: 0; }
 .insp-client { padding: 9px 14px; display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid var(--line2); }
-.insp-client a.insp-client-open { display: grid; grid-template-columns: 1fr 70px 56px; column-gap: 12px; align-items: center; text-decoration: none; }
+.insp-client a.insp-client-open { display: grid; grid-template-columns: 1fr 72px 72px; column-gap: 12px; align-items: center; text-decoration: none; }
 .insp-client a.insp-client-open:hover .b { text-decoration: underline; }
 .insp-default .callout { margin: 14px; }
 
@@ -957,9 +957,20 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   /* A phone-width table keeps what identifies a record: offset, key, value. */
   table.tbl .col-hdrs { display: none; }
   .cell-key { max-width: 110px; }
+  .tf-table td.cell-req { grid-column: 1; grid-row: 1; font-weight: 600; }
+  .tf-table td.cell-took { grid-column: 2; grid-row: 1; text-align: right; color: var(--mut); }
+  .tf-table td.cell-topic { grid-column: 1; grid-row: 2; }
+  .tf-table td.cell-result { grid-column: 2; grid-row: 2; text-align: right; }
+  .tf-table td.cell-detail { grid-column: 1 / -1; grid-row: 3; }
+  .tbl-wrap table.tbl tbody tr:not(.txnmark) td.cell-detail:empty { display: none; }
+  .tbl-wrap table.tbl tbody tr.errrow:not(.txnmark) { background: var(--badbg); }
+  .tbl-wrap table.tbl tbody tr.errrow:not(.txnmark) td { background: transparent; }
+  .tf-table td.cell-time { grid-column: 1; grid-row: 4; color: var(--mut); font-size: var(--fs-xs); }
+  .tf-table td.cell-client { grid-column: 2; grid-row: 4; color: var(--mut); font-size: var(--fs-xs); max-width: 150px; text-align: right; }
+  .keys { display: none; } /* a phone has no keys; Sy-04 draws no strip */
+  .panes > .insp:not(:has(.insp-sel:not([hidden]))) { display: none; } /* one screen at a time: the summary beside the page waits for a selection */
   .crow .field, .field.w-part, .field.w-acks { flex: 1 1 100%; }
   .cfgfoot { flex-direction: column; align-items: stretch; }
-  .keys { gap: 12px; }
 }
 
 /* Transactions on the tape: records of a transaction that is open or aborted are dimmed
@@ -1003,13 +1014,21 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
 
 /* ---------- traffic ---------- */
 .trafficwrap { max-width: 1280px; }
-.tf-table { table-layout: fixed; min-width: 800px; }
+/* Main's columns, at the board's 12 px mono: the time, the result and the duration are
+   always whole (a time is 12 characters, the longest result name 20); the topic, the
+   detail and the client give way, with their full text on hover. */
+.tf-table { table-layout: fixed; }
+@media (min-width: 641px) { .tf-table { min-width: 806px; } }
+table.tbl.tf-table th, table.tbl.tf-table td { padding-left: 6px; padding-right: 6px; }
+.tf-table th { overflow: hidden; }
 .tf-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tf-table th:nth-child(1) { width: 104px; }
-.tf-table th:nth-child(2) { width: 128px; }
-.tf-table th:nth-child(3) { width: 150px; }
-.tf-table th:nth-child(5) { width: 150px; }
-.tf-table th:nth-child(6) { width: 128px; }
+.tf-table td.cell-result { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; } /* a long error name wraps; it is never cut */
+.tf-table th:nth-child(1) { width: 100px; }
+.tf-table th:nth-child(2) { width: 120px; }
+.tf-table th:nth-child(3) { width: 130px; }
+.tf-table th:nth-child(4) { width: 110px; }
+.tf-table th:nth-child(5) { width: 130px; }
+.tf-table th:nth-child(6) { width: 158px; }
 .tf-table th:nth-child(7) { width: 60px; }
 .tf-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 8px; }
 .tf-f { flex: 1 1 150px; min-width: 130px; }

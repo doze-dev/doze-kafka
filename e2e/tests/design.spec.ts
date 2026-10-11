@@ -429,3 +429,79 @@ test('at 390 the top bar is a menu button, logo, title and the palette, and mess
   const b = await panel.boundingBox();
   expect(b!.y + b!.height).toBeGreaterThanOrEqual(843);
 });
+
+// Main: the Traffic table shows the whole time, the whole "took" and the whole result;
+// a header never runs into the next one. (The audit read "17:12:57.1…", "0.0…" and
+// "TOPIC_ALREADY…" off the first build of this table.)
+test('the Traffic table does not truncate time, took or result, and its headers do not collide', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('traffic');
+  const table = page.locator('#traffic-table');
+  await expect(table.locator('tbody tr', { hasText: 'TOPIC_ALREADY_EXISTS' })).toHaveCount(1);
+  const bad = await table.evaluate((t) => {
+    const clipped: string[] = [];
+    // Time (1), Result (6), Took (7) are shown whole on every row.
+    for (const tr of Array.from(t.querySelectorAll('tbody tr'))) {
+      for (const i of [0, 5, 6]) {
+        const td = tr.children[i] as HTMLElement;
+        if (td.scrollWidth > td.clientWidth) clipped.push(`${td.textContent!.trim()} (${td.scrollWidth} > ${td.clientWidth})`);
+      }
+    }
+    // A header's words fit its cell, so neighbours cannot run into one another.
+    for (const th of Array.from(t.querySelectorAll('thead th'))) {
+      const el = th as HTMLElement;
+      if (el.scrollWidth > el.clientWidth) clipped.push(`th ${el.textContent} (${el.scrollWidth} > ${el.clientWidth})`);
+    }
+    return clipped;
+  });
+  expect(bad).toEqual([]);
+  // The result column's text starts where its header does, and Took ends where its header ends.
+  const left = await table.evaluate((t) => {
+    const th = t.querySelector('thead th:nth-child(6)') as HTMLElement;
+    const td = t.querySelector('tbody tr td:nth-child(6)') as HTMLElement;
+    return [th.getBoundingClientRect().left, td.getBoundingClientRect().left];
+  });
+  expect(left[1]).toBeCloseTo(left[0], 0);
+  const right = await table.evaluate((t) => {
+    const th = t.querySelector('thead th:nth-child(7)') as HTMLElement;
+    const td = t.querySelector('tbody tr td:nth-child(7)') as HTMLElement;
+    return [th.getBoundingClientRect().right, td.getBoundingClientRect().right];
+  });
+  expect(right[1]).toBeCloseTo(right[0], 0);
+});
+
+test('the Traffic summary says the window of each number', async ({ page }) => {
+  await page.goto('traffic');
+  const sum = page.locator('#traffic-summary');
+  await expect(sum).toContainText(/clients? connected/);
+  await expect(sum).toContainText(/\d+ requests? and \d+ errors? in the last minute/);
+  await expect(sum).toContainText(/kept: the last [\d,]+, in memory only/);
+});
+
+test('the keys strip is never clipped: whole at 960 and 1440, not drawn at 390 where the board draws none', async ({ page }) => {
+  for (const w of [1440, 960]) {
+    await page.setViewportSize({ width: w, height: 800 });
+    for (const path of ['traffic', 'topics', 'topics/seed-orders']) {
+      await page.goto(path);
+      const strip = page.locator('#keys');
+      await expect(strip).toBeVisible();
+      expect(await strip.evaluate((el) => el.scrollWidth <= el.clientWidth), `${path} at ${w}`).toBe(true);
+    }
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('traffic');
+  await expect(page.locator('#keys')).toBeHidden();
+});
+
+test('at 390 the Traffic requests are cards: time, request, what it was about, and how it went', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('traffic');
+  const row = page.locator('#traffic-table tbody tr').first();
+  await expect(row).toBeVisible();
+  expect(await row.evaluate((el) => getComputedStyle(el).display)).toBe('grid');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  // The result is on the card, whole.
+  const res = row.locator('td.cell-result');
+  await expect(res).toBeVisible();
+  expect(await res.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+});
