@@ -1,0 +1,756 @@
+{
+  "scenario": "classic-rebalance-generations",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create-topic",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 2,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "cg"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 2,
+            "ReplicationFactor": 1,
+            "Topic": "cg",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "find-coordinator",
+      "api": "FindCoordinator",
+      "version": 4,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": [
+          "gens"
+        ],
+        "CoordinatorType": 0
+      },
+      "response": {
+        "Coordinators": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "gens",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          }
+        ],
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-join-no-id",
+      "conn": "c1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "gens",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 10000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-join-1",
+      "conn": "c1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "gens",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 6000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:1\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJjZ/////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-sync-1",
+      "conn": "c1",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "gens",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:1\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c2-join-no-id",
+      "conn": "c2",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "gens",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 10000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-heartbeat-during-join-2",
+      "conn": "c1",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 1,
+        "Group": "gens",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e"
+      },
+      "response": {
+        "ErrorCode": 27,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-rejoin-2",
+      "conn": "c1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "gens",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 6000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:1\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJjZ/////8="
+          },
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:2\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJjZ/////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c2-join-2",
+      "conn": "c2",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "gens",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 6000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": null,
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-sync-2",
+      "conn": "c1",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 2,
+        "Group": "gens",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:1\u003e"
+          },
+          {
+            "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:2\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c2-sync-2",
+      "conn": "c2",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 2,
+        "Group": "gens",
+        "GroupAssignment": null,
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-heartbeat-stable-2",
+      "conn": "c1",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 2,
+        "Group": "gens",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c2-heartbeat-stable-2",
+      "conn": "c2",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 2,
+        "Group": "gens",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c2-leave",
+      "conn": "c2",
+      "api": "LeaveGroup",
+      "version": 5,
+      "request": {
+        "Group": "gens",
+        "MemberID": "",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:2\u003e",
+            "Reason": null
+          }
+        ]
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Members": [
+          {
+            "ErrorCode": 0,
+            "InstanceID": null,
+            "MemberID": "\u003cmember:2\u003e"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-heartbeat-after-leave",
+      "conn": "c1",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 2,
+        "Group": "gens",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e"
+      },
+      "response": {
+        "ErrorCode": 27,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-rejoin-3",
+      "conn": "c1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "gens",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 6000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 3,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:1\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJjZ/////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-sync-3",
+      "conn": "c1",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 3,
+        "Group": "gens",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:1\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c2-join-again-no-id",
+      "conn": "c2",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "gens",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 6000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:3\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-heartbeat-during-join-4",
+      "conn": "c1",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 3,
+        "Group": "gens",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e"
+      },
+      "response": {
+        "ErrorCode": 27,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-rejoin-4",
+      "conn": "c1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "gens",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 6000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 4,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:1\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJjZ/////8="
+          },
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:3\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJjZ/////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c2-join-4",
+      "conn": "c2",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "gens",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:3\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 6000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 4,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:3\u003e",
+        "Members": null,
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-sync-4",
+      "conn": "c1",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 4,
+        "Group": "gens",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:1\u003e"
+          },
+          {
+            "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:3\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c2-sync-4",
+      "conn": "c2",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 4,
+        "Group": "gens",
+        "GroupAssignment": null,
+        "InstanceID": null,
+        "MemberID": "\u003cmember:3\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-heartbeat-after-expiry",
+      "conn": "c1",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 4,
+        "Group": "gens",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e"
+      },
+      "response": {
+        "ErrorCode": 27,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-rejoin-5",
+      "conn": "c1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "gens",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 6000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 5,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:1\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJjZ/////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-sync-5",
+      "conn": "c1",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 5,
+        "Group": "gens",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:1\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c2-heartbeat-after-expiry",
+      "conn": "c2",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 4,
+        "Group": "gens",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:3\u003e"
+      },
+      "response": {
+        "ErrorCode": 25,
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}

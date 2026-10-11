@@ -1,0 +1,332 @@
+{
+  "scenario": "telemetry-throttle",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "subscribe",
+      "api": "GetTelemetrySubscriptions",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003czero-id\u003e"
+      },
+      "response": {
+        "AcceptedCompressionTypes": [
+          4,
+          3,
+          1,
+          2
+        ],
+        "ClientInstanceID": "\u003cinstance:1\u003e",
+        "DeltaTemporality": true,
+        "ErrorCode": 0,
+        "PushIntervalMillis": 300000,
+        "RequestedMetrics": null,
+        "SubscriptionID": "\u003csubscription:1\u003e",
+        "TelemetryMaxBytes": 1048576,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "push-first",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:1\u003e",
+        "CompressionType": 0,
+        "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
+        "SubscriptionID": "\u003csubscription:1\u003e",
+        "Terminating": false
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "push-at-once",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:1\u003e",
+        "CompressionType": 0,
+        "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
+        "SubscriptionID": "\u003csubscription:1\u003e",
+        "Terminating": false
+      },
+      "response": {
+        "ErrorCode": 89,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "push-at-once-again",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:1\u003e",
+        "CompressionType": 0,
+        "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
+        "SubscriptionID": "\u003csubscription:1\u003e",
+        "Terminating": false
+      },
+      "response": {
+        "ErrorCode": 89,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "early-and-unknown-subscription",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:1\u003e",
+        "CompressionType": 0,
+        "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
+        "SubscriptionID": "\u003csubscription:2\u003e",
+        "Terminating": false
+      },
+      "response": {
+        "ErrorCode": 89,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "early-and-unsupported-compression",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:1\u003e",
+        "CompressionType": 9,
+        "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
+        "SubscriptionID": "\u003csubscription:1\u003e",
+        "Terminating": false
+      },
+      "response": {
+        "ErrorCode": 89,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "early-and-too-large",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:1\u003e",
+        "CompressionType": 0,
+        "Metrics": "\u003c1048577 bytes, sha256 2cb74edba754\u003e",
+        "SubscriptionID": "\u003csubscription:1\u003e",
+        "Terminating": false
+      },
+      "response": {
+        "ErrorCode": 89,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "early-and-corrupt",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:1\u003e",
+        "CompressionType": 1,
+        "Metrics": "bm90IGd6aXA=",
+        "SubscriptionID": "\u003csubscription:1\u003e",
+        "Terminating": false
+      },
+      "response": {
+        "ErrorCode": 89,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "early-terminating",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:1\u003e",
+        "CompressionType": 0,
+        "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
+        "SubscriptionID": "\u003csubscription:1\u003e",
+        "Terminating": true
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "push-after-terminating",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:1\u003e",
+        "CompressionType": 0,
+        "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
+        "SubscriptionID": "\u003csubscription:1\u003e",
+        "Terminating": false
+      },
+      "response": {
+        "ErrorCode": 42,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "push-after-terminating-wrong-subscription",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:1\u003e",
+        "CompressionType": 0,
+        "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
+        "SubscriptionID": "\u003csubscription:2\u003e",
+        "Terminating": false
+      },
+      "response": {
+        "ErrorCode": 89,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "push-after-terminating-once-more",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:1\u003e",
+        "CompressionType": 0,
+        "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
+        "SubscriptionID": "\u003csubscription:1\u003e",
+        "Terminating": false
+      },
+      "response": {
+        "ErrorCode": 89,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "subscribe-after-terminating",
+      "api": "GetTelemetrySubscriptions",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:1\u003e"
+      },
+      "response": {
+        "AcceptedCompressionTypes": null,
+        "ClientInstanceID": "\u003czero-id\u003e",
+        "DeltaTemporality": false,
+        "ErrorCode": 89,
+        "PushIntervalMillis": 0,
+        "RequestedMetrics": null,
+        "SubscriptionID": "\u003csubscription:3\u003e",
+        "TelemetryMaxBytes": 0,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "push-after-terminating-and-subscribe",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:1\u003e",
+        "CompressionType": 0,
+        "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
+        "SubscriptionID": "\u003csubscription:1\u003e",
+        "Terminating": false
+      },
+      "response": {
+        "ErrorCode": 89,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "subscribe-second-client",
+      "api": "GetTelemetrySubscriptions",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003czero-id\u003e"
+      },
+      "response": {
+        "AcceptedCompressionTypes": [
+          4,
+          3,
+          1,
+          2
+        ],
+        "ClientInstanceID": "\u003cinstance:2\u003e",
+        "DeltaTemporality": true,
+        "ErrorCode": 0,
+        "PushIntervalMillis": 300000,
+        "RequestedMetrics": null,
+        "SubscriptionID": "\u003csubscription:4\u003e",
+        "TelemetryMaxBytes": 1048576,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "subscribe-second-client-again",
+      "api": "GetTelemetrySubscriptions",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:2\u003e"
+      },
+      "response": {
+        "AcceptedCompressionTypes": null,
+        "ClientInstanceID": "\u003czero-id\u003e",
+        "DeltaTemporality": false,
+        "ErrorCode": 89,
+        "PushIntervalMillis": 0,
+        "RequestedMetrics": null,
+        "SubscriptionID": "\u003csubscription:3\u003e",
+        "TelemetryMaxBytes": 0,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "push-after-throttled-subscribe",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:2\u003e",
+        "CompressionType": 0,
+        "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
+        "SubscriptionID": "\u003csubscription:4\u003e",
+        "Terminating": false
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "push-unknown-instance",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:3\u003e",
+        "CompressionType": 0,
+        "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
+        "SubscriptionID": "\u003csubscription:1\u003e",
+        "Terminating": false
+      },
+      "response": {
+        "ErrorCode": 117,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "push-unknown-instance-zero-subscription",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:3\u003e",
+        "CompressionType": 0,
+        "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
+        "SubscriptionID": "\u003csubscription:3\u003e",
+        "Terminating": false
+      },
+      "response": {
+        "ErrorCode": 89,
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}
