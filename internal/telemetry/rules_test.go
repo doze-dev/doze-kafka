@@ -57,37 +57,26 @@ func TestDroppedSeriesAreCounted(t *testing.T) {
 	}
 }
 
-// An instance is a principal's: another principal cannot take it over or replace its
-// who. Another connection of the same principal can speak for it, and the instance then
-// follows that connection: the Java client subscribes on its bootstrap connection and
-// pushes on the one the metadata gave it. What real Kafka does about the rest is
-// unrecorded (queue R4).
-func TestInstanceBelongsToItsPrincipalAndFollowsItsConnection(t *testing.T) {
+// An instance is nobody's: any principal and any connection may speak for an instance id,
+// and the instance follows whoever spoke last. That is what Apache Kafka 4.3.1 does
+// (recorded: conformance/recordings/telemetry-instance-binding-spaced.json), and the Java
+// client relies on part of it: it subscribes on its bootstrap connection and pushes on
+// the one the metadata gave it.
+func TestAnyConnectionAndPrincipalMaySpeakForAnInstance(t *testing.T) {
 	s := NewStore()
 	s.now = func() time.Time { return t0 }
-	open := true
-	a := Who{ClientID: "a", Principal: "User:a", Conn: 1, Open: func() bool { return open }}
-	if !s.Touch(id(1), a) {
-		t.Fatal("the first claim was refused")
-	}
+	a := Who{ClientID: "a", Principal: "User:a", Conn: 1, Open: func() bool { return true }}
+	s.Touch(id(1), a)
 	b := Who{ClientID: "a", Principal: "User:a", Conn: 2, Open: func() bool { return true }}
-	if !s.Push(id(1), b, gauge("m", t0, 1), false) {
-		t.Fatal("the same principal's other connection was refused")
-	}
+	s.Push(id(1), b, gauge("m", t0, 1), false)
 	if in := s.Instances()[0]; in.Conn != 2 || in.Pushes != 1 {
 		t.Errorf("the instance did not follow the connection that spoke: %+v", in)
 	}
-	evil := Who{ClientID: "evil", Principal: "User:evil", Conn: 3, Open: func() bool { return true }}
-	if s.Touch(id(1), evil) || s.Push(id(1), evil, gauge("m", t0, 1), false) {
-		t.Error("another principal took the instance")
+	other := Who{ClientID: "other", Principal: "User:other", Conn: 3, Open: func() bool { return true }}
+	s.Push(id(1), other, gauge("m", t0, 1), false)
+	if in := s.Instances()[0]; in.Conn != 3 || in.Principal != "User:other" || in.Pushes != 2 {
+		t.Errorf("another principal's push was not taken for the instance: %+v", in)
 	}
-	if !s.Owned(id(1), evil) || s.Owned(id(1), a) || s.Owned(id(5), evil) {
-		t.Error("Owned does not say who the instance belongs to")
-	}
-	if in := s.Instances()[0]; in.ClientID != "a" || in.Principal != "User:a" {
-		t.Errorf("the refused claim changed the instance: %+v", in)
-	}
-	_ = open
 }
 
 func TestOneConnectionCannotFillTheStoreAndFreshIDsEvictTheClosedFirst(t *testing.T) {
@@ -95,14 +84,15 @@ func TestOneConnectionCannotFillTheStoreAndFreshIDsEvictTheClosedFirst(t *testin
 	now := t0
 	s.now = func() time.Time { return now }
 	flood := Who{Conn: 9, Open: func() bool { return true }}
-	accepted := 0
 	for i := 0; i < 50; i++ {
-		if s.Touch(id2(i), flood) {
-			accepted++
-		}
+		now = t0.Add(time.Duration(i) * time.Second)
+		s.Touch(id2(i), flood)
 	}
-	if accepted != maxPerConn {
-		t.Errorf("one connection owns %d instances, want at most %d", accepted, maxPerConn)
+	if n := len(s.Instances()); n != maxPerConn {
+		t.Errorf("one connection owns %d instances, want at most %d", n, maxPerConn)
+	}
+	if !s.Known(id2(49)) || s.Known(id2(0)) {
+		t.Error("a flood from one connection did not cost it its own oldest instances")
 	}
 
 	// A full store of live clients with one that has closed: the closed one goes.
@@ -120,36 +110,65 @@ func TestOneConnectionCannotFillTheStoreAndFreshIDsEvictTheClosedFirst(t *testin
 	}
 }
 
-// Pushes faster than the interval allows are not decoded and are counted; a terminating
-// push always is (TRF-5).
-func TestPushesPastTheRateAreSkippedAndCounted(t *testing.T) {
+// The gate answers as Apache Kafka 4.3.1 does (recorded:
+// conformance/recordings/telemetry-throttle.json and telemetry-interval.json): the first
+// push after a subscription is taken whenever it comes; after that a push is early, and
+// refused, until an interval has passed since the last one taken; a refused request does
+// not postpone the next; a terminating push is never early; and the push after it is
+// refused once.
+func TestPushesBeforeTheIntervalAreEarlyAndCounted(t *testing.T) {
 	s := NewStore()
 	now := t0
 	s.now = func() time.Time { return now }
-	s.Touch(id(1), Who{})
-	admitted := 0
-	for i := 0; i < 100; i++ {
-		now = t0.Add(time.Duration(i) * time.Millisecond)
-		if s.Admit(id(1), false) {
-			admitted++
-		}
+	at := func(d time.Duration) { now = t0.Add(d) }
+	w := Who{}
+	if v := s.Subscribe(id(1), w); v != Accepted {
+		t.Fatalf("first subscription: %v", v)
 	}
-	if admitted != pushBurst {
-		t.Errorf("%d of 100 pushes in 100 ms admitted, want the burst of %d", admitted, pushBurst)
+	at(10 * time.Millisecond)
+	if v := s.Arrive(id(1), w, false); v != Accepted {
+		t.Errorf("the push straight after the subscription: %v, want Accepted", v)
 	}
-	if in := s.Instances()[0]; in.Skipped != 100-pushBurst {
-		t.Errorf("skipped = %d, want %d", in.Skipped, 100-pushBurst)
+	at(2 * time.Second)
+	if v := s.Arrive(id(1), w, false); v != Early {
+		t.Errorf("a push 2 s after the last, interval 5 s: %v, want Early", v)
 	}
-	if !s.Admit(id(1), true) {
-		t.Error("a terminating push was skipped")
+	at(4900 * time.Millisecond)
+	if v := s.Arrive(id(1), w, false); v != Early {
+		t.Errorf("a push 4.89 s after the last: %v, want Early (no tolerance)", v)
 	}
-	// After a pause it is admitted again, at the interval's third.
-	now = t0.Add(10 * time.Second)
-	if !s.Admit(id(1), false) {
-		t.Error("a push after the interval was skipped")
+	// The refused ones did not postpone it: 5.01 s after the one that was taken.
+	at(5020 * time.Millisecond)
+	if v := s.Arrive(id(1), w, false); v != Accepted {
+		t.Errorf("a push 5.01 s after the last taken: %v, want Accepted", v)
 	}
-	if !s.Admit(id(200), false) {
-		t.Error("an unknown instance is the broker's to refuse, not the throttle's")
+	if in := s.Instances()[0]; in.Skipped != 2 {
+		t.Errorf("skipped %d pushes, want 2", in.Skipped)
+	}
+	// A subscription request right after a push is early too, and one after the interval is not.
+	at(5100 * time.Millisecond)
+	if v := s.Subscribe(id(1), w); v != Early {
+		t.Errorf("a subscription request 80 ms after a push: %v, want Early", v)
+	}
+	at(11 * time.Second)
+	if v := s.Subscribe(id(1), w); v != Accepted {
+		t.Errorf("a subscription request after the interval: %v, want Accepted", v)
+	}
+	// A terminating push is never early, and the push after it is refused once.
+	at(11100 * time.Millisecond)
+	if v := s.Arrive(id(1), w, true); v != Accepted {
+		t.Errorf("a terminating push straight after: %v, want Accepted", v)
+	}
+	s.Push(id(1), w, Payload{}, true) // the broker stores it, which is what arms the refusal.
+	if v := s.Arrive(id(1), w, false); v != AfterTerminating {
+		t.Errorf("the push after a terminating one: %v, want AfterTerminating", v)
+	}
+	if v := s.Arrive(id(1), w, false); v != Early {
+		t.Errorf("the one after that, still inside the interval: %v, want Early", v)
+	}
+	// An instance never seen is made by the push and its first push is taken.
+	if v := s.Arrive(id(200), w, false); v != Accepted || !s.Known(id(200)) {
+		t.Errorf("an unknown instance: %v, known %v", v, s.Known(id(200)))
 	}
 }
 

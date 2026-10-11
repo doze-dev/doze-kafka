@@ -25,9 +25,6 @@ const (
 	// maxPerConn is how many instances one connection may own: a flood of fresh ids from
 	// one socket does not push real clients out (TRF-27).
 	maxPerConn = 8
-	// pushBurst is how many pushes an instance may make in a burst; after it, pushes are
-	// admitted at one per third of the interval it was told to push at (TRF-5).
-	pushBurst = 20
 	// maxFuture and maxPast are how far a point's own timestamp may be from the broker's
 	// clock before the broker's is used instead (TRF-25).
 	maxFuture = time.Minute
@@ -104,8 +101,9 @@ type Instance struct {
 	Pushes     int
 	Terminated bool
 	// Metrics is how many series are held, and Dropped how many more the client sent
-	// that the per-instance cap kept out. Skipped is how many pushes came faster than
-	// the interval allows and were not decoded.
+	// that the per-instance cap kept out. Skipped is how many pushes came before the
+	// interval had passed and were answered THROTTLING_QUOTA_EXCEEDED, as Apache Kafka
+	// does, and so were not read.
 	Metrics, Dropped, Skipped int
 	Resource                  map[string]string
 	// Series is every series held; empty in a summary (Summaries).
@@ -157,12 +155,17 @@ func (s *series) export() Series {
 
 type instance struct {
 	Instance
-	series  map[string]*series
-	order   []string
-	owner   func() bool // reports whether the owning connection is still open.
-	tokens  float64
-	refill  time.Time
-	hasPush bool
+	series map[string]*series
+	order  []string
+	owner  func() bool // reports whether the owning connection is still open.
+
+	// What the gate (Subscribe, Arrive) remembers, as Apache Kafka's
+	// ClientMetricsInstance does: when a subscription was last given and a push
+	// last taken, and that the last push said it was the client's last, which the
+	// next push is told once (recorded: conformance/recordings/telemetry-throttle.json).
+	lastGet, lastPush time.Time
+	hasGet, hasPush   bool
+	afterTerminating  bool
 }
 
 // Store keeps the instances, bounded: at most maxInstances, each with at most
@@ -180,7 +183,8 @@ func NewStore() *Store {
 	return &Store{instances: map[[16]byte]*instance{}, now: time.Now, interval: 5 * time.Second}
 }
 
-// SetPushInterval is how often clients were told to push, for the rate Admit allows.
+// SetPushInterval is how often clients were told to push, for the rate Subscribe and
+// Arrive allow.
 func (s *Store) SetPushInterval(d time.Duration) {
 	s.mu.Lock()
 	s.interval = d
@@ -218,35 +222,15 @@ type Who struct {
 
 // Touch records that an instance asked for its subscription (or pushed), creating it if
 // it is new. A client the broker has never heard of, whose id survived a broker restart,
-// is adopted. It reports false when the instance belongs to another principal: the
-// caller must not serve it as that instance. An instance belongs to a principal, not to
-// a connection: another connection of the same principal may speak for it, and the
-// instance follows the connection that spoke last (TRF-27, narrowed).
-func (s *Store) Touch(id [16]byte, who Who) bool {
+// is adopted. An instance is not tied to a principal or a connection: Apache Kafka
+// 4.3.1 lets any connection speak for any instance id (recorded:
+// conformance/recordings/telemetry-instance-binding-spaced.json), and the instance
+// follows the connection that spoke last, which is how the console links a client's
+// requests to its metrics.
+func (s *Store) Touch(id [16]byte, who Who) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.touch(id, who) != nil
-}
-
-// Owned reports whether id exists and belongs to somebody else than who: the claim
-// Touch would refuse. The broker uses it to give a client that quotes another's id a
-// fresh one.
-func (s *Store) Owned(id [16]byte, who Who) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	in := s.instances[id]
-	return in != nil && !s.mayClaim(in, who)
-}
-
-func (s *Store) mayClaim(in *instance, who Who) bool {
-	if who.Principal != "" && in.Principal != "" && who.Principal != in.Principal {
-		return false
-	}
-	// Not the connection: a client may speak to the broker over more than one (the Java
-	// client subscribes on its bootstrap connection and pushes on the one metadata gave
-	// it), and what real Kafka does about another connection's push is unrecorded (queue
-	// R4). The instance follows whichever connection last spoke for it.
-	return true
+	s.touch(id, who)
 }
 
 func (s *Store) touch(id [16]byte, who Who) *instance {
@@ -262,16 +246,17 @@ func (s *Store) touch(id [16]byte, who Who) *instance {
 				}
 			}
 			if owned >= maxPerConn {
-				return nil
+				// Never refused (Apache Kafka refuses nothing): the connection's own
+				// oldest goes, so a flood of fresh ids from one socket costs the flood's
+				// maker and nobody else.
+				s.evictOf(who.Conn)
 			}
 		}
 		if len(s.instances) >= maxInstances {
 			s.evict()
 		}
-		in = &instance{Instance: Instance{ID: id, First: now, Resource: map[string]string{}}, series: map[string]*series{}, tokens: pushBurst}
+		in = &instance{Instance: Instance{ID: id, First: now, Resource: map[string]string{}}, series: map[string]*series{}}
 		s.instances[id] = in
-	} else if !s.mayClaim(in, who) {
-		return nil
 	}
 	in.Conn, in.owner = who.Conn, who.Open
 	if who.ClientID != "" {
@@ -298,41 +283,89 @@ func (s *Store) Known(id [16]byte) bool {
 	return ok
 }
 
-// Admit says whether a push from this instance is within the rate its interval allows:
-// a burst of pushBurst, then one per third of the interval. A push that is not is
-// counted (Instance.Skipped) and need not be decoded. A terminating push is always
-// admitted: it is the client's last word.
-func (s *Store) Admit(id [16]byte, terminating bool) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	in := s.instances[id]
-	if in == nil || terminating {
-		return true
-	}
-	now := s.now()
-	if in.hasPush {
-		in.tokens = min(pushBurst, in.tokens+float64(now.Sub(in.refill))/float64(s.interval/3))
-	}
-	in.refill, in.hasPush = now, true
-	if in.tokens < 1 {
-		in.Skipped++
-		return false
-	}
-	in.tokens--
-	return true
-}
+// Verdict is what the gate says to a request.
+type Verdict int
 
-// Push records one decoded push. It reports false when the instance is another
-// connection's or principal's, and nothing was recorded.
-func (s *Store) Push(id [16]byte, who Who, p Payload, terminating bool) bool {
+const (
+	// Accepted: the request is within the rules.
+	Accepted Verdict = iota
+	// Early: it came before the interval had passed (THROTTLING_QUOTA_EXCEEDED).
+	Early
+	// AfterTerminating: it is the push that follows one that said it was the last
+	// (INVALID_REQUEST).
+	AfterTerminating
+)
+
+// Subscribe is the gate for a client asking for its subscription. Apache Kafka answers
+// a second request within the push interval of the last request it took from the
+// instance, a subscription or a push, THROTTLING_QUOTA_EXCEEDED; a refused request does
+// not postpone the next (recorded: conformance/recordings/telemetry-interval.json).
+func (s *Store) Subscribe(id [16]byte, who Who) Verdict {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	in := s.touch(id, who)
-	if in == nil {
-		return false
+	now := s.now()
+	if last, ok := in.lastRequest(); ok && now.Sub(last) < s.interval {
+		return Early
 	}
+	in.lastGet, in.hasGet = now, true
+	return Accepted
+}
+
+// Arrive is the gate for a push, applied before anything else is looked at. The push
+// that follows a terminating one is refused once. A push is early, and refused, when the
+// instance's previous push is less than an interval old, except the first after a
+// subscription was given, and a terminating push, which is the client's last word. A
+// push that passes sets the clock whatever becomes of it after (an unknown subscription
+// id still counts), and one that does not leaves it (recorded:
+// conformance/recordings/telemetry-throttle.json and telemetry-interval.json).
+func (s *Store) Arrive(id [16]byte, who Who, terminating bool) Verdict {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	in := s.touch(id, who)
+	if in.afterTerminating {
+		in.afterTerminating = false
+		return AfterTerminating
+	}
+	now := s.now()
+	afterSubscribe := in.hasGet && (!in.hasPush || in.lastPush.Before(in.lastGet))
+	if !terminating && !afterSubscribe && in.hasPush && now.Sub(in.lastPush) < s.interval {
+		in.Skipped++
+		return Early
+	}
+	in.lastPush, in.hasPush = now, true
+	return Accepted
+}
+
+// lastRequest is when the instance's last accepted request, a subscription or a push,
+// was.
+func (in *instance) lastRequest() (time.Time, bool) {
+	switch {
+	case in.hasGet && in.hasPush:
+		return maxTime(in.lastGet, in.lastPush), true
+	case in.hasGet:
+		return in.lastGet, true
+	case in.hasPush:
+		return in.lastPush, true
+	}
+	return time.Time{}, false
+}
+
+func maxTime(a, b time.Time) time.Time {
+	if b.After(a) {
+		return b
+	}
+	return a
+}
+
+// Push records one decoded push.
+func (s *Store) Push(id [16]byte, who Who, p Payload, terminating bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	in := s.touch(id, who)
 	in.Pushes++
 	in.Terminated = terminating
+	in.afterTerminating = terminating
 	for k, v := range p.Resource {
 		setResource(in.Resource, k, v)
 	}
@@ -362,7 +395,6 @@ func (s *Store) Push(id [16]byte, who Who, p Payload, terminating bool) bool {
 		}
 	}
 	in.Metrics = len(in.series)
-	return true
 }
 
 func (s *Store) prune(now time.Time) {
@@ -374,6 +406,20 @@ func (s *Store) prune(now time.Time) {
 		if now.Sub(in.Last) > ttl {
 			delete(s.instances, id)
 		}
+	}
+}
+
+// evictOf drops the connection's least recently heard instance.
+func (s *Store) evictOf(conn uint64) {
+	var victim [16]byte
+	var best *instance
+	for id, in := range s.instances {
+		if in.Conn == conn && (best == nil || in.Last.Before(best.Last)) {
+			victim, best = id, in
+		}
+	}
+	if best != nil {
+		delete(s.instances, victim)
 	}
 }
 

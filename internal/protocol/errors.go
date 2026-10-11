@@ -78,7 +78,7 @@ var errorTable = []errorRow{
 	{kerr.InvalidConfig, ClassRefused, "A topic setting that is not one, or a value out of its range.", "See the topic's Config tab for the settings and their ranges."},
 	{kerr.InvalidRequiredAcks, ClassRefused, "A producer's acks that is not -1, 0 or 1.", "Set acks to all, 1 or 0."},
 	{kerr.MessageTooLarge, ClassRefused, "A batch larger than the topic's max.message.bytes.", "Send smaller batches, or raise max.message.bytes on the topic."},
-	{kerr.InvalidRecord, ClassRefused, "A record the topic will not take: on a compacted topic, one without a key.", "Give every record on a compacted topic a key."},
+	{kerr.InvalidRecord, ClassRefused, "A record the topic will not take: on a compacted topic, one without a key. For a telemetry push, a body that does not decompress or inflates past the size the broker said it would take.", "Give every record on a compacted topic a key. A client that pushes metrics must compress them as the codec it names."},
 	{kerr.CorruptMessage, ClassRefused, "A record batch whose checksum or framing does not match.", "A client or proxy altered the bytes: look at what sits between the app and the broker."},
 	{kerr.OffsetOutOfRange, ClassRefused, "A consumer asked for an offset the log no longer has, or has not reached.", "The consumer resets by its auto.offset.reset; check retention if it keeps happening."},
 	{kerr.OffsetMetadataTooLarge, ClassRefused, "The metadata string on an offset commit is too long.", "Commit shorter metadata or none."},
@@ -135,7 +135,8 @@ var errorTable = []errorRow{
 	{kerr.UnsupportedEndpointType, ClassNotImplemented, "A request for an endpoint type this broker does not offer.", "Use the broker listener."},
 	{kerr.DelegationTokenAuthDisabled, ClassNotImplemented, "Delegation tokens are not a thing this broker issues.", "Use SASL/SCRAM credentials."},
 	{kerr.DelegationTokenAuthorizationFailed, ClassDenied, "The principal may not use delegation tokens.", "Use SASL/SCRAM credentials."},
-	{kerr.UnknownSubscriptionID, ClassRefused, "A telemetry push for a subscription the broker did not give out (it restarted).", "Nothing: the client subscribes again."},
+	{kerr.UnknownSubscriptionID, ClassRefused, "A telemetry push for a subscription the broker did not give this client instance (Apache Kafka answers so after a CLIENT_METRICS resource changed the subscription).", "Nothing: the client subscribes again."},
+	{kerr.ThrottlingQuotaExceeded, ClassExpected, "A telemetry request that came before the push interval had passed: a subscription request or a push, one interval after the last one taken (KIP-714).", "Nothing: the client waits out its interval and pushes again."},
 	{kerr.TelemetryTooLarge, ClassRefused, "A telemetry push larger than the broker said it would take.", "Nothing: the client sends less next time."},
 }
 
