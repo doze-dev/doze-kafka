@@ -18,3 +18,13 @@ func TestConsoleBrandIsTheInstanceName(t *testing.T) {
 		t.Errorf("the top bar names the broker %q, want the instance name %q", m, "harbour")
 	}
 }
+
+// The top bar prints "doze-kafka <instance>" (Sy-01). An instance with no name of
+// its own must not make it "doze-kafka doze-kafka" or "doze-kafka local".
+func TestWorkspaceLabelOmitsTheDefaultInstance(t *testing.T) {
+	for name, want := range map[string]string{"harbour": "harbour", "doze-kafka": "", "local": ""} {
+		if got := workspaceLabel(name); got != want {
+			t.Errorf("workspaceLabel(%q) = %q, want %q", name, got, want)
+		}
+	}
+}

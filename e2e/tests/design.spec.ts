@@ -618,3 +618,12 @@ test('the shell is the board\'s: the top bar, the brand, the page padding and th
   }
 });
 
+test('the brand says doze-kafka once, and the instance only when it has a name of its own', async ({ page }) => {
+  await page.goto('topics');
+  const text = (await page.locator('header.topbar .brand').innerText()).replace(/\s+/g, ' ').trim();
+  expect(text).not.toMatch(/doze-kafka doze-kafka/);
+  expect(text).not.toMatch(/doze-kafka local$/);
+  const label = page.locator('#workspace-label');
+  if (await label.count()) expect(['doze-kafka', 'local']).not.toContain((await label.innerText()).trim());
+});
+

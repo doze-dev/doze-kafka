@@ -486,7 +486,7 @@ func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger
 		RegistryURL: registryURL, RegistryUser: user, RegistryPass: pass,
 		Traffic: traffic, TraceHeader: cfg.TraceHeader, ClientMetrics: clientMetrics,
 		Facts: console.BrokerFacts{
-			Workspace: cfg.InstanceName(), KafkaMajor: cfg.Version,
+			Workspace: workspaceLabel(cfg.InstanceName()), KafkaMajor: cfg.Version,
 			DataDir: cfg.DataDir, SASLMechanisms: cfg.SASLMechanisms, RegistryURL: registryPublic,
 			AutoCreateTopics: cfg.AutoCreateTopics, DefaultPartitions: cfg.DefaultPartitions, MaxPartitions: cfg.MaxPartitions,
 			Version: version, Started: time.Now(),
@@ -574,4 +574,15 @@ func consoleDialAddr(cfg config.Config, bound net.Addr) (string, error) {
 		host = "127.0.0.1"
 	}
 	return net.JoinHostPort(host, port), nil
+}
+
+// workspaceLabel is what the top bar prints after the product name (Sy-01 draws
+// "doze-kafka harbour"). An instance that carries no name of its own, the
+// default or one derived from a directory that happens to be called doze-kafka,
+// has nothing to add: the bar says "doze-kafka" once rather than twice.
+func workspaceLabel(name string) string {
+	if name == config.DefaultName || name == "doze-kafka" {
+		return ""
+	}
+	return name
 }
