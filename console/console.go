@@ -372,7 +372,7 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 		// A name that may wrap, at its underscores: UNKNOWN_TOPIC_OR_PARTITION is three
 		// words, not a run to be cut anywhere (AD5).
 		"wrapName": wrapName,
-		"icon":   icon,
+		"icon":     icon,
 		// Links to resources. Names are data: never concatenate them into a URL
 		// in a template, use these (see resourceurl.go).
 		"topicURL": func(name string) string { return topicPath(prefix, name) },
