@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Kafka Connect in distributed mode: the worker creates and verifies its three internal
 # topics (which must be compacted), runs a file source into a topic and a file sink out
-# of it, and after a restart picks its connectors and its offsets back up from those topics.
+# of it (the plugin path holds only the file connectors: scanning all of libs/ takes minutes on a loaded machine and has nothing to do with the broker), and after a restart picks its connectors and its offsets back up from those topics.
 set -euo pipefail
 . ../lib.sh
 need_docker; trap_cleanup
@@ -30,11 +30,11 @@ config.storage.replication.factor=1
 status.storage.topic=connect-status-$P
 status.storage.replication.factor=1
 listeners=http://0.0.0.0:8083
-plugin.path=/opt/kafka/libs
+plugin.path=/tmp/plugins
 $SEC"
 # shellcheck disable=SC2086
 docker run -d --name "$CONTAINER" ${HOSTS_FLAG:-} -p 127.0.0.1::8083 ${MOUNT[@]+"${MOUNT[@]}"} -e CONF="$CONF" --entrypoint sh apache/kafka:4.3.1 \
-  -c 'printf "%s\n" "$CONF" > /tmp/worker.properties; exec /opt/kafka/bin/connect-distributed.sh /tmp/worker.properties' >/dev/null
+  -c 'mkdir /tmp/plugins && cp /opt/kafka/libs/connect-file-*.jar /tmp/plugins/; printf "%s\n" "$CONF" > /tmp/worker.properties; exec /opt/kafka/bin/connect-distributed.sh /tmp/worker.properties' >/dev/null
 PORT=$(publish_port "$CONTAINER" 8083)
 URL=http://127.0.0.1:$PORT
 wait_http "$URL/connectors" 180 || fail "the Connect worker did not start against doze-kafka"
