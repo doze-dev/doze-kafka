@@ -6,6 +6,14 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Traffic, third review: Enter on a link inside the inspector (the client link, "See a
+  client that reports", a topic's neighbours) opens its selection; a refusal's name
+  never breaks inside a word (the Result column is 118 px, the board's 84 cut
+  `UNSUPPORTED_` and `AUTHORIZATION_`); a story row is 28 px; the story files a join
+  or sync under the rebalance that produced the generation it names, and a LeaveGroup
+  under the rebalance it triggers; the Clients view draws the frozen line when the
+  broker is lost.
+
 - Traffic, second review: Enter on a row (after `j`, or on a focused row) opens the
   inspector and leaves it open (the key's default pressed the Close button the loading
   inspector had taken focus for); a join request goes under the earliest rebalance that

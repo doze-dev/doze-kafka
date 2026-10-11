@@ -209,3 +209,45 @@ test('Traf-09: nothing has reached the broker, and Traf-10 over it', async ({ pa
   await expect(page.locator('html')).not.toHaveAttribute('data-connection-lost', '', { timeout: 20_000 });
   await expect(empty.locator('.up-only')).toBeVisible();
 });
+
+// The Clients view is a table of its own and says the same as the others when the broker
+// is lost: the frozen line under the header, then the rows (Traf-10).
+test('Traf-06 and Traf-10: the Clients view draws the frozen line under its header when the broker is lost', async ({ page, request, uniqueName }) => {
+  await kill();
+  await up();
+  const topic = uniqueName('clients');
+  expect((await request.post(`${CONSOLE}new/topic`, { form: { name: topic, partitions: '1' } })).ok()).toBe(true);
+  const holdBin = join(ROOT, 'e2e', '.tmp', 'bin', `hold-disc-${PORT}`);
+  execFileSync('go', ['build', '-o', holdBin, './e2e/hold'], { cwd: ROOT, env: { ...process.env, GOWORK: 'off' } });
+  const hold = spawn(holdBin, [`127.0.0.1:${PORT}`, 'disc-hold', `${topic}-group`, topic],
+    { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, E2E_SASL_USER: '', E2E_TLS: '' } });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('the held consumer never joined its group')), 20_000);
+      hold.stdout!.on('data', (b) => { if (String(b).includes('ready')) { clearTimeout(t); resolve(); } });
+      hold.on('exit', () => reject(new Error('the held consumer exited')));
+    });
+    await page.goto(`${CONSOLE}traffic?view=clients`);
+    const table = page.locator('#clients-table');
+    await expect(table.locator('tbody tr', { hasText: 'disc-hold' })).toBeVisible();
+    await expect(table.locator('.frozen-line')).toBeHidden();
+    await kill();
+    await expect(page.locator('html')).toHaveAttribute('data-connection-lost', '', { timeout: 15_000 });
+    const line = table.locator('.frozen-line');
+    await expect(line).toBeVisible();
+    await expect(line).toContainText('Nothing newer than this line is known.');
+    const below = await table.evaluate((t) => {
+      const head = t.querySelector('thead th')!.getBoundingClientRect();
+      const frozen = t.querySelector('.frozen-line')!.getBoundingClientRect();
+      const first = t.querySelector('tbody tr')!.getBoundingClientRect();
+      return { headBottom: head.bottom, frozenTop: frozen.top, frozenBottom: frozen.bottom, firstTop: first.top };
+    });
+    expect(below.frozenTop).toBeGreaterThanOrEqual(below.headBottom - 1);
+    expect(below.firstTop).toBeGreaterThanOrEqual(below.frozenBottom - 1);
+    await expect(line).toHaveCSS('opacity', '1');
+    await expect(table.locator('tbody')).toHaveCSS('opacity', '0.55');
+  } finally {
+    hold.kill('SIGTERM');
+    await up();
+  }
+});

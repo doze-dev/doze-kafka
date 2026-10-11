@@ -154,7 +154,8 @@
 {{define "traffic_clients_table"}}
   {{if .Clients}}
   <div class="tbl-wrap">
-    <table class="tbl tf-clients" id="clients-table"><thead><tr><th>Client</th><th class="c-sw">Software</th><th class="c-pr">Principal</th><th class="c-ad">Address</th><th class="c-op">Open for</th><th class="c-la">Last request</th><th class="num c-rq">Req/min</th><th class="c-gr">Groups</th><th class="num c-er">Error rate</th></tr></thead>
+    <table class="tbl tf-clients" id="clients-table"><thead><tr><th>Client</th><th class="c-sw">Software</th><th class="c-pr">Principal</th><th class="c-ad">Address</th><th class="c-op">Open for</th><th class="c-la">Last request</th><th class="num c-rq">Req/min</th><th class="c-gr">Groups</th><th class="num c-er">Error rate</th></tr>
+      <tr class="frozen-line lost-only"><td colspan="9" class="m">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</td></tr></thead>
       <tbody>{{range .Clients}}<tr id="cl-{{.Conn}}" class="{{if .NeedsALook}}needs-look{{end}}" tabindex="0" data-inspector-open data-open-keys="{{.Keys}}" aria-selected="false" hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
         <td class="m b nw">{{.Who}}{{if gt .Conns 1}} <span class="mut" title="{{.Conns}} open connections from this client id">{{.Conns}} connections</span>{{end}}</td>
         <td class="m c-sw">{{if .Software}}{{.Software}}{{else}}<span class="mut">not reported</span>{{end}}</td>
@@ -179,7 +180,7 @@
 {{/* A group's rebalance told in order (Traf-12). */}}
 {{define "traffic_story"}}
 <div class="row ce g8 wrap tf-story-head"><span class="m" id="story-count"><span class="b">{{.Story.Requests}}</span> requests{{if .Story.Folded}} ({{.Story.Folded}} folded){{end}}, {{.Story.Rebalances}} rebalance{{if ne .Story.Rebalances 1}}s{{end}}</span><div class="grow"></div><a class="note" href="{{.FlatURL}}">Show them as a plain list</a></div>
-<div class="card tf-story" id="traffic-story" style="--c: 92px 150px 130px 1fr 80px 56px">
+<div class="card tf-story" id="traffic-story" style="--c: 92px 150px 130px 1fr 118px 56px">
   <div class="r h"><span>Time</span><span>Client</span><span>Request</span><span>What happened</span><span>Result</span><span class="ra">Took</span></div>
   <div class="frozen-line lost-only m">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</div>
   {{range .Story.Blocks}}

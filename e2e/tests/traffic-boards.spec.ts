@@ -246,6 +246,61 @@ test('AD5: a refusal name wraps at its underscores, in the table and in the stor
   }
 });
 
+/** In the page, whether a name set in `cell`'s own font has a segment (a run that ends at
+ * an underscore) wider than the cell's content box: that name would break mid-word. */
+async function midWordBreaks(cell: import('@playwright/test').Locator, names: string[]) {
+  return cell.evaluate((td, names) => {
+    const cs = getComputedStyle(td);
+    const room = td.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const probe = document.createElement('span');
+    probe.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font:${cs.font};letter-spacing:${cs.letterSpacing}`;
+    td.appendChild(probe);
+    const bad: string[] = [];
+    for (const n of names) {
+      const parts = n.split('_');
+      for (let i = 0; i < parts.length; i++) {
+        probe.textContent = i < parts.length - 1 ? `${parts[i]}_` : parts[i];
+        if (probe.getBoundingClientRect().width > room + 0.01) { bad.push(`${n} (${probe.textContent})`); break; }
+      }
+    }
+    probe.remove();
+    return { room, bad };
+  }, names);
+}
+
+const ERROR_NAMES = execFileSync('go', ['run', './e2e/errnames'], { cwd: '..', env: { ...process.env, GOWORK: 'off' } })
+  .toString().split('\n').filter(Boolean);
+
+test('AD5: no error name needs a break inside a word, in the table or in the story, at 1440', async ({ page }) => {
+  expect(ERROR_NAMES.length).toBeGreaterThan(50);
+  expect(ERROR_NAMES).toContain('TOPIC_AUTHORIZATION_FAILED');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await lightTraffic(page, 'traffic?kind=errors&q=doze-seed');
+  const cell = page.locator('#traffic-table td.cell-result').first();
+  await expect(cell).toBeVisible();
+  const flat = await midWordBreaks(cell, ERROR_NAMES);
+  expect(flat.bad, `the table's Result column is ${flat.room} px`).toEqual([]);
+
+  await page.goto(`traffic?group=${GROUP}&kind=groups`);
+  const sc = page.locator('#traffic-story .r:not(.h) > .cell-result').first();
+  await expect(sc).toBeVisible();
+  const story = await midWordBreaks(sc, ERROR_NAMES);
+  expect(story.bad, `the story's Result column is ${story.room} px`).toEqual([]);
+});
+
+test('Traf-12: an ordinary story row is the board\'s 28 px', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await lightTraffic(page, `traffic?group=${GROUP}&kind=groups`);
+  const rows = page.locator('#traffic-story .r:not(.h):not(.rebalance)');
+  await expect(rows.first()).toBeVisible();
+  const heights = await rows.evaluateAll((rs) => rs.map((r) => ({
+    h: r.getBoundingClientRect().height,
+    text: (r.querySelector('.cell-result') as HTMLElement | null)?.getBoundingClientRect().height ?? 0,
+  })));
+  expect(heights.length).toBeGreaterThan(0);
+  for (const r of heights) if (r.text <= 28) expect(r.h).toBe(28);
+});
+
 test('Traf-07: a client that reports its metrics puts what is worth a look first', async ({ page }) => {
   await lightTraffic(page, 'traffic?view=clients');
   const rows = page.locator('#clients-table tbody tr', { hasText: CLIENT });

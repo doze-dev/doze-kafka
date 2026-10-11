@@ -1024,14 +1024,17 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
 /* ---------- traffic ---------- */
 .trafficwrap { max-width: 1280px; }
 /* Main's columns: the board's own tracks, 92 150 118 1fr 190 84 52, with its 14 px
-   gap (7 px each side of a cell) and 12 px at the row's two ends. The time, the
-   result and the duration are always whole (a time is 12 characters, the longest
-   result name 20, which wraps); the client, the request, the topic and the detail
-   are the ones the board cuts with an ellipsis, with their full text on hover. The
+   gap (7 px each side of a cell) and 12 px at the row's two ends, except the Result,
+   which is 118 (a deviation, taken from the topic's 1fr): a name wraps only after an
+   underscore, and the longest run between two (DESERIALIZATION_, 16 characters at
+   7.2 px) is 116 px; at 84 UNSUPPORTED_ and AUTHORIZATION_ were cut mid-word. The
+   time, the result and the duration are always whole; the client, the request, the
+   topic and the detail are the ones the board cuts with an ellipsis, with their full
+   text on hover. The
    board's 1fr is 10 px beside a 400 px inspector at 1440; the topic keeps 96 here (its header's words need 109 with the padding) and
    the card scrolls sideways before it gives that up. */
 .tf-table { table-layout: fixed; }
-@media (min-width: 641px) { .tf-table { min-width: 890px; } }
+@media (min-width: 641px) { .tf-table { min-width: 924px; } } /* 890 + the 34 the Result took */
 table.tbl.tf-table th, table.tbl.tf-table td { padding-left: 7px; padding-right: 7px; }
 table.tbl.tf-table th:first-child, table.tbl.tf-table td:first-child { padding-left: 12px; }
 table.tbl.tf-table th:last-child, table.tbl.tf-table td:last-child { padding-right: 12px; }
@@ -1043,7 +1046,7 @@ table.tbl.tf-table th:last-child, table.tbl.tf-table td:last-child { padding-rig
 .tf-table th:nth-child(2) { width: 164px; }  /* 150 + 14 */
 .tf-table th:nth-child(3) { width: 132px; }  /* 118 + 14 */
 .tf-table th:nth-child(5) { width: 204px; }  /* 190 + 14 */
-.tf-table th:nth-child(6) { width: 98px; }   /* 84 + 14 */
+.tf-table th:nth-child(6) { width: 132px; }  /* 118 + 14 (the board has 84) */
 .tf-table th:nth-child(7) { width: 71px; }   /* 52 + 7 + 12 */
 .tf-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 8px; }
 .tf-f { flex: 1 1 150px; min-width: 130px; }
@@ -1163,7 +1166,7 @@ table.tbl tbody tr.errrow.failed td { background: var(--badbg); }
 .tf-cut { margin: 0 0 6px; }
 .tf-story-head { margin: 4px 0 6px; }
 .tf-story .r.kid { color: var(--mut); }
-.tf-story .r > .cell-result { white-space: normal; overflow: visible; overflow-wrap: break-word; text-overflow: clip; padding: 4px 0; } /* AD5: never cut */
+.tf-story .r > .cell-result { white-space: normal; overflow: visible; overflow-wrap: break-word; text-overflow: clip; padding: 3px 0; } /* AD5: never cut; 20 + 6 + the rule is the board's 28 */
 .tf-story .r.rebalance .b { color: var(--ink); }
 .tree { color: var(--line); font-family: var(--mono); }
 .tick { display: inline-block; width: 3px; border-radius: 1px; background: var(--ink); }
@@ -1206,7 +1209,7 @@ html[data-connection-lost] div.frozen-line.lost-only { display: block; }
 /* In the table it is the row under the header, as Traf-10 draws it. */
 html[data-connection-lost] tr.frozen-line.lost-only { display: table-row; }
 tr.frozen-line > td { background: var(--well); color: var(--mut); text-align: center; padding: 5px 12px; border-bottom: 1px solid var(--line2); white-space: normal; }
-table.tbl.tf-table tr.frozen-line > td { overflow: visible; }
+table.tbl.tf-table tr.frozen-line > td, table.tbl.tf-clients tr.frozen-line > td { overflow: visible; }
 .frozen-line { background: var(--well); color: var(--mut); text-align: center; padding: 5px 12px; border-bottom: 1px solid var(--line2); }
 html[data-connection-lost] #traffic-controls [data-live-state],
 html[data-connection-lost] #traffic-controls [data-live-toggle]:not(.lost-only) { display: none; }

@@ -648,7 +648,7 @@ test('the top bar holds no control that is hidden: Retry is drawn with the disco
   expect(await page.locator('header.topbar button[hidden], header.topbar a[hidden]').count()).toBe(0);
 });
 
-test('the Traffic columns are the board\'s: 92 150 118 1fr 190 84 52, with its 14 px gaps', async ({ page }) => {
+test('the Traffic columns are the board\'s: 92 150 118 1fr 190 118 52 (the board's, but the Result 118 not 84), with its 14 px gaps', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('traffic');
   const cells = await page.locator('#traffic-table thead th').evaluateAll((ths) => ths.map((th) => {
@@ -657,7 +657,7 @@ test('the Traffic columns are the board\'s: 92 150 118 1fr 190 84 52, with its 1
     // The track is the cell less its padding; the board's gap is the two paddings that meet.
     return { track: Math.round(w - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)), pl: cs.paddingLeft, pr: cs.paddingRight };
   }));
-  expect(cells.map((c) => c.track)).toEqual([92, 150, 118, cells[3].track, 190, 84, 52]);
+  expect(cells.map((c) => c.track)).toEqual([92, 150, 118, cells[3].track, 190, 118, 52]);
   expect(cells[3].track).toBeGreaterThanOrEqual(96); // the topic's 1fr keeps room to be read.
   for (let i = 0; i < cells.length - 1; i++) {
     const meet = parseFloat(cells[i].pr) + parseFloat(cells[i + 1].pl);
