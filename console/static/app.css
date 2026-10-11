@@ -242,7 +242,7 @@ h1, h2, h3 { margin: 0; }
 .el { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .h1 { font-size: var(--fs-xl); font-weight: 600; line-height: 24px; }
 .h2 { font-size: var(--fs-base); font-weight: 600; line-height: 20px; }
-.h1.m { font-size: var(--fs-lg); }
+.h1.m { font-family: var(--sans); font-size: var(--fs-xl); }
 .note { font-size: var(--fs-sm); color: var(--mut); }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
 .pad { padding: 12px 14px; }
@@ -301,17 +301,30 @@ span.num {
 /* The page: a column of what the board draws, newest design first. It scrolls on
    its own; children keep their natural height (a table is not squeezed), and one
    marked .grow takes the room that is left. */
-.main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 14px 18px 12px; gap: 10px; overflow-y: auto; }
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 16px 20px 0; gap: 10px; overflow-y: auto; }
+/* The page boards draw 16 20 0 with a 10 px gap (Main, Traf-02..12, Gr-02, Sc-05, ...);
+   a home or an empty state draws 12 (Tp-Home, Cl-Home, Tc-Home, Traf-09), and the
+   topic's page 8 (Tp-05). Sy-01's own 14 18 is the specimen's, not the page's. */
+.main.gap12 { gap: 12px; }
+.main.gap8 { gap: 8px; }
 .main > * { flex: none; }
 .main > .grow { flex: 1 0 auto; }
-.firstrun { padding: 36px 56px 12px; gap: 20px; }
+.firstrun { padding: 36px 56px 0; gap: 20px; }
 .firstrun-title { font-size: var(--fs-2xl); font-weight: 600; line-height: 32px; }
 .firstrun-lede { font-size: var(--fs-base); line-height: 22px; max-width: 760px; margin: 0; }
 .steps { align-items: stretch; }
 .steps > .card { min-width: 220px; }
 .firstrun-foot { padding: 10px 14px; }
+.well.pad.slim { padding: 10px 14px; }
+.btn.pill-x { height: 18px; padding: 0 4px; }
+/* The three cards share the page: where one is narrower than a console address needs
+   beside its label, the label goes above the value, so an address is never broken
+   mid-word (Sy-08 at 1440). */
+.steps > .card { container-type: inline-size; }
+.kv-stack > span { overflow-wrap: normal; }
+@container (max-width: 440px) { .kv-stack { grid-template-columns: 1fr; row-gap: 0; } .kv-stack > :nth-child(even) { margin-bottom: 5px; overflow-wrap: anywhere; } }
 .snippets { align-items: flex-start; }
-@media (max-width: 1100px) { .steps { flex-wrap: wrap; } .firstrun { padding: 24px 20px 12px; } }
+@media (max-width: 1100px) { .steps { flex-wrap: wrap; } .firstrun { padding: 24px 20px 0; } }
 .workspace { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .workspace > .flash { margin: 12px 16px 0; }
 .panes { flex: 1; display: flex; min-height: 0; }
@@ -471,7 +484,7 @@ table.tbl tbody tr.hl td { animation: rowflash 2.2s ease 1; }
 .idband { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .idband > div:first-child { min-width: 0; }
 .idband h1 { font-size: var(--fs-xl); font-weight: 600; line-height: 24px; overflow-wrap: anywhere; }
-.idband h1.m { font-family: var(--mono); font-size: var(--fs-lg); }
+.idband h1.m { font-family: var(--sans); font-size: var(--fs-xl); }  /* the boards' .h1.m: .h1's font shorthand, declared after .m, sets the family back to Plex Sans, 600 */
 .idband h1.page-title { font-family: var(--sans); }
 .idband .lede { margin: 2px 0 0; font-size: var(--fs-md); color: var(--mut); }
 .idchips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -491,6 +504,9 @@ table.tbl tbody tr.hl td { animation: rowflash 2.2s ease 1; }
   color: var(--ink); white-space: nowrap;
 }
 .btn:hover { background: var(--well); }
+/* The boards' `.app button { font: inherit }` outranks `.btn { font-weight: 500 }`, so
+   a <button class="btn"> is 400 on every board and only an <a class="btn"> is 500. */
+button.btn { font-weight: 400; }
 .btn.pri { background: var(--ink); border-color: var(--ink); color: var(--card); }
 .btn.pri:hover { background: var(--ink); opacity: .88; }
 .btn.danger { color: var(--bad); border-color: var(--bad); }
@@ -610,8 +626,8 @@ p.note { margin: 0; }
 [data-live].disconnected { position: relative; }
 [data-live].disconnected::after { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--background) 55%, transparent); pointer-events: none; }
 .pill.live.disconnected .dot { background: var(--bad); }
-.pill.live .pill-state { margin-left: 8px; color: var(--bad); }
-.pill-retry { margin-left: 8px; padding: 0 8px; font-family: inherit; font-size: var(--fs-sm); background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; }
+/* Traf-10's top bar: the address and "not reachable" in a pill the red tint (.pill.bad). */
+.pill.live .pill-state { color: var(--bad); font-family: var(--sans); }
 
 /* ---------- try it: the composer ----------
    Sy-01 part 7: a card at the foot of the page with the Produce API's own fields.
@@ -690,13 +706,26 @@ tr[data-inspector-open]:hover td { background: var(--well); }
 tr[data-inspector-open]:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 tr.on td, tr[data-inspector-open].on td, tr[data-inspector-open].on:hover td { background: var(--sel); }
 td.empty { padding: 22px 12px; color: var(--muted-foreground); }
-.cell-offset { font-family: var(--mono); font-weight: 500; }
-.cell-time { font-family: var(--mono); font-size: var(--fs-sm); color: var(--muted-foreground); white-space: nowrap; }
-.cell-key { font-family: var(--mono); color: var(--ink); white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+/* Sy-01's record table: P, Offset, Key, Value, Age, every cell the board's .m (12 px
+   mono, 400), the rows 28 px with their rule inside, the board's 14 px between columns. */
+.cell-offset { font-family: var(--mono); font-size: var(--fs-sm); font-weight: 400; white-space: nowrap; }
+.cell-age { font-family: var(--mono); font-size: var(--fs-sm); white-space: nowrap; }
+.p-inline { display: none; }
+table.msg-table { table-layout: fixed; }
+table.msg-table td, table.msg-table th { padding-left: 7px; padding-right: 7px; }
+table.msg-table td:first-child, table.msg-table th:first-child { padding-left: 12px; }
+table.msg-table td:last-child, table.msg-table th:last-child { padding-right: 12px; }
+table.msg-table td { padding-bottom: 3px; font-size: var(--fs-sm); }
+table.msg-table .col-p { width: 45px; }          /* 26 + 12 + 7 */
+table.msg-table th:nth-child(2) { width: 86px; } /* 72 + 14: the board's 62 holds 4,789, not 1,234,567 */
+table.msg-table th:nth-child(3) { width: 134px; } /* 120 + 14 */
+table.msg-table th:nth-child(5) { width: 81px; }  /* 62 + 7 + 12 */
+table.msg-table td { overflow: hidden; text-overflow: ellipsis; }
+.cell-key { font-family: var(--mono); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cell-key.none { color: var(--muted-foreground); font-style: italic; font-family: var(--sans); }
 /* width:100% + max-width:0 makes this the cell that soaks up all remaining
    table width, truncating at the real available space instead of a fixed cap. */
-.cell-val { font-family: var(--mono); width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell-val { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cell-val.binary .vspecial { color: var(--warn-foreground); }
 .cell-val.tomb .vspecial { color: var(--muted-foreground); font-style: italic; font-family: var(--sans); }
 
@@ -708,7 +737,6 @@ td.empty { padding: 22px 12px; color: var(--muted-foreground); }
 
 .pager { display: inline-flex; align-items: center; gap: 12px; }
 .pagelink { color: var(--foreground); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
-.hdrct { font-family: var(--mono); font-size: var(--fs-xs); color: var(--muted-foreground); background: var(--muted); padding: 1px 6px; border-radius: var(--radius-sm); }
 .tbl-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 12px; font-size: var(--fs-xs); color: var(--muted-foreground); border-top: 1px solid var(--border); background: var(--muted); white-space: nowrap; }
 
 /* ---------- inspector / palette / confirm (all .overlay, shown via [hidden]) ---------- */
@@ -907,7 +935,7 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   :root { --pad: 16px; }
   .panes { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto auto; }
   .panes > .list { display: none; }
-  .panes > .main { grid-column: 1; grid-row: 1; padding: 12px 16px 8px; gap: 8px; }
+  .panes > .main { grid-column: 1; grid-row: 1; padding: 12px 16px 0; gap: 8px; }
   .panes > .insp { grid-column: 1; grid-row: 2; width: auto; max-height: 45vh; margin: 0 16px 8px; border: 1px solid var(--line); border-radius: var(--radius-md); }
   .panes > .insp:has(.insp-sel:not([hidden])) { border-color: var(--ink); }
   .insp[data-kind="message"] { width: auto; }
@@ -944,14 +972,35 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .tbl-wrap table.tbl td.cell-key { grid-column: 1; grid-row: 1; font-weight: 600; max-width: none; }
   .tbl-wrap table.tbl td.cell-offset { grid-column: 2; grid-row: 1; text-align: right; color: var(--mut); }
   .tbl-wrap table.tbl td.cell-val { grid-column: 1 / -1; grid-row: 2; }
-  .tbl-wrap table.tbl td.col-time { display: block; grid-column: 1 / -1; grid-row: 3; color: var(--mut); font-size: var(--fs-xs); }
+  .tbl-wrap table.tbl td.cell-age { display: block; grid-column: 1 / -1; grid-row: 3; text-align: left; color: var(--mut); font-size: var(--fs-xs); }
+  .tbl-wrap table.tbl td.cell-age::after { content: " ago"; }
+  .tbl-wrap table.tbl td.col-p { display: none; }
+  .tbl-wrap table.tbl td.cell-offset .p-inline { display: inline; }
   .tb-right .pill.live.disconnected { display: inline-flex; } /* ...but "not connected" is never hidden */
   .tb-right .pill.live.disconnected .pill-addr { display: none; }
   .tb-spacer { display: none; }
-  .panes > .main { padding: 10px 12px 8px; }
+  .panes > .main { padding: 10px 12px 0; gap: 8px; }
   .panes > .insp:has(.insp-sel:not([hidden])) {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; margin: 0; max-height: 70vh; border: 0; border-top: 1px solid var(--line);
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; margin: 0; max-height: 47vh; border: 0; border-top: 1px solid var(--line);
     border-radius: 12px 12px 0 0; box-shadow: 0 0 0 100vmax var(--scrim);
+  }
+  /* Sy-04: 400 of 844 (47%), so the page's own tabs and first card stay in view under
+     it, and the grab handle the board draws: 36 x 4, centred, 8 px from the top. */
+  /* Sy-04 draws the name, the action, one sentence and the tabs; the neighbours are one
+     strip you scroll sideways (every link still there), and the note about how they
+     are counted waits for a wider screen, so the tabs and the first card stay in view. */
+  .neighbours { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .neighbours a.well { flex: none; }
+  .nbnote { display: none; }
+  /* Nor does Sy-04 draw the tape's marks: the partitions, live and the log end stay,
+     the records are the cards below. */
+  .tape-strip, .tape-foot { display: none; }
+  /* The cards come before the search and the jumps, which are still all there below
+     them: Sy-04's page is the name, the tabs and the first card. */
+  #tape-and-table { display: flex; flex-direction: column; gap: 8px; }
+  #tape-and-table > .secrow { order: 2; }
+  .panes > .insp:has(.insp-sel:not([hidden]))::before {
+    content: ""; flex: none; align-self: center; width: 36px; height: 4px; border-radius: 2px; background: var(--line); margin: 8px 0 0;
   }
   .idband-acts { flex-wrap: wrap; }
   .tape-head { flex-wrap: wrap; }
@@ -964,8 +1013,6 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .dock-foot { flex-direction: column; align-items: stretch; }
   .crow2 { flex-wrap: wrap; gap: 2px 16px; }
   /* A phone-width table keeps what identifies a record: offset, key, value. */
-  table.tbl .col-hdrs { display: none; }
-  .cell-key { max-width: 110px; }
   .tf-table td.cell-req { grid-column: 1; grid-row: 1; font-weight: 600; }
   .tf-table td.cell-took { grid-column: 2; grid-row: 1; text-align: right; color: var(--mut); }
   .tf-table td.cell-topic { grid-column: 1; grid-row: 2; }
@@ -1034,7 +1081,13 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
    board's 1fr is 10 px beside a 400 px inspector at 1440; the topic keeps 96 here (its header's words need 109 with the padding) and
    the card scrolls sideways before it gives that up. */
 .tf-table { table-layout: fixed; }
-@media (min-width: 641px) { .tf-table { min-width: 924px; } } /* 890 + the 34 the Result took */
+/* The board's tracks are 92 150 118 1fr 190 84 52 (906 with the gaps and the row's own
+   padding), and its own render cannot hold them at 1440 beside the inspector: the page
+   is 802 wide and the topic's 1fr is 8 px. So the fixed ones are Time, Request (130:
+   "FindCoordinator v4" is 130 at the board's font), Result (118, AD5) and Took; Client,
+   Topic and Detail share what is left as shares of the table, growing with the window,
+   and nothing is pushed off the right edge. */
+@media (min-width: 641px) { .tf-table { min-width: 740px; } }
 table.tbl.tf-table th, table.tbl.tf-table td { padding-left: 7px; padding-right: 7px; }
 table.tbl.tf-table th:first-child, table.tbl.tf-table td:first-child { padding-left: 12px; }
 table.tbl.tf-table th:last-child, table.tbl.tf-table td:last-child { padding-right: 12px; }
@@ -1042,19 +1095,34 @@ table.tbl.tf-table th:last-child, table.tbl.tf-table td:last-child { padding-rig
 .tf-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tf-table td.cell-result { white-space: normal; overflow-wrap: break-word; text-overflow: clip; } /* a long error name wraps at its underscores; it is never cut */
 .tf-table td.cell-time, .tf-table td.cell-took { text-overflow: clip; }
+@media (min-width: 641px) { .tf-table td.cell-time { color: var(--ink); } } /* the board's time is plain .m, ink (the phone's card sets it quiet) */
+.tf-table td.cell-client a { text-decoration: none; } /* and so is the client's name: it opens the client without a link's look */
 .tf-table th:nth-child(1) { width: 111px; }  /* 92 + 12 + 7 */
-.tf-table th:nth-child(2) { width: 164px; }  /* 150 + 14 */
-.tf-table th:nth-child(3) { width: 132px; }  /* 118 + 14 */
-.tf-table th:nth-child(5) { width: 204px; }  /* 190 + 14 */
+.tf-table th:nth-child(2) { width: 16%; }    /* the board's 150 */
+.tf-table th:nth-child(3) { width: 144px; }  /* 130 + 14 */
+.tf-table th:nth-child(4) { width: 15%; }    /* the board's 1fr */
+.tf-table th:nth-child(5) { width: 12%; }    /* the board's 190 */
 .tf-table th:nth-child(6) { width: 132px; }  /* 118 + 14 (the board has 84) */
 .tf-table th:nth-child(7) { width: 71px; }   /* 52 + 7 + 12 */
+/* Wide enough for the board's own tracks beside the inspector (962 and up): Client 150
+   and Detail 190 as drawn, and the topic's 1fr takes what is left. */
+@media (min-width: 1600px) {
+  .tf-table th:nth-child(2) { width: 164px; }
+  .tf-table th:nth-child(4) { width: auto; }
+  .tf-table th:nth-child(5) { width: 204px; }
+}
 .tf-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 8px; }
 .tf-f { flex: 1 1 150px; min-width: 130px; }
 .tf-f .input { width: 100%; }
 .tf-chk { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); color: var(--muted-foreground); white-space: nowrap; }
 .tf-table tbody tr { cursor: pointer; }
 .tf-table tbody tr:hover { background: var(--muted); }
-.tf-count { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: var(--radius-pill); background: var(--muted); color: var(--muted-foreground); font-size: var(--fs-xs); }
+/* The request and its fold count (Main): the name is what gives when the track is
+   short (ellipsis, the whole name in the title), the count is a fixed-width tag that
+   is never cut. The board's .tag is plain 11 px mono. */
+.req { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+.req-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tf-count { flex: none; }
 .sec-title .livetoggle { margin-left: auto; text-transform: none; letter-spacing: 0; }
 
 /* the group timeline: what the coordinator did, newest first */
@@ -1129,10 +1197,10 @@ table.tbl.tf-table th:last-child, table.tbl.tf-table td:last-child { padding-rig
 :root[data-theme="contrast"] :focus-visible { outline-width: 3px; }
 
 /* The keys overlay (Sy-06), generated from the declared key map: three columns. */
-.help { width: min(900px, 94vw); max-height: 86vh; display: flex; flex-direction: column; background: var(--card); }
+.help { width: min(900px, 94vw); max-width: none; max-height: 86vh; display: flex; flex-direction: column; background: var(--card); }
 .help-h { padding: 12px 18px; border-bottom: 1px solid var(--line); flex: none; }
 .help-b { padding: 16px 18px; overflow-y: auto; display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
-.help-g { min-width: 220px; }
+.help-g { flex: 1 1 0; min-width: 220px; }
 .help-r { gap: 12px; }
 .help-k { display: inline-flex; gap: 4px; flex: none; }
 .help-k .kbd { margin: 0; }
@@ -1162,9 +1230,22 @@ table.tbl tbody tr.errrow.failed td { background: var(--badbg); }
 .r.errrow { background: var(--denybg); }
 .r.errrow.not-implemented { background: var(--warnbg); }
 .r.errrow.failed { background: var(--badbg); }
-.filter-note { white-space: nowrap; }
+/* The board's filter row is one row: the field, the kinds, then the note at the right,
+   which wraps inside itself when the page is narrow (Main at 1440 with the inspector
+   open). Below a phone's width it may drop under. */
+.filter-note { white-space: normal; text-align: right; }
+@media (min-width: 641px) {
+  #detail[data-traffic-view] .filterrow { flex-wrap: nowrap; }
+  /* A story's row holds the field, the kinds, the group's pill, "clear" and the count:
+     the board draws them on one row at 1440 and cannot beside the inspector (804 px),
+     where the count wraps to a second row at the right rather than run off the edge. */
+  #detail[data-traffic-view] .filterrow.story { flex-wrap: wrap; }
+  #detail[data-traffic-view] .filterrow.story > .grow { flex: 1 1 0; min-width: 0; }
+  #detail[data-traffic-view] .filterrow > *, #detail[data-traffic-view] .filterrow .inp, #detail[data-traffic-view] .filterrow .seg { flex: none; }
+  #detail[data-traffic-view] .filterrow > .grow { flex: 1 1 0; min-width: 0; }
+  #detail[data-traffic-view] .filterrow > .filter-note { flex: 0 1 auto; min-width: 0; }
+}
 .tf-cut { margin: 0 0 6px; }
-.tf-story-head { margin: 4px 0 6px; }
 .tf-story .r.kid { color: var(--mut); }
 .tf-story .r > .cell-result { white-space: normal; overflow: visible; overflow-wrap: break-word; text-overflow: clip; padding: 3px 0; } /* AD5: never cut; 20 + 6 + the rule is the board's 28 */
 .tf-story .r.rebalance .b { color: var(--ink); }
@@ -1229,3 +1310,4 @@ html[data-connection-lost] .up-only { display: none; }
 .main:has(#traffic-empty) #traffic-note { display: none; }
 .panes:has(#traffic-empty) > #inspector-panel { display: none; }
 html[data-connection-lost] #traffic-live[data-live].disconnected::after { display: none; }
+.main:has(#traffic-empty) { gap: 12px; }

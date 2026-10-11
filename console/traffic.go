@@ -471,9 +471,13 @@ func intervalText(e TrafficEvent) string {
 	return "every " + strconv.Itoa(int(each.Minutes()+0.5)) + " min"
 }
 
-// shortDuration is a duration a person reads at a glance: 0.4 ms, 12 ms, 2.5 s, 3m10s.
+// shortDuration is a duration a person reads at a glance: 42 µs, 0.4 ms, 12 ms, 2.5 s,
+// 3m10s. Under a tenth of a millisecond it is microseconds, so a request answered in
+// 40 µs does not read "0.0 ms", which says nothing was measured.
 func shortDuration(d time.Duration) string {
 	switch {
+	case d < 100*time.Microsecond:
+		return fmt.Sprintf("%d µs", max(d.Microseconds(), 0))
 	case d < time.Millisecond:
 		return fmt.Sprintf("%.1f ms", float64(d)/float64(time.Millisecond))
 	case d < time.Second:
@@ -486,7 +490,7 @@ func shortDuration(d time.Duration) string {
 	}
 }
 
-// spanText is how long ago something was, for a column of ages: "just now", 12s, 3m 10s, 2h 5m.
+// spanText is how long ago something was, for a column of ages: "just now", 12s, 3m 10s, 2h 05m, 3d 05h.
 func spanText(d time.Duration) string {
 	switch {
 	case d < 2*time.Second:
@@ -495,8 +499,10 @@ func spanText(d time.Duration) string {
 		return fmt.Sprintf("%ds", int(d.Seconds()))
 	case d < time.Hour:
 		return fmt.Sprintf("%dm %02ds", int(d.Minutes()), int(d.Seconds())%60)
-	default:
+	case d < 48*time.Hour:
 		return fmt.Sprintf("%dh %02dm", int(d.Hours()), int(d.Minutes())%60)
+	default:
+		return fmt.Sprintf("%dd %02dh", int(d.Hours())/24, int(d.Hours())%24)
 	}
 }
 

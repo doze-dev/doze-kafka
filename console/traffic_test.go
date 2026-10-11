@@ -294,7 +294,11 @@ func TestWithoutATrafficSourceThereIsNoTrafficSection(t *testing.T) {
 func TestShortDuration(t *testing.T) {
 	for in, want := range map[time.Duration]string{
 		400 * time.Microsecond: "0.4 ms", 12 * time.Millisecond: "12 ms", 2500 * time.Millisecond: "2.5 s",
-		190 * time.Second: "3m10s", 0: "0.0 ms",
+		190 * time.Second: "3m10s", 0: "0 µs",
+		// Under a tenth of a millisecond is microseconds, never "0.0 ms".
+		42 * time.Microsecond: "42 µs", 49 * time.Microsecond: "49 µs", 99*time.Microsecond + 900*time.Nanosecond: "99 µs",
+		100 * time.Microsecond: "0.1 ms", 960 * time.Microsecond: "1.0 ms", -3 * time.Microsecond: "0 µs",
+		time.Millisecond: "1 ms", 999 * time.Millisecond: "999 ms",
 	} {
 		if got := shortDuration(in); got != want {
 			t.Errorf("shortDuration(%v) = %q, want %q", in, got, want)
@@ -305,6 +309,8 @@ func TestShortDuration(t *testing.T) {
 func TestSpanText(t *testing.T) {
 	for in, want := range map[time.Duration]string{
 		0: "just now", time.Second: "just now", 12 * time.Second: "12s", 190 * time.Second: "3m 10s", 125 * time.Minute: "2h 05m",
+		// A record's age in the table is a span too: a day or more counts in days.
+		47 * time.Hour: "47h 00m", 48 * time.Hour: "2d 00h", 77 * time.Hour: "3d 05h",
 	} {
 		if got := spanText(in); got != want {
 			t.Errorf("spanText(%v) = %q, want %q", in, got, want)

@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { defineConfig } from '@playwright/test';
 import base from '../playwright.config';
 
@@ -16,4 +17,7 @@ export default defineConfig({
   retries: 0,
   reporter: 'list',
   outputDir: '../.tmp/evidence-results',
+  // The base command starts with `cd ..` from e2e/ (its config's directory); this
+  // config is one directory down, where that would not find the repository.
+  webServer: base.webServer && !Array.isArray(base.webServer) ? { ...base.webServer, cwd: resolve(import.meta.dirname, '..') } : base.webServer,
 });

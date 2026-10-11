@@ -430,8 +430,33 @@ test('Traf-12: a group filter tells the rebalance in order, with its generations
   await expect(reb).toHaveCSS('background-color', WARNBG);
   await expect(reb.locator(':scope > span').nth(3)).toContainText(/member/);
   await expect(story.locator('.tree').first()).toHaveText('└─');
-  await expect(page.locator('#story-count')).toHaveText(/\d+ requests( \(\d+ folded\))?, \d+ rebalances?/);
-  await expect(page.locator('#filter-pills .pill').first()).toContainText(GROUP);
+  // Traf-12 draws ONE row above the story: the field, the kinds, the group's pill,
+  // "clear", and the count at the right; no summary line, no "Filters" row.
+  const filterRow = page.locator('.filterrow');
+  await expect(filterRow.locator('#story-count')).toHaveText(/\d+ requests( \(\d+ folded\))?, \d+ rebalances?/);
+  await expect(filterRow.locator('.pill').first()).toContainText(GROUP);
+  await expect(filterRow.locator('a.b', { hasText: 'clear' })).toHaveAttribute('href', /\/traffic$/);
+  await expect(page.locator('#traffic-summary')).toHaveCount(0);
+  await expect(page.locator('#filter-pills')).toHaveCount(0);
+  // The chrome between the header and the story is the filter row (two rows at most
+  // beside the inspector: 804 px cannot hold the field, the kinds, the pill, "clear" and
+  // the count) and the board's gaps, not the ~104 px of summary, row, note, Filters and count.
+  const chrome = await page.evaluate(() => {
+    const idband = document.querySelector('main .idband')!.getBoundingClientRect();
+    const story = document.querySelector('#traffic-story')!.getBoundingClientRect();
+    return story.top - idband.bottom;
+  });
+  expect(chrome).toBeLessThanOrEqual(90);
+  // Nothing is off the card's right edge: the count and "clear" are on the screen.
+  const edge = await page.evaluate(() => document.querySelector('.filterrow')!.getBoundingClientRect().right);
+  for (const sel of ['#story-count', '.filterrow a.b']) {
+    expect((await page.locator(sel).boundingBox())!.x + (await page.locator(sel).boundingBox())!.width).toBeLessThanOrEqual(edge + 1);
+  }
+  // The board's foot note, and the way back to a plain list.
+  const note = page.locator('#traffic-note');
+  await expect(note).toContainText('Indented rows belong to the rebalance above them.');
+  await expect(note).toContainText('Idle repeats fold; any change breaks the fold.');
+  await expect(note.locator('a')).toHaveText('Show them as a plain list');
   // The inspector is the group's timeline: why, and the generations.
   const g = page.locator('#group-summary');
   await expect(page.locator('#insp-default .cap').first()).toHaveText('Group timeline');
@@ -592,4 +617,70 @@ test('the open client row and the open story row are drawn open too', async ({ p
   await expect(kid).toHaveClass(/\bon\b/);
   await expect(kid).toHaveCSS('background-color', SEL);
   await expect(page.locator('#traffic-story .r[aria-current="true"]')).toHaveCount(1);
+});
+
+// ---------------------------------------------------------------------------------------
+// What the evidence run measured on Main against the board.
+
+test('Main: the fold count is never cut, a long name gives way to it, and the time is ink', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await lightTraffic(page);
+  const folded = page.locator('#traffic-table tbody tr', { hasText: 'Heartbeat' }).filter({ has: page.locator('.tf-count') }).first();
+  await expect(folded).toBeVisible({ timeout: 30_000 });
+  // Every folded row in view: its count lies wholly inside its cell, however long the name.
+  const cut = await page.evaluate(() => Array.from(document.querySelectorAll('#traffic-table td.cell-req')).flatMap((td) => {
+    const count = td.querySelector('.tf-count');
+    if (!count) return [];
+    const c = count.getBoundingClientRect(), t = td.getBoundingClientRect();
+    const pr = parseFloat(getComputedStyle(td).paddingRight);
+    return c.right <= t.right - pr + 0.5 && c.left >= t.left ? [] : [`${td.textContent!.trim()}: count ${c.left}-${c.right} in cell ${t.left}-${t.right - pr}`];
+  }));
+  expect(cut).toEqual([]);
+  // A name that does not fit is ellipsised, and says itself whole on hover.
+  const longest = page.locator('#traffic-table td.cell-req', { hasText: 'GetTelemetrySubscriptions' }).first();
+  if (await longest.count()) {
+    await expect(longest).toHaveAttribute('title', /^GetTelemetrySubscriptions v\d+/);
+    await expect(longest.locator('.req-n')).toHaveCSS('text-overflow', 'ellipsis');
+  }
+  // The count is the board's plain 11 px tag, not a pill.
+  const count = folded.locator('.tf-count');
+  await expect(count).toHaveCSS('font-size', '11px');
+  await expect(count).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  // The time is plain .m, ink; the client's name is plain too (it still opens the client).
+  await expect(folded.locator('td.cell-time')).toHaveCSS('color', 'rgb(23, 25, 28)');
+  const name = folded.locator('td.cell-client a');
+  await expect(name).toHaveCSS('text-decoration-line', 'none');
+  await expect(name).toHaveAttribute('hx-get', /inspect\/client\?key=/);
+});
+
+test('Main: the filter row is one row with its note at the right, as the board draws it', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await lightTraffic(page);
+  const geo = await page.evaluate(() => {
+    const q = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+    return { input: q('.filterrow input[name=q]'), seg: q('.filterrow .seg'), note: q('#filter-note'), row: q('.filterrow') };
+  });
+  // The note shares the field's row (its top is inside the field's height) and sits to the right of the kinds.
+  expect(geo.note.top).toBeLessThan(geo.input.bottom);
+  expect(geo.note.left).toBeGreaterThanOrEqual(geo.seg.right);
+  expect(geo.note.right).toBeLessThanOrEqual(geo.row.right + 1);
+});
+
+test('Traf-06: a client\'s name is a bold, underlined link, as the board draws it', async ({ page }) => {
+  await lightTraffic(page, 'traffic?view=clients');
+  const name = page.locator('#clients-table tbody tr', { hasText: CLIENT }).first().locator('td').first().locator('a');
+  await expect(name).toHaveText(CLIENT);
+  await expect(name).toHaveCSS('font-weight', '600');
+  await expect(name).toHaveCSS('text-decoration-line', 'underline');
+  await name.click();
+  await expect(page.locator('#inspector')).toBeVisible();
+});
+
+test('Main: page padding is the board\'s 16 20 0 with the 10 px gap, whatever the filter', async ({ page }) => {
+  for (const path of ['traffic', 'traffic?topic=seed-orders', 'traffic?kind=errors', 'traffic?view=clients', `traffic?group=${GROUP}`]) {
+    await lightTraffic(page, path);
+    const main = page.locator('main.main');
+    await expect(main, path).toHaveCSS('padding', '16px 20px 0px');
+    await expect(main, path).toHaveCSS('row-gap', '10px');
+  }
 });

@@ -715,7 +715,7 @@ func TestSearchFindsRecordsAndSaysHowFarItLooked(t *testing.T) {
 	}
 
 	all := get("partition=0&q=needle&all=1")
-	if !strings.Contains(all, `id="hit-1-0"`) || !strings.Contains(all, `id="hit-0-30"`) || !strings.Contains(all, "<th class=\"num\">Partition</th>") {
+	if !strings.Contains(all, `id="hit-1-0"`) || !strings.Contains(all, `id="hit-0-30"`) || !strings.Contains(all, "<th class=\"col-p\">P</th>") {
 		t.Error("searching all partitions should find matches on each, and say which")
 	}
 	if !strings.Contains(all, "across 2 partitions: 5 matches") {

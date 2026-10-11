@@ -89,8 +89,25 @@ func TestTrafficBoardsRenderWhatTheRecorderHolds(t *testing.T) {
 			t.Errorf("the group story does not show %q", want)
 		}
 	}
+	// Traf-12 draws one row above the story: the field, the kinds, the group's pill, clear
+	// and the count; no summary line, no Filters row; its foot note and the way out.
+	for _, want := range []string{`class="seg"`, `class="pill"`, `class="b">clear</a>`, `id="story-count"`} {
+		if !strings.Contains(st, want) {
+			t.Errorf("the story's filter row does not show %q", want)
+		}
+	}
+	for _, gone := range []string{`id="traffic-summary"`, `id="filter-pills"`} {
+		if strings.Contains(st, gone) {
+			t.Errorf("the story page still draws %s", gone)
+		}
+	}
+	if !strings.Contains(st, "Indented rows belong to the rebalance above them.") || !strings.Contains(st, "Idle repeats fold; any change breaks the fold.") {
+		t.Error("the story's foot note is not drawn")
+	}
 	if flat := req(t, c, "GET", "/_console/traffic?group=g-order-validator&flat=1", nil).Body.String(); strings.Contains(flat, `id="traffic-story"`) {
 		t.Error("flat still shows the story")
+	} else if !strings.Contains(flat, `id="traffic-summary"`) || strings.Contains(flat, `class="filterrow story"`) {
+		t.Error("a plain list is the Traffic page with its summary and its own filter row")
 	}
 	// The generations table draws the newest generation as the board's .on row, and only that.
 	gens := between(st, `id="group-summary"`, "What the sequence means")

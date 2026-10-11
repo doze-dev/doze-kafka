@@ -27,33 +27,33 @@ Dark: --bg #111315, --card #191c1f, --ink #e9eaeb, --mut #a3a9b0, --line #2d3136
 
 | Board | State | Files | Key values (live) | Verdict |
 |---|---|---|---|---|
-| Sy-01 | a topic with a message open in the inspector | [dark](stage-0/Sy-01-dark.png), [light](stage-0/Sy-01-light.png), [board](stage-0/Sy-01-ref.png) | rail 196; inspector 420; top 44; h1 16px/24px 600; row 29; cols 66 153.6 200 58.9 75.9 | MATCHES (specimen values DEVIATES: inspector 420 vs 400, page padding, h1 16 mono vs 18/24) |
-| Sy-02 | the same page in the dark theme | [dark](stage-0/Sy-02-dark.png), [light](stage-0/Sy-02-light.png), [board](stage-0/Sy-02-ref.png) | rail 196; inspector 420; top 44; h1 16px/24px 600; row 29; cols 66 153.6 200 58.9 75.9 | MATCHES (specimen values DEVIATES; "Copy as curl" CUT) |
-| Sy-03 | a topic with a message open at 960 (tablet) | [960 dark](stage-0/Sy-03-960-dark.png), [960 light](stage-0/Sy-03-960-light.png), [board](stage-0/Sy-03-ref.png) | rail 48; inspector 880; top 44; h1 16px/24px 600; row 29; cols 66 153.6 200 382.5 75.9 | MATCHES |
-| Sy-04 | a topic with a message open at 390 (phone) | [390 dark](stage-0/Sy-04-390-dark.png), [390 light](stage-0/Sy-04-390-light.png), [board](stage-0/Sy-04-ref.png) | inspector 390; top 44; h1 16px/24px 600; row 135; cols 15.6 344 320.4 344 320.4 | MATCHES ("Copy as curl" CUT) |
-| Sy-05 | the command palette open over a topic, "ord" typed | [dark](stage-0/Sy-05-dark.png), [light](stage-0/Sy-05-light.png), [board](stage-0/Sy-05-ref.png) | rail 196; top 44; h1 16px/24px 600; row 29; cols 66 153.6 200 462.5 75.9 | MATCHES (specimen values DEVIATES; hint of "Follow a message by trace id" DEVIATES) |
-| Sy-06 | the keyboard shortcuts overlay over Traffic | [dark](stage-0/Sy-06-dark.png), [light](stage-0/Sy-06-light.png), [board](stage-0/Sy-06-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 111 164 132 110 204 132 71 | MATCHES |
-| Sy-07 | the Topics page in light, dark and high contrast (the contrast file has no board image of its own) | [contrast](stage-0/Sy-07-contrast.png), [dark](stage-0/Sy-07-dark.png), [light](stage-0/Sy-07-light.png), [board](stage-0/Sy-07-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 193.5 74 84 96 157.2 76 169.3 | MATCHES |
-| Sy-08 | a fresh, empty broker: "Your broker is up" | [dark](stage-0/Sy-08-dark.png), [light](stage-0/Sy-08-light.png), [390 dark](stage-0/Sy-08-390-dark.png), [390 light](stage-0/Sy-08-390-light.png), [board](stage-0/Sy-08-ref.png) | rail 196; top 44; h1 26px/32px 600 | MATCHES |
-| Tp-Home | Topics, nothing open | [dark](stage-0/Tp-Home-dark.png), [light](stage-0/Tp-Home-light.png), [board](stage-0/Tp-Home-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 193.5 74 84 96 157.2 76 169.3 | MATCHES |
-| Gr-Home | Groups, nothing open | [dark](stage-0/Gr-Home-dark.png), [light](stage-0/Gr-Home-light.png), [board](stage-0/Gr-Home-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 183 110 110 70 197 86 110 | MATCHES |
-| Sc-Home | Schemas, nothing open | [dark](stage-0/Sc-Home-dark.png), [light](stage-0/Sc-Home-light.png), [board](stage-0/Sc-Home-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 265.1 90 70 80 160 198.9 | DEVIATES (registry wire dock CUT) |
+| Sy-01 | a topic with a message open in the inspector | [dark](stage-0/Sy-01-dark.png), [light](stage-0/Sy-01-light.png), [board](stage-0/Sy-01-ref.png) | rail 196; inspector 420; top 44; h1 18px/24px 600; row 28; cols 45 86 134 188 81 | MATCHES (specimen values DEVIATES: inspector 420 vs 400, padding 14 18 and h1 16 where the page boards draw 16 20 0 and 18, which the console follows) |
+| Sy-02 | the same page in the dark theme | [dark](stage-0/Sy-02-dark.png), [light](stage-0/Sy-02-light.png), [board](stage-0/Sy-02-ref.png) | rail 196; inspector 420; top 44; h1 18px/24px 600; row 28; cols 45 86 134 188 81 | MATCHES (specimen values DEVIATES as Sy-01; "Copy as curl" CUT) |
+| Sy-03 | a topic with a message open at 960 (tablet) | [960 dark](stage-0/Sy-03-960-dark.png), [960 light](stage-0/Sy-03-960-light.png), [board](stage-0/Sy-03-ref.png) | rail 48; inspector 880; top 44; h1 18px/24px 600; row 28; cols 45 86 134 532 81 | MATCHES |
+| Sy-04 | a topic with a message open at 390 (phone) | [390 dark](stage-0/Sy-04-390-dark.png), [390 light](stage-0/Sy-04-390-light.png), [board](stage-0/Sy-04-ref.png) | inspector 390; top 44; h1 18px/24px 600; row 135; cols 45 50.4 285.6 344 344 | DEVIATES (the sheet's arrows and close icon; "Copy as curl" CUT) |
+| Sy-05 | the command palette open over a topic, "e" typed (the seed has one name with "ord" in it; a letter in more names shows the four groups of results) | [dark](stage-0/Sy-05-dark.png), [light](stage-0/Sy-05-light.png), [board](stage-0/Sy-05-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 45 86 134 608 81 | MATCHES (specimen values DEVIATES as Sy-01; hint of "Follow a message by trace id" DEVIATES) |
+| Sy-06 | the keyboard shortcuts overlay over Traffic | [dark](stage-0/Sy-06-dark.png), [light](stage-0/Sy-06-light.png), [board](stage-0/Sy-06-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 111 128 144 120 96 132 71 | MATCHES |
+| Sy-07 | the Topics page in light, dark and high contrast (the contrast file has no board image of its own) | [contrast](stage-0/Sy-07-contrast.png), [dark](stage-0/Sy-07-dark.png), [light](stage-0/Sy-07-light.png), [board](stage-0/Sy-07-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 192 74 84 96 156 76 168 | MATCHES |
+| Sy-08 | a fresh, empty broker: "Your broker is up" | [dark](stage-0/Sy-08-dark.png), [light](stage-0/Sy-08-light.png), [390 dark](stage-0/Sy-08-390-dark.png), [390 light](stage-0/Sy-08-390-light.png), [board](stage-0/Sy-08-ref.png) | rail 196; top 44; h1 26px/32px 600 | DEVIATES (copy kept where the board's would be false for this build) |
+| Tp-Home | Topics, nothing open | [dark](stage-0/Tp-Home-dark.png), [light](stage-0/Tp-Home-light.png), [board](stage-0/Tp-Home-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 192 74 84 96 156 76 168 | MATCHES |
+| Gr-Home | Groups, nothing open | [dark](stage-0/Gr-Home-dark.png), [light](stage-0/Gr-Home-light.png), [board](stage-0/Gr-Home-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 181 110 110 70 195 86 110 | MATCHES |
+| Sc-Home | Schemas, nothing open | [dark](stage-0/Sc-Home-dark.png), [light](stage-0/Sc-Home-light.png), [board](stage-0/Sc-Home-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 262.8 90 70 80 160 197.2 | DEVIATES (registry wire dock CUT) |
 | Tc-Home | Trace, the field and nothing traced | [dark](stage-0/Tc-Home-dark.png), [light](stage-0/Tc-Home-light.png), [board](stage-0/Tc-Home-ref.png) | rail 196; top 44; h1 18px/24px 600 | DEVIATES (no recent-messages table; owner: trace) |
-| Ac-Home | Access, nothing open | [dark](stage-0/Ac-Home-dark.png), [light](stage-0/Ac-Home-light.png), [board](stage-0/Ac-Home-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 181.7 80 264.3 84 100 96 44 | MATCHES |
-| Cl-Home | Cluster, one page with its sections | [dark](stage-0/Cl-Home-dark.png), [light](stage-0/Cl-Home-light.png), [board](stage-0/Cl-Home-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 130 466 | DEVIATES (sub-pages are sections; owner: cluster) |
-| Tp-24 | the shell confirm dialog (Purge a topic, cancelled) | [dark](stage-0/Tp-24-dark.png), [light](stage-0/Tp-24-light.png), [board](stage-0/Tp-24-ref.png) | rail 196; top 44; h1 16px/24px 600; row 29; cols 66 153.6 200 462.5 75.9 | MATCHES |
-| Main | Traffic, live, nothing open | [dark](stage-2/Main-dark.png), [light](stage-2/Main-light.png), [390 dark](stage-2/Main-390-dark.png), [390 light](stage-2/Main-390-light.png), [board](stage-2/Main-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 111 164 132 110 204 132 71 | DEVIATES (AD4 to AD6, AD14) |
-| Traf-02 | filtered to a topic, with "Who touched" | [dark](stage-2/Traf-02-dark.png), [light](stage-2/Traf-02-light.png), [board](stage-2/Traf-02-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 111 164 132 110 204 132 71 | MATCHES |
-| Traf-03 | errors only, the most frequent refusal explained | [dark](stage-2/Traf-03-dark.png), [light](stage-2/Traf-03-light.png), [board](stage-2/Traf-03-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 48; cols 111 164 132 110 204 132 71 | DEVIATES (refusals purple, headline wording) |
-| Traf-04 | a Produce request open, its decoded fields | [dark](stage-2/Traf-04-dark.png), [light](stage-2/Traf-04-light.png), [board](stage-2/Traf-04-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 111 164 132 110 204 132 71 | DEVIATES (field names in snake case) |
-| Traf-05 | a folded heartbeat row open, its ticks | [dark](stage-2/Traf-05-dark.png), [light](stage-2/Traf-05-light.png), [board](stage-2/Traf-05-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 111 164 132 110 204 132 71 | DEVIATES (latest generation, last 64 repeats) |
-| Traf-06 | the Clients view, nothing open | [dark](stage-2/Traf-06-dark.png), [light](stage-2/Traf-06-light.png), [390 dark](stage-2/Traf-06-390-dark.png), [390 light](stage-2/Traf-06-390-light.png), [board](stage-2/Traf-06-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 182.4 199.5 124.8 153.6 93.4 113.6 102.7 143.2 92.8 | DEVIATES (built from CUT; see the table) |
-| Traf-07 | a client that reports metrics, open | [dark](stage-2/Traf-07-dark.png), [light](stage-2/Traf-07-light.png), [board](stage-2/Traf-07-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 330 204 0 0 0 0 104 0 168 | DEVIATES (labels, line not bars, "worth a look" only when non-zero) |
-| Traf-08 | paused, with the count of requests missed | [dark](stage-2/Traf-08-dark.png), [light](stage-2/Traf-08-light.png), [board](stage-2/Traf-08-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 111 164 132 110 204 132 71 | MATCHES |
+| Ac-Home | Access, nothing open | [dark](stage-0/Ac-Home-dark.png), [light](stage-0/Ac-Home-light.png), [board](stage-0/Ac-Home-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 180.1 80 261.9 84 100 96 44 | MATCHES |
+| Cl-Home | Cluster, one page with its sections | [dark](stage-0/Cl-Home-dark.png), [light](stage-0/Cl-Home-light.png), [board](stage-0/Cl-Home-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 130 462 | DEVIATES (sub-pages are sections; the wire dock CUT, CLU-32; owner: cluster) |
+| Tp-24 | the shell confirm dialog (Purge a topic, cancelled) | [dark](stage-0/Tp-24-dark.png), [light](stage-0/Tp-24-light.png), [board](stage-0/Tp-24-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 45 86 134 608 81 | MATCHES |
+| Main | Traffic, live, nothing open | [dark](stage-2/Main-dark.png), [light](stage-2/Main-light.png), [390 dark](stage-2/Main-390-dark.png), [390 light](stage-2/Main-390-light.png), [board](stage-2/Main-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 111 128 144 120 96 132 71 | DEVIATES (AD4 to AD6, AD14; Request 130, Client/Topic/Detail share the rest beside the inspector) |
+| Traf-02 | filtered to a topic, with "Who touched" | [dark](stage-2/Traf-02-dark.png), [light](stage-2/Traf-02-light.png), [board](stage-2/Traf-02-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 111 128 144 120 96 132 71 | MATCHES |
+| Traf-03 | errors only, the most frequent refusal explained | [dark](stage-2/Traf-03-dark.png), [light](stage-2/Traf-03-light.png), [board](stage-2/Traf-03-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 48; cols 111 128 144 120 96 132 71 | DEVIATES (refusals purple, headline wording) |
+| Traf-04 | a Produce request open, its decoded fields | [dark](stage-2/Traf-04-dark.png), [light](stage-2/Traf-04-light.png), [board](stage-2/Traf-04-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 111 128 144 120 96 132 71 | DEVIATES (field names in snake case) |
+| Traf-05 | a folded heartbeat row open, its ticks | [dark](stage-2/Traf-05-dark.png), [light](stage-2/Traf-05-light.png), [board](stage-2/Traf-05-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 111 128 144 120 96 132 71 | DEVIATES (latest generation, last 64 repeats) |
+| Traf-06 | the Clients view, nothing open | [dark](stage-2/Traf-06-dark.png), [light](stage-2/Traf-06-light.png), [390 dark](stage-2/Traf-06-390-dark.png), [390 light](stage-2/Traf-06-390-light.png), [board](stage-2/Traf-06-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 182.4 197.2 124.8 153.6 93 113.4 102 142.8 92.8 | DEVIATES (built from CUT; see the table) |
+| Traf-07 | a client that reports metrics, open | [dark](stage-2/Traf-07-dark.png), [light](stage-2/Traf-07-light.png), [board](stage-2/Traf-07-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 327.4 204 0 0 0 0 104 0 166.6 | DEVIATES (labels, line not bars, "worth a look" only when non-zero) |
+| Traf-08 | paused, with the count of requests missed | [dark](stage-2/Traf-08-dark.png), [light](stage-2/Traf-08-light.png), [board](stage-2/Traf-08-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 111 128 144 120 96 132 71 | MATCHES |
 | Traf-09 | a broker nothing has asked anything of | [dark](stage-2/Traf-09-dark.png), [light](stage-2/Traf-09-light.png), [board](stage-2/Traf-09-ref.png) | rail 196; top 44; h1 18px/24px 600 | DEVIATES (adds start time and the restart sentence) |
-| Traf-10 | the broker killed under an open page: rows frozen | [dark](stage-2/Traf-10-dark.png), [light](stage-2/Traf-10-light.png), [board](stage-2/Traf-10-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 111 164 132 392 204 132 71 | DEVIATES (no link to Bad-Down; retry every 5 s) |
-| Traf-11 | a client that reports no metrics, open | [dark](stage-2/Traf-11-dark.png), [light](stage-2/Traf-11-light.png), [board](stage-2/Traf-11-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 330 204 0 0 0 0 104 0 168 | DEVIATES ("asked and got none" is false) |
-| Traf-12 | a group filter: the rebalance told in order | [dark](stage-2/Traf-12-dark.png), [light](stage-2/Traf-12-light.png), [board](stage-2/Traf-12-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 92 150 130 166 118 56 | DEVIATES (Epochs for 848, recorder detail) |
+| Traf-10 | the broker killed under an open page: rows frozen | [dark](stage-2/Traf-10-dark.png), [light](stage-2/Traf-10-light.png), [board](stage-2/Traf-10-ref.png) | rail 196; top 44; h1 18px/24px 600; row 28; cols 166 192.3 215.4 180.3 144.3 197.5 106.2 | DEVIATES (no link to Bad-Down; retry every 5 s) |
+| Traf-11 | a client that reports no metrics, open | [dark](stage-2/Traf-11-dark.png), [light](stage-2/Traf-11-light.png), [board](stage-2/Traf-11-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 327.4 204 0 0 0 0 104 0 166.6 | DEVIATES ("asked and got none" is false) |
+| Traf-12 | a group filter: the rebalance told in order | [dark](stage-2/Traf-12-dark.png), [light](stage-2/Traf-12-light.png), [board](stage-2/Traf-12-ref.png) | rail 196; inspector 400; top 44; h1 18px/24px 600; row 28; cols 92 150 130 162 118 56 | DEVIATES (Epochs for 848, recorder detail) |
 
 ## Measured differences, board against console
 
@@ -65,163 +65,109 @@ already (Result track, 28 px rows, inspector 400).
 
 **Sy-01**
 
-- main padding: board 14px 18px 0px, console 14px 18px 12px
-- h1 family: board IBM Plex Sans, console IBM Plex Mono
+- main padding: board 14px 18px 0px, console 16px 20px 0px
+- main gap: board 10px, console 8px
+- h1 font: board 16px/24px 600, console 18px/24px 600
 - table header row padding: board 0px 12px, console 0px
-- first table row h: board 28, console 29
 - first table row padding: board 0px 12px, console 0px
-- first table row font: board 12px/20px 400, console 13px/20px 500
 - first table row background: board rgb(233, 232, 226), console rgba(0, 0, 0, 0)
-- primary button font: board 13px/20px 400, console 13px/20px 500
 
 **Sy-02**
 
-- main padding: board 14px 18px 0px, console 14px 18px 12px
-- h1 family: board IBM Plex Sans, console IBM Plex Mono
+- main padding: board 14px 18px 0px, console 16px 20px 0px
+- main gap: board 10px, console 8px
+- h1 font: board 16px/24px 600, console 18px/24px 600
 - table header row padding: board 0px 12px, console 0px
-- first table row h: board 28, console 29
 - first table row padding: board 0px 12px, console 0px
-- first table row font: board 12px/20px 400, console 13px/20px 500
 - first table row background: board rgb(38, 42, 47), console rgba(0, 0, 0, 0)
-- primary button font: board 13px/20px 400, console 13px/20px 500
 
 **Sy-03**
 
-- main padding: board 12px 16px 0px, console 12px 16px 8px
-- h1 family: board IBM Plex Sans, console IBM Plex Mono
+- h1 font: board 16px/24px 600, console 18px/24px 600
 - table header row padding: board 0px 12px, console 0px
-- first table row h: board 28, console 29
 - first table row padding: board 0px 12px, console 0px
-- first table row font: board 12px/20px 400, console 13px/20px 500
 - first table row background: board rgb(233, 232, 226), console rgba(0, 0, 0, 0)
-- primary button font: board 13px/20px 400, console 13px/20px 500
-
-**Sy-04**
-
-- primary button font: board 13px/20px 400, console 13px/20px 500
 
 **Sy-05**
 
-- main padding: board 14px 18px 0px, console 14px 18px 12px
-- h1 family: board IBM Plex Sans, console IBM Plex Mono
+- main padding: board 14px 18px 0px, console 16px 20px 0px
+- main gap: board 10px, console 8px
+- h1 font: board 16px/24px 600, console 18px/24px 600
 - table header row padding: board 0px 12px, console 0px
 - table header row columns: board 4, console 5
-- first table row h: board 28, console 29
 - first table row padding: board 0px 12px, console 0px
-- first table row font: board 12px/20px 400, console 13px/20px 500
 - first table row columns: board 4, console 5
-- primary button font: board 13px/20px 400, console 13px/20px 500
 
 **Sy-06**
 
-- main padding: board 16px 20px 0px, console 14px 18px 12px
 - table header row padding: board 0px 12px, console 0px
 - table header row columns: board 5, console 7
 - first table row padding: board 0px 12px, console 0px
-- first table row color: board rgb(23, 25, 28), console rgb(86, 91, 99)
 - first table row background: board rgb(233, 232, 226), console rgba(0, 0, 0, 0)
 - first table row columns: board 5, console 7
 
 **Sy-07**
 
-- main padding: board 16px 20px 0px, console 14px 18px 12px
+- main gap: board 10px, console 12px
 - first table row font: board 12px/20px 400, console 12px/20px 600
 - first table row columns: board 2, console 7
 - primary button font: board 13px/20px 400, console 13px/20px 500
 - callout background: board rgb(236, 228, 246), console rgb(255, 255, 255)
 
-**Sy-08**
-
-- main padding: board 36px 56px 0px, console 36px 56px 12px
-
 **Tp-Home**
 
-- main padding: board 16px 20px 0px, console 14px 18px 12px
 - table header row columns: board 8, console 7
 - first table row columns: board 8, console 7
 
-**Gr-Home**
-
-- main padding: board 16px 20px 0px, console 14px 18px 12px
-
 **Sc-Home**
 
-- main padding: board 16px 20px 0px, console 14px 18px 12px
 - first table row background: board rgb(233, 232, 226), console rgba(0, 0, 0, 0)
-
-**Tc-Home**
-
-- main padding: board 16px 20px 0px, console 14px 18px 12px
-- primary button font: board 13px/20px 400, console 13px/20px 500
-
-**Ac-Home**
-
-- main padding: board 16px 20px 0px, console 14px 18px 12px
-
-**Cl-Home**
-
-- main padding: board 16px 20px 0px, console 14px 18px 12px
 
 **Tp-24**
 
-- main padding: board 14px 20px 0px, console 14px 18px 12px
-- h1 font: board 17px/24px 600, console 16px/24px 600
-- h1 family: board IBM Plex Sans, console IBM Plex Mono
+- main padding: board 14px 20px 0px, console 16px 20px 0px
+- main gap: board 9px, console 8px
+- h1 font: board 17px/24px 600, console 18px/24px 600
 - table header row padding: board 0px 12px, console 0px
-- first table row h: board 28, console 29
 - first table row padding: board 0px 12px, console 0px
-- first table row font: board 12px/20px 400, console 13px/20px 500
-- primary button font: board 13px/20px 400, console 13px/20px 500
 
 **Main**
 
-- main padding: board 16px 20px 0px, console 14px 18px 12px
 - table header row padding: board 0px 12px, console 0px
 - first table row padding: board 0px 12px, console 0px
-- first table row color: board rgb(23, 25, 28), console rgb(86, 91, 99)
 - first table row background: board rgb(233, 232, 226), console rgba(0, 0, 0, 0)
 
 **Traf-02**
 
-- main padding: board 16px 20px 0px, console 14px 18px 12px
 - table header row padding: board 0px 12px, console 0px
 - first table row padding: board 0px 12px, console 0px
-- first table row color: board rgb(23, 25, 28), console rgb(86, 91, 99)
 - first table row background: board rgb(233, 232, 226), console rgba(0, 0, 0, 0)
 
 **Traf-03**
 
-- main padding: board 16px 20px 0px, console 14px 18px 12px
 - table header row padding: board 0px 12px, console 0px
 - first table row h: board 28, console 48
 - first table row padding: board 0px 12px, console 0px
-- first table row color: board rgb(23, 25, 28), console rgb(86, 91, 99)
 - first table row background: board rgb(248, 227, 224), console rgb(236, 228, 246)
 
 **Traf-04**
 
-- main padding: board 16px 20px 0px, console 14px 18px 12px
 - table header row padding: board 0px 12px, console 0px
 - first table row padding: board 0px 12px, console 0px
-- first table row color: board rgb(23, 25, 28), console rgb(86, 91, 99)
 
 **Traf-05**
 
-- main padding: board 16px 20px 0px, console 14px 18px 12px
 - table header row padding: board 0px 12px, console 0px
 - first table row padding: board 0px 12px, console 0px
-- first table row color: board rgb(23, 25, 28), console rgb(86, 91, 99)
 - first table row background: board rgba(0, 0, 0, 0), console rgb(233, 232, 226)
 
 **Traf-06**
 
-- main padding: board 16px 20px 0px, console 14px 18px 12px
 - table header row padding: board 0px 12px, console 0px
 - first table row padding: board 0px 12px, console 0px
 
 **Traf-07**
 
-- main padding: board 16px 20px 0px, console 14px 18px 12px
 - table header row padding: board 0px 12px, console 0px
 - table header row columns: board 4, console 9
 - first table row padding: board 0px 12px, console 0px
@@ -230,35 +176,20 @@ already (Result track, 28 px rows, inspector 400).
 
 **Traf-08**
 
-- main padding: board 16px 20px 0px, console 14px 18px 12px
 - table header row padding: board 0px 12px, console 0px
 - first table row padding: board 0px 12px, console 0px
-- first table row color: board rgb(23, 25, 28), console rgb(86, 91, 99)
-- primary button font: board 12px/20px 400, console 12px/20px 500
-
-**Traf-09**
-
-- main padding: board 16px 20px 0px, console 14px 18px 12px
 
 **Traf-10**
 
-- main padding: board 16px 20px 0px, console 14px 18px 12px
 - table header row padding: board 0px 12px, console 0px
 - first table row padding: board 0px 12px, console 0px
+- first table row color: board rgb(86, 91, 99), console rgb(23, 25, 28)
 - first table row background: board rgb(247, 247, 244), console rgba(0, 0, 0, 0)
 - first table row columns: board 1, console 7
-- primary button font: board 13px/20px 400, console 13px/20px 500
-- pill color: board rgb(179, 37, 27), console rgb(23, 25, 28)
-- pill background: board rgb(248, 227, 224), console rgb(255, 255, 255)
 
 **Traf-11**
 
-- main padding: board 16px 20px 0px, console 14px 18px 12px
 - table header row padding: board 0px 12px, console 0px
 - table header row columns: board 4, console 9
 - first table row padding: board 0px 12px, console 0px
 - first table row columns: board 4, console 9
-
-**Traf-12**
-
-- main padding: board 16px 20px 0px, console 14px 18px 12px

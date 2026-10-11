@@ -27,12 +27,13 @@
     </nav>
     {{end}}
 
-    {{template "traffic_summary" .}}
+    {{/* Traf-12 draws no summary line: the filter row is the one row above the story. */}}
+    {{if not .HasStory}}{{template "traffic_summary" .}}{{end}}
 
     {{if eq .TView "requests"}}
     {{/* The filter is a plain GET form outside the polled region, so what is typed
          is not thrown away by a refresh. */}}
-    <div class="filterrow">
+    <div class="filterrow{{if .HasStory}} story{{end}}">
       <form method="get" action="{{.Prefix}}/traffic" role="search" aria-label="Filter requests">
         <input class="inp m" name="q" value="{{.Filter.Q}}" placeholder="Client, topic, group or request" aria-label="Filter requests" spellcheck="false" autocomplete="off" data-filter-target="requests">
         {{if .Filter.Kind}}<input type="hidden" name="kind" value="{{.Filter.Kind}}">{{end}}
@@ -43,13 +44,21 @@
       <div class="seg" role="group" aria-label="Kind of request">
         {{range .Kinds}}<a class="{{if .On}}on{{end}}" href="{{.URL}}" {{if .On}}aria-current="true"{{end}}>{{.Label}}</a>{{end}}
       </div>
+      {{if .HasStory}}
+      <span class="row ce g8 nw">
+      {{range .Pills}}<span class="pill"><span class="mut">{{.Name}}</span><span class="m">{{.Value}}</span><a class="btn ghost sm pill-x" href="{{.URL}}" aria-label="Remove {{.Name}} filter">×</a></span>{{end}}
+      <a href="{{.Prefix}}/traffic" class="b">clear</a>
+      </span>
+      {{end}}
       <div class="grow"></div>
+      {{if .HasStory}}{{template "story_count" .}}{{else}}
       <span class="note filter-note" id="filter-note">{{if eq .KindWord "errors"}}<span class="m" id="refused-count">{{.RefusedMatching}} refused</span>{{else}}<span class="live-only">idle heartbeats and empty fetches fold into one row</span><span class="paused-only">the list is frozen, the broker is not</span>{{end}}</span>
+      {{end}}
     </div>
-    {{if .HasPills}}
+    {{if and .HasPills (not .HasStory)}}
     <div class="row ce g8 wrap" id="filter-pills">
       <span class="cap">Filters</span>
-      {{range .Pills}}<span class="pill"><span class="mut">{{.Name}}</span><span class="m">{{.Value}}</span><a class="btn ghost sm" style="height: 18px; padding: 0 4px" href="{{.URL}}" aria-label="Remove {{.Name}} filter">×</a></span>{{end}}
+      {{range .Pills}}<span class="pill"><span class="mut">{{.Name}}</span><span class="m">{{.Value}}</span><a class="btn ghost sm pill-x" href="{{.URL}}" aria-label="Remove {{.Name}} filter">×</a></span>{{end}}
       <span class="pill"><span class="mut">kind</span><span class="m">{{.KindWord}}</span></span>
       <a href="{{.Prefix}}/traffic" class="b">clear</a>
       <div class="grow"></div>
@@ -85,13 +94,13 @@
 </div>
 {{end}}
 
-{{define "traffic_note"}}{{if eq .TView "clients"}}Error rate is the requests that were refused, denied or failed over all requests in the last 5 minutes. Select a client to open it on the right.{{else if eq .KindWord "errors"}}{{if .RefusalCount}}{{if .FailedCount}}{{.FailedCount}} of the requests kept ended in the broker failing. Refusals that Kafka would also make are purple.{{else}}Refusals that Kafka would also make are purple. Anything red is the broker unhappy, and there is none.{{end}}{{else}}Nothing was refused in the {{.KeptText}} requests kept. Refusals that Kafka would also make are purple. Anything red is the broker unhappy, and there is none.{{end}}{{else if .HasPills}}Filtering looks at the last {{.KeptText}} requests kept in memory.{{if .Filter.Topic}} Group requests that name this topic are included.{{end}}{{else}}Select a row to open it on the right. A client name opens that client. Nothing here is written to disk.{{end}}{{end}}
+{{define "traffic_note"}}{{if eq .TView "clients"}}Error rate is the requests that were refused, denied or failed over all requests in the last 5 minutes. Select a client to open it on the right.{{else if eq .KindWord "errors"}}{{if .RefusalCount}}{{if .FailedCount}}{{.FailedCount}} of the requests kept ended in the broker failing. Refusals that Kafka would also make are purple.{{else}}Refusals that Kafka would also make are purple. Anything red is the broker unhappy, and there is none.{{end}}{{else}}Nothing was refused in the {{.KeptText}} requests kept. Refusals that Kafka would also make are purple. Anything red is the broker unhappy, and there is none.{{end}}{{else if .HasStory}}Indented rows belong to the rebalance above them. Rows below the last rebalance are from before it. Idle repeats fold; any change breaks the fold. <a href="{{.FlatURL}}">Show them as a plain list</a>{{else if .HasPills}}Filtering looks at the last {{.KeptText}} requests kept in memory.{{if .Filter.Topic}} Group requests that name this topic are included.{{end}}{{else}}Select a row to open it on the right. A client name opens that client. Nothing here is written to disk.{{end}}{{end}}
 
 {{/* traffic_live is the polled unit: the request tail, or the clients table. The
      summary line and the inspector's default ride along out of band. */}}
 {{define "traffic_live"}}
 <div id="traffic-live" data-live="{{.Prefix}}/traffic/live{{if .FilterQ}}?{{.FilterQ}}{{end}}" data-hash="{{.Hash}}" data-live-ms="2500"{{if eq .TView "requests"}} data-since="{{.NewestMs}}"{{end}}>
-  {{if .OOB}}{{template "traffic_summary" .}}
+  {{if .OOB}}{{if not .HasStory}}{{template "traffic_summary" .}}{{else}}{{template "story_count" dict "Story" .Story "OOB" true}}{{end}}
   {{if .InspDefault}}<div class="insp-default" id="insp-default" hx-swap-oob="true"{{if .DefaultHidden}} hidden{{end}}>{{template "insp_default" .}}</div>{{end}}
   <div class="tablenote" id="traffic-note" hx-swap-oob="true">{{template "traffic_note" .}}</div>
   {{template "keys_strip" .}}{{end}}
@@ -123,7 +132,7 @@
           hx-get="{{$.P}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
         <td class="m nw cell-time">{{when .Time "clockms"}}</td>
         <td class="m nw cell-client" title="{{.Remote}}{{if .Software}} · {{.Software}}{{end}}">{{if .ConnKey}}<a href="{{$.P}}/traffic?client={{.Who}}" data-inspector-open hx-get="{{$.P}}/inspect/client?key={{.ConnKey}}" hx-trigger="click consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false">{{.Who}}</a>{{else}}{{.Who}}{{end}}</td>
-        <td class="m nw cell-req" title="{{.API}} v{{.Version}}{{if .Correlation}} · correlation {{.Correlation}}{{end}}"><span class="b">{{.API}}</span> <span class="mut">v{{.Version}}</span>{{if .Folded}} <span class="tag tf-count" title="{{.Count}} identical requests, {{.SameSpan}}">×{{.Count}}</span>{{end}}</td>
+        <td class="m nw cell-req" title="{{.API}} v{{.Version}}{{if .Correlation}} · correlation {{.Correlation}}{{end}}"><span class="req"><span class="req-n"><span class="b">{{.API}}</span> <span class="mut">v{{.Version}}</span></span>{{if .Folded}}<span class="tag tf-count" title="{{.Count}} identical requests, {{.SameSpan}}">×{{.Count}}</span>{{end}}</span></td>
         <td class="m cell-topic"{{if .Target}} title="{{.Target}}"{{end}}>{{if .Target}}{{.Target}}{{else}}<span class="mut">—</span>{{end}}</td>
         <td class="mut cell-detail" title="{{if .Rhythm}}{{.Interval}}{{else}}{{.DetailText}}{{end}}">{{if .Rhythm}}{{.Interval}}, since {{when .First "clock"}}{{else if .DetailText}}{{.DetailText}}{{else}}—{{end}}</td>
         <td class="m cell-result"><span class="{{.Tone}}" title="{{.ResultTitle}}">{{wrapName .Result}}</span></td>
@@ -157,7 +166,7 @@
     <table class="tbl tf-clients" id="clients-table"><thead><tr><th>Client</th><th class="c-sw">Software</th><th class="c-pr">Principal</th><th class="c-ad">Address</th><th class="c-op">Open for</th><th class="c-la">Last request</th><th class="num c-rq">Req/min</th><th class="c-gr">Groups</th><th class="num c-er">Error rate</th></tr>
       <tr class="frozen-line lost-only"><td colspan="9" class="m">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</td></tr></thead>
       <tbody>{{range .Clients}}<tr id="cl-{{.Conn}}" class="{{if .NeedsALook}}needs-look{{end}}" tabindex="0" data-inspector-open data-open-keys="{{.Keys}}" aria-selected="false" hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
-        <td class="m b nw">{{.Who}}{{if gt .Conns 1}} <span class="mut" title="{{.Conns}} open connections from this client id">{{.Conns}} connections</span>{{end}}</td>
+        <td class="m b nw cell-client"><a class="m b" href="{{.Href}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false">{{.Who}}</a>{{if gt .Conns 1}} <span class="mut" title="{{.Conns}} open connections from this client id">{{.Conns}} connections</span>{{end}}</td>
         <td class="m c-sw">{{if .Software}}{{.Software}}{{else}}<span class="mut">not reported</span>{{end}}</td>
         <td class="m c-pr">{{.Principal}}</td>
         <td class="m c-ad">{{.Remote}}{{if gt .Conns 1}} <span class="mut">+{{.More}}</span>{{end}}</td>
@@ -179,7 +188,6 @@
 
 {{/* A group's rebalance told in order (Traf-12). */}}
 {{define "traffic_story"}}
-<div class="row ce g8 wrap tf-story-head"><span class="m" id="story-count"><span class="b">{{.Story.Requests}}</span> requests{{if .Story.Folded}} ({{.Story.Folded}} folded){{end}}, {{.Story.Rebalances}} rebalance{{if ne .Story.Rebalances 1}}s{{end}}</span><div class="grow"></div><a class="note" href="{{.FlatURL}}">Show them as a plain list</a></div>
 <div class="card tf-story" id="traffic-story" style="--c: 92px 150px 130px 1fr 118px 56px">
   <div class="r h"><span>Time</span><span>Client</span><span>Request</span><span>What happened</span><span>Result</span><span class="ra">Took</span></div>
   <div class="frozen-line lost-only m">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</div>
@@ -191,10 +199,13 @@
 </div>
 {{end}}
 
+{{/* The story's count, at the right of the filter row (Traf-12). */}}
+{{define "story_count"}}<span class="m" id="story-count"{{if .OOB}} hx-swap-oob="true"{{end}}><span class="b">{{.Story.Requests}}</span> requests{{if .Story.Folded}} ({{.Story.Folded}} folded){{end}}, {{.Story.Rebalances}} rebalance{{if ne .Story.Rebalances 1}}s{{end}}</span>{{end}}
+
 {{define "story_row"}}{{with .R}}<div class="r {{if not .Nested}}kid{{end}} {{.RowClass}}" id="rq-{{.OpenKey}}" tabindex="0" data-inspector-open data-open-keys="request:{{.OpenKey}}" data-row hx-get="{{$.P}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
   <span class="m">{{if and .Folded (not .Nested)}}{{when .First "clock"}}{{else}}{{when .Time "clockms"}}{{end}}</span>
   <span class="m">{{if .Nested}}<span class="tree" aria-hidden="true">└─</span> {{end}}{{.Who}}</span>
-  <span class="m b">{{.API}} <span class="mut">v{{.Version}}</span>{{if .Folded}} <span class="tag">×{{.Count}}</span>{{end}}</span>
+  <span class="m req" title="{{.API}} v{{.Version}}"><span class="req-n"><span class="b">{{.API}}</span> <span class="mut">v{{.Version}}</span></span>{{if .Folded}}<span class="tag tf-count" title="{{.Count}} identical requests">×{{.Count}}</span>{{end}}</span>
   <span class="mut el" title="{{if .Rhythm}}{{.Interval}}{{else}}{{.DetailText}}{{end}}">{{if .Rhythm}}{{.Interval}}, since {{when .First "clock"}}{{else}}{{.DetailText}}{{if .ViaGroup}}{{if not .DetailText}}fetch by a member{{end}}{{end}}{{end}}</span>
   <span class="m cell-result {{.Tone}}" title="{{.ResultTitle}}">{{wrapName .Result}}</span>
   <span class="m ra">{{.Dur}}</span>

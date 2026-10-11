@@ -249,7 +249,7 @@ Pieces from the foundation (`A1` inspector, `A2` refusals, `A3` teaching lines, 
 
 | Board | Template / handler | Status | Built from |
 |---|---|---|---|
-| Cl-Home | `cluster_home` in `cluster.html` / `c.cluster` | needs backend | Wire: DescribeCluster, Metadata, ListGroups, ListTransactions. `Identity()` for version, uptime, cluster id. `Storage()` total. Wire dock needs CLU-32. |
+| Cl-Home | `cluster_home` in `cluster.html` / `c.cluster` | needs backend | Wire: DescribeCluster, Metadata, ListGroups, ListTransactions. `Identity()` for version, uptime, cluster id. `Storage()` total. Wire dock needs CLU-32. **As built before this stage** (evidence run, foundation "Deviations from the boards"): the page counts "Compacted partitions" from each topic's `cleanup.policy` (the cleaner's own status stays CLU-24) and draws "What this broker is not" from DescribeCluster (one broker) and `docs/limitations.md`; **the wire dock is CUT and assigned here (CLU-32)**: the recorder drops the console's own requests (`isConsole`), so it has nothing to show. |
 | Cl-01 Config | `cluster_config` / `c.clusterConfig` | needs backend | `ConfigSnapshot()` with provenance (CLU-27), redaction (CLU-4); refusal card from a live `AlterConfigs` attempt (A2, "Not implemented"). Teaching lines from B7. |
 | Cl-02 Apis | `cluster_apis` / `c.clusterAPIs` | buildable | `protocol.APIs` filtered by profile, SASL, telemetry (CLU-17); live `ApiVersions` for "this broker". |
 | Cl-03 Limits | `cluster_limits` / `c.clusterLimits` | buildable | embedded `docs/limitations.md` as the single source (CLU-26). The board's headline sentence and the three groups map to the three `##` sections. |

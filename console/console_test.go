@@ -182,7 +182,7 @@ func TestProduceAndTape(t *testing.T) {
 	body := rec.Body.String()
 	// The value renders JSON-tinted: key and number tokens each wrapped in a
 	// tint span, with the raw text HTML-escaped inside.
-	for _, want := range []string{"msg-0", "k1", `<span class="jt-k">&#34;a&#34;</span>`, `<span class="jt-n">1</span>`, "hdrct"} {
+	for _, want := range []string{"msg-0", "k1", `<span class="jt-k">&#34;a&#34;</span>`, `<span class="jt-n">1</span>`, `title="7 B · 1 header"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("tape/table response missing %q:\n%s", want, body)
 		}
@@ -498,5 +498,29 @@ func TestAccessPageListsACLsUnderTheEnforcedBanner(t *testing.T) {
 	// The section is reached by name from the rail and by g a; the palette does not list it.
 	if pal := req(t, c, "GET", "/_console/api/palette", nil).Body.String(); strings.Contains(pal, `"u":"/_console/access"`) {
 		t.Error("the palette lists the Access page as a destination (Sy-05 has no Go to group)")
+	}
+}
+
+// Cl-Home counts the partitions of the topics whose cleanup.policy compacts them (from
+// the topics' own configuration), and says what this broker is not.
+func TestClusterOverviewCountsCompactedPartitionsAndSaysWhatTheBrokerIsNot(t *testing.T) {
+	c := newTestConsole(t)
+	topicWith(t, c, "plain", 2, 1)
+	if err := c.be.CreateTopic(context.Background(), "latest", 3, map[string]string{"cleanup.policy": "compact"}); err != nil {
+		t.Fatal(err)
+	}
+	body := req(t, c, "GET", "/_console/cluster", nil).Body.String()
+	for _, want := range []string{
+		`<span>Compacted partitions</span><span class="m ra b">3</span>`,
+		`What this broker is not`, `single node`, `replication factor reported as`, `no leader election, no ISR`,
+		`no KRaft, no ZooKeeper`, `not durable against disk loss`, `All limits`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("cluster overview missing %q", want)
+		}
+	}
+	// Another view does not read every topic's configuration for a count it does not draw.
+	if strings.Contains(req(t, c, "GET", "/_console/cluster?view=apis", nil).Body.String(), "Compacted partitions") {
+		t.Error("the APIs view draws the overview's counts")
 	}
 }
