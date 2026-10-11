@@ -3,6 +3,7 @@ package broker
 import (
 	"cmp"
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"strings"
@@ -18,17 +19,31 @@ import (
 // handleCreateTopics registers each topic (assigning a UUID) and materializes its
 // partition directories with LEO=0. Single-node: replication factor is always 1.
 func (b *Broker) handleCreateTopics(ctx context.Context, req *protocol.Request, cr *kmsg.CreateTopicsRequest, resp *kmsg.CreateTopicsResponse) error {
-	// A name listed twice is a malformed request: neither entry is acted on.
+	// A name listed twice is a malformed request: neither entry is acted on, and
+	// Kafka answers once per name ("Duplicate topic name.").
 	count := map[string]int{}
 	for _, t := range cr.Topics {
 		count[t.Topic]++
 	}
+	answered := map[string]bool{}
+	defer func() {
+		// Kafka answers an error with an empty list of configs, never null.
+		for i := range resp.Topics {
+			if resp.Topics[i].Configs == nil {
+				resp.Topics[i].Configs = []kmsg.CreateTopicsResponseTopicConfig{}
+			}
+		}
+	}()
 	for _, t := range cr.Topics {
 		if count[t.Topic] > 1 {
+			if answered[t.Topic] {
+				continue
+			}
+			answered[t.Topic] = true
 			rt := kmsg.NewCreateTopicsResponseTopic()
 			rt.Topic = t.Topic
 			rt.ErrorCode = kerr.InvalidRequest.Code
-			msg := "the topic is named more than once in this request"
+			msg := "Duplicate topic name."
 			rt.ErrorMessage = &msg
 			resp.Topics = append(resp.Topics, rt)
 			continue
@@ -52,37 +67,99 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 	rt := kmsg.NewCreateTopicsResponseTopic()
 	rt.Topic = t.Topic
 
+	refuse := func(code int16, format string, args ...any) kmsg.CreateTopicsResponseTopic {
+		rt.ErrorCode = code
+		msg := fmt.Sprintf(format, args...)
+		rt.ErrorMessage = &msg
+		return rt
+	}
+	// (The wording of the name, partition-count and config messages is this
+	// broker's own: the console shows it, and its tests read it. The codes are
+	// Kafka's. conformance/scenarios.go lists the steps whose text differs.)
+	if err := meta.ValidateTopicName(t.Topic); err != nil {
+		return refuse(kerr.InvalidTopicException.Code, "%s", strings.TrimPrefix(err.Error(), "meta: "))
+	}
+	if _, ok, _ := b.meta.Topic(t.Topic); ok {
+		return refuse(kerr.TopicAlreadyExists.Code, "Topic '%s' already exists.", t.Topic)
+	}
+	if all, err := b.meta.ListTopics(); err == nil {
+		names := make([]string, len(all))
+		for i, e := range all {
+			names[i] = e.Name
+		}
+		if c := meta.FindCollision(t.Topic, names); c != nil {
+			if c.CaseOnly {
+				return refuse(kerr.InvalidTopicException.Code,
+					"Topic '%s' collides with existing topic: %s (names that differ only in letter case would share a directory on a case-insensitive file system)", c.Name, c.Existing)
+			}
+			return refuse(kerr.InvalidTopicException.Code, "Topic '%s' collides with existing topic: %s", c.Name, c.Existing)
+		}
+	}
+
 	// -1 asks for the broker's default. Zero or any other negative count is not a
 	// request for the default; it used to be quietly turned into one.
 	partitions := t.NumPartitions
-	if partitions == -1 {
-		partitions = int32(b.cfg.DefaultPartitions)
-	}
-	if err := meta.ValidateTopicName(t.Topic); err != nil {
-		rt.ErrorCode = kerr.InvalidTopicException.Code
-		msg := strings.TrimPrefix(err.Error(), "meta: ") // a client is shown this; the package is not its business.
-		rt.ErrorMessage = &msg
-		return rt
-	}
-	if partitions <= 0 {
-		rt.ErrorCode = kerr.InvalidPartitions.Code
-		msg := fmt.Sprintf("%d is not a partition count (use -1 for the broker default)", t.NumPartitions)
-		rt.ErrorMessage = &msg
-		return rt
+	if len(t.ReplicaAssignment) > 0 {
+		// A manual assignment says how many partitions there are; the request
+		// must not say so as well, nor ask for a replication factor.
+		if t.ReplicationFactor != -1 {
+			return refuse(kerr.InvalidRequest.Code, "A manual partition assignment was specified, but replication factor was not set to -1.")
+		}
+		if t.NumPartitions != -1 {
+			return refuse(kerr.InvalidRequest.Code, "A manual partition assignment was specified, but numPartitions was not set to -1.")
+		}
+		byPartition := map[int32][]int32{}
+		for _, a := range t.ReplicaAssignment {
+			if _, dup := byPartition[a.Partition]; dup {
+				return refuse(kerr.InvalidReplicaAssignment.Code, "Partition %d is assigned more than once.", a.Partition)
+			}
+			byPartition[a.Partition] = a.Replicas
+		}
+		for p := int32(0); p < int32(len(t.ReplicaAssignment)); p++ {
+			if _, ok := byPartition[p]; !ok {
+				return refuse(kerr.InvalidReplicaAssignment.Code, "partitions should be a consecutive 0-based integer sequence")
+			}
+		}
+		for p := int32(0); p < int32(len(t.ReplicaAssignment)); p++ {
+			replicas := byPartition[p]
+			if len(replicas) == 0 {
+				return refuse(kerr.InvalidReplicaAssignment.Code, "The manual partition assignment includes an empty replica list for partition %d.", p)
+			}
+			seen := map[int32]bool{}
+			for _, r := range replicas {
+				if r != b.nodeID() {
+					return refuse(kerr.InvalidReplicaAssignment.Code, "The manual partition assignment includes broker %d, but no such broker is registered.", r)
+				}
+				if seen[r] {
+					return refuse(kerr.InvalidReplicaAssignment.Code, "The manual partition assignment includes the broker %d more than once.", r)
+				}
+				seen[r] = true
+			}
+		}
+		partitions = int32(len(t.ReplicaAssignment))
+	} else {
+		if partitions == -1 {
+			partitions = int32(b.cfg.DefaultPartitions)
+		}
+		if partitions <= 0 {
+			return refuse(kerr.InvalidPartitions.Code, "%d is not a partition count (use -1 for the broker default)", t.NumPartitions)
+		}
+		if t.ReplicationFactor == 0 || t.ReplicationFactor < -1 {
+			return refuse(kerr.InvalidReplicationFactor.Code, "Replication factor must be larger than 0, or -1 to use the default value.")
+		}
 	}
 	if err := validateTopicConfig(configMap(t.Configs)); err != nil {
-		rt.ErrorCode = kerr.InvalidConfig.Code
-		msg := err.Error()
-		rt.ErrorMessage = &msg
-		return rt
+		return refuse(kerr.InvalidConfig.Code, "%s", err.Error())
 	}
 	if int(partitions) > b.cfg.MaxPartitions {
-		rt.ErrorCode = kerr.InvalidPartitions.Code
-		msg := fmt.Sprintf("%d partitions is above this broker's limit of %d (--max-partitions)", partitions, b.cfg.MaxPartitions)
-		rt.ErrorMessage = &msg
-		return rt
+		return refuse(kerr.InvalidPartitions.Code, "%d partitions is above this broker's limit of %d (--max-partitions)", partitions, b.cfg.MaxPartitions)
 	}
 	if validateOnly {
+		// Kafka answers a validation with an id it made up for the topic that
+		// was not created.
+		var id meta.TopicID
+		_, _ = rand.Read(id[:])
+		rt.TopicID = id
 		rt.NumPartitions = partitions
 		rt.ReplicationFactor = 1
 		rt.Configs = b.createdConfigs(meta.Topic{Name: t.Topic, Config: configMap(t.Configs)})
@@ -93,6 +170,8 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 	if err != nil {
 		if errors.Is(err, meta.ErrTopicExists) {
 			rt.ErrorCode = kerr.TopicAlreadyExists.Code
+			msg := fmt.Sprintf("Topic '%s' already exists.", t.Topic)
+			rt.ErrorMessage = &msg
 		} else if errors.Is(err, meta.ErrTopicCollides) {
 			rt.ErrorCode = kerr.InvalidTopicException.Code
 			msg := strings.TrimPrefix(err.Error(), "meta: ")

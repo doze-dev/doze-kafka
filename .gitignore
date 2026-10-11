@@ -27,5 +27,3 @@ compat/**/node_modules/
 compat/**/target/
 compat/**/.venv/
 console/cm6/node_modules/
-!scripts/coverage.sh
-!testdata/coverage.txt

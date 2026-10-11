@@ -15,6 +15,10 @@ import (
 // group.go), and encodes the response. The coordinator state machine, timers, and
 // deferred join/sync completion all live in group.go.
 
+// invalidRequestMessage is the sentence Apache Kafka puts in an INVALID_REQUEST
+// answer that carries no reason of its own.
+const invalidRequestMessage = "This most likely occurs because of a request being malformed by the client library or the message was sent to an incompatible broker. See the broker logs for more details."
+
 // handleFindCoordinator returns this broker as the coordinator for any group (or
 // transaction) key — single-node is always its own coordinator. It answers both
 // the v0-v3 single-key form and the v4+ batched CoordinatorKeys form.
@@ -38,11 +42,33 @@ func (b *Broker) handleFindCoordinator(ctx context.Context, req *protocol.Reques
 		return kerr.TransactionalIDAuthorizationFailed.Code
 	}
 
-	// v0-v3 single-coordinator fields.
+	// Only a group (0) and a transaction (1) have a coordinator here. A share
+	// group (2) needs v6, which is not offered; anything else is no type at all.
+	// Kafka answers INVALID_REQUEST, and says nothing in the share-group case.
+	badType := fr.CoordinatorType != 0 && fr.CoordinatorType != 1 && req.Header.APIVersion >= 1
+	badMessage := func() *string {
+		if fr.CoordinatorType == 2 {
+			return nil
+		}
+		m := invalidRequestMessage
+		return &m
+	}
+
+	// v0-v3 single-coordinator fields. A success reads "NONE" from v1 to v3, the
+	// word Kafka puts there (v0 has no message).
 	resp.NodeID = node
 	resp.Host = host
 	resp.Port = port
-	if denied(fr.CoordinatorKey) {
+	if req.Header.APIVersion >= 1 && req.Header.APIVersion <= 3 {
+		none := "NONE"
+		resp.ErrorMessage = &none
+	}
+	switch {
+	case badType:
+		resp.ErrorCode = kerr.InvalidRequest.Code
+		resp.ErrorMessage = badMessage()
+		resp.NodeID, resp.Host, resp.Port = -1, "", -1
+	case denied(fr.CoordinatorKey):
 		resp.ErrorCode = deniedCode()
 		resp.NodeID, resp.Host, resp.Port = -1, "", -1
 	}
@@ -54,7 +80,16 @@ func (b *Broker) handleFindCoordinator(ctx context.Context, req *protocol.Reques
 		c.NodeID = node
 		c.Host = host
 		c.Port = port
-		if denied(key) {
+		empty := ""
+		c.ErrorMessage = &empty
+		switch {
+		case badType:
+			c.ErrorCode = kerr.InvalidRequest.Code
+			if m := badMessage(); m != nil {
+				c.ErrorMessage = m
+			}
+			c.NodeID, c.Host, c.Port = -1, "", -1
+		case denied(key):
 			c.ErrorCode = deniedCode()
 			c.NodeID, c.Host, c.Port = -1, "", -1
 		}
@@ -93,7 +128,9 @@ func (b *Broker) handleJoinGroup(ctx context.Context, req *protocol.Request, jr 
 		p := res.protocol
 		resp.Protocol = &p
 	}
-	if jr.ProtocolType != "" { // v7+ echoes the request's protocol type.
+	// v7+ echoes the request's protocol type, on a join that succeeded: Kafka's
+	// MEMBER_ID_REQUIRED (and every other refusal) carries none.
+	if jr.ProtocolType != "" && res.errorCode == errNone {
 		pt := jr.ProtocolType
 		resp.ProtocolType = &pt
 	}

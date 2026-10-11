@@ -82,6 +82,9 @@ func openSegment(dir string, baseOffset, indexInterval int64, beforeSync func() 
 // entry. It never fsyncs — durability is the coarse-timer policy's job.
 func (s *Segment) append(offset int64, batch []byte) error {
 	pos := s.sizeBytes
+	if err := faultAt("log.write"); err != nil {
+		return err
+	}
 	if _, err := s.log.WriteAt(batch, pos); err != nil {
 		return err
 	}
@@ -112,6 +115,11 @@ func (s *Segment) sync() error {
 	s.syncMu.Lock()
 	defer s.syncMu.Unlock()
 	if s.logDirty.Load() || s.index.dirty.Load() {
+		// The fault seam's "log.sync" point and this manager's BeforeSync hook
+		// are the same place: the seam first, the per-manager hook second.
+		if err := faultAt("log.sync"); err != nil {
+			return err
+		}
 		if s.beforeSync != nil {
 			if err := s.beforeSync(); err != nil {
 				return err

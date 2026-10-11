@@ -18,6 +18,7 @@ trap 'rm -f "$now"' EXIT
 go test -cover ./... 2>&1 | awk '
   /^ok / && /coverage:/ {
     for (i = 1; i <= NF; i++) if ($i == "coverage:") { pct = $(i+1); sub(/%/, "", pct) }
+    if (pct !~ /^[0-9.]+$/) next   # "[no statements]": a package that is only tests or a build-tagged seam.
     pkg = $2; sub(/^github.com\/doze-dev\/doze-kafka\/?/, "", pkg); if (pkg == "") pkg = "."
     printf "%s %s\n", pkg, pct
   }' | sort > "$now"

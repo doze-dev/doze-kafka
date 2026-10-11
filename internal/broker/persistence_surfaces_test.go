@@ -2,7 +2,6 @@ package broker_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -26,12 +25,11 @@ import (
 // (What is deliberately not kept: group membership and idempotent-producer
 // sequence state, both documented in docs/limitations.md.)
 func TestPersistence_EverythingTheBrokerKeepsSurvivesARestart(t *testing.T) {
-	dir := t.TempDir()
-	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	stop := runBrokerAt(t, addr, dir, 4)
+	n := startNode(t)
+	addr := n.Addr
 	cl := newClient(t, addr)
 
 	// ---- topic registry: a topic with a count and overrides unlike any default.
@@ -104,11 +102,9 @@ func TestPersistence_EverythingTheBrokerKeepsSurvivesARestart(t *testing.T) {
 	}
 
 	cl.Close()
-	stop()
 
 	// ================= restart =================
-	stop = runBrokerAt(t, addr, dir, 4)
-	defer stop()
+	n.Restart()
 	cl = newClient(t, addr)
 	defer cl.Close()
 

@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -76,30 +75,22 @@ func runSoak(t *testing.T, duration time.Duration, chaos bool, every time.Durati
 
 	t.Logf("soak: duration=%s chaos=%v producers=%d partitions=%d", duration, chaos, producers, partitions)
 
-	bin := buildBinary(t)
-	dir := t.TempDir()
-	sup := &supervisor{
-		t:         t,
-		bin:       bin,
-		addr:      fmt.Sprintf("127.0.0.1:%d", freePort(t)),
-		dataDir:   filepath.Join(dir, "data"),
-		metaDB:    filepath.Join(dir, "meta.db"),
-		pprofAddr: fmt.Sprintf("127.0.0.1:%d", freePort(t)),
-	}
+	opts := []nodeOpt{nodeSubprocess(), nodePprof()}
 	// SOAK_RACE=1 builds the binary with the race detector (see buildBinary). The
 	// soak never looked at what the binary printed, and a race report is printed, not
 	// fatal: keep stderr, and fail the run if it holds one.
+	stderrLog := ""
 	if os.Getenv("SOAK_RACE") == "1" {
-		sup.stderrLog = filepath.Join(dir, "broker.stderr")
+		stderrLog = filepath.Join(t.TempDir(), "broker.stderr")
+		opts = append(opts, nodeStderr(stderrLog))
 	}
-	sup.launch()
-	defer sup.shutdown()
+	sup := startNode(t, opts...)
 
 	ctx, cancel := context.WithTimeout(context.Background(), duration+5*time.Minute)
 	defer cancel()
 
 	// Create the topic up front.
-	admin := newClient(t, sup.addr)
+	admin := newClient(t, sup.Addr)
 	mustCreateTopic(t, ctx, admin, "soak", partitions)
 	mustCreateTopic(t, ctx, admin, "soak-tx", 2)
 	createCompacted(t, ctx, admin, "soak-compact", "compact", map[string]string{"delete.retention.ms": "1000"})
@@ -112,21 +103,21 @@ func runSoak(t *testing.T, duration time.Duration, chaos bool, every time.Durati
 	// Producers.
 	for p := 0; p < producers; p++ {
 		wg.Add(1)
-		go runProducer(t, &wg, sup.addr, p, int32(p)%partitions, wm, done)
+		go runProducer(t, &wg, sup.Addr, p, int32(p)%partitions, wm, done)
 	}
 	// One live consumer group, for load and to exercise groups under chaos.
 	wg.Add(1)
-	go runLiveConsumer(t, &wg, sup.addr, done)
+	go runLiveConsumer(t, &wg, sup.Addr, done)
 	// A transactional producer: its transactions are all-or-nothing whatever the
 	// broker is doing.
 	txOut := &txnOutcomes{byTxn: map[int]string{}}
 	wg.Add(1)
-	go runTxnProducer(t, &wg, sup.addr, txOut, done)
+	go runTxnProducer(t, &wg, sup.Addr, txOut, done)
 	// A producer onto a compacted topic: the broker's cleaner is rewriting segments
 	// while it is killed, and the latest acknowledged value of each key must survive.
 	cmp := &compactAcks{latest: map[int]int{}}
 	wg.Add(1)
-	go runCompactProducer(t, &wg, sup.addr, cmp, done)
+	go runCompactProducer(t, &wg, sup.Addr, cmp, done)
 
 	// Health monitor (RSS + goroutines).
 	health := &healthMonitor{sup: sup}
@@ -150,14 +141,14 @@ func runSoak(t *testing.T, duration time.Duration, chaos bool, every time.Durati
 					return
 				case <-tick.C:
 					if restarts%2 == 0 {
-						sup.sigkill()
+						sup.Kill()
 						kills++
 						t.Logf("chaos: SIGKILL + restart (#%d)", restarts+1)
 					} else {
-						sup.sigterm()
+						sup.Stop()
 						t.Logf("chaos: SIGTERM + restart (#%d)", restarts+1)
 					}
-					sup.launch()
+					sup.Start()
 					restarts++
 				}
 			}
@@ -169,22 +160,22 @@ func runSoak(t *testing.T, duration time.Duration, chaos bool, every time.Durati
 	wg.Wait()
 
 	// Make sure the broker is up for the final read (chaos may have left it down mid-cycle).
-	if !dialOK(sup.addr) {
-		sup.launch()
+	if !sup.running() {
+		sup.Start()
 	}
 
 	// Authoritative verification: read the whole log back and check invariants.
-	perPartition := drainAll(t, ctx, sup.addr, "soak", partitions)
+	perPartition := drainAll(t, ctx, sup.Addr, "soak", partitions)
 	verifySoak(t, perPartition, wm.snapshot(), producers, partitions, chaos, restarts)
-	verifyTxnSoak(t, ctx, sup.addr, txOut)
-	verifyCompactSoak(t, ctx, sup.addr, cmp)
+	verifyTxnSoak(t, ctx, sup.Addr, txOut)
+	verifyCompactSoak(t, ctx, sup.Addr, cmp)
 
 	// Health verdict.
 	health.report(t, chaos)
 
-	if sup.stderrLog != "" {
-		sup.shutdown()
-		out, _ := os.ReadFile(sup.stderrLog)
+	if stderrLog != "" {
+		sup.Stop()
+		out, _ := os.ReadFile(stderrLog)
 		if i := strings.Index(string(out), "WARNING: DATA RACE"); i >= 0 {
 			end := min(len(out), i+3000)
 			t.Fatalf("the race detector reported a data race in the broker binary:\n%s", out[i:end])
@@ -194,78 +185,6 @@ func runSoak(t *testing.T, duration time.Duration, chaos bool, every time.Durati
 
 	t.Logf("soak complete: %d restarts (%d ungraceful), %d records on disk",
 		restarts, kills, countAll(perPartition))
-}
-
-// --- broker subprocess supervisor ---
-
-type supervisor struct {
-	t                          *testing.T
-	bin, addr, dataDir, metaDB string
-	pprofAddr                  string
-	stderrLog                  string // where the binary's stderr goes, when it is kept.
-	mu                         sync.Mutex
-	cmd                        *exec.Cmd
-	gen                        int
-}
-
-func (s *supervisor) launch() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	cmd := exec.Command(s.bin,
-		"-listen", s.addr, "-data-dir", s.dataDir, "-meta-db", s.metaDB,
-		"-pprof-addr", s.pprofAddr, "-fsync-interval", "200ms",
-		"-console=false")
-	cmd.Stdout = io.Discard
-	cmd.Stderr = io.Discard
-	if s.stderrLog != "" { // a race-detector run keeps what the binary says, across every restart.
-		f, err := os.OpenFile(s.stderrLog, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-		if err != nil {
-			s.t.Fatalf("open %s: %v", s.stderrLog, err)
-		}
-		defer f.Close() // the child holds its own descriptor.
-		cmd.Stderr = f
-	}
-	if err := cmd.Start(); err != nil {
-		s.t.Fatalf("launch broker: %v", err)
-	}
-	s.cmd = cmd
-	s.gen++
-	deadline := time.Now().Add(15 * time.Second)
-	for !dialOK(s.addr) {
-		if time.Now().After(deadline) {
-			s.t.Fatal("broker did not start listening")
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-}
-
-func (s *supervisor) signal(sig syscall.Signal) {
-	s.mu.Lock()
-	c := s.cmd
-	s.mu.Unlock()
-	if c != nil && c.Process != nil {
-		c.Process.Signal(sig)
-		c.Wait()
-	}
-}
-
-func (s *supervisor) sigkill()  { s.signal(syscall.SIGKILL) }
-func (s *supervisor) sigterm()  { s.signal(syscall.SIGTERM) }
-func (s *supervisor) shutdown() { s.signal(syscall.SIGTERM) }
-
-func (s *supervisor) pid() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.cmd != nil && s.cmd.Process != nil {
-		return s.cmd.Process.Pid
-	}
-	return 0
-}
-
-func (s *supervisor) generation() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.gen
 }
 
 // --- load ---
@@ -485,7 +404,7 @@ type sample struct {
 }
 
 type healthMonitor struct {
-	sup     *supervisor
+	sup     *node
 	mu      sync.Mutex
 	samples []sample
 }

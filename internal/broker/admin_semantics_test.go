@@ -24,8 +24,18 @@ func TestMetadataBelowV4AutoCreates(t *testing.T) {
 		if !c.do(md, &resp) {
 			t.Fatal("connection closed")
 		}
-		if len(resp.Topics) != 1 || resp.Topics[0].ErrorCode != 0 || len(resp.Topics[0].Partitions) != 1 {
-			t.Errorf("Metadata v%d for an unknown topic: %+v; want it created with 1 partition", v, resp.Topics)
+		// Kafka creates the topic after answering: this request is told it is
+		// unknown (recorded: conformance/recordings/metadata-autocreate.json), the
+		// next one finds it with its partition.
+		if len(resp.Topics) != 1 || resp.Topics[0].ErrorCode != 3 {
+			t.Errorf("Metadata v%d for an unknown topic: %+v; want UNKNOWN_TOPIC_OR_PARTITION, as Kafka answers the request that creates it", v, resp.Topics)
+		}
+		var again kmsg.MetadataResponse
+		if !c.do(md, &again) {
+			t.Fatal("connection closed")
+		}
+		if len(again.Topics) != 1 || again.Topics[0].ErrorCode != 0 || len(again.Topics[0].Partitions) != 1 {
+			t.Errorf("Metadata v%d the second time: %+v; want the topic, created with 1 partition", v, again.Topics)
 		}
 	}
 	// v4 with the flag off still does not create.
@@ -113,10 +123,11 @@ func TestCreateTopicsValidatesWhatItStores(t *testing.T) {
 			t.Errorf("%s: code %d (%v), want %d", tc.name, got[0].ErrorCode, deref(got[0].ErrorMessage), tc.want)
 		}
 	}
-	// The same name twice in one request: neither is created.
+	// The same name twice in one request: neither is created, and Kafka answers
+	// once for the name ("Duplicate topic name.").
 	got := create(topic("twice", 1), topic("twice", 1))
-	if len(got) != 2 || got[0].ErrorCode != 42 || got[1].ErrorCode != 42 {
-		t.Errorf("a duplicated name: codes %d and %d, want INVALID_REQUEST (42) for both", got[0].ErrorCode, got[1].ErrorCode)
+	if len(got) != 1 || got[0].ErrorCode != 42 || deref(got[0].ErrorMessage) != "Duplicate topic name." {
+		t.Errorf("a duplicated name: %+v, want one INVALID_REQUEST (42) entry, \"Duplicate topic name.\"", got)
 	}
 	if again := create(topic("twice", 1)); again[0].ErrorCode != 0 {
 		t.Errorf("after the refused duplicate the name should be free, got code %d", again[0].ErrorCode)

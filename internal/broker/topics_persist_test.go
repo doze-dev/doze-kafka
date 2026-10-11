@@ -2,7 +2,6 @@ package broker_test
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,10 +14,8 @@ import (
 // the protocol level: create a topic via franz-go, restart the broker over the
 // same data dir, and confirm the topic + its partitions survive.
 func TestTopics_CreateTopicPersistsAcrossRestart(t *testing.T) {
-	dir := t.TempDir()
-	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
-
-	stop := runBrokerAt(t, addr, dir, 4)
+	node := startNode(t)
+	dir, addr := node.Dir, node.Addr
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -54,11 +51,9 @@ func TestTopics_CreateTopicPersistsAcrossRestart(t *testing.T) {
 		t.Fatalf("orders has %d partitions, want 3", len(topic.Partitions))
 	}
 	cl.Close()
-	stop()
 
 	// Restart over the same dir; the topic must survive.
-	stop2 := runBrokerAt(t, addr, dir, 4)
-	defer stop2()
+	node.Restart()
 
 	cl2 := newClient(t, addr)
 	defer cl2.Close()

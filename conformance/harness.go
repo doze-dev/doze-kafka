@@ -1,0 +1,438 @@
+package conformance
+
+import (
+	"bytes"
+	"encoding/binary"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"hash/crc32"
+	"io"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"syscall"
+	"time"
+
+	"github.com/twmb/franz-go/pkg/kmsg"
+)
+
+// KafkaImage is the broker the recordings were made against: the same image the
+// compat matrix uses (compat/lib.sh), so one version is "Kafka" everywhere.
+const KafkaImage = "apache/kafka:4.3.1"
+
+// Target is a broker a scenario runs against.
+type Target interface {
+	Addr() string
+	// Restart stops the broker and starts it again over the same data.
+	Restart() error
+	Close()
+}
+
+// Scenario is a script of requests and the differences it is known to find.
+type Scenario struct {
+	Name string
+	Run  func(e *Env)
+	// Known are the differences doze-kafka has from Apache Kafka that are
+	// written down (docs/limitations.md) and not fixed. A replay fails on a
+	// difference that is not here, and fails on an entry here that no longer
+	// differs, so the list cannot go stale.
+	Known []Known
+}
+
+// Known is one written-down difference.
+type Known struct {
+	Step string // the step's label.
+	Path string // the dotted path of the response field; "" is any in the step.
+	// Limitation is a sentence of docs/limitations.md that explains it (a
+	// substring; a test checks it is there).
+	Limitation string
+}
+
+// Step is one request and its response, normalised.
+type Step struct {
+	Label    string `json:"label"`
+	API      string `json:"api"`
+	Version  int16  `json:"version"`
+	Request  any    `json:"request,omitempty"`
+	Response any    `json:"response,omitempty"`
+}
+
+// Recording is what the recorder writes for a scenario.
+type Recording struct {
+	Scenario string `json:"scenario"`
+	Kafka    string `json:"kafka"`
+	Steps    []Step `json:"steps"`
+}
+
+// Env is what a script sees: a connection, a way to send a request at a
+// version, and the steps that are not requests (restart, broker config).
+type Env struct {
+	target Target
+	w      *wire
+	norm   *normalizer
+	steps  []Step
+	fail   func(format string, args ...any)
+}
+
+// NewEnv connects to the target. fail is how a script reports a broken run
+// (t.Fatalf, or a panic in the recorder).
+func NewEnv(target Target, fail func(string, ...any)) (*Env, error) {
+	w, err := dial(target.Addr())
+	if err != nil {
+		return nil, err
+	}
+	return &Env{target: target, w: w, norm: newNormalizer(), fail: fail}, nil
+}
+
+func (e *Env) Close() { e.w.close() }
+
+// Steps are the recorded steps so far.
+func (e *Env) Steps() []Step { return e.steps }
+
+// Do sends req at version and records the answer under label.
+func (e *Env) Do(label string, req kmsg.Request, version int16) kmsg.Response {
+	return e.DoUntil(label, req, version, nil)
+}
+
+// DoUntil is Do for something Kafka finishes after it has answered (an
+// auto-created topic exists a moment after the Metadata request that asked for
+// it): the request is sent again, up to ten seconds, until done is true of the
+// response, and only that last answer is recorded.
+func (e *Env) DoUntil(label string, req kmsg.Request, version int16, done func(kmsg.Response) bool) kmsg.Response {
+	e.fail2(label)
+	nreq, err := e.norm.normalize(req)
+	if err != nil {
+		e.fail("%s: %v", label, err)
+	}
+	step := Step{Label: label, API: kmsg.NameForKey(req.Key()), Version: version, Request: nreq}
+	var resp kmsg.Response
+	// A coordinator that is still loading (or an internal topic that is still
+	// being created) is not what a script is about: ask again until it settles.
+	for attempt := 0; ; attempt++ {
+		var err error
+		resp, err = e.w.roundTrip(req, version)
+		if err != nil {
+			// A broker that closes the connection on a request it will not serve
+			// is an answer: it is recorded, and the connection is made again.
+			if !isClosed(err) {
+				e.fail("%s: %v", label, err)
+				return nil
+			}
+			step.Response = map[string]any{"(connection)": "closed by the broker"}
+			e.w.close()
+			if e.w, err = dial(e.target.Addr()); err != nil {
+				e.fail("%s: reconnect: %v", label, err)
+			}
+			e.steps = append(e.steps, step)
+			return req.ResponseKind()
+		}
+		nresp, err := e.norm.normalize(resp)
+		if err != nil {
+			e.fail("%s: %v", label, err)
+		}
+		if req.Key() == int16(kmsg.CreateTopics) {
+			onlyRequestedConfigs(nreq, nresp)
+		}
+		step.Response = nresp
+		if attempt >= 100 || !coordinatorSettling(nresp) && (done == nil || done(resp)) {
+			break
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+	e.steps = append(e.steps, step)
+	return resp
+}
+
+// onlyRequestedConfigs trims a CreateTopics response's echo of every topic
+// config (Kafka returns the whole table, a hundred rows that are the settings
+// table's business, not this scenario's) to the configs the request set, so what
+// is compared is "the value I set came back as I set it".
+func onlyRequestedConfigs(req, resp any) {
+	rq, _ := req.(map[string]any)
+	rs, _ := resp.(map[string]any)
+	asked := map[string]map[string]bool{}
+	reqTopics, _ := rq["Topics"].([]any)
+	for _, t := range reqTopics {
+		tm, _ := t.(map[string]any)
+		name, _ := tm["Topic"].(string)
+		set := map[string]bool{}
+		cfgs, _ := tm["Configs"].([]any)
+		for _, c := range cfgs {
+			if cm, ok := c.(map[string]any); ok {
+				if n, ok := cm["Name"].(string); ok {
+					set[n] = true
+				}
+			}
+		}
+		asked[name] = set
+	}
+	respTopics, _ := rs["Topics"].([]any)
+	for _, t := range respTopics {
+		tm, _ := t.(map[string]any)
+		name, _ := tm["Topic"].(string)
+		cfgs, _ := tm["Configs"].([]any)
+		if cfgs == nil {
+			continue
+		}
+		kept := []any{}
+		for _, c := range cfgs {
+			if cm, ok := c.(map[string]any); ok {
+				if n, _ := cm["Name"].(string); asked[name][n] {
+					kept = append(kept, c)
+				}
+			}
+		}
+		tm["Configs"] = kept
+	}
+}
+
+// coordinatorSettling is true for a response carrying COORDINATOR_LOAD_IN_PROGRESS,
+// COORDINATOR_NOT_AVAILABLE or NOT_COORDINATOR anywhere in it.
+func coordinatorSettling(v any) bool {
+	switch x := v.(type) {
+	case map[string]any:
+		for k, e := range x {
+			if k == "ErrorCode" {
+				if n, ok := e.(json.Number); ok && (n.String() == "14" || n.String() == "15" || n.String() == "16") {
+					return true
+				}
+			}
+			if coordinatorSettling(e) {
+				return true
+			}
+		}
+	case []any:
+		for _, e := range x {
+			if coordinatorSettling(e) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isClosed(err error) bool {
+	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE)
+}
+
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func (e *Env) fail2(label string) {
+	for _, s := range e.steps {
+		if s.Label == label {
+			e.fail("duplicate step label %q", label)
+		}
+	}
+}
+
+// Restart stops the broker and starts it again over the same data.
+func (e *Env) Restart(label string) {
+	e.fail2(label)
+	e.w.close()
+	if err := e.target.Restart(); err != nil {
+		e.fail("%s: restart: %v", label, err)
+		return
+	}
+	w, err := dial(e.target.Addr())
+	if err != nil {
+		e.fail("%s: reconnect: %v", label, err)
+		return
+	}
+	e.w = w
+	e.steps = append(e.steps, Step{Label: label, API: "(restart)"})
+}
+
+// SetBrokerConfig sets one dynamic broker-wide config (IncrementalAlterConfigs
+// on the cluster default resource) and records the answer.
+func (e *Env) SetBrokerConfig(label, name, value string) *kmsg.IncrementalAlterConfigsResponse {
+	req := kmsg.NewPtrIncrementalAlterConfigsRequest()
+	r := kmsg.NewIncrementalAlterConfigsRequestResource()
+	r.ResourceType = kmsg.ConfigResourceTypeBroker
+	r.ResourceName = ""
+	c := kmsg.NewIncrementalAlterConfigsRequestResourceConfig()
+	c.Name, c.Value = name, &value
+	c.Op = kmsg.IncrementalAlterConfigOpSet
+	r.Configs = append(r.Configs, c)
+	req.Resources = append(req.Resources, r)
+	return e.Do(label, req, 1).(*kmsg.IncrementalAlterConfigsResponse)
+}
+
+// ProduceRecord is one record of Produce, with the timestamp the script wants.
+type ProduceRecord struct {
+	TimestampMs int64
+	Key, Value  string
+}
+
+// Produce appends records to one partition, acks=all, in one batch (Produce v9).
+func (e *Env) Produce(label, topic string, partition int32, recs ...ProduceRecord) *kmsg.ProduceResponse {
+	req := kmsg.NewPtrProduceRequest()
+	req.Acks = -1
+	req.TimeoutMillis = 10000
+	t := kmsg.NewProduceRequestTopic()
+	t.Topic = topic
+	p := kmsg.NewProduceRequestTopicPartition()
+	p.Partition = partition
+	p.Records = encodeBatch(recs)
+	t.Partitions = append(t.Partitions, p)
+	req.Topics = append(req.Topics, t)
+	return e.Do(label, req, 9).(*kmsg.ProduceResponse)
+}
+
+// encodeBatch builds a v2 record batch with no producer id.
+func encodeBatch(recs []ProduceRecord) []byte {
+	first, max := recs[0].TimestampMs, recs[0].TimestampMs
+	var body []byte
+	for i, r := range recs {
+		if r.TimestampMs > max {
+			max = r.TimestampMs
+		}
+		var rec []byte
+		rec = append(rec, 0) // attributes
+		rec = binary.AppendVarint(rec, r.TimestampMs-first)
+		rec = binary.AppendVarint(rec, int64(i))
+		rec = binary.AppendVarint(rec, int64(len(r.Key)))
+		rec = append(rec, r.Key...)
+		rec = binary.AppendVarint(rec, int64(len(r.Value)))
+		rec = append(rec, r.Value...)
+		rec = binary.AppendVarint(rec, 0) // headers
+		body = binary.AppendVarint(body, int64(len(rec)))
+		body = append(body, rec...)
+	}
+	var tail []byte // everything the CRC covers: attributes onward.
+	tail = binary.BigEndian.AppendUint16(tail, 0)
+	tail = binary.BigEndian.AppendUint32(tail, uint32(len(recs)-1))
+	tail = binary.BigEndian.AppendUint64(tail, uint64(first))
+	tail = binary.BigEndian.AppendUint64(tail, uint64(max))
+	tail = binary.BigEndian.AppendUint64(tail, ^uint64(0)) // producer id -1
+	tail = binary.BigEndian.AppendUint16(tail, 0xffff)     // producer epoch -1
+	tail = binary.BigEndian.AppendUint32(tail, 0xffffffff) // base sequence -1
+	tail = binary.BigEndian.AppendUint32(tail, uint32(len(recs)))
+	tail = append(tail, body...)
+
+	var out []byte
+	out = binary.BigEndian.AppendUint64(out, 0)                       // base offset
+	out = binary.BigEndian.AppendUint32(out, uint32(4+1+4+len(tail))) // length after this field
+	out = binary.BigEndian.AppendUint32(out, 0xffffffff)              // partition leader epoch -1
+	out = append(out, 2)                                              // magic
+	out = binary.BigEndian.AppendUint32(out, crc32.Checksum(tail, crc32.MakeTable(crc32.Castagnoli)))
+	return append(out, tail...)
+}
+
+// Run executes a scenario against a target and returns its steps.
+func Run(s Scenario, target Target) (steps []Step, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if f, ok := r.(failure); ok {
+				err = fmt.Errorf("%s", string(f))
+				return
+			}
+			panic(r)
+		}
+	}()
+	e, err := NewEnv(target, func(format string, args ...any) { panic(failure(fmt.Sprintf(format, args...))) })
+	if err != nil {
+		return nil, err
+	}
+	defer e.Close()
+	s.Run(e)
+	return e.steps, nil
+}
+
+type failure string
+
+// Compare returns the differences of a replay from a recording: steps are
+// matched in order and by label, so a script that changed shows as such.
+func Compare(want Recording, got []Step) []StepDiff {
+	var out []StepDiff
+	for i, w := range want.Steps {
+		if i >= len(got) {
+			out = append(out, StepDiff{Step: w.Label, Diffs: []Diff{{Path: "(step)", Want: w.API, Got: "<missing>"}}})
+			continue
+		}
+		g := got[i]
+		var ds []Diff
+		if g.Label != w.Label || g.API != w.API || g.Version != w.Version {
+			ds = append(ds, Diff{Path: "(step)", Want: fmt.Sprintf("%s %s v%d", w.Label, w.API, w.Version), Got: fmt.Sprintf("%s %s v%d", g.Label, g.API, g.Version)})
+		}
+		// The request is compared too: a script edited after its recording must be
+		// recorded again, not quietly replayed as something else.
+		diff("request", w.Request, g.Request, &ds)
+		diff("", w.Response, g.Response, &ds)
+		if len(ds) > 0 {
+			out = append(out, StepDiff{Step: w.Label, Diffs: ds})
+		}
+	}
+	if len(got) > len(want.Steps) {
+		out = append(out, StepDiff{Step: got[len(want.Steps)].Label, Diffs: []Diff{{Path: "(step)", Want: "<none>", Got: got[len(want.Steps)].Label}}})
+	}
+	return out
+}
+
+// StepDiff is the differences in one step.
+type StepDiff struct {
+	Step  string
+	Diffs []Diff
+}
+
+// Unexplained splits a scenario's differences into those it lists as Known and
+// those it does not, and returns the Known entries that matched nothing.
+func (s Scenario) Unexplained(diffs []StepDiff) (unknown []string, stale []Known) {
+	used := make([]bool, len(s.Known))
+	for _, sd := range diffs {
+		for _, d := range sd.Diffs {
+			matched := false
+			for i, k := range s.Known {
+				if k.Step == sd.Step && (k.Path == "" || k.Path == d.Path || strings.HasPrefix(d.Path, k.Path+".") || strings.HasPrefix(d.Path, k.Path+"[")) {
+					used[i], matched = true, true
+				}
+			}
+			if !matched {
+				unknown = append(unknown, fmt.Sprintf("step %q, %s", sd.Step, d))
+			}
+		}
+	}
+	for i, k := range s.Known {
+		if !used[i] {
+			stale = append(stale, k)
+		}
+	}
+	return unknown, stale
+}
+
+// RecordingPath is where a scenario's recording lives under dir.
+func RecordingPath(dir, name string) string { return filepath.Join(dir, name+".json") }
+
+// Save writes a recording as indented JSON.
+func Save(dir string, r Recording) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	b, err := json.MarshalIndent(r, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(RecordingPath(dir, r.Scenario), append(b, '\n'), 0o644)
+}
+
+// Load reads a recording.
+func Load(dir, name string) (Recording, error) {
+	var r Recording
+	b, err := os.ReadFile(RecordingPath(dir, name))
+	if err != nil {
+		return r, err
+	}
+	// Numbers stay json.Number, as the normalizer makes them, so big ids and
+	// timestamps compare as written.
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.UseNumber()
+	return r, dec.Decode(&r)
+}

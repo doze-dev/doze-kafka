@@ -1,0 +1,246 @@
+package conformance
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"sort"
+	"strings"
+)
+
+// normalizer turns a request or response into plain JSON with everything that
+// differs from run to run replaced by a stable placeholder: broker ids, hosts
+// and ports, the cluster id, and ids Kafka makes up (topic ids, member ids,
+// producer ids), numbered in the order they first appear so two runs that
+// behave the same come out the same. One normalizer lives for a whole
+// scenario, so an id seen in a response is the same placeholder in the next
+// request.
+type normalizer struct {
+	topicIDs map[string]string
+	members  map[string]string
+	producer map[int64]string
+}
+
+func newNormalizer() *normalizer {
+	return &normalizer{topicIDs: map[string]string{}, members: map[string]string{}, producer: map[int64]string{}}
+}
+
+// nodeKeys hold a broker id; nodeListKeys hold a list of them.
+var (
+	nodeKeys     = map[string]bool{"NodeID": true, "Leader": true, "ControllerID": true, "BrokerID": true, "PreferredReadReplica": true, "CurrentLeader": false}
+	nodeListKeys = map[string]bool{"Replicas": true, "ISR": true, "OfflineReplicas": true, "ReplicaNodes": true}
+	memberKeys   = map[string]bool{"MemberID": true, "LeaderID": true, "MemberId": true, "ConsumerID": true}
+	dropKeys     = map[string]bool{"Version": true, "UnknownTags": true}
+)
+
+// normalize takes a kmsg request or response (any JSON-marshalable value).
+func (n *normalizer) normalize(v any) (any, error) {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	var tree any
+	if err := dec.Decode(&tree); err != nil {
+		return nil, err
+	}
+	return n.walk(tree, ""), nil
+}
+
+func (n *normalizer) walk(v any, key string) any {
+	switch x := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(x))
+		for k, e := range x {
+			if dropKeys[k] {
+				continue
+			}
+			out[k] = n.walk(e, k)
+		}
+		return out
+	case []any:
+		if key == "TopicID" || key == "ID" && len(x) == 16 {
+			if id, ok := uuidOf(x); ok {
+				return n.topicID(id)
+			}
+		}
+		out := make([]any, len(x))
+		for i, e := range x {
+			if nodeListKeys[key] {
+				out[i] = "<node>"
+				continue
+			}
+			out[i] = n.walk(e, key)
+		}
+		return dropInternalAndSort(out)
+	case json.Number:
+		switch {
+		case nodeKeys[key] && x.String() != "-1":
+			return "<node>"
+		case key == "Port":
+			return "<port>"
+		case key == "ProducerID" && x.String() != "-1":
+			i, _ := x.Int64()
+			if p, ok := n.producer[i]; ok {
+				return p
+			}
+			p := fmt.Sprintf("<producer:%d>", len(n.producer)+1)
+			n.producer[i] = p
+			return p
+		}
+		return x
+	case string:
+		switch {
+		case key == "Host":
+			return "<host>"
+		case key == "ClusterID":
+			return "<cluster>"
+		case memberKeys[key] && x != "":
+			if m, ok := n.members[x]; ok {
+				return m
+			}
+			m := fmt.Sprintf("<member:%d>", len(n.members)+1)
+			n.members[x] = m
+			return m
+		}
+		// A member id inside a message ("...member consumer-1-5a2c...").
+		for id, ph := range n.members {
+			if strings.Contains(x, id) {
+				x = strings.ReplaceAll(x, id, ph)
+			}
+		}
+		return x
+	}
+	return v
+}
+
+func (n *normalizer) topicID(id string) string {
+	if id == "00000000000000000000000000000000" {
+		return "<zero-id>"
+	}
+	if p, ok := n.topicIDs[id]; ok {
+		return p
+	}
+	p := fmt.Sprintf("<topic-id:%d>", len(n.topicIDs)+1)
+	n.topicIDs[id] = p
+	return p
+}
+
+// uuidOf reads the 16 numbers kmsg marshals a [16]byte as.
+func uuidOf(x []any) (string, bool) {
+	if len(x) != 16 {
+		return "", false
+	}
+	var sb strings.Builder
+	for _, e := range x {
+		num, ok := e.(json.Number)
+		if !ok {
+			return "", false
+		}
+		i, err := num.Int64()
+		if err != nil || i < 0 || i > 255 {
+			return "", false
+		}
+		fmt.Fprintf(&sb, "%02x", i)
+	}
+	return sb.String(), true
+}
+
+// dropInternalAndSort makes a list of topics comparable: a broker lists its own
+// internal topics (__consumer_offsets exists once any group has committed) and
+// in no particular order; neither is something a script can control.
+func dropInternalAndSort(list []any) []any {
+	topics := true
+	for _, e := range list {
+		m, ok := e.(map[string]any)
+		if !ok {
+			return list
+		}
+		if _, has := m["IsInternal"]; !has {
+			topics = false
+		}
+	}
+	if !topics || len(list) == 0 {
+		return list
+	}
+	out := list[:0:0]
+	for _, e := range list {
+		if b, _ := e.(map[string]any)["IsInternal"].(bool); !b {
+			out = append(out, e)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		a, _ := out[i].(map[string]any)["Topic"].(string)
+		b, _ := out[j].(map[string]any)["Topic"].(string)
+		return a < b
+	})
+	return out
+}
+
+// diff lists where got differs from want, as dotted paths.
+func diff(path string, want, got any, out *[]Diff) {
+	switch w := want.(type) {
+	case map[string]any:
+		g, ok := got.(map[string]any)
+		if !ok {
+			*out = append(*out, Diff{path, want, got})
+			return
+		}
+		keys := map[string]bool{}
+		for k := range w {
+			keys[k] = true
+		}
+		for k := range g {
+			keys[k] = true
+		}
+		sorted := make([]string, 0, len(keys))
+		for k := range keys {
+			sorted = append(sorted, k)
+		}
+		sort.Strings(sorted)
+		for _, k := range sorted {
+			p := k
+			if path != "" {
+				p = path + "." + k
+			}
+			wv, wok := w[k]
+			gv, gok := g[k]
+			switch {
+			case !wok:
+				*out = append(*out, Diff{p, "<absent>", gv})
+			case !gok:
+				*out = append(*out, Diff{p, wv, "<absent>"})
+			default:
+				diff(p, wv, gv, out)
+			}
+		}
+	case []any:
+		g, ok := got.([]any)
+		if !ok || len(g) != len(w) {
+			// A list of a different length is one difference, at the list.
+			*out = append(*out, Diff{path, want, got})
+			return
+		}
+		for i := range w {
+			diff(fmt.Sprintf("%s[%d]", path, i), w[i], g[i], out)
+		}
+	default:
+		if fmt.Sprint(want) != fmt.Sprint(got) {
+			*out = append(*out, Diff{path, want, got})
+		}
+	}
+}
+
+// Diff is one place a replay answered differently from the recording.
+type Diff struct {
+	Path string
+	Want any // what Apache Kafka answered.
+	Got  any // what doze-kafka answered.
+}
+
+func (d Diff) String() string {
+	w, _ := json.Marshal(d.Want)
+	g, _ := json.Marshal(d.Got)
+	return fmt.Sprintf("%s: kafka %s, doze %s", d.Path, w, g)
+}

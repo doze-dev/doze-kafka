@@ -64,6 +64,24 @@ implement it.
   batch headers and keeps a summary in memory, and the active segment's is extended as
   it grows. That is milliseconds for a development-sized log and proportional to its
   size for a very large one.
+- **A replication factor above 1 is accepted.** `CreateTopics` with a factor of 2 or 3
+  creates the topic with its one replica, where a single Apache Kafka broker answers
+  `INVALID_REPLICATION_FACTOR`: an application written for a cluster should start
+  unchanged. A factor of zero, or below -1, is refused, as in Kafka.
+- **Topic names that differ only in letter case are refused.** Kafka lets `Orders` and
+  `orders` live side by side; here the second is `INVALID_TOPIC_EXCEPTION`, because
+  partition directories are named after topics and the macOS and Windows file systems
+  do not tell the two apart. (Kafka's own rule, that `a.b` and `a_b` collide, applies too.)
+- **Validation messages are doze-kafka's own words.** For a refused topic name, partition
+  count, topic config value and a broker config change, the error code is Kafka's and the
+  `error_message` text is this broker's (it names what to do about it). Match on the code.
+- **A partition named twice in one ListOffsets request is answered twice.** Kafka answers
+  such an entry once, with `INVALID_REQUEST`. The console asks for a partition's earliest
+  and latest offset as two entries of one request, so this stays until it asks differently.
+- **Group membership is not kept across a restart.** Committed offsets are; the members,
+  their generation and their assignments are not. After a restart every member must
+  rejoin, and a commit that carries the old generation is `ILLEGAL_GENERATION`, where
+  Kafka (which reloads its groups) accepts it until the session times out.
 - **On-disk format is doze-kafka's own.** Record batches are stored verbatim (so
   compression round-trips), but the segment/index file layout is not byte-compatible
   with Apache Kafka's. Only doze-kafka reads its own files.
