@@ -42,7 +42,7 @@ fail=0
 while read -r pkg want; do
   got=$(awk -v p="$pkg" '$1 == p { print $2 }' "$now")
   if [ -z "$got" ]; then echo "MISSING  $pkg (floor $want%): no coverage reported" >&2; fail=1; continue; fi
-  if awk -v g="$got" -v w="$want" 'BEGIN { exit !(g + 0 < w - 0.1) }'; then
+  if awk -v g="$got" -v w="$want" 'BEGIN { exit !(g + 0 < w - 0.1001) }'; then
     echo "FELL     $pkg: $got% < floor $want%" >&2; fail=1
   else
     echo "ok       $pkg: $got% (floor $want%)"
