@@ -102,6 +102,16 @@ tasks:
     cmds:
       - compat/run.sh {{.CLI_ARGS}}
 
+  conformance:
+    desc: 'Replay the recorded Apache Kafka scenarios (conformance/recordings) against doze-kafka; no Docker'
+    cmds:
+      - go test ./conformance -count=1 -v -run 'TestReplay|TestKnown'
+
+  conformance:record:
+    desc: 'Record the scenarios against apache/kafka:4.3.1 in Docker and rewrite conformance/recordings. One scenario: task conformance:record -- -only=listoffsets'
+    cmds:
+      - go test ./conformance -count=1 -v -run TestRecord -record {{.CLI_ARGS}}
+
   test:kcat:
     desc: 'kcat (librdkafka) against the real binary; needs kcat installed'
     cmds:

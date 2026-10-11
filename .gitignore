@@ -12,6 +12,9 @@
 *.test
 *.out
 coverage.*
+# ...but not the floor task and its numbers, which match the pattern above.
+!scripts/coverage.sh
+!testdata/coverage.txt
 
 # Editor / OS noise.
 .DS_Store

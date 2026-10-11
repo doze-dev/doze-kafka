@@ -44,6 +44,16 @@ first and watch it fail.
   embed API do not); the gate runs them all.
 - Name test files after behaviour (`group_classic_test.go`), not after the phase that
   added them.
+- "What does Kafka answer?" is settled by the oracle, not by memory: scripts in
+  `conformance/scenarios.go` are recorded against `apache/kafka` in Docker
+  (`go tool task conformance:record`) and replayed against this broker in every test
+  run (`go tool task conformance`). A difference is fixed, or listed as `Known` with
+  its sentence in `docs/limitations.md`.
+- A restart or crash test is `startNode(t, ...)` (`internal/broker/node_test.go`):
+  `Restart()`, and with `nodeSubprocess()` also `Kill()` (SIGKILL) and `Pause()`.
+  Failures on command (a write error, a failing or slow fsync, a failing metadata
+  write) are `internal/faultinject`, behind the `faultinject` build tag, which a
+  release build does not contain; a full disk is a real 12 MiB volume (`smallVolume`).
 - Fuzz targets live next to the codec; a crasher goes in `testdata/fuzz/` so it stays
   fixed. `go tool task fuzz` runs all three for 30s each (`FUZZ_TIME=5m` for longer);
   `soak` and `chaos` run the long harnesses.

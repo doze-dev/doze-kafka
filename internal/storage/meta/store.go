@@ -37,6 +37,41 @@ var ErrTopicExists = errors.New("meta: topic already exists")
 // data directory behaves the same wherever it is opened.
 var ErrTopicCollides = errors.New("meta: topic name collides with an existing topic")
 
+// CollisionError is the error ErrTopicCollides stands for, with the two names.
+type CollisionError struct {
+	Name, Existing string
+	CaseOnly       bool // differs only in letter case; otherwise only in '.' against '_'.
+}
+
+func (e *CollisionError) Error() string {
+	if e.CaseOnly {
+		return fmt.Sprintf("%v: %q and %q differ only in letter case", ErrTopicCollides, e.Name, e.Existing)
+	}
+	return fmt.Sprintf("%v: %q and %q differ only in '.' against '_'", ErrTopicCollides, e.Name, e.Existing)
+}
+
+func (e *CollisionError) Is(target error) bool { return target == ErrTopicCollides }
+
+// FindCollision reports the first of existing that name may not live beside, or nil.
+// CreateTopic applies the same rule; this is for a caller that must say so without
+// creating anything (CreateTopics with validate_only).
+func FindCollision(name string, existing []string) *CollisionError {
+	for _, e := range existing {
+		if e == name {
+			continue
+		}
+		caseOnly := strings.EqualFold(e, name)
+		if caseOnly || metricKey(e) == metricKey(name) {
+			return &CollisionError{Name: name, Existing: e, CaseOnly: caseOnly}
+		}
+	}
+	return nil
+}
+
+// metricKey is a name with '.' written as '_': Kafka's metric names cannot tell
+// the two apart, so it refuses a topic whose key is one that exists.
+func metricKey(name string) string { return strings.ReplaceAll(name, ".", "_") }
+
 // ErrInvalidGroupID is returned for a group id that cannot be a key: NUL is the
 // separator between group, topic and partition in the offsets bucket, so a group
 // id containing one would read and delete another group's offsets.
@@ -266,9 +301,16 @@ func (s *boltStore) CreateTopic(name string, partitions int32, config map[string
 	defer s.topicMu.Unlock()
 	s.mu.RLock()
 	for existing := range s.byName {
-		if existing != name && strings.EqualFold(existing, name) {
+		if existing == name {
+			continue
+		}
+		// Kafka's own rule: "a.b" and "a_b" would share metric names, so they
+		// may not both exist. Ours, beside it: names that differ only in letter
+		// case would share a directory on a case-insensitive file system.
+		caseOnly := strings.EqualFold(existing, name)
+		if caseOnly || metricKey(existing) == metricKey(name) {
 			s.mu.RUnlock()
-			return Topic{}, fmt.Errorf("%w: %q and %q differ only in letter case", ErrTopicCollides, name, existing)
+			return Topic{}, &CollisionError{Name: name, Existing: existing, CaseOnly: caseOnly}
 		}
 	}
 	s.mu.RUnlock()

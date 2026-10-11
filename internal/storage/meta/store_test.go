@@ -254,6 +254,35 @@ func mustTopics(t *testing.T, s Store, names ...string) {
 	}
 }
 
+// Kafka's own collision rule: a topic whose name differs from an existing one only
+// in '.' against '_' is refused, because their metric names are the same. Recorded
+// against apache/kafka:4.3.1 (conformance/recordings/createtopics-validation.json).
+func TestTopicNamesDifferingOnlyInDotAgainstUnderscoreAreRefused(t *testing.T) {
+	s := openStore(t)
+	mustTopics(t, s, "col.lide")
+	_, err := s.CreateTopic("col_lide", 1, nil)
+	var c *CollisionError
+	if !errors.As(err, &c) || !errors.Is(err, ErrTopicCollides) || c.CaseOnly || c.Existing != "col.lide" {
+		t.Fatalf("CreateTopic(col_lide) with col.lide present = %v, want a CollisionError against col.lide", err)
+	}
+	if _, err := s.CreateTopic("col-lide", 1, nil); err != nil {
+		t.Errorf("a hyphen is a different name: %v", err)
+	}
+	if got := FindCollision("a_b", []string{"a.b", "c"}); got == nil || got.Existing != "a.b" {
+		t.Errorf("FindCollision = %v", got)
+	}
+	if got := FindCollision("a.b", []string{"a.b"}); got != nil {
+		t.Errorf("a name does not collide with itself: %v", got)
+	}
+	// The message says which kind of collision it is.
+	if msg := (&CollisionError{Name: "a_b", Existing: "a.b"}).Error(); !strings.Contains(msg, "'.' against '_'") {
+		t.Errorf("message %q", msg)
+	}
+	if msg := (&CollisionError{Name: "A", Existing: "a", CaseOnly: true}).Error(); !strings.Contains(msg, "letter case") {
+		t.Errorf("message %q", msg)
+	}
+}
+
 // "Orders" and "orders" are one directory on a case-insensitive filesystem, so two
 // such topics would share a log. The second is refused, everywhere.
 func TestTopicNamesDifferingOnlyInCaseAreRefused(t *testing.T) {
