@@ -2,7 +2,6 @@ package broker_test
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -23,14 +22,15 @@ func startAuthzBroker(t *testing.T, aclDefault string) string {
 	dir := t.TempDir()
 	cfg := config.Default()
 	cfg.Version = 4
-	cfg.ListenAddr = fmt.Sprintf("127.0.0.1:%d", freePort(t))
+	cfg.ListenAddr = "127.0.0.1:0"
 	cfg.DataDir, cfg.MetaDB = filepath.Join(dir, "data"), filepath.Join(dir, "meta.db")
 	cfg.SASLMechanisms = []string{"PLAIN"}
 	cfg.Credentials = authzUsers
 	cfg.ACLDefault = aclDefault
 	cfg.ACLSuperUsers = []string{"User:admin"}
-	t.Cleanup(runBroker(t, cfg))
-	return cfg.ListenAddr
+	addr, stop := boot(t, cfg)
+	t.Cleanup(stop)
+	return addr
 }
 
 // as is a client logged in as user.

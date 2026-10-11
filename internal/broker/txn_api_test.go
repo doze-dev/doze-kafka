@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"hash/crc32"
 	"path/filepath"
-	"strconv"
 	"testing"
 	"time"
 
@@ -297,8 +296,7 @@ func TestTransactionOffsetsAreAppliedOnlyOnCommit(t *testing.T) {
 func TestTransactionsLeftHalfDoneAreFinishedAfterARestart(t *testing.T) {
 	skipShort(t)
 	dir := t.TempDir()
-	addr := "127.0.0.1:" + strconv.Itoa(freePort(t))
-	stop := runBrokerAt(t, addr, dir, 4)
+	addr, stop := bootAt(t, "127.0.0.1:0", dir, 4)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	admin := newClient(t, addr)
@@ -397,8 +395,7 @@ func rawIdemBatch(pid int64, epoch int16, seq int32, value string) []byte {
 func TestARetriedBatchIsRecognisedAfterARestart(t *testing.T) {
 	skipShort(t)
 	dir := t.TempDir()
-	addr := "127.0.0.1:" + strconv.Itoa(freePort(t))
-	stop := runBrokerAt(t, addr, dir, 4)
+	addr, stop := bootAt(t, "127.0.0.1:0", dir, 4)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	admin := newClient(t, addr)

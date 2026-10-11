@@ -74,9 +74,7 @@ func newProtocolConsume(t *testing.T, ctx context.Context, addr, group, topic st
 // committed offset — no replay.
 func TestGroupKIP848_NewProtocolConsumeCommitResume(t *testing.T) {
 	dir := t.TempDir()
-	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
-
-	stop := runBrokerAt(t, addr, dir, 4) // version 4 advertises ConsumerGroupHeartbeat.
+	addr, stop := bootAt(t, "127.0.0.1:0", dir, 4) // version 4 advertises ConsumerGroupHeartbeat.
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -128,8 +126,8 @@ func TestGroupKIP848_NewProtocolConsumeCommitResume(t *testing.T) {
 // work.
 func TestGroupKIP848_NewProtocolTwoConsumersSplit(t *testing.T) {
 	dir := t.TempDir()
-	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
-	defer runBrokerAt(t, addr, dir, 4)()
+	addr, stop := bootAt(t, "127.0.0.1:0", dir, 4)
+	defer stop()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()

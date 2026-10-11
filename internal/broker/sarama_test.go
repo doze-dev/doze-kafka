@@ -109,8 +109,7 @@ func (h *saramaGroupHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, clai
 // committed offset.
 func TestSarama_ConsumerGroupConsumeCommitResume(t *testing.T) {
 	dir := t.TempDir()
-	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
-	stop := runBrokerAt(t, addr, dir, 4)
+	addr, stop := bootAt(t, "127.0.0.1:0", dir, 4)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()

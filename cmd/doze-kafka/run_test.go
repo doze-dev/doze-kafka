@@ -117,7 +117,7 @@ func TestPortClashesAreErrorsAndReleaseTheDataDir(t *testing.T) {
 	dir := t.TempDir()
 
 	tryRun := func(listen, console string) error {
-		st, err := loadConfig([]string{"--listen", listen, "--console-addr", console, "--data-dir", dir})
+		st, err := loadConfig([]string{"--listen", listen, "--console-addr", console, "--schema-registry-addr", "127.0.0.1:0", "--data-dir", dir})
 		if err != nil {
 			t.Fatal(err)
 		}

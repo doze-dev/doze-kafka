@@ -79,6 +79,19 @@ func runBrokerAt(t *testing.T, addr, dir string, version int) func() {
 	return runBroker(t, cfg)
 }
 
+// bootAt is runBrokerAt that also returns the address the broker bound. Pass
+// 127.0.0.1:0 and the port is never probed-then-released (which another test
+// process can win); restart on the returned address with runBrokerAt.
+func bootAt(t *testing.T, addr, dir string, version int) (string, func()) {
+	t.Helper()
+	cfg := config.Default()
+	cfg.Version = version
+	cfg.ListenAddr = addr
+	cfg.DataDir = filepath.Join(dir, "data")
+	cfg.MetaDB = filepath.Join(dir, "meta.db")
+	return boot(t, cfg)
+}
+
 // runBroker boots a broker from a full config and returns a stop func.
 func runBroker(t *testing.T, cfg config.Config) func() {
 	t.Helper()

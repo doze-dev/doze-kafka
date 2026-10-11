@@ -116,8 +116,7 @@ func TestDeleteRecordsMovesTheStart(t *testing.T) {
 func TestDeleteRecordsSurvivesARestart(t *testing.T) {
 	skipShort(t)
 	dir := t.TempDir()
-	addr := "127.0.0.1:" + strconv.Itoa(freePort(t))
-	stop := runBrokerAt(t, addr, dir, 4)
+	addr, stop := bootAt(t, "127.0.0.1:0", dir, 4)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cl := newClient(t, addr)

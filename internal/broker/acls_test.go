@@ -225,7 +225,7 @@ func TestACLsPersistAndAreEnforcedAfterARestart(t *testing.T) {
 	skipShort(t)
 	dir := t.TempDir()
 	cfg := config.Default()
-	cfg.ListenAddr = "127.0.0.1:" + strconv.Itoa(freePort(t))
+	cfg.ListenAddr = "127.0.0.1:0"
 	cfg.DataDir, cfg.MetaDB = filepath.Join(dir, "data"), filepath.Join(dir, "meta.db")
 
 	start := func(logs io.Writer) (stop func()) {
@@ -234,9 +234,11 @@ func TestACLsPersistAndAreEnforcedAfterARestart(t *testing.T) {
 			t.Fatal(err)
 		}
 		ctx, cancel := context.WithCancel(context.Background())
-		if _, err := srv.Bind(ctx); err != nil {
+		bound, err := srv.Bind(ctx)
+		if err != nil {
 			t.Fatal(err)
 		}
+		cfg.ListenAddr = bound.String() // the restart binds the same address.
 		done := make(chan struct{})
 		go func() { srv.Serve(ctx); close(done) }()
 		return func() { cancel(); <-done }
