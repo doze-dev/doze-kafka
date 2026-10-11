@@ -110,3 +110,39 @@ test('at a phone width the pill still says so, and Retry asks at once', async ({
   await page.locator('#pill-retry').click();
   await expect(pill).not.toHaveClass(/disconnected/, { timeout: 5_000 });
 });
+
+// Traf-10: Traffic loses the broker. The header says when it was last good and offers
+// Retry now; a red callout says what the rows are; the rows stay, dimmed, under a line
+// that says nothing newer is known; and the page comes back by itself.
+test('Traffic when the broker is lost: the pill, the callout, the frozen line, Retry now, and recovery', async ({ page, request, uniqueName }) => {
+  // An app's request, so there are rows to freeze (the console's own are left out).
+  const topic = uniqueName('frozen');
+  expect((await request.post(`${CONSOLE}new/topic`, { form: { name: topic, partitions: '1' } })).ok()).toBe(true);
+  execFileSync('go', ['run', './e2e/put', `127.0.0.1:${PORT}`, topic, '2026-10-10T12:00:00Z', 'x'],
+    { cwd: ROOT, env: { ...process.env, GOWORK: 'off', E2E_SASL_USER: '', E2E_TLS: '' } });
+  await page.goto(`${CONSOLE}traffic`);
+  await expect(page.locator('#traffic-table tbody tr').first()).toBeVisible();
+  const callout = page.locator('#lost-callout');
+  await expect(callout).toBeHidden();
+  await kill();
+
+  await expect(page.locator('html')).toHaveAttribute('data-connection-lost', '', { timeout: 15_000 });
+  await expect(callout).toBeVisible();
+  await expect(callout).toHaveClass(/bad/);
+  await expect(callout.locator('.b')).toHaveText('The console lost the broker');
+  await expect(callout).toContainText('The rows below are the last ones received and are no longer updating. The console retries every 5 s on its own.');
+  await expect(callout.locator('[data-lastgood]')).toHaveText(/^\d{1,2}:\d{2}:\d{2}/);
+  const header = page.locator('#traffic-controls');
+  await expect(header.locator('.pill.bad')).toContainText('disconnected · last good');
+  await expect(header.locator('button', { hasText: 'Retry now' })).toBeVisible();
+  await expect(header.locator('[data-live-state]')).toBeHidden();
+  await expect(page.locator('.frozen-line')).toContainText('Nothing newer than this line is known.');
+  await expect(page.locator('#traffic-live .tbl-wrap')).toHaveCSS('opacity', '0.55');
+  await expect(page.locator('#traffic-table tbody tr').first()).toBeVisible(); // still there.
+
+  await up();
+  await header.locator('button', { hasText: 'Retry now' }).click();
+  await expect(page.locator('html')).not.toHaveAttribute('data-connection-lost', '', { timeout: 20_000 });
+  await expect(callout).toBeHidden();
+  await expect(header.locator('[data-live-state]')).toBeVisible();
+});
