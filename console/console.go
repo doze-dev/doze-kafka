@@ -422,11 +422,11 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 			b, _ := json.Marshal(refs)
 			return string(b)
 		},
-		"lower":    strings.ToLower,
+		"lower": strings.ToLower,
 		// capital and upper write a word the way a column of the boards does: Topic, Write,
 		// ALLOW. The stored value stays as the broker names it.
-		"capital": upperFirst,
-		"upper":   strings.ToUpper,
+		"capital":  upperFirst,
+		"upper":    strings.ToUpper,
 		"jsonTint": jsonTint,
 		"stateBadge": func(state string) string {
 			switch state {
