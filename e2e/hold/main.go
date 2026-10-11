@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/doze-dev/doze-kafka/e2e/connopt"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
@@ -22,8 +23,8 @@ func main() {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	cl, err := kgo.NewClient(kgo.SeedBrokers(os.Args[1]), kgo.ClientID(os.Args[2]), kgo.ConsumerGroup(os.Args[3]), kgo.ConsumeTopics(os.Args[4]),
-		kgo.OnPartitionsAssigned(func(context.Context, *kgo.Client, map[string][]int32) { fmt.Println("ready") }))
+	cl, err := kgo.NewClient(append(connopt.Opts(), kgo.SeedBrokers(os.Args[1]), kgo.ClientID(os.Args[2]), kgo.ConsumerGroup(os.Args[3]), kgo.ConsumeTopics(os.Args[4]),
+		kgo.OnPartitionsAssigned(func(context.Context, *kgo.Client, map[string][]int32) { fmt.Println("ready") }))...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "hold:", err)
 		os.Exit(1)

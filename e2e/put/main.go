@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/doze-dev/doze-kafka/e2e/connopt"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
@@ -22,7 +23,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "put:", err)
 		os.Exit(2)
 	}
-	cl, err := kgo.NewClient(kgo.SeedBrokers(os.Args[1]), kgo.ClientID("doze-put"), kgo.RecordPartitioner(kgo.ManualPartitioner()))
+	cl, err := kgo.NewClient(append(connopt.Opts(), kgo.SeedBrokers(os.Args[1]), kgo.ClientID("doze-put"), kgo.RecordPartitioner(kgo.ManualPartitioner()))...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "put:", err)
 		os.Exit(1)
