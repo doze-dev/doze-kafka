@@ -214,7 +214,7 @@
         <tr id="{{if $.Search}}hit-{{.Partition}}-{{.Offset}}{{else}}msg-{{.Offset}}{{end}}" class="{{if and (not $.Search) (eq .Offset $.HL)}}hl{{end}}{{if .Txn}} txn-{{.Txn}}{{end}}" {{if and (not $.Search) (eq .Offset $.HL)}}data-hl{{end}} tabindex="0" role="button" aria-label="Open {{if $.Search}}partition {{.Partition}} {{end}}offset {{.Offset}}" data-inspector-open hx-get="{{topicURL $.Topic.Name}}/message?partition={{.Partition}}&offset={{.Offset}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
           {{if $.Search}}<td class="num mono">{{.Partition}}</td>{{end}}
           <td class="cell-offset num">{{.Offset}}{{if .Txn}} <span class="txnbadge txnbadge-{{.Txn}}" title="{{if eq .Txn "open"}}Part of a transaction that has not ended; a read-committed consumer cannot see it yet.{{else}}Part of a transaction that aborted; a read-committed consumer never sees it.{{end}}">{{.Txn}}</span>{{end}}</td>
-          <td class="cell-time col-time" title="{{.TimeFull}}">{{.TimeStr}} <span class="dim ago" data-ts="{{.Timestamp.UnixMilli}}">· {{ago .Timestamp}}</span></td>
+          <td class="cell-time col-time">{{when .Timestamp "clock"}} <span class="dim">· {{when .Timestamp "ago"}}</span></td>
           <td class="cell-key {{if or .Key.Null .Key.Empty}}none{{end}}" title="{{if .Key.Null}}null key{{else}}{{.Key.Preview}} · {{.Key.SizeText}}{{end}}">{{if .Key.Null}}no key{{else}}{{.Key.Preview}}{{end}}</td>
           <td class="cell-val {{if .Value.Binary}}binary{{end}} {{if .Value.Null}}tomb{{end}}" title="{{.Value.SizeText}}">{{if or .Value.Binary .Value.Null .Value.Empty}}<span class="vspecial">{{.Value.Preview}}</span>{{else}}{{jsonTint .Value.Preview}}{{end}}</td>
           <td class="col-hdrs">{{if .Headers}}<span class="hdrct">{{len .Headers}}</span>{{else}}<span class="dim">—</span>{{end}}</td>
@@ -243,7 +243,7 @@
      (title, Older, Newer, Close) is the inspector contract in inspector.html. */}}
 {{define "inspector_message"}}
 <div class="inspector-b">
-  <div class="meta-row"><span class="k">Timestamp</span><span class="v">{{.TimeStr}}</span></div>
+  <div class="meta-row"><span class="k">Timestamp</span><span class="v">{{when .Msg.Timestamp "datetime"}}</span></div>
   <div class="meta-row"><span class="k">Key</span><span class="v">
     {{if .Key.Null}}<span class="dim">null</span>{{else if .Key.Empty}}<span class="dim">"" (empty)</span>
     {{else if .Key.Binary}}<span class="mono">{{.Key.Preview}}</span> <button type="button" class="copy-btn" data-copy="{{.Key.B64}}" title="Copy as base64" aria-label="Copy as base64">{{icon "copy"}}</button>

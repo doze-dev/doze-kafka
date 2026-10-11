@@ -360,7 +360,7 @@ func (c *Console) inspectEvent(w http.ResponseWriter, r *http.Request, key strin
 		}
 		label, tone := timelineKind(e.Kind)
 		v.Title = label
-		v.Body["E"] = timelineRow{TrafficGroupEvent: e, TimeStr: e.Time.Format("15:04:05.000"), Label: label, Tone: tone, Member: shortID(e.Member)}
+		v.Body["E"] = timelineRow{TrafficGroupEvent: e, Label: label, Tone: tone, Member: shortID(e.Member)}
 		c.inspect(w, v)
 		return
 	}

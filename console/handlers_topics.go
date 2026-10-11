@@ -265,7 +265,7 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 	keyV := c.readThroughRegistry(r.Context(), name, newBytesView(m.Key, m.Key == nil), m.Key)
 	data := map[string]any{
 		"Topic": name, "Partition": partition, "Msg": m, "Older": older, "Newer": newer,
-		"TimeStr": m.Timestamp.Format(time.RFC3339), "Key": keyV, "Value": valueV, "Headers": hdrs,
+		"Key": keyV, "Value": valueV, "Headers": hdrs,
 		// "Send again" is done by the server from the stored record, so it is exact
 		// for any bytes. These are for "Edit a copy": the composer is prefilled with
 		// the record as text (or base64 when it is not text), as stored rather than
@@ -456,8 +456,6 @@ type msgView struct {
 	Offset     int64
 	Partition  int32
 	Timestamp  time.Time
-	TimeStr    string
-	TimeFull   string // full RFC 3339 timestamp, for the hover title.
 	Key        bytesView
 	Value      bytesView
 	Headers    []MessageHeader

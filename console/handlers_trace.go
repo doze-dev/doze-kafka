@@ -121,7 +121,7 @@ func (c *Console) tracePage(w http.ResponseWriter, r *http.Request) {
 	}
 	job := c.startTrace(id, anchor, at, window)
 	data := c.traceData(job)
-	data["Trace"], data["AtStr"], data["WindowKey"] = id, at.Format("15:04:05"), windowKey
+	data["Trace"], data["At"], data["WindowKey"] = id, at, windowKey
 	for _, win := range traceWindows {
 		if win.Key == windowKey {
 			data["WindowLabel"] = win.Label

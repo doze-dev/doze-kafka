@@ -396,9 +396,12 @@ func templateFuncs(prefix string) template.FuncMap {
 			}
 			return m
 		},
-		"list":      func(items ...any) []any { return items },
-		"sub":       func(a, b int) int { return a - b },
-		"ago":       ago,
+		"list": func(items ...any) []any { return items },
+		"sub":  func(a, b int) int { return a - b },
+		// when is the one formatter for a moment in time (timefmt.go); whenText is
+		// its plain text, for an attribute.
+		"when":      when,
+		"whenText":  whenText,
 		"hasPrefix": strings.HasPrefix,
 		"hasSuffix": strings.HasSuffix,
 		"refsJSON": func(refs any) string {
@@ -451,19 +454,4 @@ func humanBytes(n int) string {
 func trimFloat(f float64) string {
 	s := strconv.FormatFloat(f, 'f', 1, 64)
 	return strings.TrimSuffix(s, ".0")
-}
-
-// ago renders a compact relative time ("3m ago", "just now").
-func ago(t time.Time) string {
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		return strconv.Itoa(int(d.Minutes())) + "m ago"
-	case d < 24*time.Hour:
-		return strconv.Itoa(int(d.Hours())) + "h ago"
-	default:
-		return strconv.Itoa(int(d.Hours()/24)) + "d ago"
-	}
 }

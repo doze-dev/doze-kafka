@@ -43,8 +43,8 @@
         <td class="mono">{{if .Software}}{{.Software}}{{else}}<span class="dim">—</span>{{end}}</td>
         <td class="mono nw">{{.Remote}}</td>
         <td class="mono nw">{{.Principal}}</td>
-        <td class="num mono">{{.Age}}</td>
-        <td class="num mono">{{.Idle}}</td>
+        <td class="num mono">{{when .Opened "since"}}</td>
+        <td class="num mono">{{when .Last "since"}}</td>
         <td class="num mono">{{.Requests}}</td>
         <td class="mono">{{range $i, $g := .Groups}}{{if $i}}, {{end}}<a href="{{groupURL $g}}">{{$g}}</a>{{else}}<span class="dim">—</span>{{end}}</td>
       </tr>{{end}}</tbody>
@@ -63,7 +63,7 @@
       {{if .Software}}<span class="chip mono">{{.Software}}</span>{{end}}
       <span class="chip mono" title="The id the broker gave this client instance">{{.IDShort}}…</span>
       {{if .Closing}}<span class="badge state-empty">closing</span>{{end}}
-      <span class="mc-last dim">{{.Pushes}} report{{if ne .Pushes 1}}s{{end}} · last {{.Last.Format "15:04:05"}} <span class="ago" data-ts="{{.Last.UnixMilli}}">· {{ago .Last}}</span></span>
+      <span class="mc-last dim">{{.Pushes}} report{{if ne .Pushes 1}}s{{end}} · last {{when .Last "clock"}} <span class="dim">· {{when .Last "ago"}}</span></span>
     </div>
     {{if .Resource}}<div class="mc-res mono dim">{{.Resource}}</div>{{end}}
     {{if .Shown}}
@@ -88,9 +88,9 @@
   {{if .Rows}}
   <div class="tbl-wrap">
     <table class="tbl tf-table" id="traffic-table"><thead><tr><th>Time</th><th>Client</th><th>Request</th><th>Topic or group</th><th>Detail</th><th>Result</th><th class="num">Took</th></tr></thead>
-      <tbody>{{range .Rows}}<tr id="rq-{{.OpenKey}}" tabindex="0" role="button" aria-label="Open {{.API}} from {{.Who}} at {{.TimeStr}}" data-inspector-open
+      <tbody>{{range .Rows}}<tr id="rq-{{.OpenKey}}" tabindex="0" role="button" aria-label="Open {{.API}} from {{.Who}} at {{whenText .Time "clockms"}}" data-inspector-open
           hx-get="{{$.Prefix}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
-        <td class="mono nw">{{.TimeStr}}{{if .Folded}} <span class="tf-count" title="{{.Count}} identical requests, {{.SameSpan}}">×{{.Count}}</span>{{end}}</td>
+        <td class="mono nw">{{when .Time "clockms"}}{{if .Folded}} <span class="tf-count" title="{{.Count}} identical requests, {{.SameSpan}}">×{{.Count}}</span>{{end}}</td>
         <td class="mono nw" title="{{.Remote}}{{if .Software}} · {{.Software}}{{end}}">{{.Who}}</td>
         <td class="mono nw">{{.API}} <span class="dim">v{{.Version}}</span></td>
         <td class="mono">{{if .Target}}{{.Target}}{{else}}<span class="dim">—</span>{{end}}</td>

@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // Searching a topic's records.
@@ -163,8 +162,8 @@ func (c *Console) searchTopic(ctx context.Context, topic string, partition, part
 // newMsgView dresses a record for a table row.
 func newMsgView(m Message) msgView {
 	return msgView{
-		Offset: m.Offset, Partition: m.Partition, Timestamp: m.Timestamp, TimeStr: m.Timestamp.Format("15:04:05"),
-		TimeFull:   m.Timestamp.Format(time.RFC3339),
+		Offset: m.Offset, Partition: m.Partition, Timestamp: m.Timestamp,
+
 		Key:        previewOnly(m.Key), // the table shows one line; the inspector does the rest.
 		Value:      previewOnly(m.Value),
 		Headers:    m.Headers,

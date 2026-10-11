@@ -110,7 +110,6 @@ func (d trafficDock) DockEvents(f DockFilter, limit int, after string) ([]DockEv
 // dockRow is a DockEvent ready to show.
 type dockRow struct {
 	DockEvent
-	TimeStr string
 }
 
 func (c *Console) dockSource() DockSource {
@@ -135,7 +134,7 @@ func (c *Console) dockData(f DockFilter) map[string]any {
 	rows := make([]dockRow, 0, len(events))
 	h := fnv.New64a()
 	for _, e := range events {
-		rows = append(rows, dockRow{DockEvent: e, TimeStr: e.Time.Format("15:04:05.000")})
+		rows = append(rows, dockRow{DockEvent: e})
 		fmt.Fprint(h, e.ID, e.Count, e.Error, ";")
 	}
 	d["DockRows"], d["DockMore"], d["DockHash"] = rows, next != "", fmt.Sprintf("%x", h.Sum64())

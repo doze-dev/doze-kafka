@@ -737,21 +737,69 @@
   document.addEventListener("DOMContentLoaded", syncDock);
   document.addEventListener("htmx:afterSettle", syncDock);
 
-  // ---------- relative times ----------
-  // The server renders "3m ago" once; on a quiet or paused view it would freeze
-  // there while the clock moved on. Tick them in the browser.
+  // ---------- time ----------
+  // One formatter. The server writes every moment as <time datetime="UTC" data-style>
+  // with its own text in UTC (timefmt.go). Here it is shown in the browser's zone,
+  // with the zone and the UTC instant on hover, and "ago" and "since" are counted in
+  // the browser so they keep moving on a quiet or paused page. The styles are the
+  // server's: clock, clockms, datetime, date, ago, since.
+  function pad(n, w) { n = String(n); while (n.length < (w || 2)) n = "0" + n; return n; }
+  function zoneName() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { return ""; } }
+  function offsetText(d) {
+    var m = -d.getTimezoneOffset(), sign = m < 0 ? "-" : "+";
+    m = Math.abs(m);
+    return "UTC" + sign + pad(Math.floor(m / 60)) + ":" + pad(m % 60);
+  }
+  function local(ms, style) {
+    var d = new Date(ms);
+    var date = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+    var clock = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    switch (style) {
+      case "clockms": return clock + "." + pad(d.getMilliseconds(), 3);
+      case "datetime": return date + " " + clock;
+      case "date": return date;
+    }
+    return clock;
+  }
+  function spanText(ms) {
+    var s = Math.max(0, Math.floor(ms / 1000));
+    if (s < 2) return "just now";
+    if (s < 60) return s + "s";
+    if (s < 3600) return Math.floor(s / 60) + "m " + pad(s % 60) + "s";
+    return Math.floor(s / 3600) + "h " + pad(Math.floor(s / 60) % 60) + "m";
+  }
   function agoText(ms) {
-    var s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+    var s = Math.max(0, Math.round(ms / 1000));
     if (s < 60) return "just now";
     if (s < 3600) return Math.floor(s / 60) + "m ago";
     if (s < 86400) return Math.floor(s / 3600) + "h ago";
     return Math.floor(s / 86400) + "d ago";
   }
+  function formatTime(el) {
+    var ms = Date.parse(el.getAttribute("datetime") || "");
+    if (isNaN(ms)) return;
+    var style = el.getAttribute("data-style") || "clock", d = new Date(ms);
+    if (style === "ago") el.textContent = agoText(Date.now() - ms);
+    else if (style === "since") el.textContent = spanText(Date.now() - ms);
+    else el.textContent = local(ms, style);
+    // On hover: the moment in this browser's zone, then the same instant in UTC.
+    var utc = new Date(ms).toISOString().replace("T", " ").replace("Z", " UTC");
+    el.title = local(ms, "datetime") + "." + pad(d.getMilliseconds(), 3) + " " + (zoneName() ? zoneName() + " " : "") + "(" + offsetText(d) + ") · " + utc;
+  }
+  function formatTimes(root) {
+    (root || document).querySelectorAll("time.when").forEach(formatTime);
+  }
+  window.dozeTime = {
+    // clock is a moment as the time of day in this browser's zone.
+    clock: function (ms) { return local(ms, "clock"); },
+    format: formatTimes,
+  };
+  document.addEventListener("DOMContentLoaded", function () { formatTimes(); });
+  document.addEventListener("htmx:afterSettle", function () { formatTimes(); });
+  document.addEventListener("htmx:afterSwap", function () { formatTimes(); });
   setInterval(function () {
-    document.querySelectorAll(".ago[data-ts]").forEach(function (el) {
-      el.textContent = "· " + agoText(parseInt(el.getAttribute("data-ts"), 10));
-    });
-  }, 20000);
+    document.querySelectorAll('time.when[data-style="ago"], time.when[data-style="since"]').forEach(formatTime);
+  }, 5000);
 
   // ---------- flash banner ----------
   // The server shows a one-shot "Topic created" banner for a ?flash= redirect. Left

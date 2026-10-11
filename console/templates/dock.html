@@ -16,9 +16,9 @@
   {{else if .DockRows}}
   <div class="tbl-wrap">
     <table class="tbl tf-table" id="wire-dock-table"><thead><tr><th>Time</th><th>Client</th><th>Request</th><th>Detail</th><th>Result</th></tr></thead>
-      <tbody>{{range .DockRows}}<tr id="wd-{{.ID}}" {{if .Kind}}tabindex="0" role="button" aria-label="Open {{.Request}} from {{.Client}} at {{.TimeStr}}" data-inspector-open
+      <tbody>{{range .DockRows}}<tr id="wd-{{.ID}}" {{if .Kind}}tabindex="0" role="button" aria-label="Open {{.Request}} from {{.Client}} at {{whenText .Time "clockms"}}" data-inspector-open
           hx-get="{{$.Prefix}}/inspect/{{.Kind}}?key={{.ID}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"{{end}}>
-        <td class="mono nw">{{.TimeStr}}{{if gt .Count 1}} <span class="tf-count">×{{.Count}}</span>{{end}}</td>
+        <td class="mono nw">{{when .Time "clockms"}}{{if gt .Count 1}} <span class="tf-count">×{{.Count}}</span>{{end}}</td>
         <td class="mono nw">{{.Client}}</td>
         <td class="mono nw">{{.Request}}</td>
         <td class="dim">{{.Detail}}</td>

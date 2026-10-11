@@ -24,8 +24,8 @@
 
 {{define "inspector_request"}}
 <div class="inspector-b">
-  <div class="meta-row"><span class="k">Time</span><span class="v mono">{{.R.TimeStr}}</span></div>
-  {{if .R.Folded}}<div class="meta-row"><span class="k">Repeats</span><span class="v">{{.R.Count}} identical requests, {{.R.SameSpan}}, first at <span class="mono">{{.R.First.Format "15:04:05.000"}}</span></span></div>{{end}}
+  <div class="meta-row"><span class="k">Time</span><span class="v mono">{{when .R.Time "clockms"}}</span></div>
+  {{if .R.Folded}}<div class="meta-row"><span class="k">Repeats</span><span class="v">{{.R.Count}} identical requests, {{.R.SameSpan}}, first at <span class="mono">{{when .R.First "clockms"}}</span></span></div>{{end}}
   <div class="meta-row"><span class="k">Client</span><span class="v mono">{{if .R.ClientID}}{{.R.ClientID}}{{else}}<span class="dim">no client id</span>{{end}}</span></div>
   <div class="meta-row"><span class="k">Software</span><span class="v mono">{{if .R.Software}}{{.R.Software}}{{else}}<span class="dim">not reported</span>{{end}}</span></div>
   <div class="meta-row"><span class="k">Address</span><span class="v mono">{{.R.Remote}}</span></div>
@@ -46,8 +46,8 @@
   <div class="meta-row"><span class="k">Software</span><span class="v mono">{{if .C.Software}}{{.C.Software}}{{else}}<span class="dim">not reported</span>{{end}}</span></div>
   <div class="meta-row"><span class="k">Address</span><span class="v mono">{{.C.Remote}}</span></div>
   <div class="meta-row"><span class="k">Principal</span><span class="v mono">{{.C.Principal}}</span></div>
-  <div class="meta-row"><span class="k">Open for</span><span class="v mono">{{.C.Age}}</span></div>
-  <div class="meta-row"><span class="k">Last request</span><span class="v mono">{{.C.Idle}}</span></div>
+  <div class="meta-row"><span class="k">Open for</span><span class="v mono">{{when .C.Opened "since"}}</span></div>
+  <div class="meta-row"><span class="k">Last request</span><span class="v mono">{{when .C.Last "since"}}</span></div>
   <div class="meta-row"><span class="k">Requests</span><span class="v mono">{{.C.Requests}}</span></div>
   <div class="meta-row"><span class="k">Groups</span><span class="v mono">{{range $i, $g := .C.Groups}}{{if $i}}, {{end}}<a href="{{groupURL $g}}">{{$g}}</a>{{else}}<span class="dim">none</span>{{end}}</span></div>
   <div class="inspector-acts"><a class="btn btn-outline" href="{{prefix}}/traffic?{{.C.Filter}}">Show this client's requests</a></div>
@@ -82,7 +82,7 @@
   <div class="meta-row"><span class="k">Transactional id</span><span class="v">{{template "kvcopy" .T.ID}}</span></div>
   <div class="meta-row"><span class="k">State</span><span class="v">{{.T.State}}</span></div>
   <div class="meta-row"><span class="k">Producer</span><span class="v mono">id {{.T.ProducerID}} · epoch {{.T.Epoch}}</span></div>
-  {{if .T.Age}}<div class="meta-row"><span class="k">Open for</span><span class="v mono">{{.T.Age}} of {{.T.Timeout}}</span></div>{{end}}
+  {{if not .T.Began.IsZero}}<div class="meta-row"><span class="k">Open for</span><span class="v mono">{{when .T.Began "since"}} of {{.T.Timeout}}</span></div>{{end}}
   <div class="sec-title flush">Partitions written</div>
   {{range .Parts}}<div class="meta-row"><span class="k mono"><a href="{{.URL}}">{{.Name}}</a></span><span class="v"></span></div>
   {{else}}<div class="note">It has not written to any partition yet.</div>{{end}}
@@ -91,7 +91,7 @@
 
 {{define "inspector_event"}}
 <div class="inspector-b">
-  <div class="meta-row"><span class="k">Time</span><span class="v mono">{{.E.TimeStr}}</span></div>
+  <div class="meta-row"><span class="k">Time</span><span class="v mono">{{when .E.Time "clockms"}}</span></div>
   <div class="meta-row"><span class="k">What</span><span class="v">{{.E.Label}}</span></div>
   <div class="meta-row"><span class="k">Group</span><span class="v mono"><a href="{{.GroupURL}}">{{.Group}}</a></span></div>
   {{if .E.TrafficGroupEvent.Member}}<div class="meta-row"><span class="k">Member</span><span class="v mono">{{.E.TrafficGroupEvent.Member}}</span></div>{{end}}

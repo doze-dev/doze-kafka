@@ -155,8 +155,8 @@
 <div class="sec-title">Timeline <span class="sz">since the broker started</span></div>
 {{if .Timeline}}
 <ol class="timeline" id="group-timeline">
-  {{range .Timeline}}<li class="tl tl-{{.Tone}}" id="ev-{{.Seq}}" tabindex="0" role="button" aria-label="Open event {{.Label}} at {{.TimeStr}}" data-inspector-open
-    hx-get="{{$.Prefix}}/inspect/event?key={{eventKey $.Group.ID .Seq}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"><span class="tl-t mono">{{.TimeStr}}</span><span class="tl-k">{{.Label}}</span>{{if .Member}}<span class="tl-m mono" title="{{.Member}}">{{.Member}}</span>{{end}}<span class="tl-d">{{.Detail}}</span>{{if .Generation}}<span class="tl-g mono">gen {{.Generation}}</span>{{end}}</li>{{end}}
+  {{range .Timeline}}<li class="tl tl-{{.Tone}}" id="ev-{{.Seq}}" tabindex="0" role="button" aria-label="Open event {{.Label}} at {{whenText .Time "clockms"}}" data-inspector-open
+    hx-get="{{$.Prefix}}/inspect/event?key={{eventKey $.Group.ID .Seq}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"><span class="tl-t mono">{{when .Time "clockms"}}</span><span class="tl-k">{{.Label}}</span>{{if .Member}}<span class="tl-m mono" title="{{.Member}}">{{.Member}}</span>{{end}}<span class="tl-d">{{.Detail}}</span>{{if .Generation}}<span class="tl-g mono">gen {{.Generation}}</span>{{end}}</li>{{end}}
 </ol>
 {{else}}
 <div class="honest">{{icon "info"}}<div>Nothing has happened in this group since the broker started. Members joining, leaving or timing out, and each new generation, appear here as they happen.</div></div>

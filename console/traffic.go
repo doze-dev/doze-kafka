@@ -116,7 +116,6 @@ func queryEscape(s string) string {
 // trafficRow is a request, ready to show.
 type trafficRow struct {
 	TrafficEvent
-	TimeStr  string // 15:04:05.000
 	Target   string // the topics, or the group.
 	Who      string // the client id, else the address.
 	Dur      string
@@ -127,7 +126,7 @@ type trafficRow struct {
 }
 
 func (c *Console) trafficRow(e TrafficEvent) trafficRow {
-	row := trafficRow{TrafficEvent: e, TimeStr: e.Time.Format("15:04:05.000"), Folded: e.Count > 1}
+	row := trafficRow{TrafficEvent: e, Folded: e.Count > 1}
 	switch {
 	case len(e.Topics) > 0:
 		row.Target = strings.Join(e.Topics, ", ")
@@ -254,10 +253,9 @@ func (c *Console) trafficRequest(w http.ResponseWriter, r *http.Request) {
 // timelineRow is one thing a group did, ready to show.
 type timelineRow struct {
 	TrafficGroupEvent
-	TimeStr string
-	Label   string
-	Tone    string
-	Member  string
+	Label  string
+	Tone   string
+	Member string
 }
 
 // groupTimeline is what the group's coordinator did, newest first. It is what answers
@@ -272,7 +270,7 @@ func (c *Console) groupTimeline(group string) []timelineRow {
 	for i := len(events) - 1; i >= 0; i-- {
 		e := events[i]
 		label, tone := timelineKind(e.Kind)
-		rows = append(rows, timelineRow{TrafficGroupEvent: e, TimeStr: e.Time.Format("15:04:05.000"), Label: label, Tone: tone, Member: shortID(e.Member)})
+		rows = append(rows, timelineRow{TrafficGroupEvent: e, Label: label, Tone: tone, Member: shortID(e.Member)})
 	}
 	return rows
 }
