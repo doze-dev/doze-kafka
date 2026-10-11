@@ -72,6 +72,32 @@ func probe(w *wire) bool {
 	return ok && len(m.Brokers) > 0
 }
 
+// send writes req at version without reading anything back: for a request the
+// broker answers with nothing (Produce with acks=0).
+func (w *wire) send(req kmsg.Request, version int16) error {
+	req.SetVersion(version)
+	w.corr++
+	w.conn.SetDeadline(time.Now().Add(10 * time.Second))
+	_, err := w.conn.Write(w.frame(req, version))
+	return err
+}
+
+func (w *wire) frame(req kmsg.Request, version int16) []byte {
+	var buf []byte
+	buf = binary.BigEndian.AppendUint16(buf, uint16(req.Key()))
+	buf = binary.BigEndian.AppendUint16(buf, uint16(version))
+	buf = binary.BigEndian.AppendUint32(buf, uint32(w.corr))
+	const clientID = "doze-conformance"
+	buf = binary.BigEndian.AppendUint16(buf, uint16(len(clientID)))
+	buf = append(buf, clientID...)
+	if req.IsFlexible() {
+		buf = append(buf, 0) // header tagged fields.
+	}
+	buf = req.AppendTo(buf)
+	frame := binary.BigEndian.AppendUint32(nil, uint32(len(buf)))
+	return append(frame, buf...)
+}
+
 // roundTrip sends req at version and reads its response.
 func (w *wire) roundTrip(req kmsg.Request, version int16) (kmsg.Response, error) {
 	req.SetVersion(version)

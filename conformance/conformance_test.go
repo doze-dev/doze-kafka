@@ -30,7 +30,7 @@ func TestRecord(t *testing.T) {
 			continue
 		}
 		t.Run(s.Name, func(t *testing.T) {
-			target, err := StartKafka(KafkaImage)
+			target, err := StartKafkaOn(KafkaImage, s.DiskMiB)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -58,6 +58,9 @@ func TestReplay(t *testing.T) {
 	for _, s := range Scenarios {
 		if *only != "" && s.Name != *only {
 			continue
+		}
+		if s.DiskMiB > 0 {
+			continue // a volume of its own: see Scenario.DiskMiB.
 		}
 		t.Run(s.Name, func(t *testing.T) {
 			rec, err := Load(recordingsDir, s.Name)

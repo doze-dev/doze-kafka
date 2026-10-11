@@ -30,7 +30,11 @@ type dockerTarget struct {
 // StartKafka runs a single-node KRaft apache/kafka (the compat matrix's image)
 // published on a free loopback port, and waits until it answers. The settings
 // are Kafka's own defaults except those a one-node cluster needs.
-func StartKafka(image string) (Target, error) {
+func StartKafka(image string) (Target, error) { return StartKafkaOn(image, 0) }
+
+// StartKafkaOn is StartKafka with the data directory on a tmpfs of diskMiB
+// mebibytes when that is above zero, so the disk can be filled.
+func StartKafkaOn(image string, diskMiB int) (Target, error) {
 	port, err := freePort()
 	if err != nil {
 		return nil, err
@@ -49,6 +53,10 @@ func StartKafka(image string) (Target, error) {
 		"-e", "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1",
 		"-e", "KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0",
 		image}
+	if diskMiB > 0 {
+		args = append([]string{"run", "-d", "--tmpfs", fmt.Sprintf("/var/lib/kafka/data:size=%dm,mode=1777", diskMiB),
+			"-e", "KAFKA_LOG_DIRS=/var/lib/kafka/data"}, args[2:]...)
+	}
 	if out, err := exec.Command("docker", args...).CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("docker run: %v: %s", err, strings.TrimSpace(string(out)))
 	}

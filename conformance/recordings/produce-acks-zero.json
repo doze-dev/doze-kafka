@@ -1,0 +1,183 @@
+{
+  "scenario": "produce-acks-zero",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": [
+              {
+                "Name": "max.message.bytes",
+                "Value": "2000"
+              }
+            ],
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "z"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [
+              {
+                "IsSensitive": false,
+                "Name": "max.message.bytes",
+                "ReadOnly": false,
+                "Source": 1,
+                "Value": "2000"
+              }
+            ],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "z",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "accepted-then-metadata",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "z",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "z",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "unknown-topic-then-metadata",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "z",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "unknown-partition-then-metadata",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "z",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "too-large-then-metadata",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "z",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "corrupt-then-metadata",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "z",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    }
+  ]
+}

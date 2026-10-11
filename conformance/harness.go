@@ -34,6 +34,10 @@ type Target interface {
 type Scenario struct {
 	Name string
 	Run  func(e *Env)
+	// DiskMiB, when above zero, runs the real broker on a volume of that size
+	// (a tmpfs) so a script can fill it. Such a scenario is recorded and not
+	// replayed in-process: doze-kafka's side is the size-limited volume test.
+	DiskMiB int
 	// Known are the differences doze-kafka has from Apache Kafka that are
 	// written down (docs/limitations.md) and not fixed. A replay fails on a
 	// difference that is not here, and fails on an entry here that no longer
