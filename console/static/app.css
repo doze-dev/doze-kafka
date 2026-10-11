@@ -1126,3 +1126,10 @@ table.tbl.tf-table th, table.tbl.tf-table td { padding-left: 6px; padding-right:
 .list-filter-first { border-top: 0; }
 .refusal-head { display: flex; align-items: center; gap: 8px; }
 .tapetable { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+/* Gr-02, Try it */
+#try-offset .try-topic { width: 220px; max-width: 100%; }
+#try-offset .try-part { width: 80px; }
+#try-offset .try-off { width: 120px; }
+
+.nbnote { margin: 4px 0 0; }

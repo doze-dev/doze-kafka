@@ -487,7 +487,7 @@ func TestAccessPageListsACLsUnderTheEnforcedBanner(t *testing.T) {
 		t.Fatalf("create an ACL: %v %+v", err, resp)
 	}
 	page := req(t, c, "GET", "/_console/access", nil).Body.String()
-	for _, want := range []string{"These are enforced", ">allow<", ">read<", "User:alice", "orders", "literal"} {
+	for _, want := range []string{"These are enforced", ">ALLOW<", ">Read<", ">Topic<", "User:alice", "orders", "literal"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the Access page is missing %q after one ACL was stored", want)
 		}

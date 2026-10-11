@@ -31,7 +31,7 @@
       <span class="m">{{len .Rows}} topic{{if ne (len .Rows) 1}}s{{end}}</span><span class="mut">·</span>
       <span class="m">{{num .Partitions}} partition{{if ne .Partitions 1}}s{{end}}</span><span class="mut">·</span>
       <span class="m">{{num .Messages}} message{{if ne .Messages 1}}s{{end}}</span>
-      {{if .HasWriters}}<span class="mut">·</span><span class="m">written by {{.Writers}} client{{if ne .Writers 1}}s{{end}}</span>{{end}}
+      {{if .HasWriters}}<span class="mut">·</span><span class="m">written by {{.Writers}} client{{if ne .Writers 1}}s{{end}}</span><span class="note" title="{{.WrittenFrom}}">{{.RingText}}</span>{{end}}
       <span class="mut">·</span><span class="m">read by {{.ReaderCount}} group{{if ne .ReaderCount 1}}s{{end}}</span>
       {{if .DeadLetters}}<span class="mut">·</span><span class="m warn">{{.DeadLetters}} topic{{if ne .DeadLetters 1}}s{{end}} with dead letters</span>{{end}}
     </div>
@@ -44,7 +44,7 @@
         <span class="m ra">{{.Partitions}}</span>
         <span class="m ra {{if .DeadLetter}}warn{{end}}">{{num .Msgs}}</span>
         <span class="m {{if eq .Retention "kept per key"}}mut{{end}}">{{if .Retention}}{{.Retention}}{{else}}<span class="mut">—</span>{{end}}</span>
-        <span class="m">{{if .ReadBy}}{{range $i, $g := .ReadBy}}{{if $i}}, {{end}}{{$g}}{{end}}{{else}}<span class="mut">nobody</span>{{end}}</span>
+        <span class="m">{{if .ReadBy}}{{range $i, $g := .ReadBy}}{{if $i}}, {{end}}{{$g}}{{end}}{{else}}<span class="mut" title="Read by is the groups that have committed offsets on this topic. A consumer that assigns partitions itself has no group, so it is not counted.">no group has committed</span>{{end}}</span>
         <span>{{if .Compact}}<span class="pill">compact</span>{{else}}<span class="mut">—</span>{{end}}</span>
         <span class="m">{{if .Subject}}{{.Subject}}{{else}}<span class="mut">—</span>{{end}}</span>
       </a>

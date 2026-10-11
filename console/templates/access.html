@@ -29,8 +29,8 @@
       <div class="r h"><span>Principal</span><span>Type</span><span>Name</span><span>Pattern</span><span>Operation</span><span>Permission</span><span>Host</span></div>
       {{range .ACLs}}
       <div class="r{{if eq .Permission "deny"}} denyrow{{end}}">
-        <span class="m">{{.Principal}}</span><span class="m">{{.Resource}}</span><span class="m">{{.Name}}</span><span class="m">{{.Pattern}}</span><span class="m">{{.Operation}}</span>
-        <span class="m {{if eq .Permission "deny"}}deny b{{else}}ok{{end}}">{{.Permission}}</span><span class="m">{{.Host}}</span>
+        <span class="m">{{.Principal}}</span><span class="m">{{capital .Resource}}</span><span class="m">{{.Name}}</span><span class="m">{{.Pattern}}</span><span class="m">{{capital .Operation}}</span>
+        <span class="m {{if eq .Permission "deny"}}deny b{{else}}ok{{end}}">{{upper .Permission}}</span><span class="m">{{.Host}}</span>
       </div>
       {{end}}
     </div>

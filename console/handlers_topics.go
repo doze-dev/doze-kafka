@@ -71,6 +71,7 @@ func (c *Console) topics(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		data["Writers"], data["HasWriters"] = len(writers), true
+		data["RingText"], data["WrittenFrom"] = c.ringText(time.Now())
 	}
 	if len(rows) == 0 {
 		f := c.connectFacts(r)
@@ -208,6 +209,10 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 	data["Confirm"] = c.topicConfirms(ctx, name, int(detail.Partitions))
 	maps.Copy(data, c.dockData(DockFilter{Topic: name}))
 	data["Neighbours"] = c.neighbourClauses(c.topicGraph(ctx, name, data["Consumers"].([]consumerRow)), NodeTopic, name)
+	if c.traffic != nil {
+		short, _ := c.ringText(time.Now())
+		data["NeighboursNote"] = "Written by is " + short + ". Read by is the groups that have committed offsets here; a consumer that assigns partitions itself has no group and is not counted."
+	}
 	data["Tabs"] = c.topicTabLinks(name, partition, tab, len(schemas) > 0, int(detail.Partitions), len(data["Consumers"].([]consumerRow)))
 	data["ListCount"] = len(list)
 

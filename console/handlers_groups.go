@@ -56,6 +56,17 @@ type groupLagRow struct {
 	Trimmed    bool // committed is before the oldest retained offset: records were lost to retention.
 }
 
+// tryRow is the partition the Try it form starts on: the first one the group has an
+// offset for, or none (the fields then start empty).
+func tryRow(rows []groupLagRow) groupLagRow {
+	for _, r := range rows {
+		if !r.Deleted {
+			return r
+		}
+	}
+	return groupLagRow{}
+}
+
 // memberView is a group member, ready to show.
 type memberView struct {
 	ID       string
@@ -225,6 +236,14 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 	topics := offsetTopics(rows)
 	g := NewGraph()
 	g.AddGroupReads(id, topics)
+	clients := make([]string, 0, len(members))
+	for _, m := range members {
+		clients = append(clients, m.ClientID)
+	}
+	g.AddGroupMembers(id, clients)
+	if c.reg != nil {
+		g.AddSubjects(c.reg.SubjectNames(r.Context()), topics)
+	}
 	if c.traffic != nil {
 		g.AddTraffic(c.traffic.Events(TrafficFilter{Group: id}, 0))
 	}
@@ -243,6 +262,7 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 		"Timeline": timeline, "HasTimeline": c.traffic != nil, "Group": detail, "Members": members, "Offsets": rows, "TotalLag": totalLag, "AnyAhead": anyAhead,
 		"TotalCommitted": totalCommitted, "TotalLogEnd": totalLogEnd, "Generation": generation,
 		"Topics":    topics,
+		"Try":       tryRow(rows),
 		"Confirm":   groupConfirms(id, rows),
 		"CanAct":    detail.State == "Empty" && len(detail.Members) == 0,
 		"NoCommits": len(offsets) == 0,

@@ -530,6 +530,44 @@ test('at 390 the Traffic requests are cards: time, request, what it was about, a
   expect(await res.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
 });
 
+// Ac-Home: type and operation are words (Topic, Write), the permission is ALLOW or DENY.
+test('the ACL table writes type and operation as words and the permission in capitals', async ({ page }) => {
+  await page.goto('access');
+  const rows = page.locator('#acl-table .r:not(.h)');
+  await expect(rows.first()).toBeVisible();
+  for (const row of await rows.all()) {
+    const cells = await row.locator('span').allInnerTexts();
+    expect(cells[1], 'type').toMatch(/^(Topic|Group|Cluster|TransactionalId|DelegationToken)$/);
+    expect(cells[4], 'operation').toMatch(/^[A-Z][A-Za-z]+$/);
+    expect(cells[5], 'permission').toMatch(/^(ALLOW|DENY)$/);
+  }
+});
+
+// Tp-Home: "read by nobody" says what it is counted from, and "written by" says where its
+// number comes from and how old the oldest of those requests is.
+test('the Topics table qualifies read by and written by', async ({ page }) => {
+  await page.goto('topics');
+  await expect(page.locator('#topics-table')).not.toContainText(/^nobody$/m);
+  await expect(page.locator('#topics-summary')).toContainText(/written by \d+ clients?/);
+  await expect(page.locator('#topics-summary')).toContainText(/from recent requests, the oldest .+ old/);
+  await page.goto('topics/seed-orders');
+  await expect(page.locator('#neighbours-note')).toContainText('Written by is from recent requests, the oldest');
+});
+
+// Gr-02: the Lag tab ends in Try it, the fields OffsetCommit takes.
+test('a group\'s Lag tab ends in Try it: topic, partition, new committed offset and Set offset', async ({ page }) => {
+  await page.goto('groups/g-lag');
+  const card = page.locator('#try-offset');
+  await expect(card).toContainText('Try it');
+  await expect(card).toContainText('the same fields OffsetCommit and the admin API take');
+  await expect(card.getByLabel('Topic')).toHaveValue('seed-orders');
+  await expect(card.getByLabel('Partition')).toHaveValue('0');
+  await expect(card.getByLabel('New committed offset')).toHaveValue(/^\d+$/);
+  await expect(card.getByRole('button', { name: 'Set offset' })).toBeEnabled();
+  // The neighbours: what it reads.
+  await expect(page.locator('#neighbours')).toContainText('seed-orders');
+});
+
 // Tp-02: the form says a name is taken before it is sent.
 test('the create form says a name already exists before anything is sent', async ({ page }) => {
   await page.goto('new/topic');

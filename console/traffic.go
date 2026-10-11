@@ -270,6 +270,24 @@ type clientRow struct {
 	Refused int
 }
 
+// ringText says where a "written by" comes from and how far back it reaches: the
+// requests the broker keeps in memory, the oldest of which is so old. short is the
+// words beside the number, long is what the tooltip says.
+func (c *Console) ringText(now time.Time) (short, long string) {
+	events := c.traffic.Events(TrafficFilter{}, 0)
+	kept := "the recent requests the broker keeps in memory"
+	if n := capacityOf(c.traffic); n > 0 {
+		kept = "the last " + groupDigits(int64(n)) + " requests the broker keeps in memory"
+	}
+	if len(events) == 0 {
+		return "from recent requests; none are kept yet",
+			"Written by is counted from " + kept + ", and none are kept yet. It does not survive a restart."
+	}
+	age := spanText(now.Sub(events[len(events)-1].First))
+	return "from recent requests, the oldest " + age + " old",
+		"Written by is counted from " + kept + ". It reaches back " + age + ": a client that wrote earlier, or whose requests have been pushed out, is not listed. It does not survive a restart."
+}
+
 // capacityOf is how many rows the source keeps, when it says.
 func capacityOf(src TrafficSource) int {
 	if c, ok := src.(interface{ Capacity() int }); ok {
