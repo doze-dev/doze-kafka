@@ -6,6 +6,19 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Client telemetry answers as Apache Kafka 4.3.1 does, from recordings of it
+  (`conformance/recordings/telemetry-*.json`, `client-telemetry.json`): a push before the
+  interval has passed, and a second subscription request inside it, is
+  `THROTTLING_QUOTA_EXCEEDED`; the push after a terminating one is `INVALID_REQUEST`
+  once; a body that does not decompress is `INVALID_RECORD`, and one that is not
+  OpenTelemetry is taken and not read; the byte cap is 1 MiB and the compression types
+  are listed zstd, lz4, gzip, snappy; the subscription id is a function of the instance
+  id, so a push holding the id from before a restart is taken; an instance is tied to no
+  connection and no principal. The Traffic inspector's decoded fields carry the names of
+  Kafka's JSON specification of the request ("TransactionalId", "TopicData") and no
+  longer the client library's. A Produce partition that does not exist answers a base
+  offset of -1.
+
 - Traffic, third review: Enter on a link inside the inspector (the client link, "See a
   client that reports", a topic's neighbours) opens its selection; a refusal's name
   never breaks inside a word (the Result column is 118 px, the board's 84 cut
