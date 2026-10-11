@@ -648,7 +648,7 @@ test('the top bar holds no control that is hidden: Retry is drawn with the disco
   expect(await page.locator('header.topbar button[hidden], header.topbar a[hidden]').count()).toBe(0);
 });
 
-test('the Traffic columns are the board\'s: 92 150 118 1fr 190 118 52 (the board's, but the Result 118 not 84), with its 14 px gaps', async ({ page }) => {
+test('the Traffic columns are the board\'s: 92 150 118 1fr 190 118 52 (the Result is 118, not the board\'s 84), with its 14 px gaps', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('traffic');
   const cells = await page.locator('#traffic-table thead th').evaluateAll((ths) => ths.map((th) => {
