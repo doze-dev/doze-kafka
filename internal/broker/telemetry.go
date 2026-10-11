@@ -55,6 +55,10 @@ func telemetryWho(req *protocol.Request) telemetry.Who {
 	return telemetry.Who{
 		ClientID: req.Header.ClientID, Software: req.Conn.ClientSoftware(),
 		Principal: req.Conn.Principal(), Host: req.Conn.RemoteHost(),
+		// An instance is bound to the connection that made it, so another connection
+		// cannot speak as it while that one is open (TRF-27); the number is also how the
+		// console links a client's requests to its metrics.
+		Conn: req.Conn.ID(), Open: req.Conn.Open,
 	}
 }
 
@@ -63,7 +67,17 @@ func (b *Broker) handleGetTelemetrySubscriptions(ctx context.Context, req *proto
 	if id == ([16]byte{}) {
 		id = telemetry.NewID() // the first time a client asks, it has no id yet: the broker gives it one.
 	}
-	b.telemetry.Touch(id, telemetryWho(req))
+	who := telemetryWho(req)
+	if b.telemetry.Owned(id, who) {
+		// Somebody else's id: not adopted. This client gets one of its own.
+		id = telemetry.NewID()
+	}
+	if !b.telemetry.Touch(id, who) {
+		// One connection may hold only so many; it is told what any client is told that
+		// the broker will not take telemetry from it.
+		resp.ErrorCode = kerr.InvalidRequest.Code
+		return nil
+	}
 	resp.ClientInstanceID = id
 	resp.SubscriptionID = b.subscriptionID
 	resp.AcceptedCompressionTypes = append([]int8(nil), telemetryCompression...)
@@ -86,6 +100,9 @@ func (b *Broker) handlePushTelemetry(ctx context.Context, req *protocol.Request,
 		resp.ErrorCode = kerr.UnsupportedCompressionType.Code
 	case len(q.Metrics) > telemetryMaxBytes:
 		resp.ErrorCode = kerr.TelemetryTooLarge.Code
+	case !b.telemetry.Admit(q.ClientInstanceID, q.Terminating):
+		// Faster than the interval it was told to push at, past a burst: counted, not
+		// decoded, and answered as received. What the client sees does not change.
 	default:
 		raw, err := log.Decompress(int(q.CompressionType), q.Metrics, telemetryMaxBytes)
 		if err != nil {
@@ -99,7 +116,11 @@ func (b *Broker) handlePushTelemetry(ctx context.Context, req *protocol.Request,
 			resp.ErrorCode = kerr.InvalidRequest.Code
 			return nil
 		}
-		b.telemetry.Push(q.ClientInstanceID, telemetryWho(req), payload, q.Terminating)
+		if !b.telemetry.Push(q.ClientInstanceID, telemetryWho(req), payload, q.Terminating) {
+			// The instance is another connection's or another principal's (queue R4:
+			// what real Kafka answers is not recorded).
+			resp.ErrorCode = kerr.InvalidRequest.Code
+		}
 	}
 	return nil
 }

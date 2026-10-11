@@ -11,6 +11,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
@@ -70,6 +71,7 @@ type Conn struct {
 
 	observer Observer // told about this connection and its requests; nil = nobody is watching.
 	id       uint64   // this connection's number, for the observer.
+	done     atomic.Bool
 }
 
 func newConn(raw net.Conn, router *Router, logger *slog.Logger, authRequired bool) *Conn {
@@ -184,6 +186,7 @@ func preAuthAllowed(key APIKey) bool {
 // serve reads, dispatches, and replies until the peer closes the connection or
 // ctx is cancelled.
 func (c *Conn) serve(ctx context.Context) {
+	defer c.done.Store(true)
 	defer c.raw.Close()
 	if c.observer != nil {
 		c.observer.ConnOpened(c.id, c.raw.RemoteAddr().String())

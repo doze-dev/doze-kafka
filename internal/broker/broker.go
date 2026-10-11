@@ -14,6 +14,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 
 	"context"
 	"fmt"
@@ -107,6 +108,7 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 	// reader, and a broker without one advertises nothing for clients to push into.
 	if cfg.ClientTelemetry && cfg.Console {
 		b.telemetry, b.subscriptionID = telemetry.NewStore(), newSubscriptionID()
+		b.telemetry.SetPushInterval(telemetryPushMillis * time.Millisecond)
 	}
 	return b, nil
 }
