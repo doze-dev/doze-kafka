@@ -107,8 +107,8 @@ type Options struct {
 // shows these in the top bar, on the Connect page and on a first run; it never
 // invents a value for one that was not given.
 type BrokerFacts struct {
-	// Workspace labels the broker in the top bar: the name of the directory its
-	// data lives in, so two brokers on one machine can be told apart.
+	// Workspace labels the broker in the top bar: the instance's name (the one it
+	// answers to as kafka.<name>.doze), so two brokers on one machine can be told apart.
 	Workspace string
 	// KafkaMajor is the Kafka major version the broker declares ("Kafka 4.0 compat").
 	KafkaMajor int
