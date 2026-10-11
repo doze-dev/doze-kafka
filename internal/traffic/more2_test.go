@@ -32,8 +32,14 @@ func TestOrderingTiesAndNamesFallBackToTheAddress(t *testing.T) {
 	r.ConnOpened(5, "x")
 	r.ConnOpened(2, "y")
 	// Two rows that began at the same instant: the later one first.
-	r.Request(obs(5, "", kmsg.Fetch, 0, func(o *protocol.Observation) { o.Remote = "10.0.0.5:1"; o.ErrorCode, o.Class = 3, protocol.ClassRefused }))
-	r.Request(obs(2, "", kmsg.Fetch, 0, func(o *protocol.Observation) { o.Remote = "10.0.0.2:1"; o.ErrorCode, o.Class = 3, protocol.ClassRefused }))
+	r.Request(obs(5, "", kmsg.Fetch, 0, func(o *protocol.Observation) {
+		o.Remote = "10.0.0.5:1"
+		o.ErrorCode, o.Class = 3, protocol.ClassRefused
+	}))
+	r.Request(obs(2, "", kmsg.Fetch, 0, func(o *protocol.Observation) {
+		o.Remote = "10.0.0.2:1"
+		o.ErrorCode, o.Class = 3, protocol.ClassRefused
+	}))
 	evs := r.Events(Filter{}, 0)
 	if len(evs) != 2 || evs[0].Conn != 2 {
 		t.Errorf("order = %v %v", evs[0].Conn, evs[1].Conn)

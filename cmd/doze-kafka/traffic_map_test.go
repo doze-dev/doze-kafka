@@ -93,14 +93,16 @@ func TestClientMetricsAreMappedWithTheirConnection(t *testing.T) {
 	store.Touch(id, telemetry.Who{ClientID: "billing", Principal: "User:a", Conn: 7})
 	store.Push(id, telemetry.Who{ClientID: "billing", Principal: "User:a", Conn: 7}, telemetry.Payload{
 		Resource: map[string]string{"k": "v"},
-		Metrics: []telemetry.Metric{{Name: "org.apache.kafka.producer.x", Kind: telemetry.Gauge, Points: []telemetry.Point{{Time: time.Now(), Value: 2}}}},
+		Metrics:  []telemetry.Metric{{Name: "org.apache.kafka.producer.x", Kind: telemetry.Gauge, Points: []telemetry.Point{{Time: time.Now(), Value: 2}}}},
 	}, false)
 	src := clientMetricsFor(store)
 	all := src.Instances()
 	if len(all) != 1 || all[0].Conn != 7 || len(all[0].Series) != 1 || all[0].Series[0].Samples[0].V != 2 || all[0].Resource["k"] != "v" {
 		t.Fatalf("instances = %+v", all)
 	}
-	sum := src.(interface{ Summaries() []console.ClientInstance }).Summaries()
+	sum := src.(interface {
+		Summaries() []console.ClientInstance
+	}).Summaries()
 	if len(sum) != 1 || len(sum[0].Series) != 0 || sum[0].Pushes != 1 || sum[0].Metrics != 1 {
 		t.Errorf("summaries = %+v", sum)
 	}

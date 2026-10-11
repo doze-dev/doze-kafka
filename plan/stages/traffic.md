@@ -64,7 +64,7 @@ pause behaviour. [Access](access.md) shows principals that this stage records.
 The empty state links to Connect (foundation D).
 
 **Estimate:** L, about 20 focused days (40 half-days, section 11).
-**Actual:** _fill in when done._
+**Actual:** one session; not measured in days (see [the status of this pass](#status-of-this-pass)).
 
 ## 2. Contract
 
@@ -411,3 +411,54 @@ Order matters in three places: 2 before 5 (the recorder redesign builds on clipp
 - KIP-394 explains `MEMBER_ID_REQUIRED` on a first join; the class table cites it. (doc)
 - Redpanda Console and Kafbat UI show connected clients and group state from admin APIs; neither shows a request tail, which is why this page is built from the wire. (memory; not asserted anywhere in the product)
 - The Schema Registry work in this repository (record, commit, replay) is the method R1 to R9 follow.
+
+## Status of this pass
+
+What was done, by finding, against what the document asked. "Red" means the test failed
+on the code before the fix and was run again with the fix reverted by hand.
+
+| ID | State | Where it is tested |
+|---|---|---|
+| TRF-1 | fixed, red | `TestRowFieldsAreClipped`, `TestRecorderMemoryWithMaximalInput` (under 8 MiB for 2,000 maximal rows from 100 clients; a connection costs about 2 KB more), `TestARecordedJoinReasonIsClipped` |
+| TRF-2 | fixed, red | `TestDecompressZstdNeverAllocatesPastTheLimit`, `TestPushOfAZstdBombIsRefusedWithoutInflatingIt`. The decoder allocates the window a frame declares, so the window is capped at four times the limit (2 MiB for telemetry: a default-level compressor asks for exactly that) and a frame declaring more is refused. The "under 4 MiB" of the plan is 6 MiB at the 2 MiB window. |
+| TRF-3 | already fixed by B12 | `TestDecompressShortXerialHeaderIsAnError`, and the on-the-wire test that the connection lives was added |
+| TRF-4 | fixed, red | `TestResourceIsBounded`, `TestAResourceBurstDoesNotGrowTheStore` |
+| TRF-5 | safeguard built; the answer is not changed | a token bucket (a burst of 20, then one per third of the interval) skips decoding and counts a push (`Instance.Skipped`), answering 0 as before. What real Kafka answers is `memory` (R1): `TestEarlyPushIsAnsweredAsRecorded` is written and skipped. |
+| TRF-6 | fixed | caps 100 x 150 x 60, 12 bytes a sample, `TestStoreWorstCaseIsUnderBudget` (24.7 MB estimated, under 32 MiB measured); `Summaries`, `Instance`, `ForConn` copy only what is asked |
+| TRF-7 | fixed, red | `TestFirstErrorFindsEveryErrorCodeOfEveryResponse` (failed for exactly the five keys listed) |
+| TRF-8 | fixed, red | `TestExpectedFlowIsNotAnError`, the class table, the console's refusals read it |
+| TRF-9 | fixed | the link is a `template.URL`; `TestClientRefusedInARowIsFlagged`, e2e "links a client name to only its requests" |
+| TRF-10 | fixed, red | `TestTransactionalIdIsNotAGroup`, `TestSummarisersReportWhatTheRequestNames` |
+| TRF-11 | fixed, red | `TestConnectionEndingRequestsAreObserved` (unserved API, panic, bad header, request before authentication). A failed write is observed too; an oversized frame is not (the loop returns before the key is known). |
+| TRF-12, 13 | fixed, red | `TestAFoldedRowKeepsItsId`, `TestBusyTrafficDoesNotResetAFoldedCount`, `TestEvictionIsByLastActivity` |
+| TRF-14 | fixed, red | `TestEmbeddedBrokerDoesNotAdvertiseTelemetry`, `TestNoConsoleMeansNoTelemetry` |
+| TRF-15 | fixed | "N of M requests match" (requests among those kept); the table says when it is cut at 200 rows |
+| TRF-16 | cells written and run | `compat/java-telemetry`, `compat/kcat-telemetry`: the client's card on the page. The cells now grep the `Traffic` page's client list; see the compat note below. |
+| TRF-17 | fixed | `TestSummarisersReportWhatTheRequestNames` (22 rows) and the summariser coverage |
+| TRF-18 | fixed, red | `TestGroupFilterIncludesItsMembersFetches` |
+| TRF-19 | fixed, red | `TestGroupEventsAreKeptInOrderPerGroup` (a noisy group), `TestTheQuietestGroupIsTheOneForgotten` |
+| TRF-20 | decided | a row's time is when it began, and the table is ordered by it; the row appears when the request ends |
+| TRF-21 | fixed, red | `TestOnlyTheConsolesOwnIdsAreLeftOut`, `TestTheRecordersLeftOutIdsAreTheConsolesOwn` |
+| TRF-22 | fixed | the client's chart copy says what it covers and "one point per report" (`TestClientInspectorShowsWhatItReportsAboutItself`) |
+| TRF-23 | fixed | `TestFactsNeverHoldRecordBytesOrSecrets`, the fields held are listed in `observability.md` |
+| TRF-24, 25, 26 | fixed, red | `TestTruncatedPointIsMalformed`, `TestPastTimestampsAreClamped`, `TestDroppedSeriesAreCounted` |
+| TRF-27 | **narrowed** | an instance is a principal's: another principal is refused; another connection of the same principal is not, and the instance follows the connection that pushed. The plan's rule (refuse a push from another open connection) acted on `memory` (R4) and broke the Java client, which subscribes on its bootstrap connection and pushes on the one metadata gave it (found by the held-consumer browser spec). |
+| TRF-28 | fixed | metrics are off the request region; the hash is from counters (`TestClientMetricsDoNotRefreshTheRequestRegion`) |
+| TRF-29 | done by the foundation (E11) | `task api` |
+| TRF-30 | fixed, red | a connection that has not sent a request is not a client |
+| TRF-31 | fixed | a client with no id is named by its software and address |
+
+**Not done, with the reason.**
+
+- **R1 to R9 are not recorded.** The scenarios need the foundation's recorder run
+  against `apache/kafka`; Docker is present, but the evidence standard asks for a
+  scenario each and this pass built the console and the backend. Every claim of the pass
+  that rests on them is `doc` or `memory` and is listed above (R1 the early push, R4 the
+  other connection, R6 `MEMBER_ID_REQUIRED` as expected flow with KIP-394, R8 "any join
+  makes everyone rejoin"). Count at `doc` or `memory`: 9 of 9.
+- **The dock endpoint** is the existing `/dock`, which now pages by the recorder's row ids
+  (the contract's cursor); no `/traffic/dock` was added.
+- **Per (client, topic, direction) totals** for the map (W5) were not built; the map stage
+  owns them.
+- **Decoded fields use the library's names**, not Kafka's JSON spec names (see the
+  deviations).
