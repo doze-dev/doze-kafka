@@ -34,6 +34,7 @@ func FuzzDescribe(f *testing.F) {
 		for _, answered := range []kmsg.Response{nil, kmsg.ResponseForKey(int16(header.APIKey))} {
 			r := &Request{Header: header, decoded: q, answered: answered}
 			_ = r.Describe()
+			_ = DescribeFacts(q, answered)
 		}
 	})
 }

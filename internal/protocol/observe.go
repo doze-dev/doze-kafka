@@ -29,8 +29,15 @@ type Summary struct {
 	// TopicIDs are topics the request named only by id (Fetch v13, for one); the
 	// observer resolves them, since only it knows the names.
 	TopicIDs [][16]byte
-	// Group is the consumer group (or transactional id) the request was for.
+	// Group is the consumer group the request was for.
 	Group string
+	// TxnID is the transactional id, for the requests that name one. It is not a
+	// group: the recorder used to list it as one and link it to a page that does not
+	// exist (TRF-10).
+	TxnID string
+	// Kind is the family the request belongs to, for the console's filter: "produce",
+	// "fetch", "groups", "admin", or "" for the rest (Kinds).
+	Kind string
 	// Idle marks a request that moved nothing: a long-poll fetch that timed out
 	// empty, a heartbeat. Repeats of these collapse into one row.
 	Idle bool
@@ -71,6 +78,15 @@ type Observation struct {
 	Duration  time.Duration
 	ReqBytes  int
 	RespBytes int
+	// Correlation is the request's correlation id: what the client's own log carries.
+	Correlation int32
+	// Closed, when set, says the broker closed the connection because of this request
+	// and why ("API key 99 is not served"). The answer, if any, was never sent.
+	Closed string
+	// Req and Resp are what the handler decoded and answered with, for an observer that
+	// wants to read more of them (Facts). They are read-only and must not be kept.
+	Req  kmsg.Request
+	Resp kmsg.Response
 	Summary
 }
 
@@ -132,5 +148,29 @@ func (r *Request) Describe() Summary {
 		s.Detail = "version negotiation: the client asks again at a version offered here"
 	}
 	s.Class = Classify(r.Header.APIKey, s.ErrorCode)
+	s.Kind = Kind(r.Header.APIKey)
 	return s
+}
+
+// Kind is the family of an API, for the console's filter chips: "produce", "fetch",
+// "groups" (the consumer group protocols, offsets and coordinator lookup), "admin"
+// (topics, configs, ACLs, cluster questions), or "" for everything else (metadata,
+// version negotiation, producer ids, transactions, telemetry), which is listed under
+// "all" only.
+func Kind(api APIKey) string {
+	switch api {
+	case kmsg.Produce:
+		return "produce"
+	case kmsg.Fetch, kmsg.ShareFetch:
+		return "fetch"
+	case kmsg.JoinGroup, kmsg.SyncGroup, kmsg.Heartbeat, kmsg.LeaveGroup, kmsg.OffsetCommit, kmsg.OffsetFetch,
+		kmsg.OffsetDelete, kmsg.FindCoordinator, kmsg.ConsumerGroupHeartbeat, kmsg.ConsumerGroupDescribe,
+		kmsg.DescribeGroups, kmsg.ListGroups, kmsg.DeleteGroups, kmsg.TxnOffsetCommit:
+		return "groups"
+	case kmsg.CreateTopics, kmsg.DeleteTopics, kmsg.CreatePartitions, kmsg.AlterConfigs, kmsg.IncrementalAlterConfigs,
+		kmsg.DescribeConfigs, kmsg.CreateACLs, kmsg.DeleteACLs, kmsg.DescribeACLs, kmsg.DeleteRecords, kmsg.DescribeCluster,
+		kmsg.DescribeLogDirs, kmsg.ListTransactions, kmsg.DescribeTransactions, kmsg.DescribeProducers:
+		return "admin"
+	}
+	return ""
 }

@@ -1,12 +1,16 @@
 package protocol
 
 import (
+	"encoding/binary"
 	"fmt"
 	"reflect"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // How each API describes a request, for the APIs table (API.Summary). A summariser is
@@ -46,6 +50,60 @@ func bytesText(n int) string {
 	}
 }
 
+// partitionRanges writes partition numbers as "p1", "p0–p2", "p0–p2, p5", sorted and
+// without repeats.
+func partitionRanges(parts []int32) string {
+	if len(parts) == 0 {
+		return ""
+	}
+	ps := slices.Clone(parts)
+	slices.Sort(ps)
+	ps = slices.Compact(ps)
+	var out []string
+	for i := 0; i < len(ps); {
+		j := i
+		for j+1 < len(ps) && ps[j+1] == ps[j]+1 {
+			j++
+		}
+		switch {
+		case j == i:
+			out = append(out, "p"+strconv.Itoa(int(ps[i])))
+		case j == i+1:
+			out = append(out, "p"+strconv.Itoa(int(ps[i])), "p"+strconv.Itoa(int(ps[j])))
+		default:
+			out = append(out, "p"+strconv.Itoa(int(ps[i]))+"–p"+strconv.Itoa(int(ps[j])))
+		}
+		i = j + 1
+	}
+	return strings.Join(out, ", ")
+}
+
+// batchCounts reads how many record batches and records a run of batches holds, from
+// their headers alone: base offset (8), length (4), ... record count (4, at 57).
+func batchCounts(b []byte) (batches, records int) {
+	for len(b) >= 61 {
+		n := int(int32(binary.BigEndian.Uint32(b[8:])))
+		if n < 49 || 12+n > len(b) {
+			break
+		}
+		batches++
+		records += int(int32(binary.BigEndian.Uint32(b[57:])))
+		b = b[12+n:]
+	}
+	return batches, records
+}
+
+// withDetails joins the non-empty parts with the board's separator.
+func withDetails(parts ...string) string {
+	var out []string
+	for _, p := range parts {
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return strings.Join(out, " · ")
+}
+
 // sumNothing is for an API with nothing worth saying about its target.
 func sumNothing(kmsg.Request, kmsg.Response) Summary { return Summary{} }
 
@@ -55,21 +113,39 @@ func sumProduce(q kmsg.Request, r kmsg.Response) Summary {
 		return Summary{}
 	}
 	s := Summary{Topics: topicNames(req.Topics, func(t kmsg.ProduceRequestTopic) string { return t.Topic })}
-	parts, size := 0, 0
+	var parts []int32
+	batches, size := 0, 0
 	for _, t := range req.Topics {
-		parts += len(t.Partitions)
 		for _, p := range t.Partitions {
+			parts = append(parts, p.Partition)
+			b, _ := batchCounts(p.Records)
+			batches += b
 			size += len(p.Records)
 		}
 	}
-	s.Detail = plural(parts, "partition") + ", " + bytesText(size)
+	where := partitionRanges(parts)
+	if len(req.Topics) > 1 {
+		where = plural(len(parts), "partition") // p0 of which topic? the numbers alone would mislead.
+	}
+	batchText := ""
+	if batches > 0 {
+		batchText = batchesText(batches)
+	}
+	s.Detail = withDetails(where, batchText, bytesText(size))
 	if req.Acks == 0 {
-		s.Detail += ", acks=0"
+		s.Detail += " · acks=0"
 	}
 	if req.TransactionID != nil {
-		s.Group = *req.TransactionID
+		s.TxnID = *req.TransactionID
 	}
 	return s
+}
+
+func batchesText(n int) string {
+	if n == 1 {
+		return "1 batch"
+	}
+	return strconv.Itoa(n) + " batches"
 }
 
 func sumFetch(q kmsg.Request, r kmsg.Response) Summary {
@@ -78,6 +154,8 @@ func sumFetch(q kmsg.Request, r kmsg.Response) Summary {
 		return Summary{}
 	}
 	s := Summary{}
+	var parts []int32
+	var from int64 = -1
 	for _, t := range req.Topics {
 		if t.Topic != "" {
 			if !slices.Contains(s.Topics, t.Topic) {
@@ -86,23 +164,66 @@ func sumFetch(q kmsg.Request, r kmsg.Response) Summary {
 		} else if t.TopicID != ([16]byte{}) {
 			s.TopicIDs = append(s.TopicIDs, t.TopicID)
 		}
+		for _, p := range t.Partitions {
+			parts = append(parts, p.Partition)
+			if from < 0 {
+				from = p.FetchOffset
+			}
+		}
 	}
-	size, parts := 0, 0
+	size, records := 0, 0
 	if resp, ok := r.(*kmsg.FetchResponse); ok {
 		for _, t := range resp.Topics {
 			for _, p := range t.Partitions {
-				parts++
 				size += len(p.RecordBatches)
+				_, n := batchCounts(p.RecordBatches)
+				records += n
 			}
 		}
 		s.Idle = size == 0 && resp.ErrorCode == 0
 	}
-	if size == 0 {
-		s.Detail = "nothing new"
-	} else {
-		s.Detail = bytesText(size) + " from " + plural(parts, "partition")
+	where := partitionRanges(parts)
+	if len(req.Topics) > 1 {
+		where = plural(len(parts), "partition")
+	}
+	switch {
+	case size == 0:
+		wait := ""
+		if req.MaxWaitMillis > 0 {
+			wait = ", waiting up to " + shortMillis(req.MaxWaitMillis)
+		}
+		s.Detail = "empty" + wait
+	case len(parts) == 1 && from >= 0:
+		s.Detail = withDetails(where+" from "+groupInt(from), plural(records, "record"))
+	default:
+		s.Detail = withDetails(where, plural(records, "record"), bytesText(size))
 	}
 	return s
+}
+
+// shortMillis is "500 ms" or "30 s".
+func shortMillis(ms int32) string {
+	if ms >= 1000 && ms%1000 == 0 {
+		return strconv.Itoa(int(ms/1000)) + " s"
+	}
+	return strconv.Itoa(int(ms)) + " ms"
+}
+
+// groupInt writes 4812 as "4,812".
+func groupInt(n int64) string {
+	s := strconv.FormatInt(n, 10)
+	neg := ""
+	if n < 0 {
+		neg, s = "-", s[1:]
+	}
+	var out []byte
+	for i := range len(s) {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			out = append(out, ',')
+		}
+		out = append(out, s[i])
+	}
+	return neg + string(out)
 }
 
 func sumListOffsets(q kmsg.Request, _ kmsg.Response) Summary {
@@ -125,19 +246,31 @@ func sumMetadata(q kmsg.Request, _ kmsg.Response) Summary {
 			s.TopicIDs = append(s.TopicIDs, t.TopicID)
 		}
 	}
-	if len(req.Topics) == 0 {
+	switch {
+	case req.Topics == nil || len(req.Topics) == 0:
 		s.Detail = "all topics"
+	case req.AllowAutoTopicCreation:
+		s.Detail = "auto-create on"
 	}
 	return s
 }
 
 func sumOffsetCommit(q kmsg.Request, _ kmsg.Response) Summary {
 	if req, ok := q.(*kmsg.OffsetCommitRequest); ok {
-		parts := 0
+		var parts []int32
 		for _, t := range req.Topics {
-			parts += len(t.Partitions)
+			for _, p := range t.Partitions {
+				parts = append(parts, p.Partition)
+			}
 		}
-		return Summary{Group: req.Group, Detail: plural(parts, "partition"),
+		detail := partitionRanges(parts)
+		if len(req.Topics) > 1 {
+			detail = plural(len(parts), "partition")
+		}
+		if req.Generation > 0 {
+			detail = withDetails(detail, "generation "+strconv.Itoa(int(req.Generation)))
+		}
+		return Summary{Group: req.Group, Detail: detail,
 			Topics: topicNames(req.Topics, func(t kmsg.OffsetCommitRequestTopic) string { return t.Topic })}
 	}
 	return Summary{}
@@ -166,29 +299,43 @@ func sumFindCoordinator(q kmsg.Request, _ kmsg.Response) Summary {
 		if key == "" && len(req.CoordinatorKeys) > 0 {
 			key = req.CoordinatorKeys[0]
 		}
-		kind := "group"
 		if req.CoordinatorType == 1 {
-			kind = "transaction"
+			return Summary{TxnID: key, Detail: "transaction coordinator"}
 		}
-		return Summary{Group: key, Detail: kind + " coordinator"}
+		return Summary{Group: key, Detail: "group coordinator"}
 	}
 	return Summary{}
 }
 
-func sumJoin(q kmsg.Request, _ kmsg.Response) Summary {
-	if req, ok := q.(*kmsg.JoinGroupRequest); ok {
-		s := Summary{Group: req.Group}
-		if req.Reason != nil {
-			s.Detail = *req.Reason
-		}
-		return s
+func sumJoin(q kmsg.Request, r kmsg.Response) Summary {
+	req, ok := q.(*kmsg.JoinGroupRequest)
+	if !ok {
+		return Summary{}
 	}
-	return Summary{}
+	s := Summary{Group: req.Group}
+	var detail string
+	if resp, ok := r.(*kmsg.JoinGroupResponse); ok {
+		switch {
+		case resp.ErrorCode == kerr.MemberIDRequired.Code:
+			detail = "a new member asks in; it is given an id to join with"
+		case resp.ErrorCode == 0 && resp.Generation >= 0:
+			detail = "generation " + strconv.Itoa(int(resp.Generation))
+			if len(resp.Members) > 0 {
+				detail += " · " + plural(len(resp.Members), "member") + ", leader"
+			}
+		}
+	}
+	reason := ""
+	if req.Reason != nil {
+		reason = *req.Reason
+	}
+	s.Detail = withDetails(detail, reason)
+	return s
 }
 
 func sumHeartbeat(q kmsg.Request, _ kmsg.Response) Summary {
 	if req, ok := q.(*kmsg.HeartbeatRequest); ok {
-		return Summary{Group: req.Group, Idle: true}
+		return Summary{Group: req.Group, Idle: true, Detail: "generation " + strconv.Itoa(int(req.Generation))}
 	}
 	return Summary{}
 }
@@ -202,7 +349,11 @@ func sumLeave(q kmsg.Request, _ kmsg.Response) Summary {
 
 func sumSync(q kmsg.Request, _ kmsg.Response) Summary {
 	if req, ok := q.(*kmsg.SyncGroupRequest); ok {
-		return Summary{Group: req.Group}
+		detail := "generation " + strconv.Itoa(int(req.Generation))
+		if len(req.GroupAssignment) > 0 {
+			detail += " · hands out partitions to " + plural(len(req.GroupAssignment), "member")
+		}
+		return Summary{Group: req.Group, Detail: detail}
 	}
 	return Summary{}
 }
@@ -261,11 +412,26 @@ func sumDeleteRecords(q kmsg.Request, _ kmsg.Response) Summary {
 	return Summary{}
 }
 
-func sumInitProducerID(q kmsg.Request, _ kmsg.Response) Summary {
-	if req, ok := q.(*kmsg.InitProducerIDRequest); ok && req.TransactionalID != nil {
-		return Summary{Group: *req.TransactionalID, Detail: "transactional id"}
+func sumInitProducerID(q kmsg.Request, r kmsg.Response) Summary {
+	req, ok := q.(*kmsg.InitProducerIDRequest)
+	if !ok {
+		return Summary{}
 	}
-	return Summary{Detail: "idempotent producer"}
+	s := Summary{Detail: "idempotent producer"}
+	if req.TransactionalID != nil {
+		s.TxnID = *req.TransactionalID
+		s.Detail = "transactional producer"
+	}
+	if resp, ok := r.(*kmsg.InitProducerIDResponse); ok && resp.ErrorCode == 0 {
+		s.Detail = "producer id " + groupInt(resp.ProducerID) + ", epoch " + strconv.Itoa(int(resp.ProducerEpoch))
+		if req.ProducerEpoch >= 0 && req.ProducerID >= 0 {
+			s.Detail = "epoch " + strconv.Itoa(int(req.ProducerEpoch)) + " → " + strconv.Itoa(int(resp.ProducerEpoch))
+		}
+		if s.TxnID != "" {
+			s.Detail = withDetails("transactional", s.Detail)
+		}
+	}
+	return s
 }
 
 func sumAddPartitionsToTxn(q kmsg.Request, _ kmsg.Response) Summary {
@@ -273,10 +439,10 @@ func sumAddPartitionsToTxn(q kmsg.Request, _ kmsg.Response) Summary {
 	if !ok {
 		return Summary{}
 	}
-	s := Summary{Group: req.TransactionalID, Topics: topicNames(req.Topics, func(t kmsg.AddPartitionsToTxnRequestTopic) string { return t.Topic })}
+	s := Summary{TxnID: req.TransactionalID, Topics: topicNames(req.Topics, func(t kmsg.AddPartitionsToTxnRequestTopic) string { return t.Topic })}
 	for _, tx := range req.Transactions {
-		if s.Group == "" {
-			s.Group = tx.TransactionalID
+		if s.TxnID == "" {
+			s.TxnID = tx.TransactionalID
 		}
 		for _, t := range tx.Topics {
 			if t.Topic != "" && !slices.Contains(s.Topics, t.Topic) {
@@ -289,7 +455,7 @@ func sumAddPartitionsToTxn(q kmsg.Request, _ kmsg.Response) Summary {
 
 func sumAddOffsetsToTxn(q kmsg.Request, _ kmsg.Response) Summary {
 	if req, ok := q.(*kmsg.AddOffsetsToTxnRequest); ok {
-		return Summary{Group: req.Group, Detail: "transaction " + req.TransactionalID}
+		return Summary{Group: req.Group, TxnID: req.TransactionalID, Detail: "adds the group's offsets to the transaction"}
 	}
 	return Summary{}
 }
@@ -300,14 +466,14 @@ func sumEndTxn(q kmsg.Request, _ kmsg.Response) Summary {
 		if req.Commit {
 			verb = "commit"
 		}
-		return Summary{Group: req.TransactionalID, Detail: verb}
+		return Summary{TxnID: req.TransactionalID, Detail: verb}
 	}
 	return Summary{}
 }
 
 func sumTxnOffsetCommit(q kmsg.Request, _ kmsg.Response) Summary {
 	if req, ok := q.(*kmsg.TxnOffsetCommitRequest); ok {
-		return Summary{Group: req.Group, Detail: "transaction " + req.TransactionalID,
+		return Summary{Group: req.Group, TxnID: req.TransactionalID, Detail: "offsets inside the transaction",
 			Topics: topicNames(req.Topics, func(t kmsg.TxnOffsetCommitRequestTopic) string { return t.Topic })}
 	}
 	return Summary{}
@@ -366,7 +532,7 @@ func sumDescribeProducers(q kmsg.Request, _ kmsg.Response) Summary {
 
 func sumDescribeTransactions(q kmsg.Request, _ kmsg.Response) Summary {
 	if req, ok := q.(*kmsg.DescribeTransactionsRequest); ok && len(req.TransactionalIDs) > 0 {
-		return Summary{Group: req.TransactionalIDs[0]}
+		return Summary{TxnID: req.TransactionalIDs[0]}
 	}
 	return Summary{}
 }
@@ -413,7 +579,7 @@ func sumApiVersions(q kmsg.Request, _ kmsg.Response) Summary {
 		if req.ClientSoftwareVersion != "" {
 			sw += " " + req.ClientSoftwareVersion
 		}
-		return Summary{Software: sw}
+		return Summary{Software: sw, Detail: sw}
 	}
 	return Summary{}
 }

@@ -9,6 +9,8 @@ import (
 	"log/slog"
 	"net"
 	"runtime/debug"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
@@ -235,6 +237,7 @@ func (c *Conn) serve(ctx context.Context) {
 		header, bodyOffset, err := ParseRequestHeader(frame)
 		if err != nil {
 			c.log.Warn("bad request header", "err", err)
+			c.observeClosed(&RequestHeader{APIKey: -1}, time.Now(), len(frame), "the request header could not be read: "+err.Error())
 			return
 		}
 		// Debug: one line per request is a firehose at info (a consumer polls many
@@ -251,6 +254,7 @@ func (c *Conn) serve(ctx context.Context) {
 		// misbehaving or unauthenticated client — drop the connection.
 		if c.authRequired && !c.authenticated && !preAuthAllowed(header.APIKey) {
 			c.log.Warn("unauthenticated request rejected", "api", APIName(header.APIKey))
+			c.observeClosed(&header, time.Now(), len(frame), "the request came before authentication")
 			return
 		}
 
@@ -263,6 +267,7 @@ func (c *Conn) serve(ctx context.Context) {
 			// other client keeps being served.
 			c.log.Error("handler panicked; closing the connection", "api", APIName(header.APIKey),
 				"version", header.APIVersion, "client_id", header.ClientID, "panic", pe.value, "stack", pe.stack)
+			c.observeClosed(&header, began, len(frame), "the broker's handler panicked")
 			return
 		}
 		if err != nil {
@@ -272,6 +277,7 @@ func (c *Conn) serve(ctx context.Context) {
 			// hanging until its own timeout. Conformant clients never hit this —
 			// they only call APIs we advertise.
 			c.log.Warn("closing connection: unhandled request", "api", APIName(header.APIKey), "err", err)
+			c.observeClosed(&header, began, len(frame), "API key "+strconv.Itoa(int(header.APIKey))+" is not served by this broker")
 			return
 		}
 		if resp == nil {
@@ -284,10 +290,12 @@ func (c *Conn) serve(ctx context.Context) {
 		_ = c.raw.SetWriteDeadline(time.Now().Add(c.writeTimeout))
 		if err := WriteFrame(c.w, resp); err != nil {
 			c.log.Debug("write failed", "err", err)
+			c.observeClosed(&header, began, len(frame), "the answer could not be written: "+err.Error())
 			return
 		}
 		if err := c.w.Flush(); err != nil {
 			c.log.Debug("flush failed", "err", err)
+			c.observeClosed(&header, began, len(frame), "the answer could not be written: "+err.Error())
 			return
 		}
 		if c.observer != nil {
@@ -305,7 +313,28 @@ func (c *Conn) observe(req *Request, began time.Time, reqBytes, respBytes int) {
 		Conn: c.id, Remote: c.raw.RemoteAddr().String(), Principal: c.Principal(),
 		ClientID: req.Header.ClientID, API: req.Header.APIKey, Version: req.Header.APIVersion,
 		Start: began, Duration: time.Since(began), ReqBytes: reqBytes, RespBytes: respBytes,
+		Correlation: req.Header.CorrelationID, Req: req.decoded, Resp: req.answered,
 		Summary: req.Describe(),
+	})
+}
+
+// observeClosed tells the observer that this request ended the connection, and why.
+// It is the row "why does my app keep disconnecting" needs: the loop returns, and
+// before this the only trace was a log line.
+func (c *Conn) observeClosed(h *RequestHeader, began time.Time, reqBytes int, reason string) {
+	if c.observer == nil {
+		return
+	}
+	class := ClassFailed
+	if strings.Contains(reason, "authentication") {
+		class = ClassDenied
+	}
+	c.observer.Request(Observation{
+		Conn: c.id, Remote: c.raw.RemoteAddr().String(), Principal: c.Principal(),
+		ClientID: h.ClientID, API: h.APIKey, Version: h.APIVersion,
+		Start: began, Duration: time.Since(began), ReqBytes: reqBytes,
+		Correlation: h.CorrelationID, Closed: reason,
+		Summary: Summary{Class: class, Kind: Kind(h.APIKey), Detail: "closed the connection: " + reason},
 	})
 }
 
