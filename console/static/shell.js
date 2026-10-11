@@ -800,7 +800,12 @@
       // Enter on a focused button or link is that control's own. The list cursor
       // is opened only when nothing else has the keyboard.
       if (active !== document.body && active.matches && active.matches(FOCUSABLE + ", summary")) return false;
-      if (cursorEl && document.contains(cursorEl) && visible(cursorEl)) cursorEl.click();
+      if (cursorEl && document.contains(cursorEl) && visible(cursorEl)) {
+        // The click puts focus on the inspector's Close button; left alone, this
+        // same Enter then activates that button and shuts what it just opened.
+        e.preventDefault();
+        cursorEl.click();
+      }
     },
     create: function () {
       var nb = document.querySelector("[data-create]");
@@ -1013,7 +1018,13 @@
   document.addEventListener("keydown", function (e) {
     if (confirmOpen() || paletteOpen() || helpOpen()) return;
     var row = e.target.closest && e.target.closest("[data-inspector-open]");
-    if (row && (e.key === "Enter" || e.key === " ")) { openInspector(row); return; } // htmx fires the request.
+    if (row && (e.key === "Enter" || e.key === " ")) {
+      // htmx fires the request. The key is the row's: its default would go to the
+      // Close button the loading inspector has just taken focus for, and press it.
+      if (row === e.target) e.preventDefault();
+      openInspector(row);
+      return;
+    }
   }, true);
   // A selection landed in the inspector: put it in the URL and move focus in, to
   // the button that asked when it was Older or Newer, so stepping keeps its place.

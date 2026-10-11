@@ -283,6 +283,34 @@ test('Traf-08: paused, the list is frozen and says how many requests it has miss
   await expect(page.locator('html')).not.toHaveAttribute('data-paused', '');
 });
 
+// The key strip says "↵ open": j to a row then Enter, and a focused row then Enter, open
+// its request or client in the inspector, on every kind of row the page has.
+for (const [name, path, row, title] of [
+  ['requests', 'traffic?kind=errors&q=doze-seed', '#traffic-table tbody tr', /CreateTopics/],
+  ['clients', 'traffic?view=clients', '#clients-table tbody tr', /\S/],
+  ['story', `traffic?group=${GROUP}&kind=groups`, '#traffic-story .r[data-inspector-open]', /\S/],
+] as const) {
+  test(`keyboard: j then Enter, and a focused row then Enter, open the inspector on ${name} rows`, async ({ page }) => {
+    await lightTraffic(page, path);
+    const rows = page.locator(row);
+    await expect(rows.first()).toBeVisible();
+    const inspector = page.locator('#inspector');
+    await page.locator('body').click({ position: { x: 700, y: 10 } });
+    await page.keyboard.press('j');
+    await expect(page.locator('main .cursor')).toHaveCount(1);
+    await expect(page.locator('main .cursor')).toHaveAttribute('data-inspector-open', '');
+    await page.keyboard.press('Enter');
+    await expect(inspector).toBeVisible();
+    await expect(inspector.locator('#inspector-title')).toContainText(title);
+    await page.keyboard.press('Escape');
+    await expect(inspector).toBeHidden();
+    await rows.first().focus();
+    await page.keyboard.press('Enter');
+    await expect(inspector).toBeVisible();
+    await expect(inspector.locator('#inspector-title')).toContainText(title);
+  });
+}
+
 test('Traf-12: a group filter tells the rebalance in order, with its generations', async ({ page }) => {
   await lightTraffic(page, `traffic?group=${GROUP}&kind=groups`);
   const story = page.locator('#traffic-story');
