@@ -54,14 +54,11 @@
             </select></label>
           {{end}}
           <button type="button" class="btn btn-outline" {{if not (and .CanAct .Offsets)}}disabled title="{{if .Members}}Stop the group's {{len .Members}} consumer{{if ne (len .Members) 1}}s{{end}} first{{else}}No committed offsets to reset{{end}}"{{end}}
-            hx-post="{{groupURL .Group.ID}}/reset" hx-include="#reset-scope" data-confirm-title="Reset to earliest" data-confirm-verb="Reset offsets" hx-vals='{"to":"earliest"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
-            hx-confirm="Reset the committed offsets of &quot;{{.Group.ID}}&quot;{{if gt (len .Topics) 1}} (for the topics chosen){{end}} to the earliest retained offset? Its consumers will re-read from the start.">{{icon "skip-back"}} Reset to earliest</button>
+            hx-post="{{groupURL .Group.ID}}/reset" hx-include="#reset-scope" data-confirm-title="{{(index .Confirm "group.reset.earliest").Title}}" data-confirm-verb="{{(index .Confirm "group.reset.earliest").Verb}}" hx-confirm="{{(index .Confirm "group.reset.earliest").Text}}" hx-vals='{"to":"earliest"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this">{{icon "skip-back"}} Reset to earliest</button>
           <button type="button" class="btn btn-outline" {{if not (and .CanAct .Offsets)}}disabled{{end}}
-            hx-post="{{groupURL .Group.ID}}/reset" hx-include="#reset-scope" data-confirm-title="Reset to latest" data-confirm-verb="Reset offsets" hx-vals='{"to":"latest"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
-            hx-confirm="Reset the committed offsets of &quot;{{.Group.ID}}&quot;{{if gt (len .Topics) 1}} (for the topics chosen){{end}} to the latest offset? Its consumers will skip everything currently in the topics.">{{icon "skip-forward"}} Reset to latest</button>
+            hx-post="{{groupURL .Group.ID}}/reset" hx-include="#reset-scope" data-confirm-title="{{(index .Confirm "group.reset.latest").Title}}" data-confirm-verb="{{(index .Confirm "group.reset.latest").Verb}}" hx-confirm="{{(index .Confirm "group.reset.latest").Text}}" hx-vals='{"to":"latest"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this">{{icon "skip-forward"}} Reset to latest</button>
           <button type="button" class="btn danger" {{if not .CanAct}}disabled title="Stop the group's consumers first"{{end}}
-            hx-post="{{groupURL .Group.ID}}/delete" hx-disabled-elt="this" data-confirm-title="Delete group" data-confirm-verb="Delete group"
-            hx-confirm="Delete group &quot;{{.Group.ID}}&quot; and its committed offsets?">{{icon "trash"}} Delete</button>
+            hx-post="{{groupURL .Group.ID}}/delete" hx-disabled-elt="this" data-confirm-title="{{(index .Confirm "group.delete").Title}}" data-confirm-verb="{{(index .Confirm "group.delete").Verb}}" hx-confirm="{{(index .Confirm "group.delete").Text}}">{{icon "trash"}} Delete</button>
         </div>
       </div>
     </div>
@@ -108,7 +105,7 @@
               <button type="button" class="btn sm danger" aria-label="Remove the offset for {{.Topic}} partition {{.Partition}}"
                 hx-post="{{groupURL $.Group.ID}}/offset/delete" hx-vals='{"topic":"{{.Topic}}","partition":"{{.Partition}}"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
                 data-confirm-title="Remove offset" data-confirm-verb="Remove"
-                hx-confirm="Remove the committed offset of &quot;{{$.Group.ID}}&quot; for {{.Topic}} partition {{.Partition}}? A consumer will start there from its auto.offset.reset policy.">Remove</button>
+                hx-confirm="{{(confirmOffset $.Group.ID .Topic .Partition .Committed).Text}}">Remove</button>
             </div>
             {{if not .Deleted}}
             <form class="rowset" x-show="e" x-cloak @keydown.escape.stop="e=false" hx-post="{{groupURL $.Group.ID}}/offset" hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]">

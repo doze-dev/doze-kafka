@@ -185,6 +185,7 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 	return map[string]any{
 		"Timeline": timeline, "HasTimeline": c.traffic != nil, "Group": detail, "Members": members, "Offsets": rows, "TotalLag": totalLag, "AnyAhead": anyAhead,
 		"Topics":    offsetTopics(rows),
+		"Confirm":   groupConfirms(id, rows),
 		"CanAct":    detail.State == "Empty" && len(detail.Members) == 0,
 		"NoCommits": len(offsets) == 0,
 		"Hash":      fmt.Sprintf("%x", h.Sum64()),

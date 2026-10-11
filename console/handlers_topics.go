@@ -94,6 +94,7 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 		"Consumers": c.topicConsumers(ctx, name),
 		"Config":    newConfigView(detail.Config),
 	}
+	data["Confirm"] = c.topicConfirms(ctx, name, int(detail.Partitions))
 	maps.Copy(data, c.dockData(DockFilter{Topic: name}))
 	data["Neighbours"] = c.neighbourClauses(c.topicGraph(ctx, name, data["Consumers"].([]consumerRow)), NodeTopic, name)
 	if q, all, before, asked := searchParams(r); asked {

@@ -151,6 +151,7 @@ func (c *Console) schemaDetail(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	data["Confirm"] = subjectConfirms(subject, versions, cur.Version)
 	// The topic this subject is named for, when there is one.
 	if topics, err := c.be.ListTopics(ctx); err == nil {
 		var names []string

@@ -48,6 +48,9 @@ test('Back and Forward leave the dialogs, palette and live updates working', asy
   await page.goBack();
   await expect(page.locator('.idband h1')).toHaveText('seed-orders');
   await page.goForward();
+  // Wait for the page Forward lands on before going Back: with no wait the second
+  // navigation raced the history reload of the first (flaky on main, 5 in 16).
+  await expect(page.locator('.rail a.on')).toHaveText(/Consumer groups/);
   await page.goBack();
   await expect(page.locator('.idband h1')).toHaveText('seed-orders');
   await page.getByRole('button', { name: 'Delete' }).first().click();

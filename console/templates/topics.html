@@ -51,8 +51,8 @@
         </div>
       </div>
       <div class="idband-acts">
-        <button class="btn btn-outline" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/purge" data-confirm-title="Purge topic" data-confirm-verb="Purge" hx-confirm="Purge &quot;{{.Topic.Name}}&quot;? Every message in every partition is deleted. The topic keeps its ID and settings, and consumers keep their committed offsets, so a group that had read everything carries on with the next record.">{{icon "eraser"}} Purge</button>
-        <button class="btn danger" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/delete" data-confirm-title="Delete topic" data-confirm-verb="Delete topic" hx-confirm="Delete topic &quot;{{.Topic.Name}}&quot;? This removes every partition's data.">{{icon "trash"}} Delete</button>
+        <button class="btn btn-outline" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/purge" data-confirm-title="{{(index .Confirm "topic.purge").Title}}" data-confirm-verb="{{(index .Confirm "topic.purge").Verb}}" hx-confirm="{{(index .Confirm "topic.purge").Text}}">{{icon "eraser"}} Purge</button>
+        <button class="btn danger" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/delete" data-confirm-title="{{(index .Confirm "topic.delete").Title}}" data-confirm-verb="{{(index .Confirm "topic.delete").Verb}}" hx-confirm="{{(index .Confirm "topic.delete").Text}}">{{icon "trash"}} Delete</button>
       </div>
     </div>
 
@@ -349,7 +349,7 @@
     <span class="cfgsum"><b>Partitions</b> · <span class="mono"><b>{{.Topic.Partitions}}</b></span> · add more</span>
     <span class="twist">{{icon "chevron"}}</span>
   </summary>
-  <form class="cfgform" hx-post="{{topicURL .Topic.Name}}/partitions" hx-disabled-elt="find button[type=submit]" data-confirm-title="Add partitions" data-confirm-verb="Add partitions" hx-confirm="Add partitions to &quot;{{.Topic.Name}}&quot;? They cannot be removed afterwards, and a key may hash to a different partition than before, so records with the same key stop being ordered together across the change.">
+  <form class="cfgform" hx-post="{{topicURL .Topic.Name}}/partitions" hx-disabled-elt="find button[type=submit]" data-confirm-title="{{(index .Confirm "topic.partitions").Title}}" data-confirm-verb="{{(index .Confirm "topic.partitions").Verb}}" hx-confirm="{{(index .Confirm "topic.partitions").Text}}">
     <div class="field narrow"><label for="f-addparts">Add</label><input class="input mono" id="f-addparts" name="add" type="number" min="1" value="1" required aria-describedby="f-addparts-teach"><p class="teach" id="f-addparts-teach">{{teach "broker" "max-partitions"}}</p></div>
     <div class="err form-err" data-err-slot hidden role="alert"></div>
     <div class="cfgfoot">
