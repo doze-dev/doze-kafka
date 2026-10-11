@@ -352,3 +352,55 @@ test('the theme control is words: system, light, dark, high contrast', async ({ 
   await expect(on).toHaveCSS('outline-style', 'solid');
   await page.locator('#theme-seg [data-mode="light"]').click();
 });
+
+// Sy-05: the palette.
+test('the palette is grouped under Topics, Groups, Subjects and Actions, says what each row is, and has a foot', async ({ page, openPalette }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('topics/seed-orders');
+  await openPalette();
+  const modal = page.locator('#palette [role=dialog]');
+  await page.waitForTimeout(300); // the pop-in finishes.
+  expect((await modal.boundingBox())!.width).toBe(640);
+  await expect(page.locator('#pal-q')).toHaveAttribute('placeholder', 'Jump to a topic, group, subject or action');
+  await page.locator('#pal-q').fill('seed');
+  const caps = page.locator('#pal-list .pal-cap');
+  await expect(caps.first()).toHaveText('Topics');
+  await expect(page.locator('#pal-list .pal-cap', { hasText: 'Subjects' })).toBeVisible();
+  // The match is bold, and a topic says its partitions and messages.
+  const first = page.locator('#pal-list .pal-item').first();
+  await expect(first.locator('b')).toHaveText('seed');
+  await expect(first.locator('.pal-detail')).toContainText(/\d+ partitions? · [\d,]+ messages?/);
+  await expect(first.locator('.sv')).toHaveText('TP');
+  await expect(first.locator('.kbd')).toHaveText('↵'); // the selected row says what Enter does.
+  await expect(page.locator('#pal-count')).toContainText(/\d+ results?/);
+  // Groups say their state, members and lag.
+  await page.locator('#pal-q').fill('g-lag');
+  await expect(page.locator('#pal-list .pal-cap').first()).toHaveText('Groups');
+  await expect(page.locator('#pal-list .pal-item').first().locator('.pal-detail')).toContainText(/Empty · 0 members · lag 39/);
+  // Actions: produce to the topic you are on, and create one; with their keys.
+  await page.locator('#pal-q').fill('produce');
+  await expect(page.locator('#pal-list .pal-cap', { hasText: 'Actions' })).toBeVisible();
+  await expect(page.locator('#pal-list .pal-item', { hasText: 'Produce to seed-orders' })).toBeVisible();
+  await page.locator('#pal-q').fill('create topic');
+  await expect(page.locator('#pal-list .pal-item', { hasText: 'Create topic' }).locator('.kbd').first()).toHaveText('c');
+  // The foot: Connect an app, and the keys.
+  const foot = page.locator('#palette .pal-foot');
+  await expect(foot).toContainText('Connect an app');
+  await expect(foot).toContainText('move');
+  await expect(foot).toContainText('close');
+  // Produce to opens the composer.
+  await page.locator('#pal-q').fill('produce to');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('html')).toHaveAttribute('data-dock', 'open');
+});
+
+test('a group\'s page offers to reset its offsets from the palette, and says it asks first', async ({ page, openPalette }) => {
+  await page.goto('groups/g-lag');
+  await openPalette();
+  await page.locator('#pal-q').fill('reset offsets');
+  const row = page.locator('#pal-list .pal-item', { hasText: 'Reset offsets for g-lag' });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('asks first');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/tab=offsets/);
+});

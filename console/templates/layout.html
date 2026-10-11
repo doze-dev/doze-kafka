@@ -95,11 +95,16 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
   <div class="overlay palette-overlay" id="palette" hidden>
     <div class="palette anim" role="dialog" aria-modal="true" aria-label="Command palette">
       <div class="pal-input">
-        {{icon "search"}}
-        <input id="pal-q" role="combobox" aria-expanded="true" aria-controls="pal-list" aria-autocomplete="list" aria-label="Search topics, groups and actions" placeholder="Search topics, groups, actions…" spellcheck="false" autocomplete="off">
+        <span class="mut" aria-hidden="true">⌕</span>
+        <input id="pal-q" role="combobox" aria-expanded="true" aria-controls="pal-list" aria-autocomplete="list" aria-label="Jump to a topic, group, subject or action" placeholder="Jump to a topic, group, subject or action" spellcheck="false" autocomplete="off">
+        <span class="note" id="pal-count" aria-live="polite"></span>
         <span class="kbd">esc</span>
       </div>
       <div class="pal-list" id="pal-list" role="listbox" aria-label="Results"></div>
+      <div class="pal-foot">
+        <a class="row ce g8" href="{{.Prefix}}/connect"><span class="sv sm c-mut" aria-hidden="true">⇢</span><span>Connect an app</span></a>
+        <div class="row ce g8 note"><span><span class="kbd">↑</span><span class="kbd">↓</span>move</span><span><span class="kbd">↵</span>open</span><span><span class="kbd">esc</span>close</span></div>
+      </div>
     </div>
   </div>
 

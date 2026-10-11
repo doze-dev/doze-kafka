@@ -124,7 +124,7 @@ func TestPaletteCatalogueIsServedWithViewsAndActions(t *testing.T) {
 	c := newTestConsole(t)
 	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"a"}, "partitions": {"1"}})
 	body := req(t, c, "GET", "/_console/api/palette", nil).Body.String()
-	for _, want := range []string{`"n":"Topics","u":"/_console/topics","k":"view"`, `"n":"Consumer groups"`, `"n":"Cluster"`,
+	for _, want := range []string{`"n":"Topics","u":"/_console/topics","k":"view"`, `"n":"Groups"`, `"n":"Cluster"`,
 		`"n":"Create topic","u":"/_console/new/topic","k":"action"`, `"n":"a","u":"/_console/topics/a","k":"topic"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the palette catalogue is missing %s in %s", want, body)

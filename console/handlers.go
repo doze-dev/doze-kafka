@@ -3,8 +3,16 @@ package console
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 )
+
+func pluralS(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
 
 // liveUnchanged replies 204 when the poller's hash matches current content.
 func liveUnchanged(w http.ResponseWriter, r *http.Request, hash string) bool {
@@ -29,6 +37,11 @@ type paletteEntry struct {
 	// A names something the console does in the browser (a theme, the rail, pause,
 	// help) instead of going to an address; shell.js runs it.
 	A string `json:"a,omitempty"`
+	// D is what a resource's row says beside its name (Sy-05): "3 partitions · 14,407
+	// messages", "Stable · 1 member · lag 0", "Avro · v3". H is an action's hint: the
+	// key that does it, or "asks first".
+	D string `json:"d,omitempty"`
+	H string `json:"h,omitempty"`
 }
 
 // apiPalette is the whole palette catalogue: the console's own views and actions
@@ -37,10 +50,13 @@ func (c *Console) apiPalette(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	out := []paletteEntry{
 		{S: "views", N: "Topics", U: c.prefix + "/topics", K: "view"},
-		{S: "views", N: "Consumer groups", U: c.prefix + "/groups", K: "view"},
+		{S: "views", N: "Groups", U: c.prefix + "/groups", K: "view"},
+		{S: "views", N: "Trace", U: c.prefix + "/trace", K: "view"},
 		{S: "views", N: "Cluster", U: c.prefix + "/cluster", K: "view"},
 		{S: "views", N: "Access", U: c.prefix + "/access", K: "view"},
-		{S: "topics", N: "Create topic", U: c.newTopicURL(), K: "action"},
+		{S: "views", N: "Connect an app", U: c.prefix + "/connect", K: "view"},
+		{S: "topics", N: "Create topic", U: c.newTopicURL(), K: "action", H: "c"},
+		{S: "views", N: "Follow a message by trace id", U: c.prefix + "/trace", K: "action"},
 	}
 	// What the console does in the browser, declared once with the keys (keys.go).
 	for _, a := range clientActions {
@@ -53,18 +69,29 @@ func (c *Console) apiPalette(w http.ResponseWriter, r *http.Request) {
 		out = append(out, paletteEntry{S: "views", N: "Schemas", U: schemasPath(c.prefix), K: "view"}, paletteEntry{S: "schemas", N: "Register schema", U: newSchemaPath(c.prefix), K: "action"})
 		if subjects, err := c.reg.Subjects(ctx); err == nil {
 			for _, s := range subjects {
-				out = append(out, paletteEntry{S: "schemas", N: s.Name, U: c.schemaURL(s.Name), K: "schema"})
+				out = append(out, paletteEntry{S: "schemas", N: s.Name, U: c.schemaURL(s.Name), K: "schema", D: fmt.Sprintf("%s · v%d", s.TypeLabel, s.Latest)})
 			}
 		}
 	}
 	if topics, err := c.be.ListTopics(ctx); err == nil {
 		for _, t := range topics {
-			out = append(out, paletteEntry{S: "topics", N: t.Name, U: c.topicURL(t.Name), K: "topic"})
+			out = append(out, paletteEntry{S: "topics", N: t.Name, U: c.topicURL(t.Name), K: "topic",
+				D: fmt.Sprintf("%d partition%s · %s message%s", t.Partitions, pluralS(int(t.Partitions)), num(t.Msgs), pluralS(int(t.Msgs)))})
 		}
 	}
 	if groups, err := c.be.ListGroups(ctx); err == nil {
-		for _, g := range groups {
-			out = append(out, paletteEntry{S: "groups", N: g.ID, U: c.groupURL(g.ID), K: "group"})
+		// A group's lag takes a request per group, so it is told only where the broker
+		// has a few: the palette is opened often.
+		var rows []groupRow
+		if len(groups) <= 25 {
+			rows = c.groupRows(ctx, groups)
+		}
+		for i, g := range groups {
+			d := fmt.Sprintf("%s · %d member%s", g.State, g.Members, pluralS(g.Members))
+			if rows != nil && rows[i].HasOffsets {
+				d += " · lag " + num(rows[i].Lag)
+			}
+			out = append(out, paletteEntry{S: "groups", N: g.ID, U: c.groupURL(g.ID), K: "group", D: d})
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")

@@ -397,9 +397,15 @@
     }
   });
 
-  // ---------- command palette ----------
+  // ---------- command palette (Sy-05) ----------
+  // Jump or act: results are grouped under Topics, Groups, Subjects and Actions, each
+  // row has what it is beside its name, the part of the name that matched is bold, and
+  // the foot has Connect an app and the keys. The sections themselves are one more
+  // group ("Go to"), because they are reached by name too.
   var pal = document.getElementById("palette"), palQ = document.getElementById("pal-q"), palList = document.getElementById("pal-list");
-  var palItems = [], palSel = 0, palOpener = null;
+  var palItems = [], palSel = 0, palOpener = null, palShown = [];
+  var PAL_GROUPS = [["topics", "Topics"], ["groups", "Groups"], ["schemas", "Subjects"], ["actions", "Actions"], ["views", "Go to"]];
+  var PAL_CHIP = { topics: ["TP", "c-tp"], groups: ["GR", "c-gr"], schemas: ["SC", "c-sc"] };
 
   // The palette lists the last few topics and groups you opened first: the one
   // you just left costs ⌘K ⏎ instead of retyping its name.
@@ -417,8 +423,27 @@
   document.addEventListener("DOMContentLoaded", trackVisit);
   document.addEventListener("htmx:pushedIntoHistory", trackVisit);
 
+  function bucketOf(it) {
+    if (it.k === "action") return "actions";
+    if (it.k === "view") return "views";
+    if (it.s === "schemas") return "schemas";
+    return it.s;
+  }
+  // What can be done to the page you are on: the topic's composer, the group's reset.
+  function contextActions() {
+    var out = [], rest = location.pathname.indexOf(PREFIX + "/") === 0 ? location.pathname.slice(PREFIX.length + 1).split("/") : [];
+    if (rest[0] === "topics" && rest[1] && document.getElementById("compose-panel")) {
+      out.push({ s: "views", n: "Produce to " + decodeURIComponent(rest[1]), k: "action", a: "produce", h: "p", glyph: "+", ctx: true });
+    }
+    if (rest[0] === "groups" && rest[1]) {
+      out.push({ s: "views", n: "Reset offsets for " + decodeURIComponent(rest[1]), k: "action", u: location.pathname + "?tab=offsets#reset", h: "asks first", glyph: "↺", ctx: true });
+    }
+    return out;
+  }
+
   function openPalette() {
     if (!pal || confirmOpen()) return;
+    if (helpOpen()) closeHelp();
     if (!paletteOpen()) palOpener = document.activeElement;
     pal.hidden = false; palQ.value = ""; palSel = 0;
     var here = location.pathname;
@@ -428,15 +453,16 @@
         .filter(function (x) { return x.u !== here; }).slice(0, 5)
         .map(function (x) { return { s: x.s, n: x.n, u: x.u, k: "recent" }; });
     } catch (e) {}
-    palItems = recents;
+    palItems = recents.concat(contextActions());
     renderPal();
     palQ.focus();
-    // The catalogue (views, actions, every topic and group) comes from the server,
-    // so the palette cannot drift from the console's real routes.
+    // The catalogue (views, actions, every topic, group and subject) comes from the
+    // server, so the palette cannot drift from the console's real routes.
     fetch(PREFIX + "/api/palette").then(function (r) { return r.json(); }).then(function (all) {
-      var live = {}, fixed = [], resources = [];
+      var live = {}, fixed = [], resources = [], detail = {};
       (all || []).forEach(function (x) {
         if (x.u) live[x.u] = 1;
+        if (x.d) detail[x.u] = x.d;
         (x.k === "view" || x.k === "action" ? fixed : resources).push(x);
       });
       // A recent that no longer exists (a deleted topic) would be a dead link:
@@ -445,9 +471,10 @@
       if (pruned.length !== recents.length) {
         try { store("recents", JSON.stringify(JSON.parse(stored("recents") || "[]").filter(function (x) { return live[x.u]; }))); } catch (e) {}
       }
+      pruned.forEach(function (x) { x.d = detail[x.u]; });
       var seen = {};
       pruned.forEach(function (x) { seen[x.u] = 1; });
-      palItems = pruned.concat(resources.filter(function (r) { return !seen[r.u]; })).concat(fixed);
+      palItems = pruned.concat(resources.filter(function (r) { return !seen[r.u]; })).concat(contextActions()).concat(fixed);
       renderPal();
     }).catch(function () {}); // the console is unreachable: recents still work.
   }
@@ -459,28 +486,81 @@
     if (act.indexOf("theme:") === 0) applyTheme(act.slice(6));
     else if (act === "pause") { if (document.querySelector("[data-live-toggle]")) setPaused(!livePaused); }
     else if (act === "help") openHelp();
+    else if (act === "produce") { setDock(true); focusComposer(); }
   }
   function palFiltered() {
     var q = palQ.value.toLowerCase().trim();
-    if (!q) return palItems.slice(0, 14);
-    return palItems.filter(function (it) { return (it.n + " " + it.k).toLowerCase().indexOf(q) >= 0; }).slice(0, 14);
+    var rows = palItems.filter(function (it) {
+      if (it.ctx && q) return it.n.toLowerCase().indexOf(q) >= 0 || /^(produce|reset)/.test(q);
+      return !q || (it.n + " " + it.k).toLowerCase().indexOf(q) >= 0;
+    });
+    // In groups, in the board's order; recents lead their own group.
+    var out = [], per = q ? 6 : 5;
+    PAL_GROUPS.forEach(function (g) {
+      var inG = rows.filter(function (it) { return bucketOf(it) === g[0]; });
+      inG.sort(function (a, b) { return (a.k === "recent" ? 0 : 1) - (b.k === "recent" ? 0 : 1); });
+      var seen = {};
+      inG.filter(function (it) { var k = it.u || it.n; if (seen[k]) return false; seen[k] = 1; return true; }).slice(0, per).forEach(function (it) { out.push(it); });
+    });
+    return out;
+  }
+  function highlight(el, text, q) {
+    el.textContent = "";
+    var i = q ? text.toLowerCase().indexOf(q) : -1;
+    if (i < 0) { el.textContent = text; return; }
+    el.appendChild(document.createTextNode(text.slice(0, i)));
+    var b = document.createElement("b");
+    b.textContent = text.slice(i, i + q.length);
+    el.appendChild(b);
+    el.appendChild(document.createTextNode(text.slice(i + q.length)));
   }
   function renderPal() {
-    var items = palFiltered();
+    var items = palFiltered(), q = palQ.value.toLowerCase().trim();
+    palShown = items;
     if (palSel >= items.length) palSel = Math.max(0, items.length - 1);
     palList.innerHTML = "";
+    var count = document.getElementById("pal-count");
+    if (count) count.textContent = items.length ? items.length + " result" + (items.length === 1 ? "" : "s") : "";
     if (!items.length) { palList.innerHTML = '<div class="pal-empty">Nothing matches</div>'; palQ.removeAttribute("aria-activedescendant"); return; }
+    var lastGroup = "";
     items.forEach(function (it, i) {
+      var g = bucketOf(it);
+      if (g !== lastGroup) {
+        lastGroup = g;
+        var cap = document.createElement("div");
+        cap.className = "cap pal-cap";
+        cap.setAttribute("role", "presentation");
+        cap.textContent = PAL_GROUPS.filter(function (x) { return x[0] === g; })[0][1];
+        palList.appendChild(cap);
+      }
       var a = document.createElement("a");
       a.className = "pal-item" + (i === palSel ? " sel" : "");
       a.href = it.a ? "#" : it.u;
       a.addEventListener("click", function (ev) { if (it.a) { ev.preventDefault(); goTo(it); } });
       a.id = "pal-opt-" + i; a.setAttribute("role", "option"); a.setAttribute("aria-selected", i === palSel ? "true" : "false"); a.tabIndex = -1;
-      a.innerHTML = '<span class="pal-dot"></span><span class="pal-name"></span><span class="pal-kind"></span>';
-      // The dot is what the row is (topic, group, view), not how it got into the list.
-      a.querySelector(".pal-dot").classList.add(it.s === "topics" ? "d-topic" : it.s === "groups" ? "d-group" : "d-view");
-      a.querySelector(".pal-name").textContent = it.n;
-      a.querySelector(".pal-kind").textContent = it.k;
+      var lead = document.createElement("span");
+      if (PAL_CHIP[g]) { lead.className = "sv sm " + PAL_CHIP[g][1]; lead.textContent = PAL_CHIP[g][0]; lead.setAttribute("aria-hidden", "true"); }
+      else { lead.className = "m mut pal-glyph"; lead.setAttribute("aria-hidden", "true"); lead.textContent = it.glyph || (it.a ? "·" : g === "actions" ? "+" : "→"); }
+      var name = document.createElement("span");
+      name.className = "pal-name" + (PAL_CHIP[g] ? " m" : "");
+      highlight(name, it.n, q);
+      var det = document.createElement("span");
+      det.className = "grow note el pal-detail";
+      det.textContent = it.d || "";
+      a.appendChild(lead); a.appendChild(name); a.appendChild(det);
+      // An action's own key (or "asks first"), and on the selected row what Enter does.
+      if (it.h) {
+        var hint = document.createElement("span");
+        hint.className = it.h.length > 3 ? "note" : "kbd";
+        hint.textContent = it.h;
+        a.appendChild(hint);
+      }
+      if (i === palSel) {
+        var enter = document.createElement("span");
+        enter.className = "kbd";
+        enter.textContent = "↵";
+        a.appendChild(enter);
+      }
       a.onmousemove = function () { if (palSel !== i) { palSel = i; renderPal(); } };
       palList.appendChild(a);
     });
