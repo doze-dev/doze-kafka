@@ -1,9 +1,13 @@
 import { test as base, expect, type Page, type Locator } from '@playwright/test';
 import { randomBytes } from 'node:crypto';
+import { basename } from 'node:path';
+import { recordRequest } from '../route-gate';
 
 type ConfirmAction = 'accept' | 'cancel';
 
 type Fixtures = {
+  /** Records the suite's requests for the route gate; automatic. */
+  routeRecorder: void;
   /** `${prefix}-${hex}`: use for every resource a spec creates, so parallel tests never collide. */
   uniqueName: (prefix: string) => string;
   /** Opens the command palette from its button and waits for its first items. */
@@ -23,6 +27,40 @@ type Fixtures = {
 };
 
 export const test = base.extend<Fixtures>({
+  // The route gate (route-gate.ts): every request the browser makes to the console,
+  // and every one made through the `request` fixture, is recorded with the spec that
+  // made it. `{ auto: true }` runs it for every test without being asked.
+  routeRecorder: [
+    async ({ page }, use, testInfo) => {
+      const spec = basename(testInfo.file);
+      page.on('request', (r) => recordRequest(r.method(), r.url(), spec));
+      // A download is a navigation the browser does not report as a request.
+      page.on('download', (d) => recordRequest('GET', d.url(), spec));
+      await use();
+    },
+    { auto: true },
+  ],
+
+  request: async ({ request }, use, testInfo) => {
+    const spec = basename(testInfo.file);
+    const wrapped = new Proxy(request, {
+      get(target, prop, receiver) {
+        const v = Reflect.get(target, prop, receiver);
+        if (typeof v !== 'function') return v;
+        const verbs = ['get', 'post', 'put', 'delete', 'patch', 'head', 'fetch'];
+        return (...args: any[]) => {
+          if (verbs.includes(String(prop)) && typeof args[0] === 'string') {
+            const url = new URL(args[0], testInfo.project.use.baseURL ?? 'http://localhost/');
+            const method = prop === 'fetch' ? String(args[1]?.method ?? 'GET') : String(prop);
+            recordRequest(method, url.toString(), spec);
+          }
+          return v.apply(target, args);
+        };
+      },
+    });
+    await use(wrapped);
+  },
+
   uniqueName: async ({}, use) => {
     await use((prefix) => `${prefix}-${randomBytes(4).toString('hex')}`);
   },

@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -15,31 +14,14 @@ import (
 // route is one registration in console.go's route table.
 type route struct{ method, path string }
 
-// consoleRoutes reads the route table from console.go itself, so a route added
-// there is covered by the sweeps below without anyone remembering to list it.
+// consoleRoutes reads the route table (routes.go), the single source console.go
+// registers from, so a route added there is covered by the sweeps below without
+// anyone remembering to list it.
 func consoleRoutes(t *testing.T) []route {
 	t.Helper()
-	src, err := os.ReadFile("console.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	re := regexp.MustCompile(`m\.Handle(?:Func)?\("(GET|POST) "\+(?:p(?:\+"([^"]*)")?|newTopicPath\(p\)|newSchemaPath\(p\))`)
 	var out []route
-	for _, m := range re.FindAllStringSubmatch(string(src), -1) {
-		path := m[2]
-		if strings.Contains(m[0], "newTopicPath") {
-			path = "/new/topic"
-		}
-		if strings.Contains(m[0], "newSchemaPath") {
-			path = "/new/schema"
-		}
-		out = append(out, route{m[1], path})
-	}
-	// Every registration but one is under the prefix and must be seen: the pattern
-	// used to miss a route written a little differently, which then went unswept.
-	// (The one is the redirect from "/" to the prefix.)
-	if registered := strings.Count(string(src), "m.Handle"); len(out) != registered-1 {
-		t.Fatalf("console.go registers %d routes and the sweep sees %d; the route-table pattern has drifted", registered, len(out))
+	for _, r := range Routes() {
+		out = append(out, route{r.Method, r.Path})
 	}
 	return out
 }

@@ -12,7 +12,6 @@ import (
 	"crypto/tls"
 	"embed"
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -198,82 +197,11 @@ func originMatchesHost(origin, host string) bool {
 	return u.Host == host
 }
 
+// routes registers the route table (routes.go): the one list of what the
+// console answers.
 func (c *Console) routes() {
 	m := http.NewServeMux()
-	p := c.prefix
-
-	m.Handle("GET "+p+"/static/", http.StripPrefix(p+"/", c.staticHandler()))
-
-	// The bare root points at the console, so http://host:port works as a URL.
-	if p != "" && p != "/" {
-		m.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, p, http.StatusFound)
-		})
-	}
-
-	// Topics is the home surface. "/" also catches every path under the prefix
-	// that nothing else matches, so it answers only for the prefix itself; a
-	// mistyped address is a 404, not the home page with a 200.
-	m.HandleFunc("GET "+p+"/", func(w http.ResponseWriter, r *http.Request) {
-		if strings.TrimSuffix(r.URL.Path, "/") != strings.TrimSuffix(p, "/") {
-			c.fail(w, r, fmt.Errorf("%w: there is no page at %s", errNotFound, r.URL.Path))
-			return
-		}
-		c.topics(w, r)
-	})
-	if p != "" { // mounted at the root, "/" above is the only spelling.
-		m.HandleFunc("GET "+p, c.topics)
-	}
-	m.HandleFunc("GET "+p+"/topics", c.topics)
-	m.HandleFunc("GET "+newTopicPath(p), c.topicCreatePage)
-	m.HandleFunc("POST "+newTopicPath(p), c.topicCreate)
-	m.HandleFunc("GET "+p+"/topics/{name}", c.topicDetail)
-	m.HandleFunc("POST "+p+"/topics/{name}/delete", c.topicDelete)
-	m.HandleFunc("POST "+p+"/topics/{name}/purge", c.topicPurge)
-	m.HandleFunc("POST "+p+"/topics/{name}/partitions", c.topicPartitions) // grow it; never shrinks
-	m.HandleFunc("POST "+p+"/topics/{name}/config", c.topicConfig)         // the topic's own retention and segment size
-	m.HandleFunc("GET "+p+"/topics/{name}/tape", c.topicTape)              // HTMX partial (polled)
-	m.HandleFunc("POST "+p+"/topics/{name}/produce", c.topicProduce)
-	m.HandleFunc("POST "+p+"/topics/{name}/resend", c.topicResend)  // an exact copy of a stored record
-	m.HandleFunc("GET "+p+"/topics/{name}/message", c.topicMessage) // drawer partial
-	m.HandleFunc("GET "+p+"/topics/{name}/message/raw", c.topicMessageRaw)
-
-	// Lineage: where else did the messages of one trace go.
-	m.HandleFunc("GET "+p+"/trace", c.tracePage)
-	m.HandleFunc("GET "+p+"/trace/live", c.traceLive) // HTMX partial (polled)
-
-	// Traffic (what clients asked the broker).
-	m.HandleFunc("GET "+p+"/traffic", c.trafficPage)
-	m.HandleFunc("GET "+p+"/traffic/live", c.trafficLive)       // HTMX partial (polled)
-	m.HandleFunc("GET "+p+"/traffic/request", c.trafficRequest) // drawer partial
-
-	// Schemas (the built-in registry).
-	m.HandleFunc("GET "+p+"/schemas", c.schemas)
-	m.HandleFunc("GET "+newSchemaPath(p), c.schemaCreatePage)
-	m.HandleFunc("POST "+newSchemaPath(p), c.schemaCreate)
-	m.HandleFunc("GET "+p+"/schemas/{subject}", c.schemaDetail)
-	m.HandleFunc("POST "+p+"/schemas/{subject}/check", c.schemaCheck)
-	m.HandleFunc("POST "+p+"/schemas/{subject}/register", c.schemaRegister)
-	m.HandleFunc("POST "+p+"/schemas/{subject}/config", c.schemaConfig)
-	m.HandleFunc("POST "+p+"/schemas/{subject}/delete", c.schemaDelete)
-
-	// Consumer groups.
-	m.HandleFunc("GET "+p+"/groups", c.groups)
-	m.HandleFunc("GET "+p+"/groups/{id}", c.groupDetail)
-	m.HandleFunc("GET "+p+"/groups/{id}/live", c.groupLive) // HTMX partial (polled)
-	m.HandleFunc("POST "+p+"/groups/{id}/reset", c.groupReset)
-	m.HandleFunc("POST "+p+"/groups/{id}/offset", c.groupOffsetSet)           // one partition's committed offset
-	m.HandleFunc("POST "+p+"/groups/{id}/offset/delete", c.groupOffsetDelete) // remove one
-	m.HandleFunc("POST "+p+"/groups/{id}/delete", c.groupDelete)
-
-	// Cluster.
-	m.HandleFunc("GET "+p+"/cluster", c.cluster)
-	m.HandleFunc("GET "+p+"/access", c.access) // stored ACLs, read-only, with the banner that they are not enforced
-
-	// Resource index for the command palette.
-	m.HandleFunc("GET "+p+"/api/palette", c.apiPalette)
-	m.HandleFunc("GET "+p+"/api/counts", c.apiCounts)
-
+	c.register(m)
 	c.mux = m
 }
 

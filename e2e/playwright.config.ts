@@ -13,6 +13,7 @@ export const BASE_URL = `http://127.0.0.1:${CONSOLE_PORT}/_console/`;
 export default defineConfig({
   testDir: './tests',
   globalSetup: './global-setup.ts',
+  globalTeardown: './global-teardown.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
