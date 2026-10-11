@@ -16,6 +16,7 @@
 #   SASL_USER, SASL_PASS, SASL_MECHANISM   (scram-tls) SCRAM-SHA-512 credentials
 #   CA_CERT           (scram-tls) PEM file that signed the broker's certificate
 #   REGISTRY_URL      the built-in schema registry (REGISTRY_USER and REGISTRY_PASS under scram-tls)
+#   CONSOLE_URL       the console, for a cell that asserts on what it shows (http://127.0.0.1:PORT/_console)
 #   BROKER_BIN        the binary under test, for scripts that restart it
 #   WORK              a scratch directory the script may use
 set -uo pipefail
@@ -60,6 +61,9 @@ start() {
   local listen=127.0.0.1 extra=()
   if [ "$HOST" != 127.0.0.1 ]; then listen=0.0.0.0; extra=(--advertised-host "$HOST"); fi
   BOOTSTRAP=$HOST:$kp; REGISTRY_URL=http://$HOST:$rp
+  # The console is on the host's loopback for every client: a script reads the Traffic
+  # page from there (the telemetry cells do).
+  CONSOLE_URL=http://127.0.0.1:$cp/_console
   "$BIN" --listen "$listen:$kp" --console-addr "127.0.0.1:$cp" --schema-registry-addr "$listen:$rp" \
     ${extra[@]+"${extra[@]}"} --data-dir "$WORK/$name" "$@" >"$WORK/$name.log" 2>&1 &
   PIDS+=($!)
@@ -75,7 +79,7 @@ run_all() { # security docker(yes|no)
     [ -f "$HERE/$c/run.sh" ] || { echo "no such client: $c" >&2; exit 2; }
     local log="$WORK/$c-$sec.log"
     echo "== $c ($sec)"
-    ( cd "$HERE/$c" && SECURITY=$sec BOOTSTRAP=$BOOTSTRAP REGISTRY_URL=$REGISTRY_URL BROKER_BIN=$BIN WORK=$WORK \
+    ( cd "$HERE/$c" && SECURITY=$sec BOOTSTRAP=$BOOTSTRAP REGISTRY_URL=$REGISTRY_URL CONSOLE_URL=$CONSOLE_URL BROKER_BIN=$BIN WORK=$WORK \
         REGISTRY_USER=${SASL_USER:-} REGISTRY_PASS=${SASL_PASS:-} SASL_USER=${SASL_USER:-} SASL_PASS=${SASL_PASS:-} SASL_MECHANISM=${SASL_MECHANISM:-} CA_CERT=${CA_CERT:-} HOSTS_FLAG=${HOSTS_FLAG:-} \
         bash ./run.sh ) 2>&1 | tee "$log" | sed 's/^/   /'
     local code=${PIPESTATUS[0]}

@@ -22,6 +22,8 @@ prints a matrix.
 | `spring` | Docker | Spring Boot 3.4 / Spring Kafka: `KafkaAdmin` creating `NewTopic` beans and growing one on the next start; a transactional `@KafkaListener` whose aborted delivery is redelivered with exactly-once output |
 | `python` | `uv` | `confluent-kafka` (librdkafka): admin, idempotent producer, groups that commit and resume, KIP-848, transactions with `read_committed` and `read_uncommitted` |
 | `kcat` | `kcat` | librdkafka's command line: metadata, keys and headers, a group that resumes |
+| `kcat-telemetry` | `kcat` (librdkafka 2.5+) | KIP-714: a producer left connected pushes its metrics and its client id appears on the Traffic page with them |
+| `java-telemetry` | Docker | KIP-714 with the Java client: Kafka's own console producer, same assertion |
 | `kafkajs` | `bun` or `node` | KafkaJS: admin, idempotent producer, group consume and commit |
 | `connect` | Docker | Kafka Connect (distributed): the worker creates and verifies its three compacted internal topics; a file source into a topic and a file sink out of it; after a restart the connectors and the source's offset come back from those topics |
 | `confluent-sr` | Docker | Confluent's Schema Registry 8.3 against the broker: it keeps its state in a `_schemas` topic, completes an Avro round trip and replays after a restart |
