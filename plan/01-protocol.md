@@ -138,7 +138,9 @@ build it (a fresh review, not the stage's own author).
       rail holds) and the copy the board prints for each state.
 - [ ] **Screenshots** at 1440 and 390 in light and dark sit beside each board in
       the review, and nothing on a board is faked: a column whose data the broker
-      cannot supply is omitted and listed.
+      cannot supply is omitted and listed. `go tool task evidence` produces
+      them (and the board's own render and the measured values) into
+      `plan/evidence/`, indexed in `plan/evidence/README.md`.
 - [ ] **No invented design.** A new element not on a board is listed with the
       reason; the board is updated or the element removed.
 

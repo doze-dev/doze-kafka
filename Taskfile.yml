@@ -97,6 +97,15 @@ tasks:
       - bunx playwright install chromium
       - bunx playwright test
 
+  evidence:
+    desc: 'Design evidence: screenshots of the live console at each board state (light, dark; 1440, and 960/390 where a board has one) into plan/evidence/, with the index. DESIGN_DIR=<the design artifact''s project/ files> also renders the boards. Not part of test:e2e.'
+    dir: e2e
+    cmds:
+      - bun install --frozen-lockfile
+      - bunx playwright install chromium
+      - bunx playwright test -c evidence/playwright.config.ts
+      - python3 evidence/optimise.py ../plan/evidence
+
   check:identity:
     desc: 'The second identity (listener on :0, a console prefix, a data directory with a space, SASL and TLS on) booted as the binary and used by a real client and the console'
     cmds:
