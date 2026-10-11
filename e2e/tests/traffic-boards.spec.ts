@@ -404,7 +404,7 @@ for (const [name, path, row, title] of [
     const rows = page.locator(row);
     await expect(rows.first()).toBeVisible();
     const inspector = page.locator('#inspector');
-    await page.locator('body').click({ position: { x: 700, y: 10 } });
+    await page.locator('main h1').click(); // nothing focused; not the top bar's search, whose width follows the workspace's name.
     await page.keyboard.press('j');
     await expect(page.locator('main .cursor')).toHaveCount(1);
     await expect(page.locator('main .cursor')).toHaveAttribute('data-inspector-open', '');
