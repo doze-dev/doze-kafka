@@ -220,6 +220,9 @@ type boltStore struct {
 // "this operation is a single transaction".
 func (s *boltStore) update(fn func(tx *bbolt.Tx) error) error {
 	s.writeTxns.Add(1)
+	if err := faultAt("meta.write"); err != nil {
+		return err
+	}
 	return s.db.Update(fn)
 }
 

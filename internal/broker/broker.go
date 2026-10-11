@@ -5,11 +5,15 @@
 package broker
 
 import (
+	"errors"
+	"io/fs"
 	"log/slog"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"syscall"
 
 	"context"
 	"fmt"
@@ -207,12 +211,30 @@ func typed[Q kmsg.Request, R kmsg.Response](fn func(ctx context.Context, req *pr
 	}
 }
 
-// storageFault logs an internal error that is about to be reported to a client as
-// UNKNOWN_SERVER_ERROR and returns that code. The client sees only a code; without
-// this, the cause of "my produce fails" existed nowhere a developer could look.
+// storageFault logs an internal error that is about to be reported to a client
+// and returns the code to report. The client sees only a code; without this, the
+// cause of "my produce fails" existed nowhere a developer could look.
+//
+// An I/O failure (a full disk, a read-only remount, a failing device) is
+// KAFKA_STORAGE_ERROR, as Apache Kafka answers when a log directory fails: a
+// retriable code that says the broker's storage is the problem. Anything else is
+// UNKNOWN_SERVER_ERROR.
 func (b *Broker) storageFault(op string, err error, attrs ...any) int16 {
 	b.log.Error("request failed: "+op, append(attrs, "err", err)...)
+	if isIOError(err) {
+		return kerr.KafkaStorageError.Code
+	}
 	return kerr.UnknownServerError.Code
+}
+
+// isIOError reports whether err came from the file system rather than from the
+// broker's own logic.
+func isIOError(err error) bool {
+	var pe *fs.PathError
+	var le *os.LinkError
+	var se *os.SyscallError
+	var en syscall.Errno
+	return errors.As(err, &pe) || errors.As(err, &le) || errors.As(err, &se) || errors.As(err, &en)
 }
 
 // nodeID is this broker's node id. Single-node, so it is a constant.

@@ -16,6 +16,7 @@ package broker_test
 // client's seed address and the on-disk state survive a restart.
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -48,9 +49,10 @@ type node struct {
 	cfgEdit   func(*config.Config)
 
 	mu     sync.Mutex
-	stop   func()    // in-process: stops the running broker.
-	cmd    *exec.Cmd // subprocess: the running process.
-	gen    int       // incremented by every start.
+	stop   func()        // in-process: stops the running broker.
+	cmd    *exec.Cmd     // subprocess: the running process.
+	exited chan struct{} // closed when cmd has been waited for.
+	gen    int           // incremented by every start.
 	paused bool
 }
 
@@ -152,7 +154,8 @@ func (n *node) launch() {
 	cmd := exec.Command(n.bin, args...)
 	cmd.Env = append(os.Environ(), n.env...)
 	cmd.Stdout = io.Discard
-	cmd.Stderr = io.Discard
+	var out bytes.Buffer // what the binary said, for the failure message.
+	cmd.Stderr = &out
 	if n.stderrLog != "" {
 		f, err := os.OpenFile(n.stderrLog, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 		if err != nil {
@@ -164,13 +167,20 @@ func (n *node) launch() {
 	if err := cmd.Start(); err != nil {
 		n.t.Fatalf("launch broker: %v", err)
 	}
+	exited := make(chan struct{})
+	go func() { cmd.Wait(); close(exited) }()
 	n.mu.Lock()
-	n.cmd = cmd
+	n.cmd, n.exited = cmd, exited
 	n.mu.Unlock()
 	deadline := time.Now().Add(15 * time.Second)
 	for !dialOK(n.Addr) {
+		select {
+		case <-exited:
+			n.t.Fatalf("broker exited before it listened: %v\n%s", cmd.ProcessState, out.String())
+		default:
+		}
 		if time.Now().After(deadline) {
-			n.t.Fatal("broker did not start listening")
+			n.t.Fatalf("broker did not start listening\n%s", out.String())
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -180,7 +190,7 @@ func (n *node) launch() {
 // It is safe to call on a node that is already down.
 func (n *node) Stop() {
 	n.mu.Lock()
-	stop, cmd := n.stop, n.cmd
+	stop, cmd, exited := n.stop, n.cmd, n.exited
 	n.stop, n.cmd = nil, nil
 	paused := n.paused
 	n.paused = false
@@ -190,10 +200,10 @@ func (n *node) Stop() {
 	}
 	if cmd != nil {
 		if paused {
-			cmd.Process.Signal(syscall.SIGCONT)
+			signalCont(cmd.Process)
 		}
 		cmd.Process.Signal(syscall.SIGTERM)
-		cmd.Wait()
+		<-exited
 	}
 }
 
@@ -210,7 +220,7 @@ func (n *node) Restart() {
 func (n *node) Kill() {
 	n.t.Helper()
 	n.mu.Lock()
-	cmd := n.cmd
+	cmd, exited := n.cmd, n.exited
 	n.cmd = nil
 	n.paused = false
 	n.mu.Unlock()
@@ -218,7 +228,7 @@ func (n *node) Kill() {
 		n.t.Fatal("node: Kill needs a running subprocess node (nodeSubprocess)")
 	}
 	cmd.Process.Signal(syscall.SIGKILL)
-	cmd.Wait()
+	<-exited
 }
 
 // Pause freezes the process with SIGSTOP: connections stay open and nothing is
@@ -230,7 +240,7 @@ func (n *node) Pause() {
 	if !n.sub || n.cmd == nil {
 		n.t.Fatal("node: Pause needs a running subprocess node (nodeSubprocess)")
 	}
-	n.cmd.Process.Signal(syscall.SIGSTOP)
+	signalStop(n.cmd.Process)
 	n.paused = true
 }
 
@@ -242,7 +252,7 @@ func (n *node) Resume() {
 	if n.cmd == nil || !n.paused {
 		n.t.Fatal("node: Resume on a node that is not paused")
 	}
-	n.cmd.Process.Signal(syscall.SIGCONT)
+	signalCont(n.cmd.Process)
 	n.paused = false
 }
 

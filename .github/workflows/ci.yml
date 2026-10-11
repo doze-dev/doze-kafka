@@ -51,6 +51,8 @@ jobs:
           # The vendored protocol library is generated and mostly unreachable from here:
           # counting it would bury the number that matters.
           go test -race -coverprofile=cover.out -coverpkg="$(go list ./... | grep -v /kmsg | paste -sd, -)" ./...
+      - name: Fault seam (build tag faultinject)
+        run: go test -tags faultinject ./internal/faultinject/ ./internal/storage/... ./internal/broker/ -run 'FaultSeam|^Test(Parse|HitAfterAndClear|Delay|FileIsRead)'
       - name: Coverage
         if: matrix.os == 'ubuntu-latest'
         run: |
