@@ -163,10 +163,27 @@ It links to [what is not implemented](limitations.md).
 ## The inspector
 
 Selecting a record, a request, a client, a group member, a schema subject, an open
-transaction or a group event opens it in the inspector at the right. All seven look
-the same: a title, a body and a close control. The selection is in the address
-(`?open=`), so a refresh or a shared link reopens it, Back returns to the previous
-selection (or to none), and `Esc` closes it and puts focus back on the row.
+transaction or a group event opens it in the inspector, the column at the right of
+the page. The page narrows to make room: the inspector is part of the layout and
+nothing is drawn over it (below 640px it is a sheet from the foot). All of them look
+the same: a title, a body and a close control. With nothing selected it says what you
+can select here. The selection is in the address (`?open=`), so a refresh or a shared
+link reopens it, Back returns to the previous selection (or to none), and `Esc`
+closes it and puts focus back on the row.
+
+## Pages and tabs
+
+A topic is one page with tabs: Messages, Partitions, Readers, Config and Schema. A
+group has Lag, Members, Timeline and Offsets; a subject has Versions, Compatibility
+and Register. The tab is in the address (`?tab=`), and `[` and `]` move between
+tabs. The Cluster page has Overview, Config, APIs and Transactions (`?view=`).
+
+The sections are Traffic and Trace (Observe), Topics, Groups and Schemas (Data), and
+Access and Cluster (Broker), each in the rail with a count where there is one. A
+section's home lists its resources with the page's own summary beside them. The
+first thing a broker with nothing in it shows is a first-run page with the address
+and a way to make a first topic; **Connect an app** (`/connect`) gives the address
+to paste and how to check it.
 
 ## The wire dock and neighbours
 
@@ -178,32 +195,43 @@ g-order-validator, schema subject orders-value"), each name a link.
 ## Keyboard
 
 Press `?` for the list. It is generated from the one table the console binds its keys
-from, so it is always the keys that work.
+from, so it is always the keys that work. The strip under the page shows the few that
+matter on the page you are on.
 
 | Key | Does |
 |---|---|
-| `⌘K` / `Ctrl+K` | Command palette: any topic, group, subject or view, and actions (themes, rail, pause, help) |
+| `⌘K` / `Ctrl+K` | Command palette: jump to a topic, group or subject, or act |
+| `g` then `r` `t` `g` `s` `a` `c` | Go to Traffic, Topics, Groups, Schemas, Access, Cluster |
 | `?` | Show the keys |
-| `/` | Focus the list filter |
+| `/` | Filter this table |
 | `j` / `k`, `Enter` | Move through the list and open |
-| `c` | New topic, or new schema |
-| `m` | Open the composer |
-| `p` | Pause or resume live updates |
-| `[` | Collapse or expand the rail |
+| `[` / `]` | Previous or next tab |
+| `c` | New topic, or register a schema |
+| `p` | Produce, on a topic; otherwise pause or resume live updates |
 | `⌘Enter` / `Ctrl+Enter` | Send, from the composer |
-| `Esc` | Close a dialog or the inspector |
+| `Esc` | Close a dialog or the inspector, or clear the filter |
 
 Single keys act only when you are not typing in a field, with no modifier held, and
 no dialog open.
 
+## The palette
+
+`⌘K` opens a palette with results under Topics, Groups, Subjects and Actions. A row
+says what it is (a topic its partitions and messages, a group its state, members and
+lag), the part of the name you typed is bold, and an action carries its key. On a
+topic it offers to produce to it; on a group, to reset its offsets, which still asks
+before it does anything.
+
 ## Appearance
 
 Light, dark and high-contrast themes, or follow the system (dark, or a request for
-more contrast; the switch is at the top right). Every text and background pair is
+more contrast); the control at the top right is four words: system, light, dark, high
+contrast. High contrast also outlines the selection, so it does not rely on a fill. Every text and background pair is
 measured in all three, and the ratios are in `console/testdata/contrast.txt`. The
 fonts (IBM Plex Sans and Mono) are part of the binary, so the console looks the same
-offline. It works down to phone widths: below about 640px the list and the detail
-become two screens.
+offline. It works down to phone widths: at 960px the rail is icons and the list is one tap
+away; below 640px each page is one screen, the top bar is a menu, the page title and
+the palette, and messages are cards.
 
 Times are shown in your browser's zone, with the zone and the UTC instant on hover;
 "3m ago" keeps counting on a paused page.

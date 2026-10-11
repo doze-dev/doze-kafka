@@ -24,6 +24,9 @@ func obs(conn uint64, client string, api protocol.APIKey, at time.Duration, mod 
 
 func TestTheRingKeepsTheNewestAndNoMore(t *testing.T) {
 	r := New(5, nil)
+	if r.Capacity() != 5 {
+		t.Errorf("capacity %d, want 5", r.Capacity())
+	}
 	r.ConnOpened(1, "x")
 	for i := 0; i < 12; i++ {
 		i := i

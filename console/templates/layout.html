@@ -36,7 +36,9 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
 <div class="reqbar" id="reqbar" hidden role="progressbar" aria-label="Working"></div>
 <div class="app" data-home="{{.Home}}">
   <header class="topbar">
-    <a class="brand" href="{{.Prefix}}/"><span class="logo" aria-hidden="true">z</span><span>doze-kafka</span>{{if .Workspace}}<span class="sub" id="workspace-label">{{.Workspace}}</span>{{end}}</a>
+    <button type="button" class="menu-btn" id="menu-btn" aria-label="Menu" aria-controls="rail" aria-expanded="false">☰</button>
+    <a class="brand" href="{{.Prefix}}/"><span class="logo" aria-hidden="true">z</span><span class="brand-name">doze-kafka</span>{{if .Workspace}}<span class="sub" id="workspace-label">{{.Workspace}}</span>{{end}}</a>
+    <span class="pg-title" id="pg-title" aria-hidden="true"></span>
     <button type="button" class="tb-palette" id="palette-open" aria-haspopup="dialog"><span class="grow">Jump to a topic, group or subject, or do something…</span><span class="kbd">⌘K</span></button>
     <div class="tb-spacer"></div>
     <div class="tb-right">
@@ -52,7 +54,7 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
   </header>
 
   <div class="body">
-    <nav class="rail" aria-label="Sections" hx-boost="true" hx-target="#workspace" hx-select="#workspace" hx-swap="outerHTML">
+    <nav class="rail" aria-label="Sections" id="rail" hx-boost="true" hx-target="#workspace" hx-select="#workspace" hx-swap="outerHTML">
       {{/* Three groups, as the design draws them: what is happening (Observe), what is
            stored (Data) and the broker itself. A group with nothing in it is not drawn. */}}
       <span class="cap first">Observe</span>

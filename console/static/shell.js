@@ -572,6 +572,14 @@
     pal.hidden = true;
     if (palOpener && document.contains(palOpener) && palOpener.focus) palOpener.focus();
   }
+  // The phone's menu: the rail, opened over the page.
+  var menuBtn = document.getElementById("menu-btn");
+  (function () { var t = document.getElementById("pg-title"), nm = document.querySelector(".rail .nav.on .nm"); if (t && nm) t.textContent = nm.textContent; })();
+  if (menuBtn) menuBtn.addEventListener("click", function () {
+    var open = document.documentElement.getAttribute("data-menu") === "open";
+    if (open) document.documentElement.removeAttribute("data-menu"); else document.documentElement.setAttribute("data-menu", "open");
+    menuBtn.setAttribute("aria-expanded", open ? "false" : "true");
+  });
   var palButton = document.getElementById("palette-open");
   if (palButton) palButton.addEventListener("click", openPalette);
   if (palQ) palQ.addEventListener("input", function () { palSel = 0; renderPal(); });
@@ -595,9 +603,13 @@
   function afterNavigation() {
     if (window.dozeView) window.dozeView();
     var section = sectionFor(location.pathname);
+    document.documentElement.removeAttribute("data-menu");
+    var mb = document.getElementById("menu-btn");
+    if (mb) mb.setAttribute("aria-expanded", "false");
     document.querySelectorAll(".rail .nav").forEach(function (a) {
       var on = sectionFor(new URL(a.href, location.origin).pathname) === section;
       a.classList.toggle("on", on);
+      if (on) { var t = document.getElementById("pg-title"), nm = a.querySelector(".nm"); if (t && nm) t.textContent = nm.textContent; }
       if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     });
     // A filter typed in one section means nothing in the next (topic names do

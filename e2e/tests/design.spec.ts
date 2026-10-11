@@ -404,3 +404,28 @@ test('a group\'s page offers to reset its offsets from the palette, and says it 
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/tab=offsets/);
 });
+
+// Sy-04: at 390 the top bar is a menu, the logo, the page title and ⌘K; messages are
+// cards; the message is a sheet from the foot.
+test('at 390 the top bar is a menu button, logo, title and the palette, and messages are cards in a sheet', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('topics/seed-orders?partition=0');
+  await expect(page.locator('#menu-btn')).toBeVisible();
+  await expect(page.locator('#menu-btn')).toHaveText('☰');
+  await expect(page.locator('#pg-title')).toHaveText('Topics');
+  await expect(page.locator('#palette-open .kbd')).toBeVisible();
+  await expect(page.locator('nav.rail')).toBeHidden();
+  await page.locator('#menu-btn').click();
+  await expect(page.locator('nav.rail')).toBeVisible();
+  await page.locator('#menu-btn').click();
+  await expect(page.locator('nav.rail')).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const row = page.locator('#msg-5');
+  expect(await row.evaluate((el) => getComputedStyle(el).display)).toBe('grid');
+  await row.click();
+  const panel = page.locator('#inspector-panel');
+  await expect(panel).toBeVisible();
+  expect(await panel.evaluate((el) => getComputedStyle(el).position)).toBe('fixed');
+  const b = await panel.boundingBox();
+  expect(b!.y + b!.height).toBeGreaterThanOrEqual(843);
+});

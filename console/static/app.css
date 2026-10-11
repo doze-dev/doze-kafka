@@ -213,6 +213,7 @@ h1, h2, h3 { margin: 0; }
 .c-ac { --c: var(--c-ac); } .c-cl { --c: var(--c-cl); } .c-tc { --c: var(--c-tc); } .c-mut { --c: var(--mut); }
 /* In high contrast the selected item also wears a 2 px outline (Sy-07). */
 :root[data-theme="contrast"] .nav.on, :root[data-theme="contrast"] .li.on, :root[data-theme="contrast"] .r.on { outline: 2px solid var(--ink); outline-offset: -2px; }
+.menu-btn, .pg-title { display: none; }
 @media (max-width: 1100px) {
   .rail { width: 48px; padding: 10px 0; align-items: center; gap: 4px; }
   .rail .cap { display: none; }
@@ -914,10 +915,29 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
 @media (max-width: 640px) {
   :root { --pad: 12px; }
   .topbar { gap: 10px; padding: 0 10px; }
-  .brand .sub, .tb-right .pill.live, .tb-palette .kbd { display: none; } /* the endpoint is on the Cluster page */
+  .brand .sub, .brand-name, .tb-right .pill.live { display: none; } /* the endpoint is on the Cluster page */
+  .menu-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); color: var(--ink); cursor: pointer; flex: none; }
+  .pg-title { display: block; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tb-palette { flex: none; width: auto; padding: 0 8px; }
+  .tb-palette .grow { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+  /* The rail is what the menu opens. */
+  .body { position: relative; }
+  .rail { display: none; }
+  :root[data-menu="open"] .rail { display: flex; position: absolute; z-index: 30; top: 0; bottom: 0; left: 0; width: 196px; padding: 10px 8px; align-items: stretch; gap: 1px; box-shadow: var(--shadow-modal); }
+  :root[data-menu="open"] .rail .cap { display: block; }
+  :root[data-menu="open"] .rail .nav .nm, :root[data-menu="open"] .rail .nav .n { position: static; width: auto; height: auto; margin: 0; clip: auto; }
+  :root[data-menu="open"] .rail .nav .n { margin-left: auto; }
+  /* Messages are cards: the key and offset, the value, then when and from whom. */
+  .tbl-wrap table.tbl thead { display: none; }
+  .tbl-wrap table.tbl, .tbl-wrap table.tbl tbody { display: block; }
+  .tbl-wrap table.tbl tbody tr:not(.txnmark) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; padding: 8px 10px; border-bottom: 1px solid var(--line2); }
+  .tbl-wrap table.tbl tbody tr:not(.txnmark) td { display: block; padding: 0; border: 0; min-width: 0; max-width: none; }
+  .tbl-wrap table.tbl td.cell-key { grid-column: 1; grid-row: 1; font-weight: 600; max-width: none; }
+  .tbl-wrap table.tbl td.cell-offset { grid-column: 2; grid-row: 1; text-align: right; color: var(--mut); }
+  .tbl-wrap table.tbl td.cell-val { grid-column: 1 / -1; grid-row: 2; }
+  .tbl-wrap table.tbl td.col-time { display: block; grid-column: 1 / -1; grid-row: 3; color: var(--mut); font-size: var(--fs-xs); }
   .tb-right .pill.live.disconnected { display: inline-flex; } /* ...but "not connected" is never hidden */
   .tb-right .pill.live.disconnected .pill-addr { display: none; }
-  .tb-palette { flex: 1 1 0; width: auto; }
   .tb-spacer { display: none; }
   .panes > .main { padding: 10px 12px 8px; }
   .panes > .insp:has(.insp-sel:not([hidden])) {
@@ -935,7 +955,7 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .dock-foot { flex-direction: column; align-items: stretch; }
   .crow2 { flex-wrap: wrap; gap: 2px 16px; }
   /* A phone-width table keeps what identifies a record: offset, key, value. */
-  table.tbl .col-time, table.tbl .col-hdrs { display: none; }
+  table.tbl .col-hdrs { display: none; }
   .cell-key { max-width: 110px; }
   .crow .field, .field.w-part, .field.w-acks { flex: 1 1 100%; }
   .cfgfoot { flex-direction: column; align-items: stretch; }
