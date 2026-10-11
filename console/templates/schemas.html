@@ -58,7 +58,7 @@
         {{template "neighbours" .}}
       </div>
       <div class="idband-acts">
-        <button class="btn danger" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" data-confirm-title="{{(index .Confirm "schema.delete").Title}}" data-confirm-verb="{{(index .Confirm "schema.delete").Verb}}" hx-confirm="{{(index .Confirm "schema.delete").Text}}">{{icon "trash"}} Delete</button>
+        <button class="btn danger" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" data-confirm-url="{{confirmURL "schema.delete" "subject" .Subject}}" data-confirm-title="{{(index .Confirm "schema.delete").Title}}" data-confirm-verb="{{(index .Confirm "schema.delete").Verb}}" hx-confirm="{{(index .Confirm "schema.delete").Text}}">{{icon "trash"}} Delete</button>
       </div>
     </div>
 
@@ -75,10 +75,10 @@
           <button type="button" :class="view==='schema'&&'on'" :aria-pressed="view==='schema'" @click="view='schema'">Schema</button>
         </div>
         <button type="button" class="copy-btn" data-copy="{{.Cur.Schema}}" title="Copy the schema" aria-label="Copy the schema">{{icon "copy"}}</button>
-        {{if gt (len .Versions) 1}}<button class="btn btn-outline sm" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" hx-vals='{"version":"{{.Cur.Version}}"}' data-confirm-title="{{(index .Confirm "schema.version.delete").Title}}" data-confirm-verb="{{(index .Confirm "schema.version.delete").Verb}}" hx-confirm="{{(index .Confirm "schema.version.delete").Text}}">{{icon "trash"}} Delete v{{.Cur.Version}}</button>{{end}}
+        {{if gt (len .Versions) 1}}<button class="btn btn-outline sm" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" hx-vals='{"version":"{{.Cur.Version}}"}' data-confirm-url="{{confirmURL "schema.version.delete" "subject" .Subject "version" .Cur.Version}}" data-confirm-title="{{(index .Confirm "schema.version.delete").Title}}" data-confirm-verb="{{(index .Confirm "schema.version.delete").Verb}}" hx-confirm="{{(index .Confirm "schema.version.delete").Text}}">{{icon "trash"}} Delete v{{.Cur.Version}}</button>{{end}}
       </div>
       {{if .Prev}}
-      <div class="valuebox diff" x-show="view==='changes'" role="region" aria-label="Changes from version {{.Prev.Version}}">{{if eq .Changed 0}}<span class="dim">No change to the text: only its formatting differs.</span>{{else}}{{range .Diff}}<div class="dl {{.Op}}"><span class="dm" aria-hidden="true">{{if eq .Op "add"}}+{{else if eq .Op "del"}}−{{else}} {{end}}</span><span class="dt">{{.Text}}</span></div>{{end}}{{end}}</div>
+      <div class="valuebox diff" x-show="view==='changes'" role="region" tabindex="0" aria-label="Changes from version {{.Prev.Version}}">{{if eq .Changed 0}}<span class="dim">No change to the text: only its formatting differs.</span>{{else}}{{range .Diff}}<div class="dl {{.Op}}"><span class="dm" aria-hidden="true">{{if eq .Op "add"}}+{{else if eq .Op "del"}}−{{else}} {{end}}</span><span class="dt">{{.Text}}</span></div>{{end}}{{end}}</div>
       {{end}}
       <div class="valuebox" x-show="view==='schema'" {{if .Prev}}x-cloak{{end}}>{{if eq .Cur.Type "PROTOBUF"}}{{.Text}}{{else}}{{jsonTint .Text}}{{end}}</div>
     </div>

@@ -381,6 +381,7 @@ func templateFuncs(prefix string) template.FuncMap {
 		"teach": teachLine,
 		// confirmOffset is the confirm of one row's Remove (confirms.go).
 		"confirmOffset": offsetDeleteConfirm,
+		"confirmURL":    func(id string, kv ...any) string { return confirmURLFor(prefix, id, kv...) },
 		// Keys of the inspector's selections, escaped for a query string.
 		"memberKey": func(group, member string) string { return url.QueryEscape(joinKey(group, member)) },
 		"eventKey": func(group string, seq uint64) string {

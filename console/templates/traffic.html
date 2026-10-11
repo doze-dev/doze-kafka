@@ -37,16 +37,16 @@
   {{if .Clients}}
   <div class="tbl-wrap gap">
     <table class="tbl" id="clients-table"><thead><tr><th>Client</th><th>Software</th><th>Address</th><th>Principal</th><th class="num">Open for</th><th class="num">Last request</th><th class="num">Requests</th><th>Groups</th></tr></thead>
-      <tbody>{{range .Clients}}<tr id="cl-{{.Conn}}" tabindex="0" role="button" aria-label="Open client {{.Who}} at {{.Remote}}" data-inspector-open
+      <tbody>{{range .Clients}}<tr id="cl-{{.Conn}}" tabindex="0" role="button" data-inspector-open
           hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
-        <td class="mono"><a href="{{$.Prefix}}/traffic?{{.Filter}}" title="Show only this client's requests" onclick="event.stopPropagation()">{{.Who}}</a></td>
+        <td class="mono">{{.Who}}</td>
         <td class="mono">{{if .Software}}{{.Software}}{{else}}<span class="dim">—</span>{{end}}</td>
         <td class="mono nw">{{.Remote}}</td>
         <td class="mono nw">{{.Principal}}</td>
         <td class="num mono">{{when .Opened "since"}}</td>
         <td class="num mono">{{when .Last "since"}}</td>
         <td class="num mono">{{.Requests}}</td>
-        <td class="mono">{{range $i, $g := .Groups}}{{if $i}}, {{end}}<a href="{{groupURL $g}}">{{$g}}</a>{{else}}<span class="dim">—</span>{{end}}</td>
+        <td class="mono">{{range $i, $g := .Groups}}{{if $i}}, {{end}}{{$g}}{{else}}<span class="dim">—</span>{{end}}</td>
       </tr>{{end}}</tbody>
     </table>
   </div>
@@ -88,7 +88,7 @@
   {{if .Rows}}
   <div class="tbl-wrap">
     <table class="tbl tf-table" id="traffic-table"><thead><tr><th>Time</th><th>Client</th><th>Request</th><th>Topic or group</th><th>Detail</th><th>Result</th><th class="num">Took</th></tr></thead>
-      <tbody>{{range .Rows}}<tr id="rq-{{.OpenKey}}" tabindex="0" role="button" aria-label="Open {{.API}} from {{.Who}} at {{whenText .Time "clockms"}}" data-inspector-open
+      <tbody>{{range .Rows}}<tr id="rq-{{.OpenKey}}" tabindex="0" role="button" data-inspector-open
           hx-get="{{$.Prefix}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
         <td class="mono nw">{{when .Time "clockms"}}{{if .Folded}} <span class="tf-count" title="{{.Count}} identical requests, {{.SameSpan}}">×{{.Count}}</span>{{end}}</td>
         <td class="mono nw" title="{{.Remote}}{{if .Software}} · {{.Software}}{{end}}">{{.Who}}</td>

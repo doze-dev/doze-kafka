@@ -92,7 +92,7 @@ func TestShellMarkupIsLabelled(t *testing.T) {
 	for _, want := range []string{
 		`role="dialog" aria-modal="true" aria-label="Command palette"`,
 		`role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-msg"`,
-		`class="ri on" aria-label="Topics"`, // the slim rail hides the text; the name must remain.
+		`class="ri on" aria-current="page"`, // the name is the text: the slim rail clips it, it does not remove it.
 		`<nav class="rail" aria-label="Sections"`,
 		`<main class="detail`,
 		`aria-label="Filter Topics"`,

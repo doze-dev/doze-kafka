@@ -2,6 +2,7 @@ package console
 
 import (
 	"context"
+	"encoding/json"
 	"html"
 	"net/url"
 	"os"
@@ -343,5 +344,62 @@ func TestEveryDestructiveRouteHasAConfirm(t *testing.T) {
 				t.Errorf("%s has a confirm sentence typed into the template: %q (it comes from confirmTable)", f, m[1])
 			}
 		}
+	}
+}
+
+// The sentence a page was drawn with is as old as the page, and a topic gains
+// records: so the dialog asks the console for it when the button is pressed, and
+// what it is told is true of the broker now.
+func TestTheConfirmIsMeasuredWhenTheButtonIsPressed(t *testing.T) {
+	c, addr, _ := newRegistryConsole(t)
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"fresh"}, "partitions": {"1"}})
+	page := req(t, c, "GET", "/_console/topics/fresh", nil).Body.String()
+	if drawn := confirmOn(t, page, "/_console/topics/fresh/purge"); numberBefore(t, drawn, "records") != 0 {
+		t.Fatalf("drawn: %s", drawn)
+	}
+	// The button names where its sentence is measured.
+	if !strings.Contains(page, `data-confirm-url="/_console/confirm/topic.purge?name=fresh"`) {
+		t.Error("the purge button does not say where to ask for its sentence")
+	}
+	produceTo(t, c, "fresh", 0, 5)
+	commitFor(t, addr, "fresh-reader", "fresh", map[int32]int64{0: 2})
+
+	rec := req(t, c, "GET", "/_console/confirm/topic.purge?name=fresh", nil)
+	if rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	var got struct{ Text, Title, Verb string }
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if numberBefore(t, got.Text, "records") != 5 || !strings.Contains(got.Text, "fresh-reader") || numberBefore(t, got.Text[strings.Index(got.Text, "will be behind"):], "records") != 3 {
+		t.Errorf("the sentence is not of the topic as it is now: %s", got.Text)
+	}
+	if got.Title != "Purge topic" || got.Verb != "Purge" {
+		t.Errorf("title/verb = %q/%q", got.Title, got.Verb)
+	}
+	// Every confirm of the table can be asked for, and a thing that is not there is refused.
+	for path, code := range map[string]int{
+		"/_console/confirm/topic.delete?name=fresh":                                        200,
+		"/_console/confirm/topic.partitions?name=fresh":                                    200,
+		"/_console/confirm/group.delete?group=fresh-reader":                                200,
+		"/_console/confirm/group.reset.earliest?group=fresh-reader":                        200,
+		"/_console/confirm/group.reset.latest?group=fresh-reader":                          200,
+		"/_console/confirm/group.offset.delete?group=fresh-reader&topic=fresh&partition=0": 200,
+		"/_console/confirm/topic.purge?name=ghost":                                         404,
+		"/_console/confirm/nonsense":                                                       404,
+		"/_console/confirm/group.offset.delete?group=fresh-reader&topic=fresh&partition=9": 404,
+	} {
+		if r := req(t, c, "GET", path, nil); r.Code != code {
+			t.Errorf("%s answered %d, want %d", path, r.Code, code)
+		}
+	}
+	register(t, c, "fresh-value", userV1)
+	register(t, c, "fresh-value", userV2)
+	if r := req(t, c, "GET", "/_console/confirm/schema.version.delete?subject=fresh-value&version=2", nil); r.Code != 200 || !strings.Contains(r.Body.String(), "version 1 becomes the latest") {
+		t.Errorf("schema.version.delete: %d %s", r.Code, r.Body)
+	}
+	if r := req(t, c, "GET", "/_console/confirm/schema.delete?subject=fresh-value", nil); r.Code != 200 || !strings.Contains(r.Body.String(), "all 2 versions") {
+		t.Errorf("schema.delete: %d %s", r.Code, r.Body)
 	}
 }

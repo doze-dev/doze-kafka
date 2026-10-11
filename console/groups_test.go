@@ -85,7 +85,7 @@ func TestGroupPageShowsMembersOwnersAndLinks(t *testing.T) {
 	for _, want := range []string{
 		"billing-service", // the client id.
 		"127.0.0.1",       // the host it connected from.
-		`<a href="/_console/topics/orders">orders</a> 0–1`, // readable assignment, linked topic.
+		`orders 0–1`,      // a readable assignment (its topic link is in the member's inspector, not in the row that opens it).
 		"Offsets &amp; lag", "caught up",
 		`data-live="/_console/groups/billing/live"`, // the lag is live.
 	} {

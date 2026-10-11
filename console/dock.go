@@ -166,4 +166,5 @@ func (c *Console) dockLive(w http.ResponseWriter, r *http.Request) {
 func (c *Console) shellRoutes(m *http.ServeMux) {
 	c.inspectorRoutes(m)
 	m.HandleFunc("GET "+c.prefix+"/dock", c.dockLive)
+	m.HandleFunc("GET "+c.prefix+"/confirm/{id}", c.confirmLive) // a confirm's sentence, measured when the button is pressed
 }

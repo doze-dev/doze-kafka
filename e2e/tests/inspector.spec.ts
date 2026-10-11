@@ -94,7 +94,7 @@ test('a transaction is selected, closed, refreshed and left with Back', async ({
 
 test('a group event is selected, closed, refreshed and left with Back', async ({ page }) => {
   await page.goto('groups/g-timeline');
-  await cycle(page, page.locator('#group-timeline li[id^="ev-"]').first(), 'event');
+  await cycle(page, page.locator('#group-timeline .tl-row').first(), 'event');
 });
 
 test('a subject is selected from the neighbours sentence, closed, refreshed and left with Back', async ({ page }) => {

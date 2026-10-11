@@ -10,8 +10,12 @@ package console
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -265,4 +269,83 @@ func subjectConfirms(subject string, versions []int, shown int) map[string]confi
 	}
 	out["schema.version.delete"] = viewOf("schema.version.delete", confirmFacts{Name: subject, Version: shown, Versions: len(versions), NewLatest: newLatest})
 	return out
+}
+
+// confirmURL is where a button's confirm fetches its sentence at the moment it is
+// pressed: {{confirmURL "topic.purge" "name" .Topic.Name}}. The sentence drawn into
+// the page is the fallback; it is as old as the page, and a topic gains records.
+func confirmURLFor(prefix, id string, kv ...any) string {
+	q := url.Values{}
+	for i := 0; i+1 < len(kv); i += 2 {
+		q.Set(fmt.Sprint(kv[i]), fmt.Sprint(kv[i+1]))
+	}
+	return prefix + "/confirm/" + id + "?" + q.Encode()
+}
+
+// confirmLive answers GET {prefix}/confirm/{id}: the confirm's title, verb and
+// sentence, measured now.
+func (c *Console) confirmLive(w http.ResponseWriter, r *http.Request) {
+	id, q, ctx := r.PathValue("id"), r.URL.Query(), r.Context()
+	var views map[string]confirmView
+	switch id {
+	case "topic.delete", "topic.purge", "topic.partitions":
+		name := q.Get("name")
+		d, err := c.be.DescribeTopic(ctx, name)
+		if err != nil {
+			c.fail(w, r, err)
+			return
+		}
+		views = c.topicConfirms(ctx, name, int(d.Partitions))
+	case "group.delete", "group.reset.earliest", "group.reset.latest":
+		data, err := c.groupData(r, q.Get("group"))
+		if err != nil {
+			c.fail(w, r, err)
+			return
+		}
+		views = data["Confirm"].(map[string]confirmView)
+	case "group.offset.delete":
+		group, topic := q.Get("group"), q.Get("topic")
+		p, perr := strconv.Atoi(q.Get("partition"))
+		if perr != nil {
+			c.fail(w, r, badInput("partition must be a number"))
+			return
+		}
+		offs, err := c.be.GroupOffsets(ctx, group)
+		if err != nil {
+			c.fail(w, r, err)
+			return
+		}
+		for _, o := range offs {
+			if o.Topic == topic && int(o.Partition) == p {
+				views = map[string]confirmView{id: offsetDeleteConfirm(group, topic, o.Partition, o.Committed)}
+			}
+		}
+		if views == nil {
+			c.fail(w, r, fmt.Errorf("%w: %s has no committed offset on %s partition %d", errNotFound, group, topic, p))
+			return
+		}
+	case "schema.delete", "schema.version.delete":
+		if c.registryOff(w, r) {
+			return
+		}
+		subject := q.Get("subject")
+		versions, err := c.reg.Versions(ctx, subject)
+		if err != nil {
+			c.failSubject(w, r, err, subject)
+			return
+		}
+		shown, _ := strconv.Atoi(q.Get("version"))
+		views = subjectConfirms(subject, versions, shown)
+	default:
+		c.fail(w, r, fmt.Errorf("%w: there is no confirm %q", errNotFound, id))
+		return
+	}
+	v, ok := views[id]
+	if !ok {
+		c.fail(w, r, fmt.Errorf("%w: there is no confirm %q here", errNotFound, id))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	json.NewEncoder(w).Encode(map[string]string{"text": v.Text, "title": v.Title, "verb": v.Verb})
 }

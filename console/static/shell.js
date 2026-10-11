@@ -332,18 +332,35 @@
   // (data-confirm-title / data-confirm-verb), so the dialog says "Delete topic",
   // not "Are you sure? / Confirm". Focus starts on Cancel: Enter on a destructive
   // dialog must not be the dangerous answer.
+  // The sentence is measured when the button is pressed (data-confirm-url): the
+  // one drawn into the page is as old as the page, and a topic gains records. The
+  // drawn one is the fallback when the console cannot answer.
+  var confirmPending = false;
   document.addEventListener("htmx:confirm", function (e) {
     var box = document.getElementById("confirm");
     var q = e.detail.question;
     if (!q || !box) return;
     e.preventDefault();
-    if (confirmOpen()) return; // one question at a time.
+    if (confirmOpen() || confirmPending) return; // one question at a time.
     var elt = e.detail.elt || {}, data = elt.dataset || {};
     var opener = document.activeElement;
-    document.getElementById("confirm-title").textContent = data.confirmTitle || "Are you sure?";
-    document.getElementById("confirm-msg").textContent = q;
+    if (data.confirmUrl) {
+      confirmPending = true;
+      fetch(data.confirmUrl, { headers: { Accept: "application/json" } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; })
+        .then(function (fresh) {
+          confirmPending = false;
+          showConfirm(fresh && fresh.text ? fresh.text : q, fresh && fresh.title || data.confirmTitle, fresh && fresh.verb || data.confirmVerb);
+        });
+      return;
+    }
+    showConfirm(q, data.confirmTitle, data.confirmVerb);
+    function showConfirm(text, title, verb) {
+    document.getElementById("confirm-title").textContent = title || "Are you sure?";
+    document.getElementById("confirm-msg").textContent = text;
     var yes = document.getElementById("confirm-yes"), no = document.getElementById("confirm-no");
-    yes.textContent = data.confirmVerb || "Confirm";
+    yes.textContent = verb || "Confirm";
     box.hidden = false;
     function close(restore) {
       box.hidden = true; yes.onclick = no.onclick = box.onclick = null;
@@ -359,6 +376,7 @@
     box.onclick = function (ev) { if (ev.target === box) close(true); };
     document.addEventListener("keydown", onKey, true);
     no.focus();
+    }
   });
 
   // ---------- command palette ----------

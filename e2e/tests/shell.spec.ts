@@ -67,7 +67,8 @@ test('the rail collapses to icons and stays that way', async ({ page }) => {
   await page.goto('');
   await page.locator('#rail-toggle').click();
   await expect(page.locator('html')).toHaveAttribute('data-rail', 'slim');
-  await expect(page.locator('.rail .ri-nm').first()).toBeHidden();
+  // The icons are all that is drawn; the name stays for assistive technology (clipped, not removed).
+  expect(await page.locator('.rail .ri-nm').first().evaluate((el) => el.getBoundingClientRect().width)).toBeLessThanOrEqual(1);
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-rail', 'slim');
   await page.locator('#rail-toggle').click();
