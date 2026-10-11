@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -547,79 +546,8 @@ func TestEachThemeIsDefinedOnce(t *testing.T) {
 	}
 }
 
-// themeTokens reads the custom properties of one rule in app.css.
-func themeTokens(t *testing.T, css, selector string) map[string]string {
-	t.Helper()
-	i := strings.Index(css, selector+" {")
-	if i < 0 {
-		t.Fatalf("app.css has no %q rule", selector)
-	}
-	block := css[i : i+strings.Index(css[i:], "\n}")]
-	out := map[string]string{}
-	for _, m := range regexp.MustCompile(`(--[a-z-]+):\s*(#[0-9a-fA-F]{6})\b`).FindAllStringSubmatch(block, -1) {
-		out[m[1]] = m[2]
-	}
-	return out
-}
-
-func luminance(hex string) float64 {
-	var r, g, b int
-	fmt.Sscanf(hex, "#%02x%02x%02x", &r, &g, &b)
-	f := func(v int) float64 {
-		c := float64(v) / 255
-		if c <= 0.03928 {
-			return c / 12.92
-		}
-		return math.Pow((c+0.055)/1.055, 2.4)
-	}
-	return 0.2126*f(r) + 0.7152*f(g) + 0.0722*f(b)
-}
-
-func contrast(a, b string) float64 {
-	la, lb := luminance(a), luminance(b)
-	if la < lb {
-		la, lb = lb, la
-	}
-	return (la + 0.05) / (lb + 0.05)
-}
-
-// Text holds 4.5:1 on every surface it is set on, and the edge of a control holds
-// 3:1, in both themes. A palette is easy to make pretty and unreadable; the last
-// one had status colours at 3.6:1.
-func TestThemeContrast(t *testing.T) {
-	css := readAll(t, "static/app.css")
-	light := themeTokens(t, css, ":root")
-	dark := themeTokens(t, css, `:root[data-theme="dark"]`)
-	for k, v := range light { // dark overrides; what it does not name is shared.
-		if _, ok := dark[k]; !ok {
-			dark[k] = v
-		}
-	}
-	surfaces := []string{"--background", "--card", "--popover", "--muted", "--sidebar"}
-	text := []string{"--foreground", "--muted-foreground", "--ok-foreground", "--bad-foreground", "--warn-foreground", "--info-foreground", "--violet-foreground"}
-	for name, th := range map[string]map[string]string{"light": light, "dark": dark} {
-		check := func(fg, bg string, min float64) {
-			if th[fg] == "" || th[bg] == "" {
-				t.Errorf("%s: %s or %s is not defined", name, fg, bg)
-				return
-			}
-			if r := contrast(th[fg], th[bg]); r < min {
-				t.Errorf("%s: %s (%s) on %s (%s) is %.2f:1, want %.1f:1", name, fg, th[fg], bg, th[bg], r, min)
-			}
-		}
-		for _, bg := range surfaces {
-			for _, fg := range text {
-				check(fg, bg, 4.5)
-			}
-			check("--input", bg, 3)
-		}
-		check("--foreground", "--accent", 4.5)
-		check("--muted-foreground", "--accent", 4.5)
-		check("--brand-foreground", "--brand", 4.5)
-		check("--destructive-foreground", "--destructive", 4.5)
-		check("--ring", "--background", 3)
-	}
-}
+// (The contrast of every text and surface pair, in all three themes, is
+// contrast_test.go.)
 
 // ---- changing a group's offsets, one partition at a time ----
 
