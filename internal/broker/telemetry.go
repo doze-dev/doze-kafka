@@ -55,9 +55,10 @@ func telemetryWho(req *protocol.Request) telemetry.Who {
 	return telemetry.Who{
 		ClientID: req.Header.ClientID, Software: req.Conn.ClientSoftware(),
 		Principal: req.Conn.Principal(), Host: req.Conn.RemoteHost(),
-		// An instance is bound to the connection that made it, so another connection
-		// cannot speak as it while that one is open (TRF-27); the number is also how the
-		// console links a client's requests to its metrics.
+		// An instance belongs to a principal, not to a connection (TRF-27, narrowed): a
+		// client subscribes on one connection and pushes on another, so the connection
+		// is only where the instance was last heard from. It is how the console links a
+		// client's requests to its metrics.
 		Conn: req.Conn.ID(), Open: req.Conn.Open,
 	}
 }

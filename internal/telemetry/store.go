@@ -209,16 +209,19 @@ func NewID() [16]byte {
 // Who is what the broker knows of a client from the request that carried its telemetry.
 type Who struct {
 	ClientID, Software, Principal, Host string
-	// Conn is the connection's number. Open reports whether that connection is still
-	// open; nil means it is not known to be, so a later claim may take the instance.
+	// Conn is the number of the connection the request came over, which is where the
+	// instance was last heard from (it is not the instance's owner: that is the
+	// principal). Open reports whether that connection is still open.
 	Conn uint64
 	Open func() bool
 }
 
 // Touch records that an instance asked for its subscription (or pushed), creating it if
 // it is new. A client the broker has never heard of, whose id survived a broker restart,
-// is adopted. It reports false when the instance belongs to another connection that is
-// still open, or to another principal: the caller must not serve it as that instance.
+// is adopted. It reports false when the instance belongs to another principal: the
+// caller must not serve it as that instance. An instance belongs to a principal, not to
+// a connection: another connection of the same principal may speak for it, and the
+// instance follows the connection that spoke last (TRF-27, narrowed).
 func (s *Store) Touch(id [16]byte, who Who) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()

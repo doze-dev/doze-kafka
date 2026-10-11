@@ -280,7 +280,7 @@ func (c *Conn) serve(ctx context.Context) {
 			// hanging until its own timeout. Conformant clients never hit this —
 			// they only call APIs we advertise.
 			c.log.Warn("closing connection: unhandled request", "api", APIName(header.APIKey), "err", err)
-			c.observeClosed(&header, began, len(frame), "API key "+strconv.Itoa(int(header.APIKey))+" is not served by this broker")
+			c.observeClosed(&header, began, len(frame), notServed(header))
 			return
 		}
 		if resp == nil {
@@ -358,4 +358,14 @@ func (c *Conn) route(ctx context.Context, req *Request) (resp []byte, err error)
 		}
 	}()
 	return c.router.Route(ctx, req)
+}
+
+// notServed says why a request the router would not take ended its connection: an API
+// the broker knows by name but not at the version asked for ("Produce v99 is not served
+// by this broker"), or a key it has never heard of ("API key 999 is not served...").
+func notServed(h RequestHeader) string {
+	if kmsg.RequestForKey(int16(h.APIKey)) != nil {
+		return h.APIKey.Name() + " v" + strconv.Itoa(int(h.APIVersion)) + " is not served by this broker"
+	}
+	return "API key " + strconv.Itoa(int(h.APIKey)) + " is not served by this broker"
 }

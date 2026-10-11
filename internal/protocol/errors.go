@@ -194,3 +194,31 @@ func ErrorCodes() []int16 {
 	}
 	return out
 }
+
+// errorPhrases are the short words a row's Detail says for the errors people meet
+// first: what the refusal is, in the console's table (Traf-03, Main). A code with no
+// phrase has none: the Result column names it and the inspector explains it.
+var errorPhrases = map[int16]string{
+	kerr.UnknownTopicOrPartition.Code:            "no such topic",
+	kerr.TopicAlreadyExists.Code:                 "the topic already exists",
+	kerr.InvalidTopicException.Code:              "not a valid topic name",
+	kerr.InvalidPartitions.Code:                  "not a valid partition count",
+	kerr.InvalidReplicationFactor.Code:           "replication factor is more than the brokers",
+	kerr.InvalidConfig.Code:                      "a config value is not valid",
+	kerr.TopicAuthorizationFailed.Code:           "not authorised for the topic",
+	kerr.GroupAuthorizationFailed.Code:           "not authorised to use the group",
+	kerr.ClusterAuthorizationFailed.Code:         "not authorised for the cluster",
+	kerr.TransactionalIDAuthorizationFailed.Code: "not authorised for the transactional id",
+	kerr.ProducerFenced.Code:                     "a newer producer has this id",
+	kerr.UnknownMemberID.Code:                    "the group does not know this member",
+	kerr.IllegalGeneration.Code:                  "the member's generation is old",
+	kerr.RebalanceInProgress.Code:                "the group is rebalancing",
+	kerr.MemberIDRequired.Code:                   "a new member asks in; it is given an id to join with",
+	kerr.OffsetOutOfRange.Code:                   "the offset is outside the log",
+	kerr.NotLeaderForPartition.Code:              "this broker is not the leader",
+	kerr.GroupIDNotFound.Code:                    "no such group",
+	kerr.CoordinatorNotAvailable.Code:            "the coordinator is not ready",
+}
+
+// ErrorPhrase is the short phrase for a code, or "" when there is none.
+func ErrorPhrase(code int16) string { return errorPhrases[code] }

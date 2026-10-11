@@ -227,13 +227,47 @@ func groupInt(n int64) string {
 }
 
 func sumListOffsets(q kmsg.Request, _ kmsg.Response) Summary {
-	if req, ok := q.(*kmsg.ListOffsetsRequest); ok {
-		return Summary{Topics: topicNames(req.Topics, func(t kmsg.ListOffsetsRequestTopic) string { return t.Topic })}
+	req, ok := q.(*kmsg.ListOffsetsRequest)
+	if !ok {
+		return Summary{}
 	}
-	return Summary{}
+	s := Summary{Topics: topicNames(req.Topics, func(t kmsg.ListOffsetsRequestTopic) string { return t.Topic })}
+	// What it asks for: where each partition ends, begins or was at a time. It is a
+	// consumer finding where to start, and the answer is the offset.
+	var parts []int32
+	var stamps []int64
+	for _, t := range req.Topics {
+		for _, p := range t.Partitions {
+			parts = append(parts, p.Partition)
+			if !slices.Contains(stamps, p.Timestamp) {
+				stamps = append(stamps, p.Timestamp)
+			}
+		}
+	}
+	where := partitionRanges(parts)
+	if len(req.Topics) > 1 {
+		where = plural(len(parts), "partition")
+	}
+	what := ""
+	if len(stamps) == 1 {
+		switch stamps[0] {
+		case -1:
+			what = "latest offset"
+		case -2:
+			what = "earliest offset"
+		case -3:
+			what = "max timestamp"
+		default:
+			what = "offset at a time"
+		}
+	} else if len(stamps) > 1 {
+		what = "offsets"
+	}
+	s.Detail = withDetails(where, what)
+	return s
 }
 
-func sumMetadata(q kmsg.Request, _ kmsg.Response) Summary {
+func sumMetadata(q kmsg.Request, r kmsg.Response) Summary {
 	req, ok := q.(*kmsg.MetadataRequest)
 	if !ok {
 		return Summary{}
@@ -252,7 +286,31 @@ func sumMetadata(q kmsg.Request, _ kmsg.Response) Summary {
 	case req.AllowAutoTopicCreation:
 		s.Detail = "auto-create on"
 	}
+	// With the answer, say what came back: how many topics, or why a named one did not.
+	if resp, ok := r.(*kmsg.MetadataResponse); ok {
+		var bad int16
+		for _, t := range resp.Topics {
+			if t.ErrorCode != 0 && bad == 0 {
+				bad = t.ErrorCode
+			}
+		}
+		switch {
+		case bad != 0 && len(req.Topics) > 0:
+			s.Detail = withDetails(ErrorPhrase(bad), autoCreate(req))
+		case req.Topics == nil || len(req.Topics) == 0:
+			s.Detail = withDetails(plural(len(resp.Topics), "topic"), autoCreate(req))
+		default:
+			s.Detail = withDetails(plural(len(resp.Topics), "topic"), autoCreate(req))
+		}
+	}
 	return s
+}
+
+func autoCreate(req *kmsg.MetadataRequest) string {
+	if req.AllowAutoTopicCreation && len(req.Topics) > 0 {
+		return "auto-create on"
+	}
+	return ""
 }
 
 func sumOffsetCommit(q kmsg.Request, _ kmsg.Response) Summary {
@@ -282,13 +340,30 @@ func sumOffsetFetch(q kmsg.Request, _ kmsg.Response) Summary {
 		return Summary{}
 	}
 	s := Summary{Group: req.Group, Topics: topicNames(req.Topics, func(t kmsg.OffsetFetchRequestTopic) string { return t.Topic })}
+	var parts []int32
+	for _, t := range req.Topics {
+		parts = append(parts, t.Partitions...)
+	}
+	named := len(req.Topics) > 0
 	if s.Group == "" && len(req.Groups) > 0 {
 		s.Group = req.Groups[0].Group
+		named = len(req.Groups[0].Topics) > 0
 		for _, t := range req.Groups[0].Topics {
+			parts = append(parts, t.Partitions...)
 			if t.Topic != "" && !slices.Contains(s.Topics, t.Topic) {
 				s.Topics = append(s.Topics, t.Topic)
 			}
 		}
+	}
+	// Where the group's consumers were: the partitions asked about, or every committed
+	// offset of the group when none were named.
+	switch {
+	case !named:
+		s.Detail = "all committed offsets"
+	case len(s.Topics) > 1:
+		s.Detail = plural(len(parts), "partition")
+	default:
+		s.Detail = partitionRanges(parts)
 	}
 	return s
 }
@@ -378,11 +453,31 @@ func sumGroups(q kmsg.Request, _ kmsg.Response) Summary {
 	return s
 }
 
-func sumCreateTopics(q kmsg.Request, _ kmsg.Response) Summary {
+func sumCreateTopics(q kmsg.Request, r kmsg.Response) Summary {
 	if req, ok := q.(*kmsg.CreateTopicsRequest); ok {
 		s := Summary{Topics: topicNames(req.Topics, func(t kmsg.CreateTopicsRequestTopic) string { return t.Topic })}
+		// A refusal says why, in the words of the table; a creation says what it made.
+		var bad int16
+		if resp, ok := r.(*kmsg.CreateTopicsResponse); ok {
+			for _, t := range resp.Topics {
+				if t.ErrorCode != 0 && bad == 0 {
+					bad = t.ErrorCode
+				}
+			}
+		}
+		switch {
+		case bad != 0:
+			s.Detail = ErrorPhrase(bad)
+		case len(req.Topics) == 1:
+			parts := int(req.Topics[0].NumPartitions)
+			if parts > 0 {
+				s.Detail = plural(parts, "partition")
+			}
+		case len(req.Topics) > 1:
+			s.Detail = plural(len(req.Topics), "topic")
+		}
 		if req.ValidateOnly {
-			s.Detail = "validate only"
+			s.Detail = withDetails(s.Detail, "validate only")
 		}
 		return s
 	}

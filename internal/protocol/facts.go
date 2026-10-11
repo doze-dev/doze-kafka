@@ -219,6 +219,11 @@ func writeValue(b *strings.Builder, v reflect.Value, items, depth int) {
 			for i := range raw {
 				raw[i] = byte(v.Index(i).Uint())
 			}
+			if len(raw) == 16 { // a topic id, a client instance id: a UUID, written as one.
+				h := hex.EncodeToString(raw)
+				b.WriteString(strconv.Quote(h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:]))
+				return
+			}
 			b.WriteString(strconv.Quote(hex.EncodeToString(raw)))
 			return
 		}
@@ -272,6 +277,11 @@ func writeValue(b *strings.Builder, v reflect.Value, items, depth int) {
 				continue
 			}
 			if fv.Kind() == reflect.Slice && fv.Len() == 0 {
+				continue
+			}
+			// A zero topic id says "named by name": a row of zeros says nothing and looks
+			// like an id that matched nothing.
+			if fv.Kind() == reflect.Array && fv.Len() == 16 && fv.Type().Elem().Kind() == reflect.Uint8 && fv.IsZero() {
 				continue
 			}
 			if !first {

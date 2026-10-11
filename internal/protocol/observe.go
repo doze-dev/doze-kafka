@@ -148,6 +148,10 @@ func (r *Request) Describe() Summary {
 		s.Detail = "version negotiation: the client asks again at a version offered here"
 	}
 	s.Class = Classify(r.Header.APIKey, s.ErrorCode)
+	// A refused request with nothing else to say says why, in a phrase.
+	if s.Detail == "" && s.ErrorCode != 0 && s.Class != ClassExpected {
+		s.Detail = ErrorPhrase(s.ErrorCode)
+	}
 	s.Kind = Kind(r.Header.APIKey)
 	return s
 }
