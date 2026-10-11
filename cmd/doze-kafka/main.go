@@ -416,6 +416,22 @@ func absPath(p string) string {
 	return p
 }
 
+// workspaceLabel is the name the console's top bar gives this broker: the name of
+// the directory its data is kept in, or of the one above it when that is the
+// conventional "data" (a project's ./data is the project's name, not "data").
+func workspaceLabel(dataDir string) string {
+	name := filepath.Base(dataDir)
+	if name == "data" || name == "." || name == string(filepath.Separator) {
+		if parent := filepath.Base(filepath.Dir(dataDir)); parent != "." && parent != string(filepath.Separator) {
+			return parent
+		}
+	}
+	if name == "." || name == string(filepath.Separator) {
+		return ""
+	}
+	return name
+}
+
 // consoleUserName is the SASL user the console logs in as.
 const consoleUserName = "__console"
 
@@ -485,6 +501,10 @@ func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger
 		// With SASL the console reaches the registry as the same user it reaches the broker.
 		RegistryURL: registryURL, RegistryUser: user, RegistryPass: pass,
 		Traffic: traffic, TraceHeader: cfg.TraceHeader, ClientMetrics: clientMetrics,
+		Facts: console.BrokerFacts{
+			Workspace: workspaceLabel(absPath(cfg.DataDir)), KafkaMajor: cfg.Version,
+			DataDir: cfg.DataDir, SASLMechanisms: cfg.SASLMechanisms,
+		},
 	})
 	if err != nil {
 		ln.Close()

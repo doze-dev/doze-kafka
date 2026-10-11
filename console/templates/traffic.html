@@ -15,7 +15,7 @@
       <label class="tf-f"><span class="sr-only">Topic</span><input class="input" name="topic" value="{{.Filter.Topic}}" placeholder="Topic" spellcheck="false"></label>
       <label class="tf-f"><span class="sr-only">Group</span><input class="input" name="group" value="{{.Filter.Group}}" placeholder="Group" spellcheck="false"></label>
       <label class="tf-chk"><input type="checkbox" name="errors" value="1" {{if .Filter.ErrorsOnly}}checked{{end}}> errors only</label>
-      <button type="submit" class="btn btn-outline">Filter</button>
+      <button type="submit" class="btn">Filter</button>
       {{if .Filtered}}<a class="btn" href="{{.Prefix}}/traffic">Clear</a>{{end}}
     </form>
 

@@ -12,6 +12,7 @@ import (
 	"crypto/tls"
 	"embed"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -46,6 +47,7 @@ type Console struct {
 	dev         string // DOZE_KAFKA_CONSOLE_DEV: read templates and static files from this directory, live.
 	prefix      string
 	hosts       []string // extra Host names to answer to (see hostguard.go).
+	facts       BrokerFacts
 }
 
 // Options configures the console.
@@ -92,6 +94,26 @@ type Options struct {
 	// ClientMetrics is what clients have reported about themselves (KIP-714). Nil, the
 	// Traffic page has no client metrics section.
 	ClientMetrics ClientMetricsSource
+	// Facts are what the broker knows about itself that the console cannot read off
+	// the wire: its name in the top bar, the Kafka major it declares, where its data
+	// is and which SASL mechanisms it serves. The zero value is honest: the pages
+	// leave out what they are not told.
+	Facts BrokerFacts
+}
+
+// BrokerFacts is what the broker's own configuration says about it. The console
+// shows these in the top bar, on the Connect page and on a first run; it never
+// invents a value for one that was not given.
+type BrokerFacts struct {
+	// Workspace labels the broker in the top bar: the name of the directory its
+	// data lives in, so two brokers on one machine can be told apart.
+	Workspace string
+	// KafkaMajor is the Kafka major version the broker declares ("Kafka 4.0 compat").
+	KafkaMajor int
+	// DataDir is the data directory, as the person should read it.
+	DataDir string
+	// SASLMechanisms are the mechanisms the listener serves; empty when it is open.
+	SASLMechanisms []string
 }
 
 // New builds a console with a real Kafka client dialed at opts.Addr.
@@ -115,7 +137,7 @@ func New(opts Options) (*Console, error) {
 	// templates and static files from disk on every request, so an edit shows on
 	// reload without rebuilding the binary (`task dev` sets it).
 	dev := os.Getenv("DOZE_KAFKA_CONSOLE_DEV")
-	c := &Console{prefix: prefix, hosts: opts.AllowedHosts, dev: dev}
+	c := &Console{prefix: prefix, hosts: opts.AllowedHosts, dev: dev, facts: opts.Facts}
 	tmpl, err := c.parseTemplates()
 	if err != nil {
 		return nil, err
@@ -236,6 +258,10 @@ func (c *Console) render(w http.ResponseWriter, r *http.Request, page string, da
 	}
 	data["Endpoint"] = c.be.displayAddr()
 	data["HasRegistry"] = c.reg != nil
+	data["Workspace"] = c.facts.Workspace
+	if m := c.facts.KafkaMajor; m > 0 {
+		data["KafkaCompat"] = fmt.Sprintf("Kafka %d.0 compat", m)
+	}
 	data["HasTraffic"] = c.traffic != nil
 	if f := r.URL.Query().Get("flash"); f != "" {
 		data["Flash"] = f

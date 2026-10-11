@@ -134,10 +134,9 @@ func TestThePaletteCatalogueHasActionsAndEveryTheme(t *testing.T) {
 	base := tokensIn(css, `:root {`)
 	for _, theme := range []string{"dark", "contrast"} {
 		got := tokensIn(css, `:root[data-theme="`+theme+`"] {`)
-		for _, tok := range []string{"--background", "--foreground", "--card", "--muted", "--muted-foreground", "--border", "--input", "--ring",
-			"--ok-foreground", "--bad-foreground", "--warn-foreground", "--info-foreground", "--refused-foreground", "--denied-foreground",
-			"--notimpl-foreground", "--failed-foreground", "--brand", "--brand-foreground", "--destructive", "--destructive-foreground"} {
-			if _, ok := got[tok]; !ok && !(theme == "dark" && strings.HasPrefix(tok, "--brand")) { // dark keeps the same yellow, on purpose.
+		for _, tok := range []string{"--bg", "--card", "--ink", "--mut", "--line", "--line2", "--sel", "--well",
+			"--ok", "--warn", "--bad", "--deny", "--okbg", "--warnbg", "--badbg", "--denybg"} {
+			if _, ok := got[tok]; !ok {
 				t.Errorf("theme %s does not define %s", theme, tok)
 			}
 			if _, ok := base[tok]; !ok {

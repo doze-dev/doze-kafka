@@ -1,186 +1,144 @@
 # light
---foreground           on --background 18.29  (min 4.5)  text
---muted-foreground     on --background  5.35  (min 4.5)  secondary text
---foreground           on --card       18.29  (min 4.5)  text
---muted-foreground     on --card        5.35  (min 4.5)  secondary text
---foreground           on --popover    18.29  (min 4.5)  text
---muted-foreground     on --popover     5.35  (min 4.5)  secondary text
---foreground           on --muted      16.60  (min 4.5)  text
---muted-foreground     on --muted       4.86  (min 4.5)  secondary text
---foreground           on --sidebar    17.35  (min 4.5)  text
---muted-foreground     on --sidebar     5.08  (min 4.5)  secondary text
---foreground           on --accent     16.34  (min 4.5)  text on the selected row
---muted-foreground     on --accent      4.78  (min 4.5)  secondary text on the selected row
---ok-foreground        on --background  6.65  (min 4.5)  status text
---ok-foreground        on --card        6.65  (min 4.5)  status text
---ok-foreground        on --muted       6.03  (min 4.5)  status text
---bad-foreground       on --background  6.26  (min 4.5)  status text
---bad-foreground       on --card        6.26  (min 4.5)  status text
---bad-foreground       on --muted       5.68  (min 4.5)  status text
---warn-foreground      on --background  5.78  (min 4.5)  status text
---warn-foreground      on --card        5.78  (min 4.5)  status text
---warn-foreground      on --muted       5.25  (min 4.5)  status text
---info-foreground      on --background  8.34  (min 4.5)  status text
---info-foreground      on --card        8.34  (min 4.5)  status text
---info-foreground      on --muted       7.57  (min 4.5)  status text
---violet-foreground    on --background  7.10  (min 4.5)  status text
---violet-foreground    on --card        7.10  (min 4.5)  status text
---violet-foreground    on --muted       6.45  (min 4.5)  status text
---refused-foreground   on --background  7.20  (min 4.5)  status text
---refused-foreground   on --card        7.20  (min 4.5)  status text
---refused-foreground   on --muted       6.53  (min 4.5)  status text
---denied-foreground    on --background  5.78  (min 4.5)  status text
---denied-foreground    on --card        5.78  (min 4.5)  status text
---denied-foreground    on --muted       5.25  (min 4.5)  status text
---notimpl-foreground   on --background  8.34  (min 4.5)  status text
---notimpl-foreground   on --card        8.34  (min 4.5)  status text
---notimpl-foreground   on --muted       7.57  (min 4.5)  status text
---failed-foreground    on --background  6.26  (min 4.5)  status text
---failed-foreground    on --card        6.26  (min 4.5)  status text
---failed-foreground    on --muted       5.68  (min 4.5)  status text
---brand-foreground     on --brand      12.95  (min 4.5)  text on the brand yellow
---destructive-foreground on --destructive  5.90  (min 4.5)  text on a destructive button
---ring                 on --background  3.93  (min 3.0)  focus ring
---ring                 on --card        3.93  (min 3.0)  focus ring
---input                on --background  3.60  (min 3.0)  a control's edge
---input                on --card        3.60  (min 3.0)  a control's edge
---ok                   on --background  4.38  (min 3.0)  status dot or bar
---ok                   on --card        4.38  (min 3.0)  status dot or bar
---bad                  on --background  4.73  (min 3.0)  status dot or bar
---bad                  on --card        4.73  (min 3.0)  status dot or bar
---warn                 on --background  3.64  (min 3.0)  status dot or bar
---warn                 on --card        3.64  (min 3.0)  status dot or bar
---info                 on --background  4.43  (min 3.0)  status dot or bar
---info                 on --card        4.43  (min 3.0)  status dot or bar
---refused              on --background  4.03  (min 3.0)  status dot or bar
---refused              on --card        4.03  (min 3.0)  status dot or bar
---denied               on --background  3.64  (min 3.0)  status dot or bar
---denied               on --card        3.64  (min 3.0)  status dot or bar
---notimpl              on --background  4.43  (min 3.0)  status dot or bar
---notimpl              on --card        4.43  (min 3.0)  status dot or bar
---failed               on --background  4.73  (min 3.0)  status dot or bar
---failed               on --card        4.73  (min 3.0)  status dot or bar
+--ink                  on --bg         15.84  (min 4.5)  text
+--mut                  on --bg          6.15  (min 4.5)  secondary text
+--ink                  on --card       17.61  (min 4.5)  text
+--mut                  on --card        6.84  (min 4.5)  secondary text
+--ink                  on --well       16.41  (min 4.5)  text
+--mut                  on --well        6.37  (min 4.5)  secondary text
+--ink                  on --sel        14.35  (min 4.5)  text
+--mut                  on --sel         5.57  (min 4.5)  secondary text
+--ok                   on --bg          5.89  (min 4.5)  status text
+--ok                   on --card        6.54  (min 4.5)  status text
+--ok                   on --well        6.10  (min 4.5)  status text
+--ok                   on --sel         5.33  (min 4.5)  status text
+--ok                   on --okbg        5.61  (min 4.5)  status text on its own tint
+--warn                 on --bg          6.01  (min 4.5)  status text
+--warn                 on --card        6.68  (min 4.5)  status text
+--warn                 on --well        6.22  (min 4.5)  status text
+--warn                 on --sel         5.44  (min 4.5)  status text
+--warn                 on --warnbg      5.69  (min 4.5)  status text on its own tint
+--bad                  on --bg          5.91  (min 4.5)  status text
+--bad                  on --card        6.57  (min 4.5)  status text
+--bad                  on --well        6.12  (min 4.5)  status text
+--bad                  on --sel         5.35  (min 4.5)  status text
+--bad                  on --badbg       5.33  (min 4.5)  status text on its own tint
+--deny                 on --bg          6.99  (min 4.5)  status text
+--deny                 on --card        7.77  (min 4.5)  status text
+--deny                 on --well        7.24  (min 4.5)  status text
+--deny                 on --sel         6.33  (min 4.5)  status text
+--deny                 on --denybg      6.29  (min 4.5)  status text on its own tint
+--card                 on --ink        17.61  (min 4.5)  text on the primary button and the selected segment
+--card                 on --bad         6.57  (min 4.5)  text on a destructive button
+--ink                  on --bg         15.84  (min 3.0)  focus ring and the selection outline
+--ink                  on --card       17.61  (min 3.0)  focus ring and the selection outline
+--ok                   on --bg          5.89  (min 3.0)  status dot or bar
+--ok                   on --card        6.54  (min 3.0)  status dot or bar
+--warn                 on --bg          6.01  (min 3.0)  status dot or bar
+--warn                 on --card        6.68  (min 3.0)  status dot or bar
+--bad                  on --bg          5.91  (min 3.0)  status dot or bar
+--bad                  on --card        6.57  (min 3.0)  status dot or bar
+--deny                 on --bg          6.99  (min 3.0)  status dot or bar
+--deny                 on --card        7.77  (min 3.0)  status dot or bar
+--chip-ink             on --c-tr        4.80  (min 4.5)  letters on a section chip
+--chip-ink             on --c-tc        4.78  (min 4.5)  letters on a section chip
+--chip-ink             on --c-tp        4.65  (min 4.5)  letters on a section chip
+--chip-ink             on --c-gr        4.53  (min 4.5)  letters on a section chip
+--chip-ink             on --c-sc        4.62  (min 4.5)  letters on a section chip
+--chip-ink             on --c-ac        5.10  (min 4.5)  letters on a section chip
+--chip-ink             on --c-cl        5.81  (min 4.5)  letters on a section chip
 # dark
---foreground           on --background 16.67  (min 4.5)  text
---muted-foreground     on --background  8.27  (min 4.5)  secondary text
---foreground           on --card       15.53  (min 4.5)  text
---muted-foreground     on --card        7.71  (min 4.5)  secondary text
---foreground           on --popover    14.74  (min 4.5)  text
---muted-foreground     on --popover     7.31  (min 4.5)  secondary text
---foreground           on --muted      13.57  (min 4.5)  text
---muted-foreground     on --muted       6.73  (min 4.5)  secondary text
---foreground           on --sidebar    16.13  (min 4.5)  text
---muted-foreground     on --sidebar     8.00  (min 4.5)  secondary text
---foreground           on --accent     11.00  (min 4.5)  text on the selected row
---muted-foreground     on --accent      5.46  (min 4.5)  secondary text on the selected row
---ok-foreground        on --background  9.94  (min 4.5)  status text
---ok-foreground        on --card        9.26  (min 4.5)  status text
---ok-foreground        on --muted       8.09  (min 4.5)  status text
---bad-foreground       on --background  7.81  (min 4.5)  status text
---bad-foreground       on --card        7.28  (min 4.5)  status text
---bad-foreground       on --muted       6.36  (min 4.5)  status text
---warn-foreground      on --background 10.61  (min 4.5)  status text
---warn-foreground      on --card        9.88  (min 4.5)  status text
---warn-foreground      on --muted       8.63  (min 4.5)  status text
---info-foreground      on --background 10.43  (min 4.5)  status text
---info-foreground      on --card        9.72  (min 4.5)  status text
---info-foreground      on --muted       8.49  (min 4.5)  status text
---violet-foreground    on --background 10.23  (min 4.5)  status text
---violet-foreground    on --card        9.53  (min 4.5)  status text
---violet-foreground    on --muted       8.32  (min 4.5)  status text
---refused-foreground   on --background 10.27  (min 4.5)  status text
---refused-foreground   on --card        9.57  (min 4.5)  status text
---refused-foreground   on --muted       8.36  (min 4.5)  status text
---denied-foreground    on --background 10.61  (min 4.5)  status text
---denied-foreground    on --card        9.88  (min 4.5)  status text
---denied-foreground    on --muted       8.63  (min 4.5)  status text
---notimpl-foreground   on --background 10.43  (min 4.5)  status text
---notimpl-foreground   on --card        9.72  (min 4.5)  status text
---notimpl-foreground   on --muted       8.49  (min 4.5)  status text
---failed-foreground    on --background  7.81  (min 4.5)  status text
---failed-foreground    on --card        7.28  (min 4.5)  status text
---failed-foreground    on --muted       6.36  (min 4.5)  status text
---brand-foreground     on --brand      12.95  (min 4.5)  text on the brand yellow
---destructive-foreground on --destructive  5.77  (min 4.5)  text on a destructive button
---ring                 on --background 13.37  (min 3.0)  focus ring
---ring                 on --card       12.46  (min 3.0)  focus ring
---input                on --background  3.90  (min 3.0)  a control's edge
---input                on --card        3.64  (min 3.0)  a control's edge
---ok                   on --background  8.06  (min 3.0)  status dot or bar
---ok                   on --card        7.51  (min 3.0)  status dot or bar
---bad                  on --background  5.95  (min 3.0)  status dot or bar
---bad                  on --card        5.55  (min 3.0)  status dot or bar
---warn                 on --background  8.74  (min 3.0)  status dot or bar
---warn                 on --card        8.14  (min 3.0)  status dot or bar
---info                 on --background  6.90  (min 3.0)  status dot or bar
---info                 on --card        6.43  (min 3.0)  status dot or bar
---refused              on --background  7.17  (min 3.0)  status dot or bar
---refused              on --card        6.68  (min 3.0)  status dot or bar
---denied               on --background  8.74  (min 3.0)  status dot or bar
---denied               on --card        8.14  (min 3.0)  status dot or bar
---notimpl              on --background  6.90  (min 3.0)  status dot or bar
---notimpl              on --card        6.43  (min 3.0)  status dot or bar
---failed               on --background  5.95  (min 3.0)  status dot or bar
---failed               on --card        5.55  (min 3.0)  status dot or bar
+--ink                  on --bg         15.46  (min 4.5)  text
+--mut                  on --bg          7.86  (min 4.5)  secondary text
+--ink                  on --card       14.21  (min 4.5)  text
+--mut                  on --card        7.22  (min 4.5)  secondary text
+--ink                  on --well       14.81  (min 4.5)  text
+--mut                  on --well        7.52  (min 4.5)  secondary text
+--ink                  on --sel        11.98  (min 4.5)  text
+--mut                  on --sel         6.09  (min 4.5)  secondary text
+--ok                   on --bg          9.16  (min 4.5)  status text
+--ok                   on --card        8.42  (min 4.5)  status text
+--ok                   on --well        8.77  (min 4.5)  status text
+--ok                   on --sel         7.10  (min 4.5)  status text
+--ok                   on --okbg        6.99  (min 4.5)  status text on its own tint
+--warn                 on --bg          9.35  (min 4.5)  status text
+--warn                 on --card        8.60  (min 4.5)  status text
+--warn                 on --well        8.96  (min 4.5)  status text
+--warn                 on --sel         7.25  (min 4.5)  status text
+--warn                 on --warnbg      7.20  (min 4.5)  status text on its own tint
+--bad                  on --bg          8.15  (min 4.5)  status text
+--bad                  on --card        7.49  (min 4.5)  status text
+--bad                  on --well        7.80  (min 4.5)  status text
+--bad                  on --sel         6.32  (min 4.5)  status text
+--bad                  on --badbg       6.86  (min 4.5)  status text on its own tint
+--deny                 on --bg          8.73  (min 4.5)  status text
+--deny                 on --card        8.02  (min 4.5)  status text
+--deny                 on --well        8.36  (min 4.5)  status text
+--deny                 on --sel         6.77  (min 4.5)  status text
+--deny                 on --denybg      7.14  (min 4.5)  status text on its own tint
+--card                 on --ink        14.21  (min 4.5)  text on the primary button and the selected segment
+--card                 on --bad         7.49  (min 4.5)  text on a destructive button
+--ink                  on --bg         15.46  (min 3.0)  focus ring and the selection outline
+--ink                  on --card       14.21  (min 3.0)  focus ring and the selection outline
+--ok                   on --bg          9.16  (min 3.0)  status dot or bar
+--ok                   on --card        8.42  (min 3.0)  status dot or bar
+--warn                 on --bg          9.35  (min 3.0)  status dot or bar
+--warn                 on --card        8.60  (min 3.0)  status dot or bar
+--bad                  on --bg          8.15  (min 3.0)  status dot or bar
+--bad                  on --card        7.49  (min 3.0)  status dot or bar
+--deny                 on --bg          8.73  (min 3.0)  status dot or bar
+--deny                 on --card        8.02  (min 3.0)  status dot or bar
+--chip-ink             on --c-tr        4.80  (min 4.5)  letters on a section chip
+--chip-ink             on --c-tc        4.78  (min 4.5)  letters on a section chip
+--chip-ink             on --c-tp        4.65  (min 4.5)  letters on a section chip
+--chip-ink             on --c-gr        4.53  (min 4.5)  letters on a section chip
+--chip-ink             on --c-sc        4.62  (min 4.5)  letters on a section chip
+--chip-ink             on --c-ac        5.10  (min 4.5)  letters on a section chip
+--chip-ink             on --c-cl        5.81  (min 4.5)  letters on a section chip
 # contrast
---foreground           on --background 21.00  (min 4.5)  text
---muted-foreground     on --background 15.13  (min 4.5)  secondary text
---foreground           on --card       21.00  (min 4.5)  text
---muted-foreground     on --card       15.13  (min 4.5)  secondary text
---foreground           on --popover    21.00  (min 4.5)  text
---muted-foreground     on --popover    15.13  (min 4.5)  secondary text
---foreground           on --muted      18.10  (min 4.5)  text
---muted-foreground     on --muted      13.04  (min 4.5)  secondary text
---foreground           on --sidebar    21.00  (min 4.5)  text
---muted-foreground     on --sidebar    15.13  (min 4.5)  secondary text
---foreground           on --accent     16.78  (min 4.5)  text on the selected row
---muted-foreground     on --accent     12.09  (min 4.5)  secondary text on the selected row
---ok-foreground        on --background 10.08  (min 4.5)  status text
---ok-foreground        on --card       10.08  (min 4.5)  status text
---ok-foreground        on --muted       8.69  (min 4.5)  status text
---bad-foreground       on --background 11.45  (min 4.5)  status text
---bad-foreground       on --card       11.45  (min 4.5)  status text
---bad-foreground       on --muted       9.87  (min 4.5)  status text
---warn-foreground      on --background 10.09  (min 4.5)  status text
---warn-foreground      on --card       10.09  (min 4.5)  status text
---warn-foreground      on --muted       8.70  (min 4.5)  status text
---info-foreground      on --background 13.57  (min 4.5)  status text
---info-foreground      on --card       13.57  (min 4.5)  status text
---info-foreground      on --muted      11.69  (min 4.5)  status text
---violet-foreground    on --background 11.85  (min 4.5)  status text
---violet-foreground    on --card       11.85  (min 4.5)  status text
---violet-foreground    on --muted      10.22  (min 4.5)  status text
---refused-foreground   on --background 12.14  (min 4.5)  status text
---refused-foreground   on --card       12.14  (min 4.5)  status text
---refused-foreground   on --muted      10.47  (min 4.5)  status text
---denied-foreground    on --background 10.69  (min 4.5)  status text
---denied-foreground    on --card       10.69  (min 4.5)  status text
---denied-foreground    on --muted       9.21  (min 4.5)  status text
---notimpl-foreground   on --background 13.57  (min 4.5)  status text
---notimpl-foreground   on --card       13.57  (min 4.5)  status text
---notimpl-foreground   on --muted      11.69  (min 4.5)  status text
---failed-foreground    on --background 11.45  (min 4.5)  status text
---failed-foreground    on --card       11.45  (min 4.5)  status text
---failed-foreground    on --muted       9.87  (min 4.5)  status text
---brand-foreground     on --brand      14.88  (min 4.5)  text on the brand yellow
---destructive-foreground on --destructive 10.06  (min 4.5)  text on a destructive button
---ring                 on --background  8.95  (min 3.0)  focus ring
---ring                 on --card        8.95  (min 3.0)  focus ring
---input                on --background 21.00  (min 3.0)  a control's edge
---input                on --card       21.00  (min 3.0)  a control's edge
---ok                   on --background  6.68  (min 3.0)  status dot or bar
---ok                   on --card        6.68  (min 3.0)  status dot or bar
---bad                  on --background  8.38  (min 3.0)  status dot or bar
---bad                  on --card        8.38  (min 3.0)  status dot or bar
---warn                 on --background  5.93  (min 3.0)  status dot or bar
---warn                 on --card        5.93  (min 3.0)  status dot or bar
---info                 on --background 10.04  (min 3.0)  status dot or bar
---info                 on --card       10.04  (min 3.0)  status dot or bar
---refused              on --background  9.33  (min 3.0)  status dot or bar
---refused              on --card        9.33  (min 3.0)  status dot or bar
---denied               on --background  7.48  (min 3.0)  status dot or bar
---denied               on --card        7.48  (min 3.0)  status dot or bar
---notimpl              on --background 10.04  (min 3.0)  status dot or bar
---notimpl              on --card       10.04  (min 3.0)  status dot or bar
---failed               on --background  8.38  (min 3.0)  status dot or bar
---failed               on --card        8.38  (min 3.0)  status dot or bar
+--ink                  on --bg         21.00  (min 4.5)  text
+--mut                  on --bg         14.17  (min 4.5)  secondary text
+--ink                  on --card       21.00  (min 4.5)  text
+--mut                  on --card       14.17  (min 4.5)  secondary text
+--ink                  on --well       19.44  (min 4.5)  text
+--mut                  on --well       13.11  (min 4.5)  secondary text
+--ink                  on --sel        16.48  (min 4.5)  text
+--mut                  on --sel        11.12  (min 4.5)  secondary text
+--ok                   on --bg         16.45  (min 4.5)  status text
+--ok                   on --card       16.45  (min 4.5)  status text
+--ok                   on --well       15.23  (min 4.5)  status text
+--ok                   on --sel        12.92  (min 4.5)  status text
+--ok                   on --okbg       12.74  (min 4.5)  status text on its own tint
+--warn                 on --bg         14.58  (min 4.5)  status text
+--warn                 on --card       14.58  (min 4.5)  status text
+--warn                 on --well       13.49  (min 4.5)  status text
+--warn                 on --sel        11.44  (min 4.5)  status text
+--warn                 on --warnbg     11.13  (min 4.5)  status text on its own tint
+--bad                  on --bg         10.64  (min 4.5)  status text
+--bad                  on --card       10.64  (min 4.5)  status text
+--bad                  on --well        9.85  (min 4.5)  status text
+--bad                  on --sel         8.35  (min 4.5)  status text
+--bad                  on --badbg       9.03  (min 4.5)  status text on its own tint
+--deny                 on --bg         13.11  (min 4.5)  status text
+--deny                 on --card       13.11  (min 4.5)  status text
+--deny                 on --well       12.13  (min 4.5)  status text
+--deny                 on --sel        10.29  (min 4.5)  status text
+--deny                 on --denybg     10.91  (min 4.5)  status text on its own tint
+--card                 on --ink        21.00  (min 4.5)  text on the primary button and the selected segment
+--card                 on --bad        10.64  (min 4.5)  text on a destructive button
+--ink                  on --bg         21.00  (min 3.0)  focus ring and the selection outline
+--ink                  on --card       21.00  (min 3.0)  focus ring and the selection outline
+--ok                   on --bg         16.45  (min 3.0)  status dot or bar
+--ok                   on --card       16.45  (min 3.0)  status dot or bar
+--warn                 on --bg         14.58  (min 3.0)  status dot or bar
+--warn                 on --card       14.58  (min 3.0)  status dot or bar
+--bad                  on --bg         10.64  (min 3.0)  status dot or bar
+--bad                  on --card       10.64  (min 3.0)  status dot or bar
+--deny                 on --bg         13.11  (min 3.0)  status dot or bar
+--deny                 on --card       13.11  (min 3.0)  status dot or bar
+--chip-ink             on --c-tr        4.80  (min 4.5)  letters on a section chip
+--chip-ink             on --c-tc        4.78  (min 4.5)  letters on a section chip
+--chip-ink             on --c-tp        4.65  (min 4.5)  letters on a section chip
+--chip-ink             on --c-gr        4.53  (min 4.5)  letters on a section chip
+--chip-ink             on --c-sc        4.62  (min 4.5)  letters on a section chip
+--chip-ink             on --c-ac        5.10  (min 4.5)  letters on a section chip
+--chip-ink             on --c-cl        5.81  (min 4.5)  letters on a section chip

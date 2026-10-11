@@ -6,7 +6,7 @@ test('the theme choice sticks, and "system" follows the OS', async ({ page }) =>
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await page.locator('#theme-seg [data-mode="light"]').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(243, 243, 240)');
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await page.locator('#theme-seg [data-mode="system"]').click();

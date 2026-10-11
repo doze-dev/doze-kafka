@@ -26,28 +26,33 @@ type contrastPair struct {
 
 func contrastPairs() []contrastPair {
 	var ps []contrastPair
-	surfaces := []string{"--background", "--card", "--popover", "--muted", "--sidebar"}
+	// The board's surfaces: the page (--bg), a card or the bars (--card), a well or
+	// a table's head (--well) and the selected row (--sel).
+	surfaces := []string{"--bg", "--card", "--well", "--sel"}
 	for _, bg := range surfaces {
-		ps = append(ps, contrastPair{"--foreground", bg, 4.5, "text"}, contrastPair{"--muted-foreground", bg, 4.5, "secondary text"})
+		ps = append(ps, contrastPair{"--ink", bg, 4.5, "text"}, contrastPair{"--mut", bg, 4.5, "secondary text"})
 	}
-	ps = append(ps, contrastPair{"--foreground", "--accent", 4.5, "text on the selected row"}, contrastPair{"--muted-foreground", "--accent", 4.5, "secondary text on the selected row"})
-	for _, tok := range []string{"--ok-foreground", "--bad-foreground", "--warn-foreground", "--info-foreground", "--violet-foreground",
-		"--refused-foreground", "--denied-foreground", "--notimpl-foreground", "--failed-foreground"} {
-		for _, bg := range []string{"--background", "--card", "--muted"} {
+	// Status words and numbers, on the surfaces and on their own tints (a row, a
+	// callout or a pill drawn in that status).
+	for _, tok := range []string{"--ok", "--warn", "--bad", "--deny"} {
+		for _, bg := range surfaces {
 			ps = append(ps, contrastPair{tok, bg, 4.5, "status text"})
 		}
+		ps = append(ps, contrastPair{tok, tok + "bg", 4.5, "status text on its own tint"})
 	}
 	ps = append(ps,
-		contrastPair{"--brand-foreground", "--brand", 4.5, "text on the brand yellow"},
-		contrastPair{"--destructive-foreground", "--destructive", 4.5, "text on a destructive button"},
+		contrastPair{"--card", "--ink", 4.5, "text on the primary button and the selected segment"},
+		contrastPair{"--card", "--bad", 4.5, "text on a destructive button"},
 		// Not text: held to 3:1.
-		contrastPair{"--ring", "--background", 3, "focus ring"},
-		contrastPair{"--ring", "--card", 3, "focus ring"},
-		contrastPair{"--input", "--background", 3, "a control's edge"},
-		contrastPair{"--input", "--card", 3, "a control's edge"},
+		contrastPair{"--ink", "--bg", 3, "focus ring and the selection outline"},
+		contrastPair{"--ink", "--card", 3, "focus ring and the selection outline"},
 	)
-	for _, tok := range []string{"--ok", "--bad", "--warn", "--info", "--refused", "--denied", "--notimpl", "--failed"} {
-		ps = append(ps, contrastPair{tok, "--background", 3, "status dot or bar"}, contrastPair{tok, "--card", 3, "status dot or bar"})
+	for _, tok := range []string{"--ok", "--warn", "--bad", "--deny"} {
+		ps = append(ps, contrastPair{tok, "--bg", 3, "status dot or bar"}, contrastPair{tok, "--card", 3, "status dot or bar"})
+	}
+	// The section chips: white letters on the section's colour.
+	for _, tok := range []string{"--c-tr", "--c-tc", "--c-tp", "--c-gr", "--c-sc", "--c-ac", "--c-cl"} {
+		ps = append(ps, contrastPair{"--chip-ink", tok, 4.5, "letters on a section chip"})
 	}
 	return ps
 }
@@ -131,7 +136,9 @@ func TestEveryTextAndBackgroundPairHoldsItsContrastInAllThreeThemes(t *testing.T
 		// The high-contrast theme is held to more than the minimum: that is its point.
 		if theme == "contrast" {
 			for _, p := range contrastPairs() {
-				if p.min != 4.5 {
+				// The chips are drawn as the boards draw them in every theme (filled,
+				// white letters), so they hold the minimum, not the 7:1 of the text.
+				if p.min != 4.5 || p.fg == "--chip-ink" {
 					continue
 				}
 				if r, err := ratio(toks[p.fg], toks[p.bg]); err == nil && r < 7 {

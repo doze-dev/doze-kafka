@@ -31,8 +31,8 @@
       </div></div>
       <div class="err form-err" data-err-slot hidden role="alert"></div>
       <div class="det-foot">
-        <a class="btn btn-outline" href="{{.Prefix}}/topics">Cancel</a>
-        <button class="btn primary" type="submit">Create topic</button>
+        <a class="btn" href="{{.Prefix}}/topics">Cancel</a>
+        <button class="btn pri" type="submit">Create topic</button>
       </div>
     </form>
   </div></main>
@@ -51,7 +51,7 @@
         </div>
       </div>
       <div class="idband-acts">
-        <button class="btn btn-outline" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/purge" data-confirm-url="{{confirmURL "topic.purge" "name" .Topic.Name}}" data-confirm-title="{{(index .Confirm "topic.purge").Title}}" data-confirm-verb="{{(index .Confirm "topic.purge").Verb}}" hx-confirm="{{(index .Confirm "topic.purge").Text}}">{{icon "eraser"}} Purge</button>
+        <button class="btn" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/purge" data-confirm-url="{{confirmURL "topic.purge" "name" .Topic.Name}}" data-confirm-title="{{(index .Confirm "topic.purge").Title}}" data-confirm-verb="{{(index .Confirm "topic.purge").Verb}}" hx-confirm="{{(index .Confirm "topic.purge").Text}}">{{icon "eraser"}} Purge</button>
         <button class="btn danger" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/delete" data-confirm-url="{{confirmURL "topic.delete" "name" .Topic.Name}}" data-confirm-title="{{(index .Confirm "topic.delete").Title}}" data-confirm-verb="{{(index .Confirm "topic.delete").Verb}}" hx-confirm="{{(index .Confirm "topic.delete").Text}}">{{icon "trash"}} Delete</button>
       </div>
     </div>
@@ -130,7 +130,7 @@
           <div class="err form-err" data-err-slot hidden role="alert"></div>
           <div class="dock-foot">
             <span class="ackscaption" x-text="acks==='0' ? 'Fire-and-forget — the broker sends no response at all.' : acks==='all' ? 'Fsynced to disk before acknowledging. Slower, durable.' : 'Written to the page cache before acknowledging.'"></span>
-            <button class="btn primary" type="submit">{{icon "send"}} Send message</button>
+            <button class="btn pri" type="submit">{{icon "send"}} Send message</button>
           </div>
         </form>
       </div>
@@ -179,23 +179,23 @@
       <input type="hidden" name="partition" value="{{.Partition}}">
       <input class="input" id="find-q" name="q" type="search" placeholder="Search keys, values, headers" aria-label="Search this topic's records" autocomplete="off" {{if .Search}}value="{{.Search.Query}}"{{end}}>
       <label class="chk" title="Search every partition's newest records, and show them together"><input type="checkbox" id="find-all" name="all" value="1" {{if and .Search .Search.All}}checked{{end}}> all partitions</label>
-      <button type="submit" class="btn btn-outline jump-go">Search</button>
-      {{if .Search}}<a class="btn btn-outline jump-go" href="{{.Search.ClearURL}}">Clear</a>{{end}}
+      <button type="submit" class="btn jump-go">Search</button>
+      {{if .Search}}<a class="btn jump-go" href="{{.Search.ClearURL}}">Clear</a>{{end}}
     </form>
     {{if not .Search}}
     <form class="jump" method="get" action="{{topicURL .Topic.Name}}">
       <input type="hidden" name="partition" value="{{.Partition}}">
       <label for="jump-to">go to offset</label>
       <input class="input mono" id="jump-to" name="jump" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. {{if gt .Latest 0}}{{.Latest}}{{else}}0{{end}}" autocomplete="off">
-      <button type="submit" class="btn btn-outline jump-go">Go</button>
+      <button type="submit" class="btn jump-go">Go</button>
     </form>
     <form class="jump" method="get" action="{{topicURL .Topic.Name}}">
       <input type="hidden" name="partition" value="{{.Partition}}">
       <label for="jump-at">go to time</label>
       <input class="input mono" id="jump-at" name="at" placeholder="15m, 2h, or 2026-10-07 10:30 (UTC)" autocomplete="off">
-      <button type="submit" class="btn btn-outline jump-go">Go</button>
+      <button type="submit" class="btn jump-go">Go</button>
     </form>
-    {{if or .HasTxn .CommittedOnly}}<a class="btn btn-outline jump-go txntoggle" href="{{topicURL .Topic.Name}}?partition={{.Partition}}{{if not .CommittedOnly}}&committed=1{{end}}" aria-pressed="{{.CommittedOnly}}" title="Hide records of transactions that aborted or have not ended, and the markers, as a read-committed consumer would see this partition">{{if .CommittedOnly}}Showing committed only · show all{{else}}Committed only{{end}}</a>{{end}}
+    {{if or .HasTxn .CommittedOnly}}<a class="btn jump-go txntoggle" href="{{topicURL .Topic.Name}}?partition={{.Partition}}{{if not .CommittedOnly}}&committed=1{{end}}" aria-pressed="{{.CommittedOnly}}" title="Hide records of transactions that aborted or have not ended, and the markers, as a read-committed consumer would see this partition">{{if .CommittedOnly}}Showing committed only · show all{{else}}Committed only{{end}}</a>{{end}}
     {{end}}
   </div>
   {{if .Search}}<div class="jumpnote" role="status">{{icon "info"}} <span>{{.Search.Note}}{{if .Search.OlderURL}} <a class="pagelink" href="{{.Search.OlderURL}}">Search older records</a>{{end}}</span></div>{{end}}
@@ -250,7 +250,7 @@
     {{else}}{{template "kvcopy" .Key.Text}}{{end}}
     {{if and (not .Key.Null) (not .Key.Empty)}}<span class="sz">{{.Key.SizeText}}</span>{{end}}</span></div>
 
-  {{with .Trace}}<div class="meta-row"><span class="k">Trace</span><span class="v"><a class="btn btn-outline" id="inspector-trace" href="{{$.TraceURL}}">{{icon "activity"}} Follow this message</a> <span class="sz mono" title="{{.Kind}}">{{.ID}}</span></span></div>{{end}}
+  {{with .Trace}}<div class="meta-row"><span class="k">Trace</span><span class="v"><a class="btn" id="inspector-trace" href="{{$.TraceURL}}">{{icon "activity"}} Follow this message</a> <span class="sz mono" title="{{.Kind}}">{{.ID}}</span></span></div>{{end}}
   <div class="sec-title flush">Headers{{if .Headers}} · {{len .Headers}}{{end}}</div>
   {{if .Headers}}<div class="hdrlist">{{range .Headers}}<div class="hdrpair"><span class="hk">{{.Key}}</span><span class="dim">=</span><span class="hv">{{if .V.Null}}<span class="dim">null</span>{{else if .V.Empty}}<span class="dim">""</span>{{else if .V.Binary}}{{.V.Preview}}{{else}}{{.V.Text}}{{end}}</span></div>{{end}}</div>
   {{else}}<div class="note">No headers on this record.</div>{{end}}
@@ -274,17 +274,17 @@
     <div class="valuebox hexbox" x-show="f==='hex'" {{if not .Value.Binary}}style="display:none"{{end}}>{{.Value.Hex}}</div>
     {{if .Value.B64}}<div class="valuebox" x-show="f==='b64'" style="display:none">{{.Value.B64}}</div>{{end}}
     {{if .Value.Truncated}}<div class="honest note-gap">{{icon "info"}}<div>Showing the start of a {{.Value.SizeText}} value. Download it for the rest.</div></div>{{else if .Value.HexCut}}<div class="honest note-gap" x-show="f==='hex'" style="display:none">{{icon "info"}}<div>The hex view shows the first 16 KB of {{.Value.SizeText}}.</div></div>{{end}}
-    <div class="inspector-dl"><a class="btn btn-outline" href="{{topicURL .Topic}}/message/raw?partition={{.Partition}}&offset={{.Msg.Offset}}&field=value" download>Download value</a></div>
+    <div class="inspector-dl"><a class="btn" href="{{topicURL .Topic}}/message/raw?partition={{.Partition}}&offset={{.Msg.Offset}}&field=value" download>Download value</a></div>
     {{end}}
   </div>
 
   <div class="inspector-acts">
-    <button type="button" class="btn btn-outline" data-close-inspector-on-success
+    <button type="button" class="btn" data-close-inspector-on-success
       hx-post="{{topicURL .Topic}}/resend" hx-vals='{"partition":"{{.Partition}}","offset":"{{.Msg.Offset}}"}'
       hx-target="#tape-and-table" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
       title="Produce an exact copy of this record (same key, value and headers, byte for byte) to partition {{.Partition}}">{{icon "send"}} Send again</button>
     {{if .CanEdit}}
-    <button type="button" class="btn btn-outline" id="inspector-edit"
+    <button type="button" class="btn" id="inspector-edit"
       data-key="{{.EditKey}}" data-key-enc="{{.EditKeyEnc}}" data-value="{{.EditValue}}" data-value-enc="{{.EditValueEnc}}"
       data-headers="{{.EditHeaders}}" data-schema="{{.EditSchema}}" data-partition="{{.Partition}}" data-tombstone="{{if .Value.Null}}1{{end}}"
       title="Open the composer with this record's contents, to change and send">Edit a copy…</button>
@@ -330,7 +330,7 @@
     <div class="err form-err" data-err-slot hidden role="alert"></div>
     <div class="cfgfoot">
       <span class="note">Blank follows the broker's setting. Changes apply at once: a shorter retention deletes what now falls outside it.</span>
-      <button type="submit" class="btn primary">Save settings</button>
+      <button type="submit" class="btn pri">Save settings</button>
     </div>
   </form>
   <div class="cfgchips">
@@ -354,7 +354,7 @@
     <div class="err form-err" data-err-slot hidden role="alert"></div>
     <div class="cfgfoot">
       <span class="note">Now {{.Topic.Partitions}}. Consumers pick the new partitions up on their own; records already written stay where they are.</span>
-      <button type="submit" class="btn primary">Add partitions</button>
+      <button type="submit" class="btn pri">Add partitions</button>
     </div>
   </form>
 </details>

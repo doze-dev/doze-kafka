@@ -50,7 +50,7 @@
   <div class="meta-row"><span class="k">Last request</span><span class="v mono">{{when .C.Last "since"}}</span></div>
   <div class="meta-row"><span class="k">Requests</span><span class="v mono">{{.C.Requests}}</span></div>
   <div class="meta-row"><span class="k">Groups</span><span class="v mono">{{range $i, $g := .C.Groups}}{{if $i}}, {{end}}<a href="{{groupURL $g}}">{{$g}}</a>{{else}}<span class="dim">none</span>{{end}}</span></div>
-  <div class="inspector-acts"><a class="btn btn-outline" href="{{prefix}}/traffic?{{.C.Filter}}">Show this client's requests</a></div>
+  <div class="inspector-acts"><a class="btn" href="{{prefix}}/traffic?{{.C.Filter}}">Show this client's requests</a></div>
 </div>
 {{end}}
 
@@ -73,7 +73,7 @@
   <div class="meta-row"><span class="k">Versions</span><span class="v mono">{{range $i, $v := .Versions}}{{if $i}}, {{end}}{{$v}}{{end}}</span></div>
   <div class="meta-row"><span class="k">Schema id</span><span class="v mono">{{.Latest.ID}}</span></div>
   <div class="meta-row"><span class="k">Compatibility</span><span class="v mono">{{.Compat}}{{if not .CompatOwn}} <span class="dim">· the registry's default</span>{{end}}</span></div>
-  <div class="inspector-acts"><a class="btn btn-outline" href="{{.SubjectURL}}">Open the subject</a></div>
+  <div class="inspector-acts"><a class="btn" href="{{.SubjectURL}}">Open the subject</a></div>
 </div>
 {{end}}
 

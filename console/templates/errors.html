@@ -15,12 +15,12 @@
       {{if .Suggestions}}
       <div class="didyoumean">
         <span class="dim">Did you mean</span>
-        {{range .Suggestions}}<a class="btn btn-outline mono" href="{{.URL}}">{{.Name}}</a>{{end}}
+        {{range .Suggestions}}<a class="btn mono" href="{{.URL}}">{{.Name}}</a>{{end}}
       </div>
       {{end}}
       <div class="err-acts">
-        {{if .Back}}<a class="btn btn-outline" href="{{.Back}}">← Back to the list</a>{{end}}
-        {{if .Retry}}<button type="button" class="btn primary" onclick="location.reload()">Try again</button>{{end}}
+        {{if .Back}}<a class="btn" href="{{.Back}}">← Back to the list</a>{{end}}
+        {{if .Retry}}<button type="button" class="btn pri" onclick="location.reload()">Try again</button>{{end}}
       </div>
     </div>
   </div></main>

@@ -36,8 +36,8 @@
       </div></div>
       <div class="err form-err" data-err-slot hidden role="alert"></div>
       <div class="det-foot">
-        <a class="btn btn-outline" href="{{prefix}}/schemas">Cancel</a>
-        <button class="btn primary" type="submit">Register</button>
+        <a class="btn" href="{{prefix}}/schemas">Cancel</a>
+        <button class="btn pri" type="submit">Register</button>
       </div>
     </form>
   </div></main>
@@ -75,7 +75,7 @@
           <button type="button" :class="view==='schema'&&'on'" :aria-pressed="view==='schema'" @click="view='schema'">Schema</button>
         </div>
         <button type="button" class="copy-btn" data-copy="{{.Cur.Schema}}" title="Copy the schema" aria-label="Copy the schema">{{icon "copy"}}</button>
-        {{if gt (len .Versions) 1}}<button class="btn btn-outline sm" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" hx-vals='{"version":"{{.Cur.Version}}"}' data-confirm-url="{{confirmURL "schema.version.delete" "subject" .Subject "version" .Cur.Version}}" data-confirm-title="{{(index .Confirm "schema.version.delete").Title}}" data-confirm-verb="{{(index .Confirm "schema.version.delete").Verb}}" hx-confirm="{{(index .Confirm "schema.version.delete").Text}}">{{icon "trash"}} Delete v{{.Cur.Version}}</button>{{end}}
+        {{if gt (len .Versions) 1}}<button class="btn sm" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" hx-vals='{"version":"{{.Cur.Version}}"}' data-confirm-url="{{confirmURL "schema.version.delete" "subject" .Subject "version" .Cur.Version}}" data-confirm-title="{{(index .Confirm "schema.version.delete").Title}}" data-confirm-verb="{{(index .Confirm "schema.version.delete").Verb}}" hx-confirm="{{(index .Confirm "schema.version.delete").Text}}">{{icon "trash"}} Delete v{{.Cur.Version}}</button>{{end}}
       </div>
       {{if .Prev}}
       <div class="valuebox diff" x-show="view==='changes'" role="region" tabindex="0" aria-label="Changes from version {{.Prev.Version}}">{{if eq .Changed 0}}<span class="dim">No change to the text: only its formatting differs.</span>{{else}}{{range .Diff}}<div class="dl {{.Op}}"><span class="dm" aria-hidden="true">{{if eq .Op "add"}}+{{else if eq .Op "del"}}−{{else}} {{end}}</span><span class="dt">{{.Text}}</span></div>{{end}}{{end}}</div>
@@ -94,7 +94,7 @@
           <option value="default" {{if not .CompatOwn}}selected{{end}}>registry default ({{if .CompatOwn}}…{{else}}{{.Compat}}{{end}})</option>
           {{range .Levels}}<option value="{{.}}" {{if and $.CompatOwn (eq . $.Compat)}}selected{{end}}>{{.}}</option>{{end}}
         </select></label>
-      <button class="btn btn-outline" type="submit" hx-disabled-elt="this">Save</button>
+      <button class="btn" type="submit" hx-disabled-elt="this">Save</button>
       <span class="hint teach">{{teach "registry" .Compat}}</span>
       <span class="hint">New versions are checked against {{if hasPrefix .Compat "BACKWARD"}}what consumers of the older versions read{{else if hasPrefix .Compat "FORWARD"}}what older consumers can still read{{else if hasPrefix .Compat "FULL"}}both directions{{else}}nothing{{end}}{{if and (ne .Compat "NONE") (hasSuffix .Compat "_TRANSITIVE")}}, against every earlier version{{else if ne .Compat "NONE"}}, against the latest version{{end}}.</span>
     </form>
@@ -108,8 +108,8 @@
         <div id="check-result" aria-live="polite"></div>
       </div>
       <div class="det-foot">
-        <button type="button" class="btn btn-outline" hx-post="{{schemaURL .Subject}}/check" hx-include="#newver" hx-target="#check-result" hx-select="unset" hx-swap="innerHTML" hx-disabled-elt="this">Check compatibility</button>
-        <button type="button" class="btn primary" hx-post="{{schemaURL .Subject}}/register" hx-include="#newver" hx-disabled-elt="this">Register</button>
+        <button type="button" class="btn" hx-post="{{schemaURL .Subject}}/check" hx-include="#newver" hx-target="#check-result" hx-select="unset" hx-swap="innerHTML" hx-disabled-elt="this">Check compatibility</button>
+        <button type="button" class="btn pri" hx-post="{{schemaURL .Subject}}/register" hx-include="#newver" hx-disabled-elt="this">Register</button>
       </div>
     </form>
   </div></main>
