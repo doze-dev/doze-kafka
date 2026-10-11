@@ -30,7 +30,7 @@ func TestRecord(t *testing.T) {
 			continue
 		}
 		t.Run(s.Name, func(t *testing.T) {
-			target, err := StartKafkaOn(KafkaImage, s.DiskMiB)
+			target, err := StartKafkaFor(s)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -59,15 +59,15 @@ func TestReplay(t *testing.T) {
 		if *only != "" && s.Name != *only {
 			continue
 		}
-		if s.DiskMiB > 0 {
-			continue // a volume of its own: see Scenario.DiskMiB.
+		if s.DiskMiB > 0 || s.NoReplay != "" {
+			continue // a volume of its own (Scenario.DiskMiB), or evidence only (Scenario.NoReplay).
 		}
 		t.Run(s.Name, func(t *testing.T) {
 			rec, err := Load(recordingsDir, s.Name)
 			if err != nil {
 				t.Fatalf("no recording: %v (go tool task conformance:record)", err)
 			}
-			target, err := StartDoze(t.TempDir())
+			target, err := StartDozeFor(t.TempDir(), s)
 			if err != nil {
 				t.Fatal(err)
 			}

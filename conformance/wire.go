@@ -179,3 +179,27 @@ func skipTagged(b []byte) ([]byte, error) {
 	}
 	return b, nil
 }
+
+// saslPlain logs the connection in with SASL/PLAIN: SaslHandshake v1, then
+// SaslAuthenticate v2 with the authzid, user and password.
+func (w *wire) saslPlain(user, pass string) error {
+	h := kmsg.NewPtrSASLHandshakeRequest()
+	h.Mechanism = "PLAIN"
+	resp, err := w.roundTrip(h, 1)
+	if err != nil {
+		return err
+	}
+	if code := resp.(*kmsg.SASLHandshakeResponse).ErrorCode; code != 0 {
+		return fmt.Errorf("SaslHandshake: error %d", code)
+	}
+	a := kmsg.NewPtrSASLAuthenticateRequest()
+	a.SASLAuthBytes = []byte("\x00" + user + "\x00" + pass)
+	resp, err = w.roundTrip(a, 2)
+	if err != nil {
+		return err
+	}
+	if r := resp.(*kmsg.SASLAuthenticateResponse); r.ErrorCode != 0 {
+		return fmt.Errorf("SaslAuthenticate: error %d", r.ErrorCode)
+	}
+	return nil
+}
