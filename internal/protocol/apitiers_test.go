@@ -49,8 +49,8 @@ var apiNotes = map[kmsg.Key]struct{ tier, note string }{
 	kmsg.SASLAuthenticate:          {"F", "Only when SASL is configured."},
 	kmsg.ConsumerGroupHeartbeat:    {"F", "Kafka 4 profile only."},
 	kmsg.ConsumerGroupDescribe:     {"F", "Kafka 4 profile only."},
-	kmsg.GetTelemetrySubscriptions: {"F", "Kafka 4 profile only; off with `--client-telemetry=false`."},
-	kmsg.PushTelemetry:             {"F", "Kafka 4 profile only; off with `--client-telemetry=false`."},
+	kmsg.GetTelemetrySubscriptions: {"F", "Kafka 4 profile only; offered with the console on and not `--client-telemetry=false`. Answers a fixed subscription (every `org.apache.kafka.` metric, every 5 s, cumulative: C, there is no `CLIENT_METRICS` resource); `INVALID_REQUEST` when one connection already holds 8 instances."},
+	kmsg.PushTelemetry:             {"F", "Kafka 4 profile only; same condition. Codes: `INVALID_REQUEST` (no instance id, an undecodable or cut-off payload, another principal's instance), `UNKNOWN_SUBSCRIPTION_ID`, `UNSUPPORTED_COMPRESSION_TYPE`, `TELEMETRY_TOO_LARGE`. A push faster than the interval allows is answered 0 and counted, not read."},
 
 	kmsg.LeaderAndISR:                 {"S", reasonPeer},
 	kmsg.StopReplica:                  {"S", reasonPeer},
