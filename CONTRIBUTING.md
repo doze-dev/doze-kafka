@@ -68,7 +68,9 @@ first and watch it fail.
   surface changed without a `CHANGELOG.md` line containing "server API"
   (`task api:record` writes the new surface).
 - The console in a real browser is checked by the Playwright suite in `e2e/`
-  (`go tool task test:e2e`; needs `bun`). It builds the binary, boots it on its own
+  (`go tool task test:e2e`; needs `bun` and `node`, both pinned in `.prototools`:
+  `proto use` installs them, and a clean checkout fails with "Failed to detect an
+  applicable version" without the pin). It builds the binary, boots it on its own
   ports over a fresh data directory, and seeds it (`e2e/seed`). It runs in CI as its
   own workflow, not in `task check`. A console change that the Go tests cannot see
   (focus, the keyboard, live updates, layout) gets a spec there.
