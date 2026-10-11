@@ -6,9 +6,9 @@ import { test, expect } from '../fixtures/console';
 
 test('the rail lists Traffic, and the page shows what the seed asked, who asked it and how it went', async ({ page }) => {
   await page.goto('topics');
-  await page.locator('.rail .ri', { hasText: 'Traffic' }).click();
+  await page.locator('.rail a.nav', { hasText: 'Traffic' }).click();
   await expect(page).toHaveURL(/\/traffic$/);
-  await expect(page.locator('.rail .ri.on')).toHaveText(/Traffic/);
+  await expect(page.locator('.rail a.nav.on')).toHaveText(/Traffic/);
   const table = page.locator('#traffic-table');
   const produce = table.locator('tbody tr', { hasText: 'Produce' }).filter({ hasText: 'seed-orders' }).first();
   await expect(produce).toContainText('doze-seed');

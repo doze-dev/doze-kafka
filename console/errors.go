@@ -105,9 +105,7 @@ func (c *Console) renderError(w http.ResponseWriter, r *http.Request, f Refusal,
 	// swap a 4xx/5xx response unless told to (see the beforeSwap handler).
 	w.Header().Set("X-Doze-Page", "error")
 	w.WriteHeader(f.Status)
-	data["Prefix"] = c.prefix
-	data["Endpoint"] = c.be.displayAddr()
-	data["HasRegistry"] = c.reg != nil
+	c.shellData(r, data)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := c.templates().ExecuteTemplate(w, "error_page", data); err != nil {
 		io.WriteString(w, template.HTMLEscapeString(f.Message))

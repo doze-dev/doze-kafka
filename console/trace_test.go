@@ -303,7 +303,6 @@ func TestTraceSaysWhenItRanOutOfTime(t *testing.T) {
 func TestTracePageRefusesWhatItCannotUse(t *testing.T) {
 	c := newTestConsole(t)
 	for _, path := range []string{
-		"/_console/trace",                        // no id.
 		"/_console/trace?id=" + traceA + "&at=x", // not a time.
 		"/_console/trace?id=" + traceA + "&window=2d",
 		"/_console/trace?id=" + traceA + "&topic=orders&partition=a&offset=1",

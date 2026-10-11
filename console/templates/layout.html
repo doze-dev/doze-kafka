@@ -25,7 +25,6 @@
      defines each theme once) and the rail's width. */}}
 <script>(function(){var d=document.documentElement,g=function(k){try{return localStorage.getItem(k);}catch(e){return null;}};
 var t=g("theme");d.setAttribute("data-theme",t==="light"||t==="dark"||t==="contrast"?t:(matchMedia("(prefers-contrast: more)").matches?"contrast":matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
-var r=g("rail");if(r==="slim"||(r!=="wide"&&matchMedia("(max-width:1180px)").matches))d.setAttribute("data-rail","slim");
 window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").replace(/^\/+|\/+$/g,"").split("/");var v=(p[0]===""||((p[0]==="topics"||p[0]==="groups")&&!p[1]))?"list":"detail";d.setAttribute("data-view",v);};window.dozeView();})();</script>
 <script>document.addEventListener("alpine:init",function(){window.Alpine.store("filter",{
   q:"",
@@ -42,7 +41,7 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
 </head>
 <body>
 <div class="reqbar" id="reqbar" hidden role="progressbar" aria-label="Working"></div>
-<div class="app">
+<div class="app" data-home="{{.Home}}">
   <header class="topbar">
     <a class="brand" href="{{.Prefix}}/"><span class="logo" aria-hidden="true">z</span><span>doze-kafka</span>{{if .Workspace}}<span class="sub" id="workspace-label">{{.Workspace}}</span>{{end}}</a>
     <button type="button" class="tb-palette" id="palette-open" aria-haspopup="dialog"><span class="grow">Jump to a topic, group or subject, or do something…</span><span class="kbd">⌘K</span></button>
@@ -63,20 +62,18 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
     <nav class="rail" aria-label="Sections" hx-boost="true" hx-target="#workspace" hx-select="#workspace" hx-swap="outerHTML">
       {{/* Three groups, as the design draws them: what is happening (Observe), what is
            stored (Data) and the broker itself. A group with nothing in it is not drawn. */}}
-      {{if .HasTraffic}}
-      <div class="rgroup">Observe</div>
-      {{template "ri" dict "P" .Prefix "URL" "/traffic" "On" (eq .Page "traffic") "Name" "Traffic" "Glyph" "activity"}}
-      {{end}}
-      <div class="rgroup">Data</div>
-      {{template "ri" dict "P" .Prefix "URL" "/topics" "On" (hasPrefix .Page "topics") "Name" "Topics" "Glyph" "layers" "Ct" "topics"}}
-      {{template "ri" dict "P" .Prefix "URL" "/groups" "On" (hasPrefix .Page "groups") "Name" "Consumer groups" "Glyph" "users" "Ct" "groups"}}
-      {{if .HasRegistry}}{{template "ri" dict "P" .Prefix "URL" "/schemas" "On" (hasPrefix .Page "schemas") "Name" "Schemas" "Glyph" "braces" "Ct" "schemas"}}{{end}}
-      <div class="rgroup">Broker</div>
-      {{template "ri" dict "P" .Prefix "URL" "/access" "On" (eq .Page "access") "Name" "Access" "Glyph" "key"}}
-      {{template "ri" dict "P" .Prefix "URL" "/cluster" "On" (eq .Page "cluster") "Name" "Cluster" "Glyph" "server"}}
-      <button type="button" class="rail-toggle" id="rail-toggle" title="Collapse / expand ([)">
-        <span class="rt-ic">{{icon "chevron"}}</span><span class="ri-nm">Collapse</span>
-      </button>
+      <span class="cap first">Observe</span>
+      {{if .HasTraffic}}{{template "ri" dict "P" .Prefix "URL" "/traffic" "On" (eq .Page "traffic") "Name" "Traffic" "Chip" "TR" "C" "tr" "Ct" "traffic" "N" (index .Counts "traffic") "Unit" " open"}}{{end}}
+      {{template "ri" dict "P" .Prefix "URL" "/trace" "On" (eq .Page "trace") "Name" "Trace" "Chip" "TC" "C" "tc"}}
+      <span class="cap">Data</span>
+      {{template "ri" dict "P" .Prefix "URL" "/topics" "On" (hasPrefix .Page "topics") "Name" "Topics" "Chip" "TP" "C" "tp" "Ct" "topics" "N" (index .Counts "topics")}}
+      {{template "ri" dict "P" .Prefix "URL" "/groups" "On" (hasPrefix .Page "groups") "Name" "Groups" "Chip" "GR" "C" "gr" "Ct" "groups" "N" (index .Counts "groups")}}
+      {{if .HasRegistry}}{{template "ri" dict "P" .Prefix "URL" "/schemas" "On" (hasPrefix .Page "schemas") "Name" "Schemas" "Chip" "SC" "C" "sc" "Ct" "schemas" "N" (index .Counts "schemas")}}{{end}}
+      <span class="cap">Broker</span>
+      {{template "ri" dict "P" .Prefix "URL" "/access" "On" (eq .Page "access") "Name" "Access" "Chip" "AC" "C" "ac"}}
+      {{template "ri" dict "P" .Prefix "URL" "/cluster" "On" (eq .Page "cluster") "Name" "Cluster" "Chip" "CL" "C" "cl"}}
+      <div class="grow"></div>
+      {{template "ri" dict "P" .Prefix "URL" "/connect" "On" (eq .Page "connect") "Name" "Connect an app" "Chip" "⇢" "C" "mut"}}
     </nav>
 
     {{/* NOTE: hx-target/hx-select here are INHERITED by every htmx actuator
@@ -150,14 +147,10 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
 </html>
 {{end}}
 
-{{/* ri = one rail item. Ct, if set, gets a live count via shell.js's refreshCounts. */}}
+{{/* ri = one rail item: the section's chip, its name and, where it has one, the
+     number the boards put beside it. A count with a Ct is kept live by shell.js. */}}
 {{define "ri"}}
-<a href="{{.P}}{{.URL}}" class="ri {{if .On}}on{{end}}"{{if .On}} aria-current="page"{{end}}>
-  <span class="ri-ic">{{icon .Glyph}}</span>
-  <span class="ri-nm">{{.Name}}</span>
-  {{if .Ct}}<span class="ri-ct" data-ct="{{.Ct}}"></span>{{end}}
-  <span class="ri-fly" aria-hidden="true">{{.Name}}</span>
-</a>
+<a href="{{.P}}{{.URL}}" class="nav{{if .On}} on{{end}}"{{if .On}} aria-current="page"{{end}} title="{{.Name}}"><span class="sv c-{{.C}}" aria-hidden="true">{{.Chip}}</span><span class="nm">{{.Name}}</span>{{if .Ct}}<span class="n" data-ct="{{.Ct}}"{{if .Unit}} data-ct-unit="{{.Unit}}"{{end}}>{{if .N}}{{.N}}{{.Unit}}{{end}}</span>{{end}}</a>
 {{end}}
 
 {{define "copychip"}}<span class="copychip">{{if .Label}}<span class="cc-label">{{.Label}}</span>{{end}}<span class="cc-val" title="{{.Value}}">{{.Value}}</span><button type="button" class="copy-btn" data-copy="{{.Value}}" title="Copy" aria-label="Copy {{if .Label}}{{.Label}}{{else}}value{{end}}">{{icon "copy"}}</button></span>{{end}}

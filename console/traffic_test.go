@@ -87,7 +87,7 @@ func TestTrafficPageShowsRequestsAndClients(t *testing.T) {
 		}
 	}
 	// The rail offers it and marks it current.
-	if !strings.Contains(body, `href="/_console/traffic" class="ri on"`) {
+	if !strings.Contains(body, `href="/_console/traffic" class="nav on"`) {
 		t.Error("the rail does not mark Traffic as the current section")
 	}
 }

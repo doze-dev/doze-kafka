@@ -67,6 +67,7 @@ const (
 	specAccess   = "access.spec.ts"
 	specShell    = "shell.spec.ts"
 	specSmoke    = "smoke.spec.ts"
+	specDesign   = "design.spec.ts"
 )
 
 // routeTable lists every route, in the order they are registered.
@@ -84,14 +85,14 @@ func (c *Console) routeTable() []routeRow {
 		http.Redirect(w, r, c.prefix, http.StatusFound)
 	})
 	redirect.atHostRoot, redirect.underPrefixOnly = true, true
-	home := get("/", specTopics, "Topics is the home surface; a mistyped address under the prefix is a 404", func(w http.ResponseWriter, r *http.Request) {
+	home := get("/", specDesign, "Traffic is the home surface (the first-run page on a broker with nothing in it; Topics where no traffic is recorded); a mistyped address under the prefix is a 404", func(w http.ResponseWriter, r *http.Request) {
 		if strings.TrimSuffix(r.URL.Path, "/") != strings.TrimSuffix(c.prefix, "/") {
 			c.fail(w, r, fmt.Errorf("%w: there is no page at %s", errNotFound, r.URL.Path))
 			return
 		}
-		c.topics(w, r)
+		c.home(w, r)
 	})
-	bare := get("", specTopics, "the prefix without its slash", c.topics)
+	bare := get("", specDesign, "the prefix without its slash", c.home)
 	bare.underPrefixOnly = true
 
 	return []routeRow{
@@ -142,6 +143,9 @@ func (c *Console) routeTable() []routeRow {
 		post("/groups/{id}/offset", specGroups, "one partition's committed offset", c.groupOffsetSet),
 		post("/groups/{id}/offset/delete", specGroups, "remove one committed offset", c.groupOffsetDelete),
 		post("/groups/{id}/delete", specGroups, "delete the group", c.groupDelete),
+
+		// Connect an app: the settings a client needs, from how the broker is running.
+		get("/connect", specDesign, "the settings for a client, filled in", c.connectPage),
 
 		// Cluster and access.
 		get("/cluster", specShell, "the cluster page", c.cluster),

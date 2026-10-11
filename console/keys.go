@@ -37,7 +37,6 @@ var keyMap = []keyBinding{
 	{"Mod+k", "⌘K", "palette", "Search or jump to a topic, group, subject or action", ScopeAnywhere},
 	{"?", "?", "help", "Show this list of keys", ScopeAnywhere},
 	{"/", "/", "filter", "Filter the list (or open the palette when there is none)", ScopeAnywhere},
-	{"[", "[", "rail", "Collapse or expand the rail", ScopeAnywhere},
 	{"j", "j", "next", "Move down the list", ScopeLists},
 	{"k", "k", "prev", "Move up the list", ScopeLists},
 	{"Enter", "Enter", "open", "Open the row under the cursor", ScopeLists},
@@ -90,7 +89,6 @@ var clientActions = []clientAction{
 	{"theme:dark", "Use the dark theme"},
 	{"theme:contrast", "Use the high-contrast theme"},
 	{"theme:system", "Match the system theme"},
-	{"rail", "Collapse or expand the rail"},
 	{"pause", "Pause or resume live updates"},
 	{"help", "Show the keyboard shortcuts"},
 }

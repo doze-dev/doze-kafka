@@ -55,45 +55,62 @@
     });
   });
 
-  // ---------- collapsible rail ----------
-  function railSlim() { return root.getAttribute("data-rail") === "slim"; }
-  // The rail folds to icons on narrow windows unless you have chosen "wide".
-  var narrowMQ = window.matchMedia ? window.matchMedia("(max-width:1180px)") : null;
-  function applyRailAuto() {
-    var pref = stored("rail");
-    var slim = pref === "slim" || (pref !== "wide" && !!narrowMQ && narrowMQ.matches);
-    if (slim) root.setAttribute("data-rail", "slim"); else root.removeAttribute("data-rail");
-  }
-  if (narrowMQ && narrowMQ.addEventListener) narrowMQ.addEventListener("change", applyRailAuto);
-  function setRail(slim) {
-    if (slim) root.setAttribute("data-rail", "slim"); else root.removeAttribute("data-rail");
-    store("rail", slim ? "slim" : "wide");
-  }
-  var railToggle = document.getElementById("rail-toggle");
-  if (railToggle) railToggle.addEventListener("click", function () { setRail(!railSlim()); });
-  // Flyout labels in slim mode: positioned on hover so the rail's own overflow
-  // can never clip them.
-  document.addEventListener("mouseover", function (e) {
-    if (!railSlim()) return;
-    var ri = e.target.closest(".rail .ri");
-    var fly = ri && ri.querySelector(".ri-fly");
-    if (!fly) return;
-    var r = ri.getBoundingClientRect();
-    fly.style.left = (r.right + 8) + "px";
-    fly.style.top = (r.top + r.height / 2) + "px";
-  });
-  // The counts beside Topics and Consumer groups, refreshed gently.
+  // ---------- the rail's numbers ----------
+  // The counts beside Traffic, Topics, Groups and Schemas, refreshed gently. The
+  // server draws them with the page; this keeps them current. An item that has no
+  // number (the broker did not answer) keeps whatever it was showing.
   function refreshCounts() {
     if (document.hidden) return;
     fetch(PREFIX + "/api/counts").then(function (r) { return r.json(); }).then(function (counts) {
       document.querySelectorAll(".rail [data-ct]").forEach(function (el) {
         var n = counts[el.getAttribute("data-ct")];
-        el.textContent = n == null ? "" : String(n);
+        if (n == null) return;
+        el.textContent = String(n) + (el.getAttribute("data-ct-unit") || "");
       });
     }).catch(function () {});
   }
   refreshCounts();
   setInterval(refreshCounts, 5000);
+
+  // ---------- the traces you opened ----------
+  // Kept in this tab only (sessionStorage): the ids of the traces followed, newest
+  // first, with how many messages each had once its scan finished. The Trace page
+  // lists them (Tc-Home's list).
+  function traceRecents() {
+    try { return JSON.parse(sessionStorage.getItem("traces") || "[]") || []; } catch (e) { return []; }
+  }
+  function rememberTrace() {
+    var page = document.querySelector("[data-trace-id]");
+    if (!page) return;
+    var id = page.getAttribute("data-trace-id"), live = document.getElementById("trace-live");
+    var hits = live && live.hasAttribute("data-hits") ? live.getAttribute("data-hits") : null;
+    try {
+      var all = traceRecents(), prev = all.filter(function (x) { return x.id === id; })[0];
+      all = all.filter(function (x) { return x.id !== id; });
+      all.unshift({ id: id, n: hits != null ? hits : (prev ? prev.n : null) });
+      sessionStorage.setItem("traces", JSON.stringify(all.slice(0, 12)));
+    } catch (e) {}
+  }
+  function renderTraceRecents() {
+    var box = document.querySelector("[data-trace-recents]");
+    if (!box) return;
+    box.textContent = "";
+    traceRecents().forEach(function (t) {
+      var a = document.createElement("a");
+      a.className = "li";
+      a.href = PREFIX + "/trace?id=" + encodeURIComponent(t.id);
+      var name = document.createElement("span");
+      name.className = "m grow el";
+      name.textContent = t.id.length > 18 ? t.id.slice(0, 8) + "\u2026" + t.id.slice(-7) : t.id;
+      name.title = t.id;
+      a.appendChild(name);
+      if (t.n != null) { var n = document.createElement("span"); n.className = "m mut"; n.textContent = t.n; a.appendChild(n); }
+      box.appendChild(a);
+    });
+  }
+  function traceBookkeeping() { rememberTrace(); renderTraceRecents(); }
+  document.addEventListener("DOMContentLoaded", traceBookkeeping);
+  document.addEventListener("htmx:afterSettle", traceBookkeeping);
 
   // ---------- toasts ----------
   function toast(msg, kind) {
@@ -440,7 +457,6 @@
     closePalette();
     var act = it.a;
     if (act.indexOf("theme:") === 0) applyTheme(act.slice(6));
-    else if (act === "rail") setRail(!railSlim());
     else if (act === "pause") { if (document.querySelector("[data-live-toggle]")) setPaused(!livePaused); }
     else if (act === "help") openHelp();
   }
@@ -484,18 +500,22 @@
   // ---------- rail active state ----------
   // The rail is outside #workspace, so a boosted navigation does not repaint its
   // server-rendered `.on`. Recompute it from the URL after every navigation. The
-  // console's home and the create-topic form belong to Topics.
+  // console's home belongs to whichever section the server says is home (Traffic,
+  // or Topics when the broker records no traffic); a create form belongs to the
+  // section it creates in.
   function sectionFor(path) {
     if (path.indexOf(PREFIX) !== 0) return "";
-    var seg = path.slice(PREFIX.length).replace(/^\/+/, "").split("/")[0];
-    if (seg === "" || seg === "topics" || seg === "new") return "topics";
+    var parts = path.slice(PREFIX.length).replace(/^\/+/, "").split("/");
+    var seg = parts[0];
+    if (seg === "") return (document.querySelector(".app") || {}).getAttribute ? document.querySelector(".app").getAttribute("data-home") || "topics" : "topics";
+    if (seg === "new") return parts[1] === "schema" ? "schemas" : "topics";
     return seg;
   }
   var currentSection = sectionFor(location.pathname), currentPath = location.pathname;
   function afterNavigation() {
     if (window.dozeView) window.dozeView();
     var section = sectionFor(location.pathname);
-    document.querySelectorAll(".rail .ri").forEach(function (a) {
+    document.querySelectorAll(".rail .nav").forEach(function (a) {
       var on = sectionFor(new URL(a.href, location.origin).pathname) === section;
       a.classList.toggle("on", on);
       if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
@@ -616,7 +636,6 @@
       if (document.getElementById("compose-panel")) { e.preventDefault(); setDock(true); focusComposer(); }
     },
     pause: function () { if (document.querySelector("[data-live-toggle]")) setPaused(!livePaused); },
-    rail: function () { setRail(!railSlim()); },
     help: function (e) { e.preventDefault(); openHelp(); },
   };
 

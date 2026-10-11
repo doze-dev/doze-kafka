@@ -121,7 +121,7 @@ func TestEveryFailingHandlerAnswersWithARefusal(t *testing.T) {
 		{"deleting a subject that is not there", "POST", "/_console/schemas/ghost/delete", nil, true, nil, 404, want{"refused", "40401", "registry"}},
 		// Traffic, trace and the inspector.
 		{"a request that is not a number", "GET", "/_console/traffic/request?seq=abc", nil, true, nil, 400, want{"refused", "", "console"}},
-		{"a trace with no id", "GET", "/_console/trace", nil, false, nil, 400, want{"refused", "", "console"}},
+		{"a trace window that does not exist", "GET", "/_console/trace?id=4bf92f3577b34da6a3ce929d0e0e4736&window=2d", nil, false, nil, 400, want{"refused", "", "console"}},
 		{"an inspector kind that does not exist", "GET", "/_console/inspect/nonsense?key=1", nil, true, nil, 404, want{"refused", "", "console"}},
 		// The console's own rules.
 		{"a page that is not there", "GET", "/_console/nonsense", nil, false, nil, 404, want{"refused", "", "console"}},

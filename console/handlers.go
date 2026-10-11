@@ -1,6 +1,7 @@
 package console
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 )
@@ -70,17 +71,27 @@ func (c *Console) apiPalette(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(out)
 }
 
-// apiCounts feeds the rail's live counts.
-func (c *Console) apiCounts(w http.ResponseWriter, r *http.Request) {
+// railCounts are the numbers the rail shows beside its items: how many topics,
+// groups and subjects there are and how many client connections are open. An item
+// whose number could not be read has none (the rail draws nothing, not a zero).
+func (c *Console) railCounts(ctx context.Context) map[string]int {
 	counts := map[string]int{}
-	if topics, groups, err := c.be.Counts(r.Context()); err == nil {
+	if topics, groups, err := c.be.Counts(ctx); err == nil {
 		counts["topics"], counts["groups"] = topics, groups
 	}
 	if c.reg != nil {
-		if names := c.reg.SubjectNames(r.Context()); names != nil {
+		if names := c.reg.SubjectNames(ctx); names != nil {
 			counts["schemas"] = len(names)
 		}
 	}
+	if c.traffic != nil {
+		counts["traffic"] = len(c.traffic.Clients())
+	}
+	return counts
+}
+
+// apiCounts feeds the rail's live counts.
+func (c *Console) apiCounts(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(counts)
+	json.NewEncoder(w).Encode(c.railCounts(r.Context()))
 }

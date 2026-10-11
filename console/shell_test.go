@@ -13,7 +13,7 @@ import (
 // litRailItem returns the label of the rail item the server rendered as active.
 func litRailItem(t *testing.T, body string) string {
 	t.Helper()
-	m := regexp.MustCompile(`(?s)<a href="[^"]*" class="ri on"[^>]*>.*?<span class="ri-nm">([^<]*)</span>`).FindStringSubmatch(body)
+	m := regexp.MustCompile(`(?s)<a href="[^"]*" class="nav on"[^>]*>.*?<span class="nm">([^<]*)</span>`).FindStringSubmatch(body)
 	if m == nil {
 		return ""
 	}
@@ -64,7 +64,7 @@ func TestRailHighlightIsRightOnEveryPage(t *testing.T) {
 		"/_console/topics":    "Topics",
 		"/_console/topics/t":  "Topics",
 		"/_console/new/topic": "Topics",
-		"/_console/groups":    "Consumer groups",
+		"/_console/groups":    "Groups",
 		"/_console/cluster":   "Cluster",
 		"/_console/access":    "Access",
 	} {
@@ -92,7 +92,7 @@ func TestShellMarkupIsLabelled(t *testing.T) {
 	for _, want := range []string{
 		`role="dialog" aria-modal="true" aria-label="Command palette"`,
 		`role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-msg"`,
-		`class="ri on" aria-current="page"`, // the name is the text: the slim rail clips it, it does not remove it.
+		`class="nav on" aria-current="page"`, // the name is the text: the narrow rail clips it, it does not remove it.
 		`<nav class="rail" aria-label="Sections"`,
 		`<main class="detail`,
 		`aria-label="Filter Topics"`,

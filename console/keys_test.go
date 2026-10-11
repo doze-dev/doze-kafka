@@ -116,7 +116,7 @@ func TestThePaletteCatalogueHasActionsAndEveryTheme(t *testing.T) {
 			navs++
 		}
 	}
-	for _, want := range []string{"theme:light", "theme:dark", "theme:contrast", "theme:system", "rail", "pause", "help"} {
+	for _, want := range []string{"theme:light", "theme:dark", "theme:contrast", "theme:system", "pause", "help"} {
 		if !acts[want] {
 			t.Errorf("the palette has no action %q", want)
 		}

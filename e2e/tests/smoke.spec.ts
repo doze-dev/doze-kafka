@@ -10,6 +10,9 @@ test('the console shell renders and the broker is seeded', async ({ page, reques
   await page.goto('');
   await expect(page).toHaveTitle(/doze-kafka/);
   await expect(page.locator('.rail')).toBeVisible();
+  // The console opens on Traffic (Main, "the home page").
+  await expect(page.locator('.rail a.on')).toHaveText(/Traffic/);
+  await page.goto('topics');
   await expect(page.locator('.rail a.on')).toHaveText(/Topics/);
   await expect(page.locator('.listpane .li[data-name="seed-orders"]')).toBeVisible();
   // /healthz sits at the origin, whatever prefix the console is mounted under.

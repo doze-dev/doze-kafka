@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -42,7 +43,7 @@ func (c *Console) traceURL(id string, at time.Time, topic string, partition int3
 // traceParams reads what the page was asked: the id, when, how wide, and which record.
 func (c *Console) traceParams(r *http.Request) (id string, at time.Time, window time.Duration, windowKey string, anchor tpOffset, err error) {
 	q := r.URL.Query()
-	id = strings.TrimSpace(q.Get("id"))
+	id = traceIDFrom(q.Get("id")) // a pasted header value is read as the id it carries.
 	if id == "" || len(id) > 128 {
 		return "", time.Time{}, 0, "", anchor, badInput("a trace id is needed: open a record that carries one and choose Trace")
 	}
@@ -75,6 +76,32 @@ func (c *Console) traceParams(r *http.Request) (id string, at time.Time, window 
 		anchor = tpOffset{tpKey: tpKey{Topic: topic, Partition: int32(p)}, Offset: o, Set: true}
 	}
 	return id, at, window, windowKey, anchor, nil
+}
+
+// traceIDPatterns find a trace id in whatever was pasted: a bare id, a W3C
+// traceparent header value, or a B3 single header.
+var traceIDPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)^\s*[0-9a-f]{2}-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}\s*$`),
+	regexp.MustCompile(`(?i)^\s*([0-9a-f]{16}|[0-9a-f]{32})-[0-9a-f]{16}(?:-[01d](?:-[0-9a-f]{16})?)?\s*$`),
+}
+
+// traceIDFrom reads the trace id out of a pasted value: "00-4bf9…-00f0…-01" is the
+// trace id 4bf9…; anything else is taken as the id as typed.
+func traceIDFrom(raw string) string {
+	for _, re := range traceIDPatterns {
+		if m := re.FindStringSubmatch(raw); m != nil {
+			return strings.ToLower(m[1])
+		}
+	}
+	return strings.TrimSpace(raw)
+}
+
+// traceHome is Tc-Home: a field for a trace id (or a whole header value), the
+// formats it reads and what it can and cannot find. It runs nothing until asked.
+func (c *Console) traceHome(w http.ResponseWriter, r *http.Request) {
+	data := map[string]any{"Page": "trace", "Title": "Trace", "TraceHeader": c.traceHeader,
+		"MaxRecords": groupDigits(int64(traceMaxRecords)), "MaxSeconds": int(traceMaxTime / time.Second)}
+	c.render(w, r, "trace_home", data)
 }
 
 // traceData is the job as the page shows it, taken under its lock.
@@ -114,6 +141,11 @@ func (c *Console) traceData(j *traceJob) map[string]any {
 }
 
 func (c *Console) tracePage(w http.ResponseWriter, r *http.Request) {
+	// No id yet: the page asks for one (Tc-Home) rather than refusing.
+	if strings.TrimSpace(r.URL.Query().Get("id")) == "" {
+		c.traceHome(w, r)
+		return
+	}
 	id, at, window, windowKey, anchor, err := c.traceParams(r)
 	if err != nil {
 		c.fail(w, r, err)
@@ -140,7 +172,7 @@ func (c *Console) tracePage(w http.ResponseWriter, r *http.Request) {
 			opts[i].URL = c.traceURL(id, at, "", 0, 0, traceWindows[i].Key)
 		}
 	}
-	data["Windows"], data["Page"], data["Title"] = opts, "topics", "Trace "+id
+	data["Windows"], data["Page"], data["Title"] = opts, "trace", "Trace "+id
 	c.render(w, r, "trace_detail", data)
 }
 

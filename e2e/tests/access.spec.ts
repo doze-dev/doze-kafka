@@ -4,9 +4,9 @@ import { test, expect } from '../fixtures/console';
 // resource with no ACL is treated.
 test('the Access page says the ACLs are enforced, and is in the rail and the palette', async ({ page, openPalette }) => {
   await page.goto('');
-  await page.locator('.rail .ri', { hasText: 'Access' }).click();
+  await page.locator('.rail a.nav', { hasText: 'Access' }).click();
   await expect(page).toHaveURL(/\/access$/);
-  await expect(page.locator('.rail .ri.on')).toHaveText(/Access/);
+  await expect(page.locator('.rail a.nav.on')).toHaveText(/Access/);
   await expect(page.locator('.honest')).toContainText('These are enforced');
   await expect(page.locator('.honest')).toContainText('open to everyone');
   // The harbour world stores ACLs (seed/harbour.go); their count is asserted in harbour.spec.ts.

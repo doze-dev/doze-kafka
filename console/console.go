@@ -114,6 +114,13 @@ type BrokerFacts struct {
 	DataDir string
 	// SASLMechanisms are the mechanisms the listener serves; empty when it is open.
 	SASLMechanisms []string
+	// RegistryURL is where clients reach the schema registry, which is not always
+	// where the console does (a name the zone routes, against the loopback port).
+	RegistryURL string
+	// AutoCreateTopics says whether a producer that names a topic that does not exist
+	// makes it, with DefaultPartitions partitions.
+	AutoCreateTopics  bool
+	DefaultPartitions int
 }
 
 // New builds a console with a real Kafka client dialed at opts.Addr.
@@ -228,6 +235,9 @@ func (c *Console) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // (a variable only so a test need not wait it out).
 var requestTimeout = 15 * time.Second
 
+// railCountsTimeout bounds the broker calls that draw the rail's numbers.
+const railCountsTimeout = 2 * time.Second
+
 func originMatchesHost(origin, host string) bool {
 	u, err := url.Parse(origin)
 	if err != nil || u.Host == "" {
@@ -249,20 +259,13 @@ func (c *Console) render(w http.ResponseWriter, r *http.Request, page string, da
 	if data == nil {
 		data = map[string]any{}
 	}
-	data["Prefix"] = c.prefix
 	// The handler says which rail section a page belongs to (a topic's detail page
 	// is "topics"); only fall back to the template name when it did not. Overwriting
 	// it made the rail's server-rendered highlight wrong on every detail page.
 	if _, ok := data["Page"]; !ok {
 		data["Page"] = page
 	}
-	data["Endpoint"] = c.be.displayAddr()
-	data["HasRegistry"] = c.reg != nil
-	data["Workspace"] = c.facts.Workspace
-	if m := c.facts.KafkaMajor; m > 0 {
-		data["KafkaCompat"] = fmt.Sprintf("Kafka %d.0 compat", m)
-	}
-	data["HasTraffic"] = c.traffic != nil
+	c.shellData(r, data)
 	if f := r.URL.Query().Get("flash"); f != "" {
 		data["Flash"] = f
 	}
@@ -270,6 +273,31 @@ func (c *Console) render(w http.ResponseWriter, r *http.Request, page string, da
 	if err := c.templates().ExecuteTemplate(w, page, data); err != nil {
 		http.Error(w, err.Error(), 500)
 	}
+}
+
+// shellData adds what every full page needs of the shell around it: the prefix, the
+// broker's address, which sections exist, the rail's numbers and the top bar's
+// labels. An error page is a full page too, and calls this as well.
+func (c *Console) shellData(r *http.Request, data map[string]any) {
+	data["Prefix"] = c.prefix
+	data["Endpoint"] = c.be.displayAddr()
+	data["HasRegistry"] = c.reg != nil
+	// The rail's numbers are drawn with the page, so the first paint has them; the
+	// script keeps them current. Bounded: a broker that is not answering must not hold
+	// every page for a request's whole deadline just to draw a count.
+	cctx, cancel := context.WithTimeout(r.Context(), railCountsTimeout)
+	counts := map[string]string{}
+	for k, n := range c.railCounts(cctx) {
+		counts[k] = strconv.Itoa(n)
+	}
+	cancel()
+	data["Counts"] = counts
+	data["Home"] = c.homeSection()
+	data["Workspace"] = c.facts.Workspace
+	if m := c.facts.KafkaMajor; m > 0 {
+		data["KafkaCompat"] = fmt.Sprintf("Kafka %d.0 compat", m)
+	}
+	data["HasTraffic"] = c.traffic != nil
 }
 
 // partial renders a single named template (for HTMX swaps).

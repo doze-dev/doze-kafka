@@ -1,5 +1,5 @@
 {{define "trace_detail"}}{{template "shell_top" .}}
-  <main class="detail" id="detail"><div class="detail-inner trafficwrap">
+  <main class="detail" id="detail" data-trace-id="{{.Trace}}"><div class="detail-inner trafficwrap">
     <div class="idband">
       <div>
         <h1 class="page-title">Trace</h1>
@@ -25,7 +25,7 @@
 
 {{/* trace_live is the polled unit: progress while the scan runs, the trail when it is done. */}}
 {{define "trace_live"}}
-<div id="trace-live" data-job="{{.JobID}}" data-hash="{{.Hash}}" {{if .Running}}data-live="{{.Prefix}}/trace/live?job={{.JobID}}" data-live-ms="700"{{end}}>
+<div id="trace-live" data-job="{{.JobID}}" data-hash="{{.Hash}}"{{if not .Running}} data-hits="{{len .Hits}}"{{end}} {{if .Running}}data-live="{{.Prefix}}/trace/live?job={{.JobID}}" data-live-ms="700"{{end}}>
   {{if .ScanFailed}}
   {{template "refusal" .}}
   {{else if .Running}}

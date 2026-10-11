@@ -85,6 +85,7 @@ var formFields = map[string]formField{
 	"all":            {Not: "whether a search covers every partition"},
 	"jump":           {Not: "an offset to jump to"},
 	"at":             {Not: "a time to jump to or trace from"},
+	"id":             {Not: "a trace id, or a pasted trace header, to follow"},
 	"group":          {Not: "a filter on the traffic page"},
 	"client":         {Not: "a filter on the traffic page"},
 	"api":            {Not: "a filter on the traffic page"},
