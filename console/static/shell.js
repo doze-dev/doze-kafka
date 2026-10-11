@@ -806,6 +806,13 @@
       var nb = document.querySelector("[data-create]");
       if (nb) nb.click(); else return false;
     },
+    // r: Retry now, on a page whose broker is lost (Traffic, Traf-10); the same button.
+    retry: function () {
+      if (!document.documentElement.hasAttribute("data-connection-lost")) return false;
+      var b = document.querySelector("[data-retry], #pill-retry");
+      if (!b) return false;
+      b.click();
+    },
     // On a topic, p is produce: the composer opens and takes focus.
     produce: function (e) {
       if (!document.getElementById("compose-panel")) return false;
@@ -905,6 +912,20 @@
       else history.replaceState(history.state, "", next);
     } catch (e) {}
   }
+  // markOpenRow draws the row that is open the way the boards do (.on, the --sel fill)
+  // and says so to a screen reader. A row names what it opens in data-open-keys
+  // ("request:<id>", "client:<conn>"); the selection is the address's ?open=, so the
+  // mark survives a poll that replaces the rows and a reload.
+  function markOpenRow() {
+    var open = openParamNow();
+    document.querySelectorAll("[data-open-keys]").forEach(function (el) {
+      var on = open != null && (" " + el.getAttribute("data-open-keys") + " ").indexOf(" " + open + " ") >= 0;
+      el.classList.toggle("on", on);
+      el.setAttribute("aria-selected", on ? "true" : "false");
+    });
+  }
+  document.addEventListener("htmx:afterSettle", markOpenRow);
+  document.addEventListener("htmx:afterSwap", markOpenRow);
   function currentInspector() {
     // The page is swapped under the script; the panel and its body are looked up when
     // they are needed, never held.
@@ -935,6 +956,7 @@
     inspector.classList.remove("busy");
     inspector.removeAttribute("aria-busy");
     if (!keepURL) setOpenParam(null, false);
+    markOpenRow();
     var back = inspectorOpener;
     inspectorOpener = null;
     if (restoreFocus === false || !back) return;
@@ -1005,6 +1027,7 @@
     var region = document.getElementById("tape-and-table");
     var isMessage = title && title.hasAttribute("data-offset");
     if (open && (!isMessage || (region && region.hasAttribute("data-msg-base")))) setOpenParam(open, openParamNow() !== open);
+    markOpenRow();
     var again = inspectorRefocus && t.querySelector('button[aria-label="' + inspectorRefocus + '"]:not([disabled])');
     var btn = again || t.querySelector("[data-inspector-close]");
     if (btn) btn.focus();
@@ -1025,6 +1048,7 @@
   // A link or refresh with ?open= reopens that selection; Back and Forward move
   // between the selections the person made.
   function syncInspectorFromURL() {
+    markOpenRow();
     var open = openParamNow();
     if (open == null) { closeInspector(true, true); return; }
     var url = inspectorFetchURL(open);

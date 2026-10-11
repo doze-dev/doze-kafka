@@ -108,7 +108,7 @@ func (c *Console) railCounts(ctx context.Context) map[string]int {
 		}
 	}
 	if c.traffic != nil {
-		counts["traffic"] = len(c.traffic.Clients())
+		counts["traffic"] = clientCount(c.traffic.Clients())
 	}
 	return counts
 }

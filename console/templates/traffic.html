@@ -93,7 +93,8 @@
 <div id="traffic-live" data-live="{{.Prefix}}/traffic/live{{if .FilterQ}}?{{.FilterQ}}{{end}}" data-hash="{{.Hash}}" data-live-ms="2500"{{if eq .TView "requests"}} data-since="{{.NewestMs}}"{{end}}>
   {{if .OOB}}{{template "traffic_summary" .}}
   <div class="insp-default" id="insp-default" hx-swap-oob="true"{{if .DefaultHidden}} hidden{{end}}>{{template "insp_default" .}}</div>
-  <div class="tablenote" id="traffic-note" hx-swap-oob="true">{{template "traffic_note" .}}</div>{{end}}
+  <div class="tablenote" id="traffic-note" hx-swap-oob="true">{{template "traffic_note" .}}</div>
+  {{template "keys_strip" .}}{{end}}
   {{if eq .TView "clients"}}{{template "traffic_clients_table" .}}
   {{else if .Empty}}{{template "traffic_empty" .}}
   {{else if .HasStory}}{{template "traffic_story" .}}
@@ -118,13 +119,13 @@
 
 {{/* One request row: the board's seven columns. A folded row counts its repeats; a
      refusal is tinted by what kind of no it is. */}}
-{{define "traffic_row"}}{{with .R}}<tr id="rq-{{.OpenKey}}" class="{{.RowClass}}" tabindex="0" data-inspector-open
+{{define "traffic_row"}}{{with .R}}<tr id="rq-{{.OpenKey}}" class="{{.RowClass}}" tabindex="0" data-inspector-open data-open-keys="request:{{.OpenKey}}" aria-selected="false"
           hx-get="{{$.P}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
         <td class="m nw cell-time">{{when .Time "clockms"}}</td>
         <td class="m nw cell-client" title="{{.Remote}}{{if .Software}} · {{.Software}}{{end}}">{{if .ConnKey}}<a href="{{$.P}}/traffic?client={{.Who}}" data-inspector-open hx-get="{{$.P}}/inspect/client?key={{.ConnKey}}" hx-trigger="click consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false">{{.Who}}</a>{{else}}{{.Who}}{{end}}</td>
         <td class="m nw cell-req" title="{{.API}} v{{.Version}}{{if .Correlation}} · correlation {{.Correlation}}{{end}}"><span class="b">{{.API}}</span> <span class="mut">v{{.Version}}</span>{{if .Folded}} <span class="tag tf-count" title="{{.Count}} identical requests, {{.SameSpan}}">×{{.Count}}</span>{{end}}</td>
         <td class="m cell-topic"{{if .Target}} title="{{.Target}}"{{end}}>{{if .Target}}{{.Target}}{{else}}<span class="mut">—</span>{{end}}</td>
-        <td class="mut cell-detail" title="{{.DetailText}}">{{if .Rhythm}}{{.Interval}}, since {{when .First "clock"}}{{else}}{{.DetailText}}{{end}}</td>
+        <td class="mut cell-detail" title="{{if .Rhythm}}{{.Interval}}{{else}}{{.DetailText}}{{end}}">{{if .Rhythm}}{{.Interval}}, since {{when .First "clock"}}{{else if .DetailText}}{{.DetailText}}{{else}}—{{end}}</td>
         <td class="m cell-result"><span class="{{.Tone}}" title="{{.ResultTitle}}">{{.Result}}</span></td>
         <td class="m num nw cell-took">{{.Dur}}</td>
       </tr>{{end}}{{end}}
@@ -133,7 +134,7 @@
      the running configuration's, not a number typed here. */}}
 {{define "traffic_empty"}}
 <div class="card pad col g16 tf-empty" id="traffic-empty" style="max-width: 720px; margin-top: 24px; padding: 22px 24px">
-  <div class="col g4"><span class="h2">Nothing has reached this broker yet</span><span class="note">No app has connected, so there is nothing to show. This is not an error: the broker is up and listening{{if not .Since.IsZero}}, since {{when .Since "clock"}}{{end}}. A restart empties this page: it keeps its last requests in memory only.</span></div>
+  <div class="col g4"><span class="h2">Nothing has reached this broker yet</span><span class="note">No app has connected, so there is nothing to show. This is not an error: <span class="up-only">the broker is up and listening{{if not .Since.IsZero}}, since {{when .Since "clock"}}{{end}}. A restart empties this page: it keeps its last requests in memory only.</span><span class="lost-only">the console cannot reach the broker right now, so it cannot say whether anything has reached it. It tries again every 5 s.</span></span></div>
   <div class="col g6">
     <span class="cap">Point an app at this line</span>
     <pre class="code">bootstrap.servers={{.Facts.Bootstrap}}</pre>
@@ -145,7 +146,7 @@
     <div class="row g8"><span class="num">2</span><div class="col"><span class="b">Produce something</span><span class="note">Create a topic and send one message. A Produce request will appear here.</span></div></div>
     <div class="row g8"><span class="num">3</span><div class="col"><span class="b">Watch it appear</span><span class="note">Each request shows as a row, newest first, with who sent it and how long it took.</span></div></div>
   </div>
-  <div class="row g8"><a class="btn pri" href="{{.Prefix}}/connect">Connect an app<span aria-hidden="true">→</span></a><a class="btn" href="{{.Prefix}}/new/topic">Create a topic</a></div>
+  <div class="row g8"><a class="btn pri" href="{{.Prefix}}/connect" data-create>Connect an app<span aria-hidden="true">→</span></a><a class="btn" href="{{.Prefix}}/new/topic">Create a topic</a></div>
 </div>
 {{end}}
 
@@ -154,11 +155,11 @@
   {{if .Clients}}
   <div class="tbl-wrap">
     <table class="tbl tf-clients" id="clients-table"><thead><tr><th>Client</th><th class="c-sw">Software</th><th class="c-pr">Principal</th><th class="c-ad">Address</th><th class="c-op">Open for</th><th class="c-la">Last request</th><th class="num c-rq">Req/min</th><th class="c-gr">Groups</th><th class="num c-er">Error rate</th></tr></thead>
-      <tbody>{{range .Clients}}<tr id="cl-{{.Conn}}" class="{{if .NeedsALook}}needs-look{{end}}" tabindex="0" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
-        <td class="m b nw">{{.Who}}</td>
+      <tbody>{{range .Clients}}<tr id="cl-{{.Conn}}" class="{{if .NeedsALook}}needs-look{{end}}" tabindex="0" data-inspector-open data-open-keys="{{.Keys}}" aria-selected="false" hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
+        <td class="m b nw">{{.Who}}{{if gt .Conns 1}} <span class="mut" title="{{.Conns}} open connections from this client id">{{.Conns}} connections</span>{{end}}</td>
         <td class="m c-sw">{{if .Software}}{{.Software}}{{else}}<span class="mut">not reported</span>{{end}}</td>
         <td class="m c-pr">{{.Principal}}</td>
-        <td class="m c-ad">{{.Remote}}</td>
+        <td class="m c-ad">{{.Remote}}{{if gt .Conns 1}} <span class="mut">+{{.More}}</span>{{end}}</td>
         <td class="m c-op">{{when .Opened "since"}}</td>
         <td class="m c-la">{{when .Last "clock"}}</td>
         <td class="m num c-rq">{{.Req1m}}</td>
@@ -180,6 +181,7 @@
 <div class="row ce g8 wrap tf-story-head"><span class="m" id="story-count"><span class="b">{{.Story.Requests}}</span> requests{{if .Story.Folded}} ({{.Story.Folded}} folded){{end}}, {{.Story.Rebalances}} rebalance{{if ne .Story.Rebalances 1}}s{{end}}</span><div class="grow"></div><a class="note" href="{{.FlatURL}}">Show them as a plain list</a></div>
 <div class="card tf-story" id="traffic-story" style="--c: 92px 150px 130px 1fr 80px 56px">
   <div class="r h"><span>Time</span><span>Client</span><span>Request</span><span>What happened</span><span>Result</span><span class="ra">Took</span></div>
+  <div class="frozen-line lost-only m">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</div>
   {{range .Story.Blocks}}
   <div class="r on rebalance {{if .Done}}done{{else}}going{{end}}" style="background: var(--warnbg)"><span class="m">{{when .Start "clock"}}</span><span class="b">Rebalance</span><span class="m">{{if .Done}}{{if .From}}{{if $.Story.Epochs}}epoch{{else}}generation{{end}} <span class="b">{{.From}} → {{.To}}</span>{{else}}<span class="b">{{if $.Story.Epochs}}epoch{{else}}generation{{end}} {{.To}}</span>{{end}}{{else}}in progress{{end}}</span><span class="el">{{.Title}}</span><span class="m warn">{{if .Done}}finished{{else}}going{{end}}</span><span class="m ra">{{.Dur}}</span></div>
   {{range .Rows}}{{template "story_row" dict "R" . "P" $.Prefix}}{{end}}
@@ -188,11 +190,11 @@
 </div>
 {{end}}
 
-{{define "story_row"}}{{with .R}}<div class="r {{if not .Nested}}kid{{end}} {{.RowClass}}" id="rq-{{.OpenKey}}" tabindex="0" data-inspector-open data-row hx-get="{{$.P}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
+{{define "story_row"}}{{with .R}}<div class="r {{if not .Nested}}kid{{end}} {{.RowClass}}" id="rq-{{.OpenKey}}" tabindex="0" data-inspector-open data-open-keys="request:{{.OpenKey}}" aria-selected="false" data-row hx-get="{{$.P}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
   <span class="m">{{when .Time "clockms"}}</span>
   <span class="m">{{if .Nested}}<span class="tree" aria-hidden="true">└─</span> {{end}}{{.Who}}</span>
   <span class="m b">{{.API}} <span class="mut">v{{.Version}}</span>{{if .Folded}} <span class="tag">×{{.Count}}</span>{{end}}</span>
-  <span class="mut el" title="{{.DetailText}}">{{.DetailText}}{{if .ViaGroup}}{{if not .DetailText}}fetch by a member{{end}}{{end}}{{if and (not .Nested) .Folded}}{{end}}</span>
+  <span class="mut el" title="{{if .Rhythm}}{{.Interval}}{{else}}{{.DetailText}}{{end}}">{{if .Rhythm}}{{.Interval}}, since {{when .First "clock"}}{{else}}{{.DetailText}}{{if .ViaGroup}}{{if not .DetailText}}fetch by a member{{end}}{{end}}{{end}}</span>
   <span class="m {{.Tone}}" title="{{.ResultTitle}}">{{.Result}}</span>
   <span class="m ra">{{.Dur}}</span>
 </div>{{end}}{{end}}
@@ -201,13 +203,13 @@
      most frequent refusal (Traf-03), who touched a topic (Traf-02) or a group's
      timeline (Traf-12). A row or a client replaces it, and Esc puts it back. */}}
 {{define "traffic_clients"}}
-<div class="hd"><span class="cap">Connected clients</span><span class="h2">{{.ClientCount}} open connection{{if ne .ClientCount 1}}s{{end}}</span></div>
+<div class="hd"><span class="cap">Connected clients</span><span class="h2">{{if eq .ClientCount .ConnCount}}{{.ConnCount}} open connection{{if ne .ConnCount 1}}s{{end}}{{else}}{{.ClientCount}} client{{if ne .ClientCount 1}}s{{end}} · {{.ConnCount}} connections{{end}}</span></div>
 <div class="bd flush" id="clients-list">
   <div class="r h" style="--c: 1fr 70px 56px"><span>Client</span><span>Open for</span><span class="ra">Idle</span></div>
   {{range .Clients}}
-  <div class="insp-client" id="cl-{{.Conn}}" data-row>
+  <div class="insp-client" id="icl-{{.Conn}}" data-row data-open-keys="{{.Keys}}" aria-selected="false">
     <a class="insp-client-open" href="{{.Href}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"><span class="b el">{{.Who}}</span><span class="m mut">{{when .Opened "since"}}</span><span class="m mut ra">{{when .Last "since"}}</span></a>
-    <span class="m mut">{{if .Software}}{{.Software}}{{else}}software not reported{{end}} · {{.Principal}} · {{.Remote}}</span>
+    <span class="m mut">{{if .Software}}{{.Software}}{{else}}software not reported{{end}} · {{.Principal}} · {{.Remote}}{{if gt .Conns 1}} · {{.Conns}} connections{{end}}</span>
     <span class="note{{if .NeedsALook}} bad{{end}}">{{if .NeedsALook}}last {{.Streak}} requests refused{{else if .Doing}}{{.Doing}}{{else}}no requests kept{{end}}</span>
   </div>
   {{else}}

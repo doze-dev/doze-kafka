@@ -444,12 +444,22 @@ func (c *Console) inspectClient(w http.ResponseWriter, r *http.Request, key stri
 		return
 	}
 	v := inspectorView{Kind: KindClient, Key: key, Title: "Client", Body: map[string]any{}}
-	for _, cl := range c.traffic.Clients() {
+	all := c.traffic.Clients()
+	for _, cl := range all {
 		if cl.Conn != conn {
 			continue
 		}
 		now := time.Now()
+		// The page counts clients, not connections: what is shown is the client the
+		// connection belongs to, with each of its connections listed below.
 		cr := c.clientRow(cl, now)
+		for _, g := range c.groupClients(all, now) {
+			for _, mem := range g.Members {
+				if mem.Conn == cl.Conn {
+					cr = g
+				}
+			}
+		}
 		who := cl.ClientID
 		if who == "" { // no client id: the software and the address say which (TRF-31).
 			who = firstNonEmpty(cl.Software, cl.Remote)
@@ -459,14 +469,22 @@ func (c *Console) inspectClient(w http.ResponseWriter, r *http.Request, key stri
 		}
 		v.Title = who
 		v.Sub = joinNonEmpty(" · ", firstNonEmpty(cl.Software, "software not reported"), cl.Principal, cl.Remote)
-		v.Status, v.StatusKind = "connected "+spanText(now.Sub(cl.Opened)), "pill"
+		v.Status, v.StatusKind = "connected "+spanText(now.Sub(cr.Opened)), "pill"
 		body := v.Body
 		body["C"] = cr
+		if cr.Conns > 1 {
+			body["Members"] = cr.Members
+		}
 		body["Reqs"] = c.prefix + "/traffic?" + cr.Filter
 		in, ok := c.metricsFor(cl)
-		all := r.URL.Query().Get("all") != ""
+		for _, mem := range cr.Members {
+			if !ok {
+				in, ok = c.metricsFor(mem.TrafficClient)
+			}
+		}
+		allMetrics := r.URL.Query().Get("all") != ""
 		if ok {
-			m := c.clientMetricsView(in, all)
+			m := c.clientMetricsView(in, allMetrics)
 			m.Who = who
 			body["M"] = m
 			body["HasMetrics"] = true
@@ -475,8 +493,8 @@ func (c *Console) inspectClient(w http.ResponseWriter, r *http.Request, key stri
 			body["Asked"] = cl.AskedTelemetry
 			// A client that does report, to point at.
 			var other *clientRow
-			for _, ocl := range c.traffic.Clients() {
-				if ocl.Conn != cl.Conn && c.hasMetrics(ocl) {
+			for _, ocl := range all {
+				if ocl.Conn != cl.Conn && (ocl.ClientID == "" || ocl.ClientID != cl.ClientID) && c.hasMetrics(ocl) {
 					x := c.clientRow(ocl, now)
 					other = &x
 					break

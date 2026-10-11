@@ -61,7 +61,8 @@ var keyMap = []keyBinding{
 
 	{"p", "p", "pause", "Pause or resume the live view", ScopePage, ""},
 	{"p", "p", "produce", "Produce (on a topic)", ScopePage, ""},
-	{"c", "c", "create", "Create (on Topics, Subjects)", ScopePage, ""},
+	{"c", "c", "create", "Create (on Topics, Subjects); connect an app (on an empty Traffic)", ScopePage, ""},
+	{"r", "r", "retry", "Retry now, when the broker is lost (on Traffic)", ScopePage, ""},
 	{"e", "e", "errors", "Errors only, and back (on Traffic)", ScopePage, ""},
 	{"u", "u", "unfold", "Unfold the open folded row (on Traffic)", ScopePage, ""},
 	{"m", "m", "metrics", "All metrics of the open client (on Traffic)", ScopePage, ""},
@@ -105,15 +106,18 @@ func keyGroups() []keyGroup {
 type keyHint struct {
 	Keys  []string
 	Label string
+	// Only says when the hint is drawn: "" always, "live" while the broker answers,
+	// "lost" while it does not (the page's own state, an attribute on the document).
+	Only string
 }
 
 var (
-	hintMove   = keyHint{[]string{"j", "k"}, "move"}
-	hintOpen   = keyHint{[]string{"↵"}, "open"}
-	hintFilter = keyHint{[]string{"/"}, "filter"}
-	hintJump   = keyHint{[]string{"⌘K"}, "jump or act"}
-	hintClose  = keyHint{[]string{"esc"}, "close panel"}
-	hintHelp   = keyHint{[]string{"?"}, "all keys"}
+	hintMove   = keyHint{Keys: []string{"j", "k"}, Label: "move"}
+	hintOpen   = keyHint{Keys: []string{"↵"}, Label: "open"}
+	hintFilter = keyHint{Keys: []string{"/"}, Label: "filter"}
+	hintJump   = keyHint{Keys: []string{"⌘K"}, Label: "jump or act"}
+	hintClose  = keyHint{Keys: []string{"esc"}, Label: "close panel"}
+	hintHelp   = keyHint{Keys: []string{"?"}, Label: "all keys"}
 )
 
 // pageHints are the hints each kind of page draws at its foot. Every key named here is
@@ -121,30 +125,40 @@ var (
 func pageHints(view string) []keyHint {
 	switch view {
 	case "traffic":
-		return []keyHint{hintMove, hintOpen, hintFilter, {[]string{"e"}, "errors only"}, {[]string{"p"}, "pause"}, hintJump}
+		// While the broker is lost (Traf-10) the strip is r, j k, jump: the live hints are
+		// drawn only while it answers, and the lost ones only while it does not.
+		return []keyHint{live(hintMove), live(hintOpen), live(hintFilter), live(keyHint{Keys: []string{"e"}, Label: "errors only"}), live(keyHint{Keys: []string{"p"}, Label: "pause"}), live(hintJump),
+			lost(keyHint{Keys: []string{"r"}, Label: "retry now"}), lost(hintMove), lost(hintJump)}
+	case "traffic_empty":
+		// Nothing has reached the broker (Traf-09): connect an app, pause, jump.
+		return []keyHint{live(keyHint{Keys: []string{"c"}, Label: "connect an app"}), live(keyHint{Keys: []string{"p"}, Label: "pause"}), live(hintJump),
+			lost(keyHint{Keys: []string{"r"}, Label: "retry now"}), lost(hintJump)}
 	case "topics":
-		return []keyHint{hintMove, hintOpen, hintFilter, {[]string{"c"}, "create topic"}, hintJump}
+		return []keyHint{hintMove, hintOpen, hintFilter, {Keys: []string{"c"}, Label: "create topic"}, hintJump}
 	case "topic":
-		return []keyHint{hintMove, hintOpen, hintClose, {[]string{"g", "t"}, "topics"}, {[]string{"p"}, "produce"}, hintHelp}
+		return []keyHint{hintMove, hintOpen, hintClose, {Keys: []string{"g", "t"}, Label: "topics"}, {Keys: []string{"p"}, Label: "produce"}, hintHelp}
 	case "groups":
 		return []keyHint{hintMove, hintOpen, hintFilter, hintJump}
 	case "group":
-		return []keyHint{hintMove, hintOpen, hintClose, {[]string{"g", "g"}, "groups"}, hintHelp}
+		return []keyHint{hintMove, hintOpen, hintClose, {Keys: []string{"g", "g"}, Label: "groups"}, hintHelp}
 	case "schemas":
-		return []keyHint{hintMove, {[]string{"↵"}, "open subject"}, hintFilter, {[]string{"c"}, "register schema"}, hintJump}
+		return []keyHint{hintMove, {Keys: []string{"↵"}, Label: "open subject"}, hintFilter, {Keys: []string{"c"}, Label: "register schema"}, hintJump}
 	case "schema":
-		return []keyHint{hintMove, hintClose, {[]string{"g", "s"}, "schemas"}, hintHelp}
+		return []keyHint{hintMove, hintClose, {Keys: []string{"g", "s"}, Label: "schemas"}, hintHelp}
 	case "cluster":
-		return []keyHint{{[]string{"g", "c"}, "cluster"}, hintOpen, hintJump, hintHelp}
+		return []keyHint{{Keys: []string{"g", "c"}, Label: "cluster"}, hintOpen, hintJump, hintHelp}
 	case "access":
 		return []keyHint{hintMove, hintOpen, hintFilter, hintJump}
 	case "trace":
-		return []keyHint{{[]string{"/"}, "trace id"}, hintMove, {[]string{"↵"}, "follow"}, hintJump}
+		return []keyHint{{Keys: []string{"/"}, Label: "trace id"}, hintMove, {Keys: []string{"↵"}, Label: "follow"}, hintJump}
 	case "first_run":
-		return []keyHint{{[]string{"c"}, "create a topic"}, hintJump, hintHelp}
+		return []keyHint{{Keys: []string{"c"}, Label: "create a topic"}, hintJump, hintHelp}
 	}
 	return []keyHint{hintJump, hintHelp}
 }
+
+func live(h keyHint) keyHint { h.Only = "live"; return h }
+func lost(h keyHint) keyHint { h.Only = "lost"; return h }
 
 // clientAction is something the palette can do in the browser, not by going to an
 // address: it is declared here so that the palette's catalogue (/api/palette) has

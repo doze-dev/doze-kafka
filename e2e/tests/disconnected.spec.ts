@@ -137,12 +137,66 @@ test('Traffic when the broker is lost: the pill, the callout, the frozen line, R
   await expect(header.locator('button', { hasText: 'Retry now' })).toBeVisible();
   await expect(header.locator('[data-live-state]')).toBeHidden();
   await expect(page.locator('.frozen-line')).toContainText('Nothing newer than this line is known.');
-  await expect(page.locator('#traffic-live .tbl-wrap')).toHaveCSS('opacity', '0.55');
+  // The rows are dimmed, and only the rows: the header and the frozen line are not.
+  await expect(page.locator('#traffic-table tbody')).toHaveCSS('opacity', '0.55');
+  await expect(page.locator('#traffic-live .tbl-wrap')).toHaveCSS('opacity', '1');
+  await expect(page.locator('#traffic-table thead')).toHaveCSS('opacity', '1');
+  await expect(page.locator('.frozen-line')).toHaveCSS('opacity', '1');
   await expect(page.locator('#traffic-table tbody tr').first()).toBeVisible(); // still there.
+  // What is counted from the broker is not drawn while it cannot be reached: the board
+  // has no summary and no connected-clients panel.
+  await expect(page.locator('#traffic-summary')).toBeHidden();
+  await expect(page.locator('#insp-default')).toBeHidden();
+  // The key strip is the board's: r, j k, jump.
+  const strip = page.locator('#keys');
+  await expect(strip.locator('.keys-lost')).toHaveText([/retry now$/, /move$/, /jump or act$/]);
+  await expect(strip.locator('.keys-live')).toHaveCount(6);
+  for (const k of await strip.locator('.keys-live').all()) await expect(k).toBeHidden();
 
   await up();
-  await header.locator('button', { hasText: 'Retry now' }).click();
+  // r is Retry now.
+  await page.keyboard.press('r');
   await expect(page.locator('html')).not.toHaveAttribute('data-connection-lost', '', { timeout: 20_000 });
   await expect(callout).toBeHidden();
   await expect(header.locator('[data-live-state]')).toBeVisible();
+  await expect(page.locator('#traffic-summary')).toBeVisible();
+  await expect(strip.locator('.keys-lost').first()).toBeHidden();
+});
+
+// Traf-09 and Traf-10 together: a broker that has just started has nothing to show, and
+// when the console loses it the page does not say "up and listening".
+test('Traf-09: nothing has reached the broker, and Traf-10 over it', async ({ page }) => {
+  await kill();
+  await up(); // a fresh recorder: only the console's own requests, which are left out.
+  await page.goto(`${CONSOLE}traffic`);
+  const empty = page.locator('#traffic-empty');
+  await expect(empty).toBeVisible();
+  await expect(empty.locator('.h2')).toHaveText('Nothing has reached this broker yet');
+  await expect(empty.locator('.up-only')).toBeVisible();
+  // The board draws no filter, no kinds, no connected clients and no "select a row".
+  await expect(page.locator('.filterrow')).toBeHidden();
+  await expect(page.locator('.seg')).toBeHidden();
+  await expect(page.locator('#inspector-panel')).toBeHidden();
+  await expect(page.locator('#traffic-note')).toBeHidden();
+  await expect(page.locator('#traffic-summary')).toContainText('0 clients connected');
+  await expect(page.locator('#traffic-summary')).toContainText('0 requests so far');
+  // The keys: c connects an app, and does.
+  await expect(page.locator('#keys')).toContainText('connect an app');
+  await expect(page.locator('#keys')).toContainText('pause');
+  await expect(page.locator('#keys')).not.toContainText('errors only');
+  await page.keyboard.press('c');
+  await expect(page).toHaveURL(/\/connect$/);
+
+  // Now the console loses it: the empty card must not claim the broker is listening.
+  await page.goto(`${CONSOLE}traffic`);
+  await expect(empty).toBeVisible();
+  await kill();
+  await expect(page.locator('html')).toHaveAttribute('data-connection-lost', '', { timeout: 15_000 });
+  await expect(empty.locator('.up-only')).toBeHidden();
+  await expect(empty.locator('.lost-only')).toContainText('cannot reach the broker');
+  await expect(page.locator('#keys .keys-lost').first()).toBeVisible();
+  await up();
+  await page.keyboard.press('r');
+  await expect(page.locator('html')).not.toHaveAttribute('data-connection-lost', '', { timeout: 20_000 });
+  await expect(empty.locator('.up-only')).toBeVisible();
 });

@@ -20,6 +20,7 @@ import (
 	"html/template"
 	"math"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -522,6 +523,109 @@ type clientRow struct {
 	NeedsALook bool
 	Groups     string
 	Metrics    bool
+	// Conns says how many connections the client has open (a client is its client id:
+	// one app often holds several connections, and the page counts apps). Members are
+	// those connections, oldest first, and Keys the inspector keys of them, so that a
+	// row knows it is the one that is open whichever of its connections was opened.
+	Conns   int
+	More    int // the connections beyond the one whose address is shown.
+	Members []clientRow
+	Keys    string
+}
+
+// groupClients folds the connections of one client id into one row, in the order the
+// clients first connected. A connection with no client id is named by its address, so
+// it stays a row of its own (TRF-31).
+func (c *Console) groupClients(cls []TrafficClient, now time.Time) []clientRow {
+	var order []string
+	by := map[string][]TrafficClient{}
+	for _, cl := range cls {
+		who := cl.ClientID
+		if who == "" {
+			who = cl.Remote
+		}
+		if _, ok := by[who]; !ok {
+			order = append(order, who)
+		}
+		by[who] = append(by[who], cl)
+	}
+	out := make([]clientRow, 0, len(order))
+	for _, who := range order {
+		conns := by[who]
+		if len(conns) == 1 {
+			cr := c.clientRow(conns[0], now)
+			cr.Conns, cr.Members, cr.Keys = 1, []clientRow{cr}, "client:"+strconv.FormatUint(conns[0].Conn, 10)
+			out = append(out, cr)
+			continue
+		}
+		// The connection that spoke last stands for the client; the rest of the row is the
+		// sum of all of them.
+		m := conns[0]
+		for _, cl := range conns[1:] {
+			if cl.Last.After(m.Last) {
+				m = cl
+			}
+		}
+		m.Opened, m.Requests, m.Req1m, m.Req5m, m.Err5m, m.Streak = conns[0].Opened, 0, 0, 0, 0, 0
+		m.Groups, m.Produces, m.Fetches, m.AskedTelemetry = nil, false, false, false
+		var members []clientRow
+		var keys []string
+		var principals []string
+		for _, cl := range conns {
+			if cl.Opened.Before(m.Opened) {
+				m.Opened = cl.Opened
+			}
+			m.Requests += cl.Requests
+			m.Req1m += cl.Req1m
+			m.Req5m += cl.Req5m
+			m.Err5m += cl.Err5m
+			if cl.Streak > m.Streak {
+				m.Streak, m.LastError = cl.Streak, cl.LastError
+			}
+			for _, g := range cl.Groups {
+				if !slices.Contains(m.Groups, g) {
+					m.Groups = append(m.Groups, g)
+				}
+			}
+			m.Produces = m.Produces || cl.Produces
+			m.Fetches = m.Fetches || cl.Fetches
+			m.AskedTelemetry = m.AskedTelemetry || cl.AskedTelemetry
+			if m.Software == "" {
+				m.Software = cl.Software
+			}
+			if m.TxnID == "" {
+				m.TxnID = cl.TxnID
+			}
+			if cl.Principal != "" && !slices.Contains(principals, cl.Principal) {
+				principals = append(principals, cl.Principal)
+			}
+			members = append(members, c.clientRow(cl, now))
+			keys = append(keys, "client:"+strconv.FormatUint(cl.Conn, 10))
+		}
+		m.Principal = strings.Join(principals, ", ")
+		cr := c.clientRow(m, now)
+		cr.NeedsALook = false
+		for _, mem := range members {
+			cr.NeedsALook = cr.NeedsALook || mem.NeedsALook
+		}
+		cr.Conns, cr.More, cr.Members, cr.Keys = len(conns), len(conns)-1, members, strings.Join(keys, " ")
+		out = append(out, cr)
+	}
+	return out
+}
+
+// clientCount is how many clients (distinct client ids, or an address for a connection
+// with none) the connections are.
+func clientCount(cls []TrafficClient) int {
+	seen := map[string]bool{}
+	for _, cl := range cls {
+		who := cl.ClientID
+		if who == "" {
+			who = cl.Remote
+		}
+		seen[who] = true
+	}
+	return len(seen)
 }
 
 // needsALook is the rule behind "1 client needs a look": three refusals in a row, or
@@ -621,21 +725,25 @@ func (c *Console) trafficData(r *http.Request) map[string]any {
 	}
 
 	// The clients, in the order they connected.
-	crows := make([]clientRow, 0, len(clients))
+	crows := c.groupClients(clients, now)
 	needLook := 0
-	for _, cl := range clients {
-		cr := c.clientRow(cl, now)
+	for i := range crows {
 		if c.metrics != nil {
-			cr.Metrics = c.hasMetrics(cl)
+			for _, mem := range crows[i].Members {
+				if c.hasMetrics(mem.TrafficClient) {
+					crows[i].Metrics = true
+				}
+			}
 		}
-		if cr.NeedsALook {
+		if crows[i].NeedsALook {
 			needLook++
 		}
-		crows = append(crows, cr)
+	}
+	for _, cl := range clients {
 		fmt.Fprint(h, cl.Conn, cl.Requests, cl.ClientID, cl.Software, cl.Streak, cl.Req5m, ";")
 	}
 	data["Clients"], data["NeedLook"] = crows, needLook
-	data["ClientCount"] = len(clients)
+	data["ClientCount"], data["ConnCount"] = len(crows), len(clients)
 
 	kept := "few thousand requests"
 	if n := c.traffic.Capacity(); n > 0 {
@@ -842,6 +950,7 @@ func (c *Console) trafficPage(w http.ResponseWriter, r *http.Request) {
 	if data["ClientCount"].(int) == 0 && data["TView"] == "requests" && !data["Filtered"].(bool) && data["TotalRequests"].(int) == 0 {
 		data["Empty"] = true
 		data["Facts"] = c.connectFacts(r)
+		data["Hints"] = pageHints("traffic_empty")
 	}
 	c.render(w, r, "traffic_detail", data)
 }
@@ -863,6 +972,9 @@ func (c *Console) trafficLive(w http.ResponseWriter, r *http.Request) {
 	if data["ClientCount"].(int) == 0 && data["TView"] == "requests" && !data["Filtered"].(bool) && data["TotalRequests"].(int) == 0 {
 		data["Empty"] = true
 		data["Facts"] = c.connectFacts(r)
+		data["Hints"] = pageHints("traffic_empty")
+	} else {
+		data["Hints"] = pageHints("traffic")
 	}
 	c.partial(w, "traffic_live", data)
 }

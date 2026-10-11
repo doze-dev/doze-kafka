@@ -6,6 +6,19 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Traffic, review fixes: the open row is drawn open (and `aria-selected`) in the
+  requests, clients and story tables, through polls and a reload; clients are counted
+  by client id, with their connections per client, in the summary, the tab, the rail
+  and the table; the story files a rebalance's triggering requests (FindCoordinator,
+  JoinGroup) under it, in the order they happened, and a folded heartbeat under the
+  generation it was last seen in; a new member's cause is "a member joined"; the
+  story's "since" is a localised time; the lost-broker page dims only the rows, hides
+  what it cannot count and binds `r` to Retry now; the empty page draws only its card
+  and its keys (`c` connects an app); Metadata, ListOffsets, OffsetFetch and refused
+  CreateTopics say what they were about; a known API at an unserved version reads
+  "Produce v99 is not served by this broker"; a zero topic id is left out of the
+  decoded fields.
+
 - Traffic: everything a client says about itself is clipped before it is kept (a
   900 KiB join reason was kept whole in each of 2,000 rows); zstd telemetry and record
   payloads are read through their limit instead of being inflated first (a 6 KB frame

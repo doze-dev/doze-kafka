@@ -146,7 +146,17 @@ enable.metrics.push=<span class="jt-n">true</span>
     <span>Last request</span><span class="m">{{when .C.Last "since"}}</span>
     <span>Requests</span><span class="m">{{.C.Requests}}</span>
     {{if .C.TxnID}}<span>Transactional id</span><span class="m">{{.C.TxnID}}</span>{{end}}
+    {{if .Members}}<span>Connections</span><span class="m">{{.C.Conns}} open</span>{{end}}
   </div>
+  {{if .Members}}
+  <div class="col g4" id="client-connections">
+    <span class="cap">Its connections</span>
+    <div class="card" style="--c: 1fr 70px 70px 56px">
+      <div class="r h"><span>Address</span><span>Open for</span><span>Last</span><span class="ra">Requests</span></div>
+      {{range .Members}}<div class="r"><span class="m el" title="{{.Principal}}">{{.Remote}}</span><span class="m">{{when .Opened "since"}}</span><span class="m">{{when .Last "since"}}</span><span class="m ra">{{.Requests}}</span></div>{{end}}
+    </div>
+  </div>
+  {{end}}
   <div class="grow"></div>
   <div class="inspector-acts">
     <a class="btn" href="{{.Reqs}}">Its requests <span aria-hidden="true">→</span></a>

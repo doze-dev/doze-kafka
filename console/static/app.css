@@ -357,6 +357,7 @@ span.num {
 .insp-client { padding: 9px 14px; display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid var(--line2); }
 .insp-client a.insp-client-open { display: grid; grid-template-columns: 1fr 72px 72px; column-gap: 12px; align-items: center; text-decoration: none; }
 .insp-client a.insp-client-open:hover .b { text-decoration: underline; }
+.insp-client.on { background: var(--sel); }
 .insp-default .callout { margin: 14px; }
 
 .dock { background: var(--card); border-top: 1px solid var(--line); display: flex; flex-direction: column; flex: none; max-height: 168px; overflow: auto; }
@@ -681,10 +682,13 @@ table.tbl th.num, table.tbl td.num { text-align: right; }
 table.tbl td.nw { white-space: nowrap; }
 table.tbl td { padding: 4px 12px; min-height: 28px; border-bottom: 1px solid var(--line2); vertical-align: middle; }
 table.tbl tbody tr:last-child td { border-bottom: none; }
+/* The boards' row is 28 px with its rule inside it (.r, min-height 28, border-box); a
+   table row's border is added to it, so Traffic's rows give a pixel of padding back. */
+table.tf-table td, table.tf-clients td { padding-bottom: 3px; }
 tr[data-inspector-open] { cursor: pointer; }
 tr[data-inspector-open]:hover td { background: var(--well); }
 tr[data-inspector-open]:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
-tr.on td { background: var(--sel); }
+tr.on td, tr[data-inspector-open].on td, tr[data-inspector-open].on:hover td { background: var(--sel); }
 td.empty { padding: 22px 12px; color: var(--muted-foreground); }
 .cell-offset { font-family: var(--mono); font-weight: 500; }
 .cell-time { font-family: var(--mono); font-size: var(--fs-sm); color: var(--muted-foreground); white-space: nowrap; }
@@ -1199,5 +1203,18 @@ html[data-connection-lost] div.frozen-line.lost-only { display: block; }
 html[data-connection-lost] #traffic-controls [data-live-state],
 html[data-connection-lost] #traffic-controls [data-live-toggle]:not(.lost-only) { display: none; }
 html[data-paused] #traffic-controls [data-live-toggle] { display: none; }
-html[data-connection-lost] #traffic-live .tbl-wrap { opacity: .55; }
+/* The rows are what is old: the header and the frozen line are not dimmed (Traf-10). */
+html[data-connection-lost] #traffic-live .tbl-wrap tbody,
+html[data-connection-lost] #traffic-live .tf-story .r:not(.h) { opacity: .55; }
+/* What is counted from the broker is not known while it is lost, so it is not drawn. */
+html[data-connection-lost] #traffic-summary,
+html[data-connection-lost] .panes:has(#insp-default) > #inspector-panel:has(#inspector[hidden]) { display: none; }
+.keys .keys-lost { display: none; }
+html[data-connection-lost] .keys .keys-lost { display: inline; }
+html[data-connection-lost] .keys .keys-live { display: none; }
+html[data-connection-lost] .up-only { display: none; }
+/* Nothing has reached the broker (Traf-09): no filter, no kinds, no clients, no note. */
+.main:has(#traffic-empty) .filterrow,
+.main:has(#traffic-empty) #traffic-note { display: none; }
+.panes:has(#traffic-empty) > #inspector-panel { display: none; }
 html[data-connection-lost] #traffic-live[data-live].disconnected::after { display: none; }

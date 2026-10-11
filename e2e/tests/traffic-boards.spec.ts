@@ -327,3 +327,123 @@ test('at 390 the Traffic pages do not scroll sideways, in either view', async ({
     expect(over, `${path} is wider than the screen by ${over}px`).toBeLessThanOrEqual(0);
   }
 });
+
+// ---- the fix round: what a reviewer verified on the live page ----
+
+const SEL = 'rgb(233, 232, 226)'; // --sel in the light theme: the fill of .r.on.
+
+test('Main: the open row is drawn open (.on, --sel, aria-selected), through polls and a reload', async ({ page }) => {
+  await lightTraffic(page, 'traffic?kind=produce&topic=seed-orders');
+  const rows = page.locator('#traffic-table tbody tr');
+  await expect(rows.first()).toBeVisible();
+  const id = (await rows.first().getAttribute('id'))!;
+  await expect(rows.first()).toHaveAttribute('aria-selected', 'false');
+  await rows.first().click();
+  await expect(page).toHaveURL(/open=request/);
+  const row = page.locator(`[id="${id}"]`);
+  await expect(row).toHaveClass(/\bon\b/);
+  await expect(row).toHaveAttribute('aria-selected', 'true');
+  await expect(row.locator('td').first()).toHaveCSS('background-color', SEL);
+  await expect(page.locator('#traffic-table tbody tr.on')).toHaveCount(1);
+  // A poll replaces the rows: the mark is still there afterwards.
+  await page.waitForTimeout(3_500);
+  await expect(page.locator(`[id="${id}"]`)).toHaveClass(/\bon\b/);
+  // A reload with ?open= reopens it and marks it.
+  await page.reload();
+  await expect(page.locator('#inspector #inspector-title')).toBeVisible();
+  await expect(page.locator(`[id="${id}"]`)).toHaveClass(/\bon\b/);
+  await expect(page.locator(`[id="${id}"]`)).toHaveAttribute('aria-selected', 'true');
+  // Closing it clears the mark.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#traffic-table tbody tr.on')).toHaveCount(0);
+});
+
+test('Main: a row is 28 px high, as the boards draw it', async ({ page }) => {
+  await lightTraffic(page, 'traffic?kind=produce&topic=seed-orders');
+  const box = await page.locator('#traffic-table tbody tr').first().boundingBox();
+  expect(Math.round(box!.height)).toBe(28);
+});
+
+test('Traf-06: clients are counted by client id, with their connections per client', async ({ page }) => {
+  await lightTraffic(page, 'traffic?view=clients');
+  const rows = page.locator('#clients-table tbody tr');
+  await expect(rows.first()).toBeVisible();
+  const names = await rows.evaluateAll((trs) => trs.map((tr) => (tr.querySelector('td') as HTMLElement).childNodes[0].textContent!.trim()));
+  expect(new Set(names).size, `client names ${names.join(', ')}`).toBe(names.length);
+  await expect(page.locator('#traffic-summary')).toContainText(`${names.length} client${names.length === 1 ? '' : 's'} connected`);
+  await expect(page.locator('nav.tabs a.tab.on')).toContainText(`Clients ${names.length}`);
+  await expect(page.locator('nav.rail a.nav', { hasText: 'Traffic' }).locator('.n')).toHaveText(`${names.length} open`);
+  // A client with more than one connection says how many.
+  for (const row of await rows.all()) {
+    const text = (await row.locator('td').first().textContent())!;
+    if (/connections/.test(text)) expect(text).toMatch(/\d+ connections/);
+  }
+});
+
+test('Traf-12: the requests that start a rebalance are under it, in the order they happened, with a <time> for its folded rows', async ({ page }) => {
+  await lightTraffic(page, `traffic?group=${GROUP}&kind=groups`);
+  const story = page.locator('#traffic-story');
+  await expect(story).toBeVisible();
+  const reb = story.locator('.r.rebalance').first();
+  await expect(reb.locator(':scope > span').nth(3)).toContainText('a member joined');
+  const parts = await story.evaluate((el) => {
+    const out: { block: number; api: string; at: string; kid: boolean }[] = [];
+    let block = -1;
+    for (const r of Array.from(el.querySelectorAll(':scope > .r:not(.h)'))) {
+      if (r.classList.contains('rebalance')) { block++; continue; }
+      const spans = r.querySelectorAll(':scope > span');
+      out.push({ block: r.classList.contains('kid') ? -1 : block, api: (spans[2]?.textContent ?? '').trim(), at: spans[0].querySelector('time')?.getAttribute('datetime') ?? '', kid: r.classList.contains('kid') });
+    }
+    return out;
+  });
+  const nested = parts.filter((p) => !p.kid);
+  expect(nested.length).toBeGreaterThan(0);
+  // The join that began the group's rebalance is under it, not before it.
+  expect(parts.filter((p) => p.kid && /^(FindCoordinator|JoinGroup)\b/.test(p.api)), 'a join filed as before the rebalance').toEqual([]);
+  expect(nested.some((p) => /^JoinGroup\b/.test(p.api))).toBe(true);
+  // Inside a block the rows are chronological.
+  for (const b of new Set(nested.map((p) => p.block))) {
+    const ats = nested.filter((p) => p.block === b).map((p) => Date.parse(p.at));
+    expect(ats, `block ${b} is in time order`).toEqual([...ats].sort((x, y) => x - y));
+  }
+  // A folded row's "since" is a <time>, localised like the flat table's.
+  const since = story.locator('.r span.el', { hasText: /every [\d.]+ s, since/ });
+  if (await since.count()) {
+    await expect(since.first().locator('time')).toHaveCount(1);
+  }
+});
+
+test('Main: Detail says something for Metadata, ListOffsets, OffsetFetch and a refused CreateTopics', async ({ page }) => {
+  await lightTraffic(page);
+  const wants: [string, RegExp][] = [['Metadata', /topic|auto-create/], ['OffsetFetch', /\S/], ['ListOffsets', /offset/], ['CreateTopics', /\S/]];
+  for (const [api, re] of wants) {
+    const rows = page.locator('#traffic-table tbody tr', { has: page.locator('td.cell-req .b', { hasText: new RegExp(`^${api}$`) }) });
+    const n = await rows.count();
+    for (let i = 0; i < Math.min(n, 6); i++) {
+      const text = (await rows.nth(i).locator('td.cell-detail').textContent())!.trim();
+      expect(text, `${api} row ${i} has no detail`).not.toBe('');
+      expect(text, `${api}: ${text}`).toMatch(re);
+    }
+  }
+  const dup = page.locator('#traffic-table tbody tr', { hasText: 'TOPIC_ALREADY_EXISTS' }).first();
+  if (await dup.count()) await expect(dup.locator('td.cell-detail')).toHaveText('the topic already exists');
+});
+
+test('the open client row and the open story row are drawn open too', async ({ page }) => {
+  await lightTraffic(page, 'traffic?view=clients');
+  const client = page.locator('#clients-table tbody tr', { hasText: CLIENT }).first();
+  await client.click();
+  await expect(client).toHaveClass(/\bon\b/);
+  await expect(client).toHaveAttribute('aria-selected', 'true');
+  await expect(client.locator('td').first()).toHaveCSS('background-color', SEL);
+  await expect(page.locator('#clients-table tbody tr.on')).toHaveCount(1);
+
+  await lightTraffic(page, `traffic?group=${GROUP}&kind=groups`);
+  const kid = page.locator('#traffic-story .r[data-row]').first();
+  await expect(kid).toBeVisible();
+  await kid.click();
+  await expect(kid).toHaveAttribute('aria-selected', 'true');
+  await expect(kid).toHaveClass(/\bon\b/);
+  await expect(kid).toHaveCSS('background-color', SEL);
+  await expect(page.locator('#traffic-story .r[aria-selected="true"]')).toHaveCount(1);
+});

@@ -429,7 +429,7 @@ on the code before the fix and was run again with the fix reverted by hand.
 | TRF-8 | fixed, red | `TestExpectedFlowIsNotAnError`, the class table, the console's refusals read it |
 | TRF-9 | fixed | the link is a `template.URL`; `TestClientRefusedInARowIsFlagged`, e2e "links a client name to only its requests" |
 | TRF-10 | fixed, red | `TestTransactionalIdIsNotAGroup`, `TestSummarisersReportWhatTheRequestNames` |
-| TRF-11 | fixed, red | `TestConnectionEndingRequestsAreObserved` (unserved API, panic, bad header, request before authentication). A failed write is observed too; an oversized frame is not (the loop returns before the key is known). |
+| TRF-11 | fixed, red | `TestConnectionEndingRequestsAreObserved` (unserved API, panic, bad header, request before authentication); a known API at a version not served reads "Produce v99 is not served by this broker" (`TestNotServedNamesTheAPIAndVersionWhenTheKeyIsKnown`). A failed write is observed too; an oversized frame is not (the loop returns before the key is known). |
 | TRF-12, 13 | fixed, red | `TestAFoldedRowKeepsItsId`, `TestBusyTrafficDoesNotResetAFoldedCount`, `TestEvictionIsByLastActivity` |
 | TRF-14 | fixed, red | `TestEmbeddedBrokerDoesNotAdvertiseTelemetry`, `TestNoConsoleMeansNoTelemetry` |
 | TRF-15 | fixed | "N of M requests match" (requests among those kept); the table says when it is cut at 200 rows |
@@ -442,7 +442,7 @@ on the code before the fix and was run again with the fix reverted by hand.
 | TRF-22 | fixed | the client's chart copy says what it covers and "one point per report" (`TestClientInspectorShowsWhatItReportsAboutItself`) |
 | TRF-23 | fixed | `TestFactsNeverHoldRecordBytesOrSecrets`, the fields held are listed in `observability.md` |
 | TRF-24, 25, 26 | fixed, red | `TestTruncatedPointIsMalformed`, `TestPastTimestampsAreClamped`, `TestDroppedSeriesAreCounted` |
-| TRF-27 | **narrowed** | an instance is a principal's: another principal is refused; another connection of the same principal is not, and the instance follows the connection that pushed. The plan's rule (refuse a push from another open connection) acted on `memory` (R4) and broke the Java client, which subscribes on its bootstrap connection and pushes on the one metadata gave it (found by the held-consumer browser spec). |
+| TRF-27 | **narrowed** | an instance is a principal's: another principal is refused; another connection of the same principal is not, and the instance follows the connection that pushed. The plan's rule (refuse a push from another open connection) acted on `memory` (R4) and broke the Java client, which subscribes on its bootstrap connection and pushes on the one metadata gave it (found by the held-consumer browser spec). On a listener with no authentication every client is `User:ANONYMOUS`, so the principal does not tell clients apart there and only the random instance id (which the broker gives out and a client has to quote) protects an instance. |
 | TRF-28 | fixed | metrics are off the request region; the hash is from counters (`TestClientMetricsDoNotRefreshTheRequestRegion`) |
 | TRF-29 | done by the foundation (E11) | `task api` |
 | TRF-30 | fixed, red | a connection that has not sent a request is not a client |
