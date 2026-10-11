@@ -5,22 +5,32 @@ start one in-process: no Docker, no ports to pick, no cleanup beyond cancelling 
 context.
 
 ```go
-import "github.com/doze-dev/doze-kafka/server"
+import (
+	"context"
+	"testing"
 
-srv, err := server.New(server.Options{DataDir: t.TempDir()})
-if err != nil {
-    t.Fatal(err)
+	"github.com/doze-dev/doze-kafka/server"
+)
+
+func TestWithKafka(t *testing.T) {
+	srv, err := server.New(server.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, stop := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- srv.Serve(ctx) }()
+	<-srv.Ready()                        // the listener is bound
+	brokers := srv.Addr().String()       // 127.0.0.1:<a free port>
+	t.Cleanup(func() { stop(); <-done }) // flushes logs, closes storage
+
+	t.Log("point any Kafka client at", brokers)
 }
-ctx, stop := context.WithCancel(context.Background())
-done := make(chan error, 1)
-go func() { done <- srv.Serve(ctx) }()
-<-srv.Ready()                      // the listener is bound
-brokers := srv.Addr().String()     // 127.0.0.1:<a free port>
-t.Cleanup(func() { stop(); <-done }) // flushes logs, closes storage
 ```
 
 Point any Kafka client at `brokers`. `ExampleNew` in `server/example_test.go` is a
-complete, runnable version that produces and consumes a record.
+complete, runnable version that produces and consumes a record. The code above
+is compiled and run by `TestEmbeddingDocCompiles`, so it cannot rot.
 
 ## What the defaults give you
 
@@ -78,3 +88,11 @@ on, so Metadata sends them there rather than to the socket.
 The embed API is the broker. The web console is a separate package
 (`github.com/doze-dev/doze-kafka/console`) that talks to a broker as any Kafka
 client would; embedding it is optional.
+
+## The surface is pinned
+
+`task api` writes the exported surface of `server/` to `testdata/api/server.txt`
+and fails when the code and the file differ, or when the commit that changed the
+file has no `CHANGELOG.md` line containing "server API". `Server.Traffic()` and
+`Server.ClientMetrics()` are not on it: they returned internal types that only
+this module's own commands could use.

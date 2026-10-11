@@ -38,6 +38,7 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/broker"
 	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/internal/protocol"
+	"github.com/doze-dev/doze-kafka/internal/serverhook"
 	"github.com/doze-dev/doze-kafka/internal/storage/log"
 	"github.com/doze-dev/doze-kafka/internal/storage/meta"
 	"github.com/doze-dev/doze-kafka/internal/telemetry"
@@ -105,14 +106,14 @@ type Options struct {
 // remembers: a few minutes of a busy laptop, a few hundred KiB.
 const trafficRows = 2000
 
-// Traffic is what clients have asked this broker and what its groups have done, or
-// nil when no console is running. It is for the console in this module; the type is
-// internal to it.
-func (s *Server) Traffic() *traffic.Recorder { return s.rec }
-
-// ClientMetrics is what clients have reported about themselves (KIP-714), or nil when
-// client telemetry is off. It is for the console in this module; the type is internal.
-func (s *Server) ClientMetrics() *telemetry.Store { return s.b.Telemetry() }
+// The console's two sources of truth about a running broker (what clients have
+// asked it, and what they have reported about themselves under KIP-714) are not
+// part of the embedding API: they are internal types, and are reached through
+// internal/serverhook by this module's own commands.
+func init() {
+	serverhook.Traffic = func(srv any) *traffic.Recorder { return srv.(*Server).rec }
+	serverhook.ClientMetrics = func(srv any) *telemetry.Store { return srv.(*Server).b.Telemetry() }
+}
 
 // Server is an embedded broker. Construct with New, then Serve.
 type Server struct {

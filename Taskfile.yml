@@ -126,6 +126,16 @@ tasks:
     cmds:
       - scripts/lightness.sh record
 
+  api:
+    desc: 'The exported surface of server/ (the embedding API) against testdata/api/server.txt; a change needs a CHANGELOG.md line containing "server API"'
+    cmds:
+      - scripts/api.sh
+
+  api:record:
+    desc: 'Write the exported surface of server/ to testdata/api/server.txt (add the CHANGELOG.md line in the same commit)'
+    cmds:
+      - scripts/api.sh record
+
   fuzz:
     desc: 'Fuzz the wire-protocol decoder: each target for FUZZ_TIME (default 30s)'
     vars:
