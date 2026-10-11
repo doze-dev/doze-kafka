@@ -126,6 +126,11 @@ tasks:
     cmds:
       - scripts/lightness.sh record
 
+  claims:
+    desc: 'Print the number of claims per evidence source (spec, recorded, doc, memory) and check every claims table under conformance/claims/'
+    cmds:
+      - go test ./conformance -run TestClaimsCountPerSource -v -count=1
+
   api:
     desc: 'The exported surface of server/ (the embedding API) against testdata/api/server.txt; a change needs a CHANGELOG.md line containing "server API"'
     cmds:
