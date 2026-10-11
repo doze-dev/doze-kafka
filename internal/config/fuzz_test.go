@@ -32,8 +32,25 @@ func FuzzConfigFile(f *testing.F) {
 			return
 		}
 		var out bytes.Buffer
-		if err := WriteTOML(&out, cfg); err != nil {
+		if err := WriteTOMLWithSecrets(&out, cfg); err != nil {
 			t.Fatalf("a valid configuration cannot be written: %v", err)
+		}
+		// The redacted print holds no password of the configuration.
+		var shown bytes.Buffer
+		if err := WriteTOML(&shown, cfg); err != nil {
+			t.Fatalf("a valid configuration cannot be written: %v", err)
+		}
+		if err := os.WriteFile(path, shown.Bytes(), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		hidden := Default()
+		if err := LoadFile(path, &hidden); err != nil {
+			t.Fatalf("the redacted print does not load: %v\n%s", err, shown.Bytes())
+		}
+		for user, pass := range hidden.Credentials {
+			if pass != Redacted {
+				t.Fatalf("the redacted print holds a password for %q:\n%s", user, shown.Bytes())
+			}
 		}
 		if err := os.WriteFile(path, out.Bytes(), 0o600); err != nil {
 			t.Fatal(err)
@@ -47,7 +64,7 @@ func FuzzConfigFile(f *testing.F) {
 		}
 		// Compared as written (an empty list and an absent one are the same file).
 		var second bytes.Buffer
-		if err := WriteTOML(&second, again); err != nil {
+		if err := WriteTOMLWithSecrets(&second, again); err != nil {
 			t.Fatal(err)
 		}
 		if !bytes.Equal(out.Bytes(), second.Bytes()) {

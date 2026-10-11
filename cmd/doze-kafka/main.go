@@ -155,10 +155,22 @@ func usageError(w io.Writer, err error) int {
 // validates first, so what it prints is something the broker would accept.
 func runConfig(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 || args[0] != "print" {
-		fmt.Fprintln(stderr, "usage: doze-kafka config print [flags]")
+		fmt.Fprintln(stderr, "usage: doze-kafka config print [--show-secrets] [flags]")
 		return exitUsage
 	}
-	st, err := loadConfig(args[1:])
+	// --show-secrets is the one flag only this command has: passwords are printed as
+	// "<redacted>" unless it is given, and a file written without it is refused where it
+	// is loaded (config.Redacted).
+	showSecrets := false
+	rest := make([]string, 0, len(args)-1)
+	for _, a := range args[1:] {
+		if a == "--show-secrets" || a == "-show-secrets" {
+			showSecrets = true
+			continue
+		}
+		rest = append(rest, a)
+	}
+	st, err := loadConfig(rest)
 	switch {
 	case errors.Is(err, errHelp):
 		d := config.Default()
@@ -172,7 +184,11 @@ func runConfig(args []string, stdout, stderr io.Writer) int {
 	case err != nil:
 		return usageError(stderr, err)
 	}
-	if err := config.WriteTOML(stdout, st.cfg); err != nil {
+	write := config.WriteTOML
+	if showSecrets {
+		write = config.WriteTOMLWithSecrets
+	}
+	if err := write(stdout, st.cfg); err != nil {
 		fmt.Fprintln(stderr, "doze-kafka: config print:", err)
 		return exitRuntime
 	}
@@ -416,6 +432,10 @@ func absPath(p string) string {
 	return p
 }
 
+// credentialRand is where the console's password comes from. A test replaces it to know
+// the password it then looks for in every output.
+var credentialRand io.Reader = rand.Reader
+
 // consoleUserName is the SASL user the console logs in as.
 const consoleUserName = "__console"
 
@@ -425,7 +445,7 @@ const consoleUserName = "__console"
 // enabled (PLAIN preferred for simplicity, else SCRAM). Never logged.
 func provisionConsoleCredential(cfg *config.Config) (user, pass, mech string, err error) {
 	buf := make([]byte, 18)
-	if _, err := rand.Read(buf); err != nil {
+	if _, err := io.ReadFull(credentialRand, buf); err != nil {
 		return "", "", "", fmt.Errorf("generate console credential: %w", err)
 	}
 	mech = ""

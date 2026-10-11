@@ -109,7 +109,8 @@ Usage:
 Commands:
   version                       print the doze-kafka version
   env                           print the shell block that points a client at this instance
-  config print [flags]          print the effective configuration as TOML
+  config print [--show-secrets] [flags]
+                                print the effective configuration as TOML (passwords redacted)
   dns-setup [--check|--uninstall|--print]
                                 one-time setup for the shared .doze names
   doctor                        report what is set up for .doze names, and what is not
@@ -245,6 +246,11 @@ func flagError(fs *flag.FlagSet, err error) error {
 		// invalid value "x" for flag -name: reason
 		if val, tail, ok := strings.Cut(rest, " for flag -"); ok {
 			name, reason, _ := strings.Cut(tail, ": ")
+			if strings.TrimLeft(name, "-") == "sasl-user" {
+				// The value is user:password, or a password on its own that lost its
+				// user: not repeated, here or in the reason.
+				return fmt.Errorf("--sasl-user: not a valid value (expected user:password)")
+			}
 			return fmt.Errorf("--%s: %s is not a valid value (%s)", strings.TrimLeft(name, "-"), val, reason)
 		}
 	}
@@ -417,7 +423,7 @@ func (f credsFlag) String() string { return "" }
 func (f credsFlag) Set(s string) error {
 	user, pass, ok := strings.Cut(s, ":")
 	if !ok || user == "" {
-		return fmt.Errorf("expected user:password, got %q", s)
+		return fmt.Errorf("expected user:password") // the value is not echoed: it may be a password.
 	}
 	f.m[user] = pass
 	return nil

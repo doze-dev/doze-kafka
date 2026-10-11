@@ -6,6 +6,14 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- `doze-kafka config print` redacts passwords: every `[credentials]` entry is written as
+  `"<redacted>"`, and `config print --show-secrets` writes the file to run from. A file
+  that still holds the placeholder is refused when loaded, by user. A malformed
+  `--sasl-user` and a bad credentials line in a config file no longer repeat the value
+  in the error. Nothing else printed a secret: a test plants a password, a wrong one, the
+  console credential and TLS key material and reads the summary, the debug log, every
+  console page it links to, `DescribeConfigs` and the errors for each.
+
 - Produce: what a compressed batch may inflate to is bounded by a stream, not a buffer.
   A keyed-topic check used to inflate a batch whole (up to 256 MiB, held again by the
   record decoder) before it looked at a key; it now streams, holding a window and a

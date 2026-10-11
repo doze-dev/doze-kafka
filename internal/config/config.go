@@ -409,6 +409,9 @@ func (c Config) Validate() error {
 			if user == "" {
 				return fmt.Errorf("config: SASL credential has an empty username")
 			}
+			if pass == Redacted {
+				return fmt.Errorf("config: SASL user %q has the placeholder %q for a password: `config print` hides passwords, so a file it wrote is not one to run from; put the password back, or print with --show-secrets", user, Redacted)
+			}
 			if pass == "" {
 				return fmt.Errorf("config: SASL user %q has an empty password", user)
 			}

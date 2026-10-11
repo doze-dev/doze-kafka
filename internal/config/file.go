@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -68,7 +69,7 @@ func LoadFile(path string, cfg *Config) error {
 	var fc fileConfig
 	md, err := toml.DecodeFile(path, &fc)
 	if err != nil {
-		return fmt.Errorf("config: read %s: %w", path, err)
+		return fmt.Errorf("config: read %s: %w", path, redactParseError(err))
 	}
 	if undecoded := md.Undecoded(); len(undecoded) > 0 {
 		keys := make([]string, len(undecoded))
@@ -204,10 +205,22 @@ func (fc fileConfig) applyTo(cfg *Config) error {
 	return nil
 }
 
-// WriteTOML renders cfg as a TOML document — the effective configuration in the same
-// shape LoadFile reads, so its output is a valid config file. Used by
+// Redacted is what a password is printed as: `config print` does not write a secret
+// unless it is asked to (--show-secrets), and a file that still holds this where a
+// password goes is refused where it is loaded, by user, so the placeholder can never
+// become a password.
+const Redacted = "<redacted>"
+
+// WriteTOML renders cfg as a TOML document, the effective configuration in the shape
+// LoadFile reads, with every password written as Redacted. Used by
 // `doze-kafka config print`.
-func WriteTOML(w io.Writer, cfg Config) error {
+func WriteTOML(w io.Writer, cfg Config) error { return writeTOML(w, cfg, false) }
+
+// WriteTOMLWithSecrets is WriteTOML with the passwords in clear, so its output is a file
+// the broker can be started from. It is what `config print --show-secrets` writes.
+func WriteTOMLWithSecrets(w io.Writer, cfg Config) error { return writeTOML(w, cfg, true) }
+
+func writeTOML(w io.Writer, cfg Config, secrets bool) error {
 	fc := fileConfig{
 		KafkaVersion:           &cfg.Version,
 		Listen:                 &cfg.ListenAddr,
@@ -260,6 +273,12 @@ func WriteTOML(w io.Writer, cfg Config) error {
 	}
 	if len(cfg.Credentials) > 0 {
 		fc.Credentials = cfg.Credentials
+		if !secrets {
+			fc.Credentials = make(map[string]string, len(cfg.Credentials))
+			for user := range cfg.Credentials {
+				fc.Credentials[user] = Redacted
+			}
+		}
 	}
 	if cfg.TLSCertFile != "" || cfg.TLSKeyFile != "" {
 		fc.TLS = &tlsFile{Cert: &cfg.TLSCertFile, Key: &cfg.TLSKeyFile}
@@ -268,3 +287,15 @@ func WriteTOML(w io.Writer, cfg Config) error {
 }
 
 func strp(s string) *string { return &s }
+
+// redactParseError is err with the text of the offending value left out when the value
+// is a credential: the TOML parser quotes what it found ("expected value but found
+// "hunter2" instead"), and an unquoted or mistyped password would be printed in the
+// error. The line and the key are kept, which is what is needed to fix it.
+func redactParseError(err error) error {
+	var pe toml.ParseError
+	if errors.As(err, &pe) && (pe.LastKey == "credentials" || strings.HasPrefix(pe.LastKey, "credentials.")) {
+		return fmt.Errorf("toml: line %d (last key %q): the value is not valid here; a password is a quoted string (its text is not repeated)", pe.Position.Line, pe.LastKey)
+	}
+	return err
+}
