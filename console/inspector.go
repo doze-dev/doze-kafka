@@ -156,7 +156,6 @@ func (c *Console) inspectRoute(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// inspectorRoutes registers the inspector's address.
 func (c *Console) trafficOff(w http.ResponseWriter, r *http.Request) bool {
 	if c.traffic != nil {
 		return false

@@ -23,6 +23,9 @@ func TestEveryFuzzTargetIsRunAndDocumented(t *testing.T) {
 			return err
 		}
 		if d.IsDir() {
+			if n := d.Name(); path != root && strings.HasPrefix(n, ".") {
+				return filepath.SkipDir // .git, .claude (agent worktrees), .audit
+			}
 			switch d.Name() {
 			case "node_modules", ".git", "kmsg", "module", "e2e", "testdata":
 				return filepath.SkipDir

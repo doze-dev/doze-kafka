@@ -71,6 +71,12 @@ func TestEverySurfaceRenders(t *testing.T) {
 		}
 		path := rt.fill("orders", "billing")
 		switch {
+		case strings.Contains(path, "/inspect/"):
+			continue // one request per kind, with the key of a real selection: inspector_test.go
+		case strings.HasSuffix(path, "/dock"):
+			path += "?topic=orders"
+		case strings.Contains(path, "/confirm/"):
+			path = strings.Replace(path, "/confirm/billing", "/confirm/topic.delete?name=orders", 1)
 		case strings.HasSuffix(path, "/message"), strings.HasSuffix(path, "/message/raw"):
 			path += "?partition=0&offset=1"
 		case strings.HasSuffix(path, "/traffic/request"):
