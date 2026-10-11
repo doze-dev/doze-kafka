@@ -400,10 +400,13 @@ func templateFuncs(prefix string) template.FuncMap {
 		"sub":  func(a, b int) int { return a - b },
 		// when is the one formatter for a moment in time (timefmt.go); whenText is
 		// its plain text, for an attribute.
-		"when":      when,
-		"whenText":  whenText,
-		"hasPrefix": strings.HasPrefix,
-		"hasSuffix": strings.HasSuffix,
+		"when": when,
+		// the declared key map, for the help overlay and for shell.js (keys.go).
+		"keyGroups":  keyGroups,
+		"keymapJSON": keymapJSON,
+		"whenText":   whenText,
+		"hasPrefix":  strings.HasPrefix,
+		"hasSuffix":  strings.HasSuffix,
 		"refsJSON": func(refs any) string {
 			b, _ := json.Marshal(refs)
 			return string(b)

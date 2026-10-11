@@ -104,6 +104,41 @@
   --sh-lg: 0 18px 46px -14px rgba(0, 0, 0, .7);
 }
 
+/* High contrast: the third theme. Black ink on white, black edges, and every status
+   colour darkened until it holds well past 4.5:1; nothing relies on a tint or a
+   shadow to be seen. It is chosen from the theme switch, or by the OS asking for
+   more contrast. console/contrast_test.go measures every pair. */
+:root[data-theme="contrast"] {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #000000;
+  --card: #ffffff;
+  --popover: #ffffff;
+  --muted: #eeeeee;
+  --muted-foreground: #262626;
+  --accent: #ffe66b;
+  --brand: #ffd60a;
+  --brand-foreground: #000000;
+  --border: #000000;
+  --input: #000000;
+  --ring: #0033cc;
+  --sidebar: #ffffff;
+  --destructive: #8a0010;
+  --destructive-foreground: #ffffff;
+  --ok: #006b2f;   --ok-foreground: #004d21;
+  --bad: #a00014;  --bad-foreground: #7a000f;
+  --warn: #8a5a00; --warn-foreground: #5c3b00;
+  --info: #0b3d91; --info-foreground: #082b66;
+  --violet: #5b21b6; --violet-foreground: #46168f;
+  --refused: #4c3a85;    --refused-foreground: #3b2a6b;
+  --denied: #7a4a00;     --denied-foreground: #5c3500;
+  --notimpl: #0b3d91;    --notimpl-foreground: #082b66;
+  --failed: #a00014;     --failed-foreground: #7a000f;
+  --scrim: rgba(0, 0, 0, .6);
+  --sh: none;
+  --sh-lg: 0 0 0 2px #000000;
+}
+
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
@@ -912,3 +947,17 @@ form.htmx-request .btn.primary::after { content: ""; width: 11px; height: 11px; 
 .neighbours { margin: 10px 0 0; font-size: var(--fs-md); color: var(--muted-foreground); line-height: 1.6; }
 .neighbours a { color: var(--foreground); border-bottom: 1px solid var(--border); }
 .neighbours a:hover { border-bottom-color: var(--foreground); }
+
+/* High contrast also thickens the edges a control is found by. */
+:root[data-theme="contrast"] .btn, :root[data-theme="contrast"] .input, :root[data-theme="contrast"] .chip,
+:root[data-theme="contrast"] .tbl-wrap, :root[data-theme="contrast"] .panel { border-width: 2px; }
+:root[data-theme="contrast"] :focus-visible { outline-width: 3px; }
+
+/* The keys overlay, generated from the declared key map. */
+.help { width: min(560px, 94vw); max-height: 86vh; display: flex; flex-direction: column; }
+.help-b { padding: 4px 18px 8px; overflow-y: auto; }
+.help-g { margin-top: 12px; }
+.help-gh { font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); margin-bottom: 4px; }
+.help-r { display: flex; align-items: baseline; gap: 12px; padding: 4px 0; font-size: var(--fs-md); }
+.help-r .kbd { min-width: 52px; text-align: center; flex: none; }
+.help-l { color: var(--foreground); }

@@ -22,19 +22,21 @@
     resetListCursor();
   });
 
-  // ---------- theme: light / system / dark ----------
-  // The stylesheet knows two themes. "System" is this script choosing between
-  // them from the OS setting, and following it when it changes; it is stored as
-  // the absence of a choice. (The same resolution runs inline in <head>, before
-  // first paint.)
+  // ---------- theme: light / dark / high contrast / system ----------
+  // The stylesheet knows three themes. "System" is this script choosing between
+  // them from the OS settings (dark, or a request for more contrast), and
+  // following them when they change; it is stored as the absence of a choice.
+  // (The same resolution runs inline in <head>, before first paint.)
   var themeSeg = document.getElementById("theme-seg");
   var darkMQ = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+  var contrastMQ = window.matchMedia ? window.matchMedia("(prefers-contrast: more)") : null;
   function themeMode() {
     var t = stored("theme");
-    return t === "light" || t === "dark" ? t : "system";
+    return t === "light" || t === "dark" || t === "contrast" ? t : "system";
   }
   function applyTheme(mode) {
-    root.setAttribute("data-theme", mode === "system" ? (darkMQ && darkMQ.matches ? "dark" : "light") : mode);
+    var system = contrastMQ && contrastMQ.matches ? "contrast" : (darkMQ && darkMQ.matches ? "dark" : "light");
+    root.setAttribute("data-theme", mode === "system" ? system : mode);
     store("theme", mode === "system" ? null : mode);
     if (themeSeg) themeSeg.querySelectorAll("button").forEach(function (b) {
       var on = b.getAttribute("data-mode") === mode;
@@ -47,8 +49,10 @@
     var b = e.target.closest("button[data-mode]");
     if (b) applyTheme(b.getAttribute("data-mode"));
   });
-  if (darkMQ && darkMQ.addEventListener) darkMQ.addEventListener("change", function () {
-    if (themeMode() === "system") applyTheme("system");
+  [darkMQ, contrastMQ].forEach(function (mq) {
+    if (mq && mq.addEventListener) mq.addEventListener("change", function () {
+      if (themeMode() === "system") applyTheme("system");
+    });
   });
 
   // ---------- collapsible rail ----------
@@ -397,7 +401,7 @@
     fetch(PREFIX + "/api/palette").then(function (r) { return r.json(); }).then(function (all) {
       var live = {}, fixed = [], resources = [];
       (all || []).forEach(function (x) {
-        live[x.u] = 1;
+        if (x.u) live[x.u] = 1;
         (x.k === "view" || x.k === "action" ? fixed : resources).push(x);
       });
       // A recent that no longer exists (a deleted topic) would be a dead link:
@@ -412,6 +416,16 @@
       renderPal();
     }).catch(function () {}); // the console is unreachable: recents still work.
   }
+  // An entry is an address, or (it.a) something the console does in the browser.
+  function goTo(it) {
+    if (!it.a) { location.href = it.u; return; }
+    closePalette();
+    var act = it.a;
+    if (act.indexOf("theme:") === 0) applyTheme(act.slice(6));
+    else if (act === "rail") setRail(!railSlim());
+    else if (act === "pause") { if (document.querySelector("[data-live-toggle]")) setPaused(!livePaused); }
+    else if (act === "help") openHelp();
+  }
   function palFiltered() {
     var q = palQ.value.toLowerCase().trim();
     if (!q) return palItems.slice(0, 14);
@@ -425,7 +439,8 @@
     items.forEach(function (it, i) {
       var a = document.createElement("a");
       a.className = "pal-item" + (i === palSel ? " sel" : "");
-      a.href = it.u;
+      a.href = it.a ? "#" : it.u;
+      a.addEventListener("click", function (ev) { if (it.a) { ev.preventDefault(); goTo(it); } });
       a.id = "pal-opt-" + i; a.setAttribute("role", "option"); a.setAttribute("aria-selected", i === palSel ? "true" : "false"); a.tabIndex = -1;
       a.innerHTML = '<span class="pal-dot"></span><span class="pal-name"></span><span class="pal-kind"></span>';
       // The dot is what the row is (topic, group, view), not how it got into the list.
@@ -527,7 +542,7 @@
       if (e.key === "Escape") { closePalette(); e.preventDefault(); }
       else if (e.key === "ArrowDown") { palSel = Math.min(palSel + 1, items.length - 1); renderPal(); e.preventDefault(); }
       else if (e.key === "ArrowUp") { palSel = Math.max(palSel - 1, 0); renderPal(); e.preventDefault(); }
-      else if (e.key === "Enter") { var it = items[palSel]; if (it) location.href = it.u; e.preventDefault(); }
+      else if (e.key === "Enter") { var it = items[palSel]; if (it) goTo(it); e.preventDefault(); }
       return;
     }
     if (mod && !e.altKey && !e.shiftKey && e.key === "k") { e.preventDefault(); openPalette(); return; }
@@ -547,23 +562,72 @@
     // to the browser or the OS: ⌘C is copy, not "new topic".
     if (mod || e.altKey) return;
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || active.isContentEditable || (active.closest && active.closest(".cm-editor"))) return;
-    if (e.key === "/") {
+    // The key map is declared once, on the server (keys.go), and arrives as JSON:
+    // what a key does is looked up there, so a key cannot be bound here and left out
+    // of the help overlay.
+    var act = pageKey(e.key);
+    if (act && pageActions[act]) pageActions[act](e, active);
+  });
+
+  // ---------- the key map ----------
+  var KEYMAP = [];
+  try { KEYMAP = JSON.parse(document.getElementById("keymap").textContent) || []; } catch (err) {}
+  function pageKey(key) {
+    for (var i = 0; i < KEYMAP.length; i++) {
+      var b = KEYMAP[i];
+      if (b.key === key && b.scope !== "In a dialog") return b.action;
+    }
+    return "";
+  }
+  var pageActions = {
+    filter: function (e) {
       var f = document.querySelector(".listpane .filter input");
-      if (f && f.offsetParent !== null) { f.focus(); e.preventDefault(); } else { openPalette(); e.preventDefault(); }
-    } else if (e.key === "j") moveCursor(1);
-    else if (e.key === "k") moveCursor(-1);
-    else if (e.key === "Enter") {
+      if (f && f.offsetParent !== null) f.focus(); else openPalette();
+      e.preventDefault();
+    },
+    next: function () { moveCursor(1); },
+    prev: function () { moveCursor(-1); },
+    open: function (e, active) {
       // Enter on a focused button or link is that control's own. The list cursor
       // is opened only when nothing else has the keyboard.
       if (active !== document.body && active.matches && active.matches(FOCUSABLE + ", summary")) return;
       if (cursorEl && document.contains(cursorEl) && cursorEl.offsetParent !== null) cursorEl.click();
-    }
-    else if (e.key === "c") { var nb = document.querySelector(".listpane .new-link"); if (nb) nb.click(); }
-    else if (e.key === "m") {
+    },
+    create: function () { var nb = document.querySelector(".listpane .new-link"); if (nb) nb.click(); },
+    compose: function (e) {
       if (document.getElementById("compose-panel")) { e.preventDefault(); setDock(true); focusComposer(); }
-    }
-    else if (e.key === "[") setRail(!railSlim());
-  });
+    },
+    pause: function () { if (document.querySelector("[data-live-toggle]")) setPaused(!livePaused); },
+    rail: function () { setRail(!railSlim()); },
+    help: function (e) { e.preventDefault(); openHelp(); },
+  };
+
+  // ---------- help: the keys, listed from the declared map ----------
+  var helpBox = document.getElementById("help"), helpOpener = null;
+  function openHelp() {
+    if (!helpBox || confirmOpen()) return;
+    if (inspectorIsOpen()) closeInspector(false);
+    if (paletteOpen()) closePalette();
+    if (!helpOpen()) helpOpener = document.activeElement;
+    helpBox.hidden = false;
+    var c = document.getElementById("help-close");
+    if (c) c.focus();
+  }
+  function closeHelp() {
+    if (!helpOpen()) return;
+    helpBox.hidden = true;
+    if (helpOpener && document.contains(helpOpener) && helpOpener.focus) helpOpener.focus();
+  }
+  if (helpBox) {
+    helpBox.addEventListener("click", function (e) { if (e.target === helpBox) closeHelp(); });
+    var hc = document.getElementById("help-close");
+    if (hc) hc.addEventListener("click", closeHelp);
+  }
+  document.addEventListener("keydown", function (e) {
+    if (!helpOpen()) return;
+    if (e.key === "Escape" || e.key === "?") { closeHelp(); e.preventDefault(); e.stopPropagation(); return; }
+    trapTab(helpBox, e);
+  }, true);
 
   // ---------- the message inspector ----------
   // A real dialog in every state (loading, a record, an error): it has a title

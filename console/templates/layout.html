@@ -24,7 +24,7 @@
 {{/* Before first paint: the theme ("system" is resolved here, so the stylesheet
      defines each theme once) and the rail's width. */}}
 <script>(function(){var d=document.documentElement,g=function(k){try{return localStorage.getItem(k);}catch(e){return null;}};
-var t=g("theme");d.setAttribute("data-theme",t==="light"||t==="dark"?t:(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
+var t=g("theme");d.setAttribute("data-theme",t==="light"||t==="dark"||t==="contrast"?t:(matchMedia("(prefers-contrast: more)").matches?"contrast":matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
 var r=g("rail");if(r==="slim"||(r!=="wide"&&matchMedia("(max-width:1180px)").matches))d.setAttribute("data-rail","slim");
 window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").replace(/^\/+|\/+$/g,"").split("/");var v=(p[0]===""||((p[0]==="topics"||p[0]==="groups")&&!p[1]))?"list":"detail";d.setAttribute("data-view",v);};window.dozeView();})();</script>
 <script>document.addEventListener("alpine:init",function(){window.Alpine.store("filter",{
@@ -53,6 +53,7 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
         <button type="button" data-mode="light" title="Light" aria-label="Light theme">{{icon "sun"}}</button>
         <button type="button" data-mode="system" title="Match system" aria-label="System theme">{{icon "monitor"}}</button>
         <button type="button" data-mode="dark" title="Dark" aria-label="Dark theme">{{icon "moon"}}</button>
+        <button type="button" data-mode="contrast" title="High contrast" aria-label="High-contrast theme">{{icon "contrast"}}</button>
       </div>
     </div>
   </header>
@@ -113,6 +114,23 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
       </div>
     </div>
   </div>
+
+  <!-- the keys: generated from the declared key map (keys.go), never typed here -->
+  <div class="overlay" id="help" hidden>
+    <div class="dialog help anim" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <div class="dialog-h"><h3 id="help-title">Keyboard shortcuts</h3></div>
+      <div class="help-b">
+        {{range keyGroups}}
+        <div class="help-g">
+          <div class="help-gh">{{.Scope}}</div>
+          {{range .Keys}}<div class="help-r"><span class="kbd">{{.Show}}</span><span class="help-l">{{.Label}}</span></div>{{end}}
+        </div>
+        {{end}}
+      </div>
+      <div class="dialog-f"><button type="button" class="btn btn-outline" id="help-close">Close</button></div>
+    </div>
+  </div>
+  <script type="application/json" id="keymap">{{keymapJSON}}</script>
 
   <!-- message inspector (topic detail's table rows open here) -->
   <div class="overlay" id="inspector-overlay" hidden data-inspector-backdrop>
