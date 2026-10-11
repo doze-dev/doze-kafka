@@ -893,3 +893,7 @@ form.htmx-request .btn.primary::after { content: ""; width: 11px; height: 11px; 
 /* The line under a field, generated from the settings table. */
 .teach { margin: 4px 0 0; font-size: var(--fs-sm); line-height: 1.4; color: var(--muted-foreground); }
 .rowteach { flex-basis: 100%; }
+
+/* The wire dock: the requests that touched this resource, at the foot of its page. */
+.wiredock { margin-top: 28px; padding-bottom: 24px; }
+.wiredock tr[data-inspector-open] td { white-space: nowrap; }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"maps"
 	"net/http"
 	"sort"
 	"strconv"
@@ -199,6 +200,8 @@ func (c *Console) groupDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	list, _ := c.be.ListGroups(r.Context())
 	data["List"], data["Page"], data["Title"] = list, "groups", id
+	maps.Copy(data, c.dockData(DockFilter{Group: id}))
+	data["DockToggle"] = true // the group page has no pause control of its own.
 	c.render(w, r, "group_detail", data)
 }
 

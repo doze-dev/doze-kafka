@@ -36,6 +36,7 @@ type Console struct {
 	reg         *registryClient     // nil when there is no schema registry to talk to.
 	traffic     TrafficSource       // nil when the broker's traffic is not available to this console.
 	metrics     ClientMetricsSource // nil when clients' own metrics are not available.
+	dock        DockSource          // nil: the dock is built from traffic, or not offered.
 	traces      traceJobs           // message-lineage scans, running and recent.
 	traceHeader string              // an extra record header that holds a trace id (Options.TraceHeader).
 	mux         *http.ServeMux
@@ -79,6 +80,10 @@ type Options struct {
 	// membership changes. Nil, the Traffic section is not offered: the console cannot
 	// see the wire of a broker it is not part of.
 	Traffic TrafficSource
+	// Dock is what the wire dock under a topic, group or subject reads. Nil, it is
+	// built from Traffic (which can answer for a topic or a group); with neither, no
+	// dock is shown.
+	Dock DockSource
 	// TraceHeader is the name of a record header whose whole value is a trace id (a
 	// request id, a correlation id), found in addition to W3C traceparent and B3.
 	TraceHeader string
@@ -116,7 +121,9 @@ func New(opts Options) (*Console, error) {
 	c.traffic = opts.Traffic
 	c.metrics = opts.ClientMetrics
 	c.traceHeader = strings.TrimSpace(opts.TraceHeader)
+	c.dock = opts.Dock
 	c.routes()
+	c.shellRoutes(c.mux) // the shell's own addresses: the inspector and the wire dock (dock.go).
 	return c, nil
 }
 
@@ -271,8 +278,6 @@ func (c *Console) routes() {
 	// Cluster.
 	m.HandleFunc("GET "+p+"/cluster", c.cluster)
 	m.HandleFunc("GET "+p+"/access", c.access) // stored ACLs, read-only, with the banner that they are not enforced
-
-	c.inspectorRoutes(m) // the inspector: a request, client, member, subject, transaction or event.
 
 	// Resource index for the command palette.
 	m.HandleFunc("GET "+p+"/api/palette", c.apiPalette)

@@ -118,15 +118,26 @@
   }
   // Is this event about a live region's own poll? A failing poll must not toast
   // every few seconds; it gets one persistent state on the live control instead.
+  // The live regions a poll's path belongs to.
+  function liveRegionsFor(path) {
+    return Array.prototype.filter.call(document.querySelectorAll("[data-live]"), function (el) {
+      var base = el.getAttribute("data-live");
+      return !!base && path.indexOf(base) === 0;
+    });
+  }
   function isLivePoll(e) {
     var path = (e.detail && e.detail.requestConfig && e.detail.requestConfig.path) || "";
-    var el = document.querySelector("[data-live]");
-    var base = el && el.getAttribute("data-live");
-    return !!base && path.indexOf(base) === 0;
+    // Any live region's own poll counts: a page can have several (the tape and
+    // the wire dock), and a failing poll of any of them is "not updating", once.
+    return liveRegionsFor(path).length > 0;
   }
+  function pollPath(e) { return (e.detail && e.detail.requestConfig && e.detail.requestConfig.path) || ""; }
   function isInspectorRequest(e) { return !!(e.detail && e.detail.target && e.detail.target.id === "inspector"); }
-  function setDisconnected(on, why) {
-    document.querySelectorAll("[data-live]").forEach(function (el) {
+  // setDisconnected marks the regions whose poll failed (or all of them, with no
+  // path), once: a failing poll repeats every few seconds and says nothing new.
+  function setDisconnected(on, why, path) {
+    var regions = path ? liveRegionsFor(path) : Array.prototype.slice.call(document.querySelectorAll("[data-live]"));
+    regions.forEach(function (el) {
       el.classList.toggle("disconnected", on);
       var b = el.querySelector("[data-live-toggle]");
       if (b) b.title = on ? "Not updating: " + (why || "can't reach the broker") : (livePaused ? "Resume live updates" : "Pause live updates");
@@ -136,7 +147,7 @@
   // error slot if it has one, else a toast. (The inspector reports its own; see below.)
   document.addEventListener("htmx:responseError", function (e) {
     var msg = errorText(e.detail.xhr);
-    if (isLivePoll(e)) { setDisconnected(true, msg); return; }
+    if (isLivePoll(e)) { setDisconnected(true, msg, pollPath(e)); return; }
     if (isInspectorRequest(e)) return;
     var elt = e.detail.elt;
     var form = elt && elt.closest ? elt.closest("form") : null;
@@ -146,7 +157,7 @@
   });
   // Nothing came back at all (the console server itself is gone).
   function networkFailure(e) {
-    if (isLivePoll(e)) { setDisconnected(true, "the console server did not answer"); return; }
+    if (isLivePoll(e)) { setDisconnected(true, "the console server did not answer", pollPath(e)); return; }
     if (isInspectorRequest(e)) return;
     toast("No answer from the console — is doze-kafka still running?", "err");
   }
@@ -777,8 +788,10 @@
         // reference would go stale and the poll would silently die.
         var cur = document.getElementById(id);
         if (!cur || busy || document.hidden) return;
-        // Only a region with a pause control can be paused.
-        if (livePaused && cur.querySelector("[data-live-toggle]")) return;
+        // Paused is the page's: the tape, the dock and whatever else polls stop
+        // together (a navigation clears it, so it never follows you to a page
+        // that has no control to undo it).
+        if (livePaused) return;
         // A confirm dialog is asking about a button in this region. Replacing the
         // region would detach that button, and "Confirm" would then do nothing.
         // The same goes for a row whose offset is being edited (data-hold-live):
@@ -869,7 +882,7 @@
   document.addEventListener("htmx:afterRequest", function (e) {
     var xhr = e.detail.xhr;
     if (!xhr) return;
-    if (e.detail.successful && isLivePoll(e)) setDisconnected(false);
+    if (e.detail.successful && isLivePoll(e)) setDisconnected(false, "", pollPath(e));
     var h = xhr.getResponseHeader("HX-Live-Hash");
     if (!h || xhr.dozeHeld) return;
     var path = (e.detail.requestConfig && e.detail.requestConfig.path) || "";
