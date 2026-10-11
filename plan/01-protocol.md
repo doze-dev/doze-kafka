@@ -123,6 +123,25 @@ ticked. "N/A" is allowed only with a sentence saying why.
 - [ ] Every console route the surface owns is in the route table (foundation B8)
       with its method, whether it mutates, and the test that drives it.
 
+### Design conformance
+
+The design is the specification for the console. A stage that builds screens is
+not done until it has been compared with its boards by someone who did not
+build it (a fresh review, not the stage's own author).
+
+- [ ] **Board by board.** Every board of the stage is listed as MATCHES,
+      DEVIATES (with the reason and who accepted it) or CUT (D5, with a sentence).
+      "In spirit" is not a verdict.
+- [ ] **Tokens and structure are asserted, not eyeballed.** A spec in
+      `e2e/tests/design.spec.ts` checks the computed tokens per theme, the
+      layout facts the boards state (what is in flow, what overlays, what the
+      rail holds) and the copy the board prints for each state.
+- [ ] **Screenshots** at 1440 and 390 in light and dark sit beside each board in
+      the review, and nothing on a board is faked: a column whose data the broker
+      cannot supply is omitted and listed.
+- [ ] **No invented design.** A new element not on a board is listed with the
+      reason; the board is updated or the element removed.
+
 ### Behaviour
 
 - [ ] Every error code the surface can return is the one real Kafka returns
