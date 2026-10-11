@@ -37,7 +37,8 @@
 {{define "traffic_summary"}}
 <div class="row ce g8 wrap" id="traffic-summary"{{if .OOB}} hx-swap-oob="true"{{end}}>
   <span class="m">{{len .Clients}} client{{if ne (len .Clients) 1}}s{{end}} connected</span><span class="mut">·</span>
-  <span class="m">{{if .LastMinuteLowerBound}}at least {{end}}{{.LastMinute}} request{{if ne .LastMinute 1}}s{{end}} and <span class="{{if .ErrorCount}}bad{{else}}mut{{end}}">{{if .ErrorLowerBound}}at least {{end}}{{.ErrorCount}} error{{if ne .ErrorCount 1}}s{{end}}</span> in the last minute</span><span class="mut">·</span>
+  <span class="m">{{if .LastMinuteLowerBound}}at least {{end}}{{.LastMinute}} request{{if ne .LastMinute 1}}s{{end}} in the last minute</span><span class="mut">·</span>
+  <span class="m {{if .ErrorCount}}bad{{else}}mut{{end}}" title="Errors among the requests of the last minute">{{if .ErrorLowerBound}}at least {{end}}{{.ErrorCount}} error{{if ne .ErrorCount 1}}s{{end}}</span><span class="mut">·</span>
   <span class="m mut">kept: the last {{.KeptText}}, in memory only</span>
 </div>
 {{end}}

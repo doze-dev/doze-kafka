@@ -1014,22 +1014,28 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
 
 /* ---------- traffic ---------- */
 .trafficwrap { max-width: 1280px; }
-/* Main's columns, at the board's 12 px mono: the time, the result and the duration are
-   always whole (a time is 12 characters, the longest result name 20); the topic, the
-   detail and the client give way, with their full text on hover. */
+/* Main's columns: the board's own tracks, 92 150 118 1fr 190 84 52, with its 14 px
+   gap (7 px each side of a cell) and 12 px at the row's two ends. The time, the
+   result and the duration are always whole (a time is 12 characters, the longest
+   result name 20, which wraps); the client, the request, the topic and the detail
+   are the ones the board cuts with an ellipsis, with their full text on hover. The
+   board's 1fr is 10 px beside a 400 px inspector at 1440; the topic keeps 96 here (its header's words need 109 with the padding) and
+   the card scrolls sideways before it gives that up. */
 .tf-table { table-layout: fixed; }
-@media (min-width: 641px) { .tf-table { min-width: 806px; } }
-table.tbl.tf-table th, table.tbl.tf-table td { padding-left: 6px; padding-right: 6px; }
+@media (min-width: 641px) { .tf-table { min-width: 890px; } }
+table.tbl.tf-table th, table.tbl.tf-table td { padding-left: 7px; padding-right: 7px; }
+table.tbl.tf-table th:first-child, table.tbl.tf-table td:first-child { padding-left: 12px; }
+table.tbl.tf-table th:last-child, table.tbl.tf-table td:last-child { padding-right: 12px; }
 .tf-table th { overflow: hidden; }
 .tf-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tf-table td.cell-result { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; } /* a long error name wraps; it is never cut */
-.tf-table th:nth-child(1) { width: 100px; }
-.tf-table th:nth-child(2) { width: 120px; }
-.tf-table th:nth-child(3) { width: 130px; }
-.tf-table th:nth-child(4) { width: 110px; }
-.tf-table th:nth-child(5) { width: 130px; }
-.tf-table th:nth-child(6) { width: 158px; }
-.tf-table th:nth-child(7) { width: 60px; }
+.tf-table td.cell-time, .tf-table td.cell-took { text-overflow: clip; }
+.tf-table th:nth-child(1) { width: 111px; }  /* 92 + 12 + 7 */
+.tf-table th:nth-child(2) { width: 164px; }  /* 150 + 14 */
+.tf-table th:nth-child(3) { width: 132px; }  /* 118 + 14 */
+.tf-table th:nth-child(5) { width: 204px; }  /* 190 + 14 */
+.tf-table th:nth-child(6) { width: 98px; }   /* 84 + 14 */
+.tf-table th:nth-child(7) { width: 71px; }   /* 52 + 7 + 12 */
 .tf-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 8px; }
 .tf-f { flex: 1 1 150px; min-width: 130px; }
 .tf-f .input { width: 100%; }

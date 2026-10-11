@@ -21,7 +21,7 @@ func TestTrafficSummaryCountsEveryNumberInItsOwnWindow(t *testing.T) {
 	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = src })
 	body := req(t, c, "GET", "/_console/traffic", nil).Body.String()
 	sum := between(body, `id="traffic-summary"`, "kept:")
-	for _, want := range []string{"2 requests and", "1 error", "in the last minute"} {
+	for _, want := range []string{"2 requests in the last minute", "1 error<", "Errors among the requests of the last minute"} {
 		if !strings.Contains(sum, want) {
 			t.Errorf("the summary does not say %q:\n%s", want, sum)
 		}

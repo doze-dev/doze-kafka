@@ -504,7 +504,12 @@ test('the Traffic summary says the window of each number', async ({ page }) => {
   await page.goto('traffic');
   const sum = page.locator('#traffic-summary');
   await expect(sum).toContainText(/clients? connected/);
-  await expect(sum).toContainText(/\d+ requests? and \d+ errors? in the last minute/);
+  // Three items, as Main prints them, then the note on what is kept.
+  await expect(sum).toHaveText(/^\s*\d+ clients? connected\s*·\s*(at least )?\d+ requests? in the last minute\s*·\s*(at least )?\d+ errors?\s*·\s*kept: the last [\d,]+, in memory only\s*$/);
+  await expect(sum.locator('> .m')).toHaveCount(4);
+  await expect(sum.locator('> .mut:not(.m)')).toHaveText(['·', '·', '·']);
+  // The errors are those of the minute, and the number says so on hover.
+  await expect(sum.locator('> .m').nth(2)).toHaveAttribute('title', /last minute/);
   await expect(sum).toContainText(/kept: the last [\d,]+, in memory only/);
 });
 
@@ -625,5 +630,28 @@ test('the brand says doze-kafka once, and the instance only when it has a name o
   expect(text).not.toMatch(/doze-kafka local$/);
   const label = page.locator('#workspace-label');
   if (await label.count()) expect(['doze-kafka', 'local']).not.toContain((await label.innerText()).trim());
+});
+
+test('the Traffic columns are the board\'s: 92 150 118 1fr 190 84 52, with its 14 px gaps', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('traffic');
+  const cells = await page.locator('#traffic-table thead th').evaluateAll((ths) => ths.map((th) => {
+    const cs = getComputedStyle(th);
+    const w = th.getBoundingClientRect().width;
+    // The track is the cell less its padding; the board's gap is the two paddings that meet.
+    return { track: Math.round(w - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)), pl: cs.paddingLeft, pr: cs.paddingRight };
+  }));
+  expect(cells.map((c) => c.track)).toEqual([92, 150, 118, cells[3].track, 190, 84, 52]);
+  expect(cells[3].track).toBeGreaterThanOrEqual(96); // the topic's 1fr keeps room to be read.
+  for (let i = 0; i < cells.length - 1; i++) {
+    const meet = parseFloat(cells[i].pr) + parseFloat(cells[i + 1].pl);
+    expect(meet, `gap after column ${i + 1}`).toBe(14);
+  }
+  expect(cells[0].pl).toBe('12px');
+  expect(cells[6].pr).toBe('12px');
+  // The status strip's weights: the three counts and the note are mono, the dots are muted.
+  const strip = page.locator('#traffic-summary');
+  for (const el of await strip.locator('> .m').all()) await expect(el).toHaveCSS('font-family', /Plex Mono/);
+  await expect(strip.locator('> .mut:not(.m)').first()).toHaveCSS('color', 'rgb(86, 91, 99)');
 });
 
