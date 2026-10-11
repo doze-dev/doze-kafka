@@ -308,13 +308,11 @@ func oneOf(allowed ...string) check {
 }
 
 func cleanupPolicy(v string) error {
-	seen := map[string]bool{}
+	// Kafka's list validator checks each element and nothing else, so repeats are fine.
 	for _, p := range strings.Split(v, ",") {
-		p = strings.TrimSpace(p)
-		if p != "delete" && p != "compact" || seen[p] {
+		if p = strings.TrimSpace(p); p != "delete" && p != "compact" {
 			return fmt.Errorf("%q is not delete, compact, or both", v)
 		}
-		seen[p] = true
 	}
 	return nil
 }
