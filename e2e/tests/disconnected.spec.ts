@@ -137,6 +137,15 @@ test('Traffic when the broker is lost: the pill, the callout, the frozen line, R
   await expect(header.locator('button', { hasText: 'Retry now' })).toBeVisible();
   await expect(header.locator('[data-live-state]')).toBeHidden();
   await expect(page.locator('.frozen-line')).toContainText('Nothing newer than this line is known.');
+  // Traf-10 draws it as the row under the header, not above it.
+  const below = await page.evaluate(() => {
+    const head = document.querySelector('#traffic-table thead th')!.getBoundingClientRect();
+    const frozen = document.querySelector('.frozen-line')!.getBoundingClientRect();
+    const first = document.querySelector('#traffic-table tbody tr')!.getBoundingClientRect();
+    return { headBottom: head.bottom, frozenTop: frozen.top, frozenBottom: frozen.bottom, firstTop: first.top };
+  });
+  expect(below.frozenTop).toBeGreaterThanOrEqual(below.headBottom - 1);
+  expect(below.firstTop).toBeGreaterThanOrEqual(below.frozenBottom - 1);
   // The rows are dimmed, and only the rows: the header and the frozen line are not.
   await expect(page.locator('#traffic-table tbody')).toHaveCSS('opacity', '0.55');
   await expect(page.locator('#traffic-live .tbl-wrap')).toHaveCSS('opacity', '1');

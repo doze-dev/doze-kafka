@@ -180,6 +180,7 @@ test('Traf-05: a folded row says why it folded, draws a tick per repeat and unfo
 });
 
 test('Traf-06: the clients view has the board\'s nine columns, its tabs, and a rate for each client', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   await lightTraffic(page, 'traffic?view=clients');
   await expect(page.locator('main .idband .note').first()).toHaveText('Who is connected to this broker right now, and how each one is behaving.');
   await expect(page.locator('nav.tabs a.tab')).toHaveText([/^Requests$/, /^Clients \d+$/]);
@@ -190,9 +191,59 @@ test('Traf-06: the clients view has the board\'s nine columns, its tabs, and a r
   await expect(row.locator('td').nth(8)).toHaveText(/^(\d+(\.\d)? %|—)$/);
   await expect(page.locator('#traffic-summary')).toContainText(/\d+ clients? connected/);
   await expect(page.locator('#traffic-note')).toContainText('Error rate is the requests that were refused, denied or failed over all requests in the last 5 minutes.');
-  // The Requests tab goes back.
+  // The board draws no Connected-clients panel beside the table (the table is the list),
+  // so at 1440 the nine columns are not clipped and no row grows to wrap.
+  await expect(page.locator('#insp-default')).toHaveCount(0);
+  await expect(page.locator('#inspector-panel')).toBeHidden();
+  const fit = await page.locator('#clients-table').evaluate((t) => {
+    const wrap = t.closest('.tbl-wrap') as HTMLElement;
+    return { scroll: wrap.scrollWidth, client: wrap.clientWidth, rows: Array.from(t.querySelectorAll('tbody tr')).map((r) => r.getBoundingClientRect().height) };
+  });
+  expect(fit.scroll).toBeLessThanOrEqual(fit.client);
+  for (const h of fit.rows) expect(h).toBeLessThanOrEqual(40);
+  // Opening a client brings the panel; Esc puts the page back as it was.
+  await row.click();
+  await expect(page.locator('#inspector')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#inspector-panel')).toBeHidden();
+  // The Requests tab goes back, and its panel with it.
   await page.locator('nav.tabs a.tab', { hasText: 'Requests' }).click();
   await expect(page.locator('#traffic-table')).toBeVisible();
+  await expect(page.locator('#insp-default')).toBeVisible();
+});
+
+test('AD5: a refusal name wraps at its underscores, in the table and in the story, and is never cut', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await lightTraffic(page, 'traffic?kind=errors&q=doze-seed');
+  const cell = page.locator('#traffic-table td.cell-result', { hasText: 'TOPIC_ALREADY_EXISTS' }).first();
+  await expect(cell).toBeVisible();
+  const lines = await cell.evaluate((td) => {
+    // Each rendered line of the name, by where its words sit: a line may end only after "_".
+    const text = td.firstElementChild!;
+    const range = document.createRange();
+    range.selectNodeContents(text);
+    const rects = Array.from(range.getClientRects());
+    const tops = new Set(rects.map((r) => Math.round(r.top)));
+    return { tops: tops.size, whole: text.textContent, cut: (td as HTMLElement).scrollWidth > (td as HTMLElement).clientWidth };
+  });
+  expect(lines.whole).toBe('TOPIC_ALREADY_EXISTS');
+  expect(lines.cut).toBe(false);
+  // The break opportunities are after the underscores, and nowhere else.
+  const html = await cell.innerHTML();
+  expect(html).toContain('TOPIC_<wbr>ALREADY_<wbr>EXISTS');
+  // Rows are the board's 28 px, or two lines for a long name; never the 3 lines of a mid-word break.
+  const h = (await cell.evaluate((td) => td.parentElement!.getBoundingClientRect().height));
+  expect(h).toBeLessThan(80);
+
+  // The story's Result is whole as well (it was cut with an ellipsis at 80 px).
+  await page.goto(`traffic?group=${GROUP}&kind=groups`);
+  const results = page.locator('#traffic-story .r:not(.h) > .cell-result');
+  await expect(results.first()).toBeVisible();
+  for (const el of await results.all()) {
+    const cut = await el.evaluate((e) => e.scrollWidth > e.clientWidth + 1);
+    expect(cut).toBe(false);
+    await expect(el).toHaveCSS('text-overflow', 'clip');
+  }
 });
 
 test('Traf-07: a client that reports its metrics puts what is worth a look first', async ({ page }) => {
@@ -285,6 +336,34 @@ test('Traf-08: paused, the list is frozen and says how many requests it has miss
   await expect(banner).toBeHidden();
   await expect(page.locator('html')).not.toHaveAttribute('data-paused', '');
 });
+
+// The key strip says "↵ open": j to a row then Enter, and a focused row then Enter, open
+// its request or client in the inspector, on every kind of row the page has.
+for (const [name, path, row, title] of [
+  ['requests', 'traffic?kind=errors&q=doze-seed', '#traffic-table tbody tr', /CreateTopics/],
+  ['clients', 'traffic?view=clients', '#clients-table tbody tr', /\S/],
+  ['story', `traffic?group=${GROUP}&kind=groups`, '#traffic-story .r[data-inspector-open]', /\S/],
+] as const) {
+  test(`keyboard: j then Enter, and a focused row then Enter, open the inspector on ${name} rows`, async ({ page }) => {
+    await lightTraffic(page, path);
+    const rows = page.locator(row);
+    await expect(rows.first()).toBeVisible();
+    const inspector = page.locator('#inspector');
+    await page.locator('body').click({ position: { x: 700, y: 10 } });
+    await page.keyboard.press('j');
+    await expect(page.locator('main .cursor')).toHaveCount(1);
+    await expect(page.locator('main .cursor')).toHaveAttribute('data-inspector-open', '');
+    await page.keyboard.press('Enter');
+    await expect(inspector).toBeVisible();
+    await expect(inspector.locator('#inspector-title')).toContainText(title);
+    await page.keyboard.press('Escape');
+    await expect(inspector).toBeHidden();
+    await rows.first().focus();
+    await page.keyboard.press('Enter');
+    await expect(inspector).toBeVisible();
+    await expect(inspector.locator('#inspector-title')).toContainText(title);
+  });
+}
 
 test('Traf-12: a group filter tells the rebalance in order, with its generations', async ({ page }) => {
   await lightTraffic(page, `traffic?group=${GROUP}&kind=groups`);

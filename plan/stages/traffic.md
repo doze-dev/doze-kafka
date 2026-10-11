@@ -270,7 +270,7 @@ Statuses: `real` (exists), `buildable` (data exists, screen or small query does 
 **Raw kmsg (`internal/broker`)**
 
 - JoinGroup v9 with a 900 KiB reason, then the recorder's row is clipped (TRF-1).
-- PushTelemetry: codec 2 with an 11-byte xerial body -> `INVALID_REQUEST`, connection alive (TRF-3); the 200-push burst (TRF-4, TRF-5); a zstd bomb answered in under 5 MiB of allocation (TRF-2); a push from another connection with the same instance id (TRF-27).
+- PushTelemetry: codec 2 with an 11-byte xerial body -> `INVALID_REQUEST`, connection alive (TRF-3); the 200-push burst (TRF-4, TRF-5); a zstd bomb answered in under 5 MiB of allocation (TRF-2).
 - ApiVersions on `--console=false` and on an embedded broker has no 71/72 (TRF-14).
 - Unadvertised API -> an observation with `Class=failed` and the connection closed (TRF-11).
 - OffsetFetch v8 with a partition error, AddPartitionsToTxn v3: the recorded `Error` is that code (TRF-7).

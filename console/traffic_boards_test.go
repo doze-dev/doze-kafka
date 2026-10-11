@@ -53,7 +53,7 @@ func TestTrafficBoardsRenderWhatTheRecorderHolds(t *testing.T) {
 
 	// Main: a folded heartbeat reads as a rhythm, a refusal in the board's purple, normal
 	// flow is not an error, a closed connection says why.
-	body := req(t, c, "GET", "/_console/traffic", nil).Body.String()
+	body := strings.ReplaceAll(req(t, c, "GET", "/_console/traffic", nil).Body.String(), "<wbr>", "") // a result wraps at its underscores.
 	for _, want := range []string{"every 3 s", `class="errrow refused"`, `class="errrow denied"`, `class="errrow failed"`, "MEMBER_ID_REQUIRED", "CONNECTION_CLOSED", "3 clients connected", "last 4 requests refused", "producer · tx checkout-1"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("Main does not show %q", want)
@@ -91,6 +91,26 @@ func TestTrafficBoardsRenderWhatTheRecorderHolds(t *testing.T) {
 	}
 	if flat := req(t, c, "GET", "/_console/traffic?group=g-order-validator&flat=1", nil).Body.String(); strings.Contains(flat, `id="traffic-story"`) {
 		t.Error("flat still shows the story")
+	}
+	// The generations table draws the newest generation as the board's .on row, and only that.
+	gens := between(st, `id="group-summary"`, "What the sequence means")
+	if n := strings.Count(gens, `<div class="r on">`); n != 1 || !strings.Contains(gens, `<div class="r on"><span class="m b">7</span>`) {
+		t.Errorf("generations: %d rows are .on, want only generation 7: %s", n, gens)
+	}
+	// The folded heartbeat of the generation before is the unindented last row, at the
+	// time it was first seen (not when it was last seen, with milliseconds).
+	story := between(st, `id="traffic-story"`, "</main>")
+	if !strings.Contains(story, `<div class="r kid `) {
+		t.Errorf("the generation before is not an unindented row: %s", story)
+	}
+	// Result names wrap at their underscores: a break may follow each, never fall inside a word.
+	if main := req(t, c, "GET", "/_console/traffic", nil).Body.String(); !strings.Contains(main, "UNKNOWN_<wbr>TOPIC_<wbr>OR_<wbr>PARTITION") {
+		t.Error("a refusal's name does not offer a break after each underscore")
+	}
+	// The frozen line is the row under the header, not above the table.
+	if main := req(t, c, "GET", "/_console/traffic", nil).Body.String(); !strings.Contains(main, `</tr>
+      <tr class="frozen-line lost-only">`) {
+		t.Error("the frozen line is not the table's second header row")
 	}
 
 	// Clients: needs a look, the callout with what it means.
