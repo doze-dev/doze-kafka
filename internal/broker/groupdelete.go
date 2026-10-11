@@ -55,8 +55,7 @@ func (b *Broker) deleteGroup(id string) int16 {
 	}
 	n, err := b.meta.DeleteGroupOffsets(id)
 	if err != nil {
-		b.log.Warn("delete group: could not remove committed offsets", "group", id, "err", err)
-		return kerr.UnknownServerError.Code
+		return b.storageFault("delete group: remove committed offsets", err, "group", id)
 	}
 	if !existed && n == 0 {
 		return kerr.GroupIDNotFound.Code
@@ -102,7 +101,7 @@ func (b *Broker) handleOffsetDelete(ctx context.Context, req *protocol.Request, 
 				// can hold one, and refusing left no way to remove it short of
 				// deleting the whole group.
 				if err := b.meta.DeleteOffset(odr.Group, t.Topic, p.Partition); err != nil {
-					rp.ErrorCode = kerr.UnknownServerError.Code
+					rp.ErrorCode = b.storageFault("delete group offsets", err, "group", odr.Group, "topic", t.Topic)
 				}
 			}
 			rt.Partitions = append(rt.Partitions, rp)

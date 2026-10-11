@@ -57,7 +57,7 @@ func (b *Broker) growTopic(t kmsg.CreatePartitionsRequestTopic, validateOnly boo
 
 	cur, ok, err := b.meta.Topic(t.Topic)
 	if err != nil {
-		return kerr.UnknownServerError, err.Error()
+		return b.storageFaultError("create partitions: read the topic", err, "topic", t.Topic), err.Error()
 	}
 	if !ok {
 		return kerr.UnknownTopicOrPartition, fmt.Sprintf("there is no topic %q", t.Topic)
@@ -87,8 +87,7 @@ func (b *Broker) growTopic(t kmsg.CreatePartitionsRequestTopic, validateOnly boo
 	}
 
 	if err := b.logs.EnsurePartitionDirs(t.Topic, t.Count); err != nil {
-		b.log.Warn("create partitions: could not make the partition directories", "topic", t.Topic, "err", err)
-		return kerr.UnknownServerError, err.Error()
+		return b.storageFaultError("create partitions: make the partition directories", err, "topic", t.Topic), err.Error()
 	}
 	updated, err := b.meta.SetPartitions(t.Topic, t.Count)
 	switch {
@@ -97,8 +96,7 @@ func (b *Broker) growTopic(t kmsg.CreatePartitionsRequestTopic, validateOnly boo
 	case errors.Is(err, meta.ErrPartitionsNotIncreased):
 		return kerr.InvalidPartitions, strings.TrimPrefix(err.Error(), "meta: ")
 	case err != nil:
-		b.log.Warn("create partitions: could not store the new count", "topic", t.Topic, "err", err)
-		return kerr.UnknownServerError, err.Error()
+		return b.storageFaultError("create partitions: store the new count", err, "topic", t.Topic), err.Error()
 	}
 	b.cg848.topicChanged(updated.Name)
 	b.produce.signal(updated.Name)

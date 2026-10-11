@@ -227,6 +227,14 @@ func (b *Broker) storageFault(op string, err error, attrs ...any) int16 {
 	return kerr.UnknownServerError.Code
 }
 
+// storageFaultError is storageFault for the handlers that answer with a *kerr.Error.
+func (b *Broker) storageFaultError(op string, err error, attrs ...any) *kerr.Error {
+	if b.storageFault(op, err, attrs...) == kerr.KafkaStorageError.Code {
+		return kerr.KafkaStorageError
+	}
+	return kerr.UnknownServerError
+}
+
 // isIOError reports whether err came from the file system rather than from the
 // broker's own logic.
 func isIOError(err error) bool {

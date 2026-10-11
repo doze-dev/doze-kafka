@@ -177,7 +177,7 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 			msg := strings.TrimPrefix(err.Error(), "meta: ")
 			rt.ErrorMessage = &msg
 		} else {
-			rt.ErrorCode = kerr.UnknownServerError.Code
+			rt.ErrorCode = b.storageFault("create topic: register", err, "topic", t.Topic)
 			msg := err.Error()
 			rt.ErrorMessage = &msg
 		}
@@ -190,7 +190,7 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 	// second must undo the first: otherwise the name stays registered, every later
 	// produce fails, and CreateTopics answers TOPIC_ALREADY_EXISTS.
 	if err := b.materialize(created); err != nil {
-		rt.ErrorCode = kerr.UnknownServerError.Code
+		rt.ErrorCode = b.storageFault("create topic: make the partition directories", err, "topic", t.Topic)
 		msg := err.Error()
 		rt.ErrorMessage = &msg
 		return rt

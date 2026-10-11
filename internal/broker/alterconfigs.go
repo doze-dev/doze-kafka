@@ -46,7 +46,7 @@ func (b *Broker) alterTopic(name string, next func(current map[string]string) (m
 
 	t, ok, err := b.meta.Topic(name)
 	if err != nil {
-		return &alterError{kerr.UnknownServerError.Code, err.Error()}
+		return &alterError{b.storageFault("alter configs: read the topic", err, "topic", name), err.Error()}
 	}
 	if !ok {
 		return &alterError{kerr.UnknownTopicOrPartition.Code, fmt.Sprintf("there is no topic %q", name)}
@@ -70,8 +70,7 @@ func (b *Broker) alterTopic(name string, next func(current map[string]string) (m
 		if errors.Is(err, meta.ErrNoSuchTopic) { // deleted since the lookup above.
 			return &alterError{kerr.UnknownTopicOrPartition.Code, fmt.Sprintf("there is no topic %q", name)}
 		}
-		b.log.Warn("alter configs: could not store the topic's configuration", "topic", name, "err", err)
-		return &alterError{kerr.UnknownServerError.Code, err.Error()}
+		return &alterError{b.storageFault("alter configs: store the topic's configuration", err, "topic", name), err.Error()}
 	}
 	b.applyTopicLimits(updated.Name, updated.Config)
 	return nil

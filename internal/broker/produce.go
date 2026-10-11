@@ -55,7 +55,6 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 	}
 
 	producedTopics := map[string]struct{}{}
-	refused := false // a partition's payload was rejected as invalid.
 	// Partitions written by this request, with where their response entries sit,
 	// so an fsync failure can be reported against exactly those entries.
 	type slot struct{ topic, part int }
@@ -78,12 +77,10 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 			case !authorized:
 				rp.ErrorCode = kerr.TopicAuthorizationFailed.Code
 				rp.BaseOffset = -1
-				refused = true
 			case !ok || part.Partition < 0 || part.Partition >= topic.Partitions:
 				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
 			default:
 				wrote, answered := b.appendRecords(req.Conn, pr.TransactionID, name, topic.Config, part, &rp)
-				refused = refused || rp.ErrorCode == kerr.CorruptMessage.Code || rp.ErrorCode == kerr.MessageTooLarge.Code || rp.ErrorCode == kerr.InvalidRecord.Code
 				if wrote {
 					producedTopics[name] = struct{}{}
 				}
@@ -104,11 +101,18 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 		b.produce.signal(topic) // wake the fetchers reading this topic.
 	}
 	if pr.Acks == 0 {
-		if refused {
-			// acks=0 has no response to carry the error, so the only way to tell
-			// the producer its data was not taken is to drop the connection, as a
-			// real broker does. Staying silent lost the records unnoticed.
-			return nil, fmt.Errorf("produce with acks=0 carried a record batch the broker refused")
+		// acks=0 has no response to carry an error, so the only way to tell the
+		// producer its data was not taken (a refused batch, an unknown topic or
+		// partition, storage that could not take it) is to drop the connection.
+		// Apache Kafka does so for any partition's error (recorded:
+		// conformance/recordings/produce-acks-zero.json); staying silent lost the
+		// records unnoticed.
+		for _, t := range resp.Topics {
+			for _, p := range t.Partitions {
+				if p.ErrorCode != 0 {
+					return nil, fmt.Errorf("produce with acks=0 was refused for %s-%d (%s)", t.Topic, p.Partition, kerr.ErrorForCode(p.ErrorCode))
+				}
+			}
 		}
 		return nil, nil // fire-and-forget: the client expects no response.
 	}
