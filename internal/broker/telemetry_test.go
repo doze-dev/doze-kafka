@@ -278,6 +278,16 @@ func TestClientTelemetryFromAnotherBrokersSubscriptionAsksTheClientToSubscribeAg
 	if code := push(t, c2, sub.ClientInstanceID, sub.SubscriptionID, 0, metricsPayload(1), false); code != kerr.UnknownSubscriptionID.Code {
 		t.Errorf("a push to a broker that never subscribed it: %d, want UNKNOWN_SUBSCRIPTION_ID", code)
 	}
+	// What the client does next: it asks again, with the instance id it had. The restarted
+	// broker (an empty store) takes the id as its own and the client's pushes are stored
+	// again, over a new connection and for the same principal: it resumes, and does not stop.
+	again := subscribe(t, c2, sub.ClientInstanceID)
+	if again.ErrorCode != 0 || again.ClientInstanceID != sub.ClientInstanceID {
+		t.Fatalf("subscribing again with the old instance id: code %d, id %x (was %x)", again.ErrorCode, again.ClientInstanceID, sub.ClientInstanceID)
+	}
+	if code := push(t, c2, again.ClientInstanceID, again.SubscriptionID, 0, metricsPayload(1), false); code != 0 {
+		t.Errorf("the push after subscribing again: %d, want none", code)
+	}
 }
 
 // A payload a real librdkafka 2.15.1 sent (zstd, 480 bytes, a 2 MiB window declared): the

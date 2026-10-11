@@ -20,21 +20,43 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
-// report plays what a KIP-714 client does over its own connection: subscribe, then push
-// reports of its request latency, its error rate and its poll idle ratio.
-func report(ctx context.Context, cl *kgo.Client) error {
-	sub := kmsg.NewPtrGetTelemetrySubscriptionsRequest()
-	subResp, err := sub.RequestWith(ctx, cl)
-	if err != nil || subResp.ErrorCode != 0 {
-		return fmt.Errorf("subscription: %v", err)
+// report plays what a KIP-714 client does over its own connection: subscribe, push a
+// report of its request latency, its error rate and its poll idle ratio, and push again
+// on the interval it was given. Told UNKNOWN_SUBSCRIPTION_ID (a broker that restarted has
+// forgotten every subscription), or failing to reach the broker, it subscribes again, as
+// the Java client does; so the client keeps reporting across a broker restart.
+func report(ctx context.Context, cl *kgo.Client) {
+	var sub *kmsg.GetTelemetrySubscriptionsResponse
+	var id [16]byte
+	var burst int
+	wait := func(d time.Duration) bool {
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(d):
+			return true
+		}
 	}
-	for i, latency := range []float64{1.2, 1.4, 1.6, 1.4} {
+	for i := 0; ; i++ {
+		if sub == nil {
+			req := kmsg.NewPtrGetTelemetrySubscriptionsRequest()
+			req.ClientInstanceID = id
+			resp, err := req.RequestWith(ctx, cl)
+			if err != nil || resp.ErrorCode != 0 {
+				if !wait(time.Second) {
+					return
+				}
+				continue
+			}
+			sub, id, burst = resp, resp.ClientInstanceID, 0
+		}
+		now := time.Now()
 		payload := telemetry.Encode(telemetry.Payload{
 			Resource: map[string]string{"client_rack": "hold-rack"},
 			Metrics: []telemetry.Metric{
-				{Name: "org.apache.kafka.consumer.request.latency.avg", Unit: "ms", Kind: telemetry.Gauge, Points: []telemetry.Point{{Time: time.Now(), Value: latency}}},
-				{Name: "org.apache.kafka.consumer.request.error.rate", Unit: "1/s", Kind: telemetry.Gauge, Points: []telemetry.Point{{Time: time.Now(), Value: 0}}},
-				{Name: "org.apache.kafka.consumer.poll.idle.ratio.avg", Kind: telemetry.Gauge, Points: []telemetry.Point{{Time: time.Now(), Value: 0.9 + float64(i)/100}}},
+				{Name: "org.apache.kafka.consumer.request.latency.avg", Unit: "ms", Kind: telemetry.Gauge, Points: []telemetry.Point{{Time: now, Value: 1.2 + float64(i%4)/5}}},
+				{Name: "org.apache.kafka.consumer.request.error.rate", Unit: "1/s", Kind: telemetry.Gauge, Points: []telemetry.Point{{Time: now, Value: 0}}},
+				{Name: "org.apache.kafka.consumer.poll.idle.ratio.avg", Kind: telemetry.Gauge, Points: []telemetry.Point{{Time: now, Value: 0.9 + float64(i%4)/100}}},
 			},
 		})
 		var zipped bytes.Buffer
@@ -42,12 +64,25 @@ func report(ctx context.Context, cl *kgo.Client) error {
 		zw.Write(payload)
 		zw.Close()
 		push := kmsg.NewPtrPushTelemetryRequest()
-		push.ClientInstanceID, push.SubscriptionID, push.CompressionType, push.Metrics = subResp.ClientInstanceID, subResp.SubscriptionID, 1, zipped.Bytes()
-		if resp, err := push.RequestWith(ctx, cl); err != nil || resp.ErrorCode != 0 {
-			return fmt.Errorf("push %d: %v (error code %d)", i, err, resp.ErrorCode)
+		push.ClientInstanceID, push.SubscriptionID, push.CompressionType, push.Metrics = id, sub.SubscriptionID, 1, zipped.Bytes()
+		resp, err := push.RequestWith(ctx, cl)
+		if err != nil || resp.ErrorCode != 0 {
+			sub = nil // subscribe again on the next turn, with the id it has.
+			if !wait(time.Second) {
+				return
+			}
+			continue
+		}
+		// A few reports at once after each subscription, so a page that opens just after
+		// has a series to draw (a sparkline needs two points); then the interval's pace.
+		pause := time.Duration(sub.PushIntervalMillis) * time.Millisecond
+		if burst++; burst < 4 {
+			pause = 50 * time.Millisecond
+		}
+		if !wait(pause) {
+			return
 		}
 	}
-	return nil
 }
 
 func main() {
@@ -58,8 +93,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	opts := connopt.Opts()
-	// HOLD_NO_METRICS=1 is a client that does not report (Traf-11's board).
-	if os.Getenv("HOLD_NO_METRICS") != "" {
+	// HOLD_NO_METRICS=1 is a client that does not report (Traf-11's board). HOLD_TELEMETRY=1
+	// reports through report() above, as the one instance this client is: the library's own
+	// reporting is off then, or the client would be two instances under one client id and
+	// the console would show whichever pushed last.
+	if os.Getenv("HOLD_NO_METRICS") != "" || os.Getenv("HOLD_TELEMETRY") != "" {
 		opts = append(opts, kgo.DisableClientMetrics())
 	}
 	cl, err := kgo.NewClient(append(opts, kgo.SeedBrokers(os.Args[1]), kgo.ClientID(os.Args[2]), kgo.ConsumerGroup(os.Args[3]), kgo.ConsumeTopics(os.Args[4]),
@@ -69,13 +107,9 @@ func main() {
 		os.Exit(1)
 	}
 	defer cl.Close()
-	// HOLD_TELEMETRY=1 makes the client also report its metrics, once, over a connection
-	// of its own.
+	// HOLD_TELEMETRY=1 makes the client report its metrics for as long as it runs.
 	if os.Getenv("HOLD_TELEMETRY") != "" {
-		if err := report(ctx, cl); err != nil {
-			fmt.Fprintln(os.Stderr, "hold:", err)
-			os.Exit(1)
-		}
+		go report(ctx, cl)
 	}
 	for ctx.Err() == nil {
 		pctx, cancel := context.WithTimeout(ctx, time.Second)

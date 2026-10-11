@@ -204,6 +204,9 @@ test('Traf-07: a client that reports its metrics puts what is worth a look first
   const hasMetrics = async () => {
     await page.keyboard.press('Escape');
     await rows.first().click();
+    // The inspector is fetched: count what it holds once it has loaded, not while it says
+    // "Loading" (a count taken at once is 0 whatever the client has reported).
+    await expect(page.locator('#client-inspector')).toBeVisible();
     return (await page.locator('#client-inspector .metric-list.worth').count()) > 0;
   };
   await expect.poll(hasMetrics, { timeout: 20_000, intervals: [1_000] }).toBe(true);
