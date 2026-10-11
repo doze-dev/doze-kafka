@@ -155,8 +155,8 @@ func TestNoSecretReachesAnyOutput(t *testing.T) {
 		return p
 	}
 	for name, a := range map[string][]string{
-		"a --sasl-user with no colon": {"--sasl-mechanisms", "PLAIN", "--sasl-user", plantedPassword},
-		"a password in an unquoted TOML value": {"--config", write("a.toml", "[credentials]\nalice = "+plantedPassword+"\n")},
+		"a --sasl-user with no colon":           {"--sasl-mechanisms", "PLAIN", "--sasl-user", plantedPassword},
+		"a password in an unquoted TOML value":  {"--config", write("a.toml", "[credentials]\nalice = "+plantedPassword+"\n")},
 		"a password where a number was written": {"--config", write("b.toml", "[credentials]\nalice = 12"+plantedPassword+"\n")},
 		"a password of the wrong type":          {"--config", write("c.toml", "[credentials]\nalice = [\""+plantedPassword+"\"]\n")},
 		"a password in an unknown key":          {"--config", write("d.toml", "[credentials]\nalice = \""+plantedPassword+"\"\n[other]\nx = \""+plantedPassword+"\"\n")},
