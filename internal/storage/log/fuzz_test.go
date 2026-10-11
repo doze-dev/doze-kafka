@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"testing"
+
+	"github.com/klauspost/compress/zstd"
 )
 
 // Foundation B12: every parser of bytes a client sent has a fuzz target. These
@@ -98,6 +100,12 @@ func FuzzDecompress(f *testing.F) {
 	f.Add(uint8(codecGzip), good, uint16(10))
 	f.Add(uint8(codecSnappy), append(append([]byte(nil), xerialMagic...), 0, 0, 0), uint16(100))
 	f.Add(uint8(codecSnappy), xerialMagic, uint16(100))
+	// A zstd frame declaring a 64 MiB window over a megabyte of zeros: refused before the
+	// window is allocated (the produce path's bomb), and a tiny snappy block that claims
+	// the whole limit.
+	enc, _ := zstd.NewWriter(nil, zstd.WithWindowSize(64<<20), zstd.WithEncoderConcurrency(1))
+	f.Add(uint8(codecZstd), enc.EncodeAll(make([]byte, 1<<20), nil), uint16(65535))
+	f.Add(uint8(codecSnappy), []byte{0xff, 0xff, 0xff, 0x7f, 0x00}, uint16(65535))
 	f.Fuzz(func(t *testing.T, codec uint8, body []byte, limit uint16) {
 		out, err := Decompress(int(codec%6), body, int(limit))
 		if err == nil && codec%6 != codecNone && len(out) > int(limit) {

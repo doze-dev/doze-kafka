@@ -440,6 +440,11 @@ func TestGroupKIP848_OffsetsAreFencedByMemberAndEpoch(t *testing.T) {
 // join for the same new id, sent together, used to both succeed now and then.
 // (The older check for this compared ListGroups entries, which the client merges
 // by name, so it could not fail.)
+//
+// The classic member's subscription here is not the consumer protocol's, which is what
+// keeps its group from being taken in by the new coordinator (a group of real consumers
+// is: TestGroupCoordinators_MembersOfBothProtocolsShareAGroup); what is held is that a
+// group id is never live under both coordinators at once.
 func TestGroupCoordinators_ConcurrentFirstJoinsCannotBothWin(t *testing.T) {
 	ctx, addr, _, _ := setup848(t, 0, map[string]int32{"t": 1})
 	both := 0

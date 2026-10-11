@@ -34,6 +34,35 @@ implement it.
   retry, it takes the log directory offline; doze-kafka does the same for the one
   partition, answering `KAFKA_STORAGE_ERROR` to every write (and every `acks=all`
   acknowledgement) until a restart, when recovery decides from what is really on disk.
+- **A compressed batch is looked inside only as far as a topic needs, and one that
+  inflates past 64 MiB is refused.** Kafka holds a produced batch to
+  `max.message.bytes` as it arrived (a batch of a few hundred bytes that inflates to
+  50 KB is accepted under a 2000 byte limit), and holds a topic with
+  `compression.type=uncompressed` to the size it inflates to; both are recorded
+  (`conformance/recordings/produce-decompressed-size.json`) and doze-kafka answers
+  `MESSAGE_TOO_LARGE` for the same cases. Kafka has no other bound on what a batch
+  inflates to; this broker, which holds the records of a batch to compact it, refuses a
+  batch that inflates past 64 MiB (or a zstd frame that declares a window past 8 MiB)
+  with the same `MESSAGE_TOO_LARGE`, wherever it has to look inside the batch (a
+  compacted topic, an uncompressed topic, a timestamp lookup). The look is a stream:
+  what is held is a window and a buffer, not the payload. Other topics store the batch
+  as it came, as Kafka does with `compression.type=producer`, and a topic whose
+  `compression.type` names a codec is not re-compressed on the way in, so the
+  re-compressed size Kafka checks is not what is checked here.
+- **A consumer-protocol member is asked to heartbeat every second**, where Kafka's
+  `group.consumer.heartbeat.interval.ms` is 5 seconds: rebalances settle in a couple of
+  seconds on a development machine instead of ten.
+- **A consumer group's target assignment is computed before the request that causes it
+  is answered.** Kafka answers a join first and runs the assignor after, so a describe
+  taken in between shows the group `Assigning`, the old targets, and a classic member
+  that has just joined is told the epoch before its own join as its generation. Here the
+  new targets are there when the join is answered, the group is never `Assigning`, and
+  that generation is one higher. Which request is answered with which code is the same
+  (recorded: `mixed-protocol-groups.json`, `mixed-protocol-rolling.json`).
+- **An empty group with no committed offsets is forgotten at once.** Kafka keeps it
+  listed, `Empty`, until its offsets retention has passed; here a group that holds
+  nothing is not worth listing, and a console that showed every consumer that ever
+  came and went would be a long page.
 - **A batch whose `acks=all` fsync failed stays in the log.** The producer is told
   `KAFKA_STORAGE_ERROR` with no offset, but the batch was already appended: a consumer
   can read it, and a non-idempotent retry stores it again (an idempotent retry is

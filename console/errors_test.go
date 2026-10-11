@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kerr"
+
+	"github.com/doze-dev/doze-kafka/internal/protocol"
 )
 
 func TestRefusalFor(t *testing.T) {
@@ -175,5 +177,28 @@ func TestEmptyListsSayWhy(t *testing.T) {
 	}
 	if !strings.Contains(body, `id="list-none"`) {
 		t.Error("the list should carry a no-matches state for when a filter hides everything")
+	}
+}
+
+// A write refused with KAFKA_STORAGE_ERROR is not always a write that did not happen:
+// when the fsync after the append failed the batch is in the log (BAD-2, pinned by
+// TestFsyncFailedBatchIsEitherRolledBackOrDocumented). The console's words must not say
+// the batch was not appended; they say it may be there.
+func TestStorageErrorTextDoesNotClaimTheBatchWasNotAppended(t *testing.T) {
+	r := refusalFor(kerr.KafkaStorageError)
+	info := protocol.Explain(kerr.KafkaStorageError.Code)
+	for _, s := range []string{r.Message, r.Rule, info.Meaning, info.Cause, info.Fix} {
+		l := strings.ToLower(s)
+		for _, bad := range []string{"not appended", "was not written", "no offset was assigned", "nothing was written"} {
+			if strings.Contains(l, bad) {
+				t.Errorf("%q says %q, which is false for a failed sync", s, bad)
+			}
+		}
+	}
+	if !strings.Contains(r.Message, "may already be in the log") {
+		t.Errorf("the refusal does not say the batch may be in the log: %q", r.Message)
+	}
+	if !strings.Contains(info.Cause, "may already be in the log") {
+		t.Errorf("the Traffic inspector's cause does not say it: %q", info.Cause)
 	}
 }

@@ -39,7 +39,10 @@ func (b *Broker) handleConsumerGroupHeartbeat(ctx context.Context, req *protocol
 		mid := res.memberID
 		resp.MemberID = &mid
 		resp.MemberEpoch = res.memberEpoch
-		resp.HeartbeatIntervalMillis = cg848HeartbeatMs
+		// A leave is answered with no interval to keep (recorded: offsets-retention).
+		if res.memberEpoch >= 0 {
+			resp.HeartbeatIntervalMillis = cg848HeartbeatMs
+		}
 		resp.Assignment = res.assignment
 	}
 	return nil
@@ -60,6 +63,10 @@ func (b *Broker) handleConsumerGroupDescribe(ctx context.Context, req *protocol.
 		state, epoch, assignor, members, ok := b.cg848.describe(group)
 		if !ok || (len(members) == 0 && b.claims.ownerOf(group) == protoClassic) {
 			rg.ErrorCode = kerr.GroupIDNotFound.Code
+			if b.claims.ownerOf(group) == protoClassic {
+				msg := "Group " + group + " is not a consumer group."
+				rg.ErrorMessage = &msg
+			}
 			resp.Groups = append(resp.Groups, rg)
 			continue
 		}
@@ -76,9 +83,8 @@ func (b *Broker) handleConsumerGroupDescribe(ctx context.Context, req *protocol.
 			rm.RackID = mem.rack
 			rm.MemberEpoch = mem.epoch
 			rm.SubscribedTopics = mem.subscribed
-			if mem.regex != "" {
-				rm.SubscribedTopicRegex = &mem.regex
-			}
+			regex := mem.regex // "" when there is none, as Kafka sends it.
+			rm.SubscribedTopicRegex = &regex
 			rm.Assignment = b.describeAssignment(mem.assigned)
 			rm.TargetAssignment = b.describeAssignment(mem.target)
 			rg.Members = append(rg.Members, rm)

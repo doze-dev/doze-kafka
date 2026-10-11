@@ -19,6 +19,45 @@ here that contains "server API"; `task api` fails without it.
   longer the client library's. A Produce partition that does not exist answers a base
   offset of -1.
 
+- Groups: classic and consumer-protocol members can share a group id, as on Kafka 4 with
+  its default migration policy (a rolling upgrade or downgrade of an application, one
+  instance at a time). A consumer-protocol join turns a classic group into a consumer
+  group with its members kept; a classic join becomes a member of a consumer group; the
+  last consumer-protocol member leaving makes it classic again. Recorded against
+  `apache/kafka:4.3.1` (`mixed-protocol-groups`, `mixed-protocol-rolling`). Before this
+  the second protocol was refused (`INCONSISTENT_GROUP_PROTOCOL` / `GROUP_ID_NOT_FOUND`).
+  A new consumer-protocol group's first member epoch is 2, as Kafka's; a group nobody
+  joined is listed with an empty protocol type, as Kafka lists it, and DescribeGroups of
+  an Empty group answers no protocol.
+- Committed offsets expire, as Kafka's `offsets.retention.minutes`: `--offsets-retention`
+  (default 7 days, 0 keeps them for ever). A group that had members keeps its offsets
+  from the moment it became empty, a standalone commit from its own commit, a group with
+  members keeps those of the topics it reads and loses the rest; the rules are recorded
+  (`offsets-retention`) and the time a group emptied is kept across a restart. A group
+  whose offsets are all gone is no longer listed.
+
+- `doze-kafka config print` redacts passwords: every `[credentials]` entry is written as
+  `"<redacted>"`, and `config print --show-secrets` writes the file to run from. A file
+  that still holds the placeholder is refused when loaded, by user. A malformed
+  `--sasl-user` and a bad credentials line in a config file no longer repeat the value
+  in the error. Nothing else printed a secret: a test plants a password, a wrong one, the
+  console credential and TLS key material and reads the summary, the debug log, every
+  console page it links to, `DescribeConfigs` and the errors for each.
+
+- Produce: what a compressed batch may inflate to is bounded by a stream, not a buffer.
+  A keyed-topic check used to inflate a batch whole (up to 256 MiB, held again by the
+  record decoder) before it looked at a key; it now streams, holding a window and a
+  buffer, and refuses a batch that inflates past 64 MiB, or a zstd frame declaring a
+  window past 8 MiB, with `MESSAGE_TOO_LARGE`. A topic with `compression.type=uncompressed`
+  is held to `max.message.bytes` as the batch inflates, as Kafka holds it (recorded
+  against `apache/kafka:4.3.1`, `produce-decompressed-size`); a batch Kafka accepts
+  because it weighs little still works.
+
+- Console: a write refused with `KAFKA_STORAGE_ERROR` no longer reads as if nothing
+  was written. When the fsync after the append failed the batch is in the log (BAD-2),
+  so the refusal, the Traffic inspector's cause and the error table say it may already
+  be there and that a non-idempotent retry can store it twice.
+
 - Traffic, third review: Enter on a link inside the inspector (the client link, "See a
   client that reports", a topic's neighbours) opens its selection; a refusal's name
   never breaks inside a word (the Result column is 118 px, the board's 84 cut

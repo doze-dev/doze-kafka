@@ -40,6 +40,55 @@ and resumes from there rather than replaying from the beginning. If a group has 
 committed for a partition, the client falls back to its `auto.offset.reset` setting
 (earliest/latest).
 
+### Both at once: a rolling upgrade
+
+A group id can have members of both protocols, as on Kafka 4 with its default migration
+policy: one instance of an application moves to `group.protocol=consumer` while the
+others are still classic, and nothing is stopped. What the broker does is what Apache
+Kafka does, recorded in `conformance/recordings/mixed-protocol-groups.json` and
+`mixed-protocol-rolling.json`:
+
+- A consumer-protocol member joining a classic group (protocol type `consumer`) turns it
+  into a consumer group. The classic members stay in it, holding the partitions they
+  held, until they rejoin; the new member waits for what they give up.
+- A classic client joining a consumer group becomes one of its members. Nobody relays
+  its assignment: its `JoinGroup` is answered with no leader and no member list, and its
+  `SyncGroup` carries the partitions it may have now.
+- A classic member is told to rejoin the way the protocol always did, by
+  `REBALANCE_IN_PROGRESS` on a heartbeat, when its partitions are to change. Its rejoin
+  gives up everything it held, which is what lets another member take them.
+- When the last consumer-protocol member leaves, the group is a classic group again and
+  its members rejoin (`ILLEGAL_GENERATION` on their next heartbeat).
+- A classic group whose protocol type is not `consumer` (a Connect worker) is not
+  upgraded: the consumer-protocol join is refused with `GROUP_ID_NOT_FOUND`.
+- A group with no members moves from one protocol to the other whole, and keeps its
+  committed offsets.
+
+The differences left are in [limitations](limitations.md): Kafka computes the target
+assignment after it has answered a join, so epochs read one apart for a moment and the
+group is shown `Assigning`; this broker computes it first.
+
+### When committed offsets expire
+
+Offsets are not kept for ever: as on Kafka (`offsets.retention.minutes`), they expire
+after `--offsets-retention` (default 7 days; `0` keeps them for ever). Which clock
+applies is Kafka's, recorded against `apache/kafka:4.3.1`
+(`conformance/recordings/offsets-retention.json`):
+
+- A group that **had members and has none now** keeps its offsets for the retention from
+  the moment it became empty, however late its last commit was. A commit made into an
+  empty group does not extend it.
+- A group **nobody ever joined** (a standalone consumer committing by hand) keeps each
+  offset for the retention from its own commit.
+- A group **with members** never loses the offsets of the topics it is subscribed to;
+  those of a topic it is not subscribed to expire from their own commit. A group in the
+  middle of a rebalance is not looked at.
+- A group whose offsets are all gone is gone: it is no longer listed.
+
+When a group became empty is kept in the metadata database, so a restart does not give
+it a new retention. An offset stored by a version that did not record commit times is
+given the time of the first sweep that sees it.
+
 ## Two protocols, chosen automatically
 
 Kafka has two consumer-group protocols, and doze-kafka speaks both. You don't pick;

@@ -54,6 +54,15 @@ broker would accept:
 doze-kafka config print > doze-kafka.toml
 ```
 
+Passwords are never printed: each `[credentials]` entry is written as `"<redacted>"`,
+so the output is safe to paste into an issue or a chat. A file with the placeholder
+still in it is refused when it is loaded, by user (it would otherwise be the password),
+so put the passwords back, or print with `config print --show-secrets` to write a file
+the broker can start from. The same rule holds everywhere else: no password and no key
+material is in the start-up summary, the log (at any level), the console, a
+`DescribeConfigs` answer or an error message (a malformed `--sasl-user` or credentials
+line names the flag or the line and not the value).
+
 A bad setting is reported once, before anything starts, as a single line, with exit
 code 2 (a broker that fails *while running* exits 1). That covers a mistyped flag, a
 value out of range, and a TLS certificate that is missing or does not match its key:
@@ -112,6 +121,7 @@ where this one says `kafka-version`; that spelling is still read.
 | `--default-partitions` | `1` | Partition count for auto-created topics. |
 | `--max-partitions` | `1000` | Most partitions one topic may have. Each is a directory and open files, so a typo like `--default-partitions 100000` is refused rather than taking the machine down. |
 | `--consumer-session-timeout` | `45s` | KIP-848 group session timeout: evict a member after this long without a heartbeat. (Classic groups use the timeout the client requests.) |
+| `--offsets-retention` | `168h` | How long a group's committed offsets are kept once nothing is reading them: Kafka's `offsets.retention.minutes` (7 days). `0` keeps them for ever. The rules are in [consumer groups](consumer-groups.md#when-committed-offsets-expire). |
 | `--client-telemetry` | `true` | Accept the metrics clients push about themselves (KIP-714: Java 3.7+, librdkafka 2.5+) and show the last few minutes in the console. `--client-telemetry=false` stops advertising the two APIs, so clients stop sending. See [Observability](observability.md). |
 | `--zone` | `true` | Join the shared `.doze` zone: claim `kafka.<name>.doze` and route the console through the front door. `--zone=false` is the same as `DOZE_ZONE=off` and needs `--listen`, since there is then no name to listen on. |
 
@@ -159,7 +169,7 @@ where this one says `kafka-version`; that spelling is still read.
 | `doze-kafka version` / `--version` / `-v` | Print doze-kafka's version and the Kafka range it speaks. |
 | `doze-kafka env` | Print the shell block that points a client at this instance (`eval "$(doze-kafka env)"`): `KAFKA_BOOTSTRAP_SERVERS` and `KAFKA_BROKERS`. |
 | `doze-kafka doctor` | Report what is set up for `.doze` names and what is not, and which process holds which name. Needs no privilege. |
-| `doze-kafka config print [flags]` | Print the effective configuration as TOML. |
+| `doze-kafka config print [--show-secrets] [flags]` | Print the effective configuration as TOML, passwords as `"<redacted>"` unless `--show-secrets`. |
 | `doze-kafka dns-setup` | One-time setup for the shared `.doze` names. See [Endpoints](endpoints.md). |
 | `doze-kafka help` | The grouped help. |
 

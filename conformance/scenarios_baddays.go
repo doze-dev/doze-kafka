@@ -12,6 +12,12 @@ func init() {
 	Scenarios = append(Scenarios,
 		Scenario{Name: "joingroup-session-timeout", Run: joinGroupSessionTimeout},
 		Scenario{Name: "produce-acks-zero", Run: produceAcksZero},
+		Scenario{Name: "produce-decompressed-size", Run: produceDecompressedSize, Known: []Known{
+			// A refusal's text is doze-kafka's own; Kafka's response carries none.
+			{Step: "keep-uncompressed-over", Path: "Topics[0].Partitions[0].ErrorMessage", Limitation: limMessages},
+			{Step: "keep-gzip-compressed-over", Path: "Topics[0].Partitions[0].ErrorMessage", Limitation: limMessages},
+			{Step: "plain-gzip-small-inflates-50k", Path: "Topics[0].Partitions[0].ErrorMessage", Limitation: limMessages},
+		}},
 	)
 }
 
@@ -80,4 +86,65 @@ func produceAcksZero(e *Env) {
 	corrupt := append([]byte(nil), ok...)
 	corrupt[len(corrupt)-1] ^= 0xff
 	zero("corrupt", "z", 0, corrupt)
+}
+
+// produceDecompressedSize is the Q10 recording: which size does a real Kafka hold a
+// compressed batch to, the batch as it came (compressed) or what it inflates to? The
+// topics have max.message.bytes=2000; every payload inflates to far more than that and
+// the compressible ones weigh a few hundred bytes. Each answer is then followed by a
+// Fetch, so a "success" is shown to have stored the batch.
+func produceDecompressedSize(e *Env) {
+	cfg := func(name, compression string) kmsg.CreateTopicsRequestTopic {
+		return newTopic(name, 1, 1, "max.message.bytes", "2000", "compression.type", compression)
+	}
+	e.Do("create", createTopics(false,
+		cfg("keep", "producer"), cfg("plain", "uncompressed"), cfg("recompress", "gzip"),
+		newTopic("compact", 1, 1, "max.message.bytes", "2000", "cleanup.policy", "compact"),
+		newTopic("default", 1, 1)), 7)
+
+	zeros := func(n int) []ProduceRecord {
+		return []ProduceRecord{{TimestampMs: 1000, Key: "k", Value: string(make([]byte, n))}}
+	}
+	noise := func(n int) []ProduceRecord {
+		b := make([]byte, n)
+		x := uint32(2463534242)
+		for i := range b {
+			x ^= x << 13
+			x ^= x >> 17
+			x ^= x << 5
+			b[i] = byte(x)
+		}
+		return []ProduceRecord{{TimestampMs: 1000, Key: "k", Value: string(b)}}
+	}
+	send := func(label, topic string, records []byte) {
+		r := kmsg.NewPtrProduceRequest()
+		r.Acks, r.TimeoutMillis = -1, 5000
+		t := kmsg.NewProduceRequestTopic()
+		t.Topic = topic
+		p := kmsg.NewProduceRequestTopicPartition()
+		p.Records = records
+		t.Partitions = append(t.Partitions, p)
+		r.Topics = append(r.Topics, t)
+		// A topic only just created has no leader for a moment (NOT_LEADER_OR_FOLLOWER);
+		// ask again until it has one, and record the answer that is about the batch.
+		e.DoUntil(label, r, 9, func(resp kmsg.Response) bool {
+			for _, t := range resp.(*kmsg.ProduceResponse).Topics {
+				for _, p := range t.Partitions {
+					if p.ErrorCode == 6 {
+						return false
+					}
+				}
+			}
+			return true
+		})
+	}
+	send("keep-uncompressed-over", "keep", encodeBatch(zeros(5000)))
+	send("keep-gzip-small-inflates-50k", "keep", encodeBatchCodec(zeros(50000), 1))
+	send("keep-zstd-small-inflates-50k", "keep", encodeBatchCodec(zeros(50000), 4))
+	send("keep-gzip-compressed-over", "keep", encodeBatchCodec(noise(5000), 1))
+	send("plain-gzip-small-inflates-50k", "plain", encodeBatchCodec(zeros(50000), 1))
+	send("plain-gzip-small-inflates-1k", "plain", encodeBatchCodec(zeros(1000), 1))
+	send("recompress-zstd-small-inflates-50k", "recompress", encodeBatchCodec(zeros(50000), 4))
+	send("compact-gzip-small-inflates-50k", "compact", encodeBatchCodec(zeros(50000), 1))
+	send("default-gzip-inflates-20m", "default", encodeBatchCodec(zeros(20<<20), 1))
 }

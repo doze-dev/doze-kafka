@@ -1,7 +1,7 @@
 # Claims: Bad days (stage 1, "Durability first")
 
 The recording queue of `plan/stages/bad-days.md` section 8, as far as stage 1 got.
-Q2, Q5 and Q9 (acks=0) are recorded against `apache/kafka:4.3.1`; the rest stay at `memory` or
+Q2, Q5, Q9 (acks=0) and Q10 (what a compressed batch is held to) are recorded against `apache/kafka:4.3.1`; the rest stay at `memory` or
 `doc` until a stage that needs them records them.
 
 | ID | Claim | Source | Evidence | Scenario |
@@ -13,3 +13,7 @@ Q2, Q5 and Q9 (acks=0) are recorded against `apache/kafka:4.3.1`; the rest stay 
 | Q5c | The rebalance timeout has no bounds of its own: 1 ms and 2000000000 ms are accepted | recorded | conformance/recordings/joingroup-session-timeout.json | joingroup-session-timeout, steps rebalance-1, rebalance-huge |
 | Q1 | A failed fsync is not retried by Kafka; the log directory goes offline | doc | Kafka KIP-112 (handle disk failure for JBOD); the broker's LogDirFailureChannel | Not reproducible by a client; the observable result is Q2b. The doze-side behaviour is a design choice (BAD-3). |
 | Q9 | An acks=0 Produce that carries any partition error (unknown topic, unknown partition, message too large, corrupt batch) makes the broker close the connection; an accepted one does not | recorded | conformance/recordings/produce-acks-zero.json | produce-acks-zero (each acks=0 request followed by a Metadata request on the same connection) |
+| Q10a | Kafka holds a produced batch to `max.message.bytes` as it arrived: a gzip or zstd batch that weighs a few hundred bytes and inflates to 50 KB is accepted on a topic whose limit is 2000, and one that weighs more than 2000 compressed is MESSAGE_TOO_LARGE (10), error message null | recorded | conformance/recordings/produce-decompressed-size.json | produce-decompressed-size, steps keep-gzip-small-inflates-50k, keep-zstd-small-inflates-50k, keep-gzip-compressed-over, keep-uncompressed-over |
+| Q10b | On a topic with `compression.type=uncompressed` Kafka inflates what a producer compressed and holds the stored size to the limit: 50 KB inflated under 2000 is MESSAGE_TOO_LARGE (10); 1 KB inflated is accepted | recorded | conformance/recordings/produce-decompressed-size.json | produce-decompressed-size, steps plain-gzip-small-inflates-50k, plain-gzip-small-inflates-1k |
+| Q10c | A topic whose `compression.type` is a codec re-compresses and holds the re-compressed size: a zstd batch inflating to 50 KB is accepted on a gzip topic with a 2000 limit | recorded | conformance/recordings/produce-decompressed-size.json | produce-decompressed-size, step recompress-zstd-small-inflates-50k |
+| Q10d | A compacted topic and a default topic accept a keyed compressed batch that inflates past the limit (50 KB under 2000, and 20 MiB under the default): Kafka has no bound on what a batch inflates to, only memory | recorded | conformance/recordings/produce-decompressed-size.json | produce-decompressed-size, steps compact-gzip-small-inflates-50k, default-gzip-inflates-20m |

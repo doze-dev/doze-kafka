@@ -130,6 +130,17 @@ type cg848Manager struct {
 	claims         *groupClaims
 	stopped        bool           // the broker is shutting down: timers do nothing.
 	sink           GroupEventSink // told what happens in groups; nil = nobody is watching.
+
+	// emptied and activated tell the offsets retention when a group lost its last
+	// member and when it got one again; nil = nobody is counting.
+	emptied, activated func(group string)
+
+	// bridge is the classic coordinator, for moving a group between the two when a
+	// member of the other protocol joins (groupmigrate.go); nil when there is none.
+	bridge classicBridge
+	// pending holds the member ids handed out to classic clients joining a consumer
+	// group with MEMBER_ID_REQUIRED, and not yet used.
+	pending map[string]map[string]time.Time
 }
 
 func newCG848Manager(m meta.Store, logger *slog.Logger, sessionTimeout time.Duration, claims *groupClaims) *cg848Manager {
@@ -182,6 +193,10 @@ type cg848Member struct {
 
 	rebalanceTimeout time.Duration
 	left             bool // a static member that left (epoch -2): its place is held until its session expires.
+
+	// classic is set for a member that arrived through the classic JoinGroup, and is
+	// kept alive and told what to do by the classic APIs (groupmigrate.go).
+	classic *classicSeat
 
 	session expiry // evicts the member if it stops heartbeating.
 	revoke  expiry // fences it if it does not give up revoked partitions in time.
@@ -246,6 +261,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 		m.emit(g, "left", r.MemberID, "a member left the group", "")
 		m.removeMember(g, r.MemberID)
 		m.bumpAndReassign(g, "a member left")
+		m.maybeDowngrade(g)
 		return cg848Result{memberID: r.MemberID, memberEpoch: r.MemberEpoch}
 	}
 
@@ -286,21 +302,35 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 			// Unknown here (after a broker restart, say): the member must rejoin.
 			return cg848Error(kerr.UnknownMemberID.Code, "no such member; rejoin")
 		}
-		// The id is taken for this protocol in one step; a classic group holding
-		// it (or one being formed at this instant) wins and this join is refused.
-		if !m.claims.claim(r.Group, protoConsumer) {
-			return cg848Error(kerr.GroupIDNotFound.Code, "the group id is in use by a classic group")
+		// The id is taken for this protocol in one step. A classic group holding it
+		// with members is upgraded: they stay, as members of this one.
+		adopted, refused := m.acquire(r.Group)
+		if refused != nil {
+			return *refused
 		}
-		g = &cg848Group{id: r.Group, assignor: assignorUniform, members: make(map[string]*cg848Member)}
-		m.groups[r.Group] = g
+		if adopted == nil {
+			// Epoch 1 before anyone has joined: the first member's join takes it to 2, which
+			// is the first epoch Kafka gives a member of a new group (recorded).
+			adopted = &cg848Group{id: r.Group, epoch: 1, assignor: assignorUniform, members: make(map[string]*cg848Member)}
+			m.groups[r.Group] = adopted
+		}
+		g = adopted
 	} else if len(g.members) == 0 && r.MemberEpoch == 0 {
 		// An emptied group kept for listing: joining it needs the claim again.
-		if !m.claims.claim(r.Group, protoConsumer) {
-			return cg848Error(kerr.GroupIDNotFound.Code, "the group id is in use by a classic group")
+		adopted, refused := m.acquire(r.Group)
+		if refused != nil {
+			return *refused
+		}
+		if adopted != nil {
+			g = adopted
 		}
 	}
 
 	mem := g.members[r.MemberID]
+	if mem != nil && mem.classic != nil {
+		// A classic member is not heard from here: it heartbeats by the classic API.
+		return cg848Error(kerr.UnknownMemberID.Code, "no such member; rejoin")
+	}
 	changed := false
 
 	if r.MemberEpoch == 0 {
@@ -325,6 +355,9 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 		switch {
 		case mem == nil:
 			mem = &cg848Member{id: r.MemberID, target: tpSet{}, assigned: tpSet{}}
+			if len(g.members) == 0 && m.activated != nil {
+				m.activated(g.id)
+			}
 			g.members[r.MemberID] = mem
 			changed = true
 			m.emit(g, "joined", r.MemberID, "client "+who.clientID, "")
@@ -469,6 +502,7 @@ func (m *cg848Manager) revokeExpired(g *cg848Group, mem *cg848Member, gen uint64
 	m.emit(g, "expired", mem.id, "a member did not acknowledge a revocation within its rebalance timeout", "")
 	m.removeMember(g, mem.id)
 	m.bumpAndReassign(g, "a member was removed")
+	m.maybeDowngrade(g)
 }
 
 // bumpAndReassign advances the group epoch and recomputes every member's target.
@@ -478,11 +512,16 @@ func (m *cg848Manager) bumpAndReassign(g *cg848Group, why string) {
 	}
 	g.epoch++
 	m.assign(g)
+	m.armClassicRevocations(g)
 	m.emit(g, "epoch", "", why+"; "+plural(len(g.members), "member")+" reassigned", why)
 }
 
 func (m *cg848Manager) resetSession(g *cg848Group, mem *cg848Member) {
-	mem.session.arm(m.sessionTimeout, func(gen uint64) { m.sessionExpired(g, mem, gen) })
+	timeout := m.sessionTimeout
+	if mem.classic != nil && mem.classic.session > 0 {
+		timeout = mem.classic.session // the one its JoinGroup asked for.
+	}
+	mem.session.arm(timeout, func(gen uint64) { m.sessionExpired(g, mem, gen) })
 }
 
 // sessionExpired is a member's session timer firing. A firing overtaken by a
@@ -496,6 +535,7 @@ func (m *cg848Manager) sessionExpired(g *cg848Group, mem *cg848Member, gen uint6
 	m.emit(g, "expired", mem.id, "a member sent no heartbeat within its session timeout", "")
 	m.removeMember(g, mem.id)
 	m.bumpAndReassign(g, "a member's session expired")
+	m.maybeDowngrade(g)
 	m.log.Info("KIP-848 member session expired", "group", g.id, "member", mem.id)
 }
 
@@ -510,6 +550,9 @@ func (m *cg848Manager) removeMember(g *cg848Group, id string) {
 		// runs; forget drops it.
 		g.epoch++
 		m.claims.release(g.id, protoConsumer)
+		if m.emptied != nil {
+			m.emptied(g.id)
+		}
 	}
 }
 
@@ -587,6 +630,9 @@ func (m *cg848Manager) memberCheck(groupID, memberID string, epoch int32) int16 
 		return kerr.UnknownMemberID.Code
 	}
 	if epoch != mem.epoch {
+		if mem.classic != nil {
+			return kerr.IllegalGeneration.Code // a classic member's epoch is its generation.
+		}
 		return kerr.StaleMemberEpoch.Code
 	}
 	return errNone
@@ -640,4 +686,30 @@ func (m *cg848Manager) describe(group string) (state string, epoch int32, assign
 		})
 	}
 	return g.stateName(), g.epoch, g.assignor, members, true
+}
+
+// acquire takes the group id for the consumer protocol. A classic group holding it with
+// members is taken over (adopted); one of another protocol type is refused as Kafka
+// refuses it. adopted is nil when the id was simply free. Caller holds m.mu.
+func (m *cg848Manager) acquire(id string) (adopted *cg848Group, refused *cg848Result) {
+	if m.claims.claim(id, protoConsumer) {
+		return nil, nil
+	}
+	if m.bridge != nil && m.claims.ownerOf(id) == protoClassic {
+		snap, status := m.bridge.takeClassic(id)
+		switch status {
+		case takeOK:
+			m.log.Info("classic group became a consumer group: a consumer-protocol member joined", "group", id, "members", len(snap.members))
+			return m.adopt(id, snap), nil
+		case takeNotConsumer:
+			r := cg848Error(kerr.GroupIDNotFound.Code, "Cannot upgrade classic group "+id+" to consumer group because the group does not use the consumer embedded protocol.")
+			return nil, &r
+		case takeNone:
+			if m.claims.claim(id, protoConsumer) {
+				return nil, nil
+			}
+		}
+	}
+	r := cg848Error(kerr.GroupIDNotFound.Code, "the group id is in use by a classic group")
+	return nil, &r
 }

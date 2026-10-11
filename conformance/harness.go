@@ -2,6 +2,7 @@ package conformance
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -16,7 +17,7 @@ import (
 	"time"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
-
+	"github.com/klauspost/compress/zstd"
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
@@ -40,14 +41,20 @@ type Scenario struct {
 	// (a tmpfs) so a script can fill it. Such a scenario is recorded and not
 	// replayed in-process: doze-kafka's side is the size-limited volume test.
 	DiskMiB int
+	// KafkaEnv are extra environment settings for the real broker, as KAFKA_NAME=value
+	// (offsets.retention.minutes is KAFKA_OFFSETS_RETENTION_MINUTES).
+	KafkaEnv []string
+	// Replay, when set, configures the doze-kafka the scenario is replayed against, and
+	// Speed (1 when 0) is how many times faster than the recording its waits run: a
+	// script that waits a minute for Kafka's smallest retention waits Wait(minute) and
+	// is replayed against a retention of a minute over Speed. Only the waits scale.
+	Replay func(cfg *config.Config)
+	Speed  float64
 	// Known are the differences doze-kafka has from Apache Kafka that are
 	// written down (docs/limitations.md) and not fixed. A replay fails on a
 	// difference that is not here, and fails on an entry here that no longer
 	// differs, so the list cannot go stale.
 	Known []Known
-	// KafkaEnv are extra environment settings for the real broker's container
-	// (KAFKA_...): a scenario about authorization turns the authorizer on.
-	KafkaEnv []string
 	// Users, when set, make both brokers serve SASL/PLAIN with these users
 	// (name to password); Admin names the one that is a super user. The raw
 	// connection then logs in with Env.Open.
@@ -98,6 +105,7 @@ type Recording struct {
 // version, and the steps that are not requests (restart, broker config).
 type Env struct {
 	target Target
+	speed  float64 // 1 against Kafka; Scenario.Speed against doze-kafka.
 	w      *wire
 	norm   *normalizer
 	steps  []Step
@@ -119,7 +127,7 @@ func NewEnv(target Target, fail func(string, ...any)) (*Env, error) {
 	if err != nil {
 		return nil, err
 	}
-	e := &Env{target: target, w: w, norm: newNormalizer(), fail: fail, conns: map[string]*connSlot{"": {w: w}}}
+	e := &Env{target: target, w: w, norm: newNormalizer(), fail: fail, speed: 1, conns: map[string]*connSlot{"": {w: w}}}
 	return e, nil
 }
 
@@ -179,6 +187,18 @@ func (e *Env) Reconnect() {
 	c.w = nil
 	e.connect(c)
 	e.w = c.w
+}
+
+// Wait sleeps d, divided by the scenario's speed when it is replayed against
+// doze-kafka. It is not a step: the answers that follow it are.
+func (e *Env) Wait(d time.Duration) {
+	time.Sleep(time.Duration(float64(d) / e.speed))
+}
+
+// Quiet sends req and discards the answer, without recording a step: the keep-alive
+// traffic of a script (a member that must not be expired while the script waits).
+func (e *Env) Quiet(req kmsg.Request, version int16) {
+	e.w.roundTrip(req, version)
 }
 
 // Steps are the recorded steps so far.
@@ -398,7 +418,10 @@ func (e *Env) Produce(label, topic string, partition int32, recs ...ProduceRecor
 }
 
 // encodeBatch builds a v2 record batch with no producer id.
-func encodeBatch(recs []ProduceRecord) []byte {
+func encodeBatch(recs []ProduceRecord) []byte { return encodeBatchCodec(recs, 0) }
+
+// encodeBatchCodec is encodeBatch with the records section compressed (1 gzip, 4 zstd).
+func encodeBatchCodec(recs []ProduceRecord, codec int) []byte {
 	first, max := recs[0].TimestampMs, recs[0].TimestampMs
 	var body []byte
 	for i, r := range recs {
@@ -418,7 +441,7 @@ func encodeBatch(recs []ProduceRecord) []byte {
 		body = append(body, rec...)
 	}
 	var tail []byte // everything the CRC covers: attributes onward.
-	tail = binary.BigEndian.AppendUint16(tail, 0)
+	tail = binary.BigEndian.AppendUint16(tail, uint16(codec))
 	tail = binary.BigEndian.AppendUint32(tail, uint32(len(recs)-1))
 	tail = binary.BigEndian.AppendUint64(tail, uint64(first))
 	tail = binary.BigEndian.AppendUint64(tail, uint64(max))
@@ -426,6 +449,20 @@ func encodeBatch(recs []ProduceRecord) []byte {
 	tail = binary.BigEndian.AppendUint16(tail, 0xffff)     // producer epoch -1
 	tail = binary.BigEndian.AppendUint32(tail, 0xffffffff) // base sequence -1
 	tail = binary.BigEndian.AppendUint32(tail, uint32(len(recs)))
+	switch codec {
+	case 1:
+		var b bytes.Buffer
+		w := gzip.NewWriter(&b)
+		w.Write(body)
+		w.Close()
+		body = b.Bytes()
+	case 4:
+		var b bytes.Buffer
+		w, _ := zstd.NewWriter(&b)
+		w.Write(body)
+		w.Close()
+		body = b.Bytes()
+	}
 	tail = append(tail, body...)
 
 	var out []byte
@@ -451,6 +488,9 @@ func Run(s Scenario, target Target) (steps []Step, err error) {
 	e, err := NewEnv(target, func(format string, args ...any) { panic(failure(fmt.Sprintf(format, args...))) })
 	if err != nil {
 		return nil, err
+	}
+	if sp, ok := target.(interface{ Speed() float64 }); ok && sp.Speed() > 0 {
+		e.speed = sp.Speed()
 	}
 	defer e.Close()
 	s.Run(e)

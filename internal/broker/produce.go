@@ -181,12 +181,32 @@ func (b *Broker) appendRecords(conn *protocol.Conn, txnID *string, topic string,
 			return false, false
 		}
 	}
-	// A compacted topic is keyed: a record with no key has nothing to replace, and is
-	// refused as Kafka refuses it.
-	if compacts(topicConfig) {
-		if err := log.RequireKeys(part.Records); err != nil {
-			rp.ErrorCode = kerr.InvalidRecord.Code
+	// What the broker has to look inside a compressed batch for: a compacted topic is
+	// keyed (a record with no key has nothing to replace, and is refused as Kafka refuses
+	// it), and a topic that stores uncompressed is held to max.message.bytes as it is
+	// stored, which Kafka does by inflating what a producer compressed (recorded:
+	// produce-decompressed-size; every other topic is held to the size as it arrived,
+	// checked above). The look is a stream: a batch that inflates past what this broker
+	// holds is MESSAGE_TOO_LARGE however little it weighs.
+	check := log.RecordCheck{RequireKeys: compacts(topicConfig)}
+	if topicConfig["compression.type"] == "uncompressed" {
+		if limit, ok := topicInt(topicConfig, "max.message.bytes"); ok {
+			check.MaxStored = limit
+		}
+	}
+	if check.RequireKeys || check.MaxStored > 0 {
+		if err := log.CheckRecords(part.Records, check); err != nil {
 			msg := err.Error()
+			switch {
+			case errors.Is(err, log.ErrStoredTooLarge):
+				rp.ErrorCode = kerr.MessageTooLarge.Code
+				msg = fmt.Sprintf("a record batch that inflates past this topic's max.message.bytes (%d): the topic stores records uncompressed (compression.type)", check.MaxStored)
+			case errors.Is(err, log.ErrInflatedTooLarge):
+				rp.ErrorCode = kerr.MessageTooLarge.Code
+				msg = fmt.Sprintf("a record batch inflates past %d bytes, more than this broker will inflate", log.MaxInflatedBytes)
+			default:
+				rp.ErrorCode = kerr.InvalidRecord.Code
+			}
 			rp.ErrorMessage = &msg
 			rp.BaseOffset = -1
 			return false, false

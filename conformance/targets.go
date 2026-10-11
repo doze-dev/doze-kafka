@@ -146,6 +146,7 @@ func ready(addr, user, pass string) bool {
 type dozeTarget struct {
 	addr   string
 	dir    string
+	speed  float64
 	cancel context.CancelFunc
 	done   chan struct{}
 	mod    func(*config.Config)
@@ -155,9 +156,10 @@ type dozeTarget struct {
 // with the defaults the binary has.
 func StartDoze(dir string) (Target, error) { return startDoze(dir, nil) }
 
-// StartDozeFor is StartDoze with the configuration a scenario asks for.
+// StartDozeFor is StartDoze with the configuration a scenario asks for: its SASL users,
+// what Doze and Replay change, and the speed its waits run at.
 func StartDozeFor(dir string, s Scenario) (Target, error) {
-	return startDoze(dir, func(c *config.Config) {
+	t, err := startDozeWith(dir, func(c *config.Config) {
 		if len(s.Users) > 0 {
 			c.SASLMechanisms = []string{config.SASLPlain}
 			c.Credentials = s.Users
@@ -165,10 +167,26 @@ func StartDozeFor(dir string, s Scenario) (Target, error) {
 		if s.Doze != nil {
 			s.Doze(c)
 		}
+		if s.Replay != nil {
+			s.Replay(c)
+		}
 	})
+	if err != nil {
+		return nil, err
+	}
+	t.speed = s.Speed
+	return t, nil
 }
 
 func startDoze(dir string, mod func(*config.Config)) (Target, error) {
+	t, err := startDozeWith(dir, mod)
+	if err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+func startDozeWith(dir string, mod func(*config.Config)) (*dozeTarget, error) {
 	port, err := freePort()
 	if err != nil {
 		return nil, err
@@ -176,6 +194,9 @@ func startDoze(dir string, mod func(*config.Config)) (Target, error) {
 	t := &dozeTarget{addr: fmt.Sprintf("127.0.0.1:%d", port), dir: dir, mod: mod}
 	return t, t.start()
 }
+
+// Speed is how much faster than the recording this target's waits run.
+func (t *dozeTarget) Speed() float64 { return t.speed }
 
 func (t *dozeTarget) start() error {
 	cfg := config.Default()

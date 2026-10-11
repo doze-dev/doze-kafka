@@ -38,7 +38,8 @@ type Broker struct {
 	log     *slog.Logger
 	logs    *log.Manager
 	meta    meta.Store
-	claims  *groupClaims // which protocol each live group id belongs to.
+	claims  *groupClaims  // which protocol each live group id belongs to.
+	expiry  *offsetExpiry // applies the offsets retention; nil when it is off.
 	groups  *groupManager
 	cg848   *cg848Manager    // KIP-848 broker-driven groups (Kafka-4 profile).
 	auth    *authenticator   // nil when SASL is disabled.
@@ -104,6 +105,17 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 	}
 	// Only a broker with a console keeps what clients report: the console is its one
 	// reader, and a broker without one advertises nothing for clients to push into.
+	b.cg848.bridge = b.groups
+	if cfg.OffsetsRetention > 0 {
+		exp, err := newOffsetExpiry(b, cfg.OffsetsRetention)
+		if err != nil {
+			return nil, fmt.Errorf("broker: read when groups became empty: %w", err)
+		}
+		b.expiry = exp
+		b.groups.emptied, b.groups.activated = exp.markEmpty, exp.markActive
+		b.cg848.emptied, b.cg848.activated = exp.markEmpty, exp.markActive
+		exp.start()
+	}
 	if cfg.ClientTelemetry && cfg.Console {
 		b.telemetry = telemetry.NewStore()
 		b.telemetry.SetPushInterval(telemetryPushMillis * time.Millisecond)
@@ -376,6 +388,9 @@ func (b *Broker) advertised() []protocol.AdvertisedAPI {
 // a member's session timer firing afterwards would run an assignment against a
 // closed metadata store.
 func (b *Broker) Stop() {
+	if b.expiry != nil {
+		b.expiry.stopAndFlush()
+	}
 	b.groups.stop()
 	b.cg848.stop()
 }

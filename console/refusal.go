@@ -162,6 +162,11 @@ func kafkaRefusalFor(ke *kerr.Error, brokerMsg string, err error) Refusal {
 		// loading, a storage failure.
 		r.Kind, r.Status, r.Heading, r.Retry = Failed, http.StatusServiceUnavailable, "The broker could not do that right now", true
 		r.Message = strings.TrimSuffix(say, ".") + "."
+		if ke.Code == kerr.KafkaStorageError.Code && brokerMsg == "" {
+			// Not "the batch was not appended": a failed sync follows the append, so the
+			// batch may be in the log (BAD-2).
+			r.Message += " A write refused with this may already be in the log: if the sync after the append failed, a consumer can read it although the producer got no offset."
+		}
 		return r
 	}
 	r.Kind, r.Status, r.Heading = Refused, http.StatusBadRequest, "The broker refused that"

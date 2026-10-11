@@ -109,12 +109,16 @@ func (b *Broker) handleJoinGroup(ctx context.Context, req *protocol.Request, jr 
 		resp.Generation = -1
 		return nil
 	}
-	// One group id, one protocol: a group already running under KIP-848 cannot
-	// also be a classic group, or every partition would go to both.
-	// (the coordinator claims the id on join; see groupClaims).
-	res, err := b.groups.join(ctx, jr, clientRef{req.Header.ClientID, req.Conn.RemoteHost()})
-	if err != nil {
-		return err
+	// A group running under KIP-848 takes a classic client in as one of its members
+	// (the migration policy's default, groupmigrate.go); otherwise the classic
+	// coordinator claims the id on join (groupClaims).
+	who := clientRef{req.Header.ClientID, req.Conn.RemoteHost()}
+	res, taken := b.cg848.classicJoin(jr, who)
+	if !taken {
+		var err error
+		if res, err = b.groups.join(ctx, jr, who); err != nil {
+			return err
+		}
 	}
 
 	resp.ErrorCode = res.errorCode
@@ -152,6 +156,13 @@ func (b *Broker) handleSyncGroup(ctx context.Context, req *protocol.Request, sr 
 		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
 		return nil
 	}
+	if assignment, code, taken := b.cg848.classicSync(sr); taken {
+		resp.ErrorCode = code
+		resp.MemberAssignment = assignment
+		resp.ProtocolType = sr.ProtocolType
+		resp.Protocol = sr.Protocol
+		return nil
+	}
 	res, err := b.groups.sync(ctx, sr)
 	if err != nil {
 		return err
@@ -172,6 +183,10 @@ func (b *Broker) handleHeartbeat(ctx context.Context, req *protocol.Request, hr 
 		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
 		return nil
 	}
+	if code, taken := b.cg848.classicHeartbeat(hr); taken {
+		resp.ErrorCode = code
+		return nil
+	}
 	resp.ErrorCode = b.groups.heartbeat(hr)
 	return nil
 }
@@ -189,7 +204,10 @@ func (b *Broker) handleLeaveGroup(ctx context.Context, req *protocol.Request, lr
 		}
 		return nil
 	}
-	results := b.groups.leave(lr)
+	results, taken := b.cg848.classicLeave(lr)
+	if !taken {
+		results = b.groups.leave(lr)
+	}
 
 	if len(results) > 0 {
 		resp.ErrorCode = results[0].errorCode

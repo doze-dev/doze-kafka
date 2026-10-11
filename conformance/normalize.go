@@ -83,6 +83,7 @@ func (n *normalizer) walk(v any, key string) any {
 				return n.topicID(id)
 			}
 		}
+		x = sortMembersByContent(x)
 		out := make([]any, len(x))
 		for i, e := range x {
 			if nodeListKeys[key] {
@@ -94,7 +95,7 @@ func (n *normalizer) walk(v any, key string) any {
 		if key == "Members" {
 			sortMembers(out)
 		}
-		return dropInternalAndSort(out)
+		return sortListedGroups(dropInternalAndSort(out))
 	case json.Number:
 		switch {
 		case nodeKeys[key] && x.String() != "-1":
@@ -122,7 +123,7 @@ func (n *normalizer) walk(v any, key string) any {
 		return x
 	case string:
 		switch {
-		case key == "Host":
+		case key == "Host" || key == "ClientHost":
 			return "<host>"
 		case key == "Metrics" && len(x) > 512:
 			// A pushed payload that is a megabyte of something: kept as its size and
@@ -215,6 +216,87 @@ func dropInternalAndSort(list []any) []any {
 		return a < b
 	})
 	return out
+}
+
+// sortMembersByContent orders the members of a ConsumerGroupDescribe answer by what
+// they hold, before their ids are numbered: a broker lists them in the order of its own
+// hash table and the ids are random, so the order carries nothing and numbering them
+// by position would make every run a different recording.
+func sortMembersByContent(list []any) []any {
+	if len(list) < 2 {
+		return list
+	}
+	keys := make([]string, len(list))
+	for i, e := range list {
+		m, ok := e.(map[string]any)
+		if !ok {
+			return list
+		}
+		if _, has := m["MemberID"]; !has {
+			return list
+		}
+		if _, has := m["MemberEpoch"]; !has {
+			return list
+		}
+		a, _ := json.Marshal([]any{m["MemberEpoch"], m["Assignment"], m["TargetAssignment"], m["SubscribedTopics"]})
+		keys[i] = string(a)
+	}
+	idx := make([]int, len(list))
+	for i := range idx {
+		idx[i] = i
+	}
+	sort.SliceStable(idx, func(a, b int) bool { return keys[idx[a]] < keys[idx[b]] })
+	out := make([]any, len(list))
+	for i, j := range idx {
+		out[i] = list[j]
+	}
+	return out
+}
+
+// sortListedGroups orders a ListGroups answer by group id, and the topics of an
+// OffsetFetch answer by name: a broker answers in the order of its own hash table,
+// which says nothing about how it behaves.
+func sortListedGroups(list []any) []any {
+	key := ""
+	for _, e := range list {
+		m, ok := e.(map[string]any)
+		if !ok {
+			return list
+		}
+		switch {
+		case m["GroupState"] != nil:
+			key = "Group"
+		case m["Topic"] != nil && offsetFetchPartitions(m["Partitions"]):
+			key = "Topic"
+		default:
+			return list
+		}
+	}
+	if key == "" {
+		return list
+	}
+	sort.SliceStable(list, func(i, j int) bool {
+		a, _ := list[i].(map[string]any)[key].(string)
+		b, _ := list[j].(map[string]any)[key].(string)
+		return a < b
+	})
+	return list
+}
+
+// offsetFetchPartitions reports whether v is the partitions of an OffsetFetch topic
+// (each has an offset, metadata and a leader epoch).
+func offsetFetchPartitions(v any) bool {
+	ps, ok := v.([]any)
+	if !ok || len(ps) == 0 {
+		return false
+	}
+	for _, p := range ps {
+		m, ok := p.(map[string]any)
+		if !ok || m["Offset"] == nil || m["Metadata"] == nil || m["LeaderEpoch"] == nil {
+			return false
+		}
+	}
+	return true
 }
 
 // diff lists where got differs from want, as dotted paths.

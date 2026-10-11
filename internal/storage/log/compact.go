@@ -43,6 +43,31 @@ var ErrNoKey = errors.New("log: a compacted topic cannot accept a message withou
 // ValidateBatches has a key, which a compacted topic needs: the key is what a record
 // replaces. Kafka refuses the batch (INVALID_RECORD) and so does this.
 func RequireKeys(records []byte) error {
+	return CheckRecords(records, RecordCheck{RequireKeys: true})
+}
+
+// ErrStoredTooLarge is returned for a batch that Kafka would store, uncompressed, at
+// more than the topic's max.message.bytes (the topic has compression.type=uncompressed,
+// so the broker inflates what a producer compressed). Kafka answers MESSAGE_TOO_LARGE.
+var ErrStoredTooLarge = errors.New("log: the batch, stored uncompressed, is larger than the topic allows")
+
+// RecordCheck is what a Produce payload is looked at for beyond its shape.
+type RecordCheck struct {
+	// RequireKeys refuses a record with no key (a compacted topic).
+	RequireKeys bool
+	// MaxStored, when above zero, is the topic's max.message.bytes for a topic that
+	// stores batches uncompressed: a compressed batch is inflated and its stored size, the
+	// 61 byte header and the records, must fit (ErrStoredTooLarge). Real Kafka checks a
+	// batch's size as it is stored: the compressed size, unless the topic's
+	// compression.type makes it inflate (recorded: produce-decompressed-size).
+	MaxStored int64
+}
+
+// CheckRecords looks inside the compressed batches of a Produce payload that has passed
+// ValidateBatches, only as far as c asks, with a stream: memory is the decompressor's
+// window, never the payload. A batch that inflates past MaxInflatedBytes (or MaxStored)
+// is ErrInflatedTooLarge (ErrStoredTooLarge) however little it weighs.
+func CheckRecords(records []byte, c RecordCheck) error {
 	for pos := 0; pos < len(records); {
 		info, ok := parseHeader(records[pos:])
 		if !ok || info.totalBytes <= 0 || pos+int(info.totalBytes) > len(records) {
@@ -53,15 +78,34 @@ func RequireKeys(records []byte) error {
 		if len(batch) < batchFullHeaderBytes || attrsOf(batch)&batchControlBit != 0 {
 			continue
 		}
-		recs, err := DecodeRecords(batch)
-		if err != nil {
-			return err
+		compressed := attrsOf(batch)&batchCompressionMask != 0
+		sizeBound := c.MaxStored > 0 && compressed
+		if !c.RequireKeys && !sizeBound {
+			continue
 		}
-		for _, r := range recs {
-			if r.Key == nil {
+		limit := int64(MaxInflatedBytes)
+		byTopic := false
+		if sizeBound && c.MaxStored-batchFullHeaderBytes < limit {
+			limit, byTopic = max(c.MaxStored-batchFullHeaderBytes, 0), true
+		}
+		noKey := false
+		_, err := walkRecordsDrain(batch, int(limit), c.RequireKeys, sizeBound, func(_ int, h recordHead) bool {
+			noKey = c.RequireKeys && h.KeyNull
+			return !noKey
+		})
+		if err == nil {
+			if noKey {
 				return ErrNoKey
 			}
+			continue
 		}
+		switch {
+		case errors.Is(err, ErrInflatedTooLarge) && byTopic:
+			return fmt.Errorf("%w: it inflates past %d bytes", ErrStoredTooLarge, c.MaxStored)
+		case errors.Is(err, ErrInflatedTooLarge):
+			return fmt.Errorf("%w: a batch of %d bytes inflates past %d bytes", ErrInflatedTooLarge, len(batch), MaxInflatedBytes)
+		}
+		return fmt.Errorf("%w: %v", ErrBadRecords, err)
 	}
 	return nil
 }

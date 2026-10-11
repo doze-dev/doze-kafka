@@ -90,7 +90,7 @@ var helpGroups = []struct {
 	{"Network", []string{"name", "listen", "advertised-host", "advertised-port", "zone"}},
 	{"Storage", []string{"data-dir", "meta-db", "segment-bytes", "index-interval-bytes"}},
 	{"Retention and durability", []string{"retention-bytes", "retention-ms", "fsync-interval"}},
-	{"Topics and groups", []string{"kafka-version", "auto-create-topics", "default-partitions", "max-partitions", "consumer-session-timeout", "client-telemetry"}},
+	{"Topics and groups", []string{"kafka-version", "auto-create-topics", "default-partitions", "max-partitions", "consumer-session-timeout", "offsets-retention", "client-telemetry"}},
 	{"Security", []string{"sasl-mechanisms", "sasl-user", "tls-cert", "tls-key", "acl-default", "acl-super-user"}},
 	{"Console", []string{"console", "console-addr", "console-prefix", "console-allow-host", "trace-header"}},
 	{"Schema registry", []string{"schema-registry", "schema-registry-addr"}},
@@ -109,7 +109,8 @@ Usage:
 Commands:
   version                       print the doze-kafka version
   env                           print the shell block that points a client at this instance
-  config print [flags]          print the effective configuration as TOML
+  config print [--show-secrets] [flags]
+                                print the effective configuration as TOML (passwords redacted)
   dns-setup [--check|--uninstall|--print]
                                 one-time setup for the shared .doze names
   doctor                        report what is set up for .doze names, and what is not
@@ -245,6 +246,11 @@ func flagError(fs *flag.FlagSet, err error) error {
 		// invalid value "x" for flag -name: reason
 		if val, tail, ok := strings.Cut(rest, " for flag -"); ok {
 			name, reason, _ := strings.Cut(tail, ": ")
+			if strings.TrimLeft(name, "-") == "sasl-user" {
+				// The value is user:password, or a password on its own that lost its
+				// user: not repeated, here or in the reason.
+				return fmt.Errorf("--sasl-user: not a valid value (expected user:password)")
+			}
 			return fmt.Errorf("--%s: %s is not a valid value (%s)", strings.TrimLeft(name, "-"), val, reason)
 		}
 	}
@@ -350,6 +356,7 @@ func registerFlags(fs *flag.FlagSet, cfg *config.Config) {
 	fs.IntVar(&cfg.DefaultPartitions, "default-partitions", cfg.DefaultPartitions, "partition count for auto-created topics")
 	fs.IntVar(&cfg.MaxPartitions, "max-partitions", cfg.MaxPartitions, "most partitions one topic may have (each is a directory and open files)")
 	fs.DurationVar(&cfg.ConsumerSessionTimeout, "consumer-session-timeout", cfg.ConsumerSessionTimeout, "KIP-848 group session timeout before evicting a silent member")
+	fs.DurationVar(&cfg.OffsetsRetention, "offsets-retention", cfg.OffsetsRetention, "how long a group's committed offsets are kept once nothing is reading them, as Kafka's offsets.retention.minutes (0 = for ever)")
 
 	// Security.
 	if cfg.Credentials == nil {
@@ -417,7 +424,7 @@ func (f credsFlag) String() string { return "" }
 func (f credsFlag) Set(s string) error {
 	user, pass, ok := strings.Cut(s, ":")
 	if !ok || user == "" {
-		return fmt.Errorf("expected user:password, got %q", s)
+		return fmt.Errorf("expected user:password") // the value is not echoed: it may be a password.
 	}
 	f.m[user] = pass
 	return nil
