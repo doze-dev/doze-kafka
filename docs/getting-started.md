@@ -5,7 +5,7 @@ through it, and confirms your data survives a restart. It takes a couple of minu
 
 ## Prerequisites
 
-- **Go 1.26+** to build the binary. That's the only build dependency.
+- **Go 1.27+** to build the binary. That's the only build dependency.
 - A Kafka client to talk to it. Any will do; the examples use
   [`kcat`](https://github.com/edenhill/kcat) because it's a single command, but see
   [Clients](clients.md) for franz-go, Sarama, kafkajs, the Java client, and more.

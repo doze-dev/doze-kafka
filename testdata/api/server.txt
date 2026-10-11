@@ -1,0 +1,40 @@
+field Config.AdvertisedHost string
+field Config.AdvertisedPort int
+field Config.DataDir string
+field Config.KafkaVersion int
+field Config.ListenAddr string
+field Config.MetaDB string
+field Config.SASL bool
+field Config.TLS bool
+field Options.AdvertisedHost string
+field Options.AdvertisedPort int
+field Options.AutoCreateTopics *bool
+field Options.ConsumerSessionTimeout time.Duration
+field Options.Credentials map[string]string
+field Options.DataDir string
+field Options.DefaultPartitions int
+field Options.FsyncInterval time.Duration
+field Options.IndexIntervalBytes int64
+field Options.ListenAddr string
+field Options.Logger *slog.Logger
+field Options.MetaDB string
+field Options.RetentionBytes int64
+field Options.RetentionMs int64
+field Options.SASLMechanisms []string
+field Options.SegmentBytes int64
+field Options.TLSConfig *tls.Config
+field Options.Version int
+func New(opts Options) (*Server, error)
+func NewFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error)
+method (*Server) Addr() net.Addr
+method (*Server) AlsoListen(ctx context.Context, addr string) (net.Addr, error)
+method (*Server) Bind(ctx context.Context) (net.Addr, error)
+method (*Server) Close() error
+method (*Server) Config() Config
+method (*Server) Ready() <-chan struct{}
+method (*Server) SchemaRegistry() (http.Handler, error)
+method (*Server) Serve(ctx context.Context) (err error)
+method (*Server) ServeListener(ctx context.Context, ln net.Listener) (err error)
+type Config struct
+type Options struct
+type Server struct

@@ -126,19 +126,43 @@ tasks:
     cmds:
       - scripts/lightness.sh record
 
+  mutate:record:
+    desc: 'Mutation-test packages (gremlins, a go tool) and store counts and surviving mutants as file:line:type in testdata/mutation.json. Name packages: task mutate:record -- ./internal/protocol'
+    cmds:
+      - go run ./scripts/mutate record {{.CLI_ARGS}}
+
+  mutate:check:
+    desc: 'Fail on a surviving mutant the baseline (testdata/mutation.json) does not have. No package named runs every unit; internal/broker is four units, split by file group. task mutate:list shows them'
+    cmds:
+      - go run ./scripts/mutate check {{.CLI_ARGS}}
+
+  mutate:list:
+    desc: 'The mutation units (a package, or a file group of one that is too slow to run whole)'
+    cmds:
+      - go run ./scripts/mutate list
+
+  claims:
+    desc: 'Print the number of claims per evidence source (spec, recorded, doc, memory) and check every claims table under conformance/claims/'
+    cmds:
+      - go test ./conformance -run TestClaimsCountPerSource -v -count=1
+
+  api:
+    desc: 'The exported surface of server/ (the embedding API) against testdata/api/server.txt; a change needs a CHANGELOG.md line containing "server API"'
+    cmds:
+      - scripts/api.sh
+
+  api:record:
+    desc: 'Write the exported surface of server/ to testdata/api/server.txt (add the CHANGELOG.md line in the same commit)'
+    cmds:
+      - scripts/api.sh record
+
   fuzz:
-    desc: 'Fuzz the wire-protocol decoder: each target for FUZZ_TIME (default 30s)'
+    desc: 'Fuzz every parser of untrusted bytes (testdata/fuzz-targets.txt, listed in docs/architecture.md), each for FUZZ_TIME (default 30s). Name some to run only those: task fuzz -- Scram'
     vars:
       FUZZ_TIME: '{{.FUZZ_TIME | default "30s"}}'
     cmds:
       # One target per run: go test refuses -fuzz when it matches more than one.
-      - go test ./internal/protocol/ -run '^$' -fuzz '^FuzzParseAndDecodeRequest$' -fuzztime {{.FUZZ_TIME}}
-      - go test ./internal/protocol/ -run '^$' -fuzz '^FuzzSkipTaggedFields$' -fuzztime {{.FUZZ_TIME}}
-      - go test ./internal/protocol/ -run '^$' -fuzz '^FuzzReadFrame$' -fuzztime {{.FUZZ_TIME}}
-      - go test ./internal/storage/log/ -run '^$' -fuzz '^FuzzDecodeRecords$' -fuzztime {{.FUZZ_TIME}}
-      - go test ./schemaregistry/ -run '^$' -fuzz '^FuzzRegisterAndCompare$' -fuzztime {{.FUZZ_TIME}}
-      - go test ./schemaregistry/ -run '^$' -fuzz '^FuzzDecode$' -fuzztime {{.FUZZ_TIME}}
-      - go test ./internal/telemetry/ -run '^$' -fuzz '^FuzzDecode$' -fuzztime {{.FUZZ_TIME}}
+      - scripts/fuzz.sh {{.FUZZ_TIME}} {{.CLI_ARGS | default "."}}
 
   soak:
     desc: 'Leak-detection soak: sustained load, no faults (SOAK_DURATION, default 2m)'

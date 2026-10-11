@@ -1,0 +1,37 @@
+# Every fuzz target in the repository: package, then target. `task fuzz` runs each
+# for FUZZ_TIME; the weekly workflow (.github/workflows/fuzz.yml) runs each for at
+# least 60 seconds. A test (docs/fuzz_test.go) fails when a Fuzz function is missing
+# from here or from the parser list in docs/architecture.md.
+#
+# The wire: frames, request headers and bodies, what the recorder says about them.
+./internal/protocol FuzzReadFrame
+./internal/protocol FuzzParseAndDecodeRequest
+./internal/protocol FuzzSkipTaggedFields
+./internal/protocol FuzzDescribe
+# Record batches, the record reader, decompression, the segment scan recovery runs.
+./internal/storage/log FuzzValidateBatches
+./internal/storage/log FuzzDecodeRecords
+./internal/storage/log FuzzDecompress
+./internal/storage/log FuzzScanLog
+# Stored ACL identity.
+./internal/storage/meta FuzzACLKey
+# Pre-authentication bytes, ACL filters, topic config values, the group state machine.
+./internal/broker FuzzSASLPlain
+./internal/broker FuzzSCRAMClientFirst
+./internal/broker FuzzSCRAMClientFinal
+./internal/broker FuzzSCRAMUsernameEscaping
+./internal/broker FuzzACLFilterMatches
+./internal/broker FuzzTopicConfigValues
+./internal/broker FuzzGroupSequence
+# The configuration file.
+./internal/config FuzzConfigFile
+# Client telemetry (OTLP metrics).
+./internal/telemetry FuzzDecode
+# The schema registry: schema texts, wire payloads, REST bodies, descriptors, references.
+./schemaregistry FuzzRegisterAndCompare
+./schemaregistry FuzzDecode
+./schemaregistry FuzzAPIBody
+./schemaregistry FuzzDescriptor
+./schemaregistry FuzzRegisterReferences
+# The console's form inputs, through its handler, against a real broker.
+./server FuzzConsoleForms

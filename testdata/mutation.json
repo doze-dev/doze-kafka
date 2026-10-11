@@ -1,0 +1,82 @@
+{
+  "tool": "gremlins",
+  "units": {
+    "console": {
+      "killed": 1498,
+      "timedOut": 0,
+      "lived": 0,
+      "notCovered": 188,
+      "survivors": []
+    },
+    "internal/broker:admin": {
+      "killed": 133,
+      "timedOut": 0,
+      "lived": 0,
+      "notCovered": 46,
+      "survivors": []
+    },
+    "internal/broker:auth": {
+      "killed": 131,
+      "timedOut": 0,
+      "lived": 0,
+      "notCovered": 24,
+      "survivors": []
+    },
+    "internal/broker:data": {
+      "killed": 273,
+      "timedOut": 25,
+      "lived": 0,
+      "notCovered": 82,
+      "survivors": []
+    },
+    "internal/broker:groups": {
+      "killed": 351,
+      "timedOut": 0,
+      "lived": 0,
+      "notCovered": 47,
+      "survivors": []
+    },
+    "internal/protocol": {
+      "killed": 161,
+      "timedOut": 0,
+      "lived": 0,
+      "notCovered": 48,
+      "survivors": []
+    },
+    "internal/storage/log": {
+      "killed": 833,
+      "timedOut": 0,
+      "lived": 0,
+      "notCovered": 48,
+      "survivors": []
+    },
+    "internal/storage/meta": {
+      "killed": 94,
+      "timedOut": 0,
+      "lived": 0,
+      "notCovered": 10,
+      "survivors": []
+    },
+    "internal/telemetry": {
+      "killed": 63,
+      "timedOut": 0,
+      "lived": 0,
+      "notCovered": 38,
+      "survivors": []
+    },
+    "internal/traffic": {
+      "killed": 55,
+      "timedOut": 0,
+      "lived": 0,
+      "notCovered": 9,
+      "survivors": []
+    },
+    "schemaregistry": {
+      "killed": 647,
+      "timedOut": 0,
+      "lived": 0,
+      "notCovered": 113,
+      "survivors": []
+    }
+  }
+}

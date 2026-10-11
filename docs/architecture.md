@@ -108,6 +108,43 @@ summary on stdout. `names.go` is the zone, `dnsready.go` the first-run setup, `l
 where the broker binds and what it advertises, `doctor.go`/`env.go` the two commands; on
 Windows the zone builds but has no machine setup yet, so the default there is an address.
 
+## Parsers of untrusted bytes
+
+Anything read from a socket, a request body or a file somebody else wrote is
+parsed by one of these, and each has a fuzz target: bytes in, and no panic, no
+unbounded allocation, no hang. `task fuzz` runs them all (`testdata/fuzz-targets.txt`
+is the list); the weekly workflow runs each for at least 60 seconds, and a test
+(`docs/fuzz_test.go`) fails when a `Fuzz` function is missing from the list or from
+this table.
+
+| Parser | Where | Fuzz target |
+|---|---|---|
+| Frame (length prefix, size cap) | `internal/protocol` | `FuzzReadFrame` |
+| Request header and body, including tagged fields | `internal/protocol` | `FuzzParseAndDecodeRequest`, `FuzzSkipTaggedFields` |
+| What the recorder says about a decoded request | `internal/protocol` | `FuzzDescribe` |
+| Record batch (shape, CRC, whole batches only) | `internal/storage/log` | `FuzzValidateBatches` |
+| Record reader | `internal/storage/log` | `FuzzDecodeRecords` |
+| Decompression (gzip, snappy block and xerial, lz4, zstd) | `internal/storage/log` | `FuzzDecompress` |
+| Segment scan that recovery truncates by | `internal/storage/log` | `FuzzScanLog` |
+| OTLP metrics (client telemetry) | `internal/telemetry` | `FuzzDecode` |
+| SASL/PLAIN and SCRAM messages | `internal/broker` | `FuzzSASLPlain`, `FuzzSCRAMClientFirst`, `FuzzSCRAMClientFinal`, `FuzzSCRAMUsernameEscaping` |
+| ACL filters and the identity of a stored entry | `internal/broker`, `internal/storage/meta` | `FuzzACLFilterMatches`, `FuzzACLKey` |
+| Topic config values | `internal/broker` | `FuzzTopicConfigValues` |
+| Consumer-group state machine (the KIP-848 coordinator parses nothing; the bytes are its schedule) | `internal/broker` | `FuzzGroupSequence` |
+| Configuration file | `internal/config` | `FuzzConfigFile` |
+| Schema texts (Avro, JSON Schema, Protobuf) and their compatibility | `schemaregistry` | `FuzzRegisterAndCompare` |
+| Registry wire payloads | `schemaregistry` | `FuzzDecode` |
+| Registry REST bodies, every route | `schemaregistry` | `FuzzAPIBody` |
+| Protobuf descriptors | `schemaregistry` | `FuzzDescriptor` |
+| Schema references (graph shapes) | `schemaregistry` | `FuzzRegisterReferences` |
+| The console's form inputs and query strings | `console` (driven through its handler) | `FuzzConsoleForms` |
+
+Not yet covered, with the reason: the console's trace-header parser and its
+consumer-protocol decoder (member metadata and assignment bytes) are unexported
+inside `console/`, which the foundation work does not touch; their targets
+(`FuzzTraceRefs`, `FuzzConsumerProtocolDecode`) are owed to the Trace and Groups
+stages.
+
 ## Why this stays small
 
 Most of Kafka's size is distributed-systems machinery — replication, the controller

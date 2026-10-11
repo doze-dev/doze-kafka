@@ -17,6 +17,7 @@ import (
 	"github.com/pierrec/lz4/v4"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
+	"github.com/doze-dev/doze-kafka/internal/serverhook"
 	"github.com/doze-dev/doze-kafka/internal/telemetry"
 	"github.com/doze-dev/doze-kafka/server"
 
@@ -171,7 +172,7 @@ func TestClientTelemetrySubscribeGivesAnIdAndWhatToReport(t *testing.T) {
 	if got := subscribe(t, c, other); got.ClientInstanceID != other {
 		t.Errorf("an id the client brought was replaced: %x", got.ClientInstanceID)
 	}
-	if n := len(srv.ClientMetrics().Instances()); n != 2 {
+	if n := len(serverhook.ClientMetrics(srv).Instances()); n != 2 {
 		t.Errorf("%d instances known, want 2", n)
 	}
 }
@@ -186,7 +187,7 @@ func TestClientTelemetryPushIsDecodedInEveryCompression(t *testing.T) {
 			t.Fatalf("compression %d: error %d (%s)", codec, code, kerr.ErrorForCode(code))
 		}
 	}
-	got := srv.ClientMetrics().Instances()
+	got := serverhook.ClientMetrics(srv).Instances()
 	if len(got) != 1 || got[0].Pushes != 5 {
 		t.Fatalf("instances = %+v, want one with five pushes", got)
 	}
@@ -253,7 +254,7 @@ func TestClientTelemetryRemembersWhoItIsAndThatItIsClosing(t *testing.T) {
 	if code := push(t, c, sub.ClientInstanceID, sub.SubscriptionID, 0, metricsPayload(1), true); code != 0 {
 		t.Fatalf("terminating push: %d", code)
 	}
-	in := srv.ClientMetrics().Instances()[0]
+	in := serverhook.ClientMetrics(srv).Instances()[0]
 	if in.Software != "apache-kafka-java 3.7.0" {
 		t.Errorf("software = %q, want what ApiVersions said", in.Software)
 	}
@@ -293,7 +294,7 @@ func TestClientTelemetryAcceptsWhatRealLibrdkafkaSends(t *testing.T) {
 	if code := push(t, c, sub.ClientInstanceID, sub.SubscriptionID, 4, frame, false); code != 0 {
 		t.Fatalf("the librdkafka payload was refused: %d (%s)", code, kerr.ErrorForCode(code))
 	}
-	in := srv.ClientMetrics().Instances()[0]
+	in := serverhook.ClientMetrics(srv).Instances()[0]
 	if len(in.Series) < 5 {
 		t.Fatalf("%d series from a librdkafka report, want its producer metrics", len(in.Series))
 	}

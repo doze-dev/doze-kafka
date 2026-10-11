@@ -105,6 +105,9 @@ func validateCreation(a meta.ACL) string {
 		return "Invalid operation"
 	case a.Permission != 2 && a.Permission != 3:
 		return "Invalid permission type: an entry allows or denies"
+	case strings.ContainsRune(a.Name+a.Principal+a.Host, 0):
+		// The store identifies an entry by its fields joined with NUL.
+		return "Invalid entry: a NUL byte in the name, principal or host"
 	case a.Name == "":
 		return "Invalid resource name: it is empty"
 	case !strings.Contains(a.Principal, ":") || strings.HasPrefix(a.Principal, ":"):
