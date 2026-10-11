@@ -78,6 +78,22 @@ test('a client is selected, closed, refreshed and left with Back', async ({ page
   await cycle(page, row, 'client');
 });
 
+// Enter on a link inside the inspector that opens another selection is the link's own:
+// the shell's key handling for rows must not cancel it.
+test('Enter on the client link inside a request inspector opens the client', async ({ page }) => {
+  await page.goto('traffic');
+  await page.locator('#traffic-table tbody tr', { hasText: 'inspect-hold' }).first().click();
+  await expect(page.locator('#inspector .inspector-h')).toHaveAttribute('data-inspector-kind', 'request');
+  const link = page.locator('#inspector a[data-inspector-open]', { hasText: 'inspect-hold' }).first();
+  await expect(link).toBeVisible();
+  // htmx has swapped the record in and settled it: the link is live.
+  await expect(page.locator('#inspector .htmx-added, #inspector .htmx-settling')).toHaveCount(0);
+  await link.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#inspector .inspector-h')).toHaveAttribute('data-inspector-kind', 'client');
+  await expect(title(page)).toContainText('inspect-hold');
+});
+
 test('a member is selected, closed, refreshed and left with Back', async ({ page }) => {
   await page.goto('groups/inspect-hold-group?tab=members');
   const row = page.locator('[id^="mb-"]').first();
@@ -102,7 +118,7 @@ test('a subject is selected from the neighbours sentence, closed, refreshed and 
   const link = page.locator('#neighbours a', { hasText: 'seed-events-value' });
   await expect(link).toBeVisible();
   await cycle(page, link, 'subject');
-  await link.click();
+  await page.keyboard.press('Enter');
   await expect(title(page)).toHaveText('seed-events-value');
   await expect(overlay(page)).toContainText('Compatibility');
 });

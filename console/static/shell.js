@@ -1021,6 +1021,11 @@
     if (row && (e.key === "Enter" || e.key === " ")) {
       // htmx fires the request. The key is the row's: its default would go to the
       // Close button the loading inspector has just taken focus for, and press it.
+      // A link or button that opens a selection (the inspector's client link) is
+      // left to itself: its own Enter is the click that opens it, made while focus is
+      // still on it. Only a row, which has no click of its own, is cancelled.
+      var tag = e.target.tagName;
+      if (row === e.target && (tag === "A" || tag === "BUTTON")) return;
       if (row === e.target) e.preventDefault();
       openInspector(row);
       return;
