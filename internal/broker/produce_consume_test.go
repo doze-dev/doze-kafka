@@ -13,10 +13,8 @@ import (
 // franz-go producer and consumer round-trip records through a topic, order is
 // preserved within the partition, and the data survives a broker restart.
 func TestProduceConsume_ProduceConsumeRoundTripAndRestart(t *testing.T) {
-	dir := t.TempDir()
-	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
-
-	stop := runBrokerAt(t, addr, dir, 4)
+	node := startNode(t)
+	addr := node.Addr
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -42,9 +40,7 @@ func TestProduceConsume_ProduceConsumeRoundTripAndRestart(t *testing.T) {
 	}
 
 	// Restart over the same data dir; the records must survive.
-	stop()
-	stop2 := runBrokerAt(t, addr, dir, 4)
-	defer stop2()
+	node.Restart()
 
 	got2 := consumeFromStart(t, ctx, addr, "events", n)
 	for i := range n {
