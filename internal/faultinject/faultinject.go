@@ -18,6 +18,7 @@ import (
 const (
 	LogWrite  = "log.write"
 	LogSync   = "log.sync"
+	LogFsync  = "log.fsync"
 	MetaWrite = "meta.write"
 )
 

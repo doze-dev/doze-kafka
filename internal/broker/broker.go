@@ -234,7 +234,7 @@ func isIOError(err error) bool {
 	var le *os.LinkError
 	var se *os.SyscallError
 	var en syscall.Errno
-	return errors.As(err, &pe) || errors.As(err, &le) || errors.As(err, &se) || errors.As(err, &en)
+	return errors.Is(err, log.ErrStorageOffline) || errors.As(err, &pe) || errors.As(err, &le) || errors.As(err, &se) || errors.As(err, &en)
 }
 
 // nodeID is this broker's node id. Single-node, so it is a constant.

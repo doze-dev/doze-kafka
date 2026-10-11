@@ -116,7 +116,7 @@ func (ix *Index) sync() error {
 	if !ix.dirty.Swap(false) {
 		return nil
 	}
-	if err := fsyncFile(ix.file); err != nil {
+	if err := flushFile(ix.file); err != nil {
 		ix.dirty.Store(true) // not flushed: the next sync must try again.
 		return err
 	}

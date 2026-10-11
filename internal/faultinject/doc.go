@@ -11,7 +11,9 @@
 //
 // Points: "log.write" (appending a batch to a segment), "log.sync" (flushing a
 // segment, which acks=all and the timer both do), "meta.write" (a metadata
-// transaction). The log's existing ManagerOptions.BeforeSync hook is the
+// transaction), "log.fsync" (the fsync call itself failing, as opposed to "log.sync",
+// which fails the request before any fsync is issued: only the former takes a
+// partition offline, as a real failed fsync does). The log's existing ManagerOptions.BeforeSync hook is the
 // per-manager case of "log.sync": it runs at the same place, after the global
 // fault.
 //

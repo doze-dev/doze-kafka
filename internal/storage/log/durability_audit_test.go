@@ -191,12 +191,17 @@ func TestSyncDoesNotClaimWritesThatArrivedDuringTheFsync(t *testing.T) {
 	}
 }
 
-// A failed fsync leaves the data unflushed, so the next Sync must really try
-// again (and only then report success).
-func TestFailedFsyncIsRetriedForLogAndIndex(t *testing.T) {
+// BAD-3. On Linux a failed fsync can drop the dirty pages and clear the error,
+// so the next fsync "succeeds" for bytes that never reached the disk. The fault
+// here is exactly that: the failing call discards what was not yet synced and the
+// next call succeeds. Retrying and acknowledging is the bug; Kafka takes the log
+// directory offline, and so does this: every later flush and write is refused
+// until a restart lets recovery decide from what is really on disk.
+func TestFsyncFailureDoesNotFalselySucceed(t *testing.T) {
 	for _, suffix := range []string{".log", ".index"} {
 		t.Run(suffix, func(t *testing.T) {
-			p, err := openPartition(t.TempDir(), ManagerOptions{SegmentBytes: 1 << 20, IndexIntervalBytes: 1})
+			dir := t.TempDir()
+			p, err := openPartition(dir, ManagerOptions{SegmentBytes: 1 << 20, IndexIntervalBytes: 1})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -210,9 +215,12 @@ func TestFailedFsyncIsRetriedForLogAndIndex(t *testing.T) {
 					return f.Sync()
 				}
 				if calls.Add(1) == 1 {
+					// The kernel's behaviour: the pages are dropped, the error is
+					// reported once.
+					_ = f.Truncate(0)
 					return errDisk
 				}
-				return f.Sync()
+				return f.Sync() // the retry "succeeds".
 			})
 			if err := p.Sync(); !errors.Is(err, errDisk) {
 				t.Fatalf("first Sync = %v, want the fsync error", err)
@@ -220,11 +228,21 @@ func TestFailedFsyncIsRetriedForLogAndIndex(t *testing.T) {
 			if p.syncedSeq.Load() != 0 {
 				t.Fatal("a failed fsync advanced the durable mark")
 			}
-			if err := p.Sync(); err != nil {
-				t.Fatalf("second Sync = %v", err)
+			err = p.Sync()
+			if err == nil {
+				t.Fatal("the retry after a failed fsync reported success for data the kernel had dropped")
 			}
-			if n := calls.Load(); n != 2 {
-				t.Errorf("the %s was fsynced %d time(s) across a failure and a retry, want 2: the retry did not flush it", suffix, n)
+			if !errors.Is(err, ErrStorageOffline) {
+				t.Fatalf("second Sync = %v, want ErrStorageOffline", err)
+			}
+			if p.syncedSeq.Load() != 0 {
+				t.Fatal("the durable mark advanced across a failed fsync")
+			}
+			if _, err := p.Append(makeBatch(1, []byte("y"))); !errors.Is(err, ErrStorageOffline) {
+				t.Fatalf("an append after a failed fsync = %v, want ErrStorageOffline", err)
+			}
+			if n := calls.Load(); n != 1 {
+				t.Errorf("the %s was fsynced %d time(s); a failed fsync must not be retried", suffix, n)
 			}
 		})
 	}
@@ -233,7 +251,7 @@ func TestFailedFsyncIsRetriedForLogAndIndex(t *testing.T) {
 // A roll seals the segment it leaves. If a flush of that segment is already in
 // progress the seal must wait for it and learn how it ended: seeing "clean" and
 // moving on left the segment unsynced when that flush then failed.
-func TestRollWaitsForAnInFlightFsyncAndRedoesItIfItFailed(t *testing.T) {
+func TestRollWaitsForAnInFlightFsyncAndLearnsItFailed(t *testing.T) {
 	p, err := openPartition(t.TempDir(), ManagerOptions{SegmentBytes: 300, IndexIntervalBytes: 4096})
 	if err != nil {
 		t.Fatal(err)
@@ -273,14 +291,16 @@ func TestRollWaitsForAnInFlightFsyncAndRedoesItIfItFailed(t *testing.T) {
 	if err := <-timerErr; !errors.Is(err, errDisk) {
 		t.Fatalf("the failed flush reported %v", err)
 	}
-	if err := <-rolled; err != nil {
-		t.Fatalf("roll: %v", err)
+	// The seal must not see "clean" and move on, and must not retry (BAD-3): it
+	// learns how the flush ended, and the roll does not happen.
+	if err := <-rolled; !errors.Is(err, ErrStorageOffline) || !errors.Is(err, errDisk) {
+		t.Fatalf("roll: %v, want the failed flush reported as ErrStorageOffline", err)
 	}
-	if len(p.segments) != 2 {
-		t.Fatalf("expected a roll, have %d segment(s)", len(p.segments))
+	if len(p.segments) != 1 {
+		t.Fatalf("a segment whose flush failed was rolled off: %d segments", len(p.segments))
 	}
-	if first.logDirty.Load() || calls.Load() != 2 {
-		t.Errorf("the sealed segment is dirty=%v after %d fsync attempt(s); the seal must have flushed it itself", first.logDirty.Load(), calls.Load())
+	if !first.logDirty.Load() || calls.Load() != 1 {
+		t.Errorf("segment dirty=%v after %d fsync attempt(s); want dirty and exactly the one failed attempt", first.logDirty.Load(), calls.Load())
 	}
 }
 

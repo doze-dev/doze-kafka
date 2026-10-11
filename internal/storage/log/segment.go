@@ -1,6 +1,7 @@
 package log
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -32,6 +33,36 @@ type Segment struct {
 	// unsynced with nobody coming back for it. Waiting for the flush in progress
 	// means every caller returns knowing how it actually ended.
 	syncMu sync.Mutex
+
+	// failed is set when an fsync of this segment's log or index failed, and never
+	// cleared. After a failed fsync the kernel may have dropped the dirty pages and
+	// cleared the error, so a retry that returns success proves nothing about the
+	// bytes that were lost (the 2018 "fsyncgate" finding). Apache Kafka takes the
+	// log directory offline instead of retrying; this segment, and with it the
+	// partition's writes, is offline until the broker restarts and recovery
+	// decides from what is really on disk (BAD-3).
+	failed atomic.Pointer[error]
+}
+
+// ErrStorageOffline is returned for every write to, and every flush of, a segment
+// whose fsync once failed. It wraps the failure that put it offline.
+var ErrStorageOffline = errors.New("log: an earlier fsync of this partition failed; its writes are refused until the broker restarts")
+
+func (s *Segment) offline() error {
+	if p := s.failed.Load(); p != nil {
+		return fmt.Errorf("%w: %w", ErrStorageOffline, *p)
+	}
+	return nil
+}
+
+// flushFile is fsyncFile behind the fault seam's "log.fsync" point, which models
+// the fsync syscall itself failing (as opposed to "log.sync", which fails the
+// request before any fsync is issued).
+func flushFile(f *os.File) error {
+	if err := faultAt("log.fsync"); err != nil {
+		return err
+	}
+	return fsyncFile(f)
 }
 
 // fsyncFile flushes a file to stable storage. A variable so tests can make an
@@ -81,6 +112,9 @@ func openSegment(dir string, baseOffset, indexInterval int64, beforeSync func() 
 // interval (and always for a segment's first batch), records a sparse index
 // entry. It never fsyncs — durability is the coarse-timer policy's job.
 func (s *Segment) append(offset int64, batch []byte) error {
+	if err := s.offline(); err != nil {
+		return err
+	}
 	pos := s.sizeBytes
 	if err := faultAt("log.write"); err != nil {
 		return err
@@ -114,6 +148,9 @@ func (s *Segment) append(offset int64, batch []byte) error {
 func (s *Segment) sync() error {
 	s.syncMu.Lock()
 	defer s.syncMu.Unlock()
+	if err := s.offline(); err != nil {
+		return err
+	}
 	if s.logDirty.Load() || s.index.dirty.Load() {
 		// The fault seam's "log.sync" point and this manager's BeforeSync hook
 		// are the same place: the seam first, the per-manager hook second.
@@ -130,12 +167,17 @@ func (s *Segment) sync() error {
 	// partition's log and index whether or not anything had been written, which on
 	// an idle broker is pure waste.
 	if s.logDirty.Swap(false) {
-		if err := fsyncFile(s.log); err != nil {
+		if err := flushFile(s.log); err != nil {
 			s.logDirty.Store(true)
+			s.failed.Store(&err)
 			return err
 		}
 	}
-	return s.index.sync()
+	if err := s.index.sync(); err != nil {
+		s.failed.Store(&err)
+		return err
+	}
+	return nil
 }
 
 // readAt returns up to n raw bytes at position pos via pread, serving reads from
@@ -179,4 +221,14 @@ func (s *Segment) close() error {
 		return errIndex
 	}
 	return errLog
+}
+
+// SetFsyncForTest replaces the function every log and index fsync goes through,
+// and returns a func that puts the real one back. It exists for crash models in
+// other packages' tests (a power cut is "drop everything not fsynced", which needs
+// to see every fsync); nothing in the broker calls it.
+func SetFsyncForTest(fn func(f *os.File) error) (restore func()) {
+	old := fsyncFile
+	fsyncFile = fn
+	return func() { fsyncFile = old }
 }
