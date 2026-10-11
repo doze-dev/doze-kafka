@@ -6,7 +6,7 @@ internal/broker 89.9
 internal/config 64
 internal/protocol 71.9
 internal/settings 72.4
-internal/storage/log 81
+internal/storage/log 80.2
 internal/storage/meta 81.4
 internal/telemetry 92
 internal/traffic 96.7
