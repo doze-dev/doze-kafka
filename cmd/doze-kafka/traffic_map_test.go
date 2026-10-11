@@ -15,7 +15,7 @@ import (
 // from the one to the other.
 func TestTheConsoleSeesWhatTheRecorderHolds(t *testing.T) {
 	rec := traffic.New(100, nil)
-	start := time.Now()
+	start := time.Now().Add(-10 * time.Second) // the heartbeats follow it, and none is in the future: a window counts what has happened.
 	rec.ConnOpened(1, "127.0.0.1:50000")
 	prod := kmsg.NewPtrProduceRequest()
 	prod.Acks = -1
