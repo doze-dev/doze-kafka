@@ -300,7 +300,8 @@ func seedRegistry(ctx context.Context, cl *kgo.Client, base string) error {
 
 // seedTelemetry plays a client that reports its own metrics (KIP-714): it subscribes and
 // pushes three reports, gzip-compressed, with a request latency that climbs, so the
-// Traffic page has a series to draw.
+// Traffic page has a series to draw. A report that comes before the interval the broker
+// advised has passed is refused, as Apache Kafka refuses it, so each waits one out.
 func seedTelemetry(ctx context.Context, addr string) error {
 	cl, err := newKgo(kgo.SeedBrokers(addr), kgo.ClientID("doze-seed-telemetry"))
 	if err != nil {
@@ -312,7 +313,15 @@ func seedTelemetry(ctx context.Context, addr string) error {
 	if err != nil || subResp.ErrorCode != 0 {
 		return fmt.Errorf("telemetry subscription: %v %+v", err, subResp)
 	}
+	interval := time.Duration(subResp.PushIntervalMillis)*time.Millisecond + 100*time.Millisecond
 	for i, latency := range []float64{4.5, 6.25, 9.75} {
+		if i > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(interval):
+			}
+		}
 		payload := telemetry.Encode(telemetry.Payload{
 			Resource: map[string]string{"client_rack": "seed-rack"},
 			Metrics: []telemetry.Metric{

@@ -146,7 +146,7 @@ test('Traf-04: a request opens with who, what, per partition and the decoded fie
   await expect(parts.locator('.r').nth(1)).toContainText('seed-orders');
   const code = insp.locator('#decoded pre.code');
   await expect(insp.locator('#decoded .cap')).toHaveText('Decoded fields');
-  await expect(code).toContainText('"topics"');
+  await expect(code).toContainText('"TopicData"');
   await expect(code.locator('.jt-k').first()).toHaveCSS('color', DENY); // keys are the board's purple.
   await expect(insp).toContainText('Record bytes are shown on the topic page, not here.');
   await expect(insp.locator('a.btn', { hasText: 'Follow in Topics' })).toBeVisible();

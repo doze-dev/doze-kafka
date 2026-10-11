@@ -202,7 +202,7 @@ not on the recording queue.
 - `Recorder` locking: `Request`, `Events`, `Clients`, `GroupEvent` take one mutex and hold it for O(1) work except `Events` (copies the ring under the lock, sorts after); `go test -race` for `internal/traffic` and `internal/telemetry` is part of `task check` and passes. `resolve` (the topic id lookup) runs under the recorder's lock; it takes the broker's metadata read lock, and no broker path calls the recorder while holding that lock (checked: `emit` sites in `group.go` and `group848.go` hold only group locks). Written down as a rule in section 5.
 - `ConnClosed` removes the connection and its fold map; `recent` entries are deleted when their row is evicted (tested by `TestFoldingDoesNotOutliveTheRow`). No goroutine or fd is created by the recorder or the store.
 - Telemetry decode: depth is bounded by the schema (no recursion), `FuzzDecode` exists and is in `task fuzz`.
-- Frame limits: a non-Produce request is capped at 1 MiB (`maxControlFrameBytes`), so the 512 KiB telemetry cap and the inflated cap sit under it as the comment says.
+- Frame limits: a non-Produce request is capped at 1 MiB (`maxControlFrameBytes`); PushTelemetry alone is given 1 MiB and a header (`maxPushTelemetryFrameBytes`), because the 1 MiB `telemetry.max.bytes` that Kafka advertises, and accepts a payload of exactly, must arrive.
 - `PushTelemetry` and `GetTelemetrySubscriptions` are not reachable before authentication (`preAuthAllowed`).
 - Windows: nothing in these packages touches paths or signals.
 
@@ -270,7 +270,7 @@ Statuses: `real` (exists), `buildable` (data exists, screen or small query does 
 **Raw kmsg (`internal/broker`)**
 
 - JoinGroup v9 with a 900 KiB reason, then the recorder's row is clipped (TRF-1).
-- PushTelemetry: codec 2 with an 11-byte xerial body -> `INVALID_REQUEST`, connection alive (TRF-3); the 200-push burst (TRF-4, TRF-5); a zstd bomb answered in under 5 MiB of allocation (TRF-2).
+- PushTelemetry: codec 2 with an 11-byte xerial body -> `INVALID_RECORD` (recorded: R3), connection alive (TRF-3); one push with 40 oversized resource attributes (TRF-4); a second push inside the interval -> `THROTTLING_QUOTA_EXCEEDED` (TRF-5, R1); a zstd bomb answered in under 5 MiB of allocation (TRF-2).
 - ApiVersions on `--console=false` and on an embedded broker has no 71/72 (TRF-14).
 - Unadvertised API -> an observation with `Class=failed` and the connection closed (TRF-11).
 - OffsetFetch v8 with a partition error, AddPartitionsToTxn v3: the recorded `Error` is that code (TRF-7).
