@@ -84,7 +84,7 @@ func TestNeighboursSayHowANodeIsConnected(t *testing.T) {
 	}{
 		{NodeTopic, "orders", "Written by checkout-api+importer | read by g-order-validator+audit | schema subjects orders-key+orders-value"},
 		{NodeTopic, "payments", "Written by 127.0.0.1:50000+importer | read by g-ledger | schema subject payments-value"},
-		{NodeGroup, "g-ledger", "Reads payments"},
+		{NodeGroup, "g-ledger", "Reads payments | schema subject payments-value"},
 		{NodeClient, "importer", "Writes orders+payments"},
 		{NodeSubject, "orders-value", "Describes topic orders"},
 		{NodeTopic, "nothing-here", ""},

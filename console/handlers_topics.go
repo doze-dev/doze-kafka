@@ -2,6 +2,7 @@ package console
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"math"
@@ -70,6 +71,13 @@ func (c *Console) topics(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		data["Writers"], data["HasWriters"] = len(writers), true
+		data["RingText"], data["WrittenFrom"] = c.ringText(time.Now())
+	}
+	if len(rows) == 0 {
+		f := c.connectFacts(r)
+		data["Facts"], data["Command"] = f, createCommand(f, "", "", nil)
+	} else {
+		data["Facts"] = connectFacts{DataDir: c.facts.DataDir}
 	}
 	c.render(w, r, "topics_home", data)
 }
@@ -86,7 +94,39 @@ func (c *Console) listGroupsQuiet(ctx context.Context) []GroupSummary {
 
 func (c *Console) topicCreatePage(w http.ResponseWriter, r *http.Request) {
 	list, _ := c.be.ListTopics(r.Context())
-	c.render(w, r, "topic_create", map[string]any{"List": list, "Page": "topics", "Title": "Create topic", "Config": newConfigView(nil)})
+	taken := make([]string, 0, len(list))
+	for _, t := range list {
+		taken = append(taken, t.Name)
+	}
+	b, _ := json.Marshal(taken)
+	c.render(w, r, "topic_create", map[string]any{
+		"List": list, "Page": "topics", "Title": "Create topic", "Config": newConfigView(nil),
+		"Taken": taken, "TakenJSON": string(b), "HasRegistry": c.reg != nil, "MaxParts": c.facts.MaxPartitions,
+		"Command": createCommand(c.connectFacts(r), "", "", nil),
+	})
+}
+
+// topicShell is the shell command under the create form, rebuilt from what has been
+// typed so far. A value that does not parse yet leaves its --config out and says why.
+func (c *Console) topicShell(w http.ResponseWriter, r *http.Request) {
+	set := map[string]string{}
+	note := ""
+	for _, ts := range topicSettings {
+		raw := strings.TrimSpace(r.FormValue(ts.Key))
+		if raw == "" {
+			continue
+		}
+		v, err := ts.parse(raw)
+		if err != nil {
+			note = ts.Label + ": " + err.Error()
+			continue
+		}
+		set[ts.Key] = v
+	}
+	c.partial(w, "shell_preview", map[string]any{
+		"Command": createCommand(c.connectFacts(r), strings.TrimSpace(r.FormValue("name")), strings.TrimSpace(r.FormValue("partitions")), set),
+		"Note":    note,
+	})
 }
 
 func (c *Console) topicCreate(w http.ResponseWriter, r *http.Request) {
@@ -169,6 +209,10 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 	data["Confirm"] = c.topicConfirms(ctx, name, int(detail.Partitions))
 	maps.Copy(data, c.dockData(DockFilter{Topic: name}))
 	data["Neighbours"] = c.neighbourClauses(c.topicGraph(ctx, name, data["Consumers"].([]consumerRow)), NodeTopic, name)
+	if c.traffic != nil {
+		short, _ := c.ringText(time.Now())
+		data["NeighboursNote"] = "Written by is " + short + ". Read by is the groups that have committed offsets here; a consumer that assigns partitions itself has no group and is not counted."
+	}
 	data["Tabs"] = c.topicTabLinks(name, partition, tab, len(schemas) > 0, int(detail.Partitions), len(data["Consumers"].([]consumerRow)))
 	data["ListCount"] = len(list)
 

@@ -117,7 +117,7 @@ with the latest value and a small chart. They are metrics, not traces. See
 ## Schemas
 
 With the built-in [schema registry](schema-registry.md) running, the console grows a
-**Schemas** section (and a Schemas item in the command palette).
+**Schemas** section (its subjects are in the command palette, under Subjects).
 
 - The list shows every subject with its language (Avro, JSON Schema, Protobuf) and
   its newest version.
@@ -220,7 +220,8 @@ no dialog open.
 says what it is (a topic its partitions and messages, a group its state, members and
 lag), the part of the name you typed is bold, and an action carries its key. On a
 topic it offers to produce to it; on a group, to reset its offsets, which still asks
-before it does anything.
+before it does anything. The sections themselves are not in the palette: the rail
+and `g` then a letter go to them.
 
 ## Appearance
 

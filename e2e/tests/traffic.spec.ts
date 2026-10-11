@@ -92,11 +92,15 @@ test('a group page shows its timeline, newest first', async ({ page }) => {
   await expect(timeline).toContainText('doze-seed-consumer'); // the join names the client.
 });
 
-test('Traffic is in the palette', async ({ page, openPalette }) => {
+test('Traffic is behind g r, and the palette does not list it as a destination', async ({ page, openPalette }) => {
   await page.goto('topics');
   await openPalette();
   await page.keyboard.type('Traffic');
-  await expect(page.locator('.pal-item', { hasText: 'Traffic' })).toBeVisible();
+  await expect(page.locator('.pal-item', { hasText: /^Traffic$/ })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('g');
+  await page.keyboard.press('r');
+  await expect(page).toHaveURL(/\/traffic$/);
 });
 
 test('a client that reports its own metrics shows them, drawn, and says they are not traces', async ({ page }) => {

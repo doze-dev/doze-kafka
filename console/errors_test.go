@@ -151,7 +151,7 @@ func TestUnreachableBrokerIsAPageWithRetry(t *testing.T) {
 func TestEmptyListsSayWhy(t *testing.T) {
 	c := newTestConsole(t)
 	body := req(t, c, "GET", "/_console/topics", nil).Body.String()
-	for _, want := range []string{"No topics yet", "auto-create the topic", "Nothing selected"} {
+	for _, want := range []string{"No topics", "Nothing exists on this broker yet.", "This broker has no topics.", "kafka-topics.sh --bootstrap-server", "--create --topic orders.created", "The console makes exactly the same CreateTopics request."} {
 		if !strings.Contains(body, want) {
 			t.Errorf("an empty broker's topic list is missing %q", want)
 		}
@@ -170,7 +170,7 @@ func TestEmptyListsSayWhy(t *testing.T) {
 
 	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"orders"}, "partitions": {"1"}})
 	body = req(t, c, "GET", "/_console/topics", nil).Body.String()
-	if strings.Contains(body, "No topics yet") {
+	if strings.Contains(body, "Nothing exists on this broker yet.") {
 		t.Error("the empty-list message is shown although a topic exists")
 	}
 	if !strings.Contains(body, `id="list-none"`) {

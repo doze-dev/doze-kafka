@@ -149,6 +149,31 @@
 {{else}}
 <div class="callout"><span class="b">No members and no offsets</span><span class="note">No members connected. Offsets, if any were committed before, are still held: they are durable even when the group is empty.</span></div>
 {{end}}
+{{template "group_tryit" .}}
+{{end}}
+
+{{/* Gr-02, Try it: the fields OffsetCommit takes, for one partition. Disabled, and
+     saying why, while members are connected, as the Offsets tab is. It holds the
+     live refresh once a field has been touched, so typing is not thrown away. */}}
+{{define "group_tryit"}}
+<form class="card pad col g6" id="try-offset" x-data="{e:false}" @input="e=true" :data-hold-live="e ? '' : null"
+      hx-post="{{groupURL .Group.ID}}/offset" hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]">
+  <div class="row sb ce"><span class="b">Try it</span><span class="note">the same fields OffsetCommit and the admin API take</span></div>
+  <div class="row ce g8 wrap">
+    {{$first := .Try}}
+    <input class="inp m try-topic" name="topic" list="try-topics" value="{{$first.Topic}}" aria-label="Topic" autocomplete="off" spellcheck="false"{{if not .CanAct}} disabled{{end}}>
+    <datalist id="try-topics">{{range .Topics}}<option value="{{.}}">{{end}}</datalist>
+    <input class="inp m try-part" name="partition" type="number" min="0" value="{{$first.Partition}}" aria-label="Partition"{{if not .CanAct}} disabled{{end}}>
+    <input class="inp m try-off" name="offset" inputmode="numeric" value="{{$first.Committed}}" aria-label="New committed offset" autocomplete="off"{{if not .CanAct}} disabled{{end}}>
+    <input type="hidden" name="tab" value="lag">
+    <button class="btn" type="submit"{{if not .CanAct}} disabled{{end}}>Set offset</button>
+    {{if .CanAct}}<span class="note">The group is empty, so this applies at once and cannot be undone.</span>
+    {{else if .Members}}<span class="note">disabled while {{len .Members}} member{{if ne (len .Members) 1}}s are{{else}} is{{end}} connected: stop the consumers first (see <a href="{{groupURL .Group.ID}}?tab=offsets">Offsets</a>)</span>
+    {{else}}<span class="note">disabled while the group is not empty (see <a href="{{groupURL .Group.ID}}?tab=offsets">Offsets</a>)</span>{{end}}
+  </div>
+  <div class="teach">{{teach "group" "new-offset"}}</div>
+  <div class="err form-err" data-err-slot hidden role="alert"></div>
+</form>
 {{end}}
 
 {{/* Gr-03, Members. */}}

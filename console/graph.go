@@ -36,6 +36,7 @@ const (
 	EdgeWrites    EdgeKind = "writes"
 	EdgeReads     EdgeKind = "reads"
 	EdgeDescribes EdgeKind = "describes"
+	EdgeMember    EdgeKind = "member" // client -> group: a client id the coordinator holds as a member.
 )
 
 // Edge sources: where an edge was learned.
@@ -43,6 +44,7 @@ const (
 	FromTraffic  = "traffic"  // the recorder: a request the broker answered.
 	FromGroups   = "groups"   // a coordinator: an offset a group committed.
 	FromRegistry = "registry" // the registry: a subject named for a topic.
+	FromMembers  = "members"  // a coordinator: who is a member of a group now.
 )
 
 // Node is a client, topic, group or subject, by name.
@@ -146,6 +148,15 @@ func (g *Graph) AddGroupReads(group string, topics []string) {
 	}
 }
 
+// AddGroupMembers adds that each client id is a member of the group now.
+func (g *Graph) AddGroupMembers(group string, clients []string) {
+	for _, c := range clients {
+		if c != "" {
+			g.Add(Edge{From: Node{NodeClient, c}, To: Node{NodeGroup, group}, Kind: EdgeMember, Source: FromMembers})
+		}
+	}
+}
+
 // subjectTopic is the topic a subject describes by the registry's usual naming
 // (TopicNameStrategy: <topic>-key and <topic>-value), or "" when it does not follow it.
 func subjectTopic(subject string) string {
@@ -217,7 +228,24 @@ func (g *Graph) Neighbours(kind NodeKind, name string) []Phrase {
 		}
 	case NodeGroup, NodeClient:
 		add("Writes", outgoing(EdgeWrites, NodeTopic))
-		add("reads", outgoing(EdgeReads, NodeTopic))
+		read := outgoing(EdgeReads, NodeTopic)
+		add("reads", read)
+		if kind == NodeGroup {
+			add("members", incoming(EdgeMember, NodeClient))
+			// The schema of what it reads: the subjects that describe those topics.
+			reads := map[Node]bool{}
+			for _, t := range read {
+				reads[t] = true
+			}
+			subjects := collect(func(e Edge) (Node, bool) {
+				return e.From, e.Kind == EdgeDescribes && e.From.Kind == NodeSubject && reads[e.To]
+			})
+			if len(subjects) == 1 {
+				add("schema subject", subjects)
+			} else {
+				add("schema subjects", subjects)
+			}
+		}
 	case NodeSubject:
 		add("Describes topic", outgoing(EdgeDescribes, NodeTopic))
 	}

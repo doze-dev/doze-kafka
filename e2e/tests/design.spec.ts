@@ -152,8 +152,32 @@ test('a fresh empty broker lands on "Your broker is up", with the three steps', 
     await expect(page.locator('nav.rail a[href$="/topics"] .n')).toHaveText('0');
     await expect(page.locator('nav.rail a[href$="/groups"] .n')).toHaveText('0');
     await expect(page.locator('nav.rail a[href$="/traffic"] .n')).toHaveText('0 open');
-    // Creating a topic ends it.
+    // Tp-01: the empty Topics page says nothing exists, what it is not, and the shell command.
+    await page.goto(`${base}topics`);
+    await expect(page.locator('.list .list-note').first()).toContainText('No topics');
+    await expect(page.locator('.list .list-note').first()).toContainText('Nothing exists on this broker yet.');
+    await expect(page.locator('#topics-none')).toContainText('This broker has no topics.');
+    await expect(page.locator('#topics-none')).toContainText('This is not a filter and not a permissions problem.');
+    await expect(page.locator('#topics-none pre.code')).toContainText(/kafka-topics\.sh --bootstrap-server 127\.0\.0\.1:\d+ \\\n\s+--create --topic orders\.created/);
+    await expect(page.locator('#topics-none')).toContainText('The console makes exactly the same CreateTopics request.');
+    // Tp-02: the create form has the replication factor, the shell command that follows it, and what happens next.
+    await page.goto(base);
     await page.getByRole('link', { name: 'Or create it here' }).click();
+    await expect(page.locator('#f-replication')).toBeDisabled();
+    await expect(page.locator('#f-replication-teach')).toContainText('Always 1. This is one broker with no followers to copy to.');
+    await expect(page.locator('#f-partitions-teach')).toContainText(/^1 to \d+\. This is the broker's cap\. Partitions can be added later and never removed/);
+    // No raw record fields in any field's help.
+    const help = await page.locator('.teach, .hint').allInnerTexts();
+    for (const h of help) expect(h, 'help text').not.toMatch(/unit:|range:|; applied/);
+    await expect(page.getByText('What happens next')).toBeVisible();
+    await expect(page.locator('#shell-preview')).toContainText('--partitions 1 --replication-factor 1');
+    await page.locator('#f-name').fill('first-topic');
+    await page.locator('#f-partitions').fill('3');
+    await page.locator('#cfg-segment\\.bytes').fill('1MB');
+    await expect(page.locator('#shell-preview')).toContainText('--create --topic first-topic');
+    await expect(page.locator('#shell-preview')).toContainText('--partitions 3 --replication-factor 1');
+    await expect(page.locator('#shell-preview')).toContainText('--config segment.bytes=1048576');
+    // Creating a topic ends it.
     await page.locator('#f-name').fill('first-topic');
     await page.getByRole('button', { name: 'Create topic' }).click();
     await expect(page).toHaveURL(/topics\/first-topic/);
@@ -383,6 +407,12 @@ test('the palette is grouped under Topics, Groups, Subjects and Actions, says wh
   await expect(page.locator('#pal-list .pal-item', { hasText: 'Produce to seed-orders' })).toBeVisible();
   await page.locator('#pal-q').fill('create topic');
   await expect(page.locator('#pal-list .pal-item', { hasText: 'Create topic' }).locator('.kbd').first()).toHaveText('c');
+  // No Go to group: the sections are the rail's and the g chords'.
+  await page.locator('#pal-q').fill('a');
+  await expect(page.locator('#pal-list .pal-cap', { hasText: 'Go to' })).toHaveCount(0);
+  for (const cap of await page.locator('#pal-list .pal-cap').allTextContents()) expect(['Topics', 'Groups', 'Subjects', 'Actions']).toContain(cap);
+  await page.locator('#pal-q').fill('cluster');
+  await expect(page.locator('#pal-list .pal-item', { hasText: /^Cluster$/ })).toHaveCount(0);
   // The foot: Connect an app, and the keys.
   const foot = page.locator('#palette .pal-foot');
   await expect(foot).toContainText('Connect an app');
@@ -428,4 +458,136 @@ test('at 390 the top bar is a menu button, logo, title and the palette, and mess
   expect(await panel.evaluate((el) => getComputedStyle(el).position)).toBe('fixed');
   const b = await panel.boundingBox();
   expect(b!.y + b!.height).toBeGreaterThanOrEqual(843);
+});
+
+// Main: the Traffic table shows the whole time, the whole "took" and the whole result;
+// a header never runs into the next one. (The audit read "17:12:57.1…", "0.0…" and
+// "TOPIC_ALREADY…" off the first build of this table.)
+test('the Traffic table does not truncate time, took or result, and its headers do not collide', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('traffic');
+  const table = page.locator('#traffic-table');
+  await expect(table.locator('tbody tr', { hasText: 'TOPIC_ALREADY_EXISTS' })).toHaveCount(1);
+  const bad = await table.evaluate((t) => {
+    const clipped: string[] = [];
+    // Time (1), Result (6), Took (7) are shown whole on every row.
+    for (const tr of Array.from(t.querySelectorAll('tbody tr'))) {
+      for (const i of [0, 5, 6]) {
+        const td = tr.children[i] as HTMLElement;
+        if (td.scrollWidth > td.clientWidth) clipped.push(`${td.textContent!.trim()} (${td.scrollWidth} > ${td.clientWidth})`);
+      }
+    }
+    // A header's words fit its cell, so neighbours cannot run into one another.
+    for (const th of Array.from(t.querySelectorAll('thead th'))) {
+      const el = th as HTMLElement;
+      if (el.scrollWidth > el.clientWidth) clipped.push(`th ${el.textContent} (${el.scrollWidth} > ${el.clientWidth})`);
+    }
+    return clipped;
+  });
+  expect(bad).toEqual([]);
+  // The result column's text starts where its header does, and Took ends where its header ends.
+  const left = await table.evaluate((t) => {
+    const th = t.querySelector('thead th:nth-child(6)') as HTMLElement;
+    const td = t.querySelector('tbody tr td:nth-child(6)') as HTMLElement;
+    return [th.getBoundingClientRect().left, td.getBoundingClientRect().left];
+  });
+  expect(left[1]).toBeCloseTo(left[0], 0);
+  const right = await table.evaluate((t) => {
+    const th = t.querySelector('thead th:nth-child(7)') as HTMLElement;
+    const td = t.querySelector('tbody tr td:nth-child(7)') as HTMLElement;
+    return [th.getBoundingClientRect().right, td.getBoundingClientRect().right];
+  });
+  expect(right[1]).toBeCloseTo(right[0], 0);
+});
+
+test('the Traffic summary says the window of each number', async ({ page }) => {
+  await page.goto('traffic');
+  const sum = page.locator('#traffic-summary');
+  await expect(sum).toContainText(/clients? connected/);
+  await expect(sum).toContainText(/\d+ requests? and \d+ errors? in the last minute/);
+  await expect(sum).toContainText(/kept: the last [\d,]+, in memory only/);
+});
+
+test('the keys strip is never clipped: whole at 960 and 1440, not drawn at 390 where the board draws none', async ({ page }) => {
+  for (const w of [1440, 960]) {
+    await page.setViewportSize({ width: w, height: 800 });
+    for (const path of ['traffic', 'topics', 'topics/seed-orders']) {
+      await page.goto(path);
+      const strip = page.locator('#keys');
+      await expect(strip).toBeVisible();
+      expect(await strip.evaluate((el) => el.scrollWidth <= el.clientWidth), `${path} at ${w}`).toBe(true);
+    }
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('traffic');
+  await expect(page.locator('#keys')).toBeHidden();
+});
+
+test('at 390 the Traffic requests are cards: time, request, what it was about, and how it went', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('traffic');
+  const row = page.locator('#traffic-table tbody tr').first();
+  await expect(row).toBeVisible();
+  expect(await row.evaluate((el) => getComputedStyle(el).display)).toBe('grid');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  // The result is on the card, whole.
+  const res = row.locator('td.cell-result');
+  await expect(res).toBeVisible();
+  expect(await res.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+});
+
+// Ac-Home: type and operation are words (Topic, Write), the permission is ALLOW or DENY.
+test('the ACL table writes type and operation as words and the permission in capitals', async ({ page }) => {
+  await page.goto('access');
+  const rows = page.locator('#acl-table .r:not(.h)');
+  await expect(rows.first()).toBeVisible();
+  for (const row of await rows.all()) {
+    const cells = await row.locator('span').allInnerTexts();
+    expect(cells[1], 'type').toMatch(/^(Topic|Group|Cluster|TransactionalId|DelegationToken)$/);
+    expect(cells[4], 'operation').toMatch(/^[A-Z][A-Za-z]+$/);
+    expect(cells[5], 'permission').toMatch(/^(ALLOW|DENY)$/);
+  }
+});
+
+// Tp-Home: "read by nobody" says what it is counted from, and "written by" says where its
+// number comes from and how old the oldest of those requests is.
+test('the Topics table qualifies read by and written by', async ({ page }) => {
+  await page.goto('topics');
+  await expect(page.locator('#topics-table')).not.toContainText(/^nobody$/m);
+  await expect(page.locator('#topics-summary')).toContainText(/written by \d+ clients?/);
+  await expect(page.locator('#topics-summary')).toContainText(/from recent requests, the oldest .+ old/);
+  await page.goto('topics/seed-orders');
+  await expect(page.locator('#neighbours-note')).toContainText('Written by is from recent requests, the oldest');
+});
+
+// Gr-02: the Lag tab ends in Try it, the fields OffsetCommit takes.
+test('a group\'s Lag tab ends in Try it: topic, partition, new committed offset and Set offset', async ({ page }) => {
+  await page.goto('groups/g-lag');
+  const card = page.locator('#try-offset');
+  await expect(card).toContainText('Try it');
+  await expect(card).toContainText('the same fields OffsetCommit and the admin API take');
+  await expect(card.getByLabel('Topic')).toHaveValue('seed-orders');
+  await expect(card.getByLabel('Partition')).toHaveValue('0');
+  await expect(card.getByLabel('New committed offset')).toHaveValue(/^\d+$/);
+  await expect(card.getByRole('button', { name: 'Set offset' })).toBeEnabled();
+  // The neighbours: what it reads.
+  await expect(page.locator('#neighbours')).toContainText('seed-orders');
+});
+
+// Tp-02: the form says a name is taken before it is sent.
+test('the create form says a name already exists before anything is sent', async ({ page }) => {
+  await page.goto('new/topic');
+  await expect(page.getByText('Names that already exist')).toBeVisible();
+  await expect(page.getByText(/are taken\. The form says so before you send, and the broker would answer TOPIC_ALREADY_EXISTS/)).toBeVisible();
+  const warn = page.locator('#f-name-taken');
+  await expect(warn).toBeHidden();
+  const shell = page.waitForResponse((r) => r.url().includes('/new/topic/shell'));
+  await page.locator('#f-name').fill('seed-orders');
+  await expect(warn).toBeVisible();
+  await expect(warn).toContainText('already exists on this broker');
+  // The command under the form follows what is typed (and the route gate sees it driven).
+  await shell;
+  await expect(page.locator('#shell-preview')).toContainText('--create --topic seed-orders');
+  await page.locator('#f-name').fill('seed-orders-new');
+  await expect(warn).toBeHidden();
 });

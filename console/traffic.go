@@ -270,6 +270,24 @@ type clientRow struct {
 	Refused int
 }
 
+// ringText says where a "written by" comes from and how far back it reaches: the
+// requests the broker keeps in memory, the oldest of which is so old. short is the
+// words beside the number, long is what the tooltip says.
+func (c *Console) ringText(now time.Time) (short, long string) {
+	events := c.traffic.Events(TrafficFilter{}, 0)
+	kept := "the recent requests the broker keeps in memory"
+	if n := capacityOf(c.traffic); n > 0 {
+		kept = "the last " + groupDigits(int64(n)) + " requests the broker keeps in memory"
+	}
+	if len(events) == 0 {
+		return "from recent requests; none are kept yet",
+			"Written by is counted from " + kept + ", and none are kept yet. It does not survive a restart."
+	}
+	age := spanText(now.Sub(events[len(events)-1].First))
+	return "from recent requests, the oldest " + age + " old",
+		"Written by is counted from " + kept + ". It reaches back " + age + ": a client that wrote earlier, or whose requests have been pushed out, is not listed. It does not survive a restart."
+}
+
 // capacityOf is how many rows the source keeps, when it says.
 func capacityOf(src TrafficSource) int {
 	if c, ok := src.(interface{ Capacity() int }); ok {
@@ -313,24 +331,30 @@ func (c *Console) trafficData(r *http.Request) map[string]any {
 		fmt.Fprint(h, e.Seq, e.Count, ",")
 	}
 
-	// The summary: what each number is counted over is in its words. A row that folded
-	// repeats counts them all; one that began before the minute counts only its latest
-	// request in it, so the number is then "at least".
+	// The summary: what each number is counted over is in its words. The requests and
+	// the errors are of the same minute. A row that folded repeats counts them all; one
+	// that began before the minute counts only its latest request in it, so the number
+	// is then "at least". A client's refused count is over everything the recorder kept.
 	var lastMinute, errs int
-	lower := false
+	lower, errLower := false, false
 	byRemote := map[string]*remoteActivity{}
 	for _, e := range all {
-		if e.Error != "" {
-			errs += max(e.Count, 1)
-		}
+		n := 0
 		switch {
 		case !e.First.Before(now.Add(-time.Minute)):
-			lastMinute += max(e.Count, 1)
+			n = max(e.Count, 1)
 		case !e.Time.Before(now.Add(-time.Minute)):
-			lastMinute++
+			n = 1
 			if e.Count > 1 {
 				lower = true
+				if e.Error != "" {
+					errLower = true
+				}
 			}
+		}
+		lastMinute += n
+		if e.Error != "" {
+			errs += n
 		}
 		a := byRemote[e.Remote]
 		if a == nil {
@@ -400,7 +424,7 @@ func (c *Console) trafficData(r *http.Request) map[string]any {
 		"HasClientMetrics": c.metrics != nil, "Metrics": cards,
 		"Rows": rows, "Clients": crows, "Filter": v, "FilterQ": v.query(), "Kinds": kinds,
 		"Filtered": !v.empty(), "Hash": fmt.Sprintf("%x", h.Sum64()),
-		"LastMinute": lastMinute, "LastMinuteLowerBound": lower, "ErrorCount": errs, "KeptText": kept,
+		"LastMinute": lastMinute, "LastMinuteLowerBound": lower, "ErrorCount": errs, "ErrorLowerBound": errLower, "KeptText": kept,
 		"InspDefault": "traffic",
 	}
 }

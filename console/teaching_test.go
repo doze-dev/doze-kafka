@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/internal/settings"
 )
 
@@ -109,10 +110,20 @@ func TestTheFormFieldCheckCatchesAFieldWithNoRecord(t *testing.T) {
 
 // The line is generated from the record, not written: the words are the table's.
 func TestTeachingLinesAreGeneratedFromTheTable(t *testing.T) {
-	line := teachLine("broker", "max-partitions")
 	s, _ := settings.Lookup(settings.Broker, "max-partitions")
-	if line == "" || !strings.Contains(line, s.Rule()) {
-		t.Errorf("max-partitions teaching line %q does not carry the record's rule %q", line, s.Rule())
+	c := &Console{facts: BrokerFacts{MaxPartitions: 64}}
+	line := c.teach("broker", "max-partitions")
+	if want := s.Say(config.Config{MaxPartitions: 64}); line != want || !strings.HasPrefix(line, "1 to 64. This is the broker's cap.") {
+		t.Errorf("max-partitions teaching line %q is not what the record says, %q", line, want)
+	}
+	// No raw record fields in anything a person reads under a field.
+	for _, kind := range []settings.Kind{settings.Topic, settings.Broker, settings.Registry, settings.Console, settings.Group} {
+		for _, rec := range settings.All(kind) {
+			say := rec.Say(config.Config{})
+			if strings.Contains(say, "unit:") || strings.Contains(say, "range:") || strings.Contains(say, "; applied") {
+				t.Errorf("%s/%s: raw record fields in help text %q", kind, rec.Name, say)
+			}
+		}
 	}
 	if teachLine("broker", "no-such-setting") != "" {
 		t.Error("a field with no record produced a line")
@@ -121,7 +132,7 @@ func TestTeachingLinesAreGeneratedFromTheTable(t *testing.T) {
 	old := settingsTable
 	defer func() { settingsTable = old }()
 	settingsTable = fakeSettings{}
-	if got := teachLine("group", "new-offset"); !strings.Contains(got, "from the fake") {
+	if got := teachLine("group", "new-offset"); !strings.Contains(got, "From the fake") {
 		t.Errorf("the console did not read through its source: %q", got)
 	}
 }
@@ -129,6 +140,6 @@ func TestTeachingLinesAreGeneratedFromTheTable(t *testing.T) {
 type fakeSettings struct{}
 
 func (fakeSettings) Lookup(settings.Kind, string) (settings.Setting, bool) {
-	return settings.Setting{Name: "x", Meaning: "from the fake", Effect: settings.Applied}, true
+	return settings.Setting{Name: "x", Meaning: "From the fake", Effect: settings.Applied}, true
 }
 func (fakeSettings) All(settings.Kind) []settings.Setting { return nil }

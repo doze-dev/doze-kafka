@@ -1,8 +1,7 @@
 package console
 
 import (
-	"strings"
-
+	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/internal/settings"
 )
 
@@ -31,16 +30,23 @@ var settingsTable SettingsSource = tableSource{}
 // teachLine is the line shown under a field, from its record: what it is, then
 // its unit, range, default and whether the broker acts on it. A field with no
 // record gets nothing, which a test refuses to let happen (teaching_test.go).
-func teachLine(kind, name string) string {
+func teachLine(kind, name string) string { return teachWith(config.Config{}, kind, name) }
+
+// teachWith is teachLine for a broker that is running: cfg carries what only it
+// knows (the partition cap).
+func teachWith(cfg config.Config, kind, name string) string {
 	s, ok := settingsTable.Lookup(settings.Kind(kind), name)
 	if !ok {
 		return ""
 	}
-	rule := s.Rule()
-	if s.Meaning == "" {
-		return rule
-	}
-	return strings.TrimSuffix(s.Meaning, ".") + ". " + rule + "."
+	return s.Say(cfg)
+}
+
+// teach is the template function: a line read through the table, for this broker.
+func (c *Console) teach(kind, name string) string {
+	return teachWith(config.Config{
+		MaxPartitions: c.facts.MaxPartitions, DefaultPartitions: c.facts.DefaultPartitions, AutoCreateTopics: c.facts.AutoCreateTopics,
+	}, kind, name)
 }
 
 // formField is how a field of a console form relates to the settings table.
@@ -59,10 +65,11 @@ type formField struct {
 // teaching_test.go parses the templates and fails for a field that is not here.
 var formFields = map[string]formField{
 	// Settings: each has a record, and the template shows its teaching line.
-	"partitions": {Kind: settings.Broker, Name: "max-partitions"},
-	"add":        {Kind: settings.Broker, Name: "max-partitions"},
-	"level":      {Kind: settings.Registry, Family: true},
-	"offset":     {Kind: settings.Group, Name: "new-offset"},
+	"partitions":  {Kind: settings.Broker, Name: "max-partitions"},
+	"replication": {Kind: settings.Broker, Name: "replication-factor"},
+	"add":         {Kind: settings.Broker, Name: "max-partitions"},
+	"level":       {Kind: settings.Registry, Family: true},
+	"offset":      {Kind: settings.Group, Name: "new-offset"},
 
 	// Not settings: what is being written, or which thing is being looked at.
 	"name":           {Not: "the name of the topic being created"},

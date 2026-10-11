@@ -22,7 +22,7 @@
   {{template "topic_lp" (dict "List" .List "Sel" "")}}
   <main class="main" id="detail">
     <div class="row sb ce idband">
-      <div class="col"><h1 class="h1">Topics</h1><span class="note">Nothing selected. Pick a topic on the left, or make one.</span></div>
+      <div class="col"><h1 class="h1">Topics</h1><span class="note">{{if .Rows}}Nothing selected. Pick a topic on the left, or make one.{{else if .Facts.DataDir}}<span class="m">{{.Facts.DataDir}}</span> holds no topics.{{else}}This broker holds no topics.{{end}}</span></div>
       <div class="row g8 ce"><a class="btn pri" href="{{newTopicURL}}">Create topic</a></div>
     </div>
 
@@ -31,7 +31,7 @@
       <span class="m">{{len .Rows}} topic{{if ne (len .Rows) 1}}s{{end}}</span><span class="mut">·</span>
       <span class="m">{{num .Partitions}} partition{{if ne .Partitions 1}}s{{end}}</span><span class="mut">·</span>
       <span class="m">{{num .Messages}} message{{if ne .Messages 1}}s{{end}}</span>
-      {{if .HasWriters}}<span class="mut">·</span><span class="m">written by {{.Writers}} client{{if ne .Writers 1}}s{{end}}</span>{{end}}
+      {{if .HasWriters}}<span class="mut">·</span><span class="m">written by {{.Writers}} client{{if ne .Writers 1}}s{{end}}</span><span class="note" title="{{.WrittenFrom}}">{{.RingText}}</span>{{end}}
       <span class="mut">·</span><span class="m">read by {{.ReaderCount}} group{{if ne .ReaderCount 1}}s{{end}}</span>
       {{if .DeadLetters}}<span class="mut">·</span><span class="m warn">{{.DeadLetters}} topic{{if ne .DeadLetters 1}}s{{end}} with dead letters</span>{{end}}
     </div>
@@ -44,7 +44,7 @@
         <span class="m ra">{{.Partitions}}</span>
         <span class="m ra {{if .DeadLetter}}warn{{end}}">{{num .Msgs}}</span>
         <span class="m {{if eq .Retention "kept per key"}}mut{{end}}">{{if .Retention}}{{.Retention}}{{else}}<span class="mut">—</span>{{end}}</span>
-        <span class="m">{{if .ReadBy}}{{range $i, $g := .ReadBy}}{{if $i}}, {{end}}{{$g}}{{end}}{{else}}<span class="mut">nobody</span>{{end}}</span>
+        <span class="m">{{if .ReadBy}}{{range $i, $g := .ReadBy}}{{if $i}}, {{end}}{{$g}}{{end}}{{else}}<span class="mut" title="Read by is the groups that have committed offsets on this topic. A consumer that assigns partitions itself has no group, so it is not counted.">no group has committed</span>{{end}}</span>
         <span>{{if .Compact}}<span class="pill">compact</span>{{else}}<span class="mut">—</span>{{end}}</span>
         <span class="m">{{if .Subject}}{{.Subject}}{{else}}<span class="mut">—</span>{{end}}</span>
       </a>
@@ -59,24 +59,41 @@
     </div>
     <div class="tablenote">Retention shows the topic's own setting, or the broker default. Select a topic to open it.</div>
     {{else}}
-    <div class="callout"><span class="b">{{t "topics.none.title"}}</span><span class="note">{{t "topics.none.hint"}}</span></div>
+    {{/* Tp-01: the broker is up and nothing is on it. It says so, says what it is not
+         (a filter, a permission), and gives the same creation as a shell command. */}}
+    <div class="card pad col g8" id="topics-none">
+      <div class="col"><span class="cap">Nothing exists</span><h2 class="h2">This broker has no topics.</h2></div>
+      <p class="note">It is running and answering at <span class="m">{{.Facts.Bootstrap}}</span>; there is just nothing on it. This is not a filter and not a permissions problem. Make a topic here, or point an app at the broker: {{if .AutoCreate}}a producer that names a new topic creates it with {{.AutoParts}} partition{{if ne .AutoParts 1}}s{{end}} (auto-create is on).{{else}}a producer that names a topic that does not exist is refused, because auto-create is off, so make it first.{{end}}</p>
+      <div class="row ce g8"><a class="btn pri" href="{{newTopicURL}}">Create topic</a><span class="note">or run the same thing from a shell</span></div>
+      <pre class="code">{{.Command}}</pre>
+      <p class="note">{{if .Facts.SASL}}<span class="m">client.properties</span> carries the {{index .Facts.Mechanisms 0}} login. {{end}}The console makes exactly the same CreateTopics request.</p>
+    </div>
     {{end}}
   </main>
 {{template "shell_bottom" .}}{{end}}
 
+{{/* Tp-02: create a topic. The page says what it sends (the same CreateTopics
+     kafka-topics.sh sends), shows that call as a shell command that follows the form,
+     and says what happens next. Tp-03: the settings are open here, blank follows the
+     broker. */}}
 {{define "topic_create"}}{{template "shell_top" .}}
   {{template "topic_lp" (dict "List" .List "Sel" "")}}
   <main class="main" id="detail">
     <div class="backrow"><a class="btn sm" href="{{.Prefix}}/topics">‹ Topics</a></div>
     <div class="row sb ce idband">
-      <div class="col"><h1 class="h1">Create topic</h1><span class="note">Real Kafka creates it, and answers the same way when it cannot.</span></div>
+      <div class="col"><h1 class="h1">Create topic</h1><span class="note">Makes a new topic with the same CreateTopics request kafka-topics.sh sends.</span></div>
     </div>
-    <form class="form-page" hx-post="{{newTopicURL}}" hx-disabled-elt="find button[type=submit]">
+    <form class="form-page" id="create-topic" hx-post="{{newTopicURL}}" hx-disabled-elt="find button[type=submit]">
       <div class="card form-sec"><div class="panel-h"><h2>General</h2></div><div class="form-b">
-        <div class="field"><label for="f-name">Topic name <span class="hint">letters, digits, <span class="mono">.</span> <span class="mono">_</span> <span class="mono">-</span></span></label><input class="input mono" id="f-name" name="name" placeholder="orders.created" required autocomplete="off" autofocus></div>
-        <div class="field narrow"><label for="f-partitions">Partitions</label><input class="input mono" id="f-partitions" name="partitions" type="number" min="1" max="1000" value="1" required aria-describedby="f-partitions-teach"><p class="teach" id="f-partitions-teach">{{teach "broker" "max-partitions"}}</p></div>
+        <div class="field" x-data='{taken: {{.TakenJSON}}, v: ""}'>
+          <label for="f-name">Topic name <span class="hint">letters, digits, <span class="mono">.</span> <span class="mono">_</span> <span class="mono">-</span> and at most 249 characters</span></label>
+          <input class="input mono" id="f-name" name="name" placeholder="orders.created" required maxlength="249" autocomplete="off" autofocus x-model="v" :aria-invalid="taken.includes(v) ? 'true' : null" aria-describedby="f-name-taken">
+          <p class="teach bad" id="f-name-taken" x-show="taken.includes(v)" x-cloak role="status"><span class="m" x-text="v"></span> already exists on this broker. The broker would answer TOPIC_ALREADY_EXISTS and change nothing.</p>
+        </div>
+        <div class="field narrow"><label for="f-partitions">Partitions</label><input class="input mono" id="f-partitions" name="partitions" type="number" min="1"{{if .MaxParts}} max="{{.MaxParts}}"{{end}} value="1" required aria-describedby="f-partitions-teach"><p class="teach" id="f-partitions-teach">{{teach "broker" "max-partitions"}}</p></div>
+        <div class="field narrow"><label for="f-replication">Replication factor</label><input class="input mono" id="f-replication" name="replication" type="number" value="1" disabled aria-describedby="f-replication-teach"><p class="teach" id="f-replication-teach">{{teach "broker" "replication-factor"}}</p></div>
       </div></div>
-      <div class="card form-sec"><div class="panel-h"><h2>Settings <span class="sz">optional — leave blank to follow the broker's</span></h2></div><div class="form-b">
+      <div class="card form-sec"><div class="panel-h"><h2>Settings <span class="sz">optional. Retention, segment size and the rest; blank follows the broker's setting</span></h2></div><div class="form-b">
         {{template "topic_settings_fields" .Config}}
         <p class="note">Retention is delete-only and works in whole segments: a partition is trimmed when a full segment falls outside the limit, so a smaller segment size makes it act sooner. You can change these later from the topic's page.</p>
       </div></div>
@@ -85,9 +102,21 @@
         <a class="btn" href="{{.Prefix}}/topics">Cancel</a>
         <button class="btn pri" type="submit">Create topic</button>
       </div>
+      {{/* The command follows the form: the server builds it (it knows how "7d" and
+           "1MB" are written for Kafka), so the page does not carry a second parser. */}}
+      <section class="card pad col g8" aria-label="The same thing, from a shell">
+        <div class="row sb ce"><h2 class="h2">The same thing, from a shell</h2><span class="note">Updates as you type. Copy it to repeat this elsewhere.</span></div>
+        <div id="shell-preview-wrap" hx-get="{{.Prefix}}/new/topic/shell" hx-trigger="input from:#create-topic delay:200ms" hx-include="#create-topic" hx-target="this" hx-select="unset" hx-swap="innerHTML">{{template "shell_preview" .}}</div>
+      </section>
     </form>
+    <div class="row g12 wrap callouts">
+      <div class="callout grow"><span class="b">What happens next</span><span class="note">The topic appears in the list with 0 messages. Producers can write at once; no group reads it yet.{{if .HasRegistry}} A schema subject is only attached if you register one on the Schemas page.{{end}}</span></div>
+      {{if .Taken}}<div class="callout grow"><span class="b">Names that already exist</span><span class="note"><span class="m">{{index .Taken 0}}</span>{{if gt (len .Taken) 1}} and {{sub (len .Taken) 1}} other{{if gt (len .Taken) 2}}s{{end}}{{end}} {{if gt (len .Taken) 1}}are{{else}}is{{end}} taken. The form says so before you send, and the broker would answer TOPIC_ALREADY_EXISTS.</span></div>{{end}}
+    </div>
   </main>
 {{template "shell_bottom" .}}{{end}}
+
+{{define "shell_preview"}}<pre class="code" id="shell-preview">{{.Command}}</pre>{{if .Note}}<span class="note bad">{{.Note}}</span>{{end}}{{end}}
 
 {{/* One topic (Sy-01): its name and one action; the facts as a sentence; its
      neighbours as links; tabs; what the tab holds; try it; and, under the page, the

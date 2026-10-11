@@ -487,7 +487,7 @@ func TestAccessPageListsACLsUnderTheEnforcedBanner(t *testing.T) {
 		t.Fatalf("create an ACL: %v %+v", err, resp)
 	}
 	page := req(t, c, "GET", "/_console/access", nil).Body.String()
-	for _, want := range []string{"These are enforced", ">allow<", ">read<", "User:alice", "orders", "literal"} {
+	for _, want := range []string{"These are enforced", ">ALLOW<", ">Read<", ">Topic<", "User:alice", "orders", "literal"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the Access page is missing %q after one ACL was stored", want)
 		}
@@ -495,7 +495,8 @@ func TestAccessPageListsACLsUnderTheEnforcedBanner(t *testing.T) {
 	if strings.Contains(page, "None stored") {
 		t.Error("the page says none are stored while one is listed")
 	}
-	if pal := req(t, c, "GET", "/_console/api/palette", nil).Body.String(); !strings.Contains(pal, "/access") {
-		t.Error("the palette does not offer the Access page")
+	// The section is reached by name from the rail and by g a; the palette does not list it.
+	if pal := req(t, c, "GET", "/_console/api/palette", nil).Body.String(); strings.Contains(pal, `"u":"/_console/access"`) {
+		t.Error("the palette lists the Access page as a destination (Sy-05 has no Go to group)")
 	}
 }

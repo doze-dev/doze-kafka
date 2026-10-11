@@ -27,8 +27,10 @@ func liveUnchanged(w http.ResponseWriter, r *http.Request, hash string) bool {
 	return false
 }
 
-// paletteEntry is one row of the command palette: S is the section (topics,
-// groups, views), N the label, U the link, K what to call it.
+// paletteEntry is one row of the command palette: S is the group it sits under
+// (topics, groups, schemas, actions: Sy-05 has those four and no "Go to", the
+// sections being reached by the rail and the g chords), N the label, U the link,
+// K what to call it.
 type paletteEntry struct {
 	S string `json:"s"`
 	N string `json:"n"`
@@ -49,24 +51,15 @@ type paletteEntry struct {
 func (c *Console) apiPalette(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	out := []paletteEntry{
-		{S: "views", N: "Topics", U: c.prefix + "/topics", K: "view"},
-		{S: "views", N: "Groups", U: c.prefix + "/groups", K: "view"},
-		{S: "views", N: "Trace", U: c.prefix + "/trace", K: "view"},
-		{S: "views", N: "Cluster", U: c.prefix + "/cluster", K: "view"},
-		{S: "views", N: "Access", U: c.prefix + "/access", K: "view"},
-		{S: "views", N: "Connect an app", U: c.prefix + "/connect", K: "view"},
 		{S: "topics", N: "Create topic", U: c.newTopicURL(), K: "action", H: "c"},
-		{S: "views", N: "Follow a message by trace id", U: c.prefix + "/trace", K: "action"},
+		{S: "actions", N: "Follow a message by trace id", U: c.prefix + "/trace", K: "action"},
 	}
 	// What the console does in the browser, declared once with the keys (keys.go).
 	for _, a := range clientActions {
-		out = append(out, paletteEntry{S: "views", N: a.Label, K: "action", A: a.ID})
-	}
-	if c.traffic != nil {
-		out = append(out, paletteEntry{S: "views", N: "Traffic", U: c.prefix + "/traffic", K: "view"})
+		out = append(out, paletteEntry{S: "actions", N: a.Label, K: "action", A: a.ID})
 	}
 	if c.reg != nil {
-		out = append(out, paletteEntry{S: "views", N: "Schemas", U: schemasPath(c.prefix), K: "view"}, paletteEntry{S: "schemas", N: "Register schema", U: newSchemaPath(c.prefix), K: "action"})
+		out = append(out, paletteEntry{S: "schemas", N: "Register schema", U: newSchemaPath(c.prefix), K: "action"})
 		if subjects, err := c.reg.Subjects(ctx); err == nil {
 			for _, s := range subjects {
 				out = append(out, paletteEntry{S: "schemas", N: s.Name, U: c.schemaURL(s.Name), K: "schema", D: fmt.Sprintf("%s · v%d", s.TypeLabel, s.Latest)})

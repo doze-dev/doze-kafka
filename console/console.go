@@ -20,6 +20,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -43,6 +44,7 @@ type Console struct {
 	traces      traceJobs           // message-lineage scans, running and recent.
 	traceHeader string              // an extra record header that holds a trace id (Options.TraceHeader).
 	mux         *http.ServeMux
+	tmplOnce    sync.Once // the templates are parsed on the first request, not at start (idle heap is a budget).
 	tmpl        *template.Template
 	dev         string // DOZE_KAFKA_CONSOLE_DEV: read templates and static files from this directory, live.
 	prefix      string
@@ -105,8 +107,8 @@ type Options struct {
 // shows these in the top bar, on the Connect page and on a first run; it never
 // invents a value for one that was not given.
 type BrokerFacts struct {
-	// Workspace labels the broker in the top bar: the name of the directory its
-	// data lives in, so two brokers on one machine can be told apart.
+	// Workspace labels the broker in the top bar: the instance's name (the one it
+	// answers to as kafka.<name>.doze), so two brokers on one machine can be told apart.
 	Workspace string
 	// KafkaMajor is the Kafka major version the broker declares ("Kafka 4.0 compat").
 	KafkaMajor int
@@ -124,6 +126,9 @@ type BrokerFacts struct {
 	// makes it, with DefaultPartitions partitions.
 	AutoCreateTopics  bool
 	DefaultPartitions int
+	// MaxPartitions is the most partitions one topic may have (--max-partitions); zero
+	// when the console was not told, and the forms then name no cap.
+	MaxPartitions int
 }
 
 // New builds a console with a real Kafka client dialed at opts.Addr.
@@ -148,15 +153,11 @@ func New(opts Options) (*Console, error) {
 	// reload without rebuilding the binary (`task dev` sets it).
 	dev := os.Getenv("DOZE_KAFKA_CONSOLE_DEV")
 	c := &Console{prefix: prefix, hosts: opts.AllowedHosts, dev: dev, facts: opts.Facts}
-	tmpl, err := c.parseTemplates()
-	if err != nil {
-		return nil, err
-	}
 	be, err := newBackend(opts)
 	if err != nil {
 		return nil, err
 	}
-	c.be, c.tmpl = be, tmpl
+	c.be = be
 	c.reg = newRegistryClient(opts.RegistryURL, opts.RegistryUser, opts.RegistryPass)
 	c.traffic = opts.Traffic
 	c.metrics = opts.ClientMetrics
@@ -169,7 +170,7 @@ func New(opts Options) (*Console, error) {
 // parseTemplates loads the page templates: embedded in the binary, or from disk in
 // dev mode.
 func (c *Console) parseTemplates() (*template.Template, error) {
-	t := template.New("").Funcs(templateFuncs(c.prefix))
+	t := template.New("").Funcs(templateFuncs(c.prefix, c.teach))
 	if c.dev != "" {
 		return t.ParseFS(os.DirFS(c.dev), "templates/*.html")
 	}
@@ -179,6 +180,15 @@ func (c *Console) parseTemplates() (*template.Template, error) {
 // templates is the template set to render with. In dev mode it is re-read each
 // time (a template that does not parse is reported on the page, not swallowed).
 func (c *Console) templates() *template.Template {
+	c.tmplOnce.Do(func() {
+		t, err := c.parseTemplates()
+		if err != nil {
+			// The embedded set is checked by the suite; a dev tree can be mid-edit.
+			log.Printf("console: templates: %v", err)
+			t = template.New("")
+		}
+		c.tmpl = t
+	})
 	if c.dev == "" {
 		return c.tmpl
 	}
@@ -351,7 +361,7 @@ func toast(w http.ResponseWriter, msg string) {
 	w.Header().Set("HX-Trigger", `{"toast":`+strconv.QuoteToASCII(msg)+`}`)
 }
 
-func templateFuncs(prefix string) template.FuncMap {
+func templateFuncs(prefix string, teach func(kind, name string) string) template.FuncMap {
 	return template.FuncMap{
 		"prefix": func() string { return prefix },
 		"icon":   icon,
@@ -378,7 +388,7 @@ func templateFuncs(prefix string) template.FuncMap {
 		"needsLook": func(name string, msgs int64) bool { return isDeadLetterName(name) && msgs > 0 },
 		// teach is the line under a field, read from the settings table by the
 		// record's kind and name (teaching.go).
-		"teach": teachLine,
+		"teach": teach,
 		// confirmOffset is the confirm of one row's Remove (confirms.go).
 		"confirmOffset": offsetDeleteConfirm,
 		"confirmURL":    func(id string, kv ...any) string { return confirmURLFor(prefix, id, kv...) },
@@ -412,7 +422,11 @@ func templateFuncs(prefix string) template.FuncMap {
 			b, _ := json.Marshal(refs)
 			return string(b)
 		},
-		"lower":    strings.ToLower,
+		"lower": strings.ToLower,
+		// capital and upper write a word the way a column of the boards does: Topic, Write,
+		// ALLOW. The stored value stays as the broker names it.
+		"capital":  upperFirst,
+		"upper":    strings.ToUpper,
 		"jsonTint": jsonTint,
 		"stateBadge": func(state string) string {
 			switch state {
