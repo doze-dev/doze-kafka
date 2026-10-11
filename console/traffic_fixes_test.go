@@ -34,6 +34,9 @@ func TestClientsAreGroupedByClientID(t *testing.T) {
 	}
 
 	view := req(t, c, "GET", "/_console/traffic?view=clients", nil).Body.String()
+	if strings.Contains(view, `id="insp-default"`) || strings.Contains(view, "Connected clients") {
+		t.Error("the clients view repeats its table in the inspector's panel; Traf-06 draws none")
+	}
 	if n := strings.Count(view, `<tr id="cl-`); n != 2 {
 		t.Errorf("%d rows in the clients table, want 2 (one per client id)", n)
 	}

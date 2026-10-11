@@ -92,7 +92,7 @@
 {{define "traffic_live"}}
 <div id="traffic-live" data-live="{{.Prefix}}/traffic/live{{if .FilterQ}}?{{.FilterQ}}{{end}}" data-hash="{{.Hash}}" data-live-ms="2500"{{if eq .TView "requests"}} data-since="{{.NewestMs}}"{{end}}>
   {{if .OOB}}{{template "traffic_summary" .}}
-  <div class="insp-default" id="insp-default" hx-swap-oob="true"{{if .DefaultHidden}} hidden{{end}}>{{template "insp_default" .}}</div>
+  {{if .InspDefault}}<div class="insp-default" id="insp-default" hx-swap-oob="true"{{if .DefaultHidden}} hidden{{end}}>{{template "insp_default" .}}</div>{{end}}
   <div class="tablenote" id="traffic-note" hx-swap-oob="true">{{template "traffic_note" .}}</div>
   {{template "keys_strip" .}}{{end}}
   {{if eq .TView "clients"}}{{template "traffic_clients_table" .}}
@@ -110,8 +110,8 @@
 {{define "traffic_rows"}}
   {{if .Cut}}<div class="note tf-cut" id="rows-cut">Showing the newest {{.Shown}} of {{.MatchedRows}} matching rows.</div>{{end}}
   <div class="tbl-wrap">
-    <div class="frozen-line lost-only m">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</div>
-    <table class="tbl tf-table" id="traffic-table"><thead><tr><th>Time</th><th>Client</th><th>Request</th><th>Topic or group</th><th>Detail</th><th>Result</th><th class="num">Took</th></tr></thead>
+    <table class="tbl tf-table" id="traffic-table"><thead><tr><th>Time</th><th>Client</th><th>Request</th><th>Topic or group</th><th>Detail</th><th>Result</th><th class="num">Took</th></tr>
+      <tr class="frozen-line lost-only"><td colspan="7" class="m">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</td></tr></thead>
       <tbody>{{range .Rows}}{{template "traffic_row" dict "R" . "P" $.Prefix}}{{end}}</tbody>
     </table>
   </div>
@@ -126,7 +126,7 @@
         <td class="m nw cell-req" title="{{.API}} v{{.Version}}{{if .Correlation}} · correlation {{.Correlation}}{{end}}"><span class="b">{{.API}}</span> <span class="mut">v{{.Version}}</span>{{if .Folded}} <span class="tag tf-count" title="{{.Count}} identical requests, {{.SameSpan}}">×{{.Count}}</span>{{end}}</td>
         <td class="m cell-topic"{{if .Target}} title="{{.Target}}"{{end}}>{{if .Target}}{{.Target}}{{else}}<span class="mut">—</span>{{end}}</td>
         <td class="mut cell-detail" title="{{if .Rhythm}}{{.Interval}}{{else}}{{.DetailText}}{{end}}">{{if .Rhythm}}{{.Interval}}, since {{when .First "clock"}}{{else if .DetailText}}{{.DetailText}}{{else}}—{{end}}</td>
-        <td class="m cell-result"><span class="{{.Tone}}" title="{{.ResultTitle}}">{{.Result}}</span></td>
+        <td class="m cell-result"><span class="{{.Tone}}" title="{{.ResultTitle}}">{{wrapName .Result}}</span></td>
         <td class="m num nw cell-took">{{.Dur}}</td>
       </tr>{{end}}{{end}}
 
@@ -191,11 +191,11 @@
 {{end}}
 
 {{define "story_row"}}{{with .R}}<div class="r {{if not .Nested}}kid{{end}} {{.RowClass}}" id="rq-{{.OpenKey}}" tabindex="0" data-inspector-open data-open-keys="request:{{.OpenKey}}" data-row hx-get="{{$.P}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
-  <span class="m">{{when .Time "clockms"}}</span>
+  <span class="m">{{if and .Folded (not .Nested)}}{{when .First "clock"}}{{else}}{{when .Time "clockms"}}{{end}}</span>
   <span class="m">{{if .Nested}}<span class="tree" aria-hidden="true">└─</span> {{end}}{{.Who}}</span>
   <span class="m b">{{.API}} <span class="mut">v{{.Version}}</span>{{if .Folded}} <span class="tag">×{{.Count}}</span>{{end}}</span>
   <span class="mut el" title="{{if .Rhythm}}{{.Interval}}{{else}}{{.DetailText}}{{end}}">{{if .Rhythm}}{{.Interval}}, since {{when .First "clock"}}{{else}}{{.DetailText}}{{if .ViaGroup}}{{if not .DetailText}}fetch by a member{{end}}{{end}}{{end}}</span>
-  <span class="m {{.Tone}}" title="{{.ResultTitle}}">{{.Result}}</span>
+  <span class="m cell-result {{.Tone}}" title="{{.ResultTitle}}">{{wrapName .Result}}</span>
   <span class="m ra">{{.Dur}}</span>
 </div>{{end}}{{end}}
 
@@ -274,7 +274,8 @@
     <span class="cap">{{if .Epochs}}Epochs{{else}}Generations{{end}}</span>
     <div class="card" style="--c: 40px 1fr 62px 72px">
       <div class="r h"><span>{{if .Epochs}}Epoch{{else}}Gen{{end}}</span><span>Cause</span><span class="ra">Members</span><span class="ra">At</span></div>
-      {{range .Generations}}<div class="r"><span class="m">{{.Gen}}</span><span class="mut el">{{if .Cause}}{{.Cause}}{{else}}the group formed{{end}}</span><span class="m ra">{{.Members}}</span><span class="m ra">{{when .At "clock"}}</span></div>{{end}}
+      {{/* The newest is last, and is the one the group is in: the board's .on row. */}}
+      {{$gens := .Generations}}{{range $i, $g := $gens}}{{with $g}}{{$newest := eq (len (slice $gens $i)) 1}}<div class="r{{if $newest}} on{{end}}"><span class="m{{if $newest}} b{{end}}">{{.Gen}}</span><span class="{{if $newest}}{{else}}mut {{end}}el">{{if .Cause}}{{.Cause}}{{else}}the group formed{{end}}</span><span class="m ra">{{.Members}}</span><span class="m ra">{{when .At "clock"}}</span></div>{{end}}{{end}}
     </div>
   </div>
   {{end}}

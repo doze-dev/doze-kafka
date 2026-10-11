@@ -135,7 +135,7 @@ func TestTrafficPageShowsRequestsAndClients(t *testing.T) {
 	if rec.Code != 200 {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
 	}
-	body := rec.Body.String()
+	body := strings.ReplaceAll(rec.Body.String(), "<wbr>", "") // a result wraps at its underscores.
 	for _, want := range []string{
 		"Heartbeat", "v4", "×4", "billing-workers", // a folded row, with its count and its group.
 		"Produce", "orders", "1 partition, 2.0 KiB", "12 ms",

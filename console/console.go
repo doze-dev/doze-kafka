@@ -361,9 +361,17 @@ func toast(w http.ResponseWriter, msg string) {
 	w.Header().Set("HX-Trigger", `{"toast":`+strconv.QuoteToASCII(msg)+`}`)
 }
 
+// wrapName escapes s and lets it break after each underscore.
+func wrapName(s string) template.HTML {
+	return template.HTML(strings.ReplaceAll(template.HTMLEscapeString(s), "_", "_<wbr>"))
+}
+
 func templateFuncs(prefix string, teach func(kind, name string) string) template.FuncMap {
 	return template.FuncMap{
 		"prefix": func() string { return prefix },
+		// A name that may wrap, at its underscores: UNKNOWN_TOPIC_OR_PARTITION is three
+		// words, not a run to be cut anywhere (AD5).
+		"wrapName": wrapName,
 		"icon":   icon,
 		// Links to resources. Names are data: never concatenate them into a URL
 		// in a template, use these (see resourceurl.go).

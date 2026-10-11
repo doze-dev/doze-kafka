@@ -757,6 +757,10 @@ func (c *Console) trafficData(r *http.Request) map[string]any {
 	// The tabs' Clients badge is the number of connected clients.
 	if v.View == "clients" {
 		data["Attention"] = c.attention(crows)
+		// Traf-06 draws no panel: the table has the clients, so the inspector's own
+		// list of them would show them twice and take 400 px the table's nine
+		// columns need. A selected client opens it.
+		data["InspDefault"] = ""
 		data["Hash"] = fmt.Sprintf("%x", h.Sum64())
 		data["Rows"] = []trafficRow(nil)
 		c.trafficKindsData(data, v)

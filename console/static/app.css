@@ -1037,7 +1037,7 @@ table.tbl.tf-table th:first-child, table.tbl.tf-table td:first-child { padding-l
 table.tbl.tf-table th:last-child, table.tbl.tf-table td:last-child { padding-right: 12px; }
 .tf-table th { overflow: hidden; }
 .tf-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tf-table td.cell-result { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; } /* a long error name wraps; it is never cut */
+.tf-table td.cell-result { white-space: normal; overflow-wrap: break-word; text-overflow: clip; } /* a long error name wraps at its underscores; it is never cut */
 .tf-table td.cell-time, .tf-table td.cell-took { text-overflow: clip; }
 .tf-table th:nth-child(1) { width: 111px; }  /* 92 + 12 + 7 */
 .tf-table th:nth-child(2) { width: 164px; }  /* 150 + 14 */
@@ -1163,6 +1163,7 @@ table.tbl tbody tr.errrow.failed td { background: var(--badbg); }
 .tf-cut { margin: 0 0 6px; }
 .tf-story-head { margin: 4px 0 6px; }
 .tf-story .r.kid { color: var(--mut); }
+.tf-story .r > .cell-result { white-space: normal; overflow: visible; overflow-wrap: break-word; text-overflow: clip; padding: 4px 0; } /* AD5: never cut */
 .tf-story .r.rebalance .b { color: var(--ink); }
 .tree { color: var(--line); font-family: var(--mono); }
 .tick { display: inline-block; width: 3px; border-radius: 1px; background: var(--ink); }
@@ -1180,8 +1181,11 @@ table.tbl tbody tr.errrow.failed td { background: var(--badbg); }
 .tf-clients td:first-child, .tf-clients th:first-child { padding-left: 12px; }
 .tf-clients tr { cursor: pointer; }
 .tf-clients tr.needs-look td { background: var(--warnbg); }
-.tf-clients .c-sw { width: 190px; } .tf-clients .c-pr { width: 110px; } .tf-clients .c-ad { width: 130px; }
-.tf-clients .c-op { width: 80px; } .tf-clients .c-la { width: 100px; } .tf-clients .c-rq { width: 90px; } .tf-clients .c-gr { width: 130px; }
+/* The board's tracks (150 190 110 130 80 100 90 130) plus the 14 px a cell's padding
+   takes, and no wrapping: "just now" and "+3" are one line each, so a row is 28 px. */
+.tf-clients .c-sw { width: 204px; } .tf-clients .c-pr { width: 124px; } .tf-clients .c-ad { width: 144px; }
+.tf-clients .c-op { width: 94px; } .tf-clients .c-la { width: 114px; } .tf-clients .c-rq { width: 104px; } .tf-clients .c-gr { width: 144px; }
+@media (min-width: 641px) { .tf-clients td { white-space: nowrap; } }
 /* With a client open on the right there is no room for nine columns: the board keeps
    the client, its software, requests a minute and errors (Traf-07). */
 .panes:has(#inspector:not([hidden])) .tf-clients .c-pr,
@@ -1199,6 +1203,10 @@ html[data-paused] .live-only { display: none; }
 html[data-connection-lost] .lost-only { display: inline-flex; }
 html[data-connection-lost] .callout.lost-only { display: flex; }
 html[data-connection-lost] div.frozen-line.lost-only { display: block; }
+/* In the table it is the row under the header, as Traf-10 draws it. */
+html[data-connection-lost] tr.frozen-line.lost-only { display: table-row; }
+tr.frozen-line > td { background: var(--well); color: var(--mut); text-align: center; padding: 5px 12px; border-bottom: 1px solid var(--line2); white-space: normal; }
+table.tbl.tf-table tr.frozen-line > td { overflow: visible; }
 .frozen-line { background: var(--well); color: var(--mut); text-align: center; padding: 5px 12px; border-bottom: 1px solid var(--line2); }
 html[data-connection-lost] #traffic-controls [data-live-state],
 html[data-connection-lost] #traffic-controls [data-live-toggle]:not(.lost-only) { display: none; }

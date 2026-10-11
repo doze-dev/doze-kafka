@@ -6,6 +6,15 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Traffic, second review: Enter on a row (after `j`, or on a focused row) opens the
+  inspector and leaves it open (the key's default pressed the Close button the loading
+  inspector had taken focus for); a join request goes under the earliest rebalance that
+  begins just after it, so two rebalances 1.5 s apart each keep their own FindCoordinator
+  and JoinGroup; a refusal's name wraps at its underscores, in the table and the story,
+  and is never cut; the frozen line is the row under the header; the newest generation
+  is drawn open; the Clients view draws no Connected-clients panel, so its nine columns
+  fit at 1440.
+
 - Traffic, review fixes: the open row is drawn open (and `aria-selected`) in the
   requests, clients and story tables, through polls and a reload; clients are counted
   by client id, with their connections per client, in the summary, the tab, the rail
