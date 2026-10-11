@@ -581,9 +581,13 @@ test('the create form says a name already exists before anything is sent', async
   await expect(page.getByText(/are taken\. The form says so before you send, and the broker would answer TOPIC_ALREADY_EXISTS/)).toBeVisible();
   const warn = page.locator('#f-name-taken');
   await expect(warn).toBeHidden();
+  const shell = page.waitForResponse((r) => r.url().includes('/new/topic/shell'));
   await page.locator('#f-name').fill('seed-orders');
   await expect(warn).toBeVisible();
   await expect(warn).toContainText('already exists on this broker');
+  // The command under the form follows what is typed (and the route gate sees it driven).
+  await shell;
+  await expect(page.locator('#shell-preview')).toContainText('--create --topic seed-orders');
   await page.locator('#f-name').fill('seed-orders-new');
   await expect(warn).toBeHidden();
 });

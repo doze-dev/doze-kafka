@@ -118,7 +118,7 @@ Updated when a stage meets its criteria, in the same commit as the work.
 
 | Stage | Contract | Findings fixed | Proved | Console | Docs | Done | Actual days |
 |---|---|---|---|---|---|---|---|
-| Foundation | – | | | | – | | |
+| Foundation | – | A1 to A12 and B1 to B15 built, each with its test named in its commit; C: this repository pins `doze-names` `dc00aeec3013` and has `--zone` (doze-aws and doze not checked from here). Close-out of 2026-10-11: the audit leads in the Traffic table, 390 px keys strip, brand, Tp-01/Tp-02, Gr-02 Try it and Ac-Home casing fixed; two leads did not reproduce (messages already cards at 390; result column already aligned); palette "Go to" group removed; idle heap 2.70 to 1.71 MB. | 642 Go tests and 24 fuzz targets; 146 browser tests in 23 specs (was 73 in 11), route gate on, the second identity (`test:e2e:identity`) 146 of 146; 5 recorded real-Kafka scenarios; `check` green. Coverage floors (`testdata/coverage.txt`): console 88.0, internal/broker 89.8, internal/settings 72.4, internal/config 64.0, internal/storage/log 81.0, server 79.2, cmd/doze-kafka 79.9; none lower. Lightness: binary 27.0 MB, idle heap 1.71 MB, 435 modules. | Rebuilt to Sy-01 to Sy-08 and the section homes; 12 additions and the board-by-board verdicts are in [00-foundation.md](00-foundation.md#additions-to-the-design) and [Deviations](00-foundation.md#deviations-from-the-boards). | – | 2026-10-11 | about 2 sessions |
 | Durability first | | | | – | | | |
 | Traffic | | | | | | | |
 | Topics | | | | | | | |
