@@ -42,7 +42,7 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
     <button type="button" class="tb-palette" id="palette-open" aria-haspopup="dialog"><span class="grow">Jump to a topic, group or subject, or do something…</span><span class="kbd">⌘K</span></button>
     <div class="tb-spacer"></div>
     <div class="tb-right">
-      <span class="pill mono live" id="live-pill" title="The broker this console is connected to"><span class="dot" aria-hidden="true"></span><span class="pill-addr">{{if .Endpoint}}{{.Endpoint}}{{else}}broker{{end}}</span><span class="pill-state" hidden></span><button type="button" class="pill-retry" id="pill-retry" hidden>Retry</button></span>
+      <span class="pill mono live" id="live-pill" title="The broker this console is connected to"><span class="dot" aria-hidden="true"></span><span class="pill-addr">{{if .Endpoint}}{{.Endpoint}}{{else}}broker{{end}}</span><span class="pill-state" hidden></span></span>
       {{if .KafkaCompat}}<span class="pill" id="compat-pill">{{.KafkaCompat}}</span>{{end}}
       <div class="theme-seg" id="theme-seg" role="group" aria-label="Theme">
         <button type="button" data-mode="system" title="Follow the system setting">system</button>

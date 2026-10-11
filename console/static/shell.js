@@ -174,7 +174,15 @@
       st.textContent = down ? "Not connected · last heard " + clockText(lastGood) : "";
       st.hidden = !down;
     }
-    if (retry) retry.hidden = !down;
+    // Retry belongs to the disconnected pill: it is there while the broker cannot be
+    // reached and is not in the page, hidden, the rest of the time.
+    if (down && !retry) {
+      retry = document.createElement("button");
+      retry.type = "button"; retry.id = "pill-retry"; retry.className = "pill-retry"; retry.textContent = "Retry";
+      pill.appendChild(retry);
+    } else if (!down && retry) {
+      retry.remove();
+    }
     pill.setAttribute("aria-live", "polite");
   }
   // setDisconnected marks the regions whose poll failed (or all of them, with no

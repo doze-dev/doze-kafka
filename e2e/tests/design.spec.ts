@@ -638,6 +638,12 @@ test('the brand says doze-kafka once, and the instance only when it has a name o
   if (await label.count()) expect(['doze-kafka', 'local']).not.toContain((await label.innerText()).trim());
 });
 
+test('the top bar holds no control that is hidden: Retry is drawn with the disconnected pill, and only then', async ({ page }) => {
+  await page.goto('topics');
+  await expect(page.locator('header.topbar #pill-retry')).toHaveCount(0);
+  expect(await page.locator('header.topbar button[hidden], header.topbar a[hidden]').count()).toBe(0);
+});
+
 test('the Traffic columns are the board\'s: 92 150 118 1fr 190 84 52, with its 14 px gaps', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('traffic');
