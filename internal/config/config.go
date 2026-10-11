@@ -84,6 +84,7 @@ type Config struct {
 	// Console: the web UI, served over HTTP beside the broker.
 	Console           bool     // serve the console.
 	ConsoleAddr       string   // host:port for the console's HTTP listener.
+	ConsolePrefix     string   // URL path the console is mounted under; "" is /_console.
 	ConsoleAllowHosts []string // extra Host names the console answers to (DNS-rebinding guard).
 	TraceHeader       string   // a record header holding a trace id, for the console's message lineage.
 
@@ -336,6 +337,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: listen address %q is not host:port (for example 127.0.0.1:9092 or :9092)", c.ListenAddr)
 	case c.Console && c.ConsoleAddr != "" && !validHostPort(c.ConsoleAddr):
 		return fmt.Errorf("config: console address %q is not host:port (for example 127.0.0.1:9093)", c.ConsoleAddr)
+	case c.ConsolePrefix != "" && !validURLPrefix(c.ConsolePrefix):
+		return fmt.Errorf("config: console prefix %q is not a URL path such as /_console (it starts with /, and has no spaces, ?, #, %% or .. in it)", c.ConsolePrefix)
 	case c.SchemaRegistry && c.SchemaRegistryAddr != "" && !validHostPort(c.SchemaRegistryAddr):
 		return fmt.Errorf("config: schema registry address %q is not host:port (for example 127.0.0.1:8081)", c.SchemaRegistryAddr)
 	case c.TraceHeader != "" && !validHeaderName(c.TraceHeader):
@@ -476,4 +479,17 @@ func validHostPort(addr string) bool {
 	}
 	_, err = net.LookupPort("tcp", port)
 	return err == nil
+}
+
+// validURLPrefix reports whether p is a URL path the console can be mounted under.
+func validURLPrefix(p string) bool {
+	if !strings.HasPrefix(p, "/") || strings.ContainsAny(p, " ?#%\\\t\n") {
+		return false
+	}
+	for _, seg := range strings.Split(p, "/") {
+		if seg == ".." || seg == "." {
+			return false
+		}
+	}
+	return p == "/" || !strings.HasPrefix(p, "//") && p != "/healthz" && !strings.HasPrefix(p, "/healthz/")
 }

@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"github.com/doze-dev/doze-kafka/internal/settings"
 	"math"
 	"strconv"
 	"strings"
@@ -82,7 +83,7 @@ func TopicLimits(cfg config.Config, topicConfig map[string]string) (limits log.T
 // accepts any long for these settings, and a product past 292 years would wrap
 // to a negative duration (a lag that is already over, a tombstone kept for no time).
 func millis(n int64) time.Duration {
-	if n > maxRetentionMs {
+	if n > settings.MaxRetentionMs {
 		return time.Duration(math.MaxInt64)
 	}
 	return time.Duration(n) * time.Millisecond

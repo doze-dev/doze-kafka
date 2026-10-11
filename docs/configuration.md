@@ -132,6 +132,7 @@ where this one says `kafka-version`; that spelling is still read.
 |---|---|---|
 | `--console` | `true` | Serve the web console. `--console=false` to turn it off. |
 | `--console-addr` | *beside the broker* | `host:port` for the console's HTTP listener. Unset, it is port 9093 on the name's own address (and `http://kafka.<name>.doze`, port-less, through the shared front door); under `--listen`, `127.0.0.1:9093`. A taken port is an error naming this flag. |
+| `--console-prefix` | `/_console` | The URL path the console is served under, for a reverse proxy that mounts it below a path of its own. `/` serves it at the root of its port. |
 | `--console-allow-host` | *(none)* | Extra Host names the console answers to, besides `localhost`, IP addresses and `*.doze`. Comma-separated or repeated. A guard against DNS rebinding. |
 | `--trace-header` | *(none)* | A record header whose whole value is a trace id (a request or correlation id). The console's **Follow this message** looks for it in addition to W3C `traceparent` and B3. See [Observability](observability.md). |
 

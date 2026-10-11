@@ -43,6 +43,7 @@ type fileConfig struct {
 	ACLSuperUsers          []string          `toml:"acl-super-user"`
 	Console                *bool             `toml:"console"`
 	ConsoleAddr            *string           `toml:"console-addr"`
+	ConsolePrefix          *string           `toml:"console-prefix"`
 	ConsoleAllowHost       []string          `toml:"console-allow-host"`
 	TraceHeader            *string           `toml:"trace-header"`
 	ClientTelemetry        *bool             `toml:"client-telemetry"`
@@ -174,6 +175,9 @@ func (fc fileConfig) applyTo(cfg *Config) error {
 	if fc.TraceHeader != nil {
 		cfg.TraceHeader = *fc.TraceHeader
 	}
+	if fc.ConsolePrefix != nil {
+		cfg.ConsolePrefix = *fc.ConsolePrefix
+	}
 	if fc.ConsoleAllowHost != nil {
 		cfg.ConsoleAllowHosts = fc.ConsoleAllowHost
 	}
@@ -238,6 +242,9 @@ func WriteTOML(w io.Writer, cfg Config) error {
 	}
 	if len(cfg.ConsoleAllowHosts) > 0 {
 		fc.ConsoleAllowHost = cfg.ConsoleAllowHosts
+	}
+	if cfg.ConsolePrefix != "" {
+		fc.ConsolePrefix = &cfg.ConsolePrefix
 	}
 	if cfg.ACLDefault != ACLAllow {
 		fc.ACLDefault = &cfg.ACLDefault

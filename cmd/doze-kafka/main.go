@@ -481,7 +481,7 @@ func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger
 
 	con, err := console.New(console.Options{
 		Addr: dialAddr, SASLUser: user, SASLPass: pass, SASLMechanism: mech, TLSConfig: tlsCfg,
-		AllowedHosts: consoleHosts(cfg),
+		AllowedHosts: consoleHosts(cfg), Prefix: cfg.ConsolePrefix,
 		// With SASL the console reaches the registry as the same user it reaches the broker.
 		RegistryURL: registryURL, RegistryUser: user, RegistryPass: pass,
 		Traffic: traffic, TraceHeader: cfg.TraceHeader, ClientMetrics: clientMetrics,

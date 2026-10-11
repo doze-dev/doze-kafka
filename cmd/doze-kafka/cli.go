@@ -92,7 +92,7 @@ var helpGroups = []struct {
 	{"Retention and durability", []string{"retention-bytes", "retention-ms", "fsync-interval"}},
 	{"Topics and groups", []string{"kafka-version", "auto-create-topics", "default-partitions", "max-partitions", "consumer-session-timeout", "client-telemetry"}},
 	{"Security", []string{"sasl-mechanisms", "sasl-user", "tls-cert", "tls-key", "acl-default", "acl-super-user"}},
-	{"Console", []string{"console", "console-addr", "console-allow-host", "trace-header"}},
+	{"Console", []string{"console", "console-addr", "console-prefix", "console-allow-host", "trace-header"}},
 	{"Schema registry", []string{"schema-registry", "schema-registry-addr"}},
 	{"Process", []string{"config", "log-level", "log-format", "pprof-addr"}},
 }
@@ -370,6 +370,7 @@ func registerFlags(fs *flag.FlagSet, cfg *config.Config) {
 	fs.BoolVar(&cfg.ClientTelemetry, "client-telemetry", cfg.ClientTelemetry, "accept the metrics clients push about themselves (KIP-714) and show them in the console; --client-telemetry=false stops advertising the two APIs")
 	fs.StringVar(&cfg.TraceHeader, "trace-header", cfg.TraceHeader, "record header that holds a trace id (a request or correlation id), beside W3C traceparent and B3, for the console's \"follow this message\"")
 	fs.StringVar(&cfg.ConsoleAddr, "console-addr", cfg.ConsoleAddr, "host:port for the web console (Kafka's wire protocol cannot share a port with HTTP)")
+	fs.StringVar(&cfg.ConsolePrefix, "console-prefix", cfg.ConsolePrefix, "URL path the web console is served under, for a reverse proxy that mounts it below a path (default /_console)")
 	fs.Var(&stringSliceFlag{vals: &cfg.ConsoleAllowHosts}, "console-allow-host", "extra host name the console answers to, besides localhost, IP addresses and *.doze (comma-separated or repeated); guards against DNS rebinding")
 
 	// Process.

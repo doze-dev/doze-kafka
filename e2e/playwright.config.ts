@@ -4,15 +4,21 @@ import { defineConfig, devices } from '@playwright/test';
 // on an address (--listen): no DNS, no name claimed, nothing shared with a broker
 // already running on the machine. E2E_PORT moves it, so two runs can coexist.
 const PORT = Number(process.env.E2E_PORT ?? 14092);
-export const KAFKA_ADDR = `127.0.0.1:${PORT}`;
 export const CONSOLE_PORT = PORT + 1;
 export const REGISTRY_PORT = PORT + 2;
-export const REGISTRY_URL = `http://127.0.0.1:${REGISTRY_PORT}`;
-export const BASE_URL = `http://127.0.0.1:${CONSOLE_PORT}/_console/`;
+
+// The second identity (foundation B11, `task test:e2e:identity`) starts the broker
+// itself, on ports it was given by the system, with a console prefix, a data
+// directory with a space, SASL and TLS, and says where it is in the environment.
+const EXTERNAL = process.env.E2E_EXTERNAL === '1';
+export const KAFKA_ADDR = EXTERNAL ? process.env.E2E_KAFKA_ADDR! : `127.0.0.1:${PORT}`;
+export const REGISTRY_URL = EXTERNAL ? process.env.E2E_REGISTRY_URL! : `http://127.0.0.1:${REGISTRY_PORT}`;
+export const BASE_URL = EXTERNAL ? process.env.E2E_CONSOLE_URL! : `http://127.0.0.1:${CONSOLE_PORT}/_console/`;
 
 export default defineConfig({
   testDir: './tests',
   globalSetup: './global-setup.ts',
+  globalTeardown: './global-teardown.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -27,7 +33,7 @@ export default defineConfig({
 
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 
-  webServer: {
+  webServer: EXTERNAL ? undefined : {
     // A fresh data directory every run: state left over from a previous run is
     // how a suite's result comes to depend on how often it has been run.
     command:

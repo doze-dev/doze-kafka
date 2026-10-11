@@ -12,7 +12,7 @@ test('the console shell renders and the broker is seeded', async ({ page, reques
   await expect(page.locator('.rail')).toBeVisible();
   await expect(page.locator('.rail a.on')).toHaveText(/Topics/);
   await expect(page.locator('.listpane .li[data-name="seed-orders"]')).toBeVisible();
-  const health = await request.get('../healthz');
+  const health = await request.get('/healthz');
   expect(health.status()).toBe(200);
 });
 
@@ -22,5 +22,6 @@ test('the cluster page lists the broker, its APIs and its settings', async ({ pa
   await expect(page.locator('.apilist')).toContainText('Produce');
   await expect(page.locator('.apilist')).toContainText('IncrementalAlterConfigs');
   await expect(page.getByText('log.retention.ms')).toBeVisible();
-  await expect(page.getByText('no authentication')).toBeVisible();
+  // How the console itself is connected: the second identity (E2E_EXTERNAL) is SASL over TLS.
+  await expect(page.getByText(process.env.E2E_EXTERNAL === '1' ? /SASL PLAIN · TLS/ : /no authentication · plaintext/)).toBeVisible();
 });

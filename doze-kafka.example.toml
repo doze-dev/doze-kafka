@@ -57,6 +57,7 @@ max-partitions = 1000     # most partitions one topic may have; each is a direct
 
 console = true                   # serve the web console.
 # console-addr = "127.0.0.1:9093" # unset: beside the broker on the name's address (9093), or 127.0.0.1:9093 under listen.
+# console-prefix = "/_console"          # the URL path the console is served under.
 # console-allow-host = ["devbox.lan"] # extra Host names the console answers to.
 # trace-header = "x-request-id"         # a record header holding a trace id; the console follows it beside traceparent and B3.
 
