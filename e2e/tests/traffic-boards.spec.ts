@@ -438,14 +438,20 @@ test('Traf-12: a group filter tells the rebalance in order, with its generations
   await expect(filterRow.locator('a.b', { hasText: 'clear' })).toHaveAttribute('href', /\/traffic$/);
   await expect(page.locator('#traffic-summary')).toHaveCount(0);
   await expect(page.locator('#filter-pills')).toHaveCount(0);
-  // The chrome between the header and the story is the filter row and the board's gaps:
-  // the title block (44) + 10 + the filter row (28) + 10, not the ~104 it was.
+  // The chrome between the header and the story is the filter row (two rows at most
+  // beside the inspector: 804 px cannot hold the field, the kinds, the pill, "clear" and
+  // the count) and the board's gaps, not the ~104 px of summary, row, note, Filters and count.
   const chrome = await page.evaluate(() => {
     const idband = document.querySelector('main .idband')!.getBoundingClientRect();
     const story = document.querySelector('#traffic-story')!.getBoundingClientRect();
     return story.top - idband.bottom;
   });
-  expect(chrome).toBeLessThanOrEqual(50);
+  expect(chrome).toBeLessThanOrEqual(90);
+  // Nothing is off the card's right edge: the count and "clear" are on the screen.
+  const edge = await page.evaluate(() => document.querySelector('.filterrow')!.getBoundingClientRect().right);
+  for (const sel of ['#story-count', '.filterrow a.b']) {
+    expect((await page.locator(sel).boundingBox())!.x + (await page.locator(sel).boundingBox())!.width).toBeLessThanOrEqual(edge + 1);
+  }
   // The board's foot note, and the way back to a plain list.
   const note = page.locator('#traffic-note');
   await expect(note).toContainText('Indented rows belong to the rebalance above them.');

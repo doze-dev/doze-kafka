@@ -33,7 +33,7 @@
     {{if eq .TView "requests"}}
     {{/* The filter is a plain GET form outside the polled region, so what is typed
          is not thrown away by a refresh. */}}
-    <div class="filterrow">
+    <div class="filterrow{{if .HasStory}} story{{end}}">
       <form method="get" action="{{.Prefix}}/traffic" role="search" aria-label="Filter requests">
         <input class="inp m" name="q" value="{{.Filter.Q}}" placeholder="Client, topic, group or request" aria-label="Filter requests" spellcheck="false" autocomplete="off" data-filter-target="requests">
         {{if .Filter.Kind}}<input type="hidden" name="kind" value="{{.Filter.Kind}}">{{end}}
@@ -164,7 +164,7 @@
     <table class="tbl tf-clients" id="clients-table"><thead><tr><th>Client</th><th class="c-sw">Software</th><th class="c-pr">Principal</th><th class="c-ad">Address</th><th class="c-op">Open for</th><th class="c-la">Last request</th><th class="num c-rq">Req/min</th><th class="c-gr">Groups</th><th class="num c-er">Error rate</th></tr>
       <tr class="frozen-line lost-only"><td colspan="9" class="m">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</td></tr></thead>
       <tbody>{{range .Clients}}<tr id="cl-{{.Conn}}" class="{{if .NeedsALook}}needs-look{{end}}" tabindex="0" data-inspector-open data-open-keys="{{.Keys}}" aria-selected="false" hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
-        <td class="m nw cell-client"><a class="m b" href="{{.Href}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false">{{.Who}}</a>{{if gt .Conns 1}} <span class="mut" title="{{.Conns}} open connections from this client id">{{.Conns}} connections</span>{{end}}</td>
+        <td class="m b nw cell-client"><a class="m b" href="{{.Href}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false">{{.Who}}</a>{{if gt .Conns 1}} <span class="mut" title="{{.Conns}} open connections from this client id">{{.Conns}} connections</span>{{end}}</td>
         <td class="m c-sw">{{if .Software}}{{.Software}}{{else}}<span class="mut">not reported</span>{{end}}</td>
         <td class="m c-pr">{{.Principal}}</td>
         <td class="m c-ad">{{.Remote}}{{if gt .Conns 1}} <span class="mut">+{{.More}}</span>{{end}}</td>

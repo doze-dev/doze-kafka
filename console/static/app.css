@@ -1236,6 +1236,11 @@ table.tbl tbody tr.errrow.failed td { background: var(--badbg); }
 .filter-note { white-space: normal; text-align: right; }
 @media (min-width: 641px) {
   #detail[data-traffic-view] .filterrow { flex-wrap: nowrap; }
+  /* A story's row holds the field, the kinds, the group's pill, "clear" and the count:
+     the board draws them on one row at 1440 and cannot beside the inspector (804 px),
+     where the count wraps to a second row at the right rather than run off the edge. */
+  #detail[data-traffic-view] .filterrow.story { flex-wrap: wrap; }
+  #detail[data-traffic-view] .filterrow.story > .grow { flex: 1 1 0; min-width: 0; }
   #detail[data-traffic-view] .filterrow > *, #detail[data-traffic-view] .filterrow .inp, #detail[data-traffic-view] .filterrow .seg { flex: none; }
   #detail[data-traffic-view] .filterrow > .grow { flex: 1 1 0; min-width: 0; }
   #detail[data-traffic-view] .filterrow > .filter-note { flex: 0 1 auto; min-width: 0; }

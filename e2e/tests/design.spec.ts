@@ -159,6 +159,11 @@ test('a fresh empty broker lands on "Your broker is up", with the three steps', 
       .toHaveText('Any Kafka tool works. Auto-create is also on, so a producer can simply name a new topic.');
     await expect(page.locator('main.firstrun')).toHaveCSS('padding', '36px 56px 0px');
     await expect(page.locator('main.firstrun')).toHaveCSS('row-gap', '20px');
+    // The status line is one line: the address, the compat and the data directory (cut
+    // with the whole of it on hover when the path is long), never wrapped.
+    const status = page.locator('main.firstrun .pill.ok + .m');
+    expect(await status.evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)))).toBe(1);
+    await expect(status).toHaveAttribute('title', /data in /);
     // At 1440 each address is one line: the console's URL is never broken mid-word.
     await page.setViewportSize({ width: 1440, height: 900 });
     for (const v of await page.locator('section.card .kv.kv-stack > .m').all()) {

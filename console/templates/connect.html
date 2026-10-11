@@ -35,7 +35,7 @@
 {{define "first_run"}}{{template "shell_top" .}}
   <main class="main firstrun" id="detail">
     <div class="col g8">
-      <div class="row ce g8"><span class="pill ok"><span class="dot"></span>running</span><span class="m mut">{{.Facts.Bootstrap}}{{if .Facts.Compat}} · {{.Facts.Compat}}{{end}}{{if .Facts.DataDir}} · data in {{.Facts.DataDir}}{{end}}</span></div>
+      <div class="row ce g8"><span class="pill ok"><span class="dot"></span>running</span><span class="m mut el" title="{{.Facts.Bootstrap}}{{if .Facts.Compat}} · {{.Facts.Compat}}{{end}}{{if .Facts.DataDir}} · data in {{.Facts.DataDir}}{{end}}">{{.Facts.Bootstrap}}{{if .Facts.Compat}} · {{.Facts.Compat}}{{end}}{{if .Facts.DataDir}} · data in {{.Facts.DataDir}}{{end}}</span></div>
       <h1 class="firstrun-title">Your broker is up</h1>
       <p class="mut firstrun-lede">Nothing has been created yet, and that is fine. Three steps get a message through. Each one is a real command you can paste; the console will light up as soon as the first request arrives.</p>
     </div>
