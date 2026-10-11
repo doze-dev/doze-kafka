@@ -118,7 +118,7 @@ test('a subject is selected from the neighbours sentence, closed, refreshed and 
   const link = page.locator('#neighbours a', { hasText: 'seed-events-value' });
   await expect(link).toBeVisible();
   await cycle(page, link, 'subject');
-  await page.keyboard.press('Enter');
+  await link.click();
   await expect(title(page)).toHaveText('seed-events-value');
   await expect(overlay(page)).toContainText('Compatibility');
 });
