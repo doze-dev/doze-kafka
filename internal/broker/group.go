@@ -381,6 +381,7 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 	}
 
 	m := g.members[r.MemberID]
+	isNew := m == nil
 	// A follower that rejoins a stable group with nothing changed is told where
 	// the group is; it does not need a rebalance, and forcing one made every
 	// such rejoin cost the whole group a generation.
@@ -416,7 +417,9 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 	if g.state != statePreparingRebalance {
 		wasEmpty := g.state == stateEmpty
 		g.beginRebalance()
-		if m.rejoined || wasEmpty {
+		// A member the group did not have is "a member joined"; one it already had, asking in
+		// again, is "a member rejoined".
+		if isNew || wasEmpty {
 			gm.emit(g, "rebalance", m.id, "a member joined", "a member joined")
 		} else {
 			gm.emit(g, "rebalance", m.id, "a member rejoined", "a member rejoined")

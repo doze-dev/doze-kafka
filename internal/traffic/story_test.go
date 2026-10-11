@@ -47,8 +47,8 @@ func TestStoryNestsRequestsUnderTheirRebalance(t *testing.T) {
 	for _, e := range latest.Rows {
 		apis = append(apis, e.API)
 	}
-	if len(apis) != 4 || apis[0] != "Fetch" || apis[3] != "JoinGroup" {
-		t.Errorf("rows under the rebalance (newest first) = %v, want Fetch (a member's), OffsetCommit, SyncGroup, JoinGroup", apis)
+	if len(apis) != 4 || apis[0] != "JoinGroup" || apis[3] != "Fetch" {
+		t.Errorf("rows under the rebalance (oldest first, as they happened) = %v, want JoinGroup, SyncGroup, OffsetCommit, Fetch (a member's)", apis)
 	}
 	// Generation 6's own opening, and its beats, are the generation before.
 	if len(s.Before) != 1 || s.Before[0].API != "Heartbeat" || s.Before[0].Count != 3 {

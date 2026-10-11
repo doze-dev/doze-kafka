@@ -1,6 +1,7 @@
 package traffic
 
 import (
+	"cmp"
 	"slices"
 	"time"
 )
@@ -32,10 +33,20 @@ type Rebalance struct {
 	// known).
 	Cause                  string
 	Members, MembersBefore int
-	// Rows are the requests in this span, newest first.
+	// Rows are the requests in this span, oldest first: the order they happened in, as
+	// the board draws them under their rebalance.
 	Rows   []Event
 	unseen bool
 }
+
+// joinLead is how long before the coordinator notes a rebalance the requests that lead
+// to it can have begun: the client finds the coordinator, is told to come back with a
+// member id (KIP-394), and joins. A request of these is placed by its time plus this.
+const joinLead = 5 * time.Second
+
+// joinsAGroup are the requests that bring a member in, and so begin a rebalance. A
+// SyncGroup is not one of them: it ends a rebalance.
+var joinsAGroup = map[string]bool{"FindCoordinator": true, "JoinGroup": true}
 
 // Story is one group's recent past.
 type Story struct {
@@ -106,9 +117,21 @@ func (r *Recorder) Story(group string) Story {
 		spans = append(spans, *cur)
 	}
 
-	// Each row goes under the last rebalance that began before it.
+	// Each row goes under the last rebalance that began before it. A row is placed by
+	// when it was last seen (a folded heartbeat that ran across a rebalance sits under
+	// the generation its last beat was in, not the one that had already ended), and the
+	// requests that bring a member to a group are placed joinLead later: the
+	// coordinator notes the rebalance when it handles the JoinGroup, a moment after the
+	// client sent the FindCoordinator and the first JoinGroup that led to it.
 	for i := len(rows) - 1; i >= 0; i-- { // oldest first.
 		e := rows[i]
+		at := e.Time
+		if at.IsZero() {
+			at = e.First
+		}
+		if joinsAGroup[e.API] {
+			at = at.Add(joinLead)
+		}
 		s.Requests += max(e.Count, 1)
 		s.Folded += max(e.Count-1, 0)
 		for _, tp := range e.Topics {
@@ -118,7 +141,7 @@ func (r *Recorder) Story(group string) Story {
 		}
 		idx := -1
 		for j := len(spans) - 1; j >= 0; j-- {
-			if !e.First.Before(spans[j].Start) {
+			if !at.Before(spans[j].Start) {
 				idx = j
 				break
 			}
@@ -129,10 +152,16 @@ func (r *Recorder) Story(group string) Story {
 		}
 		spans[idx].Rows = append(spans[idx].Rows, e)
 	}
-	// Newest first, as the page lists them.
+	// Rebalances newest first, as the page lists them; inside one, the requests in the
+	// order they happened.
 	slices.Reverse(spans)
 	for i := range spans {
-		slices.Reverse(spans[i].Rows)
+		slices.SortStableFunc(spans[i].Rows, func(a, b Event) int {
+			if c := a.Time.Compare(b.Time); c != 0 {
+				return c
+			}
+			return cmp.Compare(a.Seq, b.Seq)
+		})
 	}
 	slices.Reverse(s.Before)
 	s.Rebalances = spans
