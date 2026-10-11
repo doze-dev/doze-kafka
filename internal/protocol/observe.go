@@ -40,6 +40,9 @@ type Summary struct {
 	Software string
 	// ErrorCode is the first non-zero error in the response, 0 if none.
 	ErrorCode int16
+	// Class says what the error means (Classify): normal flow, a refusal Kafka would
+	// also make, a denial, something not implemented, or the broker failing.
+	Class Class
 }
 
 // ErrorName is the Kafka name of an error code ("UNKNOWN_TOPIC_OR_PARTITION"), or
@@ -48,7 +51,9 @@ func ErrorName(code int16) string {
 	if code == 0 {
 		return ""
 	}
-	if e := kerr.TypedErrorForCode(code); e != nil {
+	// TypedErrorForCode answers UNKNOWN_SERVER_ERROR for a number it has no name for;
+	// that is not this code's name.
+	if e := kerr.TypedErrorForCode(code); e != nil && e.Code == code {
 		return e.Message
 	}
 	return "ERROR_" + strconv.Itoa(int(code))
@@ -126,5 +131,6 @@ func (r *Request) Describe() Summary {
 		s.ErrorCode = 0
 		s.Detail = "version negotiation: the client asks again at a version offered here"
 	}
+	s.Class = Classify(r.Header.APIKey, s.ErrorCode)
 	return s
 }

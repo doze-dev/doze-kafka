@@ -99,29 +99,6 @@ func (e *kafkaRefusal) Error() string {
 }
 func (e *kafkaRefusal) Unwrap() error { return e.Err }
 
-// deniedCodes are the errors an authorization or a login decided.
-var deniedCodes = map[int16]bool{
-	kerr.TopicAuthorizationFailed.Code:           true,
-	kerr.GroupAuthorizationFailed.Code:           true,
-	kerr.ClusterAuthorizationFailed.Code:         true,
-	kerr.TransactionalIDAuthorizationFailed.Code: true,
-	kerr.DelegationTokenAuthorizationFailed.Code: true,
-	kerr.SaslAuthenticationFailed.Code:           true,
-}
-
-// notImplementedCodes are the errors Kafka itself gives for a feature that is off or
-// a version that is not there, which is how this broker declines what it does not do.
-var notImplementedCodes = map[int16]bool{
-	kerr.UnsupportedVersion.Code:          true,
-	kerr.UnsupportedSaslMechanism.Code:    true,
-	kerr.UnsupportedForMessageFormat.Code: true,
-	kerr.UnsupportedCompressionType.Code:  true,
-	kerr.SecurityDisabled.Code:            true,
-	kerr.UnsupportedAssignor.Code:         true,
-	kerr.UnsupportedEndpointType.Code:     true,
-	kerr.DelegationTokenAuthDisabled.Code: true,
-}
-
 // refusalFor sorts an error into a Refusal. It is the only place that decides.
 func refusalFor(err error) Refusal {
 	if err == nil {
@@ -168,15 +145,19 @@ func kafkaRefusalFor(ke *kerr.Error, brokerMsg string, err error) Refusal {
 		r.Kind, r.Status, r.Heading = Denied, http.StatusBadGateway, "The broker refused the console's login"
 		r.Message = "The console's own credentials were rejected by the broker."
 		return r
-	case deniedCodes[ke.Code]:
+	}
+	// Which word it is comes from the table beside ErrorName, the one the Traffic page
+	// classifies the wire's answers with.
+	switch protocol.CodeClass(ke.Code) {
+	case protocol.ClassDenied:
 		r.Kind, r.Status, r.Heading = Denied, http.StatusForbidden, "Denied"
 		r.Message = say
 		return r
-	case notImplementedCodes[ke.Code]:
+	case protocol.ClassNotImplemented:
 		r.Kind, r.Status, r.Heading = NotImplemented, http.StatusNotImplemented, "Not implemented"
 		r.Message = say
 		return r
-	case ke.Retriable, ke.Code == kerr.UnknownServerError.Code, ke.Code == kerr.KafkaStorageError.Code:
+	case protocol.ClassFailed:
 		// The broker's problem, not the request's: timeouts, a coordinator still
 		// loading, a storage failure.
 		r.Kind, r.Status, r.Heading, r.Retry = Failed, http.StatusServiceUnavailable, "The broker could not do that right now", true
