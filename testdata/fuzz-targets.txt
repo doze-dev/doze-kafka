@@ -12,6 +12,7 @@
 ./internal/storage/log FuzzValidateBatches
 ./internal/storage/log FuzzDecodeRecords
 ./internal/storage/log FuzzDecompress
+./internal/storage/log FuzzCheckRecords
 ./internal/storage/log FuzzScanLog
 # Stored ACL identity.
 ./internal/storage/meta FuzzACLKey

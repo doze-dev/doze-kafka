@@ -2,6 +2,7 @@ package conformance
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -15,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
@@ -292,7 +294,10 @@ func (e *Env) Produce(label, topic string, partition int32, recs ...ProduceRecor
 }
 
 // encodeBatch builds a v2 record batch with no producer id.
-func encodeBatch(recs []ProduceRecord) []byte {
+func encodeBatch(recs []ProduceRecord) []byte { return encodeBatchCodec(recs, 0) }
+
+// encodeBatchCodec is encodeBatch with the records section compressed (1 gzip, 4 zstd).
+func encodeBatchCodec(recs []ProduceRecord, codec int) []byte {
 	first, max := recs[0].TimestampMs, recs[0].TimestampMs
 	var body []byte
 	for i, r := range recs {
@@ -312,7 +317,7 @@ func encodeBatch(recs []ProduceRecord) []byte {
 		body = append(body, rec...)
 	}
 	var tail []byte // everything the CRC covers: attributes onward.
-	tail = binary.BigEndian.AppendUint16(tail, 0)
+	tail = binary.BigEndian.AppendUint16(tail, uint16(codec))
 	tail = binary.BigEndian.AppendUint32(tail, uint32(len(recs)-1))
 	tail = binary.BigEndian.AppendUint64(tail, uint64(first))
 	tail = binary.BigEndian.AppendUint64(tail, uint64(max))
@@ -320,6 +325,20 @@ func encodeBatch(recs []ProduceRecord) []byte {
 	tail = binary.BigEndian.AppendUint16(tail, 0xffff)     // producer epoch -1
 	tail = binary.BigEndian.AppendUint32(tail, 0xffffffff) // base sequence -1
 	tail = binary.BigEndian.AppendUint32(tail, uint32(len(recs)))
+	switch codec {
+	case 1:
+		var b bytes.Buffer
+		w := gzip.NewWriter(&b)
+		w.Write(body)
+		w.Close()
+		body = b.Bytes()
+	case 4:
+		var b bytes.Buffer
+		w, _ := zstd.NewWriter(&b)
+		w.Write(body)
+		w.Close()
+		body = b.Bytes()
+	}
 	tail = append(tail, body...)
 
 	var out []byte

@@ -125,6 +125,7 @@ this table.
 | Record batch (shape, CRC, whole batches only) | `internal/storage/log` | `FuzzValidateBatches` |
 | Record reader | `internal/storage/log` | `FuzzDecodeRecords` |
 | Decompression (gzip, snappy block and xerial, lz4, zstd) | `internal/storage/log` | `FuzzDecompress` |
+| The streamed look inside a produced batch (keys, inflated size) | `internal/storage/log` | `FuzzCheckRecords` |
 | Segment scan that recovery truncates by | `internal/storage/log` | `FuzzScanLog` |
 | OTLP metrics (client telemetry) | `internal/telemetry` | `FuzzDecode` |
 | SASL/PLAIN and SCRAM messages | `internal/broker` | `FuzzSASLPlain`, `FuzzSCRAMClientFirst`, `FuzzSCRAMClientFinal`, `FuzzSCRAMUsernameEscaping` |

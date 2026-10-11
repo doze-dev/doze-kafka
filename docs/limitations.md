@@ -34,6 +34,21 @@ implement it.
   retry, it takes the log directory offline; doze-kafka does the same for the one
   partition, answering `KAFKA_STORAGE_ERROR` to every write (and every `acks=all`
   acknowledgement) until a restart, when recovery decides from what is really on disk.
+- **A compressed batch is looked inside only as far as a topic needs, and one that
+  inflates past 64 MiB is refused.** Kafka holds a produced batch to
+  `max.message.bytes` as it arrived (a batch of a few hundred bytes that inflates to
+  50 KB is accepted under a 2000 byte limit), and holds a topic with
+  `compression.type=uncompressed` to the size it inflates to; both are recorded
+  (`conformance/recordings/produce-decompressed-size.json`) and doze-kafka answers
+  `MESSAGE_TOO_LARGE` for the same cases. Kafka has no other bound on what a batch
+  inflates to; this broker, which holds the records of a batch to compact it, refuses a
+  batch that inflates past 64 MiB (or a zstd frame that declares a window past 8 MiB)
+  with the same `MESSAGE_TOO_LARGE`, wherever it has to look inside the batch (a
+  compacted topic, an uncompressed topic, a timestamp lookup). The look is a stream:
+  what is held is a window and a buffer, not the payload. Other topics store the batch
+  as it came, as Kafka does with `compression.type=producer`, and a topic whose
+  `compression.type` names a codec is not re-compressed on the way in, so the
+  re-compressed size Kafka checks is not what is checked here.
 - **A batch whose `acks=all` fsync failed stays in the log.** The producer is told
   `KAFKA_STORAGE_ERROR` with no offset, but the batch was already appended: a consumer
   can read it, and a non-idempotent retry stores it again (an idempotent retry is

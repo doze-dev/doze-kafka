@@ -6,6 +6,15 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Produce: what a compressed batch may inflate to is bounded by a stream, not a buffer.
+  A keyed-topic check used to inflate a batch whole (up to 256 MiB, held again by the
+  record decoder) before it looked at a key; it now streams, holding a window and a
+  buffer, and refuses a batch that inflates past 64 MiB, or a zstd frame declaring a
+  window past 8 MiB, with `MESSAGE_TOO_LARGE`. A topic with `compression.type=uncompressed`
+  is held to `max.message.bytes` as the batch inflates, as Kafka holds it (recorded
+  against `apache/kafka:4.3.1`, `produce-decompressed-size`); a batch Kafka accepts
+  because it weighs little still works.
+
 - Console: a write refused with `KAFKA_STORAGE_ERROR` no longer reads as if nothing
   was written. When the fsync after the append failed the batch is in the log (BAD-2),
   so the refusal, the Traffic inspector's cause and the error table say it may already
