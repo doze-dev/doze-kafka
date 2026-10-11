@@ -8,6 +8,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
+	"github.com/doze-dev/doze-kafka/internal/embed"
 	"github.com/doze-dev/doze-kafka/internal/serverhook"
 	"github.com/doze-dev/doze-kafka/server"
 )
@@ -63,7 +64,7 @@ func TestNoConsoleMeansNoTelemetry(t *testing.T) {
 	cfg := config.Default()
 	cfg.DataDir, cfg.ListenAddr, cfg.Console = t.TempDir(), "127.0.0.1:0", false
 	cfg.ClientTelemetry = true // the default: it is the console that decides.
-	srv, err := server.NewFromConfig(cfg, nil)
+	srv, err := embed.NewFromConfig(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +77,7 @@ func TestNoConsoleMeansNoTelemetry(t *testing.T) {
 	}
 
 	cfg.Console, cfg.DataDir = true, t.TempDir()
-	with, err := server.NewFromConfig(cfg, nil)
+	with, err := embed.NewFromConfig(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

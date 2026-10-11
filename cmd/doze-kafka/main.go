@@ -31,8 +31,8 @@ import (
 
 	"github.com/doze-dev/doze-kafka/console"
 	"github.com/doze-dev/doze-kafka/internal/config"
+	"github.com/doze-dev/doze-kafka/internal/embed"
 	"github.com/doze-dev/doze-kafka/internal/serverhook"
-	"github.com/doze-dev/doze-kafka/server"
 	names "github.com/doze-dev/doze-names"
 )
 
@@ -257,7 +257,7 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 		cfg.AdvertisedHost = bind.host
 	}
 
-	srv, err := server.NewFromConfig(cfg, logger)
+	srv, err := embed.NewFromConfig(cfg, logger)
 	if err != nil {
 		return err
 	}

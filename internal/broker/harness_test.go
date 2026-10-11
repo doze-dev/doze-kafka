@@ -2,7 +2,7 @@ package broker_test
 
 // The shared test harness. Every integration test boots its broker through
 // boot (directly, or via startBroker / runBroker / runBrokerAt), which goes
-// through server.NewFromConfig — the same wiring the CLI and the embed API use,
+// through embed.NewFromConfig — the same wiring the CLI and the embed API use,
 // including fsync cadence and retention — so what the tests exercise is what
 // ships, rather than a hand-assembled copy of it.
 
@@ -20,7 +20,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
-	"github.com/doze-dev/doze-kafka/server"
+	"github.com/doze-dev/doze-kafka/internal/embed"
 )
 
 // boot starts a broker from a full config and returns the address it bound and
@@ -33,9 +33,9 @@ func boot(t *testing.T, cfg config.Config) (addr string, stop func()) {
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("config: %v", err)
 	}
-	srv, err := server.NewFromConfig(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	srv, err := embed.NewFromConfig(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
-		t.Fatalf("server.NewFromConfig: %v", err)
+		t.Fatalf("embed.NewFromConfig: %v", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	bound, err := srv.Bind(ctx)

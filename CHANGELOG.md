@@ -6,6 +6,9 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- server API: `NewFromConfig` is removed. It took `internal/config.Config`, so no embedder
+  could call it; `New(Options)` is the constructor, and this module's commands reach the
+  config path through `internal/embed`.
 - Traffic, third review: Enter on a link inside the inspector (the client link, "See a
   client that reports", a topic's neighbours) opens its selection; a refusal's name
   never breaks inside a word (the Result column is 118 px, the board's 84 cut

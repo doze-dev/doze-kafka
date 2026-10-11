@@ -16,7 +16,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
-	"github.com/doze-dev/doze-kafka/server"
+	"github.com/doze-dev/doze-kafka/internal/embed"
 )
 
 func sp(s string) *string { return &s }
@@ -229,7 +229,7 @@ func TestACLsPersistAndAreEnforcedAfterARestart(t *testing.T) {
 	cfg.DataDir, cfg.MetaDB = filepath.Join(dir, "data"), filepath.Join(dir, "meta.db")
 
 	start := func(logs io.Writer) (stop func()) {
-		srv, err := server.NewFromConfig(cfg, slog.New(slog.NewTextHandler(logs, nil)))
+		srv, err := embed.NewFromConfig(cfg, slog.New(slog.NewTextHandler(logs, nil)))
 		if err != nil {
 			t.Fatal(err)
 		}
