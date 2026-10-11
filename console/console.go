@@ -362,6 +362,9 @@ func templateFuncs(prefix string) template.FuncMap {
 			return u
 		},
 		"t": uiText,
+		// teach is the line under a field, read from the settings table by the
+		// record's kind and name (teaching.go).
+		"teach": teachLine,
 		// Keys of the inspector's selections, escaped for a query string.
 		"memberKey": func(group, member string) string { return url.QueryEscape(joinKey(group, member)) },
 		"eventKey": func(group string, seq uint64) string {

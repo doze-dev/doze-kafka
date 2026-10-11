@@ -116,6 +116,7 @@
               <button type="button" class="btn sm" @click="$refs.o.value='{{.Latest}}'" title="Offset {{.Latest}}: the end of the log">Latest</button>
               <button type="submit" class="btn sm primary">Set</button>
               <button type="button" class="btn sm" @click="e=false">Cancel</button>
+              <div class="teach rowteach">{{teach "group" "new-offset"}}</div>
               <div class="err form-err" data-err-slot hidden role="alert"></div>
             </form>
             {{end}}

@@ -96,6 +96,7 @@
           {{range .Levels}}<option value="{{.}}" {{if and $.CompatOwn (eq . $.Compat)}}selected{{end}}>{{.}}</option>{{end}}
         </select></label>
       <button class="btn btn-outline" type="submit" hx-disabled-elt="this">Save</button>
+      <span class="hint teach">{{teach "registry" .Compat}}</span>
       <span class="hint">New versions are checked against {{if hasPrefix .Compat "BACKWARD"}}what consumers of the older versions read{{else if hasPrefix .Compat "FORWARD"}}what older consumers can still read{{else if hasPrefix .Compat "FULL"}}both directions{{else}}nothing{{end}}{{if and (ne .Compat "NONE") (hasSuffix .Compat "_TRANSITIVE")}}, against every earlier version{{else if ne .Compat "NONE"}}, against the latest version{{end}}.</span>
     </form>
 

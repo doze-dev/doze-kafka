@@ -889,3 +889,7 @@ form.htmx-request .btn.primary::after { content: ""; width: 11px; height: 11px; 
 .spark polyline { fill: none; stroke: var(--info); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
 .mc-more { margin-top: 8px; font-size: var(--fs-sm); }
 .mc-more summary { cursor: pointer; color: var(--muted-foreground); }
+
+/* The line under a field, generated from the settings table. */
+.teach { margin: 4px 0 0; font-size: var(--fs-sm); line-height: 1.4; color: var(--muted-foreground); }
+.rowteach { flex-basis: 100%; }

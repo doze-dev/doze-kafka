@@ -23,7 +23,7 @@
     <form hx-post="{{newTopicURL}}" hx-disabled-elt="find button[type=submit]">
       <div class="panel form-sec"><div class="panel-h"><h2>General</h2></div><div class="form-b">
         <div class="field"><label for="f-name">Topic name <span class="hint">letters, digits, <span class="mono">.</span> <span class="mono">_</span> <span class="mono">-</span></span></label><input class="input mono" id="f-name" name="name" placeholder="orders.created" required autocomplete="off" autofocus></div>
-        <div class="field narrow"><label for="f-partitions">Partitions</label><input class="input mono" id="f-partitions" name="partitions" type="number" min="1" max="1000" value="1" required></div>
+        <div class="field narrow"><label for="f-partitions">Partitions</label><input class="input mono" id="f-partitions" name="partitions" type="number" min="1" max="1000" value="1" required aria-describedby="f-partitions-teach"><p class="teach" id="f-partitions-teach">{{teach "broker" "max-partitions"}}</p></div>
       </div></div>
       <div class="panel form-sec"><div class="panel-h"><h2>Settings <span class="sz">optional — leave blank to follow the broker's</span></h2></div><div class="form-b">
         {{template "topic_settings_fields" .Config}}
@@ -347,7 +347,7 @@
     <span class="twist">{{icon "chevron"}}</span>
   </summary>
   <form class="cfgform" hx-post="{{topicURL .Topic.Name}}/partitions" hx-disabled-elt="find button[type=submit]" data-confirm-title="Add partitions" data-confirm-verb="Add partitions" hx-confirm="Add partitions to &quot;{{.Topic.Name}}&quot;? They cannot be removed afterwards, and a key may hash to a different partition than before, so records with the same key stop being ordered together across the change.">
-    <div class="field narrow"><label for="f-addparts">Add</label><input class="input mono" id="f-addparts" name="add" type="number" min="1" value="1" required></div>
+    <div class="field narrow"><label for="f-addparts">Add</label><input class="input mono" id="f-addparts" name="add" type="number" min="1" value="1" required aria-describedby="f-addparts-teach"><p class="teach" id="f-addparts-teach">{{teach "broker" "max-partitions"}}</p></div>
     <div class="err form-err" data-err-slot hidden role="alert"></div>
     <div class="cfgfoot">
       <span class="note">Now {{.Topic.Partitions}}. Consumers pick the new partitions up on their own; records already written stay where they are.</span>
