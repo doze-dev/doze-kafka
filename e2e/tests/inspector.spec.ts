@@ -1,7 +1,7 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { test, expect } from '../fixtures/console';
 import type { Locator, Page } from '@playwright/test';
-import { KAFKA_ADDR } from '../playwright.config';
+import { kafkaAddr } from '../addr';
 
 // One inspector, six selections (plus a group's events): a message, a request, a
 // client, a member, a subject and a transaction. Each is selected, closed with Esc
@@ -15,7 +15,7 @@ test.describe.configure({ mode: 'serial' });
 test.beforeAll(async () => {
   // A consumer that stays in its group, so there is a client and a member to look at.
   execFileSync('go', ['build', '-o', `e2e/.tmp/bin/hold-${process.pid}`, './e2e/hold'], { cwd: '..', env: { ...process.env, GOWORK: 'off' } });
-  hold = spawn(`e2e/.tmp/bin/hold-${process.pid}`, [KAFKA_ADDR, 'inspect-hold', 'inspect-hold-group', 'seed-orders'], { cwd: '..', stdio: ['ignore', 'pipe', 'inherit'] });
+  hold = spawn(`e2e/.tmp/bin/hold-${process.pid}`, [kafkaAddr(), 'inspect-hold', 'inspect-hold-group', 'seed-orders'], { cwd: '..', stdio: ['ignore', 'pipe', 'inherit'] });
   await new Promise<void>((resolve, reject) => {
     const t = setTimeout(() => reject(new Error('the held consumer never joined its group')), 20_000);
     hold!.stdout!.on('data', (b) => { if (String(b).includes('ready')) { clearTimeout(t); resolve(); } });

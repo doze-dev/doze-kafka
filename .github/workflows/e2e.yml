@@ -32,6 +32,12 @@ jobs:
         env:
           CI: "1"
         run: bunx playwright test
+      - name: Playwright, nothing tidy (listener on :0, a prefix, a data directory with a space, zone off)
+        working-directory: e2e
+        env:
+          CI: "1"
+          E2E_IDENTITY: "1"
+        run: bunx playwright test
       - name: Report
         if: failure()
         uses: actions/upload-artifact@v7

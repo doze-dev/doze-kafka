@@ -4,11 +4,20 @@ import { defineConfig, devices } from '@playwright/test';
 // on an address (--listen): no DNS, no name claimed, nothing shared with a broker
 // already running on the machine. E2E_PORT moves it, so two runs can coexist.
 const PORT = Number(process.env.E2E_PORT ?? 14092);
+// E2E_IDENTITY=1 runs the suite with nothing tidy about the broker: its listener
+// picks its own port (127.0.0.1:0), the console is mounted under a prefix that is
+// not the default, the data directory's path has a space in it and the name zone
+// is off (plan A8). The address the broker bound is then read from its console
+// (global-setup.ts, addr.ts), and everything else is as in the default run.
+export const IDENTITY = !!process.env.E2E_IDENTITY;
+export const PREFIX = IDENTITY ? '/ops/kafka-ui' : '/_console';
 export const KAFKA_ADDR = `127.0.0.1:${PORT}`;
 export const CONSOLE_PORT = PORT + 1;
 export const REGISTRY_PORT = PORT + 2;
 export const REGISTRY_URL = `http://127.0.0.1:${REGISTRY_PORT}`;
-export const BASE_URL = `http://127.0.0.1:${CONSOLE_PORT}/_console/`;
+export const BASE_URL = `http://127.0.0.1:${CONSOLE_PORT}${PREFIX}/`;
+const LISTEN = IDENTITY ? '127.0.0.1:0' : KAFKA_ADDR;
+const DATA_DIR = IDENTITY ? `data dir ${PORT}` : `data-${PORT}`;
 
 export default defineConfig({
   testDir: './tests',
@@ -32,8 +41,9 @@ export default defineConfig({
     // how a suite's result comes to depend on how often it has been run.
     command:
       `sh -c "cd .. && GOWORK=off go build -o e2e/.tmp/bin/doze-kafka-${PORT} ./cmd/doze-kafka && ` +
-      `cd e2e/.tmp && rm -rf data-${PORT} && mkdir -p data-${PORT} && ` +
-      `./bin/doze-kafka-${PORT} --listen ${KAFKA_ADDR} --console-addr 127.0.0.1:${CONSOLE_PORT} --schema-registry-addr 127.0.0.1:${REGISTRY_PORT} --data-dir data-${PORT}"`,
+      `cd e2e/.tmp && rm -rf \\\"${DATA_DIR}\\\" && mkdir -p \\\"${DATA_DIR}\\\" && ` +
+      `./bin/doze-kafka-${PORT} --listen ${LISTEN} --console-addr 127.0.0.1:${CONSOLE_PORT} --schema-registry-addr 127.0.0.1:${REGISTRY_PORT} --data-dir \\\"${DATA_DIR}\\\""`,
+    env: IDENTITY ? { DOZE_ZONE: 'off', DOZE_KAFKA_CONSOLE_PREFIX: PREFIX } : {},
     url: `http://127.0.0.1:${CONSOLE_PORT}/healthz`,
     reuseExistingServer: false, // a reused server keeps its state, and the wipe above never runs.
     timeout: 120_000,

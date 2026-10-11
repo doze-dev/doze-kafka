@@ -58,7 +58,7 @@ func TestRebindingRequestsAreRefused(t *testing.T) {
 			r.Header.Set("Origin", origin)
 		}
 		rec := httptest.NewRecorder()
-		c.ServeHTTP(rec, r)
+		serveInto(t, c, rec, r)
 		return rec
 	}
 

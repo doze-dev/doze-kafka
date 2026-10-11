@@ -7,7 +7,7 @@
   var root = document.documentElement;
   var PREFIX = (document.querySelector('link[rel="icon"]') || {}).href
     ? new URL(document.querySelector('link[rel="icon"]').href).pathname.replace(/\/static\/favicon\.svg$/, "")
-    : "/_console";
+    : "";
   function stored(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
   function store(key, value) {
     try { if (value == null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch (e) {}

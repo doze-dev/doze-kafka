@@ -29,6 +29,9 @@ var templateFS embed.FS
 //go:embed static/*
 var staticFS embed.FS
 
+// defaultPrefix is where the console is mounted when nothing says otherwise.
+const defaultPrefix = "/_console"
+
 // Console is the web-UI http.Handler. Mount it on its own listener — Kafka's
 // wire protocol can't share a port with HTTP.
 type Console struct {
@@ -57,7 +60,7 @@ type Options struct {
 	// TLSConfig, if set, dials the broker over TLS with this trust config.
 	TLSConfig *tls.Config
 	// Prefix is the URL path the console is mounted under; defaults to
-	// "/_console".
+	// "/_console" (or DOZE_KAFKA_CONSOLE_PREFIX, when set).
 	Prefix string
 	// DisplayAddr is the bootstrap address pages SHOW clients (copy chips
 	// etc.) when Addr itself is not dialable by them — the embedded topology
@@ -96,7 +99,13 @@ type Options struct {
 func New(opts Options) (*Console, error) {
 	prefix := opts.Prefix
 	if prefix == "" {
-		prefix = "/_console"
+		// DOZE_KAFKA_CONSOLE_PREFIX mounts the console elsewhere without a code
+		// change: the suites run once under a prefix that is not the default, to show
+		// nothing assumes it (like DOZE_KAFKA_CONSOLE_DEV below, a developer's hook).
+		prefix = os.Getenv("DOZE_KAFKA_CONSOLE_PREFIX")
+	}
+	if prefix == "" {
+		prefix = defaultPrefix
 	}
 	prefix = "/" + strings.Trim(prefix, "/")
 	if prefix == "/" {

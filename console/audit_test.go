@@ -415,7 +415,7 @@ func TestPagesCannotBeFramedAndCrossSiteWritesAreRefused(t *testing.T) {
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r.Header.Set("Sec-Fetch-Site", "cross-site") // and no Origin.
 	rec := httptest.NewRecorder()
-	c.ServeHTTP(rec, r)
+	serveInto(t, c, rec, r)
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("a cross-site POST with no Origin header: %d, want 403", rec.Code)
 	}

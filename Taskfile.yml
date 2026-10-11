@@ -95,6 +95,12 @@ tasks:
       - bunx playwright install chromium
       - bunx playwright test
 
+  test:identity:
+    desc: 'The console and browser suites with nothing tidy about the broker: the console under /ops/kafka-ui, a data directory with a space, the listener on 127.0.0.1:0 (browser), DOZE_ZONE=off. The run with the name zone on needs the doze-names daemon and is local only.'
+    cmds:
+      - DOZE_ZONE=off DOZE_KAFKA_CONSOLE_PREFIX=/ops/kafka-ui go test -count=1 ./console
+      - cd e2e && bun install --frozen-lockfile && bunx playwright install chromium && E2E_IDENTITY=1 bunx playwright test
+
   test:compat:
     desc: 'Real clients and frameworks against the binary (compat/): Java, Streams, Spring, Python, KafkaJS, kcat. Needs Docker for the JVM ones; missing toolchains are SKIPPED, not passed. Name clients to run only those: task test:compat -- java python'
     cmds:

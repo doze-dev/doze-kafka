@@ -166,7 +166,7 @@ func TestEveryMutationRouteIsGuardedAndFailsCleanly(t *testing.T) {
 		foreign.Host = "127.0.0.1:9093"
 		foreign.Header.Set("Origin", "http://evil.example")
 		rec := httptest.NewRecorder()
-		c.ServeHTTP(rec, foreign)
+		serveInto(t, c, rec, foreign)
 		if rec.Code != http.StatusForbidden {
 			t.Errorf("POST %s from a foreign origin = %d, want 403", path, rec.Code)
 		}

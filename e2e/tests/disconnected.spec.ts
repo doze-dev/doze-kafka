@@ -2,22 +2,23 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { mkdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { test, expect } from '../fixtures/console';
+import { PREFIX } from '../playwright.config';
 
 // The console when the broker is not there. This spec runs its own broker (its own
 // ports, and a data directory whose path has a space in it), kills it in the middle
 // of a poll, and brings it back on the same address and data.
 
 const PORT = Number(process.env.E2E_PORT ?? 14092) + 10;
-const CONSOLE = `http://127.0.0.1:${PORT + 1}/_console/`;
+const CONSOLE = `http://127.0.0.1:${PORT + 1}${PREFIX}/`;
 const ROOT = resolve(process.cwd(), '..');
 const BIN = join(ROOT, 'e2e', '.tmp', 'bin', `doze-kafka-disc-${PORT}`);
-const DATA = join(ROOT, 'e2e', '.tmp', `data disc ${PORT}`);
+const DATA = join(ROOT, 'e2e', '.tmp', `data disc ${PORT}`); // a space in the path, in every run.
 
 let proc: ChildProcess | undefined;
 
 async function up(): Promise<void> {
   proc = spawn(BIN, ['--listen', `127.0.0.1:${PORT}`, '--console-addr', `127.0.0.1:${PORT + 1}`, '--schema-registry-addr', `127.0.0.1:${PORT + 2}`, '--data-dir', DATA],
-    { cwd: ROOT, env: { ...process.env, DOZE_ZONE: 'off' }, stdio: 'ignore' });
+    { cwd: ROOT, env: { ...process.env, DOZE_ZONE: 'off', DOZE_KAFKA_CONSOLE_PREFIX: PREFIX }, stdio: 'ignore' });
   for (let i = 0; i < 150; i++) {
     try {
       if ((await fetch(`http://127.0.0.1:${PORT + 1}/healthz`)).ok) return;

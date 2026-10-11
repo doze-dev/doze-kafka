@@ -66,7 +66,7 @@ func doReq(t *testing.T, c *Console, method, path string, hdr map[string]string)
 		r.Header.Set(k, v)
 	}
 	rec := httptest.NewRecorder()
-	c.ServeHTTP(rec, r)
+	serveInto(t, c, rec, r)
 	return rec
 }
 
