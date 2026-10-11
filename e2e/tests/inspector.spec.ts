@@ -97,18 +97,14 @@ test('a group event is selected, closed, refreshed and left with Back', async ({
   await cycle(page, page.locator('#group-timeline li[id^="ev-"]').first(), 'event');
 });
 
-test('a subject reopens from its address, closes on Esc and Back leaves it', async ({ page }) => {
+test('a subject is selected from the neighbours sentence, closed, refreshed and left with Back', async ({ page }) => {
   await page.goto('topics/seed-events');
-  await page.goto('topics/seed-events?open=subject:seed-events-value');
-  await expect(overlay(page)).toBeVisible();
+  const link = page.locator('#neighbours a', { hasText: 'seed-events-value' });
+  await expect(link).toBeVisible();
+  await cycle(page, link, 'subject');
+  await link.click();
   await expect(title(page)).toHaveText('seed-events-value');
-  await expect(page.locator('#inspector .inspector-h')).toHaveAttribute('data-inspector-kind', 'subject');
   await expect(overlay(page)).toContainText('Compatibility');
-  await page.reload();
-  await expect(title(page)).toHaveAttribute('data-open', 'subject:seed-events-value');
-  await page.keyboard.press('Escape');
-  await expect(overlay(page)).toBeHidden();
-  expect(page.url()).not.toContain('open=');
 });
 
 test('Back returns to the previous selection, and then to none', async ({ page }) => {

@@ -95,6 +95,7 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 		"Config":    newConfigView(detail.Config),
 	}
 	maps.Copy(data, c.dockData(DockFilter{Topic: name}))
+	data["Neighbours"] = c.neighbourClauses(c.topicGraph(ctx, name, data["Consumers"].([]consumerRow)), NodeTopic, name)
 	if q, all, before, asked := searchParams(r); asked {
 		// A search replaces the tape and the live table with what it found.
 		found, err := c.searchTopic(ctx, name, partition, detail.Partitions, q, all, before)

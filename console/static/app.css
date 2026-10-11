@@ -897,3 +897,8 @@ form.htmx-request .btn.primary::after { content: ""; width: 11px; height: 11px; 
 /* The wire dock: the requests that touched this resource, at the foot of its page. */
 .wiredock { margin-top: 28px; padding-bottom: 24px; }
 .wiredock tr[data-inspector-open] td { white-space: nowrap; }
+
+/* The neighbours sentence under a page's title. */
+.neighbours { margin: 10px 0 0; font-size: var(--fs-md); color: var(--muted-foreground); line-height: 1.6; }
+.neighbours a { color: var(--foreground); border-bottom: 1px solid var(--border); }
+.neighbours a:hover { border-bottom-color: var(--foreground); }

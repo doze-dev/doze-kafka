@@ -55,6 +55,7 @@
           <span class="chip mono">{{len .Versions}} version{{if ne (len .Versions) 1}}s{{end}}</span>
           <span class="chip mono" title="{{if .CompatOwn}}set for this subject{{else}}the registry's default{{end}}">{{.Compat}}{{if not .CompatOwn}} · default{{end}}</span>
         </div>
+        {{template "neighbours" .}}
       </div>
       <div class="idband-acts">
         <button class="btn danger" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" data-confirm-title="Delete subject" data-confirm-verb="Delete subject"

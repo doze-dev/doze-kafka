@@ -23,6 +23,7 @@
 {{define "group_detail"}}{{template "shell_top" .}}
   {{template "group_lp" (dict "Prefix" .Prefix "List" .List "Sel" .Group.ID)}}
   <main class="detail" id="detail"><div class="detail-inner">
+    {{template "neighbours" .}}
     {{template "group_live" .}}
     {{template "wire_dock" .}}
   </div></main>

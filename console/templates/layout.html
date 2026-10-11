@@ -148,3 +148,8 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
   </div>
 </main>
 {{end}}
+
+{{/* neighbours: "Written by checkout-api, read by g-order-validator, schema subject
+     orders-value." One sentence of links, rendered from the neighbours graph
+     (graph.go). A subject opens in the inspector; the rest go to their pages. */}}
+{{define "neighbours"}}{{if .Neighbours}}<p class="neighbours" id="neighbours">{{range $i, $c := .Neighbours}}{{if $i}}, {{end}}{{$c.Verb}} {{range $c.Links}}{{.Sep}}<a class="mono" href="{{.URL}}"{{if .Open}} data-inspector-open hx-get="{{.Open}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"{{end}}>{{.Name}}</a>{{end}}{{end}}.</p>{{end}}{{end}}

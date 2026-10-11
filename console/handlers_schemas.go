@@ -151,6 +151,16 @@ func (c *Console) schemaDetail(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// The topic this subject is named for, when there is one.
+	if topics, err := c.be.ListTopics(ctx); err == nil {
+		var names []string
+		for _, t := range topics {
+			names = append(names, t.Name)
+		}
+		g := NewGraph()
+		g.AddSubjects([]string{subject}, names)
+		data["Neighbours"] = c.neighbourClauses(g, NodeSubject, subject)
+	}
 	c.render(w, r, "schema_detail", data)
 }
 

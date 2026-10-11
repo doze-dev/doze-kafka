@@ -202,6 +202,9 @@ func (c *Console) groupDetail(w http.ResponseWriter, r *http.Request) {
 	data["List"], data["Page"], data["Title"] = list, "groups", id
 	maps.Copy(data, c.dockData(DockFilter{Group: id}))
 	data["DockToggle"] = true // the group page has no pause control of its own.
+	g := NewGraph()
+	g.AddGroupReads(id, data["Topics"].([]string))
+	data["Neighbours"] = c.neighbourClauses(g, NodeGroup, id)
 	c.render(w, r, "group_detail", data)
 }
 
