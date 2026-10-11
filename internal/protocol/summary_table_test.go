@@ -172,6 +172,8 @@ func TestSummarisersReportWhatTheRequestNames(t *testing.T) {
 			}
 		}
 		got.TopicIDs = nil
+		// What the inspector decodes of the same request is in the specification's names.
+		checkSpecKeys(t, c.name, kmsg.NameForKey(c.q.Key())+"Request", DescribeFacts(c.q, c.r).Decoded)
 		if !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%s:\n got  %+v\n want %+v", c.name, got, c.want)
 		}
