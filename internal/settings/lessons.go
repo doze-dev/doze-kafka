@@ -17,14 +17,14 @@ import (
 func fixed(s string) func(config.Config) string { return func(config.Config) string { return s } }
 
 var lessons = map[string]func(config.Config) string{
-	key(Topic, "retention.ms"):            fixed("How long a segment is kept. 7 d is 604800000. -1 keeps records for ever."),
-	key(Topic, "retention.bytes"):         fixed("Per partition. -1 means no size limit."),
-	key(Topic, "segment.bytes"):           fixed("Retention trims whole segments, so smaller acts sooner."),
-	key(Topic, "max.message.bytes"):       fixed("A bigger batch is refused with MESSAGE_TOO_LARGE."),
-	key(Topic, "cleanup.policy"):          fixed("compact keeps the latest record of each key; records with no key are then refused."),
-	key(Topic, "message.timestamp.type"):  fixed("Whose clock stamps a record: the producer's or the broker's."),
-	key(Broker, "replication-factor"):     fixed("Always 1. This is one broker with no followers to copy to. A request for more is accepted and the topic is made with its one replica; a single Apache Kafka broker would answer INVALID_REPLICATION_FACTOR."),
-	key(Group, "new-offset"):              fixed("An offset below the log start or above the log end is refused before it is sent. The log end itself means \"caught up\"."),
+	key(Topic, "retention.ms"):           fixed("How long a segment is kept. 7 d is 604800000. -1 keeps records for ever."),
+	key(Topic, "retention.bytes"):        fixed("Per partition. -1 means no size limit."),
+	key(Topic, "segment.bytes"):          fixed("Retention trims whole segments, so smaller acts sooner."),
+	key(Topic, "max.message.bytes"):      fixed("A bigger batch is refused with MESSAGE_TOO_LARGE."),
+	key(Topic, "cleanup.policy"):         fixed("compact keeps the latest record of each key; records with no key are then refused."),
+	key(Topic, "message.timestamp.type"): fixed("Whose clock stamps a record: the producer's or the broker's."),
+	key(Broker, "replication-factor"):    fixed("Always 1. This is one broker with no followers to copy to. A request for more is accepted and the topic is made with its one replica; a single Apache Kafka broker would answer INVALID_REPLICATION_FACTOR."),
+	key(Group, "new-offset"):             fixed("An offset below the log start or above the log end is refused before it is sent. The log end itself means \"caught up\"."),
 	key(Broker, "max-partitions"): func(c config.Config) string {
 		const tail = "Partitions can be added later and never removed; a key may then hash to a different partition."
 		if c.MaxPartitions > 0 {
