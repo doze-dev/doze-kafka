@@ -60,13 +60,19 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
 
   <div class="body">
     <nav class="rail" aria-label="Sections" hx-boost="true" hx-target="#workspace" hx-select="#workspace" hx-swap="outerHTML">
-      <div class="rgroup">Broker</div>
+      {{/* Three groups, as the design draws them: what is happening (Observe), what is
+           stored (Data) and the broker itself. A group with nothing in it is not drawn. */}}
+      {{if .HasTraffic}}
+      <div class="rgroup">Observe</div>
+      {{template "ri" dict "P" .Prefix "URL" "/traffic" "On" (eq .Page "traffic") "Name" "Traffic" "Glyph" "activity"}}
+      {{end}}
+      <div class="rgroup">Data</div>
       {{template "ri" dict "P" .Prefix "URL" "/topics" "On" (hasPrefix .Page "topics") "Name" "Topics" "Glyph" "layers" "Ct" "topics"}}
       {{template "ri" dict "P" .Prefix "URL" "/groups" "On" (hasPrefix .Page "groups") "Name" "Consumer groups" "Glyph" "users" "Ct" "groups"}}
       {{if .HasRegistry}}{{template "ri" dict "P" .Prefix "URL" "/schemas" "On" (hasPrefix .Page "schemas") "Name" "Schemas" "Glyph" "braces" "Ct" "schemas"}}{{end}}
-      {{if .HasTraffic}}{{template "ri" dict "P" .Prefix "URL" "/traffic" "On" (eq .Page "traffic") "Name" "Traffic" "Glyph" "activity"}}{{end}}
-      {{template "ri" dict "P" .Prefix "URL" "/cluster" "On" (eq .Page "cluster") "Name" "Cluster" "Glyph" "server"}}
+      <div class="rgroup">Broker</div>
       {{template "ri" dict "P" .Prefix "URL" "/access" "On" (eq .Page "access") "Name" "Access" "Glyph" "key"}}
+      {{template "ri" dict "P" .Prefix "URL" "/cluster" "On" (eq .Page "cluster") "Name" "Cluster" "Glyph" "server"}}
       <button type="button" class="rail-toggle" id="rail-toggle" title="Collapse / expand ([)">
         <span class="rt-ic">{{icon "chevron"}}</span><span class="ri-nm">Collapse</span>
       </button>
