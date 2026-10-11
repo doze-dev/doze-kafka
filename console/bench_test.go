@@ -9,7 +9,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
-// What a tape refresh or a drawer open costs the console backend. Run with:
+// What a tape refresh or a inspector open costs the console backend. Run with:
 //
 //	go test ./console/ -run '^$' -bench . -benchtime 100x
 func BenchmarkFetchWindow(b *testing.B) {

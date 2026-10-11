@@ -24,7 +24,7 @@
 {{/* Before first paint: the theme ("system" is resolved here, so the stylesheet
      defines each theme once) and the rail's width. */}}
 <script>(function(){var d=document.documentElement,g=function(k){try{return localStorage.getItem(k);}catch(e){return null;}};
-var t=g("theme");d.setAttribute("data-theme",t==="light"||t==="dark"?t:(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
+var t=g("theme");d.setAttribute("data-theme",t==="light"||t==="dark"||t==="contrast"?t:(matchMedia("(prefers-contrast: more)").matches?"contrast":matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
 var r=g("rail");if(r==="slim"||(r!=="wide"&&matchMedia("(max-width:1180px)").matches))d.setAttribute("data-rail","slim");
 window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").replace(/^\/+|\/+$/g,"").split("/");var v=(p[0]===""||((p[0]==="topics"||p[0]==="groups")&&!p[1]))?"list":"detail";d.setAttribute("data-view",v);};window.dozeView();})();</script>
 <script>document.addEventListener("alpine:init",function(){window.Alpine.store("filter",{
@@ -48,24 +48,31 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
     <button type="button" class="tb-palette" id="palette-open" aria-haspopup="dialog">{{icon "search"}} <span>Search or jump to…</span> <span class="kbd">⌘K</span></button>
     <div class="tb-spacer"></div>
     <div class="tb-right">
-      <span class="chip live mono" title="The broker this console is connected to">{{if .Endpoint}}{{.Endpoint}}{{else}}127.0.0.1:9092{{end}}</span>
+      <span class="chip live mono" id="live-pill" title="The broker this console is connected to"><span class="pill-addr">{{if .Endpoint}}{{.Endpoint}}{{else}}broker{{end}}</span><span class="pill-state" hidden></span><button type="button" class="pill-retry" id="pill-retry" hidden>Retry</button></span>
       <div class="theme-seg" id="theme-seg" role="group" aria-label="Theme">
         <button type="button" data-mode="light" title="Light" aria-label="Light theme">{{icon "sun"}}</button>
         <button type="button" data-mode="system" title="Match system" aria-label="System theme">{{icon "monitor"}}</button>
         <button type="button" data-mode="dark" title="Dark" aria-label="Dark theme">{{icon "moon"}}</button>
+        <button type="button" data-mode="contrast" title="High contrast" aria-label="High-contrast theme">{{icon "contrast"}}</button>
       </div>
     </div>
   </header>
 
   <div class="body">
     <nav class="rail" aria-label="Sections" hx-boost="true" hx-target="#workspace" hx-select="#workspace" hx-swap="outerHTML">
-      <div class="rgroup">Broker</div>
+      {{/* Three groups, as the design draws them: what is happening (Observe), what is
+           stored (Data) and the broker itself. A group with nothing in it is not drawn. */}}
+      {{if .HasTraffic}}
+      <div class="rgroup">Observe</div>
+      {{template "ri" dict "P" .Prefix "URL" "/traffic" "On" (eq .Page "traffic") "Name" "Traffic" "Glyph" "activity"}}
+      {{end}}
+      <div class="rgroup">Data</div>
       {{template "ri" dict "P" .Prefix "URL" "/topics" "On" (hasPrefix .Page "topics") "Name" "Topics" "Glyph" "layers" "Ct" "topics"}}
       {{template "ri" dict "P" .Prefix "URL" "/groups" "On" (hasPrefix .Page "groups") "Name" "Consumer groups" "Glyph" "users" "Ct" "groups"}}
       {{if .HasRegistry}}{{template "ri" dict "P" .Prefix "URL" "/schemas" "On" (hasPrefix .Page "schemas") "Name" "Schemas" "Glyph" "braces" "Ct" "schemas"}}{{end}}
-      {{if .HasTraffic}}{{template "ri" dict "P" .Prefix "URL" "/traffic" "On" (eq .Page "traffic") "Name" "Traffic" "Glyph" "activity"}}{{end}}
-      {{template "ri" dict "P" .Prefix "URL" "/cluster" "On" (eq .Page "cluster") "Name" "Cluster" "Glyph" "server"}}
+      <div class="rgroup">Broker</div>
       {{template "ri" dict "P" .Prefix "URL" "/access" "On" (eq .Page "access") "Name" "Access" "Glyph" "key"}}
+      {{template "ri" dict "P" .Prefix "URL" "/cluster" "On" (eq .Page "cluster") "Name" "Cluster" "Glyph" "server"}}
       <button type="button" class="rail-toggle" id="rail-toggle" title="Collapse / expand ([)">
         <span class="rt-ic">{{icon "chevron"}}</span><span class="ri-nm">Collapse</span>
       </button>
@@ -114,9 +121,26 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
     </div>
   </div>
 
-  <!-- message drawer (topic detail's table rows open here) -->
-  <div class="overlay" id="drawer-overlay" hidden data-drawer-backdrop>
-    <div class="drawer anim" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title"></div>
+  <!-- the keys: generated from the declared key map (keys.go), never typed here -->
+  <div class="overlay" id="help" hidden>
+    <div class="dialog help anim" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <div class="dialog-h"><h3 id="help-title">Keyboard shortcuts</h3></div>
+      <div class="help-b" tabindex="0" role="region" aria-label="Keys">
+        {{range keyGroups}}
+        <div class="help-g">
+          <div class="help-gh">{{.Scope}}</div>
+          {{range .Keys}}<div class="help-r"><span class="kbd">{{.Show}}</span><span class="help-l">{{.Label}}</span></div>{{end}}
+        </div>
+        {{end}}
+      </div>
+      <div class="dialog-f"><button type="button" class="btn btn-outline" id="help-close">Close</button></div>
+    </div>
+  </div>
+  <script type="application/json" id="keymap">{{keymapJSON}}</script>
+
+  <!-- message inspector (topic detail's table rows open here) -->
+  <div class="overlay" id="inspector-overlay" hidden data-inspector-backdrop>
+    <div class="inspector anim" id="inspector" role="dialog" aria-modal="true" aria-labelledby="inspector-title"></div>
   </div>
 
   <div class="toasts" id="toasts"></div>
@@ -127,11 +151,11 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
 
 {{/* ri = one rail item. Ct, if set, gets a live count via shell.js's refreshCounts. */}}
 {{define "ri"}}
-<a href="{{.P}}{{.URL}}" class="ri {{if .On}}on{{end}}" aria-label="{{.Name}}">
+<a href="{{.P}}{{.URL}}" class="ri {{if .On}}on{{end}}"{{if .On}} aria-current="page"{{end}}>
   <span class="ri-ic">{{icon .Glyph}}</span>
   <span class="ri-nm">{{.Name}}</span>
   {{if .Ct}}<span class="ri-ct" data-ct="{{.Ct}}"></span>{{end}}
-  <span class="ri-fly">{{.Name}}</span>
+  <span class="ri-fly" aria-hidden="true">{{.Name}}</span>
 </a>
 {{end}}
 
@@ -148,3 +172,8 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
   </div>
 </main>
 {{end}}
+
+{{/* neighbours: "Written by checkout-api, read by g-order-validator, schema subject
+     orders-value." One sentence of links, rendered from the neighbours graph
+     (graph.go). A subject opens in the inspector; the rest go to their pages. */}}
+{{define "neighbours"}}{{if .Neighbours}}<p class="neighbours" id="neighbours">{{range $i, $c := .Neighbours}}{{if $i}}, {{end}}{{$c.Verb}} {{range $c.Links}}{{.Sep}}<a class="mono" href="{{.URL}}"{{if .Open}} data-inspector-open hx-get="{{.Open}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"{{end}}>{{.Name}}</a>{{end}}{{end}}.</p>{{end}}{{end}}

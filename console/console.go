@@ -28,6 +28,9 @@ var templateFS embed.FS
 //go:embed static/*
 var staticFS embed.FS
 
+// defaultPrefix is where the console is mounted when nothing says otherwise.
+const defaultPrefix = "/_console"
+
 // Console is the web-UI http.Handler. Mount it on its own listener — Kafka's
 // wire protocol can't share a port with HTTP.
 type Console struct {
@@ -35,6 +38,7 @@ type Console struct {
 	reg         *registryClient     // nil when there is no schema registry to talk to.
 	traffic     TrafficSource       // nil when the broker's traffic is not available to this console.
 	metrics     ClientMetricsSource // nil when clients' own metrics are not available.
+	dock        DockSource          // nil: the dock is built from traffic, or not offered.
 	traces      traceJobs           // message-lineage scans, running and recent.
 	traceHeader string              // an extra record header that holds a trace id (Options.TraceHeader).
 	mux         *http.ServeMux
@@ -55,7 +59,7 @@ type Options struct {
 	// TLSConfig, if set, dials the broker over TLS with this trust config.
 	TLSConfig *tls.Config
 	// Prefix is the URL path the console is mounted under; defaults to
-	// "/_console".
+	// "/_console" (or DOZE_KAFKA_CONSOLE_PREFIX, when set).
 	Prefix string
 	// DisplayAddr is the bootstrap address pages SHOW clients (copy chips
 	// etc.) when Addr itself is not dialable by them — the embedded topology
@@ -78,6 +82,10 @@ type Options struct {
 	// membership changes. Nil, the Traffic section is not offered: the console cannot
 	// see the wire of a broker it is not part of.
 	Traffic TrafficSource
+	// Dock is what the wire dock under a topic, group or subject reads. Nil, it is
+	// built from Traffic (which can answer for a topic or a group); with neither, no
+	// dock is shown.
+	Dock DockSource
 	// TraceHeader is the name of a record header whose whole value is a trace id (a
 	// request id, a correlation id), found in addition to W3C traceparent and B3.
 	TraceHeader string
@@ -90,7 +98,13 @@ type Options struct {
 func New(opts Options) (*Console, error) {
 	prefix := opts.Prefix
 	if prefix == "" {
-		prefix = "/_console"
+		// DOZE_KAFKA_CONSOLE_PREFIX mounts the console elsewhere without a code
+		// change: the suites run once under a prefix that is not the default, to show
+		// nothing assumes it (like DOZE_KAFKA_CONSOLE_DEV below, a developer's hook).
+		prefix = os.Getenv("DOZE_KAFKA_CONSOLE_PREFIX")
+	}
+	if prefix == "" {
+		prefix = defaultPrefix
 	}
 	prefix = "/" + strings.Trim(prefix, "/")
 	if prefix == "/" {
@@ -115,6 +129,7 @@ func New(opts Options) (*Console, error) {
 	c.traffic = opts.Traffic
 	c.metrics = opts.ClientMetrics
 	c.traceHeader = strings.TrimSpace(opts.TraceHeader)
+	c.dock = opts.Dock
 	c.routes()
 	return c, nil
 }
@@ -159,13 +174,15 @@ func (c *Console) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// attacker) — that is the Host guard above.
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		if origin := r.Header.Get("Origin"); origin != "" && !originMatchesHost(origin, r.Host) {
-			http.Error(w, "cross-origin request refused", http.StatusForbidden)
+			c.refuse(w, Refusal{Kind: Denied, Source: SourceConsole, Status: http.StatusForbidden,
+				Message: "cross-origin request refused", Rule: "Refused by the console: a change must come from the console's own pages."})
 			return
 		}
 		// Browsers say where a request came from; a state change coming from
 		// another site is refused even if it somehow carries no Origin.
 		if site := r.Header.Get("Sec-Fetch-Site"); site == "cross-site" {
-			http.Error(w, "cross-site request refused", http.StatusForbidden)
+			c.refuse(w, Refusal{Kind: Denied, Source: SourceConsole, Status: http.StatusForbidden,
+				Message: "cross-site request refused", Rule: "Refused by the console: a change must come from the console's own pages."})
 			return
 		}
 	}
@@ -286,6 +303,18 @@ func templateFuncs(prefix string) template.FuncMap {
 			return u
 		},
 		"t": uiText,
+		// teach is the line under a field, read from the settings table by the
+		// record's kind and name (teaching.go).
+		"teach": teachLine,
+		// confirmOffset is the confirm of one row's Remove (confirms.go).
+		"confirmOffset": offsetDeleteConfirm,
+		"confirmURL":    func(id string, kv ...any) string { return confirmURLFor(prefix, id, kv...) },
+		// Keys of the inspector's selections, escaped for a query string.
+		"memberKey": func(group, member string) string { return url.QueryEscape(joinKey(group, member)) },
+		"eventKey": func(group string, seq uint64) string {
+			return url.QueryEscape(joinKey(group, strconv.FormatUint(seq, 10)))
+		},
+		"txnKey": func(id string) string { return url.QueryEscape(id) },
 		"dict": func(kv ...any) map[string]any {
 			m := make(map[string]any, len(kv)/2)
 			for i := 0; i+1 < len(kv); i += 2 {
@@ -295,11 +324,17 @@ func templateFuncs(prefix string) template.FuncMap {
 			}
 			return m
 		},
-		"list":      func(items ...any) []any { return items },
-		"sub":       func(a, b int) int { return a - b },
-		"ago":       ago,
-		"hasPrefix": strings.HasPrefix,
-		"hasSuffix": strings.HasSuffix,
+		"list": func(items ...any) []any { return items },
+		"sub":  func(a, b int) int { return a - b },
+		// when is the one formatter for a moment in time (timefmt.go); whenText is
+		// its plain text, for an attribute.
+		"when": when,
+		// the declared key map, for the help overlay and for shell.js (keys.go).
+		"keyGroups":  keyGroups,
+		"keymapJSON": keymapJSON,
+		"whenText":   whenText,
+		"hasPrefix":  strings.HasPrefix,
+		"hasSuffix":  strings.HasSuffix,
 		"refsJSON": func(refs any) string {
 			b, _ := json.Marshal(refs)
 			return string(b)
@@ -350,19 +385,4 @@ func humanBytes(n int) string {
 func trimFloat(f float64) string {
 	s := strconv.FormatFloat(f, 'f', 1, 64)
 	return strings.TrimSuffix(s, ".0")
-}
-
-// ago renders a compact relative time ("3m ago", "just now").
-func ago(t time.Time) string {
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		return strconv.Itoa(int(d.Minutes())) + "m ago"
-	case d < 24*time.Hour:
-		return strconv.Itoa(int(d.Hours())) + "h ago"
-	default:
-		return strconv.Itoa(int(d.Hours()/24)) + "d ago"
-	}
 }

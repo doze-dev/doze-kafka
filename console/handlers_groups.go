@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"maps"
 	"net/http"
 	"sort"
 	"strconv"
@@ -184,6 +185,7 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 	return map[string]any{
 		"Timeline": timeline, "HasTimeline": c.traffic != nil, "Group": detail, "Members": members, "Offsets": rows, "TotalLag": totalLag, "AnyAhead": anyAhead,
 		"Topics":    offsetTopics(rows),
+		"Confirm":   groupConfirms(id, rows),
 		"CanAct":    detail.State == "Empty" && len(detail.Members) == 0,
 		"NoCommits": len(offsets) == 0,
 		"Hash":      fmt.Sprintf("%x", h.Sum64()),
@@ -199,6 +201,11 @@ func (c *Console) groupDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	list, _ := c.be.ListGroups(r.Context())
 	data["List"], data["Page"], data["Title"] = list, "groups", id
+	maps.Copy(data, c.dockData(DockFilter{Group: id}))
+	data["DockToggle"] = true // the group page has no pause control of its own.
+	g := NewGraph()
+	g.AddGroupReads(id, data["Topics"].([]string))
+	data["Neighbours"] = c.neighbourClauses(g, NodeGroup, id)
 	c.render(w, r, "group_detail", data)
 }
 

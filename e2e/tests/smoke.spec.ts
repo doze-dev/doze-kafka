@@ -12,7 +12,8 @@ test('the console shell renders and the broker is seeded', async ({ page, reques
   await expect(page.locator('.rail')).toBeVisible();
   await expect(page.locator('.rail a.on')).toHaveText(/Topics/);
   await expect(page.locator('.listpane .li[data-name="seed-orders"]')).toBeVisible();
-  const health = await request.get('/healthz');
+  // /healthz sits at the origin, whatever prefix the console is mounted under.
+  const health = await request.get(new URL('/healthz', page.url()).toString());
   expect(health.status()).toBe(200);
 });
 

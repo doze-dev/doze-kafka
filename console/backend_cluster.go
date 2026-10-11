@@ -42,7 +42,7 @@ type TxnRow struct {
 	State      string
 	ProducerID int64
 	Epoch      int16
-	Age        string // since it began.
+	Began      time.Time // when it began; zero when the broker did not say.
 	Timeout    string
 	Partitions []string // topic-partition, as the transaction has written to them.
 }
@@ -135,7 +135,7 @@ func (b *backend) openTransactions(ctx context.Context) []TxnRow {
 		row := TxnRow{ID: s.TransactionalID, State: s.State, ProducerID: s.ProducerID, Epoch: s.ProducerEpoch,
 			Timeout: (time.Duration(s.TimeoutMillis) * time.Millisecond).String()}
 		if s.StartTimestamp > 0 {
-			row.Age = time.Since(time.UnixMilli(s.StartTimestamp)).Round(time.Second).String()
+			row.Began = time.UnixMilli(s.StartTimestamp)
 		}
 		for _, t := range s.Topics {
 			for _, p := range t.Partitions {

@@ -148,7 +148,7 @@ func TestEveryMutationRouteIsGuardedAndFailsCleanly(t *testing.T) {
 		foreign.Host = "127.0.0.1:9093"
 		foreign.Header.Set("Origin", "http://evil.example")
 		rec := httptest.NewRecorder()
-		c.ServeHTTP(rec, foreign)
+		serveInto(t, c, rec, foreign)
 		if rec.Code != http.StatusForbidden {
 			t.Errorf("POST %s from a foreign origin = %d, want 403", path, rec.Code)
 		}
@@ -166,7 +166,7 @@ func TestEveryMutationRouteIsGuardedAndFailsCleanly(t *testing.T) {
 }
 
 // A bad query string is the caller's mistake, and says so.
-func TestDrawerRefusesBadCoordinates(t *testing.T) {
+func TestInspectorRefusesBadCoordinates(t *testing.T) {
 	c := newTestConsole(t)
 	topicWith(t, c, "t", 1, 2)
 	for _, q := range []string{"", "?partition=0", "?partition=0&offset=abc", "?partition=0&offset=-5", "?partition=x&offset=0", "?partition=-1&offset=0"} {

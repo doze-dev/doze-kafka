@@ -1,0 +1,35 @@
+{{/* wire_dock: the live requests that touched one topic, group or subject. It is
+     a polled region like the tape (data-live), paused with the page's pause control
+     (a page that has none, the group page, gets one here), and it
+     shows the shell's "not updating" state when its poll cannot be answered. A row
+     opens the request in the inspector. */}}
+{{define "wire_dock"}}
+{{if .HasDock}}
+<section class="wiredock" id="wire-dock" aria-label="Requests on the wire for {{.DockFilter.Topic}}{{.DockFilter.Group}}{{.DockFilter.Subject}}" data-live="{{.Prefix}}/dock?{{.DockQuery}}{{if .DockToggle}}&amp;t=1{{end}}" data-hash="{{.DockHash}}" data-live-ms="3000">
+  <div class="sec-title">On the wire
+    <span class="sz">the latest requests that touched this {{if .DockFilter.Topic}}topic{{else if .DockFilter.Group}}group{{else}}subject{{end}}</span>
+    {{if .DockToggle}}<button type="button" class="livetoggle" data-live-toggle aria-pressed="false" title="Pause live updates"><span class="livedot" aria-hidden="true"></span><span class="livetoggle-l">Live</span></button>
+    {{else}}<span class="livedot inline" aria-hidden="true"></span>{{end}}
+  </div>
+  {{if not .DockKnown}}
+  <div class="honest">{{icon "info"}}<div>The registry's own requests are not recorded yet, so there is nothing to show for a subject here.</div></div>
+  {{else if .DockRows}}
+  <div class="tbl-wrap">
+    <table class="tbl tf-table" id="wire-dock-table"><thead><tr><th>Time</th><th>Client</th><th>Request</th><th>Detail</th><th>Result</th></tr></thead>
+      <tbody>{{range .DockRows}}<tr id="wd-{{.ID}}" {{if .Kind}}tabindex="0" role="button" data-inspector-open
+          hx-get="{{$.Prefix}}/inspect/{{.Kind}}?key={{.ID}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"{{end}}>
+        <td class="mono nw">{{when .Time "clockms"}}{{if gt .Count 1}} <span class="tf-count">×{{.Count}}</span>{{end}}</td>
+        <td class="mono nw">{{.Client}}</td>
+        <td class="mono nw">{{.Request}}</td>
+        <td class="dim">{{.Detail}}</td>
+        <td>{{if .Error}}<span class="badge state-dead" title="The response carried this error">{{.Error}}</span>{{else}}<span class="dim">ok</span>{{end}}</td>
+      </tr>{{end}}</tbody>
+    </table>
+  </div>
+  {{if .DockMore}}<div class="tbl-foot"><span>Older requests are on the <a href="{{.Prefix}}/traffic?{{.DockQuery}}">Traffic page</a>.</span></div>{{end}}
+  {{else}}
+  <div class="honest">{{icon "info"}}<div>No request has touched this since the broker started.</div></div>
+  {{end}}
+</section>
+{{end}}
+{{end}}

@@ -51,9 +51,8 @@ type traceHit struct {
 	Consumers []traceConsumer
 
 	// Layout, filled in once the scan is done.
-	TimeStr string
-	Delta   string
-	Left    int // percent along the time axis.
+	Delta string
+	Left  int // percent along the time axis.
 }
 
 // traceConsumer says whether a group has read past a record.
@@ -423,7 +422,6 @@ func (c *Console) finishTrace(ctx context.Context, j *traceJob, hits []traceHit)
 		span := last.Sub(first)
 		for i := range hits {
 			h := &hits[i]
-			h.TimeStr = h.Time.Format("15:04:05.000")
 			h.Delta = "+" + shortDuration(h.Time.Sub(first))
 			if i == 0 {
 				h.Delta = "start"

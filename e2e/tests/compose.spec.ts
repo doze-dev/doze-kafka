@@ -13,8 +13,8 @@ test('the composer sends text, JSON, a key and headers', async ({ page, createTo
   await waitForToast();
   await waitForLive((t) => t.includes('order-1'));
   await page.locator('tr[id^="msg-"]').first().click();
-  await expect(page.locator('#drawer')).toContainText('source');
-  await expect(page.locator('#drawer')).toContainText('e2e');
+  await expect(page.locator('#inspector')).toContainText('source');
+  await expect(page.locator('#inspector')).toContainText('e2e');
 });
 
 test('invalid JSON is flagged as it is typed, and a null value needs no body', async ({ page, createTopic, uniqueName, setEditor, waitForToast }) => {

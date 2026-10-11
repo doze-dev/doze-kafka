@@ -147,6 +147,11 @@ func (c *Console) routeTable() []routeRow {
 		get("/cluster", specShell, "the cluster page", c.cluster),
 		get("/access", specAccess, "stored ACLs, read-only", c.access),
 
+		// The shell: the inspector, the wire dock and a confirm's sentence.
+		get("/inspect/{kind}", "inspector.spec.ts", "the inspector's body for one selection", c.inspectRoute),
+		get("/dock", specTopics, "the wire dock's rows for one topic or group", c.dockLive),
+		get("/confirm/{id}", specTopics, "a confirm's sentence, measured when the button is pressed", c.confirmLive),
+
 		// The resource index for the command palette, and the rail's counts.
 		get("/api/palette", specShell, "the palette's catalogue", c.apiPalette),
 		get("/api/counts", specShell, "the rail's counts", c.apiCounts),

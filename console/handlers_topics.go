@@ -94,6 +94,9 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 		"Consumers": c.topicConsumers(ctx, name),
 		"Config":    newConfigView(detail.Config),
 	}
+	data["Confirm"] = c.topicConfirms(ctx, name, int(detail.Partitions))
+	maps.Copy(data, c.dockData(DockFilter{Topic: name}))
+	data["Neighbours"] = c.neighbourClauses(c.topicGraph(ctx, name, data["Consumers"].([]consumerRow)), NodeTopic, name)
 	if q, all, before, asked := searchParams(r); asked {
 		// A search replaces the tape and the live table with what it found.
 		found, err := c.searchTopic(ctx, name, partition, detail.Partitions, q, all, before)
@@ -247,7 +250,7 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m := msgs[0]
-	// Neighbouring records, for the drawer's older/newer buttons.
+	// Neighbouring records, for the inspector's older/newer buttons.
 	older, newer := int64(-1), int64(-1)
 	if earliest, latest, err := c.be.PartitionOffsets(r.Context(), name, partition); err == nil {
 		if offset-1 >= earliest {
@@ -262,7 +265,7 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 	keyV := c.readThroughRegistry(r.Context(), name, newBytesView(m.Key, m.Key == nil), m.Key)
 	data := map[string]any{
 		"Topic": name, "Partition": partition, "Msg": m, "Older": older, "Newer": newer,
-		"TimeStr": m.Timestamp.Format(time.RFC3339), "Key": keyV, "Value": valueV, "Headers": hdrs,
+		"Key": keyV, "Value": valueV, "Headers": hdrs,
 		// "Send again" is done by the server from the stored record, so it is exact
 		// for any bytes. These are for "Edit a copy": the composer is prefilled with
 		// the record as text (or base64 when it is not text), as stored rather than
@@ -281,7 +284,24 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 	if valueV.Schema != nil {
 		data["EditValue"], data["EditValueEnc"], data["EditSchema"] = valueV.Text, "text", valueV.Schema.Subject
 	}
-	c.partial(w, "message_drawer", data)
+	// A record found by a search across partitions has no single partition to put
+	// in the address; the page says which by whether it carries a message base.
+	nav := func(label, glyph, word string, off int64) inspectorNav {
+		n := inspectorNav{Label: label, Glyph: glyph, Disabled: off < 0}
+		if off >= 0 {
+			n.Title = fmt.Sprintf("%s (offset %d)", word, off)
+			n.URL = fmt.Sprintf("%s/message?partition=%d&offset=%d", c.topicURL(name), partition, off)
+		} else {
+			n.Title = word + " (offset )"
+		}
+		return n
+	}
+	c.inspect(w, inspectorView{
+		Kind: KindMessage, Key: strconv.FormatInt(m.Offset, 10),
+		Title: fmt.Sprintf("P%d · offset %d", partition, m.Offset), Sub: name,
+		Nav:  []inspectorNav{nav("Older record", "chevron-up", "Older", older), nav("Newer record", "chevron-down", "Newer", newer)},
+		Body: data,
+	})
 }
 
 // topicResend produces an exact copy of a stored record: the same key, value and
@@ -352,7 +372,7 @@ func editField(v bytesView) string {
 	case v.Null || v.Empty:
 		return ""
 	case v.Binary, v.Schema != nil:
-		return v.B64 // a decoded value is edited as JSON; that is arranged where the drawer is built.
+		return v.B64 // a decoded value is edited as JSON; that is arranged where the inspector is built.
 	default:
 		return v.Raw
 	}
@@ -436,8 +456,6 @@ type msgView struct {
 	Offset     int64
 	Partition  int32
 	Timestamp  time.Time
-	TimeStr    string
-	TimeFull   string // full RFC 3339 timestamp, for the hover title.
 	Key        bytesView
 	Value      bytesView
 	Headers    []MessageHeader
@@ -653,7 +671,7 @@ func tickHeight(size int) int {
 }
 
 // topicMessageRaw serves a record's key or value as the exact bytes, for a value
-// too large to read in the drawer or one that is binary.
+// too large to read in the inspector or one that is binary.
 func (c *Console) topicMessageRaw(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	partition, offset, err := recordCoordinates(r.URL.Query().Get("partition"), r.URL.Query().Get("offset"))

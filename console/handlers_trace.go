@@ -102,7 +102,9 @@ func (c *Console) traceData(j *traceJob) map[string]any {
 		"Hash": fmt.Sprintf("%x", h.Sum64()),
 	}
 	if j.err != nil {
-		data["Err"] = j.err.Error()
+		f := refusalFor(j.err)
+		f.Message = "The scan failed: " + f.Message
+		data["ScanFailed"], data["Refusal"] = true, f
 	}
 	if !running && !j.finished.IsZero() {
 		data["Took"] = shortDuration(j.finished.Sub(j.started))
@@ -119,7 +121,7 @@ func (c *Console) tracePage(w http.ResponseWriter, r *http.Request) {
 	}
 	job := c.startTrace(id, anchor, at, window)
 	data := c.traceData(job)
-	data["Trace"], data["AtStr"], data["WindowKey"] = id, at.Format("15:04:05"), windowKey
+	data["Trace"], data["At"], data["WindowKey"] = id, at, windowKey
 	for _, win := range traceWindows {
 		if win.Key == windowKey {
 			data["WindowLabel"] = win.Label

@@ -203,21 +203,19 @@ func newConfigView(entries []ConfigEntry) configView {
 	return v
 }
 
-// refusal turns a broker's refusal into an error for the person at the form: the
-// broker's own explanation when it gave one for something they can correct, the
-// Kafka error otherwise.
+// refusal turns a broker's refusal into an error that keeps its code and the
+// broker's own ErrorMessage (E3): the Refusal shown names the Kafka error and says
+// what the broker said about this request.
 func refusal(code int16, msg *string) error {
-	err := kerr.ErrorForCode(code)
+	err := kerr.TypedErrorForCode(code)
 	if err == nil {
 		return nil
 	}
-	if msg != nil && *msg != "" {
-		switch code {
-		case kerr.InvalidConfig.Code, kerr.InvalidTopicException.Code, kerr.InvalidPartitions.Code, kerr.InvalidRequest.Code:
-			return badInput("%s", *msg)
-		}
+	r := &kafkaRefusal{Err: err}
+	if msg != nil {
+		r.Msg = *msg
 	}
-	return err
+	return r
 }
 
 // AlterTopicConfig sets and unsets a topic's own settings in one change.

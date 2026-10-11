@@ -23,7 +23,7 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   switch partition and show per-partition counts.
 - A **message table** that follows the log live. Pause it with the toggle. Click a
   row for the full record
-  in a drawer: key, value, headers, timestamp, size. The drawer's address is in the
+  in a inspector: key, value, headers, timestamp, size. The inspector's address is in the
   URL, so a refresh keeps it open and you can share it. Older/newer buttons walk
   the log.
 - Records are shown **as they are**. Valid UTF-8 appears as text (JSON is
@@ -77,7 +77,7 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   its groups' committed offsets, so a group that had read everything carries on with
   the next record. **Delete** removes the topic. Both ask first, naming the action.
 
-- **Follow this message**, in the drawer of a record that carries a trace id
+- **Follow this message**, in the inspector of a record that carries a trace id
   (`traceparent`, B3, or the header named by `--trace-header`): every record of the
   same trace in every topic, in order, with the groups that have read each. See
   [Observability](observability.md).
@@ -135,7 +135,7 @@ Where a topic has `<topic>-key` or `<topic>-value` subjects, its page links them
 
 **Records written by a registry-aware serializer are shown as what they mean.** A value
 that starts with the registry's wire-format header (a zero byte and a schema id) is read
-with that schema, in the table and in the drawer, which names the schema and links its
+with that schema, in the table and in the inspector, which names the schema and links its
 version. The Hex and Base64 views still show the stored bytes, *Send again* still
 resends them exactly, and a value whose schema the registry no longer has is shown as
 binary, as before. *Edit a copy* of a decoded record brings back the JSON and chooses
@@ -160,28 +160,53 @@ segment and index sizes. Settings Kafka has no name for (the data directory, the
 interval, the emulated version) are not there; `doze-kafka config print` shows those.
 It links to [what is not implemented](limitations.md).
 
+## The inspector
+
+Selecting a record, a request, a client, a group member, a schema subject, an open
+transaction or a group event opens it in the inspector at the right. All seven look
+the same: a title, a body and a close control. The selection is in the address
+(`?open=`), so a refresh or a shared link reopens it, Back returns to the previous
+selection (or to none), and `Esc` closes it and puts focus back on the row.
+
+## The wire dock and neighbours
+
+A topic or group page ends with the requests that touched it, live, with the same
+pause control as the tape. Under a topic's title one sentence says who writes it, who
+reads it and which schema subject describes it ("Written by checkout-api, read by
+g-order-validator, schema subject orders-value"), each name a link.
+
 ## Keyboard
+
+Press `?` for the list. It is generated from the one table the console binds its keys
+from, so it is always the keys that work.
 
 | Key | Does |
 |---|---|
-| `⌘K` / `Ctrl+K` | Command palette: jump to any topic, group or view |
+| `⌘K` / `Ctrl+K` | Command palette: any topic, group, subject or view, and actions (themes, rail, pause, help) |
+| `?` | Show the keys |
 | `/` | Focus the list filter |
 | `j` / `k`, `Enter` | Move through the list and open |
-| `c` | New topic |
+| `c` | New topic, or new schema |
 | `m` | Open the composer |
+| `p` | Pause or resume live updates |
 | `[` | Collapse or expand the rail |
 | `⌘Enter` / `Ctrl+Enter` | Send, from the composer |
-| `Esc` | Close a dialog or the drawer |
+| `Esc` | Close a dialog or the inspector |
 
 Single keys act only when you are not typing in a field, with no modifier held, and
 no dialog open.
 
 ## Appearance
 
-Light and dark themes, or follow the system (the switch is at the top right). The
+Light, dark and high-contrast themes, or follow the system (dark, or a request for
+more contrast; the switch is at the top right). Every text and background pair is
+measured in all three, and the ratios are in `console/testdata/contrast.txt`. The
 fonts (IBM Plex Sans and Mono) are part of the binary, so the console looks the same
 offline. It works down to phone widths: below about 640px the list and the detail
 become two screens.
+
+Times are shown in your browser's zone, with the zone and the UTC instant on hover;
+"3m ago" keeps counting on a paused page.
 
 ## Safety
 
@@ -189,11 +214,24 @@ become two screens.
   addresses, `*.doze`, and anything you add with `--console-allow-host` — and
   refuses state-changing requests from other origins. That keeps a web page open in
   your browser from reaching it through DNS rebinding or a forged form.
+- `DOZE_KAFKA_CONSOLE_PREFIX` mounts it somewhere other than `/_console` (behind a
+  reverse proxy, or to prove in a test that nothing assumes the default).
 - It is plain HTTP with no login of its own. Bind it beyond loopback only on a
   network you trust.
 
 ## Errors
 
-When the broker is unreachable the console says so, in the page, and keeps the live
-views waiting rather than flashing errors. A topic or group that does not exist gives
-a real 404 page with near-miss suggestions ("did you mean `orders`?").
+Every error is one of four words, each with its own colour: **Refused** (real Kafka
+would say no too), **Denied** (an ACL or a login decided), **Not implemented** (this
+broker does not do it) and **Failed** (the broker is unhappy). It names what said no:
+the Kafka error name, the registry's `error_code`, or "by the console" for a rule of
+the console's own, with the broker's own explanation where it gave one.
+
+When the broker is unreachable the live pill at the top right says **Not connected**
+once, with the last time anything was heard and one Retry; what was on screen stays,
+dimmed, and comes back by itself when the broker does. A topic or group that does not
+exist gives a real 404 page with near-miss suggestions ("did you mean `orders`?").
+
+Every destructive action confirms, and the confirm says what goes with it, measured
+at the moment you press the button: "deletes its 3 partitions and 12 records, and the
+committed offsets of 2 groups".

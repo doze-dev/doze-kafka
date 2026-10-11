@@ -23,8 +23,11 @@ func liveUnchanged(w http.ResponseWriter, r *http.Request, hash string) bool {
 type paletteEntry struct {
 	S string `json:"s"`
 	N string `json:"n"`
-	U string `json:"u"`
+	U string `json:"u,omitempty"`
 	K string `json:"k"`
+	// A names something the console does in the browser (a theme, the rail, pause,
+	// help) instead of going to an address; shell.js runs it.
+	A string `json:"a,omitempty"`
 }
 
 // apiPalette is the whole palette catalogue: the console's own views and actions
@@ -32,31 +35,35 @@ type paletteEntry struct {
 func (c *Console) apiPalette(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	out := []paletteEntry{
-		{"views", "Topics", c.prefix + "/topics", "view"},
-		{"views", "Consumer groups", c.prefix + "/groups", "view"},
-		{"views", "Cluster", c.prefix + "/cluster", "view"},
-		{"views", "Access", c.prefix + "/access", "view"},
-		{"topics", "Create topic", c.newTopicURL(), "action"},
+		{S: "views", N: "Topics", U: c.prefix + "/topics", K: "view"},
+		{S: "views", N: "Consumer groups", U: c.prefix + "/groups", K: "view"},
+		{S: "views", N: "Cluster", U: c.prefix + "/cluster", K: "view"},
+		{S: "views", N: "Access", U: c.prefix + "/access", K: "view"},
+		{S: "topics", N: "Create topic", U: c.newTopicURL(), K: "action"},
+	}
+	// What the console does in the browser, declared once with the keys (keys.go).
+	for _, a := range clientActions {
+		out = append(out, paletteEntry{S: "views", N: a.Label, K: "action", A: a.ID})
 	}
 	if c.traffic != nil {
-		out = append(out, paletteEntry{"views", "Traffic", c.prefix + "/traffic", "view"})
+		out = append(out, paletteEntry{S: "views", N: "Traffic", U: c.prefix + "/traffic", K: "view"})
 	}
 	if c.reg != nil {
-		out = append(out, paletteEntry{"views", "Schemas", schemasPath(c.prefix), "view"}, paletteEntry{"schemas", "Register schema", newSchemaPath(c.prefix), "action"})
+		out = append(out, paletteEntry{S: "views", N: "Schemas", U: schemasPath(c.prefix), K: "view"}, paletteEntry{S: "schemas", N: "Register schema", U: newSchemaPath(c.prefix), K: "action"})
 		if subjects, err := c.reg.Subjects(ctx); err == nil {
 			for _, s := range subjects {
-				out = append(out, paletteEntry{"schemas", s.Name, c.schemaURL(s.Name), "schema"})
+				out = append(out, paletteEntry{S: "schemas", N: s.Name, U: c.schemaURL(s.Name), K: "schema"})
 			}
 		}
 	}
 	if topics, err := c.be.ListTopics(ctx); err == nil {
 		for _, t := range topics {
-			out = append(out, paletteEntry{"topics", t.Name, c.topicURL(t.Name), "topic"})
+			out = append(out, paletteEntry{S: "topics", N: t.Name, U: c.topicURL(t.Name), K: "topic"})
 		}
 	}
 	if groups, err := c.be.ListGroups(ctx); err == nil {
 		for _, g := range groups {
-			out = append(out, paletteEntry{"groups", g.ID, c.groupURL(g.ID), "group"})
+			out = append(out, paletteEntry{S: "groups", N: g.ID, U: c.groupURL(g.ID), K: "group"})
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")

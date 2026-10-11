@@ -4,7 +4,7 @@
       <div>
         <h1 class="page-title">Trace</h1>
         <div class="idchips">{{template "copychip" dict "Label" "trace id" "Value" .Trace}}</div>
-        <p class="lede">Every record, in every topic, that carries this trace id and was written within {{.WindowLabel}} of {{.AtStr}}.</p>
+        <p class="lede">Every record, in every topic, that carries this trace id and was written within {{.WindowLabel}} of {{when .At "clock"}}.</p>
       </div>
       <div class="idband-acts">
         <span class="dim">Look across</span>
@@ -26,8 +26,8 @@
 {{/* trace_live is the polled unit: progress while the scan runs, the trail when it is done. */}}
 {{define "trace_live"}}
 <div id="trace-live" data-job="{{.JobID}}" data-hash="{{.Hash}}" {{if .Running}}data-live="{{.Prefix}}/trace/live?job={{.JobID}}" data-live-ms="700"{{end}}>
-  {{if .Err}}
-  <div class="honest warn" role="alert">{{icon "alert"}}<div>The scan failed: {{.Err}}</div></div>
+  {{if .ScanFailed}}
+  {{template "refusal" .}}
   {{else if .Running}}
   <div class="tr-status" role="status">
     <span class="spinner" aria-hidden="true"></span>
@@ -54,7 +54,7 @@
   {{if .Hits}}
   <ol class="tracelist" id="trace-list">
     {{range .Hits}}<li class="tr{{if .Anchor}} tr-anchor{{end}}">
-      <span class="tr-t mono">{{.TimeStr}} <span class="dim">{{.Delta}}</span></span>
+      <span class="tr-t mono">{{when .Time "clockms"}} <span class="dim">{{.Delta}}</span></span>
       <span class="tr-bar" aria-hidden="true" style="--at:{{.Left}}%"><i></i></span>
       <span class="tr-loc mono"><a href="{{topicURL .Topic}}?partition={{.Partition}}&jump={{.Offset}}">{{.Topic}}</a> · P{{.Partition}} · offset {{.Offset}}{{if .Anchor}} <span class="badge state-stable">this message</span>{{end}}</span>
       <span class="tr-meta mono">{{if .Key}}key {{.Key}}{{else}}<span class="dim">no key</span>{{end}}{{if .Ref.Span}} · span {{.Ref.Span}}{{end}}{{if .Ref.Parent}} · parent {{.Ref.Parent}}{{end}}</span>

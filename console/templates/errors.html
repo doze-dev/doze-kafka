@@ -1,9 +1,17 @@
+{{/* refusal is the one partial every console error is rendered through: its kind
+     (Refused, Denied, Not implemented, Failed), the name of what said no, the
+     message and the rule. It keeps the .err class so a control's error slot and
+     the toast read it the same way they always did. */}}
+{{define "refusal"}}<div class="err refusal refusal-{{.Refusal.Kind}}" role="alert" data-refusal-kind="{{.Refusal.Kind}}" data-refusal-source="{{.Refusal.Source}}"{{if .Refusal.Name}} data-refusal-name="{{.Refusal.Name}}"{{end}}><span class="refusal-kind">{{.Refusal.Kind.Word}}</span>{{if .Refusal.Name}} <span class="refusal-name mono">{{.Refusal.Name}}</span>{{else if eq .Refusal.Source "console"}} <span class="refusal-name">by the console</span>{{end}} <span class="refusal-msg">{{.Refusal.Message}}</span>{{if .Refusal.Rule}} <span class="refusal-rule dim">{{.Refusal.Rule}}</span>{{end}}</div>{{end}}
+
 {{define "error_page"}}{{template "shell_top" .}}
   <main class="detail" id="detail"><div class="detail-inner errorwrap">
-    <div class="errorpanel {{.Kind}}" role="alert">
-      <div class="err-ic">{{if eq .Kind "notfound"}}{{icon "search"}}{{else}}{{icon "info"}}{{end}}</div>
+    <div class="errorpanel {{.Kind}}" role="alert" data-refusal-kind="{{.Refusal.Kind}}"{{if .Refusal.Name}} data-refusal-name="{{.Refusal.Name}}"{{end}}>
+      <div class="err-ic">{{if .Refusal.NotFound}}{{icon "search"}}{{else}}{{icon "info"}}{{end}}</div>
       <h1>{{.Heading}}</h1>
+      <p class="refusal-line"><span class="refusal-kind refusal-{{.Refusal.Kind}}">{{.Refusal.Kind.Word}}</span>{{if .Refusal.Name}} <span class="refusal-name mono">{{.Refusal.Name}}</span>{{else if eq .Refusal.Source "console"}} <span class="refusal-name">by the console</span>{{end}}</p>
       <p>{{.Message}}</p>
+      {{if .Refusal.Rule}}<p class="refusal-rule">{{.Refusal.Rule}}</p>{{end}}
       {{if .Suggestions}}
       <div class="didyoumean">
         <span class="dim">Did you mean</span>

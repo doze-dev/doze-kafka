@@ -116,28 +116,28 @@ func TestProduceCarriesBinaryNullAndEmptyExactly(t *testing.T) {
 	}
 }
 
-func drawerFor(t *testing.T, c *Console, offset string) string {
+func inspectorFor(t *testing.T, c *Console, offset string) string {
 	t.Helper()
 	rec := req(t, c, "GET", "/_console/topics/m/message?partition=0&offset="+offset, nil)
 	if rec.Code != 200 {
-		t.Fatalf("drawer %s: %d %s", offset, rec.Code, rec.Body)
+		t.Fatalf("inspector %s: %d %s", offset, rec.Code, rec.Body)
 	}
 	return rec.Body.String()
 }
 
-func TestDrawerShowsBinaryReadablyAndOffersTheBytes(t *testing.T) {
+func TestInspectorShowsBinaryReadablyAndOffersTheBytes(t *testing.T) {
 	c := newTopicWithConsole(t)
 	bin := bytes.Repeat([]byte{0x00, 0xff, 0x41, 0x42}, 8)
 	produceForm(t, c, "m", url.Values{"value": {base64.StdEncoding.EncodeToString(bin)}, "value_enc": {"base64"}})
 
-	d := drawerFor(t, c, "0")
+	d := inspectorFor(t, c, "0")
 	for _, want := range []string{"32 B", "binary", "Hex", "Base64", "00000000  00 ff 41 42", "|..AB..AB", base64.StdEncoding.EncodeToString(bin), "Download value"} {
 		if !strings.Contains(d, want) {
-			t.Errorf("the drawer for a binary value is missing %q", want)
+			t.Errorf("the inspector for a binary value is missing %q", want)
 		}
 	}
 	if strings.Contains(d, "�") {
-		t.Error("the drawer shows replacement characters")
+		t.Error("the inspector shows replacement characters")
 	}
 
 	// Download is the exact bytes, as an attachment, not sniffed as HTML.
@@ -153,14 +153,14 @@ func TestDrawerShowsBinaryReadablyAndOffersTheBytes(t *testing.T) {
 	}
 }
 
-func TestDrawerSaysTombstoneAndEmpty(t *testing.T) {
+func TestInspectorSaysTombstoneAndEmpty(t *testing.T) {
 	c := newTopicWithConsole(t)
 	produceForm(t, c, "m", url.Values{"key": {"k"}, "tombstone": {"1"}})
 	produceForm(t, c, "m", url.Values{"key": {"k"}, "value": {""}})
-	if d := drawerFor(t, c, "0"); !strings.Contains(d, "null — a tombstone") || !strings.Contains(d, "has a null value") {
+	if d := inspectorFor(t, c, "0"); !strings.Contains(d, "null — a tombstone") || !strings.Contains(d, "has a null value") {
 		t.Error("a tombstone should be called one")
 	}
-	if d := drawerFor(t, c, "1"); !strings.Contains(d, ">empty<") && !strings.Contains(d, "has an empty value") {
+	if d := inspectorFor(t, c, "1"); !strings.Contains(d, ">empty<") && !strings.Contains(d, "has an empty value") {
 		t.Error("an empty value should be called empty, not null")
 	}
 }
@@ -178,9 +178,9 @@ func TestSendAgainReproducesARecordByteForByte(t *testing.T) {
 		"headers": {`[{"k":"trace","v":"abc"},{"k":"blob","v":"//4A","b64":true}]`},
 	})
 
-	// Read the drawer's resend attributes exactly as the browser would...
+	// Read the inspector's resend attributes exactly as the browser would...
 	attrs := map[string]string{}
-	for _, m := range dataAttr.FindAllStringSubmatch(drawerFor(t, c, "0"), -1) {
+	for _, m := range dataAttr.FindAllStringSubmatch(inspectorFor(t, c, "0"), -1) {
 		attrs[m[1]] = html.UnescapeString(m[2])
 	}
 	if attrs["value-enc"] != "base64" || attrs["key-enc"] != "text" || attrs["key"] != "order-7" {
@@ -209,7 +209,7 @@ func TestSendAgainReproducesARecordByteForByte(t *testing.T) {
 	// A tombstone resends as a tombstone.
 	produceForm(t, c, "m", url.Values{"key": {"k"}, "tombstone": {"1"}})
 	tomb := map[string]string{}
-	for _, m := range dataAttr.FindAllStringSubmatch(drawerFor(t, c, "2"), -1) {
+	for _, m := range dataAttr.FindAllStringSubmatch(inspectorFor(t, c, "2"), -1) {
 		tomb[m[1]] = html.UnescapeString(m[2])
 	}
 	if tomb["tombstone"] != "1" {

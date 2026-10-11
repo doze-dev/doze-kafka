@@ -1,4 +1,37 @@
 import { test, expect } from '../fixtures/console';
+import type { Page } from '@playwright/test';
+
+/** What sticks out past the viewport without a scroller of its own, and how far the document itself scrolls sideways. */
+async function overflow(page: Page) {
+  return page.evaluate(() => {
+    const vw = window.innerWidth;
+    const stray = Array.from(document.querySelectorAll('body *')).filter((e) => {
+      const r = e.getBoundingClientRect();
+      if (r.width === 0 || r.right <= vw + 1 || (e as HTMLElement).offsetParent === null) return false;
+      for (let p = e.parentElement; p; p = p.parentElement) { const o = getComputedStyle(p).overflowX; if (o === 'auto' || o === 'scroll' || o === 'hidden') return false; }
+      return true;
+    }).slice(0, 3).map((e) => e.className || e.tagName);
+    return { doc: document.documentElement.scrollWidth - vw, stray };
+  });
+}
+
+// Each section's home page at the three widths the design draws: 1440, 960 and 390.
+// (The two narrower ones are the ones that can break; 1440 is every other spec.)
+const HOMES = ['topics', 'groups', 'schemas', 'traffic', 'cluster', 'access'];
+for (const width of [960, 390]) {
+  test(`every section's home page fits at ${width}px, in every theme`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    for (const theme of ['light', 'dark', 'contrast']) {
+      await page.addInitScript((t) => { try { localStorage.setItem('theme', t); } catch { /* private window */ } }, theme);
+      for (const path of HOMES) {
+        await page.goto(path);
+        await page.waitForTimeout(150);
+        await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+        expect(await overflow(page), `${path} at ${width}px in the ${theme} theme`).toEqual({ doc: 0, stray: [] });
+      }
+    }
+  });
+}
 
 // Below ~640px the list and the detail become two screens; nothing may need a
 // sideways scroll at 420 or 360px.

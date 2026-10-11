@@ -121,23 +121,23 @@ test('a topic links its schema, and its records are shown as the JSON they mean'
   await expect(row.locator('.cell-val')).toContainText('"note"');
   await expect(row.locator('.cell-val')).not.toHaveClass(/binary/);
   await page.locator('#msg-0').click();
-  const drawer = page.locator('#drawer');
-  await expect(drawer).toContainText('"kind"');
-  await expect(drawer).toContainText('"created"');
-  await expect(drawer.locator('.schema-tag')).toContainText('Avro · schema');
-  await expect(drawer.locator('.schema-tag a')).toContainText('seed-events-value v1');
+  const inspector = page.locator('#inspector');
+  await expect(inspector).toContainText('"kind"');
+  await expect(inspector).toContainText('"created"');
+  await expect(inspector.locator('.schema-tag')).toContainText('Avro · schema');
+  await expect(inspector.locator('.schema-tag a')).toContainText('seed-events-value v1');
   // The bytes are still there to read.
-  await drawer.getByRole('button', { name: 'Hex', exact: true }).click();
-  await expect(drawer.locator('.hexbox')).toContainText('00 00 00 00');
+  await inspector.getByRole('button', { name: 'Hex', exact: true }).click();
+  await expect(inspector.locator('.hexbox')).toContainText('00 00 00 00');
 });
 
 test('Protobuf records are decoded too', async ({ page }) => {
   await page.goto('topics/seed-proto');
   await page.locator('#msg-0').click();
-  const drawer = page.locator('#drawer');
-  await expect(drawer).toContainText('"boiler-1"');
-  await expect(drawer).toContainText('71.5');
-  await expect(drawer.locator('.schema-tag')).toContainText('Protobuf · schema');
+  const inspector = page.locator('#inspector');
+  await expect(inspector).toContainText('"boiler-1"');
+  await expect(inspector).toContainText('71.5');
+  await expect(inspector.locator('.schema-tag')).toContainText('Protobuf · schema');
 });
 
 test('the composer writes a record encoded with the topic\'s schema, and says when the value does not fit', async ({ page, uniqueName, send, setEditor }) => {
@@ -167,10 +167,10 @@ test('the composer writes a record encoded with the topic\'s schema, and says wh
   await expect(row.locator('.cell-val')).not.toHaveClass(/binary/);
   // The stored record is Confluent's wire format: magic byte, schema id, Avro.
   await row.click();
-  await page.locator('#drawer').getByRole('button', { name: 'Hex', exact: true }).click();
-  await expect(page.locator('#drawer .hexbox')).toContainText('00 00 00 00');
+  await page.locator('#inspector').getByRole('button', { name: 'Hex', exact: true }).click();
+  await expect(page.locator('#inspector .hexbox')).toContainText('00 00 00 00');
   // Edit a copy brings the JSON back, with the subject chosen again.
-  await page.locator('#drawer-edit').click();
+  await page.locator('#inspector-edit').click();
   await expect(page.locator('select[name="schema_subject"]')).toHaveValue(`${topic}-value`);
   await expect(page.locator('.dock .cm-editor')).toContainText('"id"');
 });

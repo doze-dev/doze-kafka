@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -34,8 +35,14 @@ func newTestConsoleAddr(t testing.TB, mod ...func(*Options)) (*Console, string) 
 	if testing.Short() {
 		t.Skip("boots a real broker; omit -short (or run `go tool task test:integration`)")
 	}
+	// A data directory whose path has a space in it, and a listener that picks its
+	// own port: nothing here may depend on either being tidy (plan A8).
+	dataDir := filepath.Join(t.TempDir(), "data dir")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	srv, err := server.New(server.Options{
-		DataDir: t.TempDir(), ListenAddr: "127.0.0.1:0", AdvertisedHost: "127.0.0.1",
+		DataDir: dataDir, ListenAddr: "127.0.0.1:0", AdvertisedHost: "127.0.0.1",
 	})
 	if err != nil {
 		t.Fatalf("server.New: %v", err)
@@ -65,6 +72,40 @@ func newTestConsoleAddr(t testing.TB, mod ...func(*Options)) (*Console, string) 
 	return con, addr
 }
 
+// testPrefix is where the suite mounts the console when DOZE_KAFKA_CONSOLE_PREFIX
+// is set (task test:identity): every console.New reads it. The tests are written against "/_console"; serveInto
+// rewrites each request into the prefix and each answer back out of it, and fails
+// for an answer that still says "/_console", which is a prefix hard-coded in the
+// console.
+var testPrefix = os.Getenv("DOZE_KAFKA_CONSOLE_PREFIX")
+
+func serveInto(t testing.TB, c *Console, rec *httptest.ResponseRecorder, r *http.Request) {
+	t.Helper()
+	if testPrefix == "" {
+		c.ServeHTTP(rec, r)
+		return
+	}
+	r.URL.Path = strings.Replace(r.URL.Path, defaultPrefix, testPrefix, 1)
+	r.URL.RawPath = strings.Replace(r.URL.RawPath, defaultPrefix, testPrefix, 1)
+	r.RequestURI = ""
+	if o := r.Header.Get("Referer"); o != "" {
+		r.Header.Set("Referer", strings.Replace(o, defaultPrefix, testPrefix, 1))
+	}
+	tmp := httptest.NewRecorder()
+	c.ServeHTTP(tmp, r)
+	body := tmp.Body.String()
+	if strings.Contains(body, defaultPrefix) {
+		t.Errorf("%s answered with %q in it, with the console mounted at %q: the prefix is hard-coded", r.URL.Path, defaultPrefix, testPrefix)
+	}
+	rec.Code = tmp.Code
+	for k, vs := range tmp.Header() {
+		for _, v := range vs {
+			rec.Header().Add(k, strings.ReplaceAll(v, testPrefix, defaultPrefix))
+		}
+	}
+	rec.Body.WriteString(strings.ReplaceAll(body, testPrefix, defaultPrefix))
+}
+
 func req(t *testing.T, c *Console, method, path string, form url.Values) *httptest.ResponseRecorder {
 	t.Helper()
 	var r *http.Request
@@ -76,7 +117,7 @@ func req(t *testing.T, c *Console, method, path string, form url.Values) *httpte
 	}
 	r.Host = "127.0.0.1:9093" // httptest defaults to example.com, which the Host guard refuses.
 	rec := httptest.NewRecorder()
-	c.ServeHTTP(rec, r)
+	serveInto(t, c, rec, r)
 	return rec
 }
 
@@ -152,13 +193,13 @@ func TestProduceAndTape(t *testing.T) {
 		t.Errorf("acks=0 toast = %q", trig)
 	}
 
-	// The drawer shows the full record, including headers.
+	// The inspector shows the full record, including headers.
 	rec = req(t, c, "GET", "/_console/topics/demo/message?partition=0&offset=0", nil)
 	if rec.Code != 200 {
-		t.Fatalf("drawer: status %d: %s", rec.Code, rec.Body)
+		t.Fatalf("inspector: status %d: %s", rec.Code, rec.Body)
 	}
 	if b := rec.Body.String(); !strings.Contains(b, "trace") || !strings.Contains(b, "tr-1") {
-		t.Errorf("drawer missing header content:\n%s", b)
+		t.Errorf("inspector missing header content:\n%s", b)
 	}
 
 	// Live-poll: stale hash returns fresh content, current hash returns 204.

@@ -56,6 +56,12 @@
   --warn: #b7791f; --warn-foreground: #8f5a00;
   --info: #5b7aa0; --info-foreground: #34506e;
   --violet: #7c3aed; --violet-foreground: #6d28d9;
+  /* The four words for "no", one colour each (see refusal.go). Foregrounds are
+     text on the page or card and hold 4.5:1 (console/contrast_test.go). */
+  --refused: #8576b0;    --refused-foreground: #5c4f86;
+  --denied: #b7791f;     --denied-foreground: #8f5a00;
+  --notimpl: #5b7aa0;    --notimpl-foreground: #34506e;
+  --failed: #d8323c;     --failed-foreground: #b8262f;
   --scrim: rgba(22, 21, 15, .38);
   --sh: 0 1px 2px rgba(22, 21, 15, .05), 0 6px 20px -10px rgba(22, 21, 15, .16);
   --sh-lg: 0 20px 50px -16px rgba(22, 21, 15, .28);
@@ -89,9 +95,48 @@
   --warn: #e0a64a; --warn-foreground: #f0b95c;
   --info: #7f9fc6; --info-foreground: #a9c3e3;
   --violet: #a78bfa; --violet-foreground: #c4b5fd;
+  --refused: #a597d4;    --refused-foreground: #c3b9e8;
+  --denied: #e0a64a;     --denied-foreground: #f0b95c;
+  --notimpl: #7f9fc6;    --notimpl-foreground: #a9c3e3;
+  --failed: #f0616a;     --failed-foreground: #ff8087;
   --scrim: rgba(0, 0, 0, .55);
   --sh: 0 1px 2px rgba(0, 0, 0, .35), 0 6px 18px -8px rgba(0, 0, 0, .55);
   --sh-lg: 0 18px 46px -14px rgba(0, 0, 0, .7);
+}
+
+/* High contrast: the third theme. Black ink on white, black edges, and every status
+   colour darkened until it holds well past 4.5:1; nothing relies on a tint or a
+   shadow to be seen. It is chosen from the theme switch, or by the OS asking for
+   more contrast. console/contrast_test.go measures every pair. */
+:root[data-theme="contrast"] {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #000000;
+  --card: #ffffff;
+  --popover: #ffffff;
+  --muted: #eeeeee;
+  --muted-foreground: #262626;
+  --accent: #ffe66b;
+  --brand: #ffd60a;
+  --brand-foreground: #000000;
+  --border: #000000;
+  --input: #000000;
+  --ring: #0033cc;
+  --sidebar: #ffffff;
+  --destructive: #8a0010;
+  --destructive-foreground: #ffffff;
+  --ok: #006b2f;   --ok-foreground: #004d21;
+  --bad: #a00014;  --bad-foreground: #7a000f;
+  --warn: #8a5a00; --warn-foreground: #5c3b00;
+  --info: #0b3d91; --info-foreground: #082b66;
+  --violet: #5b21b6; --violet-foreground: #46168f;
+  --refused: #4c3a85;    --refused-foreground: #3b2a6b;
+  --denied: #7a4a00;     --denied-foreground: #5c3500;
+  --notimpl: #0b3d91;    --notimpl-foreground: #082b66;
+  --failed: #a00014;     --failed-foreground: #7a000f;
+  --scrim: rgba(0, 0, 0, .6);
+  --sh: none;
+  --sh-lg: 0 0 0 2px #000000;
 }
 
 * { box-sizing: border-box; }
@@ -194,7 +239,10 @@ h1, h2, h3 { letter-spacing: -.02em; }
 .ri .ri-ct:empty { display: none; }
 .ri.on .ri-ct { color: var(--foreground); }
 :root[data-rail="slim"] .rail .ri { justify-content: center; padding: 0; }
-:root[data-rail="slim"] .rail .ri-nm, :root[data-rail="slim"] .rail .ri-ct { display: none; }
+:root[data-rail="slim"] .rail .ri-ct { display: none; }
+/* The name stays for assistive technology when the rail shows only icons: it is
+   clipped, not removed (display: none would take the link's name with it). */
+:root[data-rail="slim"] .rail .ri-nm { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 .ri .ri-fly {
   display: none; position: fixed; transform: translateY(-50%);
   background: var(--foreground); color: var(--background); font-size: var(--fs-sm); font-weight: 500;
@@ -362,6 +410,18 @@ p.note { margin: 0; }
 .form-b { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
 .field.narrow { max-width: 180px; }
 .det-foot { display: flex; justify-content: flex-end; gap: 8px; align-items: center; padding: 6px 0; max-width: 640px; }
+/* A refusal: a kind word and one colour each. It is an .err, so a control's error
+   slot and the toasts read it as they always did; the kind recolours it. */
+.refusal { --k: var(--refused); --kf: var(--refused-foreground); color: var(--foreground); }
+.refusal-denied { --k: var(--denied); --kf: var(--denied-foreground); }
+.refusal-not-implemented { --k: var(--notimpl); --kf: var(--notimpl-foreground); }
+.refusal-failed { --k: var(--failed); --kf: var(--failed-foreground); }
+.err.refusal { background: color-mix(in srgb, var(--k) 8%, var(--card)); border-color: color-mix(in srgb, var(--k) 40%, var(--border)); }
+.refusal-kind { font-weight: 600; color: var(--kf); }
+.refusal-line .refusal-kind { text-transform: uppercase; letter-spacing: .04em; font-size: var(--fs-sm); }
+.refusal-name { font-size: var(--fs-sm); color: var(--muted-foreground); }
+.refusal-rule { font-size: var(--fs-sm); }
+.refusal-msg { overflow-wrap: anywhere; }
 .err { color: var(--bad-foreground); background: color-mix(in srgb, var(--bad) 8%, var(--card)); border: 1px solid color-mix(in srgb, var(--bad) 40%, var(--border)); border-radius: var(--radius); padding: 10px 12px; margin: 8px 0; font-size: var(--fs-md); overflow-wrap: anywhere; }
 .form-err { margin: 10px 0 0; max-width: 640px; }
 .dock .form-err { max-width: none; }
@@ -415,6 +475,14 @@ p.note { margin: 0; }
 .livetoggle.on .livetoggle-l::after { content: " paused"; }
 .disconnected .livedot { background: var(--bad); animation: none; }
 .disconnected .livetoggle-l::after { content: " — not updating"; color: var(--bad-foreground); }
+/* The console when the broker is not there: the pill says so once, and what was on
+   screen stays, frozen under a muted veil that lets clicks through. */
+[data-live].disconnected { position: relative; }
+[data-live].disconnected::after { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--background) 55%, transparent); pointer-events: none; }
+.chip.live.disconnected::before { background: var(--bad); }
+.chip.live .pill-state { margin-left: 8px; color: var(--bad-foreground); }
+.topbar .chip.live.disconnected .pill-state { color: #8c1c24; }
+.pill-retry { margin-left: 8px; padding: 0 8px; font: inherit; font-size: var(--fs-sm); background: var(--background); color: var(--foreground); border: 1px solid var(--input); border-radius: var(--radius-pill); cursor: pointer; }
 
 /* ---------- docked composer ----------
    Pinned to the bottom edge of the topic workbench, so sending is never a scroll
@@ -488,9 +556,9 @@ table.tbl th.num, table.tbl td.num { text-align: right; }
 table.tbl td.nw { white-space: nowrap; }
 table.tbl td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
 table.tbl tbody tr:last-child td { border-bottom: none; }
-tr[data-drawer-open] { cursor: pointer; }
-tr[data-drawer-open]:hover td { background: var(--muted); }
-tr[data-drawer-open]:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+tr[data-inspector-open] { cursor: pointer; }
+tr[data-inspector-open]:hover td { background: var(--muted); }
+tr[data-inspector-open]:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 td.empty { padding: 22px 12px; color: var(--muted-foreground); }
 .cell-offset { font-family: var(--mono); font-weight: 500; }
 .cell-time { font-family: var(--mono); font-size: var(--fs-sm); color: var(--muted-foreground); white-space: nowrap; }
@@ -514,30 +582,30 @@ td a, .honest a { color: var(--info-foreground); text-decoration: underline; tex
 .hdrct { font-family: var(--mono); font-size: var(--fs-xs); color: var(--muted-foreground); background: var(--muted); padding: 1px 6px; border-radius: var(--radius-sm); }
 .tbl-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 12px; font-size: var(--fs-xs); color: var(--muted-foreground); border-top: 1px solid var(--border); background: var(--muted); white-space: nowrap; }
 
-/* ---------- drawer / palette / confirm (all .overlay, shown via [hidden]) ---------- */
+/* ---------- inspector / palette / confirm (all .overlay, shown via [hidden]) ---------- */
 .overlay { position: fixed; inset: 0; background: var(--scrim); z-index: 40; display: grid; place-items: start center; padding: 12vh 16px 16px; }
 @keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
 .anim { animation: pop .14s ease; }
 
-#drawer-overlay { justify-content: flex-end; padding: 0; align-items: stretch; }
-.drawer { width: 520px; max-width: 94vw; background: var(--popover); border-left: 1px solid var(--border); height: 100%; overflow-y: auto; box-shadow: var(--sh-lg); }
-@keyframes drawer-in { from { transform: translateX(24px); opacity: .5; } to { transform: none; opacity: 1; } }
-.drawer.anim { animation: drawer-in .18s ease; }
-.drawer.busy .drawer-b { opacity: .45; transition: opacity .15s ease .15s; }
-.drawer-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--popover); z-index: 2; }
-.drawer-h > div:first-child { min-width: 0; }
-.drawer-h .t { font-family: var(--mono); font-weight: 600; font-size: var(--fs-base); }
-.drawer-sub { display: block; font-size: var(--fs-xs); color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.drawer-nav { display: flex; align-items: center; gap: 2px; flex: none; }
-.drawer-acts { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px; }
-.drawer-b { padding: 6px 16px 18px; }
-.drawer-dl { margin-top: 8px; }
-.drawer-loading { padding: 28px 16px; color: var(--muted-foreground); font-size: var(--fs-md); }
-.drawer-err { margin: 16px; }
+#inspector-overlay { justify-content: flex-end; padding: 0; align-items: stretch; }
+.inspector { width: 520px; max-width: 94vw; background: var(--popover); border-left: 1px solid var(--border); height: 100%; overflow-y: auto; box-shadow: var(--sh-lg); }
+@keyframes inspector-in { from { transform: translateX(24px); opacity: .5; } to { transform: none; opacity: 1; } }
+.inspector.anim { animation: inspector-in .18s ease; }
+.inspector.busy .inspector-b { opacity: .45; transition: opacity .15s ease .15s; }
+.inspector-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--popover); z-index: 2; }
+.inspector-h > div:first-child { min-width: 0; }
+.inspector-h .t { font-family: var(--mono); font-weight: 600; font-size: var(--fs-base); }
+.inspector-sub { display: block; font-size: var(--fs-xs); color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inspector-nav { display: flex; align-items: center; gap: 2px; flex: none; }
+.inspector-acts { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px; }
+.inspector-b { padding: 6px 16px 18px; }
+.inspector-dl { margin-top: 8px; }
+.inspector-loading { padding: 28px 16px; color: var(--muted-foreground); font-size: var(--fs-md); }
+.inspector-err { margin: 16px; }
 .meta-row { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: var(--fs-md); }
 .meta-row .k { color: var(--muted-foreground); flex: none; }
 /* A key is whatever a client sent: one long unbroken string must wrap, not push
-   the drawer wider than the window. */
+   the inspector wider than the window. */
 .meta-row .v { font-family: var(--mono); text-align: right; min-width: 0; overflow-wrap: anywhere; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 4px 8px; }
 .kv-copy { display: inline-flex; align-items: flex-start; gap: 4px; max-width: 100%; min-width: 0; }
 .kv-copy .kv { min-width: 0; overflow-wrap: anywhere; }
@@ -687,8 +755,12 @@ html .cm-editor .cm-lintRange-error { background: color-mix(in srgb, var(--bad) 
 .errorpanel { max-width: 520px; text-align: center; }
 .errorpanel .err-ic { color: var(--muted-foreground); margin-bottom: 10px; }
 .errorpanel .err-ic .ic { width: 32px; height: 32px; }
-.errorpanel.unreachable .err-ic, .errorpanel.internal .err-ic { color: var(--bad); }
-.errorpanel.refused .err-ic { color: var(--warn); }
+.errorpanel.failed .err-ic { color: var(--failed); }
+.errorpanel.refused .err-ic { color: var(--refused); }
+.errorpanel.denied .err-ic { color: var(--denied); }
+.errorpanel.not-implemented .err-ic { color: var(--notimpl); }
+.errorpanel .refusal-line { margin: 0 0 10px; }
+.errorpanel .refusal-rule { font-size: var(--fs-md); margin: 0 0 14px; }
 .errorpanel h1 { font-weight: 600; font-size: var(--fs-xl); margin: 0 0 8px; }
 .errorpanel p { color: var(--muted-foreground); font-size: var(--fs-base); line-height: 1.55; margin: 0 0 16px; overflow-wrap: anywhere; }
 .errorpanel .didyoumean { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; font-size: var(--fs-md); }
@@ -728,11 +800,14 @@ form.htmx-request .btn.primary::after { content: ""; width: 11px; height: 11px; 
   :root { --pad: 14px; }
   .topbar { gap: 10px; padding: 0 12px; }
   .brand .sub, .tb-right .chip.live, .tb-palette .kbd { display: none; } /* the endpoint is on the Cluster page */
+  .tb-right .chip.live.disconnected { display: inline-flex; } /* ...but "not connected" is never hidden */
+  .tb-right .chip.live.disconnected .pill-addr { display: none; }
   .tb-palette { flex: 1 1 0; width: auto; }
   .tb-spacer { display: none; }
   .rail, :root[data-rail="slim"] .rail { width: 48px; padding-left: 5px; padding-right: 5px; }
   .rail .ri { justify-content: center; padding: 0; }
-  .rail .ri-nm, .rail .ri-ct, .rail .rgroup, .rail-toggle { display: none; }
+  .rail .ri-ct, .rail .rgroup, .rail-toggle { display: none; }
+  .rail .ri-nm { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
   .listpane { width: 100%; flex-basis: auto; border-right: 0; }
   .panes { flex-direction: column; }
   :root[data-view="detail"] .listpane { display: none; }
@@ -748,7 +823,7 @@ form.htmx-request .btn.primary::after { content: ""; width: 11px; height: 11px; 
   .find .input { width: 100%; }
   .dock-bar .kbd { display: none; }
   .dock-foot { flex-direction: column; align-items: stretch; }
-  .drawer { max-width: 100vw; width: 100vw; border-left: 0; }
+  .inspector { max-width: 100vw; width: 100vw; border-left: 0; }
   .crow2 { flex-wrap: wrap; gap: 2px 16px; }
   /* A phone-width table keeps what identifies a record: offset, key, value. */
   table.tbl .col-time, table.tbl .col-hdrs { display: none; }
@@ -814,7 +889,10 @@ form.htmx-request .btn.primary::after { content: ""; width: 11px; height: 11px; 
 
 /* the group timeline: what the coordinator did, newest first */
 .timeline { list-style: none; margin: 0 0 16px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
-.tl { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 7px 12px; border-top: 1px solid var(--border); font-size: var(--fs-md); border-left: 3px solid transparent; }
+.tl { border-top: 1px solid var(--border); font-size: var(--fs-md); border-left: 3px solid transparent; }
+.tl-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 7px 12px; cursor: pointer; }
+.tl-row:hover { background: var(--muted); }
+.tl-row:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .tl:first-child { border-top: 0; }
 .tl-t { color: var(--muted-foreground); font-size: var(--fs-sm); }
 .tl-k { font-weight: 600; min-width: 112px; }
@@ -863,3 +941,30 @@ form.htmx-request .btn.primary::after { content: ""; width: 11px; height: 11px; 
 .spark polyline { fill: none; stroke: var(--info); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
 .mc-more { margin-top: 8px; font-size: var(--fs-sm); }
 .mc-more summary { cursor: pointer; color: var(--muted-foreground); }
+
+/* The line under a field, generated from the settings table. */
+.teach { margin: 4px 0 0; font-size: var(--fs-sm); line-height: 1.4; color: var(--muted-foreground); }
+.rowteach { flex-basis: 100%; }
+
+/* The wire dock: the requests that touched this resource, at the foot of its page. */
+.wiredock { margin-top: 28px; padding-bottom: 24px; }
+.wiredock tr[data-inspector-open] td { white-space: nowrap; }
+
+/* The neighbours sentence under a page's title. */
+.neighbours { margin: 10px 0 0; font-size: var(--fs-md); color: var(--muted-foreground); line-height: 1.6; }
+.neighbours a { color: var(--foreground); border-bottom: 1px solid var(--border); }
+.neighbours a:hover { border-bottom-color: var(--foreground); }
+
+/* High contrast also thickens the edges a control is found by. */
+:root[data-theme="contrast"] .btn, :root[data-theme="contrast"] .input, :root[data-theme="contrast"] .chip,
+:root[data-theme="contrast"] .tbl-wrap, :root[data-theme="contrast"] .panel { border-width: 2px; }
+:root[data-theme="contrast"] :focus-visible { outline-width: 3px; }
+
+/* The keys overlay, generated from the declared key map. */
+.help { width: min(560px, 94vw); max-height: 86vh; display: flex; flex-direction: column; }
+.help-b { padding: 4px 18px 8px; overflow-y: auto; }
+.help-g { margin-top: 12px; }
+.help-gh { font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); margin-bottom: 4px; }
+.help-r { display: flex; align-items: baseline; gap: 12px; padding: 4px 0; font-size: var(--fs-md); }
+.help-r .kbd { min-width: 52px; text-align: center; flex: none; }
+.help-l { color: var(--foreground); }
