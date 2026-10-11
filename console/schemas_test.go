@@ -17,7 +17,7 @@ import (
 
 // newRegistryConsole is a console with a schema registry (the real one, in memory)
 // beside its broker.
-func newRegistryConsole(t testing.TB) (*Console, string, *httptest.Server) {
+func newRegistryConsole(t testing.TB, mod ...func(*Options)) (*Console, string, *httptest.Server) {
 	t.Helper()
 	reg, err := schemaregistry.Open(schemaregistry.NewMemoryStorage())
 	if err != nil {
@@ -25,7 +25,7 @@ func newRegistryConsole(t testing.TB) (*Console, string, *httptest.Server) {
 	}
 	ts := httptest.NewServer(schemaregistry.NewAPI(reg, schemaregistry.Options{}))
 	t.Cleanup(ts.Close)
-	c, addr := newTestConsoleAddr(t, func(o *Options) { o.RegistryURL = ts.URL })
+	c, addr := newTestConsoleAddr(t, append([]func(*Options){func(o *Options) { o.RegistryURL = ts.URL }}, mod...)...)
 	return c, addr, ts
 }
 
@@ -181,7 +181,7 @@ func TestSubjectNamesRoundTripThroughLinks(t *testing.T) {
 }
 
 // Records a Confluent serializer wrote are shown as the JSON they mean, in the table
-// and in the drawer, with the schema named; anything else is shown as it always was.
+// and in the inspector, with the schema named; anything else is shown as it always was.
 func TestRegistryEncodedRecordsAreDecoded(t *testing.T) {
 	c, addr, ts := newRegistryConsole(t)
 	register(t, c, "events-value", userV1)
@@ -216,15 +216,15 @@ func TestRegistryEncodedRecordsAreDecoded(t *testing.T) {
 		t.Error("the topic page does not link its value schema")
 	}
 
-	drawer := req(t, c, "GET", "/_console/topics/events/message?partition=0&offset=0", nil).Body.String()
-	drawer = readable(drawer) + drawer
+	inspector := req(t, c, "GET", "/_console/topics/events/message?partition=0&offset=0", nil).Body.String()
+	inspector = readable(inspector) + inspector
 	for _, want := range []string{`"id": 4242`, "Avro · schema 1", "events-value v1", "data-schema=\"events-value\"", `data-value-enc="text"`} {
-		if !strings.Contains(drawer, want) {
-			t.Errorf("drawer for the decoded record is missing %q:\n%s", want, drawer)
+		if !strings.Contains(inspector, want) {
+			t.Errorf("inspector for the decoded record is missing %q:\n%s", want, inspector)
 		}
 	}
 	// Send again still carries the stored bytes: the edit button's JSON is for editing only.
-	if !strings.Contains(drawer, "Send again") {
+	if !strings.Contains(inspector, "Send again") {
 		t.Error("no Send again for a decoded record")
 	}
 
@@ -243,7 +243,7 @@ func TestRegistryEncodedRecordsAreDecoded(t *testing.T) {
 		t.Errorf("topic page with the registry down = %d", rec.Code)
 	}
 	if rec := req(t, c, "GET", "/_console/topics/events/message?partition=0&offset=0", nil); rec.Code != 200 {
-		t.Errorf("drawer with the registry down = %d", rec.Code)
+		t.Errorf("inspector with the registry down = %d", rec.Code)
 	}
 }
 

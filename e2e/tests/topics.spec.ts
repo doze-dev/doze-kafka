@@ -161,9 +161,9 @@ test('transactions on the tape: aborted and open records are marked, markers are
   await page.getByRole('link', { name: /show all/ }).click();
   await expect(page.locator('tr.txnmark')).toHaveCount(2);
 
-  // A marker is not a record: it does not open the drawer.
+  // A marker is not a record: it does not open the inspector.
   await page.locator('tr.txnmark').first().click();
-  await expect(page.locator('#drawer-overlay')).toBeHidden();
+  await expect(page.locator('#inspector-overlay')).toBeHidden();
 
   await page.goto('cluster');
   await expect(page.locator('#open-transactions')).toContainText('seed-open');

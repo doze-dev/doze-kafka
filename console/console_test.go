@@ -152,13 +152,13 @@ func TestProduceAndTape(t *testing.T) {
 		t.Errorf("acks=0 toast = %q", trig)
 	}
 
-	// The drawer shows the full record, including headers.
+	// The inspector shows the full record, including headers.
 	rec = req(t, c, "GET", "/_console/topics/demo/message?partition=0&offset=0", nil)
 	if rec.Code != 200 {
-		t.Fatalf("drawer: status %d: %s", rec.Code, rec.Body)
+		t.Fatalf("inspector: status %d: %s", rec.Code, rec.Body)
 	}
 	if b := rec.Body.String(); !strings.Contains(b, "trace") || !strings.Contains(b, "tr-1") {
-		t.Errorf("drawer missing header content:\n%s", b)
+		t.Errorf("inspector missing header content:\n%s", b)
 	}
 
 	// Live-poll: stale hash returns fresh content, current hash returns 204.

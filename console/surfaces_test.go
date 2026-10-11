@@ -184,7 +184,7 @@ func TestEveryMutationRouteIsGuardedAndFailsCleanly(t *testing.T) {
 }
 
 // A bad query string is the caller's mistake, and says so.
-func TestDrawerRefusesBadCoordinates(t *testing.T) {
+func TestInspectorRefusesBadCoordinates(t *testing.T) {
 	c := newTestConsole(t)
 	topicWith(t, c, "t", 1, 2)
 	for _, q := range []string{"", "?partition=0", "?partition=0&offset=abc", "?partition=0&offset=-5", "?partition=x&offset=0", "?partition=-1&offset=0"} {

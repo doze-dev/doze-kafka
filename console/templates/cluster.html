@@ -17,7 +17,8 @@
     </div>
     <div class="sec-title">Open transactions <span class="sz">{{len .Cluster.Transactions}} in progress</span></div>
     <div class="cpanel" id="open-transactions">
-      {{range .Cluster.Transactions}}<div class="crow2"><span class="k mono">{{.ID}}</span><span class="v">{{.State}} · producer {{.ProducerID}} epoch {{.Epoch}}{{if .Age}} · open {{.Age}} of {{.Timeout}}{{end}}{{if .Partitions}} · <span class="mono">{{range $i, $p := .Partitions}}{{if $i}}, {{end}}{{$p}}{{end}}</span>{{end}}</span></div>
+      {{range .Cluster.Transactions}}<div class="crow2" id="tx-{{.ID}}" tabindex="0" role="button" aria-label="Open transaction {{.ID}}" data-inspector-open
+        hx-get="{{prefix}}/inspect/transaction?key={{txnKey .ID}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"><span class="k mono">{{.ID}}</span><span class="v">{{.State}} · producer {{.ProducerID}} epoch {{.Epoch}}{{if .Age}} · open {{.Age}} of {{.Timeout}}{{end}}{{if .Partitions}} · <span class="mono">{{range $i, $p := .Partitions}}{{if $i}}, {{end}}{{$p}}{{end}}</span>{{end}}</span></div>
       {{else}}<div class="crow2"><span class="k">None</span><span class="v">No transaction is open. A producer with a <code>transactional.id</code> appears here from its first write until it commits or aborts.</span></div>{{end}}
     </div>
     {{if .Cluster.BrokerConfig}}

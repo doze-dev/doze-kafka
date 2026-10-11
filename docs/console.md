@@ -23,7 +23,7 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   switch partition and show per-partition counts.
 - A **message table** that follows the log live. Pause it with the toggle. Click a
   row for the full record
-  in a drawer: key, value, headers, timestamp, size. The drawer's address is in the
+  in a inspector: key, value, headers, timestamp, size. The inspector's address is in the
   URL, so a refresh keeps it open and you can share it. Older/newer buttons walk
   the log.
 - Records are shown **as they are**. Valid UTF-8 appears as text (JSON is
@@ -77,7 +77,7 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   its groups' committed offsets, so a group that had read everything carries on with
   the next record. **Delete** removes the topic. Both ask first, naming the action.
 
-- **Follow this message**, in the drawer of a record that carries a trace id
+- **Follow this message**, in the inspector of a record that carries a trace id
   (`traceparent`, B3, or the header named by `--trace-header`): every record of the
   same trace in every topic, in order, with the groups that have read each. See
   [Observability](observability.md).
@@ -135,7 +135,7 @@ Where a topic has `<topic>-key` or `<topic>-value` subjects, its page links them
 
 **Records written by a registry-aware serializer are shown as what they mean.** A value
 that starts with the registry's wire-format header (a zero byte and a schema id) is read
-with that schema, in the table and in the drawer, which names the schema and links its
+with that schema, in the table and in the inspector, which names the schema and links its
 version. The Hex and Base64 views still show the stored bytes, *Send again* still
 resends them exactly, and a value whose schema the registry no longer has is shown as
 binary, as before. *Edit a copy* of a decoded record brings back the JSON and chooses
@@ -171,7 +171,7 @@ It links to [what is not implemented](limitations.md).
 | `m` | Open the composer |
 | `[` | Collapse or expand the rail |
 | `⌘Enter` / `Ctrl+Enter` | Send, from the composer |
-| `Esc` | Close a dialog or the drawer |
+| `Esc` | Close a dialog or the inspector |
 
 Single keys act only when you are not typing in a field, with no modifier held, and
 no dialog open.

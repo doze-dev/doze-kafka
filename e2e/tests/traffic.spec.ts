@@ -50,19 +50,19 @@ test('the filters narrow the tail, and the narrowing survives a refresh of it', 
   await expect(page.locator('.honest', { hasText: 'No request matches the filter' })).toBeVisible();
 });
 
-test('a row opens its request in the drawer, and Escape closes it', async ({ page }) => {
+test('a row opens its request in the inspector, and Escape closes it', async ({ page }) => {
   await page.goto('traffic?errors=1&client=doze-seed&api=CreateTopics');
   const row = page.locator('#traffic-table tbody tr').first();
   await row.click();
-  const drawer = page.locator('#drawer');
-  await expect(drawer).toBeVisible();
-  await expect(drawer.locator('#drawer-title')).toContainText('CreateTopics');
-  await expect(drawer).toContainText('doze-seed');
-  await expect(drawer).toContainText('seed-empty');
-  await expect(drawer).toContainText('TOPIC_ALREADY_EXISTS');
-  await expect(drawer).toContainText('User:ANONYMOUS');
+  const inspector = page.locator('#inspector');
+  await expect(inspector).toBeVisible();
+  await expect(inspector.locator('#inspector-title')).toContainText('CreateTopics');
+  await expect(inspector).toContainText('doze-seed');
+  await expect(inspector).toContainText('seed-empty');
+  await expect(inspector).toContainText('TOPIC_ALREADY_EXISTS');
+  await expect(inspector).toContainText('User:ANONYMOUS');
   await page.keyboard.press('Escape');
-  await expect(drawer).toBeHidden();
+  await expect(inspector).toBeHidden();
 });
 
 test('the live toggle pauses the tail', async ({ page }) => {

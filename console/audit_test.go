@@ -85,16 +85,16 @@ func TestDeeplyNestedJSONIsNotExpanded(t *testing.T) {
 	runtime.GC()
 	runtime.ReadMemStats(&before)
 	page := req(t, c, "GET", "/_console/topics/n", nil)
-	drawer := req(t, c, "GET", "/_console/topics/n/message?partition=0&offset=0", nil)
+	inspector := req(t, c, "GET", "/_console/topics/n/message?partition=0&offset=0", nil)
 	runtime.ReadMemStats(&after)
-	if page.Code != 200 || drawer.Code != 200 {
-		t.Fatalf("page %d, drawer %d", page.Code, drawer.Code)
+	if page.Code != 200 || inspector.Code != 200 {
+		t.Fatalf("page %d, inspector %d", page.Code, inspector.Code)
 	}
 	if mb := (after.TotalAlloc - before.TotalAlloc) >> 20; mb > 64 {
-		t.Errorf("rendering a page and a drawer of deeply nested records allocated %d MB", mb)
+		t.Errorf("rendering a page and a inspector of deeply nested records allocated %d MB", mb)
 	}
-	if kb := drawer.Body.Len() >> 10; kb > 512 {
-		t.Errorf("the drawer for a 6 KB record is %d KB", kb)
+	if kb := inspector.Body.Len() >> 10; kb > 512 {
+		t.Errorf("the inspector for a 6 KB record is %d KB", kb)
 	}
 }
 
@@ -149,7 +149,7 @@ func TestSendAgainProducesAnExactCopy(t *testing.T) {
 		t.Error("the composer would be prefilled with re-indented JSON, not the JSON that was stored")
 	}
 	if !strings.Contains(d, "Send again") || !strings.Contains(d, "Edit a copy") {
-		t.Error("the drawer should offer both an exact resend and an editable copy")
+		t.Error("the inspector should offer both an exact resend and an editable copy")
 	}
 }
 

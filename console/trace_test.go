@@ -319,7 +319,7 @@ func TestTracePageRefusesWhatItCannotUse(t *testing.T) {
 
 // The way in: a record that carries a trace id offers to follow it; one that does not
 // offers nothing.
-func TestTheDrawerOffersToFollowARecordOnlyIfItCarriesATrace(t *testing.T) {
+func TestTheInspectorOffersToFollowARecordOnlyIfItCarriesATrace(t *testing.T) {
 	c, addr := newTestConsoleAddr(t, func(o *Options) { o.TraceHeader = "x-request-id" })
 	topicWith(t, c, "orders", 1, 0)
 	now := time.Now().Truncate(time.Millisecond)
@@ -329,7 +329,7 @@ func TestTheDrawerOffersToFollowARecordOnlyIfItCarriesATrace(t *testing.T) {
 		{"orders", now.Add(2 * time.Millisecond), []kgo.RecordHeader{{Key: "x-request-id", Value: []byte("req-42")}}, "custom"},
 	})
 	traced := req(t, c, "GET", "/_console/topics/orders/message?partition=0&offset=0", nil).Body.String()
-	m := regexp.MustCompile(`id="drawer-trace" href="([^"]+)"`).FindStringSubmatch(traced)
+	m := regexp.MustCompile(`id="inspector-trace" href="([^"]+)"`).FindStringSubmatch(traced)
 	if m == nil {
 		t.Fatalf("a record with a traceparent offers no way to follow it:\n%s", traced)
 	}
@@ -338,7 +338,7 @@ func TestTheDrawerOffersToFollowARecordOnlyIfItCarriesATrace(t *testing.T) {
 			t.Errorf("the link %q lacks %q", m[1], want)
 		}
 	}
-	if plain := req(t, c, "GET", "/_console/topics/orders/message?partition=0&offset=1", nil).Body.String(); strings.Contains(plain, "drawer-trace") {
+	if plain := req(t, c, "GET", "/_console/topics/orders/message?partition=0&offset=1", nil).Body.String(); strings.Contains(plain, "inspector-trace") {
 		t.Error("a record with no trace header offers to follow one")
 	}
 	if custom := req(t, c, "GET", "/_console/topics/orders/message?partition=0&offset=2", nil).Body.String(); !strings.Contains(custom, "req-42") {

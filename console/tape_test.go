@@ -134,13 +134,13 @@ func extractNote(body string) string {
 	return body[i : i+200]
 }
 
-func TestDrawerIsADialogWithNeighbours(t *testing.T) {
+func TestInspectorIsADialogWithNeighbours(t *testing.T) {
 	c := newTestConsole(t)
 	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"m"}, "partitions": {"1"}})
 	produceTo(t, c, "m", 0, 3)
 
 	page := req(t, c, "GET", "/_console/topics/m", nil).Body.String()
-	for _, want := range []string{`role="dialog"`, `aria-modal="true"`, `aria-labelledby="drawer-title"`, `data-drawer-open`, `tabindex="0"`} {
+	for _, want := range []string{`role="dialog"`, `aria-modal="true"`, `aria-labelledby="inspector-title"`, `data-inspector-open`, `tabindex="0"`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the page is missing %s", want)
 		}
@@ -149,15 +149,15 @@ func TestDrawerIsADialogWithNeighbours(t *testing.T) {
 		t.Error("the composer toggle should be a button that reports expanded/collapsed")
 	}
 
-	mid := drawerFor(t, c, "1")
+	mid := inspectorFor(t, c, "1")
 	// " disabled" is the bare attribute (hx-disabled-elt does not count).
 	if !strings.Contains(mid, "offset=0") || !strings.Contains(mid, "offset=2") || strings.Contains(mid, `" disabled`) {
 		t.Error("a middle record should link to both neighbours")
 	}
-	if first := drawerFor(t, c, "0"); !strings.Contains(first, `aria-label="Older record"`) || !strings.Contains(first, `" disabled`) {
+	if first := inspectorFor(t, c, "0"); !strings.Contains(first, `aria-label="Older record"`) || !strings.Contains(first, `" disabled`) {
 		t.Error("the oldest record has no older neighbour: that button should be disabled")
 	}
-	if last := drawerFor(t, c, "2"); strings.Count(last, `" disabled`) != 1 {
+	if last := inspectorFor(t, c, "2"); strings.Count(last, `" disabled`) != 1 {
 		t.Error("the newest record has no newer neighbour: exactly that button should be disabled")
 	}
 }

@@ -1,5 +1,5 @@
 // shell.js — the console's chrome: theme, toasts, copy, confirm dialog, command
-// palette, keyboard shortcuts, the message drawer, the docked composer and live
+// palette, keyboard shortcuts, the message inspector, the docked composer and live
 // polling. Chrome elements live outside #workspace, so they survive every
 // content swap; anything inside it is looked up when it is needed, never held.
 (function () {
@@ -124,7 +124,7 @@
     var base = el && el.getAttribute("data-live");
     return !!base && path.indexOf(base) === 0;
   }
-  function isDrawerRequest(e) { return !!(e.detail && e.detail.target && e.detail.target.id === "drawer"); }
+  function isInspectorRequest(e) { return !!(e.detail && e.detail.target && e.detail.target.id === "inspector"); }
   function setDisconnected(on, why) {
     document.querySelectorAll("[data-live]").forEach(function (el) {
       el.classList.toggle("disconnected", on);
@@ -133,11 +133,11 @@
     });
   }
   // An error response is shown where the person is looking: in the failed form's
-  // error slot if it has one, else a toast. (The drawer reports its own; see below.)
+  // error slot if it has one, else a toast. (The inspector reports its own; see below.)
   document.addEventListener("htmx:responseError", function (e) {
     var msg = errorText(e.detail.xhr);
     if (isLivePoll(e)) { setDisconnected(true, msg); return; }
-    if (isDrawerRequest(e)) return;
+    if (isInspectorRequest(e)) return;
     var elt = e.detail.elt;
     var form = elt && elt.closest ? elt.closest("form") : null;
     var slot = form && form.querySelector("[data-err-slot]");
@@ -147,7 +147,7 @@
   // Nothing came back at all (the console server itself is gone).
   function networkFailure(e) {
     if (isLivePoll(e)) { setDisconnected(true, "the console server did not answer"); return; }
-    if (isDrawerRequest(e)) return;
+    if (isInspectorRequest(e)) return;
     toast("No answer from the console — is doze-kafka still running?", "err");
   }
   document.addEventListener("htmx:sendError", networkFailure);
@@ -170,7 +170,7 @@
   //
   // The end of a request is taken from the XMLHttpRequest itself, not from
   // htmx:afterRequest: htmx raises that on the element that asked, and when the
-  // response replaces that element (the drawer's Older and Newer buttons replace
+  // response replaces that element (the inspector's Older and Newer buttons replace
   // themselves) the event has nowhere to bubble from, and the bar stayed on.
   var slowTimer = null, inflight = 0;
   document.addEventListener("htmx:beforeRequest", function (e) {
@@ -183,7 +183,7 @@
     inflight++;
     if (!slowTimer && bar) slowTimer = setTimeout(function () { bar.hidden = false; }, 500);
     var xhr = e.detail.xhr;
-    if (isDrawerRequest(e)) drawerRequestStarted(xhr, elt);
+    if (isInspectorRequest(e)) inspectorRequestStarted(xhr, elt);
     xhr.addEventListener("loadend", function () {
       inflight = Math.max(0, inflight - 1);
       if (inflight === 0) {
@@ -221,15 +221,15 @@
       function () { toast("This browser would not copy that; select the text and copy it by hand.", "err"); });
   });
 
-  // ---------- "Edit a copy" (drawer → composer) ----------
-  // Prefills the composer from a record in the drawer: key, value, headers,
+  // ---------- "Edit a copy" (inspector → composer) ----------
+  // Prefills the composer from a record in the inspector: key, value, headers,
   // partition, and how each is encoded, for changing before sending. ("Send
   // again" is a different thing: the server re-produces the stored record
   // exactly, which a form cannot promise.)
   document.addEventListener("click", function (e) {
-    var b = e.target.closest("#drawer-edit");
+    var b = e.target.closest("#inspector-edit");
     if (!b) return;
-    closeDrawer(false);
+    closeInspector(false);
     var panel = document.getElementById("compose-panel");
     if (!panel) return;
     setDock(true);
@@ -260,13 +260,14 @@
 
   // ---------- dialogs ----------
   // Three things open over the page: the confirm dialog, the command palette and
-  // the message drawer. Only one is open at a time, and while one is, the page's
+  // the message inspector. Only one is open at a time, and while one is, the page's
   // single-key shortcuts are off.
   var FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
   function isOpen(id) { var el = document.getElementById(id); return !!el && !el.hidden; }
   function confirmOpen() { return isOpen("confirm"); }
   function paletteOpen() { return isOpen("palette"); }
-  function drawerIsOpen() { return isOpen("drawer-overlay"); }
+  function inspectorIsOpen() { return isOpen("inspector-overlay"); }
+  function helpOpen() { return isOpen("help"); }
   // Tab stays inside an open dialog.
   function trapTab(box, ev) {
     if (ev.key !== "Tab") return;
@@ -334,7 +335,7 @@
 
   function openPalette() {
     if (!pal || confirmOpen()) return;
-    if (drawerIsOpen()) closeDrawer(false);
+    if (inspectorIsOpen()) closeInspector(false);
     if (!paletteOpen()) palOpener = document.activeElement;
     pal.hidden = false; palQ.value = ""; palSel = 0;
     var here = location.pathname;
@@ -486,7 +487,7 @@
       return;
     }
     if (mod && !e.altKey && !e.shiftKey && e.key === "k") { e.preventDefault(); openPalette(); return; }
-    if (drawerIsOpen()) return; // the drawer's keys are handled where the drawer is.
+    if (inspectorIsOpen()) return; // the inspector's keys are handled where the inspector is.
     var active = document.activeElement || document.body;
     // ⌘⏎ sends from the composer, from a plain field or from inside the editor.
     // Once per press: a held key repeats, and each repeat used to send a record.
@@ -520,126 +521,154 @@
     else if (e.key === "[") setRail(!railSlim());
   });
 
-  // ---------- the message drawer ----------
+  // ---------- the message inspector ----------
   // A real dialog in every state (loading, a record, an error): it has a title
   // and a close button, takes focus when it opens, keeps Tab inside, closes on
   // Esc or a click outside, and hands focus back to the row that opened it. Its
   // record is in the URL (?open=OFFSET), so a refresh or a shared link reopens it.
-  var drawerOverlay = document.getElementById("drawer-overlay");
-  var drawer = document.getElementById("drawer");
-  var drawerOpener = null, drawerXhr = null, drawerRefocus = null;
-  function setOpenParam(offset) {
+  var inspectorOverlay = document.getElementById("inspector-overlay");
+  var inspector = document.getElementById("inspector");
+  var inspectorOpener = null, inspectorXhr = null, inspectorRefocus = null;
+  // The selection is in the address as ?open=. Opening one pushes an entry (so
+  // Back returns to the previous selection, or to none); closing rewrites the
+  // current entry without it. Our entries carry a marker so a popstate to one of
+  // them is ours to answer and htmx (which restores only its own) leaves it alone.
+  function openParamNow() { return new URLSearchParams(location.search).get("open"); }
+  function setOpenParam(value, push) {
     try {
       var u = new URL(location.href);
-      if (offset == null) u.searchParams.delete("open"); else u.searchParams.set("open", offset);
-      history.replaceState(history.state, "", u.pathname + (u.search || "") + u.hash);
+      if (value == null) u.searchParams.delete("open"); else u.searchParams.set("open", value);
+      var next = u.pathname + (u.search || "") + u.hash;
+      if (next === location.pathname + location.search + location.hash) return;
+      if (push) history.pushState({ dozeInspector: 1 }, "", next);
+      else history.replaceState(history.state, "", next);
     } catch (e) {}
   }
-  function openDrawer(from) {
-    if (!drawerOverlay || confirmOpen()) return;
-    if (!drawerIsOpen()) drawerOpener = from || document.activeElement;
-    drawerOverlay.hidden = false;
+  function openInspector(from) {
+    if (!inspectorOverlay || confirmOpen()) return;
+    if (!inspectorIsOpen()) inspectorOpener = from || document.activeElement;
+    inspectorOverlay.hidden = false;
   }
-  function closeDrawer(restoreFocus) {
-    if (!drawerIsOpen()) return;
-    drawerOverlay.hidden = true;
-    // A request still on its way is for a drawer that is no longer open. Left
-    // alone, its answer filled the closed drawer and put ?open= back in the URL.
-    if (drawerXhr) { drawerXhr.dozeDropped = true; drawerXhr.abort(); drawerXhr = null; }
-    drawer.textContent = "";
-    drawer.classList.remove("busy");
-    drawer.removeAttribute("aria-busy");
-    setOpenParam(null);
-    var back = drawerOpener;
-    drawerOpener = null;
+  // closeInspector(restoreFocus, keepURL): the URL loses ?open= unless the close
+  // is the answer to the URL having already lost it (Back).
+  function closeInspector(restoreFocus, keepURL) {
+    if (!inspectorIsOpen()) return;
+    inspectorOverlay.hidden = true;
+    // A request still on its way is for an inspector that is no longer open. Left
+    // alone, its answer filled the closed inspector and put ?open= back in the URL.
+    if (inspectorXhr) { inspectorXhr.dozeDropped = true; inspectorXhr.abort(); inspectorXhr = null; }
+    inspector.textContent = "";
+    inspector.classList.remove("busy");
+    inspector.removeAttribute("aria-busy");
+    if (!keepURL) setOpenParam(null, false);
+    var back = inspectorOpener;
+    inspectorOpener = null;
     if (restoreFocus === false || !back) return;
     // A live update may have replaced the row since; the new one has the same id.
     if (!document.contains(back) && back.id) back = document.getElementById(back.id);
     if (back && back.focus) back.focus();
   }
-  // message fills the drawer with a titled state that is not a record: loading,
-  // or what went wrong.
-  function drawerMessage(title, text, isError) {
-    drawer.textContent = "";
+  // message fills the inspector with a titled state that is not a selection:
+  // loading, or what went wrong.
+  function inspectorMessage(title, text, isError) {
+    inspector.textContent = "";
     var h = document.createElement("div");
-    h.className = "drawer-h";
-    h.innerHTML = '<div><span class="t" id="drawer-title"></span></div><div class="drawer-nav"><button type="button" class="icon-btn" aria-label="Close" data-drawer-close>✕</button></div>';
-    h.querySelector("#drawer-title").textContent = title;
+    h.className = "inspector-h";
+    h.innerHTML = '<div><span class="t" id="inspector-title"></span></div><div class="inspector-nav"><button type="button" class="icon-btn" aria-label="Close" data-inspector-close>✕</button></div>';
+    h.querySelector("#inspector-title").textContent = title;
     var b = document.createElement("div");
-    if (isError) { b.className = "err drawer-err"; b.setAttribute("role", "alert"); b.textContent = text; }
-    else { b.className = "drawer-loading"; b.innerHTML = '<span class="spinner" aria-hidden="true"></span> '; b.appendChild(document.createTextNode(text)); }
-    drawer.appendChild(h);
-    drawer.appendChild(b);
-    h.querySelector("[data-drawer-close]").focus();
+    if (isError) { b.className = "err inspector-err"; b.setAttribute("role", "alert"); b.textContent = text; }
+    else { b.className = "inspector-loading"; b.innerHTML = '<span class="spinner" aria-hidden="true"></span> '; b.appendChild(document.createTextNode(text)); }
+    inspector.appendChild(h);
+    inspector.appendChild(b);
+    h.querySelector("[data-inspector-close]").focus();
   }
-  function drawerRequestStarted(xhr, from) {
-    if (!drawer) return;
+  function inspectorRequestStarted(xhr, from) {
+    if (!inspector) return;
     // htmx hears the click on a row before the document does, so the request can
-    // start while the drawer is still hidden, and a hidden dialog cannot take focus.
-    openDrawer(from);
-    if (drawerXhr) { drawerXhr.dozeDropped = true; drawerXhr.abort(); } // the newer click wins.
-    drawerXhr = xhr;
+    // start while the inspector is still hidden, and a hidden dialog cannot take focus.
+    openInspector(from);
+    if (inspectorXhr) { inspectorXhr.dozeDropped = true; inspectorXhr.abort(); } // the newer click wins.
+    inspectorXhr = xhr;
     var a = document.activeElement;
-    drawerRefocus = a && drawer.contains(a) ? a.getAttribute("aria-label") : null;
+    inspectorRefocus = a && inspector.contains(a) ? a.getAttribute("aria-label") : null;
     // Stepping to the next record keeps the current one on screen, dimmed, until
     // the new one arrives. A first open has nothing to keep, and says so.
-    if (drawer.querySelector(".drawer-b")) { drawer.classList.add("busy"); drawer.setAttribute("aria-busy", "true"); }
-    else drawerMessage("Opening record", "Loading…", false);
+    if (inspector.querySelector(".inspector-b")) { inspector.classList.add("busy"); inspector.setAttribute("aria-busy", "true"); }
+    else inspectorMessage("Opening", "Loading…", false);
     xhr.addEventListener("loadend", function () {
       if (xhr.dozeDropped) return;
-      if (drawerXhr === xhr) drawerXhr = null;
-      drawer.classList.remove("busy");
-      drawer.removeAttribute("aria-busy");
-      if (!drawerIsOpen()) return;
-      if (xhr.status === 0) drawerMessage("Could not open the record", "No answer from the console — is doze-kafka still running?", true);
-      else if (xhr.status >= 400) drawerMessage("Could not open the record", errorText(xhr), true);
+      if (inspectorXhr === xhr) inspectorXhr = null;
+      inspector.classList.remove("busy");
+      inspector.removeAttribute("aria-busy");
+      if (!inspectorIsOpen()) return;
+      if (xhr.status === 0) inspectorMessage("Could not open it", "No answer from the console — is doze-kafka still running?", true);
+      else if (xhr.status >= 400) inspectorMessage("Could not open it", errorText(xhr), true);
     });
   }
   document.addEventListener("click", function (e) {
-    var row = e.target.closest("[data-drawer-open]");
-    if (row) { openDrawer(row); return; }
-    if (e.target.closest("[data-drawer-close]")) { closeDrawer(); return; }
-    if (e.target === drawerOverlay) closeDrawer();
+    var row = e.target.closest("[data-inspector-open]");
+    if (row) { openInspector(row); return; }
+    if (e.target.closest("[data-inspector-close]")) { closeInspector(); return; }
+    if (e.target === inspectorOverlay) closeInspector();
   });
   document.addEventListener("keydown", function (e) {
-    if (confirmOpen() || paletteOpen()) return;
-    var row = e.target.closest && e.target.closest("[data-drawer-open]");
-    if (row && (e.key === "Enter" || e.key === " ")) { openDrawer(row); return; } // htmx fires the request.
-    if (!drawerIsOpen()) return;
-    if (e.key === "Escape") { closeDrawer(); e.preventDefault(); e.stopPropagation(); return; }
-    trapTab(drawerOverlay, e);
+    if (confirmOpen() || paletteOpen() || helpOpen()) return;
+    var row = e.target.closest && e.target.closest("[data-inspector-open]");
+    if (row && (e.key === "Enter" || e.key === " ")) { openInspector(row); return; } // htmx fires the request.
+    if (!inspectorIsOpen()) return;
+    if (e.key === "Escape") { closeInspector(); e.preventDefault(); e.stopPropagation(); return; }
+    trapTab(inspectorOverlay, e);
   }, true);
-  // A record landed in the drawer: put it in the URL and move focus in — to the
-  // button that asked, when it was Older or Newer, so stepping keeps its place.
+  // A selection landed in the inspector: put it in the URL and move focus in, to
+  // the button that asked when it was Older or Newer, so stepping keeps its place.
   document.addEventListener("htmx:afterSwap", function (e) {
     var t = e.detail.target;
-    if (!t || t.id !== "drawer") return;
-    if (!drawerIsOpen()) { t.textContent = ""; return; }
-    var title = t.querySelector("#drawer-title[data-offset]");
-    // Only on the partition's own table: ?open= names an offset on the partition
-    // in view, which a search across partitions does not have.
+    if (!t || t.id !== "inspector") return;
+    if (!inspectorIsOpen()) { t.textContent = ""; return; }
+    var title = t.querySelector("#inspector-title[data-open]");
+    var open = title ? title.getAttribute("data-open") : "";
+    // A record is named by an offset on the partition in view; a search across
+    // partitions has no single partition, and so no address for it.
     var region = document.getElementById("tape-and-table");
-    if (title && region && region.hasAttribute("data-msg-base")) setOpenParam(title.getAttribute("data-offset"));
-    var again = drawerRefocus && t.querySelector('button[aria-label="' + drawerRefocus + '"]:not([disabled])');
-    var btn = again || t.querySelector("[data-drawer-close]");
+    var isMessage = title && title.hasAttribute("data-offset");
+    if (open && (!isMessage || (region && region.hasAttribute("data-msg-base")))) setOpenParam(open, openParamNow() !== open);
+    var again = inspectorRefocus && t.querySelector('button[aria-label="' + inspectorRefocus + '"]:not([disabled])');
+    var btn = again || t.querySelector("[data-inspector-close]");
     if (btn) btn.focus();
   });
-  // A link or refresh with ?open=N reopens that record.
-  function reopenFromURL() {
-    var open = new URLSearchParams(location.search).get("open");
+  // Where a selection named by ?open= is fetched from: a bare value is a record on
+  // the page's own partition; kind:key is the inspector's route.
+  function inspectorFetchURL(open) {
+    var m = /^([a-z]+):(.*)$/.exec(open);
+    if (m) return PREFIX + "/inspect/" + m[1] + "?key=" + encodeURIComponent(m[2]);
     var region = document.getElementById("tape-and-table");
-    if (open == null || !region || !region.hasAttribute("data-msg-base") || !window.htmx) return;
-    openDrawer(document.getElementById("msg-" + open));
-    htmx.ajax("GET", region.getAttribute("data-msg-base") + "&offset=" + encodeURIComponent(open), {
-      target: "#drawer", swap: "innerHTML",
-    }).catch(function () {});
+    if (!region || !region.hasAttribute("data-msg-base")) return null;
+    return region.getAttribute("data-msg-base") + "&offset=" + encodeURIComponent(open);
   }
-  document.addEventListener("DOMContentLoaded", reopenFromURL);
-  // "Send again" closes the drawer once the broker has taken the copy; on a
+  function inspectorOpenRow(open) {
+    var m = /^([a-z]+):(.*)$/.exec(open);
+    return m ? null : document.getElementById("msg-" + open);
+  }
+  // A link or refresh with ?open= reopens that selection; Back and Forward move
+  // between the selections the person made.
+  function syncInspectorFromURL() {
+    var open = openParamNow();
+    if (open == null) { closeInspector(true, true); return; }
+    var url = inspectorFetchURL(open);
+    if (!url || !window.htmx) return;
+    var title = inspectorIsOpen() && inspector.querySelector("#inspector-title[data-open]");
+    if (title && title.getAttribute("data-open") === open) return;
+    openInspector(inspectorOpenRow(open));
+    htmx.ajax("GET", url, { target: "#inspector", swap: "innerHTML" }).catch(function () {});
+  }
+  document.addEventListener("DOMContentLoaded", syncInspectorFromURL);
+  window.addEventListener("popstate", syncInspectorFromURL);
+  // "Send again" closes the inspector once the broker has taken the copy; on a
   // failure it stays open, and the error is a toast.
   document.addEventListener("htmx:afterRequest", function (e) {
     var el = e.detail.elt;
-    if (el && el.hasAttribute && el.hasAttribute("data-close-drawer-on-success") && e.detail.successful) closeDrawer(false);
+    if (el && el.hasAttribute && el.hasAttribute("data-close-inspector-on-success") && e.detail.successful) closeInspector(false);
   });
 
   // ---------- docked composer ----------
@@ -784,7 +813,7 @@
     // A poll that was already on its way when a confirm dialog opened.
     if ((confirmOpen() || t.querySelector("[data-hold-live]")) && isLivePoll(e)) { e.detail.shouldSwap = false; if (e.detail.xhr) e.detail.xhr.dozeHeld = true; return; }
     // Fires for a 204 too, where nothing will be swapped. Saving state then left
-    // it lying around for the next unrelated swap (opening the drawer) to
+    // it lying around for the next unrelated swap (opening the inspector) to
     // "restore", which threw the table back to wherever it had been.
     if (!e.detail.shouldSwap) return;
     var jump = t.querySelector("#jump-to");
@@ -826,7 +855,7 @@
     // Someone reading down the table keeps their place; someone parked at the top
     // (the newest rows) just sees the new ones arrive.
     if (wrap) { wrap.scrollLeft = st.scrollLeft; if (!st.atTop) wrap.scrollTop = st.scrollTop; }
-    if (st.focus && !drawerIsOpen() && !paletteOpen()) {
+    if (st.focus && !inspectorIsOpen() && !paletteOpen()) {
       var el = st.focus.id ? document.getElementById(st.focus.id) : region.querySelectorAll(FOCUSABLE)[st.focus.at];
       if (el && region.contains(el) && (st.focus.id || el.tagName === st.focus.tag)) {
         el.focus({ preventScroll: true });

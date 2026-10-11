@@ -10,45 +10,45 @@ const row = (page: any, offset: number) => page.locator(`#msg-${offset}`);
 // brought.
 const settled = (page: any) => page.waitForFunction(() => !document.querySelector('.htmx-added, .htmx-swapping, .htmx-settling'));
 
-test('a record opens in the drawer, with its place in the URL, and Esc closes it', async ({ page }) => {
+test('a record opens in the inspector, with its place in the URL, and Esc closes it', async ({ page }) => {
   await page.goto('topics/seed-orders');
   await row(page, 5).click();
-  await expect(page.locator('#drawer-title')).toHaveAttribute('data-offset', '5');
-  await expect(page.locator('#drawer')).toContainText('ord_8905');
-  await expect(page.locator('#drawer')).toContainText('traceparent');
-  await expect(page.locator('#drawer #drawer-title')).toBeFocused({ timeout: 100 }).catch(() => {});
+  await expect(page.locator('#inspector-title')).toHaveAttribute('data-offset', '5');
+  await expect(page.locator('#inspector')).toContainText('ord_8905');
+  await expect(page.locator('#inspector')).toContainText('traceparent');
+  await expect(page.locator('#inspector #inspector-title')).toBeFocused({ timeout: 100 }).catch(() => {});
   expect(page.url()).toContain('open=5');
   await page.keyboard.press('Escape');
-  await expect(page.locator('#drawer-overlay')).toBeHidden();
+  await expect(page.locator('#inspector-overlay')).toBeHidden();
   expect(page.url()).not.toContain('open=');
   await expect(row(page, 5)).toBeFocused(); // focus goes back to where it came from.
 });
 
 test('a link with ?open= reopens the record; Older and Newer step through the log', async ({ page }) => {
   await page.goto('topics/seed-orders?partition=0&open=20');
-  await expect(page.locator('#drawer-title')).toHaveAttribute('data-offset', '20');
+  await expect(page.locator('#inspector-title')).toHaveAttribute('data-offset', '20');
   await settled(page);
   await page.getByRole('button', { name: 'Older record' }).click();
-  await expect(page.locator('#drawer-title')).toHaveAttribute('data-offset', '19');
+  await expect(page.locator('#inspector-title')).toHaveAttribute('data-offset', '19');
   await expect(page.getByRole('button', { name: 'Older record' })).toBeFocused(); // stepping keeps its place.
-  // One step at a time: each load replaces the drawer, buttons included.
+  // One step at a time: each load replaces the inspector, buttons included.
   await settled(page);
   await page.getByRole('button', { name: 'Newer record' }).click();
-  await expect(page.locator('#drawer-title')).toHaveAttribute('data-offset', '20');
+  await expect(page.locator('#inspector-title')).toHaveAttribute('data-offset', '20');
   await settled(page);
   await page.getByRole('button', { name: 'Newer record' }).click();
-  await expect(page.locator('#drawer-title')).toHaveAttribute('data-offset', '21');
+  await expect(page.locator('#inspector-title')).toHaveAttribute('data-offset', '21');
   await expect(page.locator('#reqbar')).toBeHidden(); // the slow-request bar does not stay on.
 });
 
-test('a drawer that cannot load says why, and still closes', async ({ page }) => {
+test('a inspector that cannot load says why, and still closes', async ({ page }) => {
   await page.goto('topics/seed-orders');
   await page.route('**/message?*', (r) => r.fulfill({ status: 502, body: 'The console could not get an answer from the broker.' }));
   await row(page, 5).click();
-  await expect(page.locator('#drawer [role="alert"]')).toContainText('could not get an answer');
-  await expect(page.locator('#drawer #drawer-title')).toBeVisible(); // it is still a dialog, with a title and a close button.
+  await expect(page.locator('#inspector [role="alert"]')).toContainText('could not get an answer');
+  await expect(page.locator('#inspector #inspector-title')).toBeVisible(); // it is still a dialog, with a title and a close button.
   await page.keyboard.press('Escape');
-  await expect(page.locator('#drawer-overlay')).toBeHidden();
+  await expect(page.locator('#inspector-overlay')).toBeHidden();
 });
 
 test('binary, empty and null values are labelled, with hex and base64 to read', async ({ page }) => {
@@ -57,20 +57,20 @@ test('binary, empty and null values are labelled, with hex and base64 to read', 
   await expect(row(page, 41).locator('.cell-val')).toHaveClass(/tomb/);
   await expect(row(page, 40).locator('.cell-key')).toContainText('no key');
   await row(page, 42).click();
-  await expect(page.locator('#drawer')).toContainText('binary');
+  await expect(page.locator('#inspector')).toContainText('binary');
   await expect(page.locator('.hexbox')).toContainText('de ad be ef');
   await page.getByRole('button', { name: 'Base64', exact: true }).click();
-  await expect(page.locator('#drawer')).toContainText('3q2+7wABAgP//g==');
+  await expect(page.locator('#inspector')).toContainText('3q2+7wABAgP//g==');
   await page.keyboard.press('Escape');
   await row(page, 41).click();
-  await expect(page.locator('#drawer')).toContainText('null — a tombstone');
+  await expect(page.locator('#inspector')).toContainText('null — a tombstone');
 });
 
-test('a very long key wraps inside the drawer instead of widening it', async ({ page }) => {
+test('a very long key wraps inside the inspector instead of widening it', async ({ page }) => {
   await page.goto('topics/seed-orders');
   await row(page, 43).click();
-  await expect(page.locator('#drawer-title')).toHaveAttribute('data-offset', '43');
-  const box = await page.evaluate(() => { const d = document.getElementById('drawer')!; return { scroll: d.scrollWidth, client: d.clientWidth }; });
+  await expect(page.locator('#inspector-title')).toHaveAttribute('data-offset', '43');
+  const box = await page.evaluate(() => { const d = document.getElementById('inspector')!; return { scroll: d.scrollWidth, client: d.clientWidth }; });
   expect(box.scroll).toBeLessThanOrEqual(box.client + 1);
 });
 
@@ -81,13 +81,13 @@ test('Send again produces an exact copy; Edit a copy fills the composer', async 
   await page.goto(`topics/${name}`);
   await row(page, 0).click();
   await page.getByRole('button', { name: 'Send again' }).click();
-  await expect(page.locator('#drawer-overlay')).toBeHidden(); // closes once the broker has taken the copy.
+  await expect(page.locator('#inspector-overlay')).toBeHidden(); // closes once the broker has taken the copy.
   await expect(row(page, 1)).toBeVisible();
   await settled(page); // a row only answers a click once htmx has processed it.
   await row(page, 1).click();
-  await expect(page.locator('#drawer')).toContainText('"b"');
-  // The drawer shows JSON indented to read; "Edit a copy" and "Send again" carry the stored bytes.
-  await expect(page.locator('#drawer-edit')).toHaveAttribute('data-value', '{"a":1,"b":[1,2]}');
+  await expect(page.locator('#inspector')).toContainText('"b"');
+  // The inspector shows JSON indented to read; "Edit a copy" and "Send again" carry the stored bytes.
+  await expect(page.locator('#inspector-edit')).toHaveAttribute('data-value', '{"a":1,"b":[1,2]}');
   await page.getByRole('button', { name: 'Edit a copy…' }).click();
   await expect(page.locator('#compose-head')).toHaveAttribute('aria-expanded', 'true');
   await expect(page.locator('#f-key')).toHaveValue('k');
@@ -136,6 +136,6 @@ test('searching all partitions shows where each match is, and a match opens its 
   expect(new Set(partitions.map((p) => p.trim()))).toEqual(new Set(['0', '1', '2']));
   await expect(page.locator('#tape-and-table[data-live]')).toHaveCount(0); // a search is not the live tail.
   await page.locator('tr[id^="hit-1-"]').first().click();
-  await expect(page.locator('#drawer-title')).toContainText('P1 ·');
+  await expect(page.locator('#inspector-title')).toContainText('P1 ·');
   expect(page.url()).not.toContain('open='); // ?open= names an offset on one partition; this is across several.
 });

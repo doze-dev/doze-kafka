@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"hash/fnv"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -83,7 +82,7 @@ func trafficFilterFrom(r *http.Request) TrafficFilter {
 }
 
 // query is the filter as a URL query (without the leading "?"), so the live poll and
-// the drawer links keep what the person asked for.
+// the inspector links keep what the person asked for.
 func (f TrafficFilter) query() string {
 	var parts []string
 	add := func(k, v string) {
@@ -122,7 +121,7 @@ type trafficRow struct {
 	Who      string // the client id, else the address.
 	Dur      string
 	Sizes    string
-	DrawerQ  string
+	OpenKey  string
 	Folded   bool
 	SameSpan string // "for 2m10s" on a folded row.
 }
@@ -192,7 +191,7 @@ func (c *Console) trafficData(r *http.Request) map[string]any {
 	h := fnv.New64a()
 	for _, e := range events {
 		row := c.trafficRow(e)
-		row.DrawerQ = "seq=" + strconv.FormatUint(e.Seq, 10)
+		row.OpenKey = requestKey(e)
 		rows = append(rows, row)
 		fmt.Fprint(h, e.Seq, e.Count, ",")
 	}
@@ -241,27 +240,15 @@ func (c *Console) trafficLive(w http.ResponseWriter, r *http.Request) {
 	c.partial(w, "traffic_live", data)
 }
 
-// trafficRequest is the drawer for one request. A row that has folded in another
-// request since the page was drawn has a new sequence number; the drawer says so
-// rather than showing a different request than the one clicked.
+// trafficRequest is the inspector for one request, at its earlier address (the
+// inspector route is the one the page uses). A row is named by its row id; a
+// sequence number, which moves whenever the row folds in a repeat, is still
+// accepted and is turned into the id of the row that has it now.
 func (c *Console) trafficRequest(w http.ResponseWriter, r *http.Request) {
-	if c.traffic == nil {
-		c.fail(w, r, fmt.Errorf("%w: there is no traffic view in this console", errNotFound))
+	if c.trafficOff(w, r) {
 		return
 	}
-	seq, err := strconv.ParseUint(r.URL.Query().Get("seq"), 10, 64)
-	if err != nil {
-		c.fail(w, r, badInput("seq must be a number"))
-		return
-	}
-	for _, e := range c.traffic.Events(TrafficFilter{}, 0) {
-		if e.Seq == seq {
-			row := c.trafficRow(e)
-			c.partial(w, "traffic_drawer", map[string]any{"R": row})
-			return
-		}
-	}
-	c.partial(w, "traffic_drawer", map[string]any{"Gone": true})
+	c.inspectRequest(w, r, r.URL.Query().Get("key"))
 }
 
 // timelineRow is one thing a group did, ready to show.

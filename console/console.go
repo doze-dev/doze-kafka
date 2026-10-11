@@ -235,7 +235,7 @@ func (c *Console) routes() {
 	m.HandleFunc("GET "+p+"/topics/{name}/tape", c.topicTape)              // HTMX partial (polled)
 	m.HandleFunc("POST "+p+"/topics/{name}/produce", c.topicProduce)
 	m.HandleFunc("POST "+p+"/topics/{name}/resend", c.topicResend)  // an exact copy of a stored record
-	m.HandleFunc("GET "+p+"/topics/{name}/message", c.topicMessage) // drawer partial
+	m.HandleFunc("GET "+p+"/topics/{name}/message", c.topicMessage) // inspector partial
 	m.HandleFunc("GET "+p+"/topics/{name}/message/raw", c.topicMessageRaw)
 
 	// Lineage: where else did the messages of one trace go.
@@ -245,7 +245,7 @@ func (c *Console) routes() {
 	// Traffic (what clients asked the broker).
 	m.HandleFunc("GET "+p+"/traffic", c.trafficPage)
 	m.HandleFunc("GET "+p+"/traffic/live", c.trafficLive)       // HTMX partial (polled)
-	m.HandleFunc("GET "+p+"/traffic/request", c.trafficRequest) // drawer partial
+	m.HandleFunc("GET "+p+"/traffic/request", c.trafficRequest) // inspector partial
 
 	// Schemas (the built-in registry).
 	m.HandleFunc("GET "+p+"/schemas", c.schemas)
@@ -269,6 +269,8 @@ func (c *Console) routes() {
 	// Cluster.
 	m.HandleFunc("GET "+p+"/cluster", c.cluster)
 	m.HandleFunc("GET "+p+"/access", c.access) // stored ACLs, read-only, with the banner that they are not enforced
+
+	c.inspectorRoutes(m) // the inspector: a request, client, member, subject, transaction or event.
 
 	// Resource index for the command palette.
 	m.HandleFunc("GET "+p+"/api/palette", c.apiPalette)
@@ -358,6 +360,12 @@ func templateFuncs(prefix string) template.FuncMap {
 			return u
 		},
 		"t": uiText,
+		// Keys of the inspector's selections, escaped for a query string.
+		"memberKey": func(group, member string) string { return url.QueryEscape(joinKey(group, member)) },
+		"eventKey": func(group string, seq uint64) string {
+			return url.QueryEscape(joinKey(group, strconv.FormatUint(seq, 10)))
+		},
+		"txnKey": func(id string) string { return url.QueryEscape(id) },
 		"dict": func(kv ...any) map[string]any {
 			m := make(map[string]any, len(kv)/2)
 			for i := 0; i+1 < len(kv); i += 2 {

@@ -17,7 +17,7 @@ import (
 // looked like an empty string), and offered no way to see or copy the real bytes.
 
 const (
-	displayLimit = 256 << 10 // most text/hex shown for one value in the drawer.
+	displayLimit = 256 << 10 // most text/hex shown for one value in the inspector.
 	prettyLimit  = 512 << 10 // most that re-indented JSON may grow to; past it the text is shown as sent.
 	hexLimit     = 16 << 10  // most bytes shown as a hex dump.
 	resendLimit  = 64 << 10  // largest value "Send again" will carry in the page.
@@ -116,7 +116,7 @@ const binarySample = 4096
 // looksBinarySample is looksBinary for the first bytes of a longer value. The cut
 // may fall inside a multi-byte character, which says nothing about the value, so
 // a partial character at the end is ignored: 4,095 letters followed by an "é"
-// were shown as binary in the table and as text in the drawer.
+// were shown as binary in the table and as text in the inspector.
 func looksBinarySample(b []byte) bool {
 	sample := b
 	if len(b) > binarySample {

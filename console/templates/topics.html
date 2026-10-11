@@ -208,7 +208,7 @@
           <td colspan="5" class="txnmark-l" title="A commit or abort ends a transaction here. It takes an offset and is not a record.">transaction marker</td>
         </tr>
         {{else}}
-        <tr id="{{if $.Search}}hit-{{.Partition}}-{{.Offset}}{{else}}msg-{{.Offset}}{{end}}" class="{{if and (not $.Search) (eq .Offset $.HL)}}hl{{end}}{{if .Txn}} txn-{{.Txn}}{{end}}" {{if and (not $.Search) (eq .Offset $.HL)}}data-hl{{end}} tabindex="0" role="button" aria-label="Open {{if $.Search}}partition {{.Partition}} {{end}}offset {{.Offset}}" data-drawer-open hx-get="{{topicURL $.Topic.Name}}/message?partition={{.Partition}}&offset={{.Offset}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML">
+        <tr id="{{if $.Search}}hit-{{.Partition}}-{{.Offset}}{{else}}msg-{{.Offset}}{{end}}" class="{{if and (not $.Search) (eq .Offset $.HL)}}hl{{end}}{{if .Txn}} txn-{{.Txn}}{{end}}" {{if and (not $.Search) (eq .Offset $.HL)}}data-hl{{end}} tabindex="0" role="button" aria-label="Open {{if $.Search}}partition {{.Partition}} {{end}}offset {{.Offset}}" data-inspector-open hx-get="{{topicURL $.Topic.Name}}/message?partition={{.Partition}}&offset={{.Offset}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
           {{if $.Search}}<td class="num mono">{{.Partition}}</td>{{end}}
           <td class="cell-offset num">{{.Offset}}{{if .Txn}} <span class="txnbadge txnbadge-{{.Txn}}" title="{{if eq .Txn "open"}}Part of a transaction that has not ended; a read-committed consumer cannot see it yet.{{else}}Part of a transaction that aborted; a read-committed consumer never sees it.{{end}}">{{.Txn}}</span>{{end}}</td>
           <td class="cell-time col-time" title="{{.TimeFull}}">{{.TimeStr}} <span class="dim ago" data-ts="{{.Timestamp.UnixMilli}}">· {{ago .Timestamp}}</span></td>
@@ -236,15 +236,10 @@
 </div>
 {{end}}
 
-{{define "message_drawer"}}
-<div class="drawer-h">
-  <div><span class="t" id="drawer-title" data-offset="{{.Msg.Offset}}">P{{.Partition}} · offset {{.Msg.Offset}}</span><span class="drawer-sub mono">{{.Topic}}</span></div>
-  <div class="drawer-nav">
-    <button type="button" class="icon-btn" aria-label="Older record" title="Older (offset {{if ge .Older 0}}{{.Older}}{{end}})" {{if lt .Older 0}}disabled{{else}}hx-get="{{topicURL .Topic}}/message?partition={{.Partition}}&offset={{.Older}}" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML"{{end}}>{{icon "chevron-up"}}</button>
-    <button type="button" class="icon-btn" aria-label="Newer record" title="Newer (offset {{if ge .Newer 0}}{{.Newer}}{{end}})" {{if lt .Newer 0}}disabled{{else}}hx-get="{{topicURL .Topic}}/message?partition={{.Partition}}&offset={{.Newer}}" hx-target="#drawer" hx-select="unset" hx-swap="innerHTML"{{end}}>{{icon "chevron-down"}}</button>
-    <button type="button" class="icon-btn" aria-label="Close" data-drawer-close>{{icon "x"}}</button>
-  </div></div>
-<div class="drawer-b">
+{{/* inspector_message is the body of the inspector for a record; the header
+     (title, Older, Newer, Close) is the inspector contract in inspector.html. */}}
+{{define "inspector_message"}}
+<div class="inspector-b">
   <div class="meta-row"><span class="k">Timestamp</span><span class="v">{{.TimeStr}}</span></div>
   <div class="meta-row"><span class="k">Key</span><span class="v">
     {{if .Key.Null}}<span class="dim">null</span>{{else if .Key.Empty}}<span class="dim">"" (empty)</span>
@@ -252,7 +247,7 @@
     {{else}}{{template "kvcopy" .Key.Text}}{{end}}
     {{if and (not .Key.Null) (not .Key.Empty)}}<span class="sz">{{.Key.SizeText}}</span>{{end}}</span></div>
 
-  {{with .Trace}}<div class="meta-row"><span class="k">Trace</span><span class="v"><a class="btn btn-outline" id="drawer-trace" href="{{$.TraceURL}}">{{icon "activity"}} Follow this message</a> <span class="sz mono" title="{{.Kind}}">{{.ID}}</span></span></div>{{end}}
+  {{with .Trace}}<div class="meta-row"><span class="k">Trace</span><span class="v"><a class="btn btn-outline" id="inspector-trace" href="{{$.TraceURL}}">{{icon "activity"}} Follow this message</a> <span class="sz mono" title="{{.Kind}}">{{.ID}}</span></span></div>{{end}}
   <div class="sec-title flush">Headers{{if .Headers}} · {{len .Headers}}{{end}}</div>
   {{if .Headers}}<div class="hdrlist">{{range .Headers}}<div class="hdrpair"><span class="hk">{{.Key}}</span><span class="dim">=</span><span class="hv">{{if .V.Null}}<span class="dim">null</span>{{else if .V.Empty}}<span class="dim">""</span>{{else if .V.Binary}}{{.V.Preview}}{{else}}{{.V.Text}}{{end}}</span></div>{{end}}</div>
   {{else}}<div class="note">No headers on this record.</div>{{end}}
@@ -276,17 +271,17 @@
     <div class="valuebox hexbox" x-show="f==='hex'" {{if not .Value.Binary}}style="display:none"{{end}}>{{.Value.Hex}}</div>
     {{if .Value.B64}}<div class="valuebox" x-show="f==='b64'" style="display:none">{{.Value.B64}}</div>{{end}}
     {{if .Value.Truncated}}<div class="honest note-gap">{{icon "info"}}<div>Showing the start of a {{.Value.SizeText}} value. Download it for the rest.</div></div>{{else if .Value.HexCut}}<div class="honest note-gap" x-show="f==='hex'" style="display:none">{{icon "info"}}<div>The hex view shows the first 16 KB of {{.Value.SizeText}}.</div></div>{{end}}
-    <div class="drawer-dl"><a class="btn btn-outline" href="{{topicURL .Topic}}/message/raw?partition={{.Partition}}&offset={{.Msg.Offset}}&field=value" download>Download value</a></div>
+    <div class="inspector-dl"><a class="btn btn-outline" href="{{topicURL .Topic}}/message/raw?partition={{.Partition}}&offset={{.Msg.Offset}}&field=value" download>Download value</a></div>
     {{end}}
   </div>
 
-  <div class="drawer-acts">
-    <button type="button" class="btn btn-outline" data-close-drawer-on-success
+  <div class="inspector-acts">
+    <button type="button" class="btn btn-outline" data-close-inspector-on-success
       hx-post="{{topicURL .Topic}}/resend" hx-vals='{"partition":"{{.Partition}}","offset":"{{.Msg.Offset}}"}'
       hx-target="#tape-and-table" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
       title="Produce an exact copy of this record (same key, value and headers, byte for byte) to partition {{.Partition}}">{{icon "send"}} Send again</button>
     {{if .CanEdit}}
-    <button type="button" class="btn btn-outline" id="drawer-edit"
+    <button type="button" class="btn btn-outline" id="inspector-edit"
       data-key="{{.EditKey}}" data-key-enc="{{.EditKeyEnc}}" data-value="{{.EditValue}}" data-value-enc="{{.EditValueEnc}}"
       data-headers="{{.EditHeaders}}" data-schema="{{.EditSchema}}" data-partition="{{.Partition}}" data-tombstone="{{if .Value.Null}}1{{end}}"
       title="Open the composer with this record's contents, to change and send">Edit a copy…</button>

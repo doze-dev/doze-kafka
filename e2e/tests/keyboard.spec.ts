@@ -34,7 +34,7 @@ test('j, k and Enter walk the list; "/" filters; Enter on a focused button is th
 test('while a dialog is open nothing else answers the keyboard, and dialogs do not stack', async ({ page }) => {
   await page.goto('topics/seed-orders');
   await page.locator('#msg-5').click();
-  await expect(page.locator('#drawer-title')).toHaveAttribute('data-offset', '5');
+  await expect(page.locator('#inspector-title')).toHaveAttribute('data-offset', '5');
   await page.keyboard.press('c'); await page.keyboard.press('m'); await page.keyboard.press('j');
   await expect(page).toHaveURL(/seed-orders/);
   await expect(page.locator('html')).not.toHaveAttribute('data-dock', 'open');

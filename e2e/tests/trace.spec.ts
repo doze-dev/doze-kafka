@@ -10,11 +10,11 @@ const TRACE = '0af7651916cd43dd8448eb211c80319c';
 test('a record that carries a trace offers to follow it, and the trail crosses topics in order', async ({ page }) => {
   await page.goto('topics/seed-trace-a');
   await page.locator('#tape-and-table tbody tr').first().click();
-  const drawer = page.locator('#drawer');
-  await expect(drawer).toBeVisible();
-  const follow = drawer.getByRole('link', { name: /Follow this message/ });
+  const inspector = page.locator('#inspector');
+  await expect(inspector).toBeVisible();
+  const follow = inspector.getByRole('link', { name: /Follow this message/ });
   await expect(follow).toBeVisible();
-  await expect(drawer).toContainText(TRACE);
+  await expect(inspector).toContainText(TRACE);
   await follow.click();
 
   await expect(page).toHaveURL(/\/trace\?/);
@@ -47,9 +47,9 @@ test('a record with no trace header offers nothing to follow', async ({ page }) 
   // seed-orders partition 0, offset 40: "plain text, no key", written with no headers.
   await page.goto('topics/seed-orders?partition=0&jump=40');
   await page.locator('#msg-40').click();
-  await expect(page.locator('#drawer')).toBeVisible();
-  await expect(page.locator('#drawer')).toContainText('No headers on this record');
-  await expect(page.locator('#drawer-trace')).toHaveCount(0);
+  await expect(page.locator('#inspector')).toBeVisible();
+  await expect(page.locator('#inspector')).toContainText('No headers on this record');
+  await expect(page.locator('#inspector-trace')).toHaveCount(0);
 });
 
 test('the span can be widened, and the choice is in the address', async ({ page }) => {

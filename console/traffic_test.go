@@ -80,7 +80,7 @@ func TestTrafficPageShowsRequestsAndClients(t *testing.T) {
 		"apache-kafka-java 3.7.0",    // in the clients table.
 		`id="clients-table"`, `id="traffic-table"`,
 		`data-live="/_console/traffic/live"`, // the tail polls itself.
-		`hx-get="/_console/traffic/request?seq=8"`,
+		`hx-get="/_console/inspect/request?key=`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the page does not show %q", want)
@@ -161,7 +161,7 @@ func TestTrafficLiveOnlyAnswersWhenSomethingChanged(t *testing.T) {
 	}
 }
 
-func TestTrafficDrawerShowsOneRequestAndSaysWhenItMovedOn(t *testing.T) {
+func TestTrafficInspectorShowsOneRequestAndSaysWhenItMovedOn(t *testing.T) {
 	src := sampleTraffic()
 	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = src })
 
@@ -172,10 +172,10 @@ func TestTrafficDrawerShowsOneRequestAndSaysWhenItMovedOn(t *testing.T) {
 	body := rec.Body.String()
 	for _, want := range []string{"Produce v9", "billing", "apache-kafka-java 3.7.0", "127.0.0.1:50001", "User:ANONYMOUS", "orders", "1 partition, 2.0 KiB", "12 ms", "2.1 KB in"} {
 		if !strings.Contains(body, want) {
-			t.Errorf("the drawer is missing %q:\n%s", want, body)
+			t.Errorf("the inspector is missing %q:\n%s", want, body)
 		}
 	}
-	if gone := req(t, c, "GET", "/_console/traffic/request?seq=999", nil); gone.Code != 200 || !strings.Contains(gone.Body.String(), "changed or aged out") {
+	if gone := req(t, c, "GET", "/_console/traffic/request?seq=999", nil); gone.Code != 200 || !strings.Contains(gone.Body.String(), "aged out") {
 		t.Errorf("a vanished row: %d %s", gone.Code, gone.Body)
 	}
 	if bad := req(t, c, "GET", "/_console/traffic/request?seq=abc", nil); bad.Code != 400 {
