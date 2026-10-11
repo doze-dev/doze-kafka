@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -219,7 +220,7 @@ func freePort(t *testing.T) int {
 // server is a built binary run the way the document says.
 type server struct {
 	cmd *exec.Cmd
-	out *bytes.Buffer
+	out *syncBuf
 }
 
 func startServer(t *testing.T, dir string) *server {
@@ -227,7 +228,7 @@ func startServer(t *testing.T, dir string) *server {
 	cmd := exec.Command("./doze-kafka")
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "DOZE_ZONE=off") // no .doze names: they need a one-time sudo
-	out := &bytes.Buffer{}
+	out := &syncBuf{}
 	cmd.Stdout, cmd.Stderr = out, out
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
@@ -421,7 +422,7 @@ func TestGettingStartedCommandsRunAgainstABuiltBinary(t *testing.T) {
 	}
 }
 
-func waitFor(buf *bytes.Buffer, s string) bool {
+func waitFor(buf *syncBuf, s string) bool {
 	for i := 0; i < 50; i++ {
 		if strings.Contains(buf.String(), s) {
 			return true
@@ -467,4 +468,22 @@ func consumeDemo(t *testing.T, addr string) []string {
 		fs.EachRecord(func(r *kgo.Record) { got = append(got, string(r.Value)) })
 	}
 	return got
+}
+
+// syncBuf is a buffer a process writes to while the test reads it.
+type syncBuf struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (s *syncBuf) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+
+func (s *syncBuf) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.String()
 }
