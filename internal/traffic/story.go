@@ -40,7 +40,8 @@ type Rebalance struct {
 
 // joinLead is how long before the coordinator notes a rebalance the requests that lead
 // to it can have begun: the client finds the coordinator, is told to come back with a
-// member id (KIP-394), and joins. A request of these is placed by its time plus this.
+// member id (KIP-394), and joins. A request of these goes under the earliest rebalance
+// that began within this after it.
 const joinLead = 5 * time.Second
 
 // joinsAGroup are the requests that bring a member in, and so begin a rebalance. A
@@ -119,15 +120,13 @@ func (r *Recorder) Story(group string) Story {
 	// Each row goes under the last rebalance that began before it. A row is placed by
 	// when it was last seen (a folded heartbeat that ran across a rebalance sits under
 	// the generation its last beat was in, not the one that had already ended), and the
-	// requests that bring a member to a group are placed joinLead later: the
+	// requests that bring a member to a group are placed under the rebalance that began
+	// within joinLead after them: the
 	// coordinator notes the rebalance when it handles the JoinGroup, a moment after the
 	// client sent the FindCoordinator and the first JoinGroup that led to it.
 	for i := len(rows) - 1; i >= 0; i-- { // oldest first.
 		e := rows[i]
 		at := e.Time
-		if joinsAGroup[e.API] {
-			at = at.Add(joinLead)
-		}
 		s.Requests += max(e.Count, 1)
 		s.Folded += max(e.Count-1, 0)
 		for _, tp := range e.Topics {
@@ -136,10 +135,22 @@ func (r *Recorder) Story(group string) Story {
 			}
 		}
 		idx := -1
-		for j := len(spans) - 1; j >= 0; j-- {
-			if !at.Before(spans[j].Start) {
-				idx = j
-				break
+		if joinsAGroup[e.API] {
+			// The earliest rebalance that began at or just after the request: the one
+			// it led to, not a later one that began within joinLead of it too.
+			for j := range spans {
+				if !spans[j].Start.Before(at) && spans[j].Start.Sub(at) <= joinLead {
+					idx = j
+					break
+				}
+			}
+		}
+		if idx < 0 {
+			for j := len(spans) - 1; j >= 0; j-- {
+				if !at.Before(spans[j].Start) {
+					idx = j
+					break
+				}
 			}
 		}
 		if idx < 0 {
