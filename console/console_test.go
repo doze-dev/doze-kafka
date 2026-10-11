@@ -182,7 +182,7 @@ func TestProduceAndTape(t *testing.T) {
 	body := rec.Body.String()
 	// The value renders JSON-tinted: key and number tokens each wrapped in a
 	// tint span, with the raw text HTML-escaped inside.
-	for _, want := range []string{"msg-0", "k1", `<span class="jt-k">&#34;a&#34;</span>`, `<span class="jt-n">1</span>`, "hdrct"} {
+	for _, want := range []string{"msg-0", "k1", `<span class="jt-k">&#34;a&#34;</span>`, `<span class="jt-n">1</span>`, `title="7 B · 1 header"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("tape/table response missing %q:\n%s", want, body)
 		}

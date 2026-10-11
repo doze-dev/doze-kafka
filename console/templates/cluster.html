@@ -41,7 +41,7 @@
     {{/* Cl-Home's "What this broker is not": what docs/limitations.md says of this build,
          and that DescribeCluster lists one broker. The Limits page (Cl-03) is the cluster
          stage's; "All limits" is the document. */}}
-    <div class="well pad" id="cluster-is-not" style="padding: 10px 14px">
+    <div class="well pad slim" id="cluster-is-not">
       <div class="row ce g16 wrap"><span class="cap">What this broker is not</span>
         {{if eq .Cluster.Brokers 1}}<span class="pill">single node</span>{{end}}
         <span class="pill">replication factor reported as <span class="m">1</span></span>

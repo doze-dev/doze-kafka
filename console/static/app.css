@@ -315,6 +315,8 @@ span.num {
 .steps { align-items: stretch; }
 .steps > .card { min-width: 220px; }
 .firstrun-foot { padding: 10px 14px; }
+.well.pad.slim { padding: 10px 14px; }
+.btn.pill-x { height: 18px; padding: 0 4px; }
 /* The three cards share the page: where one is narrower than a console address needs
    beside its label, the label goes above the value, so an address is never broken
    mid-word (Sy-08 at 1440). */
@@ -735,7 +737,6 @@ table.msg-table td { overflow: hidden; text-overflow: ellipsis; }
 
 .pager { display: inline-flex; align-items: center; gap: 12px; }
 .pagelink { color: var(--foreground); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
-.hdrct { font-family: var(--mono); font-size: var(--fs-xs); color: var(--muted-foreground); background: var(--muted); padding: 1px 6px; border-radius: var(--radius-sm); }
 .tbl-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 12px; font-size: var(--fs-xs); color: var(--muted-foreground); border-top: 1px solid var(--border); background: var(--muted); white-space: nowrap; }
 
 /* ---------- inspector / palette / confirm (all .overlay, shown via [hidden]) ---------- */

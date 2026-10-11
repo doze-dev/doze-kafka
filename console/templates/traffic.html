@@ -45,7 +45,7 @@
         {{range .Kinds}}<a class="{{if .On}}on{{end}}" href="{{.URL}}" {{if .On}}aria-current="true"{{end}}>{{.Label}}</a>{{end}}
       </div>
       {{if .HasStory}}
-      {{range .Pills}}<span class="pill"><span class="mut">{{.Name}}</span><span class="m">{{.Value}}</span><a class="btn ghost sm" style="height: 18px; padding: 0 4px" href="{{.URL}}" aria-label="Remove {{.Name}} filter">×</a></span>{{end}}
+      {{range .Pills}}<span class="pill"><span class="mut">{{.Name}}</span><span class="m">{{.Value}}</span><a class="btn ghost sm pill-x" href="{{.URL}}" aria-label="Remove {{.Name}} filter">×</a></span>{{end}}
       <a href="{{.Prefix}}/traffic" class="b">clear</a>
       {{end}}
       <div class="grow"></div>
@@ -56,7 +56,7 @@
     {{if and .HasPills (not .HasStory)}}
     <div class="row ce g8 wrap" id="filter-pills">
       <span class="cap">Filters</span>
-      {{range .Pills}}<span class="pill"><span class="mut">{{.Name}}</span><span class="m">{{.Value}}</span><a class="btn ghost sm" style="height: 18px; padding: 0 4px" href="{{.URL}}" aria-label="Remove {{.Name}} filter">×</a></span>{{end}}
+      {{range .Pills}}<span class="pill"><span class="mut">{{.Name}}</span><span class="m">{{.Value}}</span><a class="btn ghost sm pill-x" href="{{.URL}}" aria-label="Remove {{.Name}} filter">×</a></span>{{end}}
       <span class="pill"><span class="mut">kind</span><span class="m">{{.KindWord}}</span></span>
       <a href="{{.Prefix}}/traffic" class="b">clear</a>
       <div class="grow"></div>
