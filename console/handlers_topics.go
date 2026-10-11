@@ -101,7 +101,7 @@ func (c *Console) topicCreatePage(w http.ResponseWriter, r *http.Request) {
 	b, _ := json.Marshal(taken)
 	c.render(w, r, "topic_create", map[string]any{
 		"List": list, "Page": "topics", "Title": "Create topic", "Config": newConfigView(nil),
-		"Taken": taken, "TakenJSON": string(b), "HasRegistry": c.reg != nil, "MaxParts": c.facts.MaxPartitions,
+		"Taken": taken, "TakenJSON": string(b), "Prefill": strings.TrimSpace(r.URL.Query().Get("name")), "HasRegistry": c.reg != nil, "MaxParts": c.facts.MaxPartitions,
 		"Command": createCommand(c.connectFacts(r), "", "", nil),
 	})
 }

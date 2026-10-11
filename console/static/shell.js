@@ -184,6 +184,7 @@
       retry.remove();
     }
     pill.setAttribute("aria-live", "polite");
+    if (down) document.querySelectorAll("[data-lastgood]").forEach(function (el) { el.textContent = clockText(lastGood); });
   }
   // setDisconnected marks the regions whose poll failed (or all of them, with no
   // path), once: a failing poll repeats every few seconds and says nothing new.
@@ -198,7 +199,7 @@
     renderPill();
   }
   document.addEventListener("click", function (e) {
-    if (!e.target.closest("#pill-retry") || !window.htmx) return;
+    if (!e.target.closest("#pill-retry, [data-retry]") || !window.htmx) return;
     // One retry: every frozen region asks now rather than at its next tick.
     document.querySelectorAll("[data-live].disconnected").forEach(function (el) {
       var url = el.getAttribute("data-live");
@@ -817,6 +818,20 @@
       setPaused(!livePaused);
     },
     help: function (e) { e.preventDefault(); openHelp(); },
+    // e: the errors-only chip of Traffic, and back to all.
+    errors: function () {
+      var seg = document.querySelector('main .seg[aria-label="Kind of request"]');
+      if (!seg) return false;
+      var on = seg.querySelector("a.on"), isErr = on && on.textContent.trim() === "errors";
+      var want = Array.prototype.find.call(seg.querySelectorAll("a"), function (a) { return a.textContent.trim() === (isErr ? "all" : "errors"); });
+      if (!want) return false;
+      want.click();
+    },
+    // u: unfold the folded row that is open; m: all of the open client's metrics.
+    unfold: function () { var b = document.querySelector("#inspector [data-unfold]"); if (!b) return false; b.click(); },
+    metrics: function () { var b = document.querySelector("#inspector [data-all-metrics]"); if (!b) return false; b.click(); },
+    // c copies the decoded request when a request is open (elsewhere c creates).
+    copy: function () { var b = document.querySelector("#inspector [data-copy-decoded]"); if (!b) return false; b.click(); },
     // ] and [ move along the page's tabs.
     "tab-next": function () { return stepTab(1); },
     "tab-prev": function () { return stepTab(-1); },
@@ -1281,8 +1296,39 @@
   // lose (the jump field's text, keyboard focus, the table's scroll position) is
   // saved before the swap and put back after it.
   var livePaused = false;
+  var pausedTimer = null;
+  // A paused Traffic page asks, cheaply, how many requests it has missed since the
+  // newest row it shows (Traf-08). The list stays where it is.
+  function countMissed() {
+    var banner = document.getElementById("paused-banner"), region = document.getElementById("traffic-live");
+    if (!banner || !region) return;
+    var base = banner.getAttribute("data-new-url"), since = region.getAttribute("data-since");
+    if (!base || !since) return;
+    var live = region.getAttribute("data-live") || "", q = live.indexOf("?") >= 0 ? live.slice(live.indexOf("?") + 1) : "";
+    fetch(base + "?since=" + encodeURIComponent(since) + (q ? "&" + q : ""), { headers: { Accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j) return;
+        var n = banner.querySelector("[data-new-n]"), pl = banner.querySelector("[data-new-s]");
+        if (n) n.textContent = (j.atLeast ? "at least " : "") + j.n;
+        if (pl) pl.textContent = j.n === 1 && !j.atLeast ? "" : "s";
+      }).catch(function () {});
+  }
   function setPaused(p) {
+    var was = livePaused;
     livePaused = p;
+    document.documentElement.toggleAttribute("data-paused", p);
+    if (p && !was) {
+      var region = document.getElementById("traffic-live"), since = region && region.getAttribute("data-since");
+      document.querySelectorAll("[data-paused-since]").forEach(function (el) {
+        el.textContent = since && Number(since) > 0 ? clockText(Number(since)) : clockText(Date.now());
+      });
+      countMissed();
+      if (!pausedTimer) pausedTimer = setInterval(countMissed, 2500);
+    } else if (!p && pausedTimer) {
+      clearInterval(pausedTimer);
+      pausedTimer = null;
+    }
     document.querySelectorAll("[data-live-toggle]").forEach(function (b) {
       b.setAttribute("aria-pressed", p ? "true" : "false");
       b.classList.toggle("on", p);
@@ -1293,10 +1339,11 @@
     });
     document.querySelectorAll("[data-live-state]").forEach(function (el) {
       el.classList.toggle("ok", !p);
+      el.classList.toggle("warn", p);
       var l = el.querySelector("[data-live-state-l]");
       if (l) l.textContent = p ? "paused" : "live";
       var d = el.querySelector(".dot");
-      if (d) d.classList.toggle("off", p);
+      if (d) { d.classList.toggle("off", false); d.classList.toggle("warn", p); }
     });
   }
   document.addEventListener("click", function (e) {
@@ -1318,6 +1365,13 @@
         // together (a navigation clears it, so it never follows you to a page
         // that has no control to undo it).
         if (livePaused) return;
+        // Retrying a broker that is not there is slower than polling one that is: the
+        // page says "every 5 s", and it is.
+        if (cur.classList.contains("disconnected") && every < 5000) {
+          var last = parseInt(cur.getAttribute("data-last-try") || "0", 10);
+          if (Date.now() - last < 4900) return;
+          cur.setAttribute("data-last-try", String(Date.now()));
+        }
         // A confirm dialog is asking about a button in this region. Replacing the
         // region would detach that button, and "Confirm" would then do nothing.
         // The same goes for a row whose offset is being edited (data-hold-live):

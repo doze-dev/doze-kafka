@@ -85,9 +85,9 @@
     </div>
     <form class="form-page" id="create-topic" hx-post="{{newTopicURL}}" hx-disabled-elt="find button[type=submit]">
       <div class="card form-sec"><div class="panel-h"><h2>General</h2></div><div class="form-b">
-        <div class="field" x-data='{taken: {{.TakenJSON}}, v: ""}'>
+        <div class="field" x-data='{taken: {{.TakenJSON}}, v: {{.Prefill}}}'>
           <label for="f-name">Topic name <span class="hint">letters, digits, <span class="mono">.</span> <span class="mono">_</span> <span class="mono">-</span> and at most 249 characters</span></label>
-          <input class="input mono" id="f-name" name="name" placeholder="orders.created" required maxlength="249" autocomplete="off" autofocus x-model="v" :aria-invalid="taken.includes(v) ? 'true' : null" aria-describedby="f-name-taken">
+          <input class="input mono" id="f-name" name="name" value="{{.Prefill}}" placeholder="orders.created" required maxlength="249" autocomplete="off" autofocus x-model="v" :aria-invalid="taken.includes(v) ? 'true' : null" aria-describedby="f-name-taken">
           <p class="teach bad" id="f-name-taken" x-show="taken.includes(v)" x-cloak role="status"><span class="m" x-text="v"></span> already exists on this broker. The broker would answer TOPIC_ALREADY_EXISTS and change nothing.</p>
         </div>
         <div class="field narrow"><label for="f-partitions">Partitions</label><input class="input mono" id="f-partitions" name="partitions" type="number" min="1"{{if .MaxParts}} max="{{.MaxParts}}"{{end}} value="1" required aria-describedby="f-partitions-teach"><p class="teach" id="f-partitions-teach">{{teach "broker" "max-partitions"}}</p></div>

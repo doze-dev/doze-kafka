@@ -62,6 +62,10 @@ var keyMap = []keyBinding{
 	{"p", "p", "pause", "Pause or resume the live view", ScopePage, ""},
 	{"p", "p", "produce", "Produce (on a topic)", ScopePage, ""},
 	{"c", "c", "create", "Create (on Topics, Subjects)", ScopePage, ""},
+	{"e", "e", "errors", "Errors only, and back (on Traffic)", ScopePage, ""},
+	{"u", "u", "unfold", "Unfold the open folded row (on Traffic)", ScopePage, ""},
+	{"m", "m", "metrics", "All metrics of the open client (on Traffic)", ScopePage, ""},
+	{"c", "c", "copy", "Copy the decoded fields of the open request (on Traffic)", ScopePage, ""},
 	{"?", "?", "help", "This help", ScopePage, ""},
 	{"Mod+Enter", "⌘↵", "send", "Send from the composer", ScopePage, ""},
 
@@ -117,7 +121,7 @@ var (
 func pageHints(view string) []keyHint {
 	switch view {
 	case "traffic":
-		return []keyHint{hintMove, hintOpen, hintFilter, {[]string{"p"}, "pause"}, hintJump}
+		return []keyHint{hintMove, hintOpen, hintFilter, {[]string{"e"}, "errors only"}, {[]string{"p"}, "pause"}, hintJump}
 	case "topics":
 		return []keyHint{hintMove, hintOpen, hintFilter, {[]string{"c"}, "create topic"}, hintJump}
 	case "topic":

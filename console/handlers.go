@@ -54,6 +54,9 @@ func (c *Console) apiPalette(w http.ResponseWriter, r *http.Request) {
 		{S: "topics", N: "Create topic", U: c.newTopicURL(), K: "action", H: "c"},
 		{S: "actions", N: "Follow a message by trace id", U: c.prefix + "/trace", K: "action"},
 	}
+	if c.traffic != nil {
+		out = append(out, paletteEntry{S: "actions", N: "Show errors", U: c.prefix + "/traffic?kind=errors", K: "action", H: "e"})
+	}
 	// What the console does in the browser, declared once with the keys (keys.go).
 	for _, a := range clientActions {
 		out = append(out, paletteEntry{S: "actions", N: a.Label, K: "action", A: a.ID})
