@@ -591,3 +591,30 @@ test('the create form says a name already exists before anything is sent', async
   await page.locator('#f-name').fill('seed-orders-new');
   await expect(warn).toBeHidden();
 });
+
+// ---------------------------------------------------------------------------------------
+// The audit's measurements, each against the board's own CSS or markup.
+
+test('the shell is the board\'s: the top bar, the brand, the page padding and the page title', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  for (const path of ['topics', 'traffic']) {
+    await page.goto(path);
+    // Sy-01/02/05: the page is padded 14 18 and gaps its parts by 10; its title is an 18/24 h1.
+    const main = page.locator('.panes > .main');
+    await expect(main).toHaveCSS('padding-top', '14px');
+    await expect(main).toHaveCSS('padding-right', '18px');
+    await expect(main).toHaveCSS('padding-bottom', '12px');
+    await expect(main).toHaveCSS('padding-left', '18px');
+    await expect(main).toHaveCSS('row-gap', '10px');
+    await expect(main.locator('h1').first()).toHaveCSS('font-size', '18px');
+    await expect(main.locator('h1').first()).toHaveCSS('line-height', '24px');
+    // The inspector is 400 px (the board's .insp) until a message is open.
+    expect((await page.locator('.insp').boundingBox())?.width ?? 400).toBe(400);
+    // The brand is as wide as its words ("width: auto" on every board), never a fixed 182.
+    const brand = page.locator('header.topbar .brand');
+    const w = (await brand.boundingBox())!.width;
+    expect(w).toBeLessThan(182);
+    expect(parseFloat(await brand.evaluate((el) => getComputedStyle(el).width))).toBeCloseTo(w, 1);
+  }
+});
+
