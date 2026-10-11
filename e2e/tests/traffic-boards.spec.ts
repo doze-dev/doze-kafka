@@ -199,6 +199,15 @@ test('Traf-07: a client that reports its metrics puts what is worth a look first
   await lightTraffic(page, 'traffic?view=clients');
   const rows = page.locator('#clients-table tbody tr', { hasText: CLIENT });
   await expect(rows.first()).toBeVisible();
+  // A client's first telemetry push comes a few seconds after it connects (the broker asks
+  // for one every 5 s): wait for it rather than read the page the moment the client is listed.
+  const hasMetrics = async () => {
+    await page.keyboard.press('Escape');
+    await rows.first().click();
+    return (await page.locator('#client-inspector .metric-list.worth').count()) > 0;
+  };
+  await expect.poll(hasMetrics, { timeout: 20_000, intervals: [1_000] }).toBe(true);
+  await page.keyboard.press('Escape');
   const n = await rows.count();
   let worth = false;
   for (let i = 0; i < n && !worth; i++) {
