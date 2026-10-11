@@ -72,7 +72,7 @@ func TestEvictionIsByLastActivity(t *testing.T) {
 	r.Request(obs(1, "app", kmsg.Heartbeat, 0, idle("g")))
 	r.Request(obs(1, "app", kmsg.Produce, time.Second, func(o *protocol.Observation) { o.Topics = []string{"a"} }))
 	r.Request(obs(1, "app", kmsg.Produce, 2*time.Second, func(o *protocol.Observation) { o.Topics = []string{"b"} }))
-	r.Request(obs(1, "app", kmsg.Heartbeat, 3*time.Second, idle("g")))                                           // the beat is active again.
+	r.Request(obs(1, "app", kmsg.Heartbeat, 3*time.Second, idle("g")))                                                // the beat is active again.
 	r.Request(obs(1, "app", kmsg.Produce, 4*time.Second, func(o *protocol.Observation) { o.Topics = []string{"c"} })) // evicts "a".
 	got := map[string]bool{}
 	for _, e := range r.Events(Filter{}, 0) {
