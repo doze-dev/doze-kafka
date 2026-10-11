@@ -1,0 +1,256 @@
+{
+  "kafka": "apache/kafka:4.3.1",
+  "advertised_by_default": false,
+  "advertised_with_plugin": true,
+  "runs": [
+    {
+      "client": "java",
+      "version": "4.3.1",
+      "client_metrics_resource": false,
+      "connections": [
+        {
+          "conn": 1,
+          "requests": [
+            "ApiVersions v4",
+            "Metadata v13",
+            "InitProducerID v5",
+            "GetTelemetrySubscriptions v0"
+          ]
+        },
+        {
+          "conn": 2,
+          "requests": [
+            "ApiVersions v4",
+            "InitProducerID v5",
+            "Produce v13"
+          ]
+        }
+      ],
+      "subscribed_on": [
+        1
+      ],
+      "pushed_on": null
+    },
+    {
+      "client": "java",
+      "version": "4.3.1",
+      "client_metrics_resource": true,
+      "connections": [
+        {
+          "conn": 1,
+          "requests": [
+            "ApiVersions v4",
+            "Metadata v13",
+            "InitProducerID v5",
+            "GetTelemetrySubscriptions v0",
+            "PushTelemetry v0 x9"
+          ]
+        },
+        {
+          "conn": 2,
+          "requests": [
+            "ApiVersions v4",
+            "InitProducerID v5",
+            "Produce v13"
+          ]
+        }
+      ],
+      "subscribed_on": [
+        1
+      ],
+      "pushed_on": [
+        1
+      ]
+    },
+    {
+      "client": "java",
+      "version": "3.7.0",
+      "client_metrics_resource": false,
+      "connections": [
+        {
+          "conn": 1,
+          "requests": [
+            "ApiVersions v3",
+            "Metadata v12",
+            "InitProducerID v4",
+            "GetTelemetrySubscriptions v0"
+          ]
+        },
+        {
+          "conn": 2,
+          "requests": [
+            "ApiVersions v3",
+            "InitProducerID v4",
+            "Produce v10"
+          ]
+        }
+      ],
+      "subscribed_on": [
+        1
+      ],
+      "pushed_on": null
+    },
+    {
+      "client": "java",
+      "version": "3.7.0",
+      "client_metrics_resource": true,
+      "connections": [
+        {
+          "conn": 1,
+          "requests": [
+            "ApiVersions v3",
+            "Metadata v12",
+            "InitProducerID v4",
+            "GetTelemetrySubscriptions v0",
+            "PushTelemetry v0 x9"
+          ]
+        },
+        {
+          "conn": 2,
+          "requests": [
+            "ApiVersions v3",
+            "InitProducerID v4",
+            "Produce v10"
+          ]
+        }
+      ],
+      "subscribed_on": [
+        1
+      ],
+      "pushed_on": [
+        1
+      ]
+    },
+    {
+      "client": "franz-go",
+      "version": "1.22.1",
+      "client_metrics_resource": false,
+      "connections": [
+        {
+          "conn": 1,
+          "requests": [
+            "ApiVersions v5",
+            "ApiVersions v4",
+            "Metadata v13",
+            "InitProducerID v5"
+          ]
+        },
+        {
+          "conn": 2,
+          "requests": [
+            "ApiVersions v5",
+            "ApiVersions v4",
+            "InitProducerID v5",
+            "GetTelemetrySubscriptions v0"
+          ]
+        },
+        {
+          "conn": 3,
+          "requests": [
+            "ApiVersions v4",
+            "Produce v13"
+          ]
+        }
+      ],
+      "subscribed_on": [
+        2
+      ],
+      "pushed_on": null
+    },
+    {
+      "client": "franz-go",
+      "version": "1.22.1",
+      "client_metrics_resource": true,
+      "connections": [
+        {
+          "conn": 1,
+          "requests": [
+            "ApiVersions v5",
+            "ApiVersions v4",
+            "Metadata v13",
+            "InitProducerID v5",
+            "PushTelemetry v0 x13"
+          ]
+        },
+        {
+          "conn": 2,
+          "requests": [
+            "ApiVersions v5",
+            "ApiVersions v4",
+            "InitProducerID v5",
+            "GetTelemetrySubscriptions v0"
+          ]
+        },
+        {
+          "conn": 3,
+          "requests": [
+            "ApiVersions v4",
+            "Produce v13"
+          ]
+        }
+      ],
+      "subscribed_on": [
+        2
+      ],
+      "pushed_on": [
+        1
+      ]
+    },
+    {
+      "client": "librdkafka (kcat)",
+      "version": "2.15.1",
+      "client_metrics_resource": false,
+      "connections": [
+        {
+          "conn": 1,
+          "requests": [
+            "ApiVersions v3",
+            "Metadata v13"
+          ]
+        },
+        {
+          "conn": 2,
+          "requests": [
+            "ApiVersions v3",
+            "GetTelemetrySubscriptions v0",
+            "Produce v10"
+          ]
+        }
+      ],
+      "subscribed_on": [
+        2
+      ],
+      "pushed_on": null
+    },
+    {
+      "client": "librdkafka (kcat)",
+      "version": "2.15.1",
+      "client_metrics_resource": true,
+      "connections": [
+        {
+          "conn": 1,
+          "requests": [
+            "ApiVersions v3",
+            "Metadata v13"
+          ]
+        },
+        {
+          "conn": 2,
+          "requests": [
+            "ApiVersions v3",
+            "GetTelemetrySubscriptions v0",
+            "PushTelemetry v0 x10",
+            "Produce v10",
+            "PushTelemetry v0"
+          ]
+        }
+      ],
+      "subscribed_on": [
+        2
+      ],
+      "pushed_on": [
+        2
+      ]
+    }
+  ]
+}
