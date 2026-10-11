@@ -60,7 +60,7 @@ test('a row opens its request in the drawer, and Escape closes it', async ({ pag
   await expect(drawer).toContainText('doze-seed');
   await expect(drawer).toContainText('seed-empty');
   await expect(drawer).toContainText('TOPIC_ALREADY_EXISTS');
-  await expect(drawer).toContainText('User:ANONYMOUS');
+  await expect(drawer).toContainText(process.env.E2E_SASL_USER ? `User:${process.env.E2E_SASL_USER}` : 'User:ANONYMOUS');
   await page.keyboard.press('Escape');
   await expect(drawer).toBeHidden();
 });

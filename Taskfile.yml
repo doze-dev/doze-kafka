@@ -95,6 +95,18 @@ tasks:
       - bunx playwright install chromium
       - bunx playwright test
 
+  check:identity:
+    desc: 'The second identity (listener on :0, a console prefix, a data directory with a space, SASL and TLS on) booted as the binary and used by a real client and the console'
+    cmds:
+      - go test -race -count=1 -run 'SecondIdentity' ./cmd/doze-kafka
+
+  test:e2e:identity:
+    desc: 'The browser suite against a broker started with the second identity (listener on 127.0.0.1:0, console prefix, data dir with a space, SASL and TLS); the route gate is on'
+    cmds:
+      - go build -o bin/{{.BINARY}} ./cmd/doze-kafka
+      - cd e2e && bun install --frozen-lockfile && bunx playwright install chromium
+      - go run ./e2e/identity -bin bin/{{.BINARY}} -- sh -c 'cd e2e && bunx playwright test'
+
   test:compat:
     desc: 'Real clients and frameworks against the binary (compat/): Java, Streams, Spring, Python, KafkaJS, kcat. Needs Docker for the JVM ones; missing toolchains are SKIPPED, not passed. Name clients to run only those: task test:compat -- java python'
     cmds:

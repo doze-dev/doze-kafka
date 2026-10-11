@@ -32,6 +32,15 @@ jobs:
         env:
           CI: "1"
         run: bunx playwright test
+      # The same suite, route gate included, against a broker started with the second
+      # identity: listener on 127.0.0.1:0, a console prefix, a data directory with a
+      # space, SASL and TLS (foundation B11).
+      - name: Playwright (second identity)
+        env:
+          CI: "1"
+        run: |
+          go build -o bin/doze-kafka ./cmd/doze-kafka
+          go run ./e2e/identity -bin bin/doze-kafka -- sh -c 'cd e2e && bunx playwright test'
       - name: Report
         if: failure()
         uses: actions/upload-artifact@v7

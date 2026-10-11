@@ -31,6 +31,10 @@ jobs:
         run: GOOS=windows GOARCH=amd64 go vet ./...
       - name: build the binary
         run: go build ./cmd/doze-kafka
+      # The second identity: listener on :0, a console prefix, a data directory with a
+      # space in its name, SASL and TLS all on (foundation B11).
+      - name: second identity
+        run: go test -race -count=1 -run SecondIdentity ./cmd/doze-kafka
 
   test:
     strategy:
