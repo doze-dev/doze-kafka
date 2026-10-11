@@ -45,7 +45,7 @@ test('the top bar is white, with the workspace, the jump field, the address and 
   await expect(bar).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await expect(bar).toHaveCSS('height', '44px');
   await expect(bar.locator('.brand')).toContainText('doze-kafka');
-  await expect(bar.locator('#workspace-label')).toHaveText(/\S/);
+  // The workspace label is drawn only for an instance with a name of its own (the brand test below holds that).
   await expect(bar.locator('#palette-open')).toContainText('Jump to a topic, group or subject, or do something…');
   await expect(bar.locator('#live-pill .pill-addr')).toHaveText(/^127\.0\.0\.1:\d+$/);
   await expect(bar.locator('#compat-pill')).toHaveText(/^Kafka \d\.0 compat$/);
