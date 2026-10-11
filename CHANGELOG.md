@@ -6,6 +6,11 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Console: a write refused with `KAFKA_STORAGE_ERROR` no longer reads as if nothing
+  was written. When the fsync after the append failed the batch is in the log (BAD-2),
+  so the refusal, the Traffic inspector's cause and the error table say it may already
+  be there and that a non-idempotent retry can store it twice.
+
 - Traffic, third review: Enter on a link inside the inspector (the client link, "See a
   client that reports", a topic's neighbours) opens its selection; a refusal's name
   never breaks inside a word (the Result column is 118 px, the board's 84 cut
