@@ -2,6 +2,8 @@ package traffic
 
 import (
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -46,7 +48,30 @@ const joinLead = 5 * time.Second
 
 // joinsAGroup are the requests that bring a member in, and so begin a rebalance. A
 // SyncGroup is not one of them: it ends a rebalance.
-var joinsAGroup = map[string]bool{"FindCoordinator": true, "JoinGroup": true}
+// A LeaveGroup is the cause of the rebalance that follows it, so it is placed the
+// same way: under the rebalance it triggers, not the generation it leaves.
+var joinsAGroup = map[string]bool{"FindCoordinator": true, "JoinGroup": true, "LeaveGroup": true}
+
+// namedGeneration is the generation a JoinGroup's answer or a SyncGroup's request names
+// in its detail ("generation 7 · ..."), or 0.
+func namedGeneration(e Event) int32 {
+	if e.API != "JoinGroup" && e.API != "SyncGroup" {
+		return 0
+	}
+	rest, ok := strings.CutPrefix(e.Detail, "generation ")
+	if !ok {
+		return 0
+	}
+	end := 0
+	for end < len(rest) && rest[end] >= '0' && rest[end] <= '9' {
+		end++
+	}
+	n, err := strconv.Atoi(rest[:end])
+	if err != nil || n <= 0 {
+		return 0
+	}
+	return int32(n)
+}
 
 // Story is one group's recent past.
 type Story struct {
@@ -135,7 +160,31 @@ func (r *Recorder) Story(group string) Story {
 			}
 		}
 		idx := -1
-		if joinsAGroup[e.API] {
+		if gen := namedGeneration(e); gen > 0 {
+			// The response (or the sync) names the generation: it belongs to the
+			// rebalance that produced it, whenever the request began.
+			for j := range spans {
+				if spans[j].Done && spans[j].To == gen {
+					idx = j
+					break
+				}
+			}
+			if idx < 0 && slices.ContainsFunc(s.Generations, func(g Generation) bool { return g.Gen == gen }) {
+				// A generation whose rebalance the recorder did not see.
+				s.Before = append(s.Before, e)
+				continue
+			}
+		}
+		if idx < 0 && joinsAGroup[e.API] {
+			// One that arrives while a rebalance is in progress is part of it.
+			for j := range spans {
+				if !at.Before(spans[j].Start) && (!spans[j].Done || !at.After(spans[j].End)) {
+					idx = j
+					break
+				}
+			}
+		}
+		if idx < 0 && joinsAGroup[e.API] {
 			// The earliest rebalance that began at or just after the request: the one
 			// it led to, not a later one that began within joinLead of it too.
 			for j := range spans {
