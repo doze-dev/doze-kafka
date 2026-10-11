@@ -131,6 +131,7 @@ this table.
 | SASL/PLAIN and SCRAM messages | `internal/broker` | `FuzzSASLPlain`, `FuzzSCRAMClientFirst`, `FuzzSCRAMClientFinal`, `FuzzSCRAMUsernameEscaping` |
 | ACL filters and the identity of a stored entry | `internal/broker`, `internal/storage/meta` | `FuzzACLFilterMatches`, `FuzzACLKey` |
 | Topic config values | `internal/broker` | `FuzzTopicConfigValues` |
+| The classic consumer protocol bytes (a subscription, an assignment) | `internal/broker` | `FuzzDecodeConsumerProtocol` |
 | Consumer-group state machine (the KIP-848 coordinator parses nothing; the bytes are its schedule) | `internal/broker` | `FuzzGroupSequence` |
 | Configuration file | `internal/config` | `FuzzConfigFile` |
 | Schema texts (Avro, JSON Schema, Protobuf) and their compatibility | `schemaregistry` | `FuzzRegisterAndCompare` |

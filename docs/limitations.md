@@ -49,6 +49,20 @@ implement it.
   as it came, as Kafka does with `compression.type=producer`, and a topic whose
   `compression.type` names a codec is not re-compressed on the way in, so the
   re-compressed size Kafka checks is not what is checked here.
+- **A consumer-protocol member is asked to heartbeat every second**, where Kafka's
+  `group.consumer.heartbeat.interval.ms` is 5 seconds: rebalances settle in a couple of
+  seconds on a development machine instead of ten.
+- **A consumer group's target assignment is computed before the request that causes it
+  is answered.** Kafka answers a join first and runs the assignor after, so a describe
+  taken in between shows the group `Assigning`, the old targets, and a classic member
+  that has just joined is told the epoch before its own join as its generation. Here the
+  new targets are there when the join is answered, the group is never `Assigning`, and
+  that generation is one higher. Which request is answered with which code is the same
+  (recorded: `mixed-protocol-groups.json`, `mixed-protocol-rolling.json`).
+- **An empty group with no committed offsets is forgotten at once.** Kafka keeps it
+  listed, `Empty`, until its offsets retention has passed; here a group that holds
+  nothing is not worth listing, and a console that showed every consumer that ever
+  came and went would be a long page.
 - **A batch whose `acks=all` fsync failed stays in the log.** The producer is told
   `KAFKA_STORAGE_ERROR` with no offset, but the batch was already appended: a consumer
   can read it, and a non-idempotent retry stores it again (an idempotent retry is

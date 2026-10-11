@@ -30,7 +30,7 @@ func TestRecord(t *testing.T) {
 			continue
 		}
 		t.Run(s.Name, func(t *testing.T) {
-			target, err := StartKafkaOn(KafkaImage, s.DiskMiB)
+			target, err := StartKafkaWith(KafkaImage, s.DiskMiB, s.KafkaEnv)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -67,7 +67,7 @@ func TestReplay(t *testing.T) {
 			if err != nil {
 				t.Fatalf("no recording: %v (go tool task conformance:record)", err)
 			}
-			target, err := StartDoze(t.TempDir())
+			target, err := StartDozeFor(t.TempDir(), s)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -34,6 +34,7 @@ type fileConfig struct {
 	RetentionMs            *int64            `toml:"retention-ms"`
 	FsyncInterval          *string           `toml:"fsync-interval"`
 	ConsumerSessionTimeout *string           `toml:"consumer-session-timeout"`
+	OffsetsRetention       *string           `toml:"offsets-retention"`
 	AutoCreateTopics       *bool             `toml:"auto-create-topics"`
 	DefaultPartitions      *int              `toml:"default-partitions"`
 	MaxPartitions          *int              `toml:"max-partitions"`
@@ -128,6 +129,13 @@ func (fc fileConfig) applyTo(cfg *Config) error {
 			return fmt.Errorf("config: consumer-session-timeout: %w", err)
 		}
 		cfg.ConsumerSessionTimeout = d
+	}
+	if fc.OffsetsRetention != nil {
+		d, err := time.ParseDuration(*fc.OffsetsRetention)
+		if err != nil {
+			return fmt.Errorf("config: offsets-retention: %w", err)
+		}
+		cfg.OffsetsRetention = d
 	}
 	if fc.AutoCreateTopics != nil {
 		cfg.AutoCreateTopics = *fc.AutoCreateTopics
@@ -234,6 +242,7 @@ func writeTOML(w io.Writer, cfg Config, secrets bool) error {
 		RetentionMs:            &cfg.RetentionMs,
 		FsyncInterval:          strp(cfg.FsyncInterval.String()),
 		ConsumerSessionTimeout: strp(cfg.ConsumerSessionTimeout.String()),
+		OffsetsRetention:       strp(cfg.OffsetsRetention.String()),
 		AutoCreateTopics:       &cfg.AutoCreateTopics,
 		DefaultPartitions:      &cfg.DefaultPartitions,
 		MaxPartitions:          &cfg.MaxPartitions,

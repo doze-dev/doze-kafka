@@ -60,6 +60,9 @@ type Config struct {
 
 	// Groups.
 	ConsumerSessionTimeout time.Duration // KIP-848 session timeout: evict a member after this long without a heartbeat.
+	// OffsetsRetention is how long a group's committed offsets are kept once nothing is
+	// reading them (offsets.retention.minutes: 7 days). Zero keeps them for ever.
+	OffsetsRetention time.Duration
 
 	// Topics.
 	AutoCreateTopics  bool
@@ -162,6 +165,7 @@ func Default() Config {
 		IndexIntervalBytes:     defaultIndexStride,
 		FsyncInterval:          500 * time.Millisecond,
 		ConsumerSessionTimeout: 45 * time.Second,
+		OffsetsRetention:       7 * 24 * time.Hour,
 		AutoCreateTopics:       true,
 		DefaultPartitions:      1,
 		MaxPartitions:          defaultMaxPartitions,
@@ -376,6 +380,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: advertised-port %d is not a port (1–65535, or 0 for the port actually bound)", c.AdvertisedPort)
 	case c.AdvertisedHost != "" && !validAdvertisedHost(c.AdvertisedHost): // "" is "derive it": see ResolveAdvertisedHost.
 		return fmt.Errorf("config: advertised-host %q is not a host name or an IP address (no scheme, port or spaces; the port is --advertised-port)", c.AdvertisedHost)
+	case c.OffsetsRetention < 0:
+		return fmt.Errorf("config: offsets-retention must not be negative, got %s (0 keeps offsets for ever)", c.OffsetsRetention)
 	case c.ConsumerSessionTimeout <= 0:
 		return fmt.Errorf("config: consumer-session-timeout must be positive, got %s (a member would be evicted the moment it joined)", c.ConsumerSessionTimeout)
 	case c.PprofAddr != "" && !validHostPort(c.PprofAddr):

@@ -115,6 +115,10 @@ type groupManager struct {
 	stopped bool // the broker is shutting down: timers do nothing.
 
 	sink GroupEventSink // told what happens in groups; nil = nobody is watching.
+
+	// emptied and activated tell the offsets retention when a group lost its last
+	// member and when it got one again; nil = nobody is counting.
+	emptied, activated func(group string)
 }
 
 // stop makes every timer a no-op. After shutdown a session timer would otherwise
@@ -416,6 +420,9 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 
 	if g.state != statePreparingRebalance {
 		wasEmpty := g.state == stateEmpty
+		if wasEmpty && gm.activated != nil {
+			gm.activated(g.id)
+		}
 		g.beginRebalance()
 		// A member the group did not have is "a member joined"; one it already had, asking in
 		// again, is "a member rejoined".
@@ -877,6 +884,9 @@ func (gm *groupManager) completeJoin(g *group) {
 func (gm *groupManager) dropIfUnused(g *group) {
 	if gm.groups[g.id] != g || len(g.members) != 0 {
 		return
+	}
+	if gm.emptied != nil {
+		gm.emptied(g.id)
 	}
 	// No members: the id is free for either protocol again.
 	gm.claims.release(g.id, protoClassic)

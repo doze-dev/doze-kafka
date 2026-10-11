@@ -78,3 +78,28 @@ func TestValidateTopic(t *testing.T) {
 		t.Error("list configs wrong")
 	}
 }
+
+// Every flag the console shows has a default it can say for a configuration, and the
+// offsets retention says the one the broker runs with (7 days, Kafka's
+// offsets.retention.minutes), and zero for "for ever" is told in its range.
+func TestBrokerSettingsStateTheirDefaults(t *testing.T) {
+	cfg := config.Default()
+	seen := map[string]string{}
+	for _, s := range All(Broker) {
+		if v, ok := s.DefaultValue(cfg); ok {
+			seen[s.Name] = v
+		}
+	}
+	if got := seen["offsets-retention"]; got != "168h0m0s" {
+		t.Errorf("offsets-retention default %q, want 168h0m0s", got)
+	}
+	s, ok := Lookup(Broker, "offsets-retention")
+	if !ok || !strings.Contains(s.Range, "for ever") {
+		t.Errorf("offsets-retention: %+v %v", s, ok)
+	}
+	for _, name := range []string{"fsync-interval", "consumer-session-timeout", "kafka-version", "log-level", "client-telemetry", "schema-registry", "console", "max-partitions"} {
+		if seen[name] == "" {
+			t.Errorf("%s states no default", name)
+		}
+	}
+}

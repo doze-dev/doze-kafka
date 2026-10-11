@@ -483,6 +483,7 @@ func brokerSettings() []Setting {
 		}(),
 		withDefault(f("fsync-interval", "duration", "0 disables", StartupOnly, "coarse fsync cadence for active segments"), func(c config.Config) string { return c.FsyncInterval.String() }),
 		withDefault(f("consumer-session-timeout", "duration", "", StartupOnly, "KIP-848 group session timeout before a silent member is evicted"), func(c config.Config) string { return c.ConsumerSessionTimeout.String() }),
+		withDefault(f("offsets-retention", "duration", "0 keeps offsets for ever", StartupOnly, "how long committed offsets are kept once their group is empty and unsubscribed (offsets.retention.minutes)"), func(c config.Config) string { return c.OffsetsRetention.String() }),
 		withDefault(f("kafka-version", "major version", "1 to 4", StartupOnly, "the Kafka major version emulated"), func(c config.Config) string { return strconv.Itoa(c.Version) }),
 		withDefault(f("log-level", "", "debug, info, warn, error", StartupOnly, "log verbosity"), func(c config.Config) string { return c.LogLevel }),
 		withDefault(f("client-telemetry", "", "true or false", StartupOnly, "accept the metrics clients push about themselves (KIP-714)"), func(c config.Config) string { return strconv.FormatBool(c.ClientTelemetry) }),

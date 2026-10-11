@@ -44,7 +44,7 @@ var Units = []Unit{
 	{Name: "console", Dir: "console"},
 	// The broker by what the file does: each group is one run.
 	{Name: "internal/broker:groups", Dir: "internal/broker", Only: []string{
-		"group", "group848", "group848_assign", "groups", "groups848", "groupadmin", "groupdelete", "groupevents", "grouptimer", "offsets"}},
+		"group", "group848", "group848_assign", "groups", "groups848", "groupadmin", "groupdelete", "groupevents", "grouptimer", "groupmigrate", "offsetexpiry", "offsets"}},
 	{Name: "internal/broker:data", Dir: "internal/broker", Only: []string{
 		"produce", "fetch", "idempotency", "listoffsets", "deleterecords", "producerid", "txn", "txnapis"}},
 	{Name: "internal/broker:admin", Dir: "internal/broker", Only: []string{

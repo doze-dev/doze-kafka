@@ -133,6 +133,21 @@ type Store interface {
 	// DeleteOffset removes one committed offset (a no-op if there is none).
 	DeleteOffset(group, topic string, partition int32) error
 
+	// ExpireOffsets deletes, in one transaction, the offsets of group that expire says
+	// to (given the topic, partition and the time the offset was committed, in unix
+	// milliseconds), and reports how many. Run inside the write transaction, so a commit
+	// that races with it is either before (and judged) or after (and kept). An offset
+	// that has no commit time, written before they were kept, is given the time of this
+	// call, so a retention starts counting from the first sweep that saw it.
+	ExpireOffsets(group string, expire func(topic string, partition int32, committedAt int64) bool) (int, error)
+	// SetGroupEmptySince records when a group lost its last member, in unix
+	// milliseconds, or forgets it (0): offsets that outlive their group's members are
+	// kept for a retention from then. It is kept across a restart, which forgets the
+	// members themselves.
+	SetGroupEmptySince(group string, at int64) error
+	// GroupsEmptySince is every recorded group and when it became empty.
+	GroupsEmptySince() (map[string]int64, error)
+
 	// CommitOffsets stores several offsets of one group in a single transaction.
 	// Each bolt transaction is an fsync, so committing 20 partitions one at a time
 	// was 20 fsyncs; this is one.
@@ -172,7 +187,11 @@ type Store interface {
 
 // Open opens (creating if needed) the metadata database at path and ensures its
 // buckets exist.
-func Open(path string) (Store, error) {
+func Open(path string) (Store, error) { return OpenWithClock(path, time.Now) }
+
+// OpenWithClock is Open with the clock offsets are stamped with, for a test that
+// has to say what time a commit was made.
+func OpenWithClock(path string, clock func() time.Time) (Store, error) {
 	// bbolt takes an exclusive file lock. With no timeout a second broker on the
 	// same file (a forgotten terminal, a crashed run still shutting down) blocks
 	// forever in silence; a short timeout turns it into an error that says why.
@@ -195,7 +214,7 @@ func Open(path string) (Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("meta: init buckets: %w", err)
 	}
-	s := &boltStore{db: db, byName: map[string]Topic{}, byID: map[TopicID]string{}}
+	s := &boltStore{db: db, byName: map[string]Topic{}, byID: map[TopicID]string{}, clock: clock}
 	if err := s.loadCache(); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("meta: load topic registry: %w", err)
@@ -245,6 +264,8 @@ type boltStore struct {
 
 	afterCreateCommit func() // test hook: runs between the commit and the cache update.
 
+	clock func() time.Time // the time an offset is stamped with; replaceable for a test.
+
 	topicMu sync.Mutex // serializes registry writes together with their cache update.
 	mu      sync.RWMutex
 	byName  map[string]Topic
@@ -270,6 +291,9 @@ type topicRecord struct {
 type offsetRecord struct {
 	Offset   int64  `json:"offset"`
 	Metadata string `json:"metadata,omitempty"`
+	// At is when it was committed, unix milliseconds; 0 for one written before they
+	// were kept.
+	At int64 `json:"at,omitempty"`
 }
 
 // OffsetEntry is one committed (topic, partition) → offset for a group, returned
@@ -279,6 +303,8 @@ type OffsetEntry struct {
 	Partition int32
 	Offset    int64
 	Metadata  string
+	// CommittedAt is when the offset was committed, unix milliseconds (0: not known).
+	CommittedAt int64
 }
 
 func (s *boltStore) CreateTopic(name string, partitions int32, config map[string]string) (Topic, error) {
@@ -475,6 +501,7 @@ func (s *boltStore) CommitOffsets(group string, offsets []OffsetCommit) error {
 	if err := ValidateGroupID(group); err != nil {
 		return err
 	}
+	now := s.clock().UnixMilli()
 	return s.update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucketOffsets)
 		topics := tx.Bucket(bucketTopics)
@@ -486,7 +513,7 @@ func (s *boltStore) CommitOffsets(group string, offsets []OffsetCommit) error {
 			if topics.Get([]byte(o.Topic)) == nil {
 				continue
 			}
-			val, err := json.Marshal(offsetRecord{Offset: o.Offset, Metadata: o.Metadata})
+			val, err := json.Marshal(offsetRecord{Offset: o.Offset, Metadata: o.Metadata, At: now})
 			if err != nil {
 				return err
 			}
@@ -551,6 +578,10 @@ func (s *boltStore) DeleteGroupOffsets(group string) (int, error) {
 	prefix := append([]byte(group), 0)
 	var n int
 	err := s.update(func(tx *bbolt.Tx) error {
+		// A group with nothing left has nothing to expire: when it was empty goes too.
+		if err := tx.Bucket(bucketMeta).Delete(emptySinceKey(group)); err != nil {
+			return err
+		}
 		b := tx.Bucket(bucketOffsets)
 		var keys [][]byte
 		c := b.Cursor()
@@ -590,7 +621,7 @@ func (s *boltStore) ListOffsets(group string) ([]OffsetEntry, error) {
 			if err := json.Unmarshal(v, &rec); err != nil {
 				return err
 			}
-			out = append(out, OffsetEntry{Topic: topic, Partition: partition, Offset: rec.Offset, Metadata: rec.Metadata})
+			out = append(out, OffsetEntry{Topic: topic, Partition: partition, Offset: rec.Offset, Metadata: rec.Metadata, CommittedAt: rec.At})
 		}
 		return nil
 	})
@@ -667,4 +698,90 @@ func (s *boltStore) SetPartitions(name string, count int32) (Topic, error) {
 	s.byName[name] = cloneTopic(t)
 	s.mu.Unlock()
 	return cloneTopic(t), nil
+}
+
+// emptySincePrefix keys, in the meta bucket, when a group lost its last member.
+var emptySincePrefix = []byte("empty_since\x00")
+
+func emptySinceKey(group string) []byte {
+	return append(append([]byte(nil), emptySincePrefix...), group...)
+}
+
+func (s *boltStore) SetGroupEmptySince(group string, at int64) error {
+	return s.update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(bucketMeta)
+		if at == 0 {
+			return b.Delete(emptySinceKey(group))
+		}
+		var v [8]byte
+		binary.BigEndian.PutUint64(v[:], uint64(at))
+		return b.Put(emptySinceKey(group), v[:])
+	})
+}
+
+func (s *boltStore) GroupsEmptySince() (map[string]int64, error) {
+	out := map[string]int64{}
+	err := s.db.View(func(tx *bbolt.Tx) error {
+		c := tx.Bucket(bucketMeta).Cursor()
+		for k, v := c.Seek(emptySincePrefix); k != nil && bytes.HasPrefix(k, emptySincePrefix); k, v = c.Next() {
+			if len(v) == 8 {
+				out[string(k[len(emptySincePrefix):])] = int64(binary.BigEndian.Uint64(v))
+			}
+		}
+		return nil
+	})
+	return out, err
+}
+
+func (s *boltStore) ExpireOffsets(group string, expire func(topic string, partition int32, committedAt int64) bool) (int, error) {
+	prefix := append([]byte(group), 0)
+	now := s.clock().UnixMilli()
+	var n int
+	err := s.update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(bucketOffsets)
+		type change struct {
+			key []byte
+			val []byte // nil: delete.
+		}
+		var changes []change
+		c := b.Cursor()
+		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
+			rem := k[len(prefix):]
+			if len(rem) < 5 {
+				continue
+			}
+			var rec offsetRecord
+			if err := json.Unmarshal(v, &rec); err != nil {
+				return err
+			}
+			stamped := false
+			if rec.At == 0 {
+				rec.At, stamped = now, true
+			}
+			topic := string(rem[:len(rem)-5])
+			partition := int32(binary.BigEndian.Uint32(rem[len(rem)-4:]))
+			switch {
+			case expire(topic, partition, rec.At):
+				changes = append(changes, change{key: append([]byte(nil), k...)})
+				n++
+			case stamped:
+				val, err := json.Marshal(rec)
+				if err != nil {
+					return err
+				}
+				changes = append(changes, change{key: append([]byte(nil), k...), val: val})
+			}
+		}
+		for _, ch := range changes {
+			if ch.val == nil {
+				if err := b.Delete(ch.key); err != nil {
+					return err
+				}
+			} else if err := b.Put(ch.key, ch.val); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return n, err
 }

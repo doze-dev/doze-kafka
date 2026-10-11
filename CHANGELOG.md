@@ -6,6 +6,23 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Groups: classic and consumer-protocol members can share a group id, as on Kafka 4 with
+  its default migration policy (a rolling upgrade or downgrade of an application, one
+  instance at a time). A consumer-protocol join turns a classic group into a consumer
+  group with its members kept; a classic join becomes a member of a consumer group; the
+  last consumer-protocol member leaving makes it classic again. Recorded against
+  `apache/kafka:4.3.1` (`mixed-protocol-groups`, `mixed-protocol-rolling`). Before this
+  the second protocol was refused (`INCONSISTENT_GROUP_PROTOCOL` / `GROUP_ID_NOT_FOUND`).
+  A new consumer-protocol group's first member epoch is 2, as Kafka's; a group nobody
+  joined is listed with an empty protocol type, as Kafka lists it, and DescribeGroups of
+  an Empty group answers no protocol.
+- Committed offsets expire, as Kafka's `offsets.retention.minutes`: `--offsets-retention`
+  (default 7 days, 0 keeps them for ever). A group that had members keeps its offsets
+  from the moment it became empty, a standalone commit from its own commit, a group with
+  members keeps those of the topics it reads and loses the rest; the rules are recorded
+  (`offsets-retention`) and the time a group emptied is kept across a restart. A group
+  whose offsets are all gone is no longer listed.
+
 - `doze-kafka config print` redacts passwords: every `[credentials]` entry is written as
   `"<redacted>"`, and `config print --show-secrets` writes the file to run from. A file
   that still holds the placeholder is refused when loaded, by user. A malformed

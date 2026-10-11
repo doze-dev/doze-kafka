@@ -35,6 +35,11 @@ func StartKafka(image string) (Target, error) { return StartKafkaOn(image, 0) }
 // StartKafkaOn is StartKafka with the data directory on a tmpfs of diskMiB
 // mebibytes when that is above zero, so the disk can be filled.
 func StartKafkaOn(image string, diskMiB int) (Target, error) {
+	return StartKafkaWith(image, diskMiB, nil)
+}
+
+// StartKafkaWith is StartKafkaOn with extra environment settings (NAME=value).
+func StartKafkaWith(image string, diskMiB int, env []string) (Target, error) {
 	port, err := freePort()
 	if err != nil {
 		return nil, err
@@ -53,6 +58,13 @@ func StartKafkaOn(image string, diskMiB int) (Target, error) {
 		"-e", "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1",
 		"-e", "KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0",
 		image}
+	if len(env) > 0 {
+		var extra []string
+		for _, kv := range env {
+			extra = append(extra, "-e", kv)
+		}
+		args = append(args[:len(args)-1], append(extra, image)...)
+	}
 	if diskMiB > 0 {
 		args = append([]string{"run", "-d", "--tmpfs", fmt.Sprintf("/var/lib/kafka/data:size=%dm,mode=1777", diskMiB),
 			"-e", "KAFKA_LOG_DIRS=/var/lib/kafka/data"}, args[2:]...)
@@ -108,6 +120,8 @@ func ready(addr string) bool {
 type dozeTarget struct {
 	addr   string
 	dir    string
+	speed  float64
+	mod    func(cfg *config.Config)
 	cancel context.CancelFunc
 	done   chan struct{}
 }
@@ -123,8 +137,24 @@ func StartDoze(dir string) (Target, error) {
 	return t, t.start()
 }
 
+// StartDozeFor is StartDoze configured as the scenario asks for its replay.
+func StartDozeFor(dir string, s Scenario) (Target, error) {
+	port, err := freePort()
+	if err != nil {
+		return nil, err
+	}
+	t := &dozeTarget{addr: fmt.Sprintf("127.0.0.1:%d", port), dir: dir, speed: s.Speed, mod: s.Replay}
+	return t, t.start()
+}
+
+// Speed is how much faster than the recording this target's waits run.
+func (t *dozeTarget) Speed() float64 { return t.speed }
+
 func (t *dozeTarget) start() error {
 	cfg := config.Default()
+	if t.mod != nil {
+		t.mod(&cfg)
+	}
 	cfg.ListenAddr = t.addr
 	cfg.DataDir = filepath.Join(t.dir, "data")
 	cfg.MetaDB = filepath.Join(t.dir, "meta.db")
