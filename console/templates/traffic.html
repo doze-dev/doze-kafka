@@ -1,130 +1,292 @@
-{{/* Traffic (Main, "the home page"): what the apps have asked the broker, newest
-     first. The requests table comes first, with one filter field and one segmented
-     control; the open connections are the inspector's summary, on the right, until a
-     row or a client is selected. */}}
+{{/* Traffic: Main and Traf-02 to Traf-12. What the apps have asked the broker, newest
+     first (Main); filtered (Traf-02); errors only, with each refusal explained
+     (Traf-03); the clients (Traf-06); paused (Traf-08); nothing yet (Traf-09); the
+     broker lost (Traf-10); and a group's rebalance told in order (Traf-12). One
+     filter field and one segmented control; the open connections, a request, a folded
+     row or a client are the inspector's, on the right. */}}
 {{define "traffic_detail"}}{{template "shell_top" .}}
-  <main class="main" id="detail">
+  <main class="main" id="detail" data-traffic-view="{{.TView}}">
     <div class="row sb ce idband">
-      <div class="col"><h1 class="h1">Traffic</h1><span class="note">What your apps have asked this broker, newest first. The console's own requests are left out.</span></div>
-      <div class="row g8 ce"><span class="pill ok" data-live-state><span class="dot" aria-hidden="true"></span><span data-live-state-l>live</span></span><button type="button" class="btn" data-live-toggle aria-pressed="false" data-label-off="Pause" data-label-on="Resume" title="Pause live updates (p)">Pause</button></div>
+      <div class="col"><h1 class="h1">Traffic</h1><span class="note">{{if eq .TView "clients"}}Who is connected to this broker right now, and how each one is behaving.{{else}}What your apps have asked this broker, newest first. The console's own requests are left out.{{end}}</span></div>
+      <div class="row g8 ce" id="traffic-controls">
+        <span class="pill ok" data-live-state><span class="dot" aria-hidden="true"></span><span data-live-state-l>live</span></span>
+        <span class="pill bad lost-only" role="status"><span class="dot bad" aria-hidden="true"></span>disconnected · last good <span class="m" data-lastgood></span></span>
+        <button type="button" class="btn" data-live-toggle aria-pressed="false" data-label-off="Pause" data-label-on="Resume" title="Pause live updates (p)">Pause</button>
+        <button type="button" class="btn pri lost-only" data-retry>Retry now</button>
+      </div>
     </div>
+
+    <div class="callout bad lost-only" role="status" id="lost-callout"><span class="b">The console lost the broker</span><span class="note">It stopped answering at <span class="m" data-lastgood></span>. The rows below are the last ones received and are no longer updating. The console retries every 5 s on its own.</span></div>
+
+    <div class="callout warn paused-only" role="status" id="paused-banner" data-new-url="{{.Prefix}}/traffic/new"><span class="paused-text"><span class="b">Paused.</span> <span class="m" data-new-n>0</span> new request<span data-new-s>s</span> since <span class="m" data-paused-since></span></span><button type="button" class="btn pri sm" data-live-toggle id="paused-resume">Resume</button></div>
+
+    {{if eq .TView "clients"}}
+    <nav class="tabs" aria-label="Traffic views">
+      <a class="tab" href="{{.TabRequests}}">Requests</a>
+      <a class="tab on" href="{{.TabClients}}" aria-current="page">Clients <span class="m mut">{{.ClientCount}}</span></a>
+    </nav>
+    {{end}}
 
     {{template "traffic_summary" .}}
 
+    {{if eq .TView "requests"}}
     {{/* The filter is a plain GET form outside the polled region, so what is typed
          is not thrown away by a refresh. */}}
     <div class="filterrow">
       <form method="get" action="{{.Prefix}}/traffic" role="search" aria-label="Filter requests">
         <input class="inp m" name="q" value="{{.Filter.Q}}" placeholder="Client, topic, group or request" aria-label="Filter requests" spellcheck="false" autocomplete="off" data-filter-target="requests">
         {{if .Filter.Kind}}<input type="hidden" name="kind" value="{{.Filter.Kind}}">{{end}}
+        {{if .Filter.Topic}}<input type="hidden" name="topic" value="{{.Filter.Topic}}">{{end}}
+        {{if .Filter.Group}}<input type="hidden" name="group" value="{{.Filter.Group}}">{{end}}
+        {{if .Filter.Client}}<input type="hidden" name="client" value="{{.Filter.Client}}">{{end}}
       </form>
       <div class="seg" role="group" aria-label="Kind of request">
         {{range .Kinds}}<a class="{{if .On}}on{{end}}" href="{{.URL}}" {{if .On}}aria-current="true"{{end}}>{{.Label}}</a>{{end}}
       </div>
       <div class="grow"></div>
-      <span class="note">idle heartbeats and empty fetches fold into one row</span>
+      <span class="note filter-note" id="filter-note">{{if eq .KindWord "errors"}}<span class="m" id="refused-count">{{.RefusedMatching}} refused</span>{{else}}<span class="live-only">idle heartbeats and empty fetches fold into one row</span><span class="paused-only">the list is frozen, the broker is not</span>{{end}}</span>
     </div>
+    {{if .HasPills}}
+    <div class="row ce g8 wrap" id="filter-pills">
+      <span class="cap">Filters</span>
+      {{range .Pills}}<span class="pill"><span class="mut">{{.Name}}</span><span class="m">{{.Value}}</span><a class="btn ghost sm" style="height: 18px; padding: 0 4px" href="{{.URL}}" aria-label="Remove {{.Name}} filter">×</a></span>{{end}}
+      <span class="pill"><span class="mut">kind</span><span class="m">{{.KindWord}}</span></span>
+      <a href="{{.Prefix}}/traffic" class="b">clear</a>
+      <div class="grow"></div>
+      <span class="m" id="match-count"><span class="b">{{.Matched}}</span> of {{.TotalRequests}} requests match</span>
+    </div>
+    {{end}}
+    {{end}}
 
     {{template "traffic_live" .}}
 
-    <div class="tablenote">Select a row to open it on the right. A client name opens that client. Nothing here is written to disk.</div>
+    <div class="tablenote" id="traffic-note">{{template "traffic_note" .}}</div>
   </main>
 {{template "shell_bottom" .}}{{end}}
 
-{{/* The summary line: counted from what the recorder keeps, so each number says what
-     it is counted over. It is outside the polled region and is replaced out of band
-     with it. */}}
+{{/* The summary line: counted from the broker's counters, so each number says what it
+     is counted over. It is outside the polled region and is replaced out of band with
+     it. */}}
 {{define "traffic_summary"}}
 <div class="row ce g8 wrap" id="traffic-summary"{{if .OOB}} hx-swap-oob="true"{{end}}>
-  <span class="m">{{len .Clients}} client{{if ne (len .Clients) 1}}s{{end}} connected</span><span class="mut">·</span>
-  <span class="m">{{if .LastMinuteLowerBound}}at least {{end}}{{.LastMinute}} request{{if ne .LastMinute 1}}s{{end}} in the last minute</span><span class="mut">·</span>
-  <span class="m {{if .ErrorCount}}bad{{else}}mut{{end}}" title="Errors among the requests of the last minute">{{if .ErrorLowerBound}}at least {{end}}{{.ErrorCount}} error{{if ne .ErrorCount 1}}s{{end}}</span><span class="mut">·</span>
+  <span class="m">{{if ne .TView "clients"}}<a href="{{.Prefix}}/traffic?view=clients">{{end}}{{.ClientCount}} client{{if ne .ClientCount 1}}s{{end}} connected{{if ne .TView "clients"}}</a>{{end}}</span><span class="mut">·</span>
+  {{if and .Empty (not .Filtered)}}
+  <span class="m">{{.LastMinute}} requests so far</span>
+  {{else}}
+  <span class="m">{{.LastMinute}} request{{if ne .LastMinute 1}}s{{end}} in the last minute</span><span class="mut">·</span>
+  {{if eq .TView "clients"}}
+  <span class="m {{if .NeedLook}}warn{{else}}mut{{end}}">{{if .NeedLook}}{{.NeedLook}} client{{if ne .NeedLook 1}}s{{end}} need{{if eq .NeedLook 1}}s{{end}} a look{{else}}no client needs a look{{end}}</span>
+  {{else}}
+  <span class="m {{if .ErrorCount}}bad{{else}}mut{{end}}" title="Errors among the requests of the last minute: refused, denied, not implemented or failed. A consumer's first join is part of the protocol and is not counted.">{{.ErrorCount}} error{{if ne .ErrorCount 1}}s{{end}}</span><span class="mut">·</span>
   <span class="m mut">kept: the last {{.KeptText}}, in memory only</span>
+  {{end}}
+  {{end}}
 </div>
 {{end}}
 
-{{/* traffic_live is the polled unit: the request tail and its metrics. The open
-     connections and the summary line ride along out of band. */}}
+{{define "traffic_note"}}{{if eq .TView "clients"}}Error rate is the requests that were refused, denied or failed over all requests in the last 5 minutes. Select a client to open it on the right.{{else if eq .KindWord "errors"}}{{if .RefusalCount}}{{if .FailedCount}}{{.FailedCount}} of the requests kept ended in the broker failing. Refusals that Kafka would also make are purple.{{else}}Refusals that Kafka would also make are purple. Anything red is the broker unhappy, and there is none.{{end}}{{else}}Nothing was refused in the {{.KeptText}} requests kept. Refusals that Kafka would also make are purple. Anything red is the broker unhappy, and there is none.{{end}}{{else if .HasPills}}Filtering looks at the last {{.KeptText}} requests kept in memory.{{if .Filter.Topic}} Group requests that name this topic are included.{{end}}{{else}}Select a row to open it on the right. A client name opens that client. Nothing here is written to disk.{{end}}{{end}}
+
+{{/* traffic_live is the polled unit: the request tail, or the clients table. The
+     summary line and the inspector's default ride along out of band. */}}
 {{define "traffic_live"}}
-<div id="traffic-live" data-live="{{.Prefix}}/traffic/live{{if .FilterQ}}?{{.FilterQ}}{{end}}" data-hash="{{.Hash}}" data-live-ms="2500">
+<div id="traffic-live" data-live="{{.Prefix}}/traffic/live{{if .FilterQ}}?{{.FilterQ}}{{end}}" data-hash="{{.Hash}}" data-live-ms="2500"{{if eq .TView "requests"}} data-since="{{.NewestMs}}"{{end}}>
   {{if .OOB}}{{template "traffic_summary" .}}
-  <div class="insp-default" id="insp-default" hx-swap-oob="true"{{if .DefaultHidden}} hidden{{end}}>{{template "traffic_clients" .}}</div>{{end}}
-  {{if .Rows}}
-  <div class="tbl-wrap">
-    <table class="tbl tf-table" id="traffic-table"><thead><tr><th>Time</th><th>Client</th><th>Request</th><th>Topic or group</th><th>Detail</th><th>Result</th><th class="num">Took</th></tr></thead>
-      <tbody>{{range .Rows}}<tr id="rq-{{.OpenKey}}" class="{{if .Error}}errrow{{end}}" tabindex="0" data-inspector-open
-          hx-get="{{$.Prefix}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
-        <td class="m nw cell-time">{{when .Time "clockms"}}</td>
-        <td class="m nw cell-client" title="{{.Remote}}{{if .Software}} · {{.Software}}{{end}}">{{if .ConnKey}}<a href="{{$.Prefix}}/traffic?q={{.Who}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.ConnKey}}" hx-trigger="click consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false">{{.Who}}</a>{{else}}{{.Who}}{{end}}</td>
-        <td class="m nw cell-req" title="{{.API}} v{{.Version}}"><span class="b">{{.API}}</span> <span class="mut">v{{.Version}}</span>{{if .Folded}} <span class="tag tf-count" title="{{.Count}} identical requests, {{.SameSpan}}">×{{.Count}}</span>{{end}}</td>
-        <td class="m cell-topic"{{if .Target}} title="{{.Target}}"{{end}}>{{if .Target}}{{.Target}}{{else}}<span class="mut">—</span>{{end}}</td>
-        <td class="mut cell-detail" title="{{.Detail}}">{{.Detail}}</td>
-        <td class="m cell-result">{{if .Error}}<span class="bad" title="The response carried this error">{{.Error}}</span>{{else}}<span class="ok">ok</span>{{end}}</td>
-        <td class="m num nw cell-took">{{.Dur}}</td>
-      </tr>{{end}}</tbody>
-    </table>
-  </div>
+  <div class="insp-default" id="insp-default" hx-swap-oob="true"{{if .DefaultHidden}} hidden{{end}}>{{template "insp_default" .}}</div>
+  <div class="tablenote" id="traffic-note" hx-swap-oob="true">{{template "traffic_note" .}}</div>{{end}}
+  {{if eq .TView "clients"}}{{template "traffic_clients_table" .}}
+  {{else if .Empty}}{{template "traffic_empty" .}}
+  {{else if .HasStory}}{{template "traffic_story" .}}
+  {{else if .Rows}}{{template "traffic_rows" .}}
   {{else if .Filtered}}
   <div class="honest">{{icon "info"}}<div>No request matches the filter. <a href="{{.Prefix}}/traffic">Clear it</a> to see everything.</div></div>
   {{else}}
   <div class="honest">{{icon "info"}}<div>Nothing has reached the broker yet. Point an app at it and its requests appear here as they happen.</div></div>
   {{end}}
-
-  {{if .HasClientMetrics}}
-  <div class="cap metrics-cap">Client metrics <span class="sz">reported by the clients themselves, every few seconds · metrics, not traces</span></div>
-  {{range .Metrics}}
-  <section class="mcard" aria-label="Metrics from {{.Who}}">
-    <div class="mc-h">
-      <span class="mc-who mono">{{.Who}}</span>
-      {{if .Software}}<span class="chip mono">{{.Software}}</span>{{end}}
-      <span class="chip mono" title="The id the broker gave this client instance">{{.IDShort}}…</span>
-      {{if .Closing}}<span class="badge state-empty">closing</span>{{end}}
-      <span class="mc-last dim">{{.Pushes}} report{{if ne .Pushes 1}}s{{end}} · last {{when .Last "clock"}} <span class="dim">· {{when .Last "ago"}}</span></span>
-    </div>
-    {{if .Resource}}<div class="mc-res mono dim">{{.Resource}}</div>{{end}}
-    {{if .Shown}}
-    <div class="mc-grid">
-      {{range .Shown}}{{template "metric_row" .}}{{end}}
-    </div>
-    {{if .More}}
-    <details class="mc-more"><summary>{{len .More}} more metrics</summary>
-      <div class="mc-grid">{{range .More}}{{template "metric_row" .}}{{end}}</div>
-    </details>
-    {{end}}
-    {{else}}
-    <div class="dim mc-none">It has reported no metrics yet.</div>
-    {{end}}
-  </section>
-  {{else}}
-  <div class="honest">{{icon "info"}}<div>No client has reported metrics yet. Clients that support KIP-714 (the Java client from 3.7, librdkafka from 2.5) send them on their own a few seconds after they connect; <span class="mono">enable.metrics.push=false</span> turns it off in the client.</div></div>
-  {{end}}
-  {{end}}
 </div>
 {{end}}
 
-{{/* The open connections: the inspector's summary on the Traffic page (Main). A name
-     opens that client in the panel, which replaces this until Esc. */}}
+{{define "traffic_rows"}}
+  {{if .Cut}}<div class="note tf-cut" id="rows-cut">Showing the newest {{.Shown}} of {{.MatchedRows}} matching rows.</div>{{end}}
+  <div class="tbl-wrap">
+    <table class="tbl tf-table" id="traffic-table"><thead><tr><th>Time</th><th>Client</th><th>Request</th><th>Topic or group</th><th>Detail</th><th>Result</th><th class="num">Took</th></tr></thead>
+      <tbody><tr class="frozen-line lost-only"><td colspan="7" class="m">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</td></tr>{{range .Rows}}{{template "traffic_row" dict "R" . "P" $.Prefix}}{{end}}</tbody>
+    </table>
+  </div>
+{{end}}
+
+{{/* One request row: the board's seven columns. A folded row counts its repeats; a
+     refusal is tinted by what kind of no it is. */}}
+{{define "traffic_row"}}{{with .R}}<tr id="rq-{{.OpenKey}}" class="{{.RowClass}}" tabindex="0" data-inspector-open
+          hx-get="{{$.P}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
+        <td class="m nw cell-time">{{when .Time "clockms"}}</td>
+        <td class="m nw cell-client" title="{{.Remote}}{{if .Software}} · {{.Software}}{{end}}">{{if .ConnKey}}<a href="{{$.P}}/traffic?client={{.Who}}" data-inspector-open hx-get="{{$.P}}/inspect/client?key={{.ConnKey}}" hx-trigger="click consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false">{{.Who}}</a>{{else}}{{.Who}}{{end}}</td>
+        <td class="m nw cell-req" title="{{.API}} v{{.Version}}{{if .Correlation}} · correlation {{.Correlation}}{{end}}"><span class="b">{{.API}}</span> <span class="mut">v{{.Version}}</span>{{if .Folded}} <span class="tag tf-count" title="{{.Count}} identical requests, {{.SameSpan}}">×{{.Count}}</span>{{end}}</td>
+        <td class="m cell-topic"{{if .Target}} title="{{.Target}}"{{end}}>{{if .Target}}{{.Target}}{{else}}<span class="mut">—</span>{{end}}</td>
+        <td class="mut cell-detail" title="{{.DetailText}}">{{.DetailText}}</td>
+        <td class="m cell-result"><span class="{{.Tone}}" title="{{.ResultTitle}}">{{.Result}}</span></td>
+        <td class="m num nw cell-took">{{.Dur}}</td>
+      </tr>{{end}}{{end}}
+
+{{/* The empty broker (Traf-09): nothing has reached it. The line to point an app at is
+     the running configuration's, not a number typed here. */}}
+{{define "traffic_empty"}}
+<div class="card pad col g16 tf-empty" id="traffic-empty" style="max-width: 720px; margin-top: 24px; padding: 22px 24px">
+  <div class="col g4"><span class="h2">Nothing has reached this broker yet</span><span class="note">No app has connected, so there is nothing to show. This is not an error: the broker is up and listening{{if not .Since.IsZero}}, since {{when .Since "clock"}}{{end}}. A restart empties this page: it keeps its last requests in memory only.</span></div>
+  <div class="col g6">
+    <span class="cap">Point an app at this line</span>
+    <pre class="code">bootstrap.servers={{.Facts.Bootstrap}}</pre>
+    {{if .Facts.SASL}}<span class="note">{{range $i, $m := .Facts.Mechanisms}}{{if $i}}, {{end}}SASL/{{$m}}{{end}} is on, so the app also needs a username and password. They are on the connect page.</span>{{end}}
+  </div>
+  <div class="col g8">
+    <span class="cap">Three first steps</span>
+    <div class="row g8"><span class="num">1</span><div class="col"><span class="b">Connect an app</span><span class="note">Use the line above in a producer, a consumer, or <span class="m">kcat -b {{.Facts.Bootstrap}} -L</span>.</span></div></div>
+    <div class="row g8"><span class="num">2</span><div class="col"><span class="b">Produce something</span><span class="note">Create a topic and send one message. A Produce request will appear here.</span></div></div>
+    <div class="row g8"><span class="num">3</span><div class="col"><span class="b">Watch it appear</span><span class="note">Each request shows as a row, newest first, with who sent it and how long it took.</span></div></div>
+  </div>
+  <div class="row g8"><a class="btn pri" href="{{.Prefix}}/connect">Connect an app<span aria-hidden="true">→</span></a><a class="btn" href="{{.Prefix}}/new/topic">Create a topic</a></div>
+</div>
+{{end}}
+
+{{/* The clients (Traf-06): who is connected and how each is behaving. */}}
+{{define "traffic_clients_table"}}
+  {{if .Clients}}
+  <div class="tbl-wrap">
+    <table class="tbl tf-clients" id="clients-table"><thead><tr><th>Client</th><th class="c-sw">Software</th><th class="c-pr">Principal</th><th class="c-ad">Address</th><th class="c-op">Open for</th><th class="c-la">Last request</th><th class="num c-rq">Req/min</th><th class="c-gr">Groups</th><th class="num c-er">Error rate</th></tr></thead>
+      <tbody>{{range .Clients}}<tr id="cl-{{.Conn}}" class="{{if .NeedsALook}}needs-look{{end}}" tabindex="0" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
+        <td class="m b nw">{{.Who}}</td>
+        <td class="m c-sw">{{if .Software}}{{.Software}}{{else}}<span class="mut">not reported</span>{{end}}</td>
+        <td class="m c-pr">{{.Principal}}</td>
+        <td class="m c-ad">{{.Remote}}</td>
+        <td class="m c-op">{{when .Opened "since"}}</td>
+        <td class="m c-la">{{when .Last "clock"}}</td>
+        <td class="m num c-rq">{{.Req1m}}</td>
+        <td class="c-gr {{if and .NeedsALook .Groups}}m warn{{else if eq .Groups "none"}}mut{{else if eq .Groups "none (producer)"}}mut{{else}}m{{end}}">{{.Groups}}</td>
+        <td class="m num c-er {{.RateTon}}">{{.Rate}}</td>
+      </tr>{{end}}</tbody>
+    </table>
+  </div>
+  {{if .Attention}}
+  <div class="callout warn" id="attention"><span class="b">{{.Attention.Who}} has been refused {{.Attention.Streak}} times in a row</span><span class="note">{{if .Attention.Why}}{{.Attention.Why}} {{end}}<a href="{{.Attention.URL}}">See the refusals</a></span></div>
+  {{end}}
+  {{else}}
+  <div class="honest">{{icon "info"}}<div>No client is connected. An app that uses the broker appears here for as long as its connection stays open.</div></div>
+  {{end}}
+{{end}}
+
+{{/* A group's rebalance told in order (Traf-12). */}}
+{{define "traffic_story"}}
+<div class="row ce g8 wrap tf-story-head"><span class="m" id="story-count"><span class="b">{{.Story.Requests}}</span> requests{{if .Story.Folded}} ({{.Story.Folded}} folded){{end}}, {{.Story.Rebalances}} rebalance{{if ne .Story.Rebalances 1}}s{{end}}</span><div class="grow"></div><a class="note" href="{{.FlatURL}}">Show them as a plain list</a></div>
+<div class="card tf-story" id="traffic-story" style="--c: 92px 150px 130px 1fr 80px 56px">
+  <div class="r h"><span>Time</span><span>Client</span><span>Request</span><span>What happened</span><span>Result</span><span class="ra">Took</span></div>
+  {{range .Story.Blocks}}
+  <div class="r on rebalance {{if .Done}}done{{else}}going{{end}}" style="background: var(--warnbg)"><span class="m">{{when .Start "clock"}}</span><span class="b">Rebalance</span><span class="m">{{if .Done}}{{if .From}}{{if $.Story.Epochs}}epoch{{else}}generation{{end}} <span class="b">{{.From}} → {{.To}}</span>{{else}}<span class="b">{{if $.Story.Epochs}}epoch{{else}}generation{{end}} {{.To}}</span>{{end}}{{else}}in progress{{end}}</span><span class="el">{{.Title}}</span><span class="m warn">{{if .Done}}finished{{else}}going{{end}}</span><span class="m ra">{{.Dur}}</span></div>
+  {{range .Rows}}{{template "story_row" dict "R" . "P" $.Prefix}}{{end}}
+  {{end}}
+  {{range .Story.Before}}{{template "story_row" dict "R" . "P" $.Prefix}}{{end}}
+</div>
+{{end}}
+
+{{define "story_row"}}{{with .R}}<div class="r {{if not .Nested}}kid{{end}} {{.RowClass}}" id="rq-{{.OpenKey}}" tabindex="0" data-inspector-open data-row hx-get="{{$.P}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
+  <span class="m">{{when .Time "clockms"}}</span>
+  <span class="m">{{if .Nested}}<span class="tree" aria-hidden="true">└─</span> {{end}}{{.Who}}</span>
+  <span class="m b">{{.API}} <span class="mut">v{{.Version}}</span>{{if .Folded}} <span class="tag">×{{.Count}}</span>{{end}}</span>
+  <span class="mut el" title="{{.DetailText}}">{{.DetailText}}{{if .ViaGroup}}{{if not .DetailText}}fetch by a member{{end}}{{end}}{{if and (not .Nested) .Folded}}{{end}}</span>
+  <span class="m {{.Tone}}" title="{{.ResultTitle}}">{{.Result}}</span>
+  <span class="m ra">{{.Dur}}</span>
+</div>{{end}}{{end}}
+
+{{/* The inspector's default, by what the page is: the open connections (Main), the
+     most frequent refusal (Traf-03), who touched a topic (Traf-02) or a group's
+     timeline (Traf-12). A row or a client replaces it, and Esc puts it back. */}}
 {{define "traffic_clients"}}
-<div class="hd"><span class="cap">Connected clients</span><span class="h2">{{len .Clients}} open connection{{if ne (len .Clients) 1}}s{{end}}</span></div>
+<div class="hd"><span class="cap">Connected clients</span><span class="h2">{{.ClientCount}} open connection{{if ne .ClientCount 1}}s{{end}}</span></div>
 <div class="bd flush" id="clients-list">
-  <div class="r h" style="--c: 1fr 72px 72px"><span>Client</span><span>Open for</span><span class="ra">Idle</span></div>
+  <div class="r h" style="--c: 1fr 70px 56px"><span>Client</span><span>Open for</span><span class="ra">Idle</span></div>
   {{range .Clients}}
   <div class="insp-client" id="cl-{{.Conn}}" data-row>
-    <a class="insp-client-open" href="{{$.Prefix}}/traffic?q={{.Who}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"><span class="b el">{{.Who}}</span><span class="m mut">{{when .Opened "since"}}</span><span class="m mut ra">{{when .Last "since"}}</span></a>
+    <a class="insp-client-open" href="{{.Href}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"><span class="b el">{{.Who}}</span><span class="m mut">{{when .Opened "since"}}</span><span class="m mut ra">{{when .Last "since"}}</span></a>
     <span class="m mut">{{if .Software}}{{.Software}}{{else}}software not reported{{end}} · {{.Principal}} · {{.Remote}}</span>
-    <span class="note">{{if .Doing}}{{.Doing}}{{else}}no requests kept{{end}}{{if .Refused}} · <span class="bad">{{.Refused}} of its kept requests refused</span>{{end}}</span>
+    <span class="note{{if .NeedsALook}} bad{{end}}">{{if .NeedsALook}}last {{.Streak}} requests refused{{else if .Doing}}{{.Doing}}{{else}}no requests kept{{end}}</span>
   </div>
   {{else}}
   <div class="callout spaced"><span class="b">No client is connected</span><span class="note">An app that uses the broker appears here for as long as its connection stays open.</span></div>
   {{end}}
   <div class="grow"></div>
-  {{if .HasClientMetrics}}<div class="callout"><span class="b">Clients that report their own metrics</span><span class="note">Java 3.7+ and librdkafka 2.5+ send request latency and poll idle ratio every few seconds. They are listed under the requests.</span></div>{{end}}
+  {{if .HasClientMetrics}}<div class="callout"><span class="b">Clients that report their own metrics</span><span class="note">Java 3.7+ and librdkafka 2.5+ send request latency and poll idle ratio every few seconds. Open a client to see them.</span></div>{{end}}
 </div>
+{{end}}
+
+{{define "traffic_errors_default"}}
+{{with .ErrorSummary}}
+<div class="hd"><span class="cap">Most frequent refusal</span><span class="h2">{{.Headline}}</span><span class="m {{.Tone}}">{{.Name}}</span></div>
+<div class="bd" id="error-summary">
+  <div class="callout {{.Tone}}" role="alert"><div class="row g8 ce"><span class="b">{{.ClassWord}}</span><span class="m">{{.Name}}</span></div>
+    {{if .Meaning}}<span class="m">{{.Meaning}}</span>{{end}}
+    <span class="note">{{.Said}}{{if .Verdict}} {{.Verdict}}{{end}}</span></div>
+  {{if .Cause}}<p>In plain words: {{.Cause}}</p>{{end}}
+  <div class="kv" style="--c: 100px 1fr"><span>Client</span><span class="m">{{.Client}}</span><span>Seen</span><span class="m">{{.Seen}}, {{when .SeenAt "clock"}}</span>{{if .Nearest}}<span>Nearest topic</span><span class="m"><a href="{{.NearestURL}}">{{.Nearest}}</a></span>{{end}}</div>
+  {{if or .CreateURL .Fix}}
+  <div class="col g8">
+    <span class="cap">What to do</span>
+    {{if .CreateURL}}
+    <a class="well pad row ce sb" href="{{.CreateURL}}"><span class="col"><span class="b">Create {{.Create}}</span><span class="note">Or fix the name in {{.Client}}.</span></span><span aria-hidden="true">→</span></a>
+    <a class="well pad row ce sb" href="{{.TopicsURL}}"><span class="col"><span class="b">See the {{.TopicCount}} topic{{if ne .TopicCount 1}}s{{end}} that exist{{if eq .TopicCount 1}}s{{end}}</span><span class="note">Compare with the name the app uses.</span></span><span aria-hidden="true">→</span></a>
+    {{else}}<div class="well pad col"><span class="note">{{.Fix}}</span></div>{{end}}
+  </div>
+  {{end}}
+  <div class="grow"></div>
+  {{if .Others}}<div class="note">The other refusal{{if gt (len .Others) 1}}s{{end}}: {{range $i, $o := .Others}}{{if $i}}, {{end}}<span class="m">{{$o.Name}}</span>{{if $o.Clients}} for {{$o.Clients}}{{end}}{{end}}. Select a row to read each one.</div>{{else}}<div class="note">Select a row to read it.</div>{{end}}
+</div>
+{{else}}
+<div class="hd"><span class="cap">Refusals</span><span class="h2">Nothing was refused</span></div>
+<div class="bd"><div class="note">Nothing the broker has been asked was refused, denied or failed in the requests it keeps. Select a row to open it.</div></div>
+{{end}}
+{{end}}
+
+{{define "traffic_touched"}}
+{{with .Touched}}
+<div class="hd"><span class="cap">Nothing selected</span><span class="h2">Who touched {{.Topic}}</span></div>
+<div class="bd" id="touched">
+  <div class="kv" style="--c: 120px 1fr">
+    <span>Producers</span><span class="m">{{range $i, $p := .Producers}}{{if $i}}, {{end}}{{$p}}{{else}}<span class="mut">none</span>{{end}}</span>
+    <span>Consumers</span><span class="m">{{range $i, $p := .Consumers}}{{if $i}}, {{end}}{{$p}}{{else}}<span class="mut">none</span>{{end}}</span>
+    <span>Produce requests</span><span class="m">{{.Produces}}</span>
+    <span>Fetch requests</span><span class="m">{{.Fetches}}{{if .FetchesFolded}} ({{.FetchesFolded}} folded){{end}}</span>
+    <span>Errors</span><span class="m {{if .Errors}}bad{{else}}ok{{end}}">{{.Errors}}</span>
+  </div>
+  <div class="well pad col g4"><span class="b">Open the topic</span><span class="note">Messages, partitions and the schema are on its own page.</span><a href="{{.TopicURL}}" class="row ce g6"><span class="sv sm c-tp" aria-hidden="true">TP</span>{{.Topic}}</a></div>
+  <div class="note">Select a row to see the whole request.</div>
+</div>
+{{end}}
+{{end}}
+
+{{define "traffic_group_default"}}
+{{with .GroupSummary}}
+<div class="hd"><span class="cap">Group timeline</span><div class="row sb ce"><span class="h2">{{.Group}}</span>{{if .State}}<span class="badge {{stateBadge .State}}">{{.State}}</span>{{end}}</div><span class="m mut">{{.Protocol}}{{range $i, $t := .Topics}}{{if eq $i 0}} · {{end}}{{if $i}}, {{end}}{{$t}}{{end}}</span></div>
+<div class="bd" id="group-summary">
+  {{if .Has}}<div class="callout"><span class="b">Why it rebalanced</span><span>{{.Why}}{{if .WhyDetail}} {{.WhyDetail}}{{end}}</span>{{if not .Epochs}}<span class="note">Real Kafka does the same: any join in the classic protocol makes everyone rejoin.</span>{{end}}</div>{{end}}
+  {{if .Generations}}
+  <div class="col g6">
+    <span class="cap">{{if .Epochs}}Epochs{{else}}Generations{{end}}</span>
+    <div class="card" style="--c: 40px 1fr 62px 72px">
+      <div class="r h"><span>{{if .Epochs}}Epoch{{else}}Gen{{end}}</span><span>Cause</span><span class="ra">Members</span><span class="ra">At</span></div>
+      {{range .Generations}}<div class="r"><span class="m">{{.Gen}}</span><span class="mut el">{{if .Cause}}{{.Cause}}{{else}}the group formed{{end}}</span><span class="m ra">{{.Members}}</span><span class="m ra">{{when .At "clock"}}</span></div>{{end}}
+    </div>
+  </div>
+  {{end}}
+  {{if not .Epochs}}<div class="col g4"><span class="cap">What the sequence means</span><span class="note">JoinGroup collects the members. SyncGroup hands out the partitions. Heartbeat and OffsetCommit then carry the new generation.</span></div>{{end}}
+  <div class="grow"></div>
+  <a class="btn" href="{{.TimelineURL}}">Open the full timeline<span aria-hidden="true">→</span></a>
+</div>
+{{else}}
+<div class="hd"><span class="cap">Group timeline</span><span class="h2">{{.Filter.Group}}</span></div>
+<div class="bd"><div class="note">The broker has not heard from this group since it started.</div></div>
+{{end}}
 {{end}}
 
 {{define "metric_row"}}
 <div class="mrow">
-  <span class="mr-n mono" title="{{.Name}}">{{.Short}}{{if .Attrs}} <span class="mr-a">{{.Attrs}}</span>{{end}}</span>
+  <span class="mr-n{{if not .Label}} mono{{end}}" title="{{.Name}}">{{if .Label}}{{.Label}}{{else}}{{.Short}}{{end}}{{if .Attrs}} <span class="mr-a">{{.Attrs}}</span>{{end}}</span>
   <span class="mr-s">{{.Spark}}</span>
   <span class="mr-v mono">{{.Last}}</span>
 </div>

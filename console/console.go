@@ -367,7 +367,9 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 		"icon":   icon,
 		// Links to resources. Names are data: never concatenate them into a URL
 		// in a template, use these (see resourceurl.go).
-		"topicURL":    func(name string) string { return topicPath(prefix, name) },
+		"topicURL": func(name string) string { return topicPath(prefix, name) },
+		// The address the inspector fetches a selection of one kind from.
+		"inspectHref": func(kind, key string) string { return prefix + "/inspect/" + kind + "?key=" + url.QueryEscape(key) },
 		"groupURL":    func(id string) string { return groupPath(prefix, id) },
 		"newTopicURL": func() string { return newTopicPath(prefix) },
 		"schemaURL":   func(subject string) string { return schemaPath(prefix, subject) },

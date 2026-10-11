@@ -52,7 +52,7 @@ func TestEverySelectionRendersThroughTheInspectorContract(t *testing.T) {
 	}
 	txnWrite(t, context.Background(), p, "tx", "open")
 
-	reqKey := requestKey(src.events[1])
+	reqKey := src.events[1].ID
 	cases := []struct {
 		kind, path string
 		title      string // the title the selection must have.
@@ -126,23 +126,6 @@ func TestEverySelectionRendersThroughTheInspectorContract(t *testing.T) {
 		if rec := req(t, c, "GET", path, nil); rec.Code != code {
 			t.Errorf("%s answered %d, want %d", path, rec.Code, code)
 		}
-	}
-}
-
-// The key of a request is its row id: what stays the same when the row folds in a
-// repeat. A sequence number moves each time, which is what made a selection and
-// the focus a poll puts back point at the wrong row.
-func TestARequestsKeyDoesNotMoveWhenItFoldsInARepeat(t *testing.T) {
-	a := sampleTraffic().events[0]
-	b := a
-	b.Seq, b.Count, b.Time = a.Seq+40, a.Count+7, a.Time.Add(time.Minute)
-	if requestKey(a) != requestKey(b) {
-		t.Errorf("a folded row's key moved: %s -> %s", requestKey(a), requestKey(b))
-	}
-	other := a
-	other.API = "Fetch"
-	if requestKey(a) == requestKey(other) {
-		t.Error("two different requests share a key")
 	}
 }
 

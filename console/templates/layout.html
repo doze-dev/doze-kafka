@@ -174,7 +174,7 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
 </aside>
 {{end}}
 
-{{define "insp_default"}}{{if eq .InspDefault "traffic"}}{{template "traffic_clients" .}}{{end}}{{end}}
+{{define "insp_default"}}{{if eq .InspDefault "traffic"}}{{template "traffic_clients" .}}{{else if eq .InspDefault "errors"}}{{template "traffic_errors_default" .}}{{else if eq .InspDefault "touched"}}{{template "traffic_touched" .}}{{else if eq .InspDefault "story"}}{{template "traffic_group_default" .}}{{end}}{{end}}
 
 {{/* The keys strip: what the keys do on this page, one line at the foot (Sy-01).
      The hints come from keys.go, per page; a hint is a key the page really has. */}}

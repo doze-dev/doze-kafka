@@ -16,7 +16,6 @@ package console
 
 import (
 	"fmt"
-	"hash/fnv"
 	"net/http"
 	"net/url"
 	"sort"
@@ -65,8 +64,17 @@ type inspectorView struct {
 	Nav   []inspectorNav
 	// Gone says the selection no longer exists (it aged out, or was deleted): the
 	// inspector still opens, with a title and a way out, and says so.
-	Gone    bool
-	GoneMsg string
+	// Cap replaces the kind's word above the title ("Folded row" for a request that is
+	// many); Status is what the board writes at the right of the title ("ok · 2 ms"), in
+	// StatusTone's colour, or as a pill when StatusKind is "pill"; SubTime is a moment
+	// written under the title before Sub.
+	Cap        string
+	Status     string
+	StatusTone string
+	StatusKind string
+	SubTime    time.Time
+	Gone       bool
+	GoneMsg    string
 	// NoURL keeps this selection out of the address (a message found by a search
 	// across partitions has no single partition to name).
 	NoURL bool
@@ -113,16 +121,6 @@ func (c *Console) inspectURL(kind, key string) string {
 	return c.prefix + "/inspect/" + kind + "?key=" + url.QueryEscape(key)
 }
 
-// requestKey is a request row's identity. It is made of what does not change when
-// the row folds in another identical request (the first time, who, what, on what),
-// not of its sequence number, which moves every time the row is repeated; a
-// selection and the focus a poll puts back both depend on that.
-func requestKey(e TrafficEvent) string {
-	h := fnv.New64a()
-	fmt.Fprint(h, e.First.UnixNano(), "|", e.Remote, "|", e.ClientID, "|", e.API, "|", e.Version, "|", strings.Join(e.Topics, ","), "|", e.Group)
-	return strconv.FormatUint(h.Sum64(), 36)
-}
-
 // inspect renders one selection through the inspector contract.
 func (c *Console) inspect(w http.ResponseWriter, v inspectorView) {
 	data := map[string]any{}
@@ -137,6 +135,10 @@ func (c *Console) inspect(w http.ResponseWriter, v inspectorView) {
 	// not be overwritten by the contract's.
 	data["InspKind"], data["InspKey"], data["InspTitle"], data["InspSub"] = v.Kind, v.Key, v.Title, v.Sub
 	data["InspKindLabel"] = inspectorKindLabels[v.Kind]
+	if v.Cap != "" {
+		data["InspKindLabel"] = v.Cap
+	}
+	data["InspStatus"], data["InspStatusTone"], data["InspStatusKind"], data["InspSubTime"] = v.Status, v.StatusTone, v.StatusKind, v.SubTime
 	data["InspNav"], data["InspGone"], data["InspGoneMsg"], data["InspOpen"] = v.Nav, v.Gone, v.GoneMsg, open
 	c.partial(w, "inspector", data)
 }
@@ -170,74 +172,6 @@ func (c *Console) trafficOff(w http.ResponseWriter, r *http.Request) bool {
 	}
 	c.fail(w, r, fmt.Errorf("%w: there is no traffic view in this console", errNotFound))
 	return true
-}
-
-func (c *Console) inspectRequest(w http.ResponseWriter, r *http.Request, key string) {
-	if c.trafficOff(w, r) {
-		return
-	}
-	if raw := r.URL.Query().Get("seq"); key == "" && raw != "" {
-		// The earlier address named a sequence number.
-		seq, err := strconv.ParseUint(raw, 10, 64)
-		if err != nil {
-			c.fail(w, r, badInput("seq must be a number"))
-			return
-		}
-		key = "seq-" + raw // no row: it has moved on or aged out.
-		for _, e := range c.traffic.Events(TrafficFilter{}, 0) {
-			if e.Seq == seq {
-				key = requestKey(e)
-			}
-		}
-	}
-	if key == "" {
-		c.fail(w, r, badInput("a request is named by its row id"))
-		return
-	}
-	v := inspectorView{Kind: KindRequest, Key: key, Title: "Request", Body: map[string]any{}}
-	for _, e := range c.traffic.Events(TrafficFilter{}, 0) {
-		if requestKey(e) != key {
-			continue
-		}
-		row := c.trafficRow(e)
-		v.Title, v.Sub = fmt.Sprintf("%s v%d", e.API, e.Version), row.Who
-		v.Body["R"] = row
-		c.inspect(w, v)
-		return
-	}
-	v.Gone = true
-	v.GoneMsg = "This request has aged out of what the broker remembers. The last couple of thousand are kept, in memory only."
-	c.inspect(w, v)
-}
-
-func (c *Console) inspectClient(w http.ResponseWriter, r *http.Request, key string) {
-	if c.trafficOff(w, r) {
-		return
-	}
-	conn, err := strconv.ParseUint(key, 10, 64)
-	if err != nil {
-		c.fail(w, r, badInput("a client is named by its connection number"))
-		return
-	}
-	v := inspectorView{Kind: KindClient, Key: key, Title: "Client", Body: map[string]any{}}
-	for _, cl := range c.traffic.Clients() {
-		if cl.Conn != conn {
-			continue
-		}
-		now := time.Now()
-		who := cl.ClientID
-		if who == "" {
-			who = cl.Remote
-		}
-		v.Title, v.Sub = who, cl.Remote
-		v.Body["C"] = clientRow{TrafficClient: cl, Who: who, Age: spanText(now.Sub(cl.Opened)), Idle: spanText(now.Sub(cl.Last)),
-			Filter: TrafficFilter{Client: who}.query()}
-		c.inspect(w, v)
-		return
-	}
-	v.Gone = true
-	v.GoneMsg = "This connection has closed."
-	c.inspect(w, v)
 }
 
 func (c *Console) inspectMember(w http.ResponseWriter, r *http.Request, key string) {

@@ -60,6 +60,14 @@ func seedOpts(addr string) []kgo.Opt {
 // displayAddr is the bootstrap address pages show clients: DisplayAddr when
 // set (the embedded topology, where the dial addr is a unix socket apps can't
 // use), the dial addr otherwise.
+// The client ids of the console's own Kafka clients. The traffic recorder leaves exactly
+// these out (cmd/doze-kafka checks that its list is this one).
+const (
+	ClientID      = "doze-kafka-console"
+	ClientIDFetch = "doze-kafka-console-fetch"
+	ClientIDTrace = "doze-kafka-console-trace"
+)
+
 func (b *backend) displayAddr() string {
 	if b.opts.DisplayAddr != "" {
 		return b.opts.DisplayAddr
@@ -73,7 +81,7 @@ func newBackend(opts Options) (*backend, error) {
 	if opts.Addr == "" {
 		return nil, fmt.Errorf("console: Addr is required")
 	}
-	base := append([]kgo.Opt{kgo.ClientID("doze-kafka-console")}, seedOpts(opts.Addr)...)
+	base := append([]kgo.Opt{kgo.ClientID(ClientID)}, seedOpts(opts.Addr)...)
 	if opts.SASLUser != "" {
 		mech, err := saslMechanism(opts.SASLMechanism, opts.SASLUser, opts.SASLPass)
 		if err != nil {
@@ -608,7 +616,7 @@ func (b *backend) fetchWindow(ctx context.Context, topic string, partition int32
 	if committed {
 		iso = kgo.ReadCommitted()
 	}
-	kopts := append(seedOpts(b.addr), kgo.ClientID("doze-kafka-console-fetch"),
+	kopts := append(seedOpts(b.addr), kgo.ClientID(ClientIDFetch),
 		kgo.ConsumePartitions(map[string]map[int32]kgo.Offset{topic: {partition: kgo.NewOffset().At(fromOffset)}}),
 		kgo.FetchMaxBytes(4<<20), kgo.FetchIsolationLevel(iso),
 	)
@@ -678,7 +686,7 @@ func (b *backend) fetchWindow(ctx context.Context, topic string, partition int32
 // given, as the console's other short-lived readers are: no group, no commits. The
 // caller closes it.
 func (b *backend) newReader(assign map[string]map[int32]kgo.Offset) (*kgo.Client, error) {
-	kopts := append(seedOpts(b.addr), kgo.ClientID("doze-kafka-console-trace"),
+	kopts := append(seedOpts(b.addr), kgo.ClientID(ClientIDTrace),
 		kgo.ConsumePartitions(assign), kgo.FetchMaxBytes(8<<20), kgo.FetchIsolationLevel(kgo.ReadUncommitted()))
 	if b.opts.SASLUser != "" {
 		mech, err := saslMechanism(b.opts.SASLMechanism, b.opts.SASLUser, b.opts.SASLPass)

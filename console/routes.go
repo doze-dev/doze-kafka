@@ -125,6 +125,7 @@ func (c *Console) routeTable() []routeRow {
 		get("/traffic", specTraffic, "the page", c.trafficPage),
 		get("/traffic/live", specTraffic, "HTMX partial, polled", c.trafficLive),
 		get("/traffic/request", specTraffic, "inspector partial", c.trafficRequest),
+		get("/traffic/new", specTraffic, "how many requests a paused page has missed", c.trafficNew),
 
 		// Schemas: the built-in registry.
 		get("/schemas", specSchemas, "the list", c.schemas),

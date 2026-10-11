@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"html/template"
 	"math"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -29,11 +28,17 @@ type ClientMetricsSource interface {
 type ClientInstance struct {
 	ID                                  string // the client instance id, a UUID.
 	ClientID, Software, Principal, Host string
-	First, Last                         time.Time
-	Pushes                              int
-	Terminated                          bool // its last push said it was closing.
-	Resource                            map[string]string
-	Series                              []MetricSeries
+	// Conn is the connection it reports over (the traffic recorder's connection id), 0
+	// when the source does not know.
+	Conn        uint64
+	First, Last time.Time
+	Pushes      int
+	// Metrics is how many series it has, Dropped how many beyond the cap were not kept
+	// and Skipped how many pushes were not read for coming too fast.
+	Metrics, Dropped, Skipped int
+	Terminated                bool // its last push said it was closing.
+	Resource                  map[string]string
+	Series                    []MetricSeries
 }
 
 // MetricSeries is one metric for one set of attributes, oldest sample first.
@@ -52,23 +57,13 @@ type MetricSample struct {
 type metricRow struct {
 	Name  string
 	Short string
+	// Label is the metric as a person writes it, where it is known; "" otherwise.
+	Label string
 	Attrs string
 	Unit  string
 	Last  string
 	N     int
 	Spark template.HTML
-}
-
-// metricCard is a client, ready to show.
-type metricCard struct {
-	ClientInstance
-	Who      string
-	IDShort  string // the first part of the instance id: enough to tell two apart.
-	Age      string
-	Closing  bool
-	Shown    []metricRow
-	More     []metricRow
-	Resource string
 }
 
 // metricsShown is how many series a card lists before folding the rest away.
@@ -101,51 +96,6 @@ func metricRank(name string, last float64) int {
 		}
 	}
 	return len(metricPriority)
-}
-
-func (c *Console) metricCards() []metricCard {
-	if c.metrics == nil {
-		return nil
-	}
-	now := time.Now()
-	var cards []metricCard
-	for _, in := range c.metrics.Instances() {
-		card := metricCard{ClientInstance: in, Who: in.ClientID, Age: spanText(now.Sub(in.Last)), Closing: in.Terminated}
-		if card.Who == "" {
-			card.Who = in.Host
-		}
-		card.IDShort = in.ID
-		if len(card.IDShort) > 8 {
-			card.IDShort = card.IDShort[:8]
-		}
-		var keys []string
-		for k, v := range in.Resource {
-			keys = append(keys, k+"="+v)
-		}
-		sort.Strings(keys)
-		card.Resource = strings.Join(keys, " · ")
-
-		rows := make([]metricRow, 0, len(in.Series))
-		for _, s := range in.Series {
-			rows = append(rows, metricRow{
-				Name: s.Name, Short: strings.TrimPrefix(s.Name, "org.apache.kafka."), Attrs: s.Attrs, Unit: s.Unit,
-				Last: formatMetric(lastSample(s), s.Unit), N: len(s.Samples), Spark: sparkline(s.Samples),
-			})
-		}
-		lastOf := map[string]float64{}
-		for _, ser := range in.Series {
-			lastOf[ser.Name+"\x00"+ser.Attrs] = lastSample(ser)
-		}
-		rank := func(r metricRow) int { return metricRank(r.Name, lastOf[r.Name+"\x00"+r.Attrs]) }
-		sort.SliceStable(rows, func(a, b int) bool { return rank(rows[a]) < rank(rows[b]) })
-		if len(rows) > metricsShown {
-			card.Shown, card.More = rows[:metricsShown], rows[metricsShown:]
-		} else {
-			card.Shown = rows
-		}
-		cards = append(cards, card)
-	}
-	return cards
 }
 
 func lastSample(s MetricSeries) float64 {

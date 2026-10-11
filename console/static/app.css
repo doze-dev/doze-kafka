@@ -685,7 +685,6 @@ tr[data-inspector-open] { cursor: pointer; }
 tr[data-inspector-open]:hover td { background: var(--well); }
 tr[data-inspector-open]:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 tr.on td { background: var(--sel); }
-tr.errrow td { background: var(--badbg); }
 td.empty { padding: 22px 12px; color: var(--muted-foreground); }
 .cell-offset { font-family: var(--mono); font-weight: 500; }
 .cell-time { font-family: var(--mono); font-size: var(--fs-sm); color: var(--muted-foreground); white-space: nowrap; }
@@ -1145,3 +1144,60 @@ table.tbl.tf-table th:last-child, table.tbl.tf-table td:last-child { padding-rig
 #try-offset .try-off { width: 120px; }
 
 .nbnote { margin: 4px 0 0; }
+
+/* ---------- Traffic (Main, Traf-02 to Traf-12) ---------- */
+/* A refusal is tinted by what kind of no it is: purple for what real Kafka would also
+   say and for what an ACL decided, amber for not implemented, red only for the broker
+   failing (Traf-03's own note: "anything red is the broker unhappy"). */
+table.tbl tbody tr.errrow td { background: var(--denybg); }
+table.tbl tbody tr.errrow.not-implemented td { background: var(--warnbg); }
+table.tbl tbody tr.errrow.failed td { background: var(--badbg); }
+.r.errrow { background: var(--denybg); }
+.r.errrow.not-implemented { background: var(--warnbg); }
+.r.errrow.failed { background: var(--badbg); }
+.filter-note { white-space: nowrap; }
+.tf-cut { margin: 0 0 6px; }
+.tf-story-head { margin: 4px 0 6px; }
+.tf-story .r.kid { color: var(--mut); }
+.tf-story .r.rebalance .b { color: var(--ink); }
+.tree { color: var(--line); font-family: var(--mono); }
+.tick { display: inline-block; width: 3px; border-radius: 1px; background: var(--ink); }
+.tick.deny { background: var(--deny); } .tick.bad { background: var(--bad); } .tick.warn { background: var(--warn); }
+.t-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.t-row .t { min-width: 0; }
+.insp-status { flex: none; }
+.metric-list { display: grid; row-gap: 9px; }
+.metric-list.worth { padding: 8px 12px; row-gap: 8px; }
+.metric-list .mrow { display: grid; grid-template-columns: 1fr 76px 72px; column-gap: 10px; align-items: center; }
+.metric-list .mr-s svg.spark { width: 76px; height: 16px; }
+.metric-list .mr-v { text-align: right; }
+.tf-clients { table-layout: auto; width: 100%; }
+.tf-clients td, .tf-clients th { padding-left: 7px; padding-right: 7px; }
+.tf-clients td:first-child, .tf-clients th:first-child { padding-left: 12px; }
+.tf-clients tr { cursor: pointer; }
+.tf-clients tr.needs-look td { background: var(--warnbg); }
+.tf-clients .c-sw { width: 190px; } .tf-clients .c-pr { width: 110px; } .tf-clients .c-ad { width: 130px; }
+.tf-clients .c-op { width: 80px; } .tf-clients .c-la { width: 100px; } .tf-clients .c-rq { width: 90px; } .tf-clients .c-gr { width: 130px; }
+/* With a client open on the right there is no room for nine columns: the board keeps
+   the client, its software, requests a minute and errors (Traf-07). */
+.panes:has(#inspector:not([hidden])) .tf-clients .c-pr,
+.panes:has(#inspector:not([hidden])) .tf-clients .c-ad,
+.panes:has(#inspector:not([hidden])) .tf-clients .c-op,
+.panes:has(#inspector:not([hidden])) .tf-clients .c-la,
+.panes:has(#inspector:not([hidden])) .tf-clients .c-gr { display: none; }
+/* The paused page (Traf-08) and the lost broker (Traf-10) are the page's two states: the
+   shell says which with an attribute on the document. */
+.lost-only, .paused-only { display: none; }
+html[data-paused] .paused-only { display: inline; }
+html[data-paused] .callout.paused-only { display: flex; }
+html[data-paused] .live-only { display: none; }
+#paused-banner { flex-direction: row; align-items: center; justify-content: space-between; }
+html[data-connection-lost] .lost-only { display: inline-flex; }
+html[data-connection-lost] .callout.lost-only { display: flex; }
+html[data-connection-lost] tr.frozen-line.lost-only { display: table-row; }
+tr.frozen-line td { background: var(--well); color: var(--mut); text-align: center; }
+html[data-connection-lost] #traffic-controls [data-live-state],
+html[data-connection-lost] #traffic-controls [data-live-toggle]:not(.lost-only) { display: none; }
+html[data-paused] #traffic-controls [data-live-toggle] { display: none; }
+html[data-connection-lost] #traffic-live .tbl-wrap { opacity: .55; }
+html[data-connection-lost] #traffic-live[data-live].disconnected::after { display: none; }

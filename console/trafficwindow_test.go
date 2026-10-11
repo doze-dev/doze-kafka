@@ -13,10 +13,10 @@ func TestTrafficSummaryCountsEveryNumberInItsOwnWindow(t *testing.T) {
 	now := time.Now()
 	src := &fakeTraffic{events: []TrafficEvent{
 		{Seq: 5, First: now.Add(-2 * time.Second), Time: now.Add(-2 * time.Second), Count: 1, ClientID: "a", Remote: "r1", API: "Produce", Topics: []string{"orders"}},
-		{Seq: 4, First: now.Add(-5 * time.Second), Time: now.Add(-5 * time.Second), Count: 1, ClientID: "a", Remote: "r1", API: "CreateTopics", Error: "TOPIC_ALREADY_EXISTS"},
+		{Seq: 4, First: now.Add(-5 * time.Second), Time: now.Add(-5 * time.Second), Count: 1, ClientID: "a", Remote: "r1", API: "CreateTopics", Error: "TOPIC_ALREADY_EXISTS", Class: "refused"},
 		// Failed ten minutes ago: in the ring, not in the minute.
-		{Seq: 3, First: now.Add(-10 * time.Minute), Time: now.Add(-10 * time.Minute), Count: 1, ClientID: "a", Remote: "r1", API: "Fetch", Error: "UNKNOWN_TOPIC_OR_PARTITION"},
-		{Seq: 2, First: now.Add(-11 * time.Minute), Time: now.Add(-11 * time.Minute), Count: 7, ClientID: "a", Remote: "r1", API: "JoinGroup", Error: "REBALANCE_IN_PROGRESS"},
+		{Seq: 3, First: now.Add(-10 * time.Minute), Time: now.Add(-10 * time.Minute), Count: 1, ClientID: "a", Remote: "r1", API: "Fetch", Error: "UNKNOWN_TOPIC_OR_PARTITION", Class: "refused"},
+		{Seq: 2, First: now.Add(-11 * time.Minute), Time: now.Add(-11 * time.Minute), Count: 7, ClientID: "a", Remote: "r1", API: "JoinGroup", Error: "REBALANCE_IN_PROGRESS", Class: "expected"},
 	}}
 	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = src })
 	body := req(t, c, "GET", "/_console/traffic", nil).Body.String()
@@ -33,18 +33,25 @@ func TestTrafficSummaryCountsEveryNumberInItsOwnWindow(t *testing.T) {
 	}
 }
 
-// A client's "refused" count is over the requests the recorder kept, and says so.
-func TestClientRefusedCountSaysItIsOverKeptRequests(t *testing.T) {
+// A client that was refused several times in a row is flagged in the connected-clients
+// list, with the number of requests, and nowhere else is it an "over all kept" count.
+func TestClientRefusedInARowIsFlagged(t *testing.T) {
 	now := time.Now()
 	src := &fakeTraffic{
 		events: []TrafficEvent{
-			{Seq: 2, First: now, Time: now, Count: 1, Conn: 1, ClientID: "a", Remote: "r1", API: "CreateTopics", Error: "TOPIC_ALREADY_EXISTS"},
+			{ID: "r2", Seq: 2, First: now, Time: now, Count: 1, Conn: 1, ClientID: "a", Remote: "r1", API: "CreateTopics", Error: "TOPIC_ALREADY_EXISTS", Class: "refused"},
 		},
-		clients: []TrafficClient{{Conn: 1, Remote: "r1", ClientID: "a", Opened: now.Add(-time.Hour), Last: now}},
+		clients: []TrafficClient{{Conn: 1, Remote: "r1", ClientID: "a", Opened: now.Add(-time.Hour), Last: now, Requests: 4, Streak: 4, Req5m: 4, Err5m: 4, LastError: "TOPIC_ALREADY_EXISTS"}},
 	}
 	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = src })
 	body := req(t, c, "GET", "/_console/traffic", nil).Body.String()
-	if !strings.Contains(body, "1 of its kept requests refused") {
-		t.Errorf("the clients list does not say what its refused count is over:\n%s", between(body, `id="clients-list"`, "</aside>"))
+	if !strings.Contains(body, "last 4 requests refused") {
+		t.Errorf("the clients list does not flag it:\n%s", between(body, `id="clients-list"`, "</aside>"))
+	}
+	view := req(t, c, "GET", "/_console/traffic?view=clients", nil).Body.String()
+	for _, want := range []string{"1 client needs a look", "has been refused 4 times in a row", "100 %", "See the refusals"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("the clients view does not say %q", want)
+		}
 	}
 }

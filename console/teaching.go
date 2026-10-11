@@ -94,5 +94,7 @@ var formFields = map[string]formField{
 	"at":             {Not: "a time to jump to or trace from"},
 	"id":             {Not: "a trace id, or a pasted trace header, to follow"},
 	"kind":           {Not: "which kind of request the Traffic page shows"},
+	"group":          {Not: "the consumer group the Traffic page is narrowed to, carried through its filter form"},
+	"client":         {Not: "the client the Traffic page is narrowed to, carried through its filter form"},
 	"tab":            {Not: "which tab of a page a form belongs to, so its answer is the same tab"},
 }

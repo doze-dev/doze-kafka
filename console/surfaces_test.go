@@ -81,6 +81,8 @@ func TestEverySurfaceRenders(t *testing.T) {
 			path += "?partition=0&offset=1"
 		case strings.HasSuffix(path, "/traffic/request"):
 			path += "?seq=8"
+		case strings.HasSuffix(path, "/traffic/new"):
+			path += "?since=0"
 		case strings.HasSuffix(path, "/trace"):
 			path += "?id=" + traceA
 		case strings.HasSuffix(path, "/trace/live"):

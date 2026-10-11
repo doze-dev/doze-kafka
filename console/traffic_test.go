@@ -35,6 +35,63 @@ func (f *fakeTraffic) Events(flt TrafficFilter, limit int) []TrafficEvent {
 	}
 	return out
 }
+func (f *fakeTraffic) Row(id string) (TrafficEvent, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, e := range f.events {
+		if e.ID == id {
+			return e, true
+		}
+	}
+	return TrafficEvent{}, false
+}
+
+func (f *fakeTraffic) NewSince(flt TrafficFilter, t time.Time) (int, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, e := range f.events {
+		if e.Time.After(t) {
+			n += max(e.Count, 1)
+		}
+	}
+	return n, false
+}
+
+func (f *fakeTraffic) Story(group string) TrafficStory { return TrafficStory{Group: group} }
+
+func (f *fakeTraffic) Window(d time.Duration) TrafficWindow {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var w TrafficWindow
+	for _, e := range f.events {
+		if time.Since(e.Time) > d {
+			continue
+		}
+		w.Requests += max(e.Count, 1)
+		if e.Class != "" && e.Class != "expected" {
+			w.Errors += max(e.Count, 1)
+		}
+	}
+	return w
+}
+
+func (f *fakeTraffic) Refusals() []TrafficRefusal {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []TrafficRefusal
+	for _, e := range f.events {
+		if e.Class != "" && e.Class != "expected" {
+			out = append(out, TrafficRefusal{Code: e.ErrorCode, Name: e.Error, Class: e.Class, Count: 1,
+				Clients: []TrafficClientCount{{e.ClientID, 1}}, First: e.Time, Last: e.Time, Latest: e.ID, API: e.API, Topics: e.Topics})
+		}
+	}
+	return out
+}
+
+func (f *fakeTraffic) Capacity() int    { return 2000 }
+func (f *fakeTraffic) Since() time.Time { return tt0 }
+
 func (f *fakeTraffic) Clients() []TrafficClient { return f.clients }
 func (f *fakeTraffic) GroupEvents(g string, limit int) []TrafficGroupEvent {
 	return f.groups[g]
@@ -45,11 +102,11 @@ var tt0 = time.Date(2026, 10, 10, 12, 30, 15, 250_000_000, time.Local)
 func sampleTraffic() *fakeTraffic {
 	return &fakeTraffic{
 		events: []TrafficEvent{
-			{Seq: 9, First: tt0, Time: tt0.Add(5 * time.Second), Count: 4, ClientID: "billing", Remote: "127.0.0.1:50001", Principal: "User:ANONYMOUS",
+			{ID: "r9", Seq: 9, First: tt0, Time: tt0.Add(5 * time.Second), Count: 4, ClientID: "billing", Remote: "127.0.0.1:50001", Principal: "User:ANONYMOUS",
 				API: "Heartbeat", Version: 4, Group: "billing-workers", Duration: 800 * time.Microsecond, ReqBytes: 60, RespBytes: 12},
-			{Seq: 8, First: tt0, Time: tt0, Count: 1, ClientID: "billing", Software: "apache-kafka-java 3.7.0", Remote: "127.0.0.1:50001", Principal: "User:ANONYMOUS",
+			{ID: "r8", Seq: 8, First: tt0, Time: tt0, Count: 1, ClientID: "billing", Software: "apache-kafka-java 3.7.0", Remote: "127.0.0.1:50001", Principal: "User:ANONYMOUS",
 				API: "Produce", Version: 9, Topics: []string{"orders"}, Detail: "1 partition, 2.0 KiB", Duration: 12 * time.Millisecond, ReqBytes: 2100, RespBytes: 80},
-			{Seq: 7, First: tt0, Time: tt0, Count: 1, ClientID: "audit", Remote: "127.0.0.1:50002", Principal: "User:ANONYMOUS",
+			{ID: "r7", Seq: 7, First: tt0, Class: "refused", ErrorCode: 3, Time: tt0, Count: 1, ClientID: "audit", Remote: "127.0.0.1:50002", Principal: "User:ANONYMOUS",
 				API: "Fetch", Version: 13, Topics: []string{"payments"}, Error: "UNKNOWN_TOPIC_OR_PARTITION", Duration: 2 * time.Millisecond, ReqBytes: 90, RespBytes: 50},
 		},
 		clients: []TrafficClient{{Conn: 1, Remote: "127.0.0.1:50001", ClientID: "billing", Software: "apache-kafka-java 3.7.0", Principal: "User:ANONYMOUS",
@@ -275,74 +332,86 @@ func sampleMetrics() fakeMetrics {
 		MetricSeries{Name: "org.apache.kafka.producer.somethingelse.total", Kind: "sum", Samples: ramp(3, 1000, 1000)},
 	)
 	return fakeMetrics{[]ClientInstance{
-		{ID: "0d7a8e3c-1b1e-4c2f-9a77-3b7c2f6a9d10", ClientID: "billing", Software: "apache-kafka-java 3.7.1", Principal: "User:ANONYMOUS", Host: "/127.0.0.1",
+		{ID: "0d7a8e3c-1b1e-4c2f-9a77-3b7c2f6a9d10", Conn: 1, ClientID: "billing", Software: "apache-kafka-java 3.7.1", Principal: "User:ANONYMOUS", Host: "/127.0.0.1",
 			First: tt0, Last: time.Now(), Pushes: 20, Resource: map[string]string{"client_rack": "r1"}, Series: series},
 		{ID: "11111111-2222-4333-8444-555555555555", ClientID: "audit", Last: time.Now(), Pushes: 1, Terminated: true},
 	}}
 }
 
-func TestTrafficPageShowsWhatClientsReportAboutThemselves(t *testing.T) {
+// A client's own metrics are the client's page (Traf-07), not a section under the
+// requests: the inspector says what they are and puts the ones worth a look first.
+func TestClientInspectorShowsWhatItReportsAboutItself(t *testing.T) {
 	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic(); o.ClientMetrics = sampleMetrics() })
-	body := req(t, c, "GET", "/_console/traffic", nil).Body.String()
-
+	body := req(t, c, "GET", "/_console/inspect/client?key=1", nil).Body.String()
 	for _, want := range []string{
-		"Client metrics", "metrics, not traces", // what it is, said on the page.
-		`aria-label="Metrics from billing"`, "apache-kafka-java 3.7.1", "0d7a8e3c…", "20 reports",
-		"producer.node.request.latency.avg", "node_id=1", // the short name, and the attributes it is for.
-		"13.5 ms",        // 4 + 19*0.5, with its unit and without float noise.
-		"3",              // the connection total.
-		"3,000",          // a thousands separator.
+		"Metrics reported by the client itself", "metrics, not traces", "20 reports", "last report",
+		"Request latency, average", "node_id=1", // the label a person writes, and the attributes it is for.
+		"13.5 ms", // 4 + 19*0.5, with its unit and without float noise.
+		"Sparklines cover", "one point per report",
+		"more metrics are in the full list",
 		"client_rack=r1", // what the client said about itself.
-		"closing",        // the one whose last report said it was closing.
-		"It has reported no metrics yet",
+		"connected",
 	} {
 		if !strings.Contains(body, want) {
-			t.Errorf("the page does not show %q", want)
+			t.Errorf("the client's inspector does not show %q:\n%s", want, body)
 		}
 	}
-	// A series with samples is drawn; one with a single sample is not.
-	if n := strings.Count(body, `<polyline points=`); n < 3 {
-		t.Errorf("%d sparklines, want one per series that has a history", n)
+	if strings.Contains(body, "one bar per report") {
+		t.Error("the copy says bars; the chart is a line of points")
 	}
-	// The interesting ones come first, and the rest fold away.
-	lat, filler := strings.Index(body, "producer.node.request.latency.avg"), strings.Index(body, "producer.filler.00")
-	if !(lat > 0 && filler > lat) {
-		t.Errorf("the request latency (%d) does not come before filler (%d)", lat, filler)
+	if n := strings.Count(body, `<polyline points=`); n < 1 {
+		t.Errorf("%d sparklines drawn", n)
 	}
-	// Three of the thirteen are folded: the interesting ones stayed up, so what is folded
-	// is filler, never the latency.
-	if folded := between(body, `class="mc-more"`, "</details>"); strings.Contains(folded, "request.latency") || !strings.Contains(folded, "filler") {
-		t.Errorf("the fold hides the wrong metrics:\n%s", folded)
+	// The interesting ones come first, and the rest fold away until asked for.
+	if strings.Contains(body, "producer.filler.09") {
+		t.Error("the filler is not folded away")
 	}
-	if !strings.Contains(body, "<summary>3 more metrics</summary>") {
-		t.Errorf("a long list is not folded:\n%s", between(body, "mc-more", "</summary>"))
+	all := req(t, c, "GET", "/_console/inspect/client?key=1&all=1", nil).Body.String()
+	if !strings.Contains(all, "producer.filler.09") || strings.Contains(all, "more metrics are in the full list") {
+		t.Error("asking for all of them does not list them all")
 	}
 }
 
-func TestClientMetricsSectionIsAbsentWithoutASourceAndSaysSoWhenThereAreNone(t *testing.T) {
-	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic() })
-	if body := req(t, c, "GET", "/_console/traffic", nil).Body.String(); strings.Contains(body, "Client metrics") {
-		t.Error("the page offers client metrics with nothing behind them")
+func TestClientWithoutMetricsSaysWhyAndWhatToFlip(t *testing.T) {
+	src := sampleTraffic()
+	src.clients = append(src.clients, TrafficClient{Conn: 2, ClientID: "seed-loader", Software: "kgo", Principal: "User:ANONYMOUS", Remote: "127.0.0.1:55190",
+		Opened: time.Now().Add(-9 * time.Second), Last: time.Now(), Requests: 3})
+	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = src; o.ClientMetrics = sampleMetrics() })
+	body := req(t, c, "GET", "/_console/inspect/client?key=2", nil).Body.String()
+	for _, want := range []string{"This client does not report metrics", "The client is too old", "The client turned it off", "enable.metrics.push=", "--client-telemetry", "See a client that reports"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the no-metrics inspector does not show %q", want)
+		}
 	}
-	c, _ = newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic(); o.ClientMetrics = fakeMetrics{} })
+	// With telemetry off on the broker it says that instead of blaming the client.
+	c2, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = src })
+	if b := req(t, c2, "GET", "/_console/inspect/client?key=2", nil).Body.String(); strings.Contains(b, "does not report metrics") || !strings.Contains(b, "does not collect client metrics") {
+		t.Errorf("without a store the page still blames the client:\n%s", b)
+	}
+}
+
+// The requests page no longer carries a section of metric cards: the open connections
+// are the inspector's default, with the sentence that points at a client.
+func TestTrafficPageHasNoMetricCardsAndPointsAtTheClient(t *testing.T) {
+	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic(); o.ClientMetrics = sampleMetrics() })
 	body := req(t, c, "GET", "/_console/traffic", nil).Body.String()
-	if !strings.Contains(body, "No client has reported metrics yet") || !strings.Contains(body, "enable.metrics.push") {
-		t.Error("with metrics on and none reported, the page does not explain why it is empty")
+	if strings.Contains(body, `class="mcard"`) {
+		t.Error("the page still draws metric cards under the requests")
+	}
+	if !strings.Contains(body, "Open a client to see them.") {
+		t.Error("the connected clients do not say where the metrics are")
 	}
 }
 
-// A new report must refresh the polled region, or a quiet page would never move.
-func TestClientMetricsRefreshTheLiveRegion(t *testing.T) {
+// A new report changes nothing in the request region: the metrics are not part of it.
+func TestClientMetricsDoNotRefreshTheRequestRegion(t *testing.T) {
 	src := sampleMetrics()
 	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic(); o.ClientMetrics = src })
 	first := req(t, c, "GET", "/_console/traffic/live", nil)
 	hash := first.Header().Get("HX-Live-Hash")
-	if rec := req(t, c, "GET", "/_console/traffic/live?h="+hash, nil); rec.Code != 204 {
-		t.Fatalf("nothing changed, but the poll answered %d", rec.Code)
-	}
 	src.instances[0].Pushes++
-	if rec := req(t, c, "GET", "/_console/traffic/live?h="+hash, nil); rec.Code != 200 {
-		t.Errorf("a new report did not refresh the region: %d", rec.Code)
+	if rec := req(t, c, "GET", "/_console/traffic/live?h="+hash, nil); rec.Code != 204 {
+		t.Errorf("a metrics report refreshed the whole request region: %d", rec.Code)
 	}
 }
 

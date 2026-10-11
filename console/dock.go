@@ -79,7 +79,7 @@ func (d trafficDock) DockEvents(f DockFilter, limit int, after string) ([]DockEv
 	if after != "" {
 		start = len(all)
 		for i, e := range all {
-			if requestKey(e) == after {
+			if e.ID == after {
 				start = i + 1
 				break
 			}
@@ -101,7 +101,7 @@ func (d trafficDock) DockEvents(f DockFilter, limit int, after string) ([]DockEv
 			target = e.Group
 		}
 		out = append(out, DockEvent{
-			ID: requestKey(e), Time: e.Time, Source: "kafka", Client: who, Request: fmt.Sprintf("%s v%d", e.API, e.Version),
+			ID: e.ID, Time: e.Time, Source: "kafka", Client: who, Request: fmt.Sprintf("%s v%d", e.API, e.Version),
 			Target: target, Detail: e.Detail, Error: e.Error, Took: shortDuration(e.Duration), Count: e.Count, Kind: KindRequest,
 		})
 	}
