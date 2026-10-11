@@ -82,10 +82,15 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 			case !ok || part.Partition < 0 || part.Partition >= topic.Partitions:
 				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
 			default:
-				wrote := b.appendRecords(req.Conn, pr.TransactionID, name, topic.Config, part, &rp)
+				wrote, answered := b.appendRecords(req.Conn, pr.TransactionID, name, topic.Config, part, &rp)
 				refused = refused || rp.ErrorCode == kerr.CorruptMessage.Code || rp.ErrorCode == kerr.MessageTooLarge.Code || rp.ErrorCode == kerr.InvalidRecord.Code
 				if wrote {
 					producedTopics[name] = struct{}{}
+				}
+				// A partition is synced for acks=all when this request wrote to it
+				// or when its answer rests on bytes an earlier request wrote (a
+				// duplicate retry): acknowledging those is the same promise.
+				if wrote || (answered && rp.ErrorCode == 0) {
 					tp := topicPartition{name, part.Partition}
 					written[tp] = append(written[tp], slot{len(resp.Topics), len(rt.Partitions)})
 				}
@@ -132,17 +137,20 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 
 // appendRecords appends one partition's records and fills rp. A non-idempotent
 // payload (producer id -1) takes the plain fast path; an idempotent one goes through
-// sequence dedup. It reports whether any new data was written.
-func (b *Broker) appendRecords(conn *protocol.Conn, txnID *string, topic string, topicConfig map[string]string, part kmsg.ProduceRequestTopicPartition, rp *kmsg.ProduceResponseTopicPartition) bool {
+// sequence dedup. It reports whether any new data was written, and whether the
+// answer rests on data already in the log without having written it (a duplicate
+// retry): that data may still be in the page cache, so an acks=all answer must
+// sync it too (BAD-1).
+func (b *Broker) appendRecords(conn *protocol.Conn, txnID *string, topic string, topicConfig map[string]string, part kmsg.ProduceRequestTopicPartition, rp *kmsg.ProduceResponseTopicPartition) (wrote, answered bool) {
 	plog, err := b.logs.ExistingPartition(topic, part.Partition)
 	if errors.Is(err, log.ErrNoSuchPartition) {
 		// The topic was deleted between resolving it and opening its log.
 		rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
-		return false
+		return false, false
 	}
 	if err != nil {
 		rp.ErrorCode = b.storageFault("produce: open partition", err, "topic", topic, "partition", part.Partition)
-		return false
+		return false, false
 	}
 
 	// Validate every batch before writing any: shape and CRC. A bad batch must not
@@ -153,7 +161,7 @@ func (b *Broker) appendRecords(conn *protocol.Conn, txnID *string, topic string,
 		msg := err.Error()
 		rp.ErrorMessage = &msg
 		rp.BaseOffset = -1
-		return false
+		return false, false
 	}
 
 	// The topic's own limit on one record batch, if it has set one. (There is no
@@ -165,7 +173,7 @@ func (b *Broker) appendRecords(conn *protocol.Conn, txnID *string, topic string,
 			msg := fmt.Sprintf("a record batch of %d bytes is larger than this topic's max.message.bytes (%d)", largest, limit)
 			rp.ErrorMessage = &msg
 			rp.BaseOffset = -1
-			return false
+			return false, false
 		}
 	}
 	// A compacted topic is keyed: a record with no key has nothing to replace, and is
@@ -176,7 +184,7 @@ func (b *Broker) appendRecords(conn *protocol.Conn, txnID *string, topic string,
 			msg := err.Error()
 			rp.ErrorMessage = &msg
 			rp.BaseOffset = -1
-			return false
+			return false, false
 		}
 	}
 	// message.timestamp.type=LogAppendTime: the records take the broker's clock.
@@ -186,31 +194,31 @@ func (b *Broker) appendRecords(conn *protocol.Conn, txnID *string, topic string,
 		log.StampLogAppendTime(part.Records, appendTime)
 	}
 
-	var wrote bool
 	if hdr, ok := log.ParseBatch(part.Records); !ok || hdr.ProducerID < 0 {
 		wrote = b.appendPlain(plog, part.Records, rp)
+		answered = wrote
 	} else if hdr.Transactional {
 		// A transactional producer needs Write on its transactional id as well, and
 		// the transaction must be open on this partition for the length of the append.
 		if txnID != nil && !b.canTxnID(conn, *txnID, opWrite) {
 			rp.ErrorCode, rp.BaseOffset = kerr.TransactionalIDAuthorizationFailed.Code, -1
-			return false
+			return false, false
 		}
 		unlock, code, msg := b.lockForProduce(txnID, hdr, topic, part.Partition)
 		if code != 0 {
 			rp.ErrorCode, rp.BaseOffset = code, -1
 			rp.ErrorMessage = &msg
-			return false
+			return false, false
 		}
 		defer unlock()
-		wrote = b.appendIdempotent(topic, part.Partition, plog, part.Records, rp)
+		wrote, answered = b.appendIdempotent(topic, part.Partition, plog, part.Records, rp)
 	} else {
-		wrote = b.appendIdempotent(topic, part.Partition, plog, part.Records, rp)
+		wrote, answered = b.appendIdempotent(topic, part.Partition, plog, part.Records, rp)
 	}
 	if rp.ErrorCode == 0 {
 		rp.LogAppendTime = appendTime // -1 under CreateTime: the record's own timestamp stands.
 	}
-	return wrote
+	return wrote, answered
 }
 
 // topicInt reads a numeric topic config, if the topic has set it.
@@ -243,24 +251,21 @@ func (b *Broker) appendPlain(plog *log.Partition, records []byte, rp *kmsg.Produ
 // lock, deduplicating retries and rejecting out-of-order or fenced batches. The
 // check→append→record sequence is atomic per partition so two concurrent retries
 // can't both append.
-func (b *Broker) appendIdempotent(topic string, partition int32, plog *log.Partition, records []byte, rp *kmsg.ProduceResponseTopicPartition) bool {
+func (b *Broker) appendIdempotent(topic string, partition int32, plog *log.Partition, records []byte, rp *kmsg.ProduceResponseTopicPartition) (wrote, answered bool) {
 	pp := b.idem.forPartition(topic, partition)
 	pp.mu.Lock()
 	defer pp.mu.Unlock()
 	if err := pp.loadFrom(plog); err != nil {
 		rp.ErrorCode = b.storageFault("produce: read the producers' history", err, "topic", topic, "partition", partition)
-		return false
+		return false, false
 	}
 
-	var (
-		firstOffset int64 = -1
-		wrote       bool
-	)
+	var firstOffset int64 = -1
 	for pos := 0; pos < len(records); {
 		hdr, ok := log.ParseBatch(records[pos:])
 		if !ok || hdr.TotalBytes <= 0 || pos+hdr.TotalBytes > len(records) {
 			rp.ErrorCode = kerr.UnknownServerError.Code
-			return wrote
+			return wrote, answered
 		}
 		batch := records[pos : pos+hdr.TotalBytes]
 		firstSeq := hdr.BaseSequence
@@ -274,7 +279,7 @@ func (b *Broker) appendIdempotent(topic string, partition int32, plog *log.Parti
 				rp.ErrorCode = b.storageFault("produce: append (idempotent)", err, "topic", topic, "partition", partition)
 				msg := err.Error()
 				rp.ErrorMessage = &msg
-				return wrote
+				return wrote, answered
 			}
 			pp.record(hdr.ProducerID, hdr.ProducerEpoch, firstSeq, lastSeq, off)
 			if firstOffset < 0 {
@@ -282,18 +287,19 @@ func (b *Broker) appendIdempotent(topic string, partition int32, plog *log.Parti
 			}
 			wrote = true
 		case seqDuplicate:
+			answered = true
 			if firstOffset < 0 {
 				firstOffset = v.offset
 			}
 		case seqDuplicateOld:
 			rp.ErrorCode = kerr.DuplicateSequenceNumber.Code
-			return wrote
+			return wrote, answered
 		case seqOutOfOrder:
 			rp.ErrorCode = kerr.OutOfOrderSequenceNumber.Code
-			return wrote
+			return wrote, answered
 		case seqFenced:
 			rp.ErrorCode = kerr.InvalidProducerEpoch.Code
-			return wrote
+			return wrote, answered
 		}
 		pos += hdr.TotalBytes
 	}
@@ -301,5 +307,5 @@ func (b *Broker) appendIdempotent(topic string, partition int32, plog *log.Parti
 	rp.BaseOffset = firstOffset
 	rp.LogAppendTime = -1
 	rp.LogStartOffset = plog.LogStartOffset()
-	return wrote
+	return wrote, answered
 }
