@@ -148,7 +148,8 @@ what moved from the text below:
   producers' unsynced batches may follow the failed one before its sync, and a truncate
   would take them too. `TestFsyncFailedBatchIsEitherRolledBackOrDocumented` pins it
   (a characterisation test, green on main as well; the board text "was not appended"
-  is still wrong for a failed sync and belongs to the console stage).
+  is still wrong for a failed sync and belongs to the console stage; the console's own
+  text for `KAFKA_STORAGE_ERROR` now says the batch may already be in the log, with a test).
 - **BAD-3** fixed by taking the segment offline after a failed fsync (not by
   truncating to the last synced length, which would remove records a consumer may
   already have read). `TestFsyncFailureDoesNotFalselySucceed` and, through the binary,
