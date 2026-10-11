@@ -103,7 +103,9 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 		profile: profile,
 		produce: newNotifier(),
 	}
-	if cfg.ClientTelemetry {
+	// Only a broker with a console keeps what clients report: the console is its one
+	// reader, and a broker without one advertises nothing for clients to push into.
+	if cfg.ClientTelemetry && cfg.Console {
 		b.telemetry, b.subscriptionID = telemetry.NewStore(), newSubscriptionID()
 	}
 	return b, nil
