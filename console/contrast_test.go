@@ -52,7 +52,11 @@ func contrastPairs() []contrastPair {
 	}
 	// The section chips: white letters on the section's colour.
 	for _, tok := range []string{"--c-tr", "--c-tc", "--c-tp", "--c-gr", "--c-sc", "--c-ac", "--c-cl"} {
-		ps = append(ps, contrastPair{"--chip-ink", tok, 4.5, "letters on a section chip"})
+		ink := "--chip-ink"
+		if tok == "--c-tp" || tok == "--c-tr" {
+			ink = "--chip-ink-dark" // the board's fill cannot carry white letters at 4.5:1
+		}
+		ps = append(ps, contrastPair{ink, tok, 4.5, "letters on a section chip"})
 	}
 	return ps
 }
@@ -138,7 +142,7 @@ func TestEveryTextAndBackgroundPairHoldsItsContrastInAllThreeThemes(t *testing.T
 			for _, p := range contrastPairs() {
 				// The chips are drawn as the boards draw them in every theme (filled,
 				// white letters), so they hold the minimum, not the 7:1 of the text.
-				if p.min != 4.5 || p.fg == "--chip-ink" {
+				if p.min != 4.5 || strings.HasPrefix(p.fg, "--chip-ink") {
 					continue
 				}
 				if r, err := ratio(toks[p.fg], toks[p.bg]); err == nil && r < 7 {

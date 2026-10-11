@@ -39,9 +39,9 @@
 --bad                  on --card        6.57  (min 3.0)  status dot or bar
 --deny                 on --bg          6.99  (min 3.0)  status dot or bar
 --deny                 on --card        7.77  (min 3.0)  status dot or bar
---chip-ink             on --c-tr        4.80  (min 4.5)  letters on a section chip
+--chip-ink-dark        on --c-tr        5.10  (min 4.5)  letters on a section chip
 --chip-ink             on --c-tc        4.78  (min 4.5)  letters on a section chip
---chip-ink             on --c-tp        4.65  (min 4.5)  letters on a section chip
+--chip-ink-dark        on --c-tp        4.67  (min 4.5)  letters on a section chip
 --chip-ink             on --c-gr        4.53  (min 4.5)  letters on a section chip
 --chip-ink             on --c-sc        4.62  (min 4.5)  letters on a section chip
 --chip-ink             on --c-ac        5.10  (min 4.5)  letters on a section chip
@@ -87,9 +87,9 @@
 --bad                  on --card        7.49  (min 3.0)  status dot or bar
 --deny                 on --bg          8.73  (min 3.0)  status dot or bar
 --deny                 on --card        8.02  (min 3.0)  status dot or bar
---chip-ink             on --c-tr        4.80  (min 4.5)  letters on a section chip
+--chip-ink-dark        on --c-tr        5.10  (min 4.5)  letters on a section chip
 --chip-ink             on --c-tc        4.78  (min 4.5)  letters on a section chip
---chip-ink             on --c-tp        4.65  (min 4.5)  letters on a section chip
+--chip-ink-dark        on --c-tp        4.67  (min 4.5)  letters on a section chip
 --chip-ink             on --c-gr        4.53  (min 4.5)  letters on a section chip
 --chip-ink             on --c-sc        4.62  (min 4.5)  letters on a section chip
 --chip-ink             on --c-ac        5.10  (min 4.5)  letters on a section chip
@@ -135,9 +135,9 @@
 --bad                  on --card       10.64  (min 3.0)  status dot or bar
 --deny                 on --bg         13.11  (min 3.0)  status dot or bar
 --deny                 on --card       13.11  (min 3.0)  status dot or bar
---chip-ink             on --c-tr        4.80  (min 4.5)  letters on a section chip
+--chip-ink-dark        on --c-tr        5.10  (min 4.5)  letters on a section chip
 --chip-ink             on --c-tc        4.78  (min 4.5)  letters on a section chip
---chip-ink             on --c-tp        4.65  (min 4.5)  letters on a section chip
+--chip-ink-dark        on --c-tp        4.67  (min 4.5)  letters on a section chip
 --chip-ink             on --c-gr        4.53  (min 4.5)  letters on a section chip
 --chip-ink             on --c-sc        4.62  (min 4.5)  letters on a section chip
 --chip-ink             on --c-ac        5.10  (min 4.5)  letters on a section chip

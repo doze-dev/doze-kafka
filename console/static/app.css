@@ -46,7 +46,12 @@
   --okbg: #e3f1e8; --warnbg: #f6ecd6; --badbg: #f8e3e0; --denybg: #ece4f6;
   /* Section chips (Sy-01's .c-*): white letters on these. */
   --chip-ink: #ffffff;
-  --c-tp: #2d69fa; --c-gr: #00857a; --c-sc: #a83bf0; --c-tr: #b85609; --c-ac: #d02f25; --c-cl: #5b6678; --c-tc: #d6247a;
+  /* The board's own blue and orange (#2f6bff, #c85f0a) are 4.499:1 and 4.12:1 under
+     white letters, below the 4.5:1 this console holds text to. The fill stays the
+     board's; the two chips that cannot carry white wear black letters (4.67:1 and
+     5.10:1). */
+  --chip-ink-dark: #000000;
+  --c-tp: #2f6bff; --c-gr: #00857a; --c-sc: #a83bf0; --c-tr: #c85f0a; --c-ac: #d02f25; --c-cl: #5b6678; --c-tc: #d6247a;
   --scrim: rgba(20, 22, 25, .34);
   --shadow-modal: 0 18px 50px rgba(0, 0, 0, .22);
 
@@ -210,6 +215,7 @@ h1, h2, h3 { margin: 0; }
 }
 .sv.sm { width: 14px; height: 14px; border-radius: var(--radius-sm); font-size: var(--fs-3xs); }
 .c-tp { --c: var(--c-tp); } .c-gr { --c: var(--c-gr); } .c-sc { --c: var(--c-sc); } .c-tr { --c: var(--c-tr); }
+.sv.c-tp, .sv.c-tr { color: var(--chip-ink-dark); }
 .c-ac { --c: var(--c-ac); } .c-cl { --c: var(--c-cl); } .c-tc { --c: var(--c-tc); } .c-mut { --c: var(--mut); }
 /* In high contrast the selected item also wears a 2 px outline (Sy-07). */
 :root[data-theme="contrast"] .nav.on, :root[data-theme="contrast"] .li.on, :root[data-theme="contrast"] .r.on { outline: 2px solid var(--ink); outline-offset: -2px; }

@@ -72,7 +72,13 @@ test('the rail has Observe, Data and Broker, each item its chip, and Connect an 
   await expect(rail.locator('a.nav .nm')).toHaveText(['Traffic', 'Trace', 'Topics', 'Groups', 'Schemas', 'Access', 'Cluster', 'Connect an app']);
   await expect(rail.locator('a.nav .sv')).toHaveText(['TR', 'TC', 'TP', 'GR', 'SC', 'AC', 'CL', '⇢']);
   // The chips carry the boards' colours (white letters on them).
-  await expect(rail.locator('a.nav .sv.c-tp')).toHaveCSS('background-color', 'rgb(45, 105, 250)');
+  // (the boards' own #2f6bff and #c85f0a; their letters are black where white would
+  // fall under 4.5:1, which plan/00-foundation.md records).
+  await expect(rail.locator('a.nav .sv.c-tp')).toHaveCSS('background-color', 'rgb(47, 107, 255)');
+  await expect(rail.locator('a.nav .sv.c-tp')).toHaveCSS('color', 'rgb(0, 0, 0)');
+  await expect(rail.locator('a.nav .sv.c-tr')).toHaveCSS('background-color', 'rgb(200, 95, 10)');
+  await expect(rail.locator('a.nav .sv.c-tr')).toHaveCSS('color', 'rgb(0, 0, 0)');
+  await expect(rail.locator('a.nav .sv.c-gr')).toHaveCSS('color', 'rgb(255, 255, 255)');
   await expect(rail.locator('a.nav .sv.c-gr')).toHaveCSS('background-color', 'rgb(0, 133, 122)');
   // The numbers: open connections on Traffic, how many on the others.
   await expect(rail.locator('a[href$="/traffic"] .n')).toHaveText(/^\d+ open$/);
