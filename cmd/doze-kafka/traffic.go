@@ -29,7 +29,7 @@ func (s trafficSource) Events(f console.TrafficFilter, limit int) []console.Traf
 		out[i] = console.TrafficEvent{
 			Seq: e.Seq, First: e.First, Time: e.Time, Count: e.Count, Conn: e.Conn,
 			Remote: e.Remote, ClientID: e.ClientID, Software: e.Software, Principal: e.Principal,
-			API: e.API, Version: e.Version, Topics: e.Topics, Group: e.Group, Detail: e.Detail, Error: e.Error,
+			API: e.API, Version: e.Version, Topics: e.Topics, TopicsMore: e.TopicsMore, Group: e.Group, Detail: e.Detail, Error: e.Error,
 			Duration: e.Duration, ReqBytes: e.ReqBytes, RespBytes: e.RespBytes,
 		}
 	}

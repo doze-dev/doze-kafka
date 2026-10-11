@@ -142,7 +142,7 @@ func decodeResourceMetrics(b []byte, out *Payload) error {
 			return eachField(v, func(num protowire.Number, typ protowire.Type, kv []byte, _ uint64) error {
 				if num == 1 && typ == protowire.BytesType { // Resource.attributes
 					if k, val, ok := decodeKeyValue(kv); ok {
-						out.Resource[k] = val
+						setResource(out.Resource, k, val)
 					}
 				}
 				return nil

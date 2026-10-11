@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -19,7 +20,37 @@ const (
 	terminatedTTL = time.Minute
 	maxInstances  = 200
 	maxSeriesEach = 400
+
+	// What a client may make the broker hold about it besides its numbers. Every one is
+	// the client's own choice, so each is bounded on the way in (TRF-4).
+	maxResourceKeys  = 32
+	maxResourceKey   = 128
+	maxResourceValue = 1024
+	maxNameBytes     = 256 // a metric's name, and its attributes.
+	maxUnitBytes     = 32
 )
+
+// clipText cuts s to at most n bytes on a character boundary, as a copy so that it
+// does not keep the payload it was read from alive.
+func clipText(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return strings.Clone(s[:n])
+}
+
+// setResource adds one attribute, bounded: a key it has is updated, a new key is kept
+// only while there are fewer than maxResourceKeys.
+func setResource(m map[string]string, k, v string) {
+	k, v = clipText(k, maxResourceKey), clipText(v, maxResourceValue)
+	if _, ok := m[k]; !ok && len(m) >= maxResourceKeys {
+		return
+	}
+	m[k] = v
+}
 
 // Sample is one point of a series.
 type Sample struct {
@@ -115,16 +146,16 @@ func (s *Store) touch(id [16]byte, who Who) *instance {
 		s.instances[id] = in
 	}
 	if who.ClientID != "" {
-		in.ClientID = who.ClientID
+		in.ClientID = clipText(who.ClientID, maxNameBytes/2)
 	}
 	if who.Software != "" {
-		in.Software = who.Software
+		in.Software = clipText(who.Software, maxNameBytes/2)
 	}
 	if who.Principal != "" {
-		in.Principal = who.Principal
+		in.Principal = clipText(who.Principal, maxNameBytes)
 	}
 	if who.Host != "" {
-		in.Host = who.Host
+		in.Host = clipText(who.Host, maxNameBytes)
 	}
 	in.Last = now
 	return in
@@ -146,18 +177,19 @@ func (s *Store) Push(id [16]byte, who Who, p Payload, terminating bool) {
 	in.Pushes++
 	in.Terminated = terminating
 	for k, v := range p.Resource {
-		in.Resource[k] = v
+		setResource(in.Resource, k, v)
 	}
 	at := s.now()
 	for _, m := range p.Metrics {
 		for _, pt := range m.Points {
-			key := m.Name + "\x00" + pt.Attrs
+			name, attrs := clipText(m.Name, maxNameBytes), clipText(pt.Attrs, maxNameBytes)
+			key := name + "\x00" + attrs
 			ser := in.series[key]
 			if ser == nil {
 				if len(in.series) >= maxSeriesEach {
 					continue
 				}
-				ser = &Series{Name: m.Name, Attrs: pt.Attrs, Unit: m.Unit, Kind: m.Kind}
+				ser = &Series{Name: name, Attrs: attrs, Unit: clipText(m.Unit, maxUnitBytes), Kind: m.Kind}
 				in.series[key] = ser
 				in.order = append(in.order, key)
 			}

@@ -46,6 +46,7 @@ type TrafficEvent struct {
 	API                                   string
 	Version                               int16
 	Topics                                []string
+	TopicsMore                            int // topics the request named that the recorder did not keep.
 	Group, Detail                         string
 	Error                                 string
 	Duration                              time.Duration
@@ -213,6 +214,9 @@ func (c *Console) trafficRow(e TrafficEvent) trafficRow {
 	switch {
 	case len(e.Topics) > 0:
 		row.Target = strings.Join(e.Topics, ", ")
+		if e.TopicsMore > 0 {
+			row.Target += " and " + strconv.Itoa(e.TopicsMore) + " more"
+		}
 	case e.Group != "":
 		row.Target = e.Group
 	}

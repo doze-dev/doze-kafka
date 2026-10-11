@@ -37,9 +37,19 @@ const (
 // writes: the first eight bytes of its 16-byte header, then length-prefixed blocks.
 var xerialMagic = []byte{0x82, 'S', 'N', 'A', 'P', 'P', 'Y', 0}
 
-// zstdMinWindow is the least memory a zstd decoder is given, whatever the limit: enough for
-// the largest window a real compressor declares (zstd's default levels use up to 8 MiB).
-const zstdMinWindow = 64 << 20
+// The windows a zstd frame may declare. A real compressor declares what its level says,
+// not what the payload needs: librdkafka and the Java client at their default level ask
+// for 2 MiB for a 12 KiB report, so no window under that may be refused. The decoder
+// allocates the declared window before reading, so a frame is not allowed more than
+// four times what it may inflate to, nor more than zstd's levels reach in practice.
+const (
+	zstdMinWindow = 2 << 20
+	zstdMaxWindow = 64 << 20
+)
+
+func zstdWindowFor(limit int) uint64 {
+	return uint64(min(max(4*limit, zstdMinWindow), zstdMaxWindow))
+}
 
 var errRecords = errors.New("log: cannot read the records of a batch")
 
@@ -150,23 +160,19 @@ func inflateMax(codec int, body []byte, limit int) ([]byte, error) {
 	case codecLZ4:
 		return readAllBounded(lz4.NewReader(bytes.NewReader(body)), limit)
 	case codecZstd:
-		// The decoder's memory cap is also the largest window it accepts, and a frame
-		// declares its window by what the compressor was set to, not by how little it
-		// compressed: librdkafka's, for a 12 KiB payload, asks for a megabyte. So the cap is
-		// kept generous and the size of what came out is checked against the limit after.
-		d, err := zstd.NewReader(nil, zstd.WithDecoderMaxMemory(max(uint64(limit), zstdMinWindow)))
-		if err != nil {
-			return nil, err
-		}
-		defer d.Close()
-		out, err := d.DecodeAll(body, nil)
+		// Streamed through the limit, so what is allocated is what is read, not what the
+		// frame claims: DecodeAll inflated a 6 KB frame to 60 MiB before the size was
+		// looked at (TRF-2). The window the frame declares is the compressor's setting, not
+		// a measure of the payload (librdkafka asks for 2 MiB for a 12 KiB report), so it
+		// is allowed up to a few times the limit and no more, because the decoder allocates
+		// the window the frame declares before it has read a byte.
+		d, err := zstd.NewReader(bytes.NewReader(body),
+			zstd.WithDecoderConcurrency(1), zstd.WithDecoderMaxWindow(zstdWindowFor(limit)))
 		if err != nil {
 			return nil, fmt.Errorf("%w: zstd: %v", errRecords, err)
 		}
-		if len(out) > limit {
-			return nil, fmt.Errorf("%w: inflates past %d bytes", errRecords, limit)
-		}
-		return out, nil
+		defer d.Close()
+		return readAllBounded(d, limit)
 	}
 	return nil, fmt.Errorf("%w: unknown compression codec %d", errRecords, codec)
 }

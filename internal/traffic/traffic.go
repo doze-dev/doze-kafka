@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 )
@@ -29,6 +30,54 @@ const ConsoleClientPrefix = "doze-kafka-console"
 // consumer's heartbeat every three seconds is one row for as long as the consumer
 // lives; this only stops a row that went quiet an hour ago from swallowing the next.
 const collapseWindow = 10 * time.Minute
+
+// What is kept of what a client said about itself. The recorder holds up to
+// 2,000 rows for as long as the broker runs, and everything in a row was chosen by
+// a client that may be anyone, so every string is clipped on the way in: a 900 KiB
+// join reason kept whole, in each of 2,000 rows, was 1.8 GiB (TRF-1). A clipped
+// value ends in an ellipsis and is a copy, so it does not keep its original alive.
+const (
+	// MaxText bounds a detail, an address, a principal, a group and a member id.
+	MaxText = 256
+	// MaxName bounds a client id and a software name.
+	MaxName = 128
+	// MaxTopics is how many topic names a row keeps, and MaxTopicBytes how many bytes
+	// of them; the rest are counted. Twenty ordinary names fit; twenty at the longest a
+	// name may be do not, and four of them do.
+	MaxTopics     = 20
+	MaxTopicBytes = 1024
+	// MaxTopicName is the longest a topic may be named.
+	MaxTopicName = 249
+)
+
+// clip returns s cut to at most n bytes, on a character boundary, ending in an
+// ellipsis when it was cut.
+func clip(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	const dots = "…"
+	cut := n - len(dots)
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return strings.Clone(s[:cut]) + dots
+}
+
+// clipTopics keeps the first topics that fit the row's budget, each clipped, and says
+// how many it left out.
+func clipTopics(topics []string) (kept []string, more int) {
+	size := 0
+	for i, tp := range topics {
+		tp = clip(tp, MaxTopicName)
+		if len(kept) == MaxTopics || size+len(tp) > MaxTopicBytes {
+			return kept, len(topics) - i
+		}
+		kept = append(kept, tp)
+		size += len(tp)
+	}
+	return kept, 0
+}
 
 // Event is one row: a request, or a run of identical ones folded together.
 type Event struct {
@@ -48,8 +97,10 @@ type Event struct {
 	Version int16
 
 	Topics []string
-	Group  string
-	Detail string
+	// TopicsMore is how many topics the request named beyond the MaxTopics kept.
+	TopicsMore int
+	Group      string
+	Detail     string
 	// Error is the Kafka name of the first error in the response ("" when it went well).
 	Error string
 	// Idle marks a request that moved nothing. These are the rows that fold.
@@ -132,7 +183,7 @@ func isConsole(clientID string) bool { return strings.HasPrefix(clientID, Consol
 func (r *Recorder) ConnOpened(id uint64, remote string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.conns[id] = &Client{Conn: id, Remote: remote, Opened: time.Now(), Last: time.Now()}
+	r.conns[id] = &Client{Conn: id, Remote: clip(remote, MaxText), Opened: time.Now(), Last: time.Now()}
 }
 
 // ConnClosed implements protocol.Observer.
@@ -150,19 +201,20 @@ func (r *Recorder) Request(o protocol.Observation) {
 
 	c := r.conns[o.Conn]
 	if c == nil {
-		c = &Client{Conn: o.Conn, Remote: o.Remote, Opened: o.Start}
+		c = &Client{Conn: o.Conn, Remote: clip(o.Remote, MaxText), Opened: o.Start}
 		r.conns[o.Conn] = c
 	}
 	if o.ClientID != "" {
-		c.ClientID = o.ClientID
+		c.ClientID = clip(o.ClientID, MaxName)
 	}
 	if o.Software != "" {
-		c.Software = o.Software
+		c.Software = clip(o.Software, MaxName)
 	}
-	c.Principal = o.Principal
+	c.Principal = clip(o.Principal, MaxText)
 	c.Last = o.Start
 	c.Requests++
-	if g := o.Group; g != "" && !slices.Contains(c.Groups, g) {
+	group := clip(o.Group, MaxText)
+	if g := group; g != "" && !slices.Contains(c.Groups, g) {
 		c.Groups = append(c.Groups, g)
 		if len(c.Groups) > 4 {
 			c.Groups = c.Groups[1:]
@@ -180,11 +232,12 @@ func (r *Recorder) Request(o protocol.Observation) {
 			}
 		}
 	}
+	topics, more := clipTopics(topics)
 	ev := Event{
 		First: o.Start, Time: o.Start, Count: 1, Conn: o.Conn, Remote: c.Remote,
-		ClientID: c.ClientID, Software: c.Software, Principal: o.Principal,
+		ClientID: c.ClientID, Software: c.Software, Principal: c.Principal,
 		API: protocol.APIName(o.API), Key: int16(o.API), Version: o.Version,
-		Topics: topics, Group: o.Group, Detail: o.Detail, Error: protocol.ErrorName(o.ErrorCode),
+		Topics: topics, TopicsMore: more, Group: group, Detail: clip(o.Detail, MaxText), Error: protocol.ErrorName(o.ErrorCode),
 		Idle: o.Idle, Duration: o.Duration, ReqBytes: o.ReqBytes, RespBytes: o.RespBytes,
 	}
 
@@ -306,7 +359,10 @@ func (r *Recorder) GroupEvent(group, kind, member string, generation int32, deta
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.seq++
-	ev := GroupEvent{Seq: r.seq, Time: time.Now(), Group: group, Kind: kind, Member: member, Generation: generation, Detail: detail}
+	ev := GroupEvent{
+		Seq: r.seq, Time: time.Now(), Group: clip(group, MaxText), Kind: clip(kind, MaxName),
+		Member: clip(member, MaxText), Generation: generation, Detail: clip(detail, MaxText),
+	}
 	r.groupEvents = append(r.groupEvents, ev)
 	if len(r.groupEvents) > r.groupLimit {
 		r.groupEvents = slices.Delete(r.groupEvents, 0, len(r.groupEvents)-r.groupLimit)
