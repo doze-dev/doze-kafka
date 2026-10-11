@@ -133,6 +133,29 @@
   }
   function pollPath(e) { return (e.detail && e.detail.requestConfig && e.detail.requestConfig.path) || ""; }
   function isInspectorRequest(e) { return !!(e.detail && e.detail.target && e.detail.target.id === "inspector"); }
+  // The console when the broker is not there. One persistent state, not a toast
+  // per poll: the live pill says "Not connected" with the last time anything was
+  // heard, the regions whose poll failed are frozen under a muted overlay, and one
+  // Retry asks again at once. Polling carries on behind it, so it ends by itself
+  // (no reload) when the broker comes back.
+  var lastGood = Date.now();
+  function clockText(ms) {
+    return window.dozeTime ? window.dozeTime.clock(ms) : new Date(ms).toLocaleTimeString();
+  }
+  function renderPill() {
+    var pill = document.getElementById("live-pill");
+    var down = document.querySelectorAll("[data-live].disconnected").length > 0;
+    document.documentElement.toggleAttribute("data-connection-lost", down);
+    if (!pill) return;
+    pill.classList.toggle("disconnected", down);
+    var st = pill.querySelector(".pill-state"), retry = document.getElementById("pill-retry");
+    if (st) {
+      st.textContent = down ? "Not connected · last heard " + clockText(lastGood) : "";
+      st.hidden = !down;
+    }
+    if (retry) retry.hidden = !down;
+    pill.setAttribute("aria-live", "polite");
+  }
   // setDisconnected marks the regions whose poll failed (or all of them, with no
   // path), once: a failing poll repeats every few seconds and says nothing new.
   function setDisconnected(on, why, path) {
@@ -142,7 +165,17 @@
       var b = el.querySelector("[data-live-toggle]");
       if (b) b.title = on ? "Not updating: " + (why || "can't reach the broker") : (livePaused ? "Resume live updates" : "Pause live updates");
     });
+    if (!on && regions.length) lastGood = Date.now();
+    renderPill();
   }
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest("#pill-retry") || !window.htmx) return;
+    // One retry: every frozen region asks now rather than at its next tick.
+    document.querySelectorAll("[data-live].disconnected").forEach(function (el) {
+      var url = el.getAttribute("data-live");
+      if (url && el.id) htmx.ajax("GET", url + (url.indexOf("?") >= 0 ? "&" : "?") + "h=", { target: "#" + el.id, swap: "outerHTML" }).catch(function () {});
+    });
+  });
   // An error response is shown where the person is looking: in the failed form's
   // error slot if it has one, else a toast. (The inspector reports its own; see below.)
   document.addEventListener("htmx:responseError", function (e) {
@@ -810,6 +843,7 @@
     });
   }
   document.addEventListener("DOMContentLoaded", setupLive);
+  document.addEventListener("htmx:afterSettle", renderPill);
   document.addEventListener("htmx:afterSwap", function (e) {
     // Re-arm after a navigation, or after any swap that lands or contains a live region.
     var t = e.detail.target;

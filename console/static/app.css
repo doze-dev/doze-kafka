@@ -437,6 +437,14 @@ p.note { margin: 0; }
 .livetoggle.on .livetoggle-l::after { content: " paused"; }
 .disconnected .livedot { background: var(--bad); animation: none; }
 .disconnected .livetoggle-l::after { content: " — not updating"; color: var(--bad-foreground); }
+/* The console when the broker is not there: the pill says so once, and what was on
+   screen stays, frozen under a muted veil that lets clicks through. */
+[data-live].disconnected { position: relative; }
+[data-live].disconnected::after { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--background) 55%, transparent); pointer-events: none; }
+.chip.live.disconnected::before { background: var(--bad); }
+.chip.live .pill-state { margin-left: 8px; color: var(--bad-foreground); }
+.topbar .chip.live.disconnected .pill-state { color: #8c1c24; }
+.pill-retry { margin-left: 8px; padding: 0 8px; font: inherit; font-size: var(--fs-sm); background: var(--background); color: var(--foreground); border: 1px solid var(--input); border-radius: var(--radius-pill); cursor: pointer; }
 
 /* ---------- docked composer ----------
    Pinned to the bottom edge of the topic workbench, so sending is never a scroll
@@ -754,6 +762,8 @@ form.htmx-request .btn.primary::after { content: ""; width: 11px; height: 11px; 
   :root { --pad: 14px; }
   .topbar { gap: 10px; padding: 0 12px; }
   .brand .sub, .tb-right .chip.live, .tb-palette .kbd { display: none; } /* the endpoint is on the Cluster page */
+  .tb-right .chip.live.disconnected { display: inline-flex; } /* ...but "not connected" is never hidden */
+  .tb-right .chip.live.disconnected .pill-addr { display: none; }
   .tb-palette { flex: 1 1 0; width: auto; }
   .tb-spacer { display: none; }
   .rail, :root[data-rail="slim"] .rail { width: 48px; padding-left: 5px; padding-right: 5px; }

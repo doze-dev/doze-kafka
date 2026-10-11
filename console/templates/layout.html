@@ -48,7 +48,7 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
     <button type="button" class="tb-palette" id="palette-open" aria-haspopup="dialog">{{icon "search"}} <span>Search or jump to…</span> <span class="kbd">⌘K</span></button>
     <div class="tb-spacer"></div>
     <div class="tb-right">
-      <span class="chip live mono" title="The broker this console is connected to">{{if .Endpoint}}{{.Endpoint}}{{else}}127.0.0.1:9092{{end}}</span>
+      <span class="chip live mono" id="live-pill" title="The broker this console is connected to"><span class="pill-addr">{{if .Endpoint}}{{.Endpoint}}{{else}}127.0.0.1:9092{{end}}</span><span class="pill-state" hidden></span><button type="button" class="pill-retry" id="pill-retry" hidden>Retry</button></span>
       <div class="theme-seg" id="theme-seg" role="group" aria-label="Theme">
         <button type="button" data-mode="light" title="Light" aria-label="Light theme">{{icon "sun"}}</button>
         <button type="button" data-mode="system" title="Match system" aria-label="System theme">{{icon "monitor"}}</button>
