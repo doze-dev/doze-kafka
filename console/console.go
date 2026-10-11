@@ -160,13 +160,15 @@ func (c *Console) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// attacker) — that is the Host guard above.
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		if origin := r.Header.Get("Origin"); origin != "" && !originMatchesHost(origin, r.Host) {
-			http.Error(w, "cross-origin request refused", http.StatusForbidden)
+			c.refuse(w, Refusal{Kind: Denied, Source: SourceConsole, Status: http.StatusForbidden,
+				Message: "cross-origin request refused", Rule: "Refused by the console: a change must come from the console's own pages."})
 			return
 		}
 		// Browsers say where a request came from; a state change coming from
 		// another site is refused even if it somehow carries no Origin.
 		if site := r.Header.Get("Sec-Fetch-Site"); site == "cross-site" {
-			http.Error(w, "cross-site request refused", http.StatusForbidden)
+			c.refuse(w, Refusal{Kind: Denied, Source: SourceConsole, Status: http.StatusForbidden,
+				Message: "cross-site request refused", Rule: "Refused by the console: a change must come from the console's own pages."})
 			return
 		}
 	}

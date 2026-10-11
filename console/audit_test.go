@@ -335,8 +335,8 @@ func TestErrorsAreClassifiedByWhatTheyAre(t *testing.T) {
 		{context.DeadlineExceeded, 502},
 		{errors.New("unable to dial: dial tcp 127.0.0.1:1: connect: connection refused"), 502},
 	} {
-		if got := classify(tc.err).status; got != tc.status {
-			t.Errorf("classify(%v) = %d, want %d", tc.err, got, tc.status)
+		if got := refusalFor(tc.err).Status; got != tc.status {
+			t.Errorf("refusalFor(%v) = %d, want %d", tc.err, got, tc.status)
 		}
 	}
 }

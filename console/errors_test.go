@@ -14,24 +14,34 @@ import (
 	"github.com/twmb/franz-go/pkg/kerr"
 )
 
-func TestClassify(t *testing.T) {
+func TestRefusalFor(t *testing.T) {
 	cases := []struct {
-		err  error
-		want string
-		code int
+		err    error
+		want   RefusalKind
+		name   string
+		status int
 	}{
-		{fmt.Errorf("%w: topic x", errNotFound), "notfound", 404},
-		{kerr.UnknownTopicOrPartition, "notfound", 404},
-		{kerr.GroupIDNotFound, "notfound", 404},
-		{context.DeadlineExceeded, "unreachable", 502},
-		{errors.New("unable to dial: dial tcp 127.0.0.1:1: connect: connection refused"), "unreachable", 502},
-		{kerr.TopicAlreadyExists, "refused", 400},
-		{kerr.InvalidTopicException, "refused", 400},
-		{errors.New("something odd"), "internal", 500},
+		{fmt.Errorf("%w: topic x", errNotFound), Refused, "", 404},
+		{kerr.UnknownTopicOrPartition, Refused, "UNKNOWN_TOPIC_OR_PARTITION", 404},
+		{kerr.GroupIDNotFound, Refused, "GROUP_ID_NOT_FOUND", 404},
+		{context.DeadlineExceeded, Failed, "", 502},
+		{errors.New("unable to dial: dial tcp 127.0.0.1:1: connect: connection refused"), Failed, "", 502},
+		{kerr.TopicAlreadyExists, Refused, "TOPIC_ALREADY_EXISTS", 400},
+		{kerr.InvalidTopicException, Refused, "INVALID_TOPIC_EXCEPTION", 400},
+		{kerr.TopicAuthorizationFailed, Denied, "TOPIC_AUTHORIZATION_FAILED", 403},
+		{kerr.SaslAuthenticationFailed, Denied, "SASL_AUTHENTICATION_FAILED", 502},
+		{kerr.UnsupportedVersion, NotImplemented, "UNSUPPORTED_VERSION", 501},
+		{kerr.KafkaStorageError, Failed, "KAFKA_STORAGE_ERROR", 503},
+		{badInput("partitions must be a number"), Refused, "", 400},
+		{&regError{Status: 422, Code: 42201, Message: "Invalid schema"}, Refused, "42201", 400},
+		{&regError{Status: 404, Code: 40401, Message: "Subject not found"}, Refused, "40401", 404},
+		{&regError{Status: 403, Code: 40301, Message: "forbidden"}, Denied, "40301", 403},
+		{errors.New("something odd"), Failed, "", 500},
 	}
 	for _, tc := range cases {
-		if got := classify(tc.err); got.kind != tc.want || got.status != tc.code {
-			t.Errorf("classify(%v) = %s/%d, want %s/%d", tc.err, got.kind, got.status, tc.want, tc.code)
+		got := refusalFor(tc.err)
+		if got.Kind != tc.want || got.Name != tc.name || got.Status != tc.status {
+			t.Errorf("refusalFor(%v) = %s %q %d, want %s %q %d", tc.err, got.Kind, got.Name, got.Status, tc.want, tc.name, tc.status)
 		}
 	}
 }
@@ -98,7 +108,7 @@ func TestNotFoundIsAHelpfulPageInTheShell(t *testing.T) {
 	}
 	// A partial (the tape's poll, say) must NOT get a whole page to swap into a region.
 	rec = doReq(t, c, "GET", "/_console/topics/ordres/tape", map[string]string{"HX-Request": "true"})
-	if rec.Code != http.StatusNotFound || strings.Contains(rec.Body.String(), "<html") || !strings.Contains(rec.Body.String(), `class="err"`) {
+	if rec.Code != http.StatusNotFound || strings.Contains(rec.Body.String(), "<html") || !strings.Contains(rec.Body.String(), `class="err refusal `) {
 		t.Errorf("a partial request should get a small error fragment, got %d: %.100s", rec.Code, rec.Body.String())
 	}
 }

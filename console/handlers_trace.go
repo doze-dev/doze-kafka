@@ -102,7 +102,9 @@ func (c *Console) traceData(j *traceJob) map[string]any {
 		"Hash": fmt.Sprintf("%x", h.Sum64()),
 	}
 	if j.err != nil {
-		data["Err"] = j.err.Error()
+		f := refusalFor(j.err)
+		f.Message = "The scan failed: " + f.Message
+		data["ScanFailed"], data["Refusal"] = true, f
 	}
 	if !running && !j.finished.IsZero() {
 		data["Took"] = shortDuration(j.finished.Sub(j.started))

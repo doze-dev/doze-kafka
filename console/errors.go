@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"syscall"
 )
@@ -22,51 +21,6 @@ var errNotFound = errors.New("not found")
 // errBadInput marks a request the person can correct (a malformed header, a
 // partition that does not exist). It is shown beside the form, not as a failure.
 var errBadInput = errors.New("invalid input")
-
-// failure is a backend error sorted into what the person looking at the screen
-// needs to be told.
-type failure struct {
-	status  int
-	kind    string // "notfound", "unreachable", "refused", "internal"
-	title   string
-	message string
-}
-
-// classify decides how an error is shown. The distinctions matter: "that topic
-// does not exist" and "I cannot reach your broker" call for different next steps,
-// and both used to be the same raw error string in a toast.
-func classify(err error) failure {
-	switch {
-	case errors.Is(err, errNotFound),
-		errors.Is(err, kerr.UnknownTopicOrPartition),
-		errors.Is(err, kerr.UnknownTopicID),
-		errors.Is(err, kerr.GroupIDNotFound):
-		return failure{http.StatusNotFound, "notfound", "Not found", err.Error()}
-	case errors.Is(err, errBadInput):
-		return failure{http.StatusBadRequest, "refused", "Check the form", err.Error()}
-	}
-	// A broker error is the broker's answer and is classified by what it is, before
-	// anything is guessed from the wording (a topic called "EOF-events" used to
-	// turn INVALID_TOPIC into "can't reach the broker").
-	var ke *kerr.Error
-	if errors.As(err, &ke) {
-		switch {
-		case ke.Retriable, ke.Code == kerr.UnknownServerError.Code, ke.Code == kerr.KafkaStorageError.Code:
-			// The broker's problem, not the request's: timeouts, a coordinator
-			// still loading, a storage failure.
-			return failure{http.StatusServiceUnavailable, "unreachable", "The broker could not do that right now", ke.Message + "."}
-		case ke.Code == kerr.SaslAuthenticationFailed.Code:
-			return failure{http.StatusBadGateway, "unreachable", "The broker refused the console's login",
-				"The console's own credentials were rejected by the broker."}
-		}
-		return failure{http.StatusBadRequest, "refused", "The broker refused that", ke.Message + "."}
-	}
-	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) || isNetworkError(err) {
-		return failure{http.StatusBadGateway, "unreachable", "Can't reach the broker",
-			"The console could not get an answer from the broker. It may have stopped, or be busy."}
-	}
-	return failure{http.StatusInternalServerError, "internal", "Something went wrong", err.Error()}
-}
 
 // isNetworkError reports whether err is a failure to talk to the broker at all.
 // It goes by the error's type; the client's own "could not dial" is the one case
@@ -94,38 +48,36 @@ func wantsPage(r *http.Request) bool {
 // fail reports err. A navigation gets an in-shell page with the way out on it; a
 // partial request gets a small fragment the client shows next to the control that
 // failed. A nil error (a handler that found nothing without erroring) is still a
-// failure to report, not a crash.
+// failure to report, not a crash. Either way what is shown is a Refusal, through
+// the one "refusal" partial.
 func (c *Console) fail(w http.ResponseWriter, r *http.Request, err error) {
-	if err == nil {
-		err = fmt.Errorf("%w: nothing to show", errNotFound)
-	}
-	f := classify(err)
+	f := refusalFor(err)
 	if wantsPage(r) {
 		c.renderError(w, r, f, errorPage{})
 		return
 	}
-	// What the person did wrong is said in their terms (the form's own message);
-	// anything else gets the same plain explanation a page would, not the client
-	// library's raw error ("unable to dial: dial tcp 127.0.0.1:1: connect: ...").
-	msg := f.message
-	if errors.Is(err, errBadInput) || f.kind == "notfound" {
-		msg = err.Error()
-	}
+	c.refuse(w, f)
+}
+
+// refuse writes a Refusal as the small fragment for a control that failed.
+func (c *Console) refuse(w http.ResponseWriter, f Refusal) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(f.status)
-	io.WriteString(w, `<div class="err">`+template.HTMLEscapeString(msg)+`</div>`)
+	w.WriteHeader(f.Status)
+	if err := c.templates().ExecuteTemplate(w, "refusal", f.data(nil)); err != nil {
+		io.WriteString(w, template.HTMLEscapeString(f.Message))
+	}
 }
 
 // failResource is fail for a page about one named thing. When that thing does not
 // exist it says so by name and offers the nearest names that do.
 func (c *Console) failResource(w http.ResponseWriter, r *http.Request, err error, kind, name string) {
-	f := classify(err)
-	if f.kind != "notfound" || !wantsPage(r) {
+	f := refusalFor(err)
+	if !f.NotFound || !wantsPage(r) {
 		c.fail(w, r, err)
 		return
 	}
-	f.title = strings.ToUpper(kind[:1]) + kind[1:] + " not found"
-	f.message = fmt.Sprintf("There is no %s named %q on this broker.", kind, name)
+	f.Heading = strings.ToUpper(kind[:1]) + kind[1:] + " not found"
+	f.Message = fmt.Sprintf("There is no %s named %q on this broker.", kind, name)
 	page := errorPage{Section: kind + "s", Back: c.prefix + "/" + kind + "s"}
 	page.Suggestions = c.suggest(r.Context(), kind, name)
 	c.renderError(w, r, f, page)
@@ -140,26 +92,25 @@ type errorPage struct {
 
 type suggestion struct{ Name, URL string }
 
-func (c *Console) renderError(w http.ResponseWriter, r *http.Request, f failure, p errorPage) {
-	data := map[string]any{
-		"Title": f.title, "Heading": f.title, "Message": f.message, "Kind": f.kind,
-		"Status": f.status, "Suggestions": p.Suggestions, "Back": p.Back,
-		"Retry": f.kind == "unreachable" || f.kind == "internal",
-		"Page":  p.Section,
-	}
+func (c *Console) renderError(w http.ResponseWriter, r *http.Request, f Refusal, p errorPage) {
+	data := f.data(map[string]any{
+		"Title": f.Heading, "Heading": f.Heading, "Message": f.Message, "Kind": string(f.Kind),
+		"Status": f.Status, "Suggestions": p.Suggestions, "Back": p.Back, "Retry": f.Retry,
+		"Page": p.Section,
+	})
 	if p.Section == "" {
 		data["Page"] = "topics"
 	}
 	// Tells the client this is a page to show, not an error to toast: htmx does not
 	// swap a 4xx/5xx response unless told to (see the beforeSwap handler).
 	w.Header().Set("X-Doze-Page", "error")
-	w.WriteHeader(f.status)
+	w.WriteHeader(f.Status)
 	data["Prefix"] = c.prefix
 	data["Endpoint"] = c.be.displayAddr()
 	data["HasRegistry"] = c.reg != nil
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := c.templates().ExecuteTemplate(w, "error_page", data); err != nil {
-		io.WriteString(w, template.HTMLEscapeString(f.message))
+		io.WriteString(w, template.HTMLEscapeString(f.Message))
 	}
 }
 

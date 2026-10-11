@@ -56,6 +56,12 @@
   --warn: #b7791f; --warn-foreground: #8f5a00;
   --info: #5b7aa0; --info-foreground: #34506e;
   --violet: #7c3aed; --violet-foreground: #6d28d9;
+  /* The four words for "no", one colour each (see refusal.go). Foregrounds are
+     text on the page or card and hold 4.5:1 (console/contrast_test.go). */
+  --refused: #8576b0;    --refused-foreground: #5c4f86;
+  --denied: #b7791f;     --denied-foreground: #8f5a00;
+  --notimpl: #5b7aa0;    --notimpl-foreground: #34506e;
+  --failed: #d8323c;     --failed-foreground: #b8262f;
   --scrim: rgba(22, 21, 15, .38);
   --sh: 0 1px 2px rgba(22, 21, 15, .05), 0 6px 20px -10px rgba(22, 21, 15, .16);
   --sh-lg: 0 20px 50px -16px rgba(22, 21, 15, .28);
@@ -89,6 +95,10 @@
   --warn: #e0a64a; --warn-foreground: #f0b95c;
   --info: #7f9fc6; --info-foreground: #a9c3e3;
   --violet: #a78bfa; --violet-foreground: #c4b5fd;
+  --refused: #a597d4;    --refused-foreground: #c3b9e8;
+  --denied: #e0a64a;     --denied-foreground: #f0b95c;
+  --notimpl: #7f9fc6;    --notimpl-foreground: #a9c3e3;
+  --failed: #f0616a;     --failed-foreground: #ff8087;
   --scrim: rgba(0, 0, 0, .55);
   --sh: 0 1px 2px rgba(0, 0, 0, .35), 0 6px 18px -8px rgba(0, 0, 0, .55);
   --sh-lg: 0 18px 46px -14px rgba(0, 0, 0, .7);
@@ -362,6 +372,18 @@ p.note { margin: 0; }
 .form-b { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
 .field.narrow { max-width: 180px; }
 .det-foot { display: flex; justify-content: flex-end; gap: 8px; align-items: center; padding: 6px 0; max-width: 640px; }
+/* A refusal: a kind word and one colour each. It is an .err, so a control's error
+   slot and the toasts read it as they always did; the kind recolours it. */
+.refusal { --k: var(--refused); --kf: var(--refused-foreground); color: var(--foreground); }
+.refusal-denied { --k: var(--denied); --kf: var(--denied-foreground); }
+.refusal-not-implemented { --k: var(--notimpl); --kf: var(--notimpl-foreground); }
+.refusal-failed { --k: var(--failed); --kf: var(--failed-foreground); }
+.err.refusal { background: color-mix(in srgb, var(--k) 8%, var(--card)); border-color: color-mix(in srgb, var(--k) 40%, var(--border)); }
+.refusal-kind { font-weight: 600; color: var(--kf); }
+.refusal-line .refusal-kind { text-transform: uppercase; letter-spacing: .04em; font-size: var(--fs-sm); }
+.refusal-name { font-size: var(--fs-sm); color: var(--muted-foreground); }
+.refusal-rule { font-size: var(--fs-sm); }
+.refusal-msg { overflow-wrap: anywhere; }
 .err { color: var(--bad-foreground); background: color-mix(in srgb, var(--bad) 8%, var(--card)); border: 1px solid color-mix(in srgb, var(--bad) 40%, var(--border)); border-radius: var(--radius); padding: 10px 12px; margin: 8px 0; font-size: var(--fs-md); overflow-wrap: anywhere; }
 .form-err { margin: 10px 0 0; max-width: 640px; }
 .dock .form-err { max-width: none; }
@@ -687,8 +709,12 @@ html .cm-editor .cm-lintRange-error { background: color-mix(in srgb, var(--bad) 
 .errorpanel { max-width: 520px; text-align: center; }
 .errorpanel .err-ic { color: var(--muted-foreground); margin-bottom: 10px; }
 .errorpanel .err-ic .ic { width: 32px; height: 32px; }
-.errorpanel.unreachable .err-ic, .errorpanel.internal .err-ic { color: var(--bad); }
-.errorpanel.refused .err-ic { color: var(--warn); }
+.errorpanel.failed .err-ic { color: var(--failed); }
+.errorpanel.refused .err-ic { color: var(--refused); }
+.errorpanel.denied .err-ic { color: var(--denied); }
+.errorpanel.not-implemented .err-ic { color: var(--notimpl); }
+.errorpanel .refusal-line { margin: 0 0 10px; }
+.errorpanel .refusal-rule { font-size: var(--fs-md); margin: 0 0 14px; }
 .errorpanel h1 { font-weight: 600; font-size: var(--fs-xl); margin: 0 0 8px; }
 .errorpanel p { color: var(--muted-foreground); font-size: var(--fs-base); line-height: 1.55; margin: 0 0 16px; overflow-wrap: anywhere; }
 .errorpanel .didyoumean { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; font-size: var(--fs-md); }

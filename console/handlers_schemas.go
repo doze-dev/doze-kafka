@@ -160,13 +160,13 @@ func (c *Console) schemaDetail(w http.ResponseWriter, r *http.Request) {
 
 // failSubject is failResource for a subject, which is in the Schemas section.
 func (c *Console) failSubject(w http.ResponseWriter, r *http.Request, err error, subject string) {
-	f := classify(err)
-	if f.kind != "notfound" || !wantsPage(r) {
+	f := refusalFor(err)
+	if !f.NotFound || !wantsPage(r) {
 		c.fail(w, r, err)
 		return
 	}
-	f.title = "Subject not found"
-	f.message = fmt.Sprintf("There is no subject named %q in the schema registry.", subject)
+	f.Heading = "Subject not found"
+	f.Message = fmt.Sprintf("There is no subject named %q in the schema registry.", subject)
 	page := errorPage{Section: "schemas", Back: schemasPath(c.prefix)}
 	if rows, lerr := c.reg.Subjects(r.Context()); lerr == nil {
 		var names []string

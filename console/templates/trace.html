@@ -26,8 +26,8 @@
 {{/* trace_live is the polled unit: progress while the scan runs, the trail when it is done. */}}
 {{define "trace_live"}}
 <div id="trace-live" data-job="{{.JobID}}" data-hash="{{.Hash}}" {{if .Running}}data-live="{{.Prefix}}/trace/live?job={{.JobID}}" data-live-ms="700"{{end}}>
-  {{if .Err}}
-  <div class="honest warn" role="alert">{{icon "alert"}}<div>The scan failed: {{.Err}}</div></div>
+  {{if .ScanFailed}}
+  {{template "refusal" .}}
   {{else if .Running}}
   <div class="tr-status" role="status">
     <span class="spinner" aria-hidden="true"></span>
