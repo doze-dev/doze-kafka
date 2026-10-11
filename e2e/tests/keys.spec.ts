@@ -75,12 +75,14 @@ test('g then a letter goes to a section, and the chord lapses', async ({ page })
   await expect(page).toHaveURL(/\/traffic$/);
 });
 
-test('the palette carries actions, and the third theme is one of them', async ({ page, openPalette }) => {
+// Sy-05 lists no theme rows; the theme is the top bar's words (Sy-07).
+test('the theme is the top bar\'s control, not a palette row, and the choice sticks', async ({ page, openPalette }) => {
   await page.goto('topics');
   await openPalette();
   await page.locator('#pal-q').fill('high-contrast');
-  await expect(page.locator('.pal-item').first()).toContainText('Use the high-contrast theme');
-  await page.keyboard.press('Enter');
+  await expect(page.locator('.pal-item', { hasText: /theme/i })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.locator('#theme-seg button[data-mode="contrast"]').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'contrast');
   // It is the choice that stuck, and the switch shows it.
   await page.reload();
