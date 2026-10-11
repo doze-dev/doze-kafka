@@ -305,3 +305,25 @@ test('the clients table links a client name to only its requests (TRF-9)', async
   await expect(rows.first()).toBeVisible();
   for (const row of await rows.all()) await expect(row).toContainText(CLIENT);
 });
+
+// The same boards in the dark theme (Sy-02's tokens) and at a phone's width (Sy-04).
+test('dark: a refusal is the dark purple on its tint, a failure the dark red', async ({ page }) => {
+  await page.addInitScript(() => { try { localStorage.setItem('theme', 'dark'); } catch { /* none */ } });
+  await page.goto('traffic?kind=errors');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  const refusal = page.locator('#traffic-table tbody tr', { hasText: 'TOPIC_ALREADY_EXISTS' }).first();
+  await expect(refusal.locator('td.cell-result span')).toHaveCSS('color', 'rgb(195, 163, 242)');
+  await expect(refusal.locator('td').first()).toHaveCSS('background-color', 'rgb(42, 32, 64)');
+  await page.goto('traffic?view=clients');
+  await expect(page.locator('#clients-table')).toBeVisible();
+});
+
+test('at 390 the Traffic pages do not scroll sideways, in either view', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  for (const path of ['traffic', 'traffic?view=clients', 'traffic?kind=errors', `traffic?group=${GROUP}`]) {
+    await page.goto(path);
+    await expect(page.locator('main h1')).toHaveText('Traffic');
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(over, `${path} is wider than the screen by ${over}px`).toBeLessThanOrEqual(0);
+  }
+});
