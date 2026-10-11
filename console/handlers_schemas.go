@@ -17,10 +17,6 @@ import (
 // version against it before registering. A subject name is data like a group id, and
 // travels in the path the same way (see groupSegment).
 
-var compatLevels = []string{
-	"BACKWARD", "BACKWARD_TRANSITIVE", "FORWARD", "FORWARD_TRANSITIVE", "FULL", "FULL_TRANSITIVE", "NONE",
-}
-
 func schemasPath(prefix string) string             { return prefix + "/schemas" }
 func schemaPath(prefix, subject string) string     { return prefix + "/schemas/" + groupSegment(subject) }
 func newSchemaPath(prefix string) string           { return prefix + "/new/schema" }
@@ -130,7 +126,7 @@ func (c *Console) schemaDetail(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{
 		"List": list, "Sel": subject, "Subject": subject, "Page": "schemas", "Title": subject,
 		"Versions": versions, "Cur": cur, "Text": cur.Pretty(), "Latest": versions[len(versions)-1],
-		"Compat": level, "CompatOwn": own, "Levels": compatLevels,
+		"Compat": level, "CompatOwn": own, "Levels": compatLevels(),
 		"IsLatest": cur.Version == versions[len(versions)-1],
 	}
 	// The editor for a new version starts from the latest, whichever is on show.

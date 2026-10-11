@@ -181,7 +181,7 @@ func newConfigView(entries []ConfigEntry) configView {
 	for _, ts := range topicSettings {
 		editable[ts.Key] = true
 		e, ok := byKey[ts.Key]
-		sv := settingView{Key: ts.Key, Label: ts.Label, Hint: ts.Hint, Options: ts.Options}
+		sv := settingView{Key: ts.Key, Label: ts.Label, Hint: settingHint(ts.Key, ts.Hint), Options: ts.Options}
 		if ok {
 			sv.Effective = ts.show(e.Value)
 			if e.Own {

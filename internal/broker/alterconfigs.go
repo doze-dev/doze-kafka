@@ -10,6 +10,7 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
+	"github.com/doze-dev/doze-kafka/internal/settings"
 	"github.com/doze-dev/doze-kafka/internal/storage/meta"
 
 	"github.com/twmb/franz-go/pkg/kerr"
@@ -26,14 +27,6 @@ import (
 
 // errBrokerConfigReadOnly is the answer to an attempt to alter a broker resource.
 const errBrokerConfigReadOnly = "broker configuration is read-only here: it is set with doze-kafka's flags or config file"
-
-// listConfigs are the topic configs whose value is a comma-separated list, the
-// only ones IncrementalAlterConfigs may APPEND to or SUBTRACT from.
-var listConfigs = map[string]bool{
-	"cleanup.policy": true,
-	"follower.replication.throttled.replicas": true,
-	"leader.replication.throttled.replicas":   true,
-}
 
 // alterError is a refusal to alter one resource: the code and what to say.
 type alterError struct {
@@ -182,7 +175,7 @@ func applyIncremental(config map[string]string, c kmsg.IncrementalAlterConfigsRe
 	case kmsg.IncrementalAlterConfigOpDelete:
 		delete(config, c.Name)
 	case kmsg.IncrementalAlterConfigOpAppend, kmsg.IncrementalAlterConfigOpSubtract:
-		if !listConfigs[c.Name] {
+		if !settings.IsListTopicConfig(c.Name) {
 			return &alterError{kerr.InvalidRequest.Code, fmt.Sprintf("config %q is not a list, so there is nothing to append to or subtract from", c.Name)}
 		}
 		// A list not set on the topic starts from its default, as Kafka does:
