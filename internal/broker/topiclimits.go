@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -52,7 +53,7 @@ func TopicLimits(cfg config.Config, topicConfig map[string]string) (limits log.T
 			// limit, so this is the smallest age instead.
 			limits.Retention.MaxAge = time.Millisecond
 		default:
-			limits.Retention.MaxAge = time.Duration(n) * time.Millisecond
+			limits.Retention.MaxAge = millis(n)
 		}
 	}
 	if n, ok := num("retention.bytes"); ok {
@@ -77,6 +78,16 @@ func TopicLimits(cfg config.Config, topicConfig map[string]string) (limits log.T
 	return limits, own
 }
 
+// millis is n milliseconds as a duration, saturating at the longest one: Kafka
+// accepts any long for these settings, and a product past 292 years would wrap
+// to a negative duration (a lag that is already over, a tombstone kept for no time).
+func millis(n int64) time.Duration {
+	if n > maxRetentionMs {
+		return time.Duration(math.MaxInt64)
+	}
+	return time.Duration(n) * time.Millisecond
+}
+
 // compacts reports whether a topic's cleanup.policy asks for compaction (compact, or
 // compact,delete).
 func compacts(topicConfig map[string]string) bool {
@@ -97,13 +108,13 @@ func compactionPolicy(topicConfig map[string]string) log.CompactionPolicy {
 		pol.MinDirtyRatio = v
 	}
 	if v, err := strconv.ParseInt(topicConfig["min.compaction.lag.ms"], 10, 64); err == nil && v > 0 {
-		pol.MinLag = time.Duration(v) * time.Millisecond
+		pol.MinLag = millis(v)
 	}
 	if v, err := strconv.ParseInt(topicConfig["max.compaction.lag.ms"], 10, 64); err == nil && v > 0 {
-		pol.MaxLag = time.Duration(v) * time.Millisecond
+		pol.MaxLag = millis(v)
 	}
 	if v, err := strconv.ParseInt(topicConfig["delete.retention.ms"], 10, 64); err == nil && v >= 0 {
-		pol.DeleteRetention = time.Duration(v) * time.Millisecond
+		pol.DeleteRetention = millis(v)
 	}
 	pol.Codec = log.CodecByName(topicConfig["compression.type"])
 	return pol

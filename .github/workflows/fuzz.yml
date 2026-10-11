@@ -1,22 +1,42 @@
 name: Fuzz
 
-# Weekly (and on demand) extended fuzzing of the wire-protocol decoder — the code
-# that parses untrusted bytes off the socket. On a crash the failing input is saved
-# as an artifact so it can be replayed locally.
+# Weekly (and on demand) extended fuzzing of every parser of untrusted bytes: the
+# wire protocol, record batches and decompression, SASL messages, ACL filters,
+# topic config values, the registry's REST bodies and schema texts, the config file,
+# the console's forms. The list is testdata/fuzz-targets.txt (the same one `task
+# fuzz` runs); each target gets at least 60 seconds, a job of its own, and on a
+# crash its failing input is saved as an artifact so it can be replayed locally.
 on:
   schedule:
     - cron: "0 7 * * 1" # Mondays 07:00 UTC
   workflow_dispatch:
+    inputs:
+      fuzztime:
+        description: "How long each target runs (at least 60s for the weekly run)"
+        default: "90s"
 
 permissions:
   contents: read
 
 jobs:
+  targets:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: list
+        run: |
+          matrix="$(grep -v '^#' testdata/fuzz-targets.txt | grep -v '^$' | jq -Rsc 'split("\n") | map(select(length > 0) | split(" ") | {pkg: .[0], target: .[1]})')"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "$matrix" | jq -r '.[] | "\(.pkg) \(.target)"'
+
   fuzz:
+    needs: targets
     strategy:
       fail-fast: false
       matrix:
-        target: [FuzzParseAndDecodeRequest, FuzzSkipTaggedFields, FuzzReadFrame]
+        include: ${{ fromJSON(needs.targets.outputs.matrix) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -24,13 +44,13 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Fuzz ${{ matrix.target }}
-        run: go test ./internal/protocol/ -run '^$' -fuzz '^${{ matrix.target }}$' -fuzztime 5m
+        run: go test ${{ matrix.pkg }} -run '^$' -fuzz '^${{ matrix.target }}$' -fuzztime ${{ inputs.fuzztime || '90s' }}
       - name: Upload failing inputs
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: fuzz-crashers-${{ matrix.target }}
-          path: internal/protocol/testdata/fuzz/
+          path: ${{ matrix.pkg }}/testdata/fuzz/
           if-no-files-found: ignore
 
   # A scheduled run nobody is watching fails silently: the fuzz job was red for

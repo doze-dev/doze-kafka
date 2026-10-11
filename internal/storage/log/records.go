@@ -120,6 +120,9 @@ func inflateMax(codec int, body []byte, limit int) ([]byte, error) {
 			}
 			return out, nil
 		}
+		if len(body) < 16 {
+			return nil, fmt.Errorf("%w: snappy stream header is cut short", errRecords)
+		}
 		var out []byte
 		rest := body[16:] // magic, version and the oldest compatible version.
 		for len(rest) > 0 {
