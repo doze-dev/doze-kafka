@@ -74,8 +74,11 @@ test('the broker stops mid-poll: one state on the pill, the rows frozen, no toas
   // The pill says so, once, with the last time anything was heard.
   const pill = page.locator('#live-pill');
   await expect(pill).toHaveClass(/disconnected/, { timeout: 15_000 });
-  await expect(pill.locator('.pill-state')).toContainText('Not connected');
-  await expect(pill.locator('.pill-state')).toContainText(/last heard \d{1,2}:\d{2}/);
+  // Traf-10's top bar: the address and "not reachable", the pill red-tinted.
+  await expect(pill.locator('.pill-state')).toHaveText('not reachable');
+  await expect(pill).toHaveClass(/\bbad\b/);
+  await expect(pill).toHaveCSS('background-color', 'rgb(248, 227, 224)');
+  await expect(pill).toHaveAttribute('title', /Not reachable\. The last answer was at \d{1,2}:\d{2}/);
   // What was on screen stays, frozen under the veil.
   await expect(page.locator('#tape-and-table.disconnected')).toBeVisible();
   await expect(page.locator('tr[id^="msg-"]')).toHaveCount(1);
@@ -136,6 +139,18 @@ test('Traffic when the broker is lost: the pill, the callout, the frozen line, R
   await expect(header.locator('.pill.bad')).toContainText('disconnected · last good');
   await expect(header.locator('button', { hasText: 'Retry now' })).toBeVisible();
   await expect(header.locator('[data-live-state]')).toBeHidden();
+  // Traf-10's top bar: the address and "not reachable" in a red-tinted pill (the
+  // board's .pill.bad: badbg, bad ink), no Retry inside it or beside it (Retry now is
+  // the page header's), and the jump field is still the board's 420.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const top = page.locator('header.topbar #live-pill');
+  await expect(top.locator('.pill-addr')).toHaveText(/^127\.0\.0\.1:\d+$/);
+  await expect(top.locator('.pill-state')).toHaveText('not reachable');
+  await expect(top).toHaveCSS('background-color', 'rgb(248, 227, 224)');
+  await expect(top).toHaveCSS('color', 'rgb(179, 37, 27)');
+  await expect(top.locator('.dot')).toHaveCSS('background-color', 'rgb(179, 37, 27)');
+  await expect(page.locator('header.topbar #pill-retry')).toHaveCount(0);
+  expect((await page.locator('header.topbar #palette-open').boundingBox())!.width).toBe(420);
   await expect(page.locator('.frozen-line')).toContainText('Nothing newer than this line is known.');
   // Traf-10 draws it as the row under the header, not above it.
   const below = await page.evaluate(() => {

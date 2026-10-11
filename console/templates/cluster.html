@@ -6,7 +6,7 @@
     <a class="li {{if .On}}on{{end}}" href="{{.URL}}"{{if .On}} aria-current="page"{{end}}>{{.Label}}<span class="grow"></span>{{if .Count}}<span class="m {{if .Warn}}warn{{else}}mut{{end}}">{{.Count}}</span>{{end}}</a>
     {{end}}
   </aside>
-  <main class="main" id="detail">
+  <main class="main gap12" id="detail">
     <div class="row sb ce idband">
       <div class="col"><h1 class="h1">Cluster</h1><span class="note">One broker. No replication, no controller quorum. That is the whole point.</span></div>
       <div class="row g8 ce"><a class="btn pri" href="{{prefix}}/connect">Connect an app</a></div>
@@ -34,7 +34,21 @@
         <a class="r" style="--c: 1fr 70px" href="{{prefix}}/groups"><span>Consumer groups</span><span class="m ra b">{{.GroupCount}}</span></a>
         <a class="r" style="--c: 1fr 70px" href="{{prefix}}/cluster?view=transactions"><span>Open transactions</span><span class="m ra b {{if .Cluster.Transactions}}warn{{end}}">{{len .Cluster.Transactions}}</span></a>
         {{if .HasTraffic}}<a class="r" style="--c: 1fr 70px" href="{{prefix}}/traffic"><span>Open connections</span><span class="m ra b">{{.OpenConnections}}</span></a>{{end}}
+        <a class="r" style="--c: 1fr 70px" href="{{prefix}}/topics" title="Partitions of the topics whose cleanup.policy compacts them"><span>Compacted partitions</span><span class="m ra b">{{.CompactedPartitions}}</span></a>
       </div>
+    </div>
+
+    {{/* Cl-Home's "What this broker is not": what docs/limitations.md says of this build,
+         and that DescribeCluster lists one broker. The Limits page (Cl-03) is the cluster
+         stage's; "All limits" is the document. */}}
+    <div class="well pad" id="cluster-is-not" style="padding: 10px 14px">
+      <div class="row ce g16 wrap"><span class="cap">What this broker is not</span>
+        {{if eq .Cluster.Brokers 1}}<span class="pill">single node</span>{{end}}
+        <span class="pill">replication factor reported as <span class="m">1</span></span>
+        <span class="pill">no leader election, no ISR</span>
+        <span class="pill">no KRaft, no ZooKeeper</span>
+        <span class="pill">not durable against disk loss</span>
+        <a href="https://github.com/doze-dev/doze-kafka/blob/main/docs/limitations.md" target="_blank" rel="noopener">All limits</a></div>
     </div>
     <div class="note">Replication factor 1 is what every topic here reports, because there is nowhere to put a second copy. Every API the broker does not implement closes the connection cleanly on that call; everything else keeps working. See <a href="https://github.com/doze-dev/doze-kafka/blob/main/docs/limitations.md" target="_blank" rel="noopener">limitations</a>.</div>
 

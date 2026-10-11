@@ -43,7 +43,7 @@
     <div class="row g16 steps">
       <section class="card pad col g12 grow" aria-label="Step 1, create a topic">
         <div class="row ce g8"><span class="num">1</span><h2 class="h2">Create a topic</h2></div>
-        <span class="note">Any Kafka tool works.{{if .Facts.AutoCreate}} Auto-create is also on, so a producer can simply name a new topic{{if .Facts.AutoParts}}, with {{.Facts.AutoParts}} partition{{if ne .Facts.AutoParts 1}}s{{end}}{{end}}.{{else}} Auto-create is off, so a topic has to be made first.{{end}}</span>
+        <span class="note">Any Kafka tool works.{{if .Facts.AutoCreate}} Auto-create is also on, so a producer can simply name a new topic.{{else}} Auto-create is off, so a topic has to be made first.{{end}}</span>
         <pre class="code">kafka-topics.sh \
   --bootstrap-server {{.Facts.Bootstrap}} \
   {{.Facts.CommandConfig}}--create --topic orders \
@@ -55,7 +55,7 @@
       <section class="card pad col g12 grow" aria-label="Step 2, connect an app">
         <div class="row ce g8"><span class="num">2</span><h2 class="h2">Connect an app</h2></div>
         <span class="note">Point any client at the broker.{{if .Facts.Registry}} The built-in schema registry answers on its own port, no second container.{{end}}</span>
-        <div class="kv" style="--c: 120px 1fr"><span>Bootstrap</span><span class="m">{{.Facts.Bootstrap}}</span>{{if .Facts.Registry}}<span>Schema registry</span><span class="m">{{.Facts.Registry}}</span>{{end}}<span>Console</span><span class="m">{{.Facts.Console}}</span></div>
+        <div class="kv kv-stack" style="--c: 120px 1fr"><span>Bootstrap</span><span class="m">{{.Facts.Bootstrap}}</span>{{if .Facts.Registry}}<span>Schema registry</span><span class="m">{{.Facts.Registry}}</span>{{end}}<span>Console</span><span class="m">{{.Facts.Console}}</span></div>
         <pre class="code">kafka-console-producer.sh \
   --bootstrap-server {{.Facts.Bootstrap}} \
   {{if .Facts.CommandConfig}}--producer.config client.properties \

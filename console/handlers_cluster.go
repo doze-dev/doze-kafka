@@ -37,6 +37,22 @@ func (c *Console) cluster(w http.ResponseWriter, r *http.Request) {
 		partitions += int(t.Partitions)
 	}
 	groups, _ := c.be.ListGroups(ctx)
+	// Cl-Home's "Compacted partitions": the partitions of the topics whose
+	// cleanup.policy asks for compaction, as the broker reports each topic's
+	// configuration (the background cleaner's own status has no source: CLU-24).
+	compacted := 0
+	if view == "overview" && len(topics) > 0 {
+		names := make([]string, len(topics))
+		for i, t := range topics {
+			names[i] = t.Name
+		}
+		cfgs := c.be.TopicConfigs(ctx, names)
+		for _, t := range topics {
+			if strings.Contains(cfgs[t.Name]["cleanup.policy"], "compact") {
+				compacted += int(t.Partitions)
+			}
+		}
+	}
 
 	views := []struct {
 		Key, Label, URL, Count string
@@ -53,7 +69,7 @@ func (c *Console) cluster(w http.ResponseWriter, r *http.Request) {
 
 	data := map[string]any{
 		"Cluster": info, "Views": views, "View": "cluster", "ClusterView": view, "Page": "cluster", "Title": "Cluster",
-		"TopicCount": len(topics), "PartitionCount": partitions, "GroupCount": len(groups),
+		"TopicCount": len(topics), "PartitionCount": partitions, "GroupCount": len(groups), "CompactedPartitions": compacted,
 		"Facts": c.connectFacts(r),
 	}
 	if !c.facts.Started.IsZero() {

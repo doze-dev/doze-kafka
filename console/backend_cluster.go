@@ -21,6 +21,7 @@ type APIRange struct {
 // little to show here; padding it out with a dashboard would be dishonest.
 type ClusterInfo struct {
 	NodeID        int32
+	Brokers       int // how many brokers DescribeCluster lists: one, here.
 	ClusterID     string
 	Host          string
 	Port          int32
@@ -59,7 +60,7 @@ func (b *backend) ClusterInfo(ctx context.Context) (*ClusterInfo, error) {
 	if dresp.ErrorCode != 0 {
 		return nil, kerr.ErrorForCode(dresp.ErrorCode)
 	}
-	info := &ClusterInfo{ClusterID: dresp.ClusterID, TLS: b.opts.TLSConfig != nil}
+	info := &ClusterInfo{ClusterID: dresp.ClusterID, Brokers: len(dresp.Brokers), TLS: b.opts.TLSConfig != nil}
 	if b.opts.SASLUser != "" {
 		if info.AuthMech = b.opts.SASLMechanism; info.AuthMech == "" {
 			info.AuthMech = "PLAIN"

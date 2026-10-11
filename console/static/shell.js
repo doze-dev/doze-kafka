@@ -169,17 +169,24 @@
     document.documentElement.toggleAttribute("data-connection-lost", down);
     if (!pill) return;
     pill.classList.toggle("disconnected", down);
+    // Traf-10 draws the top bar's pill red with the address and the words "not
+    // reachable"; the time of the last good answer is the page's own (its header and
+    // its callout say it) and is this pill's tooltip, so the bar stays one short pill.
+    pill.classList.toggle("bad", down);
+    pill.title = down ? "Not reachable. The last answer was at " + clockText(lastGood) : "The broker this console is connected to";
     var st = pill.querySelector(".pill-state"), retry = document.getElementById("pill-retry");
     if (st) {
-      st.textContent = down ? "Not connected · last heard " + clockText(lastGood) : "";
+      st.textContent = down ? "not reachable" : "";
       st.hidden = !down;
     }
-    // Retry belongs to the disconnected pill: it is there while the broker cannot be
-    // reached and is not in the page, hidden, the rest of the time.
-    if (down && !retry) {
+    // Retry is the page header's button where the page draws one (Traf-10). A page
+    // without one gets it beside the pill, never inside it, so the jump field keeps
+    // its width.
+    var pageRetry = document.querySelector("main [data-retry]");
+    if (down && !retry && !pageRetry) {
       retry = document.createElement("button");
-      retry.type = "button"; retry.id = "pill-retry"; retry.className = "pill-retry"; retry.textContent = "Retry";
-      pill.appendChild(retry);
+      retry.type = "button"; retry.id = "pill-retry"; retry.className = "btn sm"; retry.textContent = "Retry";
+      pill.insertAdjacentElement("afterend", retry);
     } else if (!down && retry) {
       retry.remove();
     }
@@ -1259,7 +1266,8 @@
     if (s < 2) return "just now";
     if (s < 60) return s + "s";
     if (s < 3600) return Math.floor(s / 60) + "m " + pad(s % 60) + "s";
-    return Math.floor(s / 3600) + "h " + pad(Math.floor(s / 60) % 60) + "m";
+    if (s < 172800) return Math.floor(s / 3600) + "h " + pad(Math.floor(s / 60) % 60) + "m";
+    return Math.floor(s / 86400) + "d " + pad(Math.floor(s / 3600) % 24) + "h";
   }
   function agoText(ms) {
     var s = Math.max(0, Math.round(ms / 1000));

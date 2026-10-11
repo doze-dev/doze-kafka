@@ -153,6 +153,18 @@ test('a fresh empty broker lands on "Your broker is up", with the three steps', 
     await expect(page.locator('section.card .num')).toHaveText(['1', '2', '3']);
     await expect(page.locator('section.card pre.code').first()).toContainText('kafka-topics.sh');
     await expect(page.getByText('waiting for the first request')).toBeVisible();
+    // Sy-08's copy where it is true for this build: step 1's sentence is the board's
+    // word for word, and the page is padded 36 56 0 with a 20 px gap.
+    await expect(page.locator('section.card').first().locator('.note').first())
+      .toHaveText('Any Kafka tool works. Auto-create is also on, so a producer can simply name a new topic.');
+    await expect(page.locator('main.firstrun')).toHaveCSS('padding', '36px 56px 0px');
+    await expect(page.locator('main.firstrun')).toHaveCSS('row-gap', '20px');
+    // At 1440 each address is one line: the console's URL is never broken mid-word.
+    await page.setViewportSize({ width: 1440, height: 900 });
+    for (const v of await page.locator('section.card .kv.kv-stack > .m').all()) {
+      const lines = await v.evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
+      expect(lines, `"${await v.innerText()}" is on one line`).toBe(1);
+    }
     await expect(page.locator('nav.rail a.nav.on .nm')).toHaveText('Traffic');
     // The counts the board prints for an empty broker.
     await expect(page.locator('nav.rail a[href$="/topics"] .n')).toHaveText('0');
@@ -608,15 +620,16 @@ test('the create form says a name already exists before anything is sent', async
 
 test('the shell is the board\'s: the top bar, the brand, the page padding and the page title', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  for (const path of ['topics', 'traffic']) {
+  // The page boards (Main, Traf-02..12, the section homes, Tp-05) draw `padding: 16px
+  // 20px 0` with the gap each sets: 10 on a page of parts, 12 on a home with nothing
+  // open, 8 on a topic (Tp-05). Sy-01/02/05 draw 14 18 as the specimen of the anatomy;
+  // that is not the page.
+  for (const [path, gap] of [['topics', '12px'], ['traffic', '10px'], ['groups', '10px'], ['schemas', '10px'], ['access', '10px'], ['cluster', '12px'],
+    ['trace', '12px'], ['topics/seed-orders', '8px']] as const) {
     await page.goto(path);
-    // Sy-01/02/05: the page is padded 14 18 and gaps its parts by 10; its title is an 18/24 h1.
-    const main = page.locator('.panes > .main');
-    await expect(main).toHaveCSS('padding-top', '14px');
-    await expect(main).toHaveCSS('padding-right', '18px');
-    await expect(main).toHaveCSS('padding-bottom', '12px');
-    await expect(main).toHaveCSS('padding-left', '18px');
-    await expect(main).toHaveCSS('row-gap', '10px');
+    const main = page.locator('.panes > .main, main.main').first();
+    await expect(main, `${path} padding`).toHaveCSS('padding', '16px 20px 0px');
+    await expect(main, `${path} gap`).toHaveCSS('row-gap', gap);
     await expect(main.locator('h1').first()).toHaveCSS('font-size', '18px');
     await expect(main.locator('h1').first()).toHaveCSS('line-height', '24px');
     // The inspector is 400 px (the board's .insp) until a message is open.
@@ -648,23 +661,40 @@ test('the top bar holds no control that is hidden: Retry is drawn with the disco
   expect(await page.locator('header.topbar button[hidden], header.topbar a[hidden]').count()).toBe(0);
 });
 
-test('the Traffic columns are the board\'s: 92 150 118 1fr 190 118 52 (the Result is 118, not the board\'s 84), with its 14 px gaps', async ({ page }) => {
+test('the Traffic columns: the board\'s tracks where the page has room, and nothing pushed off the edge at 1440 beside the inspector', async ({ page }) => {
+  // The board's tracks are 92 150 118 1fr 190 84 52, 906 px with the gaps and the row's
+  // padding; its own render at 1440 beside the 400 px inspector has 802, leaves the
+  // topic 8 px and cuts the Time. So: Time 92, Request 130 (the board's 118 is
+  // "Heartbeat v4 x18" and cannot hold "FindCoordinator v4"), Result 118 (AD5) and Took 52
+  // are fixed; Client, Topic and Detail share the rest, and there is no sideways scroll.
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('traffic');
-  const cells = await page.locator('#traffic-table thead th').evaluateAll((ths) => ths.map((th) => {
+  const wrap = page.locator('#traffic-table').locator('xpath=ancestor::div[contains(@class,"tbl-wrap")]');
+  const fit = await wrap.evaluate((w) => ({ client: w.clientWidth, scroll: w.scrollWidth }));
+  expect(fit.scroll, 'the table is as wide as its card').toBeLessThanOrEqual(fit.client);
+  const cells = await page.locator('#traffic-table thead tr:first-child th').evaluateAll((ths) => ths.map((th) => {
     const cs = getComputedStyle(th);
     const w = th.getBoundingClientRect().width;
     // The track is the cell less its padding; the board's gap is the two paddings that meet.
-    return { track: Math.round(w - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)), pl: cs.paddingLeft, pr: cs.paddingRight };
+    return { track: Math.round(w - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)), pl: cs.paddingLeft, pr: cs.paddingRight, right: th.getBoundingClientRect().right };
   }));
-  expect(cells.map((c) => c.track)).toEqual([92, 150, 118, cells[3].track, 190, 118, 52]);
-  expect(cells[3].track).toBeGreaterThanOrEqual(96); // the topic's 1fr keeps room to be read.
+  const [time, , request, , , result, took] = cells.map((c) => c.track);
+  expect([time, request, result, took]).toEqual([92, 130, 118, 52]);
+  for (const i of [1, 3, 4]) expect(cells[i].track, `column ${i + 1} keeps room to be read`).toBeGreaterThanOrEqual(80);
   for (let i = 0; i < cells.length - 1; i++) {
     const meet = parseFloat(cells[i].pr) + parseFloat(cells[i + 1].pl);
     expect(meet, `gap after column ${i + 1}`).toBe(14);
   }
   expect(cells[0].pl).toBe('12px');
   expect(cells[6].pr).toBe('12px');
+  // The last column ends inside the card: Took is on screen.
+  const cardRight = await wrap.evaluate((w) => w.getBoundingClientRect().right);
+  expect(cells[6].right).toBeLessThanOrEqual(cardRight + 1);
+  // From 1600 the board's own tracks hold beside the inspector, and the topic's 1fr is the rest.
+  await page.setViewportSize({ width: 1920, height: 1000 });
+  const wide = await page.locator('#traffic-table thead tr:first-child th').evaluateAll((ths) => ths.map((th, i) => Math.round(th.getBoundingClientRect().width - (i === 0 ? 19 : i === 6 ? 19 : 14))));
+  expect([wide[0], wide[1], wide[2], wide[4], wide[5], wide[6]]).toEqual([92, 150, 130, 190, 118, 52]);
+  expect(wide[3]).toBeGreaterThan(300);
   // The status strip's weights: the three counts and the note are mono, the dots are muted.
   const strip = page.locator('#traffic-summary');
   for (const el of await strip.locator('> .m').all()) await expect(el).toHaveCSS('font-family', /Plex Mono/);
@@ -720,4 +750,124 @@ test('the palette offers Produce to and Reset offsets for what the query matched
   await expect(reset.getByText('asks first', { exact: true })).toBeVisible();
   await reset.click();
   await expect(page).toHaveURL(/groups\/g-lag\?tab=offsets/);
+});
+
+// ---------------------------------------------------------------------------------------
+// What the evidence run measured against the boards (plan/evidence). Each is a computed
+// value or a structure of the page, held so that it cannot drift again.
+
+test('the title of a topic, a group and a subject is the boards\' .h1.m: Plex Sans 600, 18 px', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  for (const path of ['topics/seed-orders', 'groups/g-lag', 'schemas/seed-events-value']) {
+    await page.goto(path);
+    const h1 = page.locator('main h1').first();
+    await expect(h1, path).toHaveCSS('font-family', /IBM Plex Sans/);
+    await expect(h1, path).toHaveCSS('font-weight', '600');
+    await expect(h1, path).toHaveCSS('font-size', '18px');
+    await expect(h1, path).toHaveCSS('line-height', '24px');
+  }
+});
+
+test('a <button class="btn"> is weight 400 as on every board, and an <a class="btn"> is 500', async ({ page }) => {
+  await page.goto('topics/seed-orders');
+  await expect(page.locator('main button.btn.pri').first()).toHaveCSS('font-weight', '400');
+  await expect(page.locator('main button.btn').first()).toHaveCSS('font-weight', '400');
+  await page.goto('topics');
+  await expect(page.locator('main a.btn.pri').first()).toHaveCSS('font-weight', '500');
+});
+
+test('Sy-01: the record table is P, Offset, Key, Value, Age, in rows of 28 with the offset a plain 12 px mono', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('topics/seed-orders?partition=0');
+  const table = page.locator('#messages-table');
+  await expect(table.locator('thead th')).toHaveText(['P', 'Offset', 'Key', 'Value', 'Age']);
+  const row = table.locator('tbody tr[id^="msg-"]').first();
+  expect((await row.boundingBox())!.height).toBe(28);
+  const off = row.locator('.cell-offset');
+  await expect(off).toHaveCSS('font-family', /Plex Mono/);
+  await expect(off).toHaveCSS('font-size', '12px');
+  await expect(off).toHaveCSS('font-weight', '400');
+  // The board's columns: 26 62 120 1fr 62 with 14 px between (the offset is 72: the
+  // board's 62 holds 4,789, not 1,234,567).
+  const tracks = await table.locator('thead th').evaluateAll((ths) => ths.map((th) => {
+    const cs = getComputedStyle(th);
+    return Math.round(th.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
+  }));
+  expect([tracks[0], tracks[1], tracks[2], tracks[4]]).toEqual([26, 72, 120, 62]);
+  // Nothing a record has is out of reach: the age says the moment on hover, and the
+  // headers and the timestamp are the inspector's.
+  await expect(row.locator('.cell-age time')).toHaveAttribute('title', /\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3} UTC$/);
+  const withHeaders = table.locator('tbody tr[id^="msg-"] .cell-val[title*="header"]').first();
+  await expect(withHeaders).toHaveAttribute('title', /\d+ headers?$/);
+  await withHeaders.click();
+  await expect(page.locator('#inspector')).toContainText('Headers ·');
+  await expect(page.locator('#inspector')).toContainText('Timestamp');
+});
+
+test('the shortcuts sheet is three columns in a 900 px dialog, with no scroll (Sy-06)', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('traffic');
+  await page.locator('main h1').click();
+  await page.keyboard.press('?');
+  const help = page.locator('#help .help');
+  await expect(help).toBeVisible();
+  expect(await help.evaluate((el) => (el as HTMLElement).offsetWidth)).toBe(900); // not the box mid-animation (scaled .98)
+  const lefts = await page.locator('#help .help-g').evaluateAll((gs) => gs.map((g) => Math.round(g.getBoundingClientRect().left)));
+  expect(new Set(lefts).size, 'three columns side by side').toBe(3);
+  const body = await page.locator('#help .help-b').evaluate((b) => ({ ch: b.clientHeight, sh: b.scrollHeight, cw: b.clientWidth, sw: b.scrollWidth }));
+  expect(body.sh).toBeLessThanOrEqual(body.ch);
+  expect(body.sw).toBeLessThanOrEqual(body.cw);
+});
+
+test('Sy-05: the palette says the chord to a section on the first row of each group that is not the selected one', async ({ page, openPalette }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('topics');
+  await openPalette();
+  const rows = page.locator('#pal-list .pal-item');
+  await expect(rows.first()).toHaveClass(/sel/);
+  await expect(rows.first().locator('.kbd')).toHaveText('↵');
+  // Topics: the selected row says ↵, the next says g t. Groups: g g. Subjects: g s.
+  await expect(page.locator('#pal-list .pal-item', { has: page.locator('.sv.c-tp') }).nth(1).locator('.kbd')).toHaveText('g t');
+  await expect(page.locator('#pal-list .pal-item', { has: page.locator('.sv.c-gr') }).first().locator('.kbd')).toHaveText('g g');
+  await expect(page.locator('#pal-list .pal-item', { has: page.locator('.sv.c-sc') }).first().locator('.kbd')).toHaveText('g s');
+  // Actions: Create topic is c.
+  await expect(page.locator('#pal-list .pal-item', { hasText: 'Create topic' }).locator('.kbd')).toHaveText('c');
+});
+
+test('Sy-04: the message sheet is 47% of the phone, has its grab handle, and leaves the tabs in view', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('topics/seed-orders?partition=0&open=5');
+  const sheet = page.locator('aside.insp');
+  await expect(sheet.locator('.insp-sel')).toBeVisible();
+  const box = (await sheet.boundingBox())!;
+  expect(box.height / 844).toBeLessThanOrEqual(0.475);
+  expect(box.height / 844).toBeGreaterThan(0.4);
+  // The handle: 36 x 4, centred.
+  const handle = await sheet.evaluate((el) => {
+    const cs = getComputedStyle(el, '::before');
+    return { w: cs.width, h: cs.height, content: cs.content, br: cs.borderRadius };
+  });
+  expect(handle).toEqual({ w: '36px', h: '4px', content: '""', br: '2px' });
+  // The page's tabs and its first record are above the sheet, not under it.
+  const tabs = (await page.locator('nav.tabs').boundingBox())!;
+  expect(tabs.y + tabs.height).toBeLessThanOrEqual(box.y + 1);
+  const firstCard = (await page.locator('tbody tr[id^="msg-"]').first().boundingBox())!;
+  expect(firstCard.y).toBeLessThan(box.y);
+});
+
+test('Cl-Home: the compacted partitions are counted from the topics\' own cleanup.policy, and what this broker is not is drawn', async ({ page }) => {
+  await page.goto('cluster');
+  const counts = page.locator('#cluster-counts');
+  const row = counts.locator('a.r', { hasText: 'Compacted partitions' });
+  await expect(row).toBeVisible();
+  const n = Number(await row.locator('.ra').innerText());
+  // The seed's harbour-berths is compacted (cleanup.policy=compact, one partition); the
+  // rest are not, so the count is of some partitions, never all of them.
+  const all = Number(await counts.locator('a.r', { hasText: /^Partitions/ }).locator('.ra').innerText());
+  expect(n).toBeGreaterThanOrEqual(1);
+  expect(n).toBeLessThan(all);
+  const panel = page.locator('#cluster-is-not');
+  await expect(panel.locator('.cap')).toHaveText('What this broker is not');
+  await expect(panel.locator('.pill')).toHaveText(['single node', 'replication factor reported as 1', 'no leader election, no ISR', 'no KRaft, no ZooKeeper', 'not durable against disk loss']);
+  await expect(panel.locator('a')).toHaveText('All limits');
 });
