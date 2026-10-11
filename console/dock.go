@@ -48,6 +48,7 @@ type DockEvent struct {
 	Target  string
 	Detail  string
 	Error   string // the error's name, empty for success.
+	Took    string // how long the broker took, as the Traffic table writes it; empty when not known.
 	Count   int
 	// Kind is the inspector kind the row opens ("request"), or empty for a row that
 	// has none.
@@ -101,7 +102,7 @@ func (d trafficDock) DockEvents(f DockFilter, limit int, after string) ([]DockEv
 		}
 		out = append(out, DockEvent{
 			ID: requestKey(e), Time: e.Time, Source: "kafka", Client: who, Request: fmt.Sprintf("%s v%d", e.API, e.Version),
-			Target: target, Detail: e.Detail, Error: e.Error, Count: e.Count, Kind: KindRequest,
+			Target: target, Detail: e.Detail, Error: e.Error, Took: shortDuration(e.Duration), Count: e.Count, Kind: KindRequest,
 		})
 	}
 	return out, next
@@ -110,6 +111,21 @@ func (d trafficDock) DockEvents(f DockFilter, limit int, after string) ([]DockEv
 // dockRow is a DockEvent ready to show.
 type dockRow struct {
 	DockEvent
+}
+
+// Name is the request without its version, as the board's wire prints it
+// ("Produce"); the version stays on the hover.
+func (r dockRow) Name() string {
+	i := strings.LastIndex(r.Request, " v")
+	if i < 0 || i+2 >= len(r.Request) {
+		return r.Request
+	}
+	for _, c := range r.Request[i+2:] {
+		if c < '0' || c > '9' {
+			return r.Request
+		}
+	}
+	return r.Request[:i]
 }
 
 func (c *Console) dockSource() DockSource {

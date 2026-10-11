@@ -7,7 +7,7 @@
 {{define "wire_dock"}}
 {{if .HasDock}}
 <section class="dock" id="wire-dock" aria-label="The wire: requests for {{.DockFilter.Topic}}{{.DockFilter.Group}}{{.DockFilter.Subject}}" data-live="{{.Prefix}}/dock?{{.DockQuery}}{{if .DockToggle}}&amp;t=1{{end}}" data-hash="{{.DockHash}}" data-live-ms="3000">
-  <div class="dh"><span class="b">The wire</span>
+  <div class="dh"><span class="b">The wire, underneath</span>
     {{if .DockToggle}}<button type="button" class="livetoggle" data-live-toggle aria-pressed="false" title="Pause live updates"><span class="livedot" aria-hidden="true"></span><span class="livetoggle-l">Live</span></button>
     {{else}}<span class="pill ok"><span class="dot" aria-hidden="true"></span>live</span>{{end}}
     <span class="note">requests that touched {{if .DockFilter.Topic}}{{.DockFilter.Topic}}{{else if .DockFilter.Group}}{{.DockFilter.Group}}{{else}}{{.DockFilter.Subject}}{{end}}</span>
@@ -16,12 +16,14 @@
   <div class="note dock-more">The registry's own requests are not recorded yet, so there is nothing to show for a subject here.</div>
   {{else if .DockRows}}
   <div id="wire-dock-rows">
-    {{range .DockRows}}<div class="r" style="--c: 92px 120px 1fr 120px" id="wd-{{.ID}}" {{if .Kind}}tabindex="0" role="button" data-inspector-open
+    {{range .DockRows}}<div class="r" style="--c: 92px 120px 100px minmax(120px, 1fr) 60px 48px" id="wd-{{.ID}}" {{if .Kind}}tabindex="0" role="button" data-inspector-open
         hx-get="{{$.Prefix}}/inspect/{{.Kind}}?key={{.ID}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"{{end}}>
       <span class="m">{{when .Time "clockms"}}</span>
-      <span class="m b">{{.Request}}{{if gt .Count 1}} <span class="tag">×{{.Count}}</span>{{end}}</span>
-      <span class="mut el">{{.Client}}{{if .Detail}} · {{.Detail}}{{end}}</span>
-      {{if .Error}}<span class="m bad" title="The response carried this error">{{.Error}}</span>{{else}}<span class="m ok">ok</span>{{end}}
+      <span class="m" title="{{.Client}}">{{.Client}}</span>
+      <span class="m b" title="{{.Request}}">{{.Name}}{{if gt .Count 1}} <span class="tag">×{{.Count}}</span>{{end}}</span>
+      <span class="m mut el" title="{{.Detail}}">{{.Detail}}</span>
+      {{if .Error}}<span class="m bad" title="The response carried this error: {{.Error}}">{{.Error}}</span>{{else}}<span class="m ok">ok</span>{{end}}
+      <span class="m ra">{{.Took}}</span>
     </div>{{end}}
   </div>
   {{if .DockMore}}<div class="note dock-more">Older requests are on the <a href="{{.Prefix}}/traffic?{{.DockQuery}}">Traffic page</a>.</div>{{end}}

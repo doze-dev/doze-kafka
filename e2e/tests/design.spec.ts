@@ -287,7 +287,7 @@ test('a topic page is the board: one sentence, one action and ···, neighbours
   // Try it, and the wire underneath with its live pill, below the page and beside the inspector.
   await expect(page.locator('#compose-panel .t')).toHaveText('Try it: produce');
   const dock = page.locator('#wire-dock');
-  await expect(dock.locator('.dh .b')).toHaveText('The wire');
+  await expect(dock.locator('.dh .b')).toHaveText('The wire, underneath');
   await expect(dock.locator('.dh .livetoggle, .dh .pill.ok').first()).toContainText(/live/i);
   const m = await page.locator('main#detail').boundingBox();
   const d = await dock.boundingBox();
@@ -665,6 +665,27 @@ test('the Traffic columns are the board\'s: 92 150 118 1fr 190 84 52, with its 1
   const strip = page.locator('#traffic-summary');
   for (const el of await strip.locator('> .m').all()) await expect(el).toHaveCSS('font-family', /Plex Mono/);
   await expect(strip.locator('> .mut:not(.m)').first()).toHaveCSS('color', 'rgb(86, 91, 99)');
+});
+
+test('the wire dock writes the client, the request, the detail, the result and the time taken whole at 1280', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('topics/seed-orders');
+  const dock = page.locator('#wire-dock');
+  await expect(dock.locator('.dh .b')).toHaveText('The wire, underneath');
+  const row = dock.locator('.r').first();
+  await expect(row).toBeVisible();
+  const cols = await row.evaluate((r) => getComputedStyle(r).gridTemplateColumns.split(' ').map(parseFloat));
+  expect(cols.length).toBe(6);
+  expect(cols.slice(0, 3)).toEqual([92, 120, 100]);
+  expect(cols.slice(4)).toEqual([60, 48]);
+  expect(cols[3]).toBeGreaterThanOrEqual(120);
+  // Nothing in the first rows is cut: the detail reads "p0 · 1 batch · ..." in full, not "p…".
+  const cut = await dock.locator('.r').evaluateAll((rows) => rows.slice(0, 4).flatMap((r) =>
+    Array.from(r.children).filter((c) => c.scrollWidth > c.clientWidth).map((c) => c.textContent!.trim())));
+  expect(cut).toEqual([]);
+  const detail = await row.locator('> span').nth(3).innerText();
+  expect(detail).not.toMatch(/…$/);
+  expect(detail.length).toBeGreaterThan(3);
 });
 
 test('the palette offers Produce to and Reset offsets for what the query matched, with the section chords', async ({ page, openPalette }) => {
