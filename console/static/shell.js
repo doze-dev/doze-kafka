@@ -921,7 +921,10 @@
     document.querySelectorAll("[data-open-keys]").forEach(function (el) {
       var on = open != null && (" " + el.getAttribute("data-open-keys") + " ").indexOf(" " + open + " ") >= 0;
       el.classList.toggle("on", on);
-      el.setAttribute("aria-selected", on ? "true" : "false");
+      // A table row is selected; a div that is a row of a list is the current one.
+      if (el.tagName === "TR") el.setAttribute("aria-selected", on ? "true" : "false");
+      else if (on) el.setAttribute("aria-current", "true");
+      else el.removeAttribute("aria-current");
     });
   }
   document.addEventListener("htmx:afterSettle", markOpenRow);

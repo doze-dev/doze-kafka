@@ -442,8 +442,8 @@ test('the open client row and the open story row are drawn open too', async ({ p
   const kid = page.locator('#traffic-story .r[data-row]').first();
   await expect(kid).toBeVisible();
   await kid.click();
-  await expect(kid).toHaveAttribute('aria-selected', 'true');
+  await expect(kid).toHaveAttribute('aria-current', 'true');
   await expect(kid).toHaveClass(/\bon\b/);
   await expect(kid).toHaveCSS('background-color', SEL);
-  await expect(page.locator('#traffic-story .r[aria-selected="true"]')).toHaveCount(1);
+  await expect(page.locator('#traffic-story .r[aria-current="true"]')).toHaveCount(1);
 });

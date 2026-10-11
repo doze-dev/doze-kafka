@@ -476,10 +476,11 @@ func (c *Console) inspectClient(w http.ResponseWriter, r *http.Request, key stri
 			body["Members"] = cr.Members
 		}
 		body["Reqs"] = c.prefix + "/traffic?" + cr.Filter
+		// Of the client's connections, the instance that reported last is the one shown.
 		in, ok := c.metricsFor(cl)
 		for _, mem := range cr.Members {
-			if !ok {
-				in, ok = c.metricsFor(mem.TrafficClient)
+			if mi, mok := c.metricsFor(mem.TrafficClient); mok && (!ok || mi.Last.After(in.Last)) {
+				in, ok = mi, true
 			}
 		}
 		allMetrics := r.URL.Query().Get("all") != ""

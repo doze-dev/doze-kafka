@@ -1,7 +1,6 @@
 package traffic
 
 import (
-	"cmp"
 	"slices"
 	"time"
 )
@@ -126,9 +125,6 @@ func (r *Recorder) Story(group string) Story {
 	for i := len(rows) - 1; i >= 0; i-- { // oldest first.
 		e := rows[i]
 		at := e.Time
-		if at.IsZero() {
-			at = e.First
-		}
 		if joinsAGroup[e.API] {
 			at = at.Add(joinLead)
 		}
@@ -157,10 +153,7 @@ func (r *Recorder) Story(group string) Story {
 	slices.Reverse(spans)
 	for i := range spans {
 		slices.SortStableFunc(spans[i].Rows, func(a, b Event) int {
-			if c := a.Time.Compare(b.Time); c != 0 {
-				return c
-			}
-			return cmp.Compare(a.Seq, b.Seq)
+			return a.Time.Compare(b.Time) // stable: rows seen at one instant stay in the order seen.
 		})
 	}
 	slices.Reverse(s.Before)

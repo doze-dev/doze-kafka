@@ -190,7 +190,7 @@
 </div>
 {{end}}
 
-{{define "story_row"}}{{with .R}}<div class="r {{if not .Nested}}kid{{end}} {{.RowClass}}" id="rq-{{.OpenKey}}" tabindex="0" data-inspector-open data-open-keys="request:{{.OpenKey}}" aria-selected="false" data-row hx-get="{{$.P}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
+{{define "story_row"}}{{with .R}}<div class="r {{if not .Nested}}kid{{end}} {{.RowClass}}" id="rq-{{.OpenKey}}" tabindex="0" data-inspector-open data-open-keys="request:{{.OpenKey}}" data-row hx-get="{{$.P}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
   <span class="m">{{when .Time "clockms"}}</span>
   <span class="m">{{if .Nested}}<span class="tree" aria-hidden="true">└─</span> {{end}}{{.Who}}</span>
   <span class="m b">{{.API}} <span class="mut">v{{.Version}}</span>{{if .Folded}} <span class="tag">×{{.Count}}</span>{{end}}</span>
@@ -207,7 +207,7 @@
 <div class="bd flush" id="clients-list">
   <div class="r h" style="--c: 1fr 70px 56px"><span>Client</span><span>Open for</span><span class="ra">Idle</span></div>
   {{range .Clients}}
-  <div class="insp-client" id="icl-{{.Conn}}" data-row data-open-keys="{{.Keys}}" aria-selected="false">
+  <div class="insp-client" id="icl-{{.Conn}}" data-row data-open-keys="{{.Keys}}">
     <a class="insp-client-open" href="{{.Href}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"><span class="b el">{{.Who}}</span><span class="m mut">{{when .Opened "since"}}</span><span class="m mut ra">{{when .Last "since"}}</span></a>
     <span class="m mut">{{if .Software}}{{.Software}}{{else}}software not reported{{end}} · {{.Principal}} · {{.Remote}}{{if gt .Conns 1}} · {{.Conns}} connections{{end}}</span>
     <span class="note{{if .NeedsALook}} bad{{end}}">{{if .NeedsALook}}last {{.Streak}} requests refused{{else if .Doing}}{{.Doing}}{{else}}no requests kept{{end}}</span>
