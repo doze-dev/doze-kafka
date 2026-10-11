@@ -20,6 +20,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -43,6 +44,7 @@ type Console struct {
 	traces      traceJobs           // message-lineage scans, running and recent.
 	traceHeader string              // an extra record header that holds a trace id (Options.TraceHeader).
 	mux         *http.ServeMux
+	tmplOnce    sync.Once // the templates are parsed on the first request, not at start (idle heap is a budget).
 	tmpl        *template.Template
 	dev         string // DOZE_KAFKA_CONSOLE_DEV: read templates and static files from this directory, live.
 	prefix      string
@@ -148,15 +150,11 @@ func New(opts Options) (*Console, error) {
 	// reload without rebuilding the binary (`task dev` sets it).
 	dev := os.Getenv("DOZE_KAFKA_CONSOLE_DEV")
 	c := &Console{prefix: prefix, hosts: opts.AllowedHosts, dev: dev, facts: opts.Facts}
-	tmpl, err := c.parseTemplates()
-	if err != nil {
-		return nil, err
-	}
 	be, err := newBackend(opts)
 	if err != nil {
 		return nil, err
 	}
-	c.be, c.tmpl = be, tmpl
+	c.be = be
 	c.reg = newRegistryClient(opts.RegistryURL, opts.RegistryUser, opts.RegistryPass)
 	c.traffic = opts.Traffic
 	c.metrics = opts.ClientMetrics
@@ -179,6 +177,15 @@ func (c *Console) parseTemplates() (*template.Template, error) {
 // templates is the template set to render with. In dev mode it is re-read each
 // time (a template that does not parse is reported on the page, not swallowed).
 func (c *Console) templates() *template.Template {
+	c.tmplOnce.Do(func() {
+		t, err := c.parseTemplates()
+		if err != nil {
+			// The embedded set is checked by the suite; a dev tree can be mid-edit.
+			log.Printf("console: templates: %v", err)
+			t = template.New("")
+		}
+		c.tmpl = t
+	})
 	if c.dev == "" {
 		return c.tmpl
 	}
