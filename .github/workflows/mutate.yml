@@ -1,0 +1,45 @@
+name: Mutation
+
+# Weekly (and on demand): do the tests notice when the code is wrong? gremlins
+# mutates each package (the broker by file group, see `task mutate:list`) and the
+# run fails on a surviving mutant that testdata/mutation.json does not list. It
+# takes minutes to hours, so it is not in the push gate; a survivor is a test to
+# write, or, once understood, `task mutate:record` with the reason in the commit.
+on:
+  schedule:
+    - cron: "0 3 * * 0" # Sundays 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  units:
+    runs-on: ubuntu-latest
+    outputs:
+      units: ${{ steps.list.outputs.units }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - id: list
+        run: |
+          units="$(go run ./scripts/mutate list | awk '{print $1}' | jq -Rsc 'split("\n") | map(select(length > 0))')"
+          echo "units=$units" >> "$GITHUB_OUTPUT"
+
+  mutate:
+    needs: units
+    strategy:
+      fail-fast: false
+      matrix:
+        unit: ${{ fromJSON(needs.units.outputs.units) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Mutation check ${{ matrix.unit }}
+        run: go run ./scripts/mutate check ${{ matrix.unit }}

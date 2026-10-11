@@ -126,6 +126,21 @@ tasks:
     cmds:
       - scripts/lightness.sh record
 
+  mutate:record:
+    desc: 'Mutation-test packages (gremlins, a go tool) and store counts and surviving mutants as file:line:type in testdata/mutation.json. Name packages: task mutate:record -- ./internal/protocol'
+    cmds:
+      - go run ./scripts/mutate record {{.CLI_ARGS}}
+
+  mutate:check:
+    desc: 'Fail on a surviving mutant the baseline (testdata/mutation.json) does not have. No package named runs every unit; internal/broker is four units, split by file group. task mutate:list shows them'
+    cmds:
+      - go run ./scripts/mutate check {{.CLI_ARGS}}
+
+  mutate:list:
+    desc: 'The mutation units (a package, or a file group of one that is too slow to run whole)'
+    cmds:
+      - go run ./scripts/mutate list
+
   claims:
     desc: 'Print the number of claims per evidence source (spec, recorded, doc, memory) and check every claims table under conformance/claims/'
     cmds:

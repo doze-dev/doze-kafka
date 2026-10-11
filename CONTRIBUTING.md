@@ -45,8 +45,18 @@ first and watch it fail.
 - Name test files after behaviour (`group_classic_test.go`), not after the phase that
   added them.
 - Fuzz targets live next to the codec; a crasher goes in `testdata/fuzz/` so it stays
-  fixed. `go tool task fuzz` runs all three for 30s each (`FUZZ_TIME=5m` for longer);
-  `soak` and `chaos` run the long harnesses.
+  fixed. `go tool task fuzz` runs every target in `testdata/fuzz-targets.txt` for 30s
+  each (`FUZZ_TIME=5m` for longer; `task fuzz -- Scram` for some); a new parser of
+  untrusted bytes gets a target there and a row in `docs/architecture.md` (a test
+  fails otherwise). `soak` and `chaos` run the long harnesses.
+- Tests notice when the code is wrong, not only when it runs: `go tool task
+  mutate:check -- ./internal/protocol` fails on a surviving mutant that
+  `testdata/mutation.json` does not list (`mutate:record` after killing or
+  understanding one; `mutate:list` shows the units, the broker is split by file
+  group). It takes minutes to hours, so it runs weekly in CI, not in `task check`.
+- The embedding API (`server/`) is pinned: `go tool task api` fails when its exported
+  surface changed without a `CHANGELOG.md` line containing "server API"
+  (`task api:record` writes the new surface).
 - The console in a real browser is checked by the Playwright suite in `e2e/`
   (`go tool task test:e2e`; needs `bun`). It builds the binary, boots it on its own
   ports over a fresh data directory, and seeds it (`e2e/seed`). It runs in CI as its
