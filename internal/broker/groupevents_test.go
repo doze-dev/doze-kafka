@@ -14,6 +14,8 @@ type loggedEvent struct {
 	group, kind, member string
 	generation          int32
 	detail              string
+	members             int
+	cause               string
 }
 
 type eventLog struct {
@@ -21,10 +23,10 @@ type eventLog struct {
 	got []loggedEvent
 }
 
-func (l *eventLog) GroupEvent(group, kind, member string, generation int32, detail string) {
+func (l *eventLog) GroupEvent(group, kind, member string, generation int32, detail string, members int, cause string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.got = append(l.got, loggedEvent{group, kind, member, generation, detail})
+	l.got = append(l.got, loggedEvent{group, kind, member, generation, detail, members, cause})
 }
 
 func (l *eventLog) kinds() string {
@@ -65,6 +67,13 @@ func TestClassicCoordinatorTellsTheTimeline(t *testing.T) {
 	}
 	if e, _ := log.find("generation"); e.generation != 1 || e.member != a.memberID || !strings.Contains(e.detail, "1 member") {
 		t.Errorf("generation event = %+v", e)
+	}
+	// The counts and the cause are fields, so the console does not read them out of prose.
+	if e, _ := log.find("generation"); e.members != 1 {
+		t.Errorf("the generation event counts %d members, want 1", e.members)
+	}
+	if e, _ := log.find("rebalance"); e.cause != "a member joined" || e.members != 1 {
+		t.Errorf("the rebalance event = %+v, want the cause \"a member joined\"", e)
 	}
 	if e, _ := log.find("joined"); !strings.Contains(e.detail, "app-1") {
 		t.Errorf("the joined event does not name the client: %+v", e)

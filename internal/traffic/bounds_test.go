@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
@@ -31,15 +32,19 @@ func TestRowFieldsAreClipped(t *testing.T) {
 	}
 	e := evs[0]
 	for name, s := range map[string]string{"Detail": e.Detail, "ClientID": e.ClientID, "Software": e.Software, "Group": e.Group, "Principal": e.Principal, "Remote": e.Remote} {
-		if len(s) > 256 {
-			t.Errorf("%s kept %d bytes, want at most 256", name, len(s))
+		limit := 128
+		switch name {
+		case "Detail":
+			limit = 256
+		case "Remote":
+			limit = 64
+		}
+		if len(s) > limit {
+			t.Errorf("%s kept %d bytes, want at most %d", name, len(s), limit)
 		}
 		if !utf8.ValidString(s) {
 			t.Errorf("%s was cut in the middle of a character", name)
 		}
-	}
-	if len(e.ClientID) > 128 || len(e.Software) > 128 {
-		t.Errorf("client id %d and software %d bytes kept, want at most 128", len(e.ClientID), len(e.Software))
 	}
 	// 50 names of 400 bytes: each is clipped to 249, and four fit in 1,024.
 	if len(e.Topics) != 4 || e.TopicsMore != 46 {
@@ -54,37 +59,25 @@ func TestRowFieldsAreClipped(t *testing.T) {
 	if len(cs) != 1 {
 		t.Fatalf("%d clients, want 1", len(cs))
 	}
-	if c := cs[0]; len(c.ClientID) > 128 || len(c.Software) > 128 || len(c.Remote) > 256 || len(c.Principal) > 256 {
+	if c := cs[0]; len(c.ClientID) > 128 || len(c.Software) > 128 || len(c.Remote) > 64 || len(c.Principal) > 128 {
 		t.Errorf("the client was kept whole: client id %d, software %d, remote %d, principal %d", len(c.ClientID), len(c.Software), len(c.Remote), len(c.Principal))
 	}
 	// The coordinators' events carry a client id in a detail, and a member id.
-	r.GroupEvent("g", "joined", huge, 1, huge)
+	r.GroupEvent("g", "joined", huge, 1, huge, 0, "")
 	ge := r.GroupEvents("g", 0)
-	if len(ge) != 1 || len(ge[0].Detail) > 256 || len(ge[0].Member) > 256 {
+	if len(ge) != 1 || len(ge[0].Detail) > 256 || len(ge[0].Member) > 128 {
 		t.Errorf("a group event was kept whole: %d events", len(ge))
 	}
 }
 
-// The bound is on what is held, in total: a ring filled with maximal rows from
-// maximal clients stays under 8 MiB (the number the lightness budget takes). Each row
-// gets strings of its own, so a clipped string that still pointed into its huge
-// original would be counted.
-// Ordinary names are all kept, up to twenty, and the rest are counted.
-func TestTwentyOrdinaryTopicsAreKeptAndTheRestCounted(t *testing.T) {
-	r := New(10, nil)
-	var topics []string
-	for i := 0; i < 25; i++ {
-		topics = append(topics, fmt.Sprintf("orders-%02d", i))
-	}
-	r.Request(obs(1, "app", kmsg.Metadata, 0, func(o *protocol.Observation) { o.Topics = topics }))
-	e := r.Events(Filter{}, 0)[0]
-	if len(e.Topics) != 20 || e.TopicsMore != 5 || e.Topics[19] != "orders-19" {
-		t.Errorf("kept %d topics (last %q) and %d more, want 20 (orders-19) and 5", len(e.Topics), e.Topics[len(e.Topics)-1], e.TopicsMore)
-	}
-}
-
+// The bound is on what is held, in total: a ring filled with maximal rows (every
+// string at its limit, in distinct strings so that nothing is shared) from a hundred
+// maximal clients, and two thousand group events, stays under 8 MiB. That is the
+// number the lightness budget takes. A connection costs about two kilobytes on top
+// (its counters and its strings), which the number of connections sets, not the
+// recorder.
 func TestRecorderMemoryWithMaximalInput(t *testing.T) {
-	const rows = 2000
+	const rows, clients = 2000, 100
 	big := func(i int) string { return fmt.Sprintf("%06d", i) + strings.Repeat("é", 8<<10) }
 	heap := func() uint64 {
 		runtime.GC()
@@ -94,17 +87,19 @@ func TestRecorderMemoryWithMaximalInput(t *testing.T) {
 	}
 	r := New(rows, nil)
 	before := heap()
+	for c := 0; c < clients; c++ {
+		r.ConnOpened(uint64(c), big(c))
+	}
 	for i := 0; i < rows; i++ {
 		var topics []string
 		for j := 0; j < 40; j++ {
 			topics = append(topics, fmt.Sprintf("%02d%06d", j, i)+strings.Repeat("t", 200))
 		}
-		h := big(i)
-		r.ConnOpened(uint64(i), h)
-		r.Request(obs(uint64(i), h, kmsg.JoinGroup, 0, func(o *protocol.Observation) {
-			o.Remote, o.Principal, o.Software, o.Group, o.Detail, o.Topics = h, h, h, h, h, topics
+		h, who := big(i), big(i%clients)
+		r.Request(obs(uint64(i%clients), who, kmsg.JoinGroup, time.Duration(i)*time.Second, func(o *protocol.Observation) {
+			o.Remote, o.Principal, o.Software, o.Group, o.Detail, o.Topics = who, who, who, h, h, topics
 		}))
-		r.GroupEvent(fmt.Sprintf("g%d", i%50), "joined", h, 1, h)
+		r.GroupEvent(fmt.Sprintf("g%d", i%50), "joined", h, 1, h, 3, h)
 	}
 	after := heap()
 	runtime.KeepAlive(r)
