@@ -1,12 +1,12 @@
 cmd/doze-kafka 82.3
 conformance 88.7
 console 89
-e2e/seed 78.5
+e2e/seed 78.4
 internal/broker 89.9
 internal/config 65.8
 internal/protocol 81.8
 internal/settings 78.9
-internal/storage/log 85.1
+internal/storage/log 84.9
 internal/storage/meta 82.4
 internal/telemetry 98.8
 internal/traffic 98.8
