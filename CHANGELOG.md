@@ -6,6 +6,11 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Console: every button reads weight 400 whether it is a button or a link drawn as one (the
+  boards draw them all as buttons). A request that took under a millisecond shows its
+  measured time (`42 µs`, `0.4 ms`) rather than the design boards' `0 ms`: a broker
+  answering from memory does that constantly, and `0 ms` says nothing was measured (AD6).
+
 - Client telemetry answers as Apache Kafka 4.3.1 does, from recordings of it
   (`conformance/recordings/telemetry-*.json`, `client-telemetry.json`): a push before the
   interval has passed, and a second subscription request inside it, is
