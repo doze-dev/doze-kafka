@@ -2,10 +2,10 @@
   "tool": "gremlins",
   "units": {
     "console": {
-      "killed": 2131,
+      "killed": 2138,
       "timedOut": 0,
       "lived": 0,
-      "notCovered": 276,
+      "notCovered": 282,
       "survivors": []
     },
     "internal/broker:admin": {
@@ -23,17 +23,17 @@
       "survivors": []
     },
     "internal/broker:data": {
-      "killed": 309,
-      "timedOut": 0,
+      "killed": 311,
+      "timedOut": 3,
       "lived": 0,
       "notCovered": 82,
       "survivors": []
     },
     "internal/broker:groups": {
-      "killed": 379,
+      "killed": 537,
       "timedOut": 0,
       "lived": 0,
-      "notCovered": 52,
+      "notCovered": 63,
       "survivors": []
     },
     "internal/protocol": {
