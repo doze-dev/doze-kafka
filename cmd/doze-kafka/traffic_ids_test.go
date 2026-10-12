@@ -19,12 +19,3 @@ func TestTheRecordersLeftOutIdsAreTheConsolesOwn(t *testing.T) {
 		t.Errorf("the recorder leaves out %v, the console connects as %v", got, want)
 	}
 }
-
-func TestTrafficForNilIsNil(t *testing.T) {
-	if trafficFor(nil) != nil {
-		t.Error("a server with no recorder offers a traffic source")
-	}
-	if clientMetricsFor(nil) != nil {
-		t.Error("a server with no store offers client metrics")
-	}
-}

@@ -31,6 +31,7 @@ import (
 
 	"github.com/doze-dev/doze-kafka/console"
 	"github.com/doze-dev/doze-kafka/internal/config"
+	"github.com/doze-dev/doze-kafka/internal/consolefeed"
 	"github.com/doze-dev/doze-kafka/internal/embed"
 	"github.com/doze-dev/doze-kafka/internal/serverhook"
 	names "github.com/doze-dev/doze-names"
@@ -313,7 +314,7 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 		if cfg.ConsoleAddr == "" {
 			cfg.ConsoleAddr = consoleAddrFor(z.ip())
 		}
-		closeConsole, consoleAddr, err := startConsole(ctx, cfg, bind.ln.Addr(), logger, consoleUser, consolePass, consoleMech, registryForConsole, ready.registryURL, trafficFor(serverhook.Traffic(srv)), clientMetricsFor(serverhook.ClientMetrics(srv)))
+		closeConsole, consoleAddr, err := startConsole(ctx, cfg, bind.ln.Addr(), logger, consoleUser, consolePass, consoleMech, registryForConsole, ready.registryURL, consolefeed.Traffic(serverhook.Traffic(srv)), consolefeed.ClientMetrics(serverhook.ClientMetrics(srv)))
 		if err != nil {
 			return err
 		}

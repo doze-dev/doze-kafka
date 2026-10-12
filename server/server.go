@@ -112,6 +112,7 @@ const trafficRows = 2000
 // internal/serverhook by this module's own commands.
 func init() {
 	serverhook.New = func(cfg config.Config, logger *slog.Logger) (any, error) { return newFromConfig(cfg, logger) }
+	serverhook.NewWithConsole = func(opts any) (any, error) { return newFromOptions(opts.(Options), true) }
 	serverhook.Traffic = func(srv any) *traffic.Recorder { return srv.(*Server).rec }
 	serverhook.ClientMetrics = func(srv any) *telemetry.Store { return srv.(*Server).b.Telemetry() }
 }
@@ -147,7 +148,14 @@ type Server struct {
 
 // New validates the options and opens storage + broker + router. It does not
 // bind a listener yet — call Serve (or Bind) to start accepting.
-func New(opts Options) (*Server, error) {
+func New(opts Options) (*Server, error) { return newFromOptions(opts, false) }
+
+// newFromOptions is New, told whether a console will be attached to the broker:
+// only then does it keep the record of requests and the store of client metrics
+// that a console reads, and offer the client-telemetry APIs (docs/observability.md).
+// An embedder has no console to attach (the types it would need are internal), so
+// New says no; the doze module, which starts one, says yes through internal/embed.
+func newFromOptions(opts Options, console bool) (*Server, error) {
 	if opts.DataDir == "" {
 		return nil, errors.New("server: Options.DataDir is required (a test can use t.TempDir())")
 	}
@@ -156,7 +164,7 @@ func New(opts Options) (*Server, error) {
 		cfg.Version = opts.Version
 	}
 	cfg.DataDir = opts.DataDir
-	cfg.Console = false      // an embedded broker runs no console, so keeps no record for one.
+	cfg.Console = console    // an embedded broker runs no console, so keeps no record for one.
 	cfg.MetaDB = opts.MetaDB // empty is resolved to <DataDir>/meta.db by newFromConfig.
 	// An embedder asked for no particular address; the CLI default (port 9092) is
 	// the wrong answer for a library, which would fight over a fixed port with

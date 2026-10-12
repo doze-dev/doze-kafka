@@ -138,7 +138,13 @@ on, so Metadata sends them there rather than to the socket.
 
 The embed API is the broker. The web console is a separate package
 (`github.com/doze-dev/doze-kafka/console`) that talks to a broker as any Kafka
-client would; embedding it is optional.
+client would; embedding it is optional. A console started that way shows topics,
+messages and groups, and no Traffic: what clients asked is kept inside the broker,
+in types this API does not export, and a broker built with `server.New` keeps none
+of it and offers no client-telemetry APIs (`TestEmbeddedBrokerDoesNotAdvertiseTelemetry`).
+The doze module, which lives in this repository and so can reach the broker's
+internals, builds its broker through `internal/embed.NewWithConsole` when it starts a
+console, and that one has Traffic and client metrics as the `doze-kafka` command's does.
 
 ## The surface is pinned
 

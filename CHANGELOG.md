@@ -6,6 +6,13 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- The doze module's console (the one `doze` starts beside a `kafka` instance) has the
+  Traffic page and the clients' own metrics, as the `doze-kafka` command's console has.
+  Its broker was built as one with no console, so nothing was recorded, `/traffic` was a
+  404 and the client-telemetry APIs (71, 72) were not offered. A module instance started
+  with no console address still keeps and offers neither, and neither does a broker built
+  with `server.New`.
+
 - CreateTopics: a request for many topics no longer compares each name with every topic
   (twice: the handler listed them all and the store looked at them all, so a batch was
   quadratic); both ask an index kept by the metadata store. Which names collide is now
