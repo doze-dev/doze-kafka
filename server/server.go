@@ -128,9 +128,11 @@ type Server struct {
 	tls  bool              // the listener terminates TLS, from cert files or Options.TLSConfig.
 
 	mu      sync.Mutex
-	bound   net.Addr // set by Bind.
-	claimed bool     // Serve or ServeListener has been called.
-	closed  bool     // Close has been called.
+	bound   net.Addr           // set by Bind.
+	claimed bool               // Serve or ServeListener has been called.
+	closed  bool               // Close has been called.
+	stop    context.CancelFunc // ends the Serve in progress; nil until one is.
+	served  chan struct{}      // closed when that Serve has released everything.
 
 	dirLock io.Closer // held for the life of the server: one broker per data directory.
 
@@ -344,7 +346,8 @@ func reconcileDisk(cfg config.Config, logger *slog.Logger, logs *log.Manager, st
 
 // Bind opens the TCP listener without accepting and returns the bound address
 // (useful with a ":0" ListenAddr). Serve does this itself if it was not called;
-// it is not used with ServeListener.
+// it is not used with ServeListener. If it fails the server still holds its
+// storage and any AlsoListen listener: Close releases them.
 func (s *Server) Bind(ctx context.Context) (net.Addr, error) {
 	addr, err := s.srv.Bind(ctx)
 	if err != nil {
@@ -371,7 +374,7 @@ func (s *Server) Ready() <-chan struct{} { return s.ready }
 // kafka.doze, say) when the main one is narrower than the wildcard. Call it
 // before Serve: once Serve has started it returns an error, because Serve is what
 // starts accepting on each listener. Clients are still told the main listener's
-// port.
+// port. The listener is closed when Serve returns, or by Close.
 func (s *Server) AlsoListen(ctx context.Context, addr string) (net.Addr, error) {
 	return s.srv.AlsoListen(ctx, addr)
 }
@@ -385,16 +388,18 @@ func (s *Server) Addr() net.Addr {
 	return s.bound
 }
 
-// Serve accepts connections until ctx is cancelled, drains in-flight
-// connections, then flushes partition logs and closes the metadata store. A
-// Server is served once: a second call (or a call after Close) returns an error
-// and leaves the first undisturbed.
+// Serve accepts connections until ctx is cancelled (or Close is called), drains
+// in-flight connections, then flushes partition logs and closes the metadata
+// store. However it returns, with or without an error, nothing is left behind:
+// every listener (the AlsoListen ones too) is closed, storage is closed and the
+// lock on the data directory is released. A Server is served once: a second call
+// (or a call after Close) returns an error and leaves the first undisturbed.
 func (s *Server) Serve(ctx context.Context) (err error) {
-	if err := s.claim(); err != nil {
+	ctx, err = s.claim(ctx)
+	if err != nil {
 		return err
 	}
-	defer s.closeStorage(&err)
-	defer s.markReady()
+	defer s.release(&err)
 	if s.Addr() == nil {
 		// Bind here rather than letting protocol.Server do it, so the broker
 		// learns the real port before the first client connects.
@@ -402,47 +407,80 @@ func (s *Server) Serve(ctx context.Context) (err error) {
 			return err
 		}
 	}
-	go s.b.RunTransactions(ctx)
-	return s.srv.Serve(ctx)
+	return s.serve(ctx)
 }
 
 // ServeListener is Serve on a caller-provided listener — the doze module passes
 // a unix-socket listener the proxy splices TCP clients onto. Kafka framing is
 // transport-agnostic, so this works unmodified. With a TCP listener, clients are
 // told its port (unless AdvertisedPort says otherwise), as with Serve.
+//
+// The listener becomes the server's, and is closed when ServeListener returns. The
+// one exception is a call that is refused because the server is already serving or
+// already closed: that call has not touched ln, which is still the caller's.
 func (s *Server) ServeListener(ctx context.Context, ln net.Listener) (err error) {
-	if err := s.claim(); err != nil {
+	ctx, err = s.claim(ctx)
+	if err != nil {
 		return err
 	}
-	defer s.closeStorage(&err)
-	defer s.markReady()
+	defer s.release(&err)
 	s.srv.UseListener(ln)
+	s.mu.Lock()
 	if _, ok := ln.Addr().(*net.TCPAddr); ok {
 		// Metadata used to advertise the default port (9092) for a listener the
 		// broker did not bind itself, so a client that bootstrapped fine was then
 		// sent to a port nothing was listening on.
 		s.b.SetBoundAddr(ln.Addr())
 	}
-	s.mu.Lock()
 	s.bound = ln.Addr()
 	s.mu.Unlock()
 	s.markReady()
-	go s.b.RunTransactions(ctx)
-	return s.srv.Serve(ctx)
+	return s.serve(ctx)
 }
 
-// claim marks the server as being served, once.
-func (s *Server) claim() error {
+// serve accepts until ctx ends. The transaction timer runs beside it and has
+// stopped by the time it returns: it writes to storage, which the caller closes
+// next.
+func (s *Server) serve(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	timer := make(chan struct{})
+	go func() {
+		defer close(timer)
+		s.b.RunTransactions(ctx)
+	}()
+	err := s.srv.Serve(ctx)
+	cancel()
+	<-timer
+	return err
+}
+
+// claim marks the server as being served, once, and returns the context that
+// serving runs under: the caller's, which Close can also end.
+func (s *Server) claim(ctx context.Context) (context.Context, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	switch {
 	case s.closed:
-		return errors.New("server: Serve called after Close")
+		return nil, errors.New("server: Serve called after Close")
 	case s.claimed:
-		return errors.New("server: already serving; a Server is served once")
+		return nil, errors.New("server: already serving; a Server is served once")
 	}
 	s.claimed = true
-	return nil
+	ctx, s.stop = context.WithCancel(ctx)
+	s.served = make(chan struct{})
+	return ctx, nil
+}
+
+// release is the end of every Serve: whatever happened, the listeners are closed
+// (a failed bind used to leave the AlsoListen ones bound and accepting, with
+// storage already closed behind them), then storage, and whoever waits on Ready or
+// in Close is let go.
+func (s *Server) release(err *error) {
+	s.stop()
+	_ = s.srv.Close()
+	s.closeStorage(err)
+	s.markReady()
+	close(s.served)
 }
 
 // closeStorage flushes and closes the partition logs and the metadata store, and
@@ -467,15 +505,26 @@ func (s *Server) closeStorage(err *error) {
 	}
 }
 
-// Close releases everything a server holds that was built but never served — a
-// start-up step failed after New or Bind succeeded, say: the listeners it bound,
-// its storage and the lock on its data directory. It is safe to call more than
-// once and after Serve (which closes storage itself). To stop a server that is
-// serving, cancel the context passed to Serve instead.
+// Close releases everything the server holds: the listeners Bind and AlsoListen
+// opened, its storage and the lock on its data directory. On a server that was
+// built but never served (a start-up step failed after New or Bind, say) that is
+// all there is to do. On one that is serving it also stops it, exactly as
+// cancelling Serve's context does, and returns once Serve has drained its
+// connections and closed storage, with what that reported. It is safe to call more
+// than once, from any goroutine, and after Serve.
 func (s *Server) Close() error {
 	s.mu.Lock()
 	s.closed = true
+	stop, served := s.stop, s.served
 	s.mu.Unlock()
+	if served != nil {
+		// Storage is Serve's to close, after the connections using it are gone.
+		stop()
+		<-served
+		var err error
+		s.closeStorage(&err)
+		return err
+	}
 	// The listeners first: Bind opens one, and it used to stay bound (and
 	// accepting into a backlog nobody served) for the life of the process.
 	lerr := s.srv.Close()
