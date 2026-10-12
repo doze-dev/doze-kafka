@@ -54,6 +54,11 @@ here that contains "server API"; `task api` fails without it.
   Kafka). A version of ApiVersions that is not served is answered `UNSUPPORTED_VERSION`
   with one row, ApiVersions itself (it was the whole table). ApiVersions is offered to
   v4 when emulating Kafka 4.
+- Traffic leaves out the console and nobody else. The console was known by its client
+  id, so a client that called itself `doze-kafka-console` (or `-fetch`, `-trace`) had
+  no rows and was not among the connected clients. The console is now known by its
+  connections, which the broker process marks in memory when it opens them to itself;
+  a client id is only a name, and a client using one of the console's is listed.
 - What a client can make the broker keep is bounded. A client's software name and
   version are kept to 128 bytes (300 connections each sending a 1 MiB name held 500 MB).
   A group id, group instance id, rack id, client-chosen member id, protocol name,

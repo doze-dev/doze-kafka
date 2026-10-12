@@ -440,7 +440,7 @@ on the code before the fix and was run again with the fix reverted by hand.
 | TRF-18 | fixed, red | `TestGroupFilterIncludesItsMembersFetches` |
 | TRF-19 | fixed, red | `TestGroupEventsAreKeptInOrderPerGroup` (a noisy group), `TestTheQuietestGroupIsTheOneForgotten` |
 | TRF-20 | decided | a row's time is when it began, and the table is ordered by it; the row appears when the request ends |
-| TRF-21 | fixed, red | `TestOnlyTheConsolesOwnIdsAreLeftOut`, `TestTheRecordersLeftOutIdsAreTheConsolesOwn` |
+| TRF-21 | fixed again, red | The exact ids were still only names: a client that used one was invisible. The console is now known by its connections, which the process marks in memory (`protocol.Adopt`); a client id decides nothing. `TestOnlyAnAdoptedConnectionIsTheProcessesOwn`, `TestAdoptIsOnlyForConnectionsServedHereAndEndsWithThem`, `TestAClientThatCallsItselfTheConsoleIsListed`, `TestTheProcessesOwnRequestsAreLeftOutWhateverTheyAreCalled`, `TestTrafficLeavesOutTheConsoleAndNobodyElse` (the real binary, plain and SASL over TLS) |
 | TRF-22 | fixed | the client's chart copy says what it covers and "one point per report" (`TestClientInspectorShowsWhatItReportsAboutItself`) |
 | TRF-23 | fixed | `TestFactsNeverHoldRecordBytesOrSecrets`, the fields held are listed in `observability.md` |
 | TRF-24, 25, 26 | fixed, red | `TestTruncatedPointIsMalformed`, `TestPastTimestampsAreClamped`, `TestDroppedSeriesAreCounted` |

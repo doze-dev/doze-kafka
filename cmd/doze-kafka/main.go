@@ -32,6 +32,7 @@ import (
 	"github.com/doze-dev/doze-kafka/console"
 	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/internal/embed"
+	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/serverhook"
 	names "github.com/doze-dev/doze-names"
 )
@@ -501,6 +502,10 @@ func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger
 
 	con, err := console.New(console.Options{
 		Addr: dialAddr, SASLUser: user, SASLPass: pass, SASLMechanism: mech, TLSConfig: tlsCfg,
+		// The console is a client of the broker in this same process: its connections are
+		// marked as the process's own where they arrive, so Traffic leaves them out whatever
+		// any other client calls itself.
+		OnDial:       protocol.Adopt,
 		AllowedHosts: consoleHosts(cfg), Prefix: cfg.ConsolePrefix,
 		// With SASL the console reaches the registry as the same user it reaches the broker.
 		RegistryURL: registryURL, RegistryUser: user, RegistryPass: pass,

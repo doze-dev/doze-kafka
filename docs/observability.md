@@ -87,10 +87,13 @@ seconds. *N of M requests match* counts requests among those the recorder keeps.
   belong to each nested under it, and the generations table.
 - **When the broker is lost** the rows stay, dimmed, under a line that says when they
   were last known; the console asks again every five seconds.
-- **The console is left out.** Its own requests would otherwise fill the page that
-  shows traffic. A client whose id is exactly `doze-kafka-console`,
-  `doze-kafka-console-fetch` or `doze-kafka-console-trace` is not listed; an app that
-  merely begins that way is.
+- **The console is left out, and nobody else.** Its own requests would otherwise fill
+  the page that shows traffic. They are known by their connections: the console runs in
+  the broker's process, and the process marks, in memory, the connections it opened to
+  itself. Nothing a client sends decides it. The console's clients call themselves
+  `doze-kafka-console`, `doze-kafka-console-fetch` and `doze-kafka-console-trace`, and
+  those are only names: a client of yours that uses one of them is listed like any
+  other (it used to be invisible).
 - **Version negotiation is not an error.** A client newer than the broker is told
   `UNSUPPORTED_VERSION` by `ApiVersions` and asks again at a version it can use.
 

@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -62,6 +63,12 @@ type Options struct {
 	SASLUser, SASLPass, SASLMechanism string
 	// TLSConfig, if set, dials the broker over TLS with this trust config.
 	TLSConfig *tls.Config
+	// OnDial, if set, is called with every TCP connection the console opens to the
+	// broker, after it is made and before anything is sent on it. A broker in the same
+	// process uses it to know the console's connections for its own, so that the
+	// Traffic page can leave the console's requests out without trusting a client id.
+	// Its error is not the console's business: the connection is used either way.
+	OnDial func(ctx context.Context, conn net.Conn) error
 	// Prefix is the URL path the console is mounted under; defaults to
 	// "/_console" (or DOZE_KAFKA_CONSOLE_PREFIX, when set).
 	Prefix string

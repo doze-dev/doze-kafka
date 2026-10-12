@@ -73,6 +73,8 @@ type Conn struct {
 	observer Observer // told about this connection and its requests; nil = nobody is watching.
 	id       uint64   // this connection's number, for the observer.
 	done     atomic.Bool
+	// own says this process opened the connection to itself (Adopt): the console's.
+	own atomic.Bool
 }
 
 func newConn(raw net.Conn, router *Router, logger *slog.Logger, authRequired bool) *Conn {
@@ -243,6 +245,7 @@ func preAuthAllowed(key APIKey) bool {
 func (c *Conn) serve(ctx context.Context) {
 	defer c.done.Store(true)
 	defer c.raw.Close()
+	defer c.forget() // before the socket is closed: see own.go.
 	if c.observer != nil {
 		c.observer.ConnOpened(c.id, c.raw.RemoteAddr().String())
 		defer c.observer.ConnClosed(c.id)
@@ -370,13 +373,19 @@ func (c *Conn) serve(ctx context.Context) {
 
 // observe tells the observer about an answered request.
 func (c *Conn) observe(req *Request, began time.Time, reqBytes, respBytes int) {
-	c.observer.Request(Observation{
+	o := Observation{
 		Conn: c.id, Remote: c.raw.RemoteAddr().String(), Principal: c.Principal(),
 		ClientID: req.Header.ClientID, API: req.Header.APIKey, Version: req.Header.APIVersion,
 		Start: began, Duration: time.Since(began), ReqBytes: reqBytes, RespBytes: respBytes,
-		Correlation: req.Header.CorrelationID, Req: req.decoded, Resp: req.answered,
-		Summary: req.Describe(),
-	})
+		Correlation: req.Header.CorrelationID, Own: c.own.Load(),
+	}
+	// The process's own requests (the console's polling) are told to the observer and
+	// not described: nobody lists them, and they are most of the requests on a quiet
+	// broker with a page open.
+	if !o.Own {
+		o.Req, o.Resp, o.Summary = req.decoded, req.answered, req.Describe()
+	}
+	c.observer.Request(o)
 }
 
 // observeClosed tells the observer that this request ended the connection, and why.
@@ -394,7 +403,7 @@ func (c *Conn) observeClosed(h *RequestHeader, began time.Time, reqBytes int, re
 		Conn: c.id, Remote: c.raw.RemoteAddr().String(), Principal: c.Principal(),
 		ClientID: h.ClientID, API: h.APIKey, Version: h.APIVersion,
 		Start: began, Duration: time.Since(began), ReqBytes: reqBytes,
-		Correlation: h.CorrelationID, Closed: reason,
+		Correlation: h.CorrelationID, Closed: reason, Own: c.own.Load(),
 		Summary: Summary{Class: class, Kind: Kind(h.APIKey), Detail: "closed the connection: " + reason},
 	})
 }

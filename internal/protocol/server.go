@@ -272,6 +272,7 @@ func (s *Server) acceptLoop(ctx context.Context, ln net.Listener) error {
 		conn := newConn(raw, s.router, s.log, s.authRequired)
 		conn.observer = s.observer
 		conn.id = s.connSeq.Add(1)
+		conn.accept()
 		conn.preAuthTimeout, conn.idleTimeout, conn.frameTimeout = s.preAuthTimeout, s.idleTimeout, s.frameTimeout
 		s.mu.Lock()
 		conn.writeTimeout = s.writeTimeout

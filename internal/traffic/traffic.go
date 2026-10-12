@@ -35,12 +35,6 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 )
 
-// ConsoleClientIDs are the client ids of the console's own Kafka clients, whose
-// requests are left out: the page that shows traffic would otherwise be mostly its
-// own polling. They are exact: an app that begins its client id the same way is an
-// app (TRF-21).
-var ConsoleClientIDs = []string{"doze-kafka-console", "doze-kafka-console-fetch", "doze-kafka-console-trace"}
-
 // collapseWindow is how long a repeated request may keep folding into one row. A
 // consumer's heartbeat every three seconds is one row for as long as the consumer
 // lives; this only stops a row that went quiet an hour ago from swallowing the next.
@@ -362,8 +356,6 @@ func New(capacity int, resolve func([16]byte) string) *Recorder {
 	}
 }
 
-func isConsole(clientID string) bool { return slices.Contains(ConsoleClientIDs, clientID) }
-
 // ConnOpened implements protocol.Observer.
 func (r *Recorder) ConnOpened(id uint64, remote string) {
 	r.mu.Lock()
@@ -457,6 +449,12 @@ func (r *Recorder) prepare(o *protocol.Observation) prepared {
 // row on the list. Describing the request (prepare, and the partitions and decoded
 // fields of DescribeFacts) is done without it.
 func (r *Recorder) Request(o protocol.Observation) {
+	// The process's own requests (the console beside the broker, polling) are not
+	// traffic. Which they are is said by the connection (protocol.Adopt), in memory:
+	// nothing a client sends, its client id least of all, makes a request one of them.
+	if o.Own {
+		return
+	}
 	p := r.prepare(&o)
 
 	// A request that moved nothing may fold into the row before it, and then it needs no
@@ -477,10 +475,7 @@ func (r *Recorder) Request(o protocol.Observation) {
 		c = &conn{Client: Client{Conn: o.Conn, Remote: p.remote, Opened: o.Start}, recent: map[string]*row{}}
 		r.conns[o.Conn] = c
 	}
-	if !r.count(c, &o, &p) {
-		r.mu.Unlock()
-		return
-	}
+	r.count(c, &o, &p)
 	ev := Event{
 		First: o.Start, Time: o.Start, Count: 1, Conn: o.Conn, Remote: c.Remote,
 		ClientID: c.ClientID, Software: c.Software, Principal: c.Principal,
@@ -515,9 +510,8 @@ func (r *Recorder) Request(o protocol.Observation) {
 	r.mu.Unlock()
 }
 
-// count notes a request against its connection and the counters. It reports false for
-// a request that is not recorded (the console's own). The lock is held.
-func (r *Recorder) count(c *conn, o *protocol.Observation, p *prepared) bool {
+// count notes a request against its connection and the counters. The lock is held.
+func (r *Recorder) count(c *conn, o *protocol.Observation, p *prepared) {
 	c.seen = true
 	if p.clientID != "" {
 		c.ClientID = p.clientID
@@ -533,9 +527,6 @@ func (r *Recorder) count(c *conn, o *protocol.Observation, p *prepared) bool {
 		if len(c.Groups) > 4 {
 			c.Groups = c.Groups[1:]
 		}
-	}
-	if isConsole(c.ClientID) {
-		return false
 	}
 	if p.txnID != "" {
 		c.TxnID = p.txnID
@@ -558,7 +549,6 @@ func (r *Recorder) count(c *conn, o *protocol.Observation, p *prepared) bool {
 	} else {
 		c.Streak, c.LastError = 0, ""
 	}
-	return true
 }
 
 // fold adds the request to the row its connection is folding requests like it into,
@@ -851,7 +841,7 @@ func (r *Recorder) Clients() []Client {
 	now := r.now()
 	out := make([]Client, 0, len(r.conns))
 	for _, c := range r.conns {
-		if !c.seen || isConsole(c.ClientID) {
+		if !c.seen {
 			continue
 		}
 		cc := c.Client

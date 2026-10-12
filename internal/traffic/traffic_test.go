@@ -50,8 +50,8 @@ func TestTheConsolesOwnRequestsAreLeftOut(t *testing.T) {
 	r := New(50, nil)
 	r.ConnOpened(1, "a")
 	r.ConnOpened(2, "b")
-	r.Request(obs(1, "doze-kafka-console", kmsg.Metadata, 0))
-	r.Request(obs(1, "doze-kafka-console", kmsg.Fetch, time.Second))
+	r.Request(obs(1, "doze-kafka-console", kmsg.Metadata, 0, own))
+	r.Request(obs(1, "doze-kafka-console", kmsg.Fetch, time.Second, own))
 	r.Request(obs(2, "billing", kmsg.Produce, 2*time.Second))
 	if got := r.Events(Filter{}, 0); len(got) != 1 || got[0].ClientID != "billing" {
 		t.Fatalf("rows = %+v, want only billing's", got)
