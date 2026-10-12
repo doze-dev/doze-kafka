@@ -73,21 +73,46 @@ group is shown `Assigning`; this broker computes it first.
 Offsets are not kept for ever: as on Kafka (`offsets.retention.minutes`), they expire
 after `--offsets-retention` (default 7 days; `0` keeps them for ever). Which clock
 applies is Kafka's, recorded against `apache/kafka:4.3.1`
-(`conformance/recordings/offsets-retention.json`):
+(`conformance/recordings/offsets-retention.json`, `offsets-retention-restart.json`):
 
-- A group that **had members and has none now** keeps its offsets for the retention from
-  the moment it became empty, however late its last commit was. A commit made into an
-  empty group does not extend it.
+- A **classic group that had members and has none now** keeps its offsets for the
+  retention from the moment it became empty, however late its last commit was. A commit
+  made into an empty group does not extend it.
 - A group **nobody ever joined** (a standalone consumer committing by hand) keeps each
-  offset for the retention from its own commit.
+  offset for the retention from its own commit. So does a **consumer-protocol group
+  whose members have gone**: Kafka keeps no moment of emptying for it.
 - A group **with members** never loses the offsets of the topics it is subscribed to;
   those of a topic it is not subscribed to expire from their own commit. A group in the
   middle of a rebalance is not looked at.
 - A group whose offsets are all gone is gone: it is no longer listed.
 
-When a group became empty is kept in the metadata database, so a restart does not give
-it a new retention. An offset stored by a version that did not record commit times is
-given the time of the first sweep that sees it.
+**Across a restart** a real broker has its groups' members again when it is back. A
+member that does not return runs out of session, and the group is without members from
+then: not from the restart, and not from its commits. doze-kafka does not keep members
+([limitations](limitations.md)), so it keeps what that rule needs. The metadata
+database records, for each group, that it has members and the longest session among
+them, written before the first member's join is answered, or when a classic group lost
+its last one. After a restart, a clean one or a crash, a group recorded as having
+members is treated as having them until that session has passed with nobody joining,
+and as having lost them at that moment. An application that is back within its session
+timeout finds its offsets, however old they are. One that stays away gets the retention
+from there if it is a classic group, and for a consumer-protocol group offsets as old
+as their commits, as on Kafka. Until the session has passed nothing of such a group
+expires, not even the offsets of a topic it was not subscribed to.
+
+Three things follow from keeping that record:
+
+- A join that cannot be recorded (the metadata database cannot be written) is refused
+  with `COORDINATOR_NOT_AVAILABLE` and tried again by the client; the member is not
+  seated in a group the store would later take for one nobody joined.
+- The record is kept with `--offsets-retention 0` too, so turning the retention on later
+  does not expire the offsets of groups that were live all along.
+- A data directory written before the record existed is adopted once: every group that
+  has offsets and no record is treated as having had members with a 45-second session.
+  Which of them really had is not known, and an offset is kept when that is in doubt.
+
+An offset stored by a version that did not record commit times is given the time of the
+first sweep that sees it.
 
 ## Two protocols, chosen automatically
 

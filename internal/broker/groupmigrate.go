@@ -339,6 +339,14 @@ func (m *cg848Manager) classicJoin(r *kmsg.JoinGroupRequest, who clientRef) (res
 		return refuse(kerr.UnknownMemberID.Code)
 	}
 
+	// The group is recorded as having a classic member before it has this one
+	// (offsetexpiry.go). A join refused here has not used its id up: it comes again.
+	if m.liveness != nil {
+		if err := m.liveness.joining(g.id, true, time.Duration(r.SessionTimeoutMillis)*time.Millisecond); err != nil {
+			return refuse(kerr.CoordinatorNotAvailable.Code)
+		}
+	}
+	m.redeemSeat(r.Group, id)
 	changed := false
 	if mem == nil {
 		mem = &cg848Member{id: id, target: tpSet{}, assigned: tpSet{}}
@@ -536,16 +544,17 @@ func (m *cg848Manager) pendingSeat(group, id string) {
 	m.pending[group][id] = time.Now()
 }
 
-// seatIssued reports whether id was handed out for group and is still valid, and uses
-// it up.
+// seatIssued reports whether id was handed out for group and is still valid.
 func (m *cg848Manager) seatIssued(group, id string) bool {
 	at, ok := m.pending[group][id]
-	if !ok || time.Since(at) > pendingMemberTTL {
-		return false
-	}
+	return ok && time.Since(at) <= pendingMemberTTL
+}
+
+// redeemSeat uses up an id handed out for group, once the member it was handed to is
+// about to be seated.
+func (m *cg848Manager) redeemSeat(group, id string) {
 	delete(m.pending[group], id)
 	if len(m.pending[group]) == 0 {
 		delete(m.pending, group)
 	}
-	return true
 }

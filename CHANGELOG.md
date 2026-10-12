@@ -6,6 +6,27 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Offsets retention: a restart no longer expires the offsets of a group that was live
+  when the broker stopped. Members are not kept across a restart, and a group with none
+  in memory and no record of having emptied was taken for one nobody had ever joined:
+  each offset expired from its own commit, so the first sweep after a restart could
+  delete an old, valid offset on a quiet partition before its consumer was back. The
+  metadata database now records that a group has members (and their longest session)
+  before the first member's join is answered, so it is there after a crash too. After a
+  restart such a group is treated as Apache Kafka 4.3.1 treats the members it loads
+  back (recorded: `offsets-retention-restart`): they are there until their session has
+  passed with nobody joining; from then a classic group has its retention to go, and a
+  consumer-protocol group's offsets are as old as their commits. That last is Kafka's
+  rule for any consumer-protocol group with no members, and is new here: such a group
+  used to keep its offsets for the retention from when it emptied. A data directory
+  from an earlier version is adopted on first start (every group with offsets is taken
+  to have had members). The record is kept with `--offsets-retention 0` as well. A join
+  that cannot be recorded is `COORDINATOR_NOT_AVAILABLE`. The sweep judges a group from
+  one view of it, taken with both coordinators held still, where it read three things
+  under three locks; a failed write of the record is tried again; and a group being
+  deleted is skipped. ConsumerGroupDescribe of a group that does not exist carries
+  Kafka's message, `Group <id> not found.`
+
 - Console: every button reads weight 400 whether it is a button or a link drawn as one (the
   boards draw them all as buttons). A request that took under a millisecond shows its
   measured time (`42 µs`, `0.4 ms`) rather than the design boards' `0 ms`: a broker

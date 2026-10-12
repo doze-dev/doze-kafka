@@ -116,9 +116,25 @@ type groupManager struct {
 
 	sink GroupEventSink // told what happens in groups; nil = nobody is watching.
 
-	// emptied and activated tell the offsets retention when a group lost its last
-	// member and when it got one again; nil = nobody is counting.
-	emptied, activated func(group string)
+	// liveness is the offsets retention, told when a group gets members and when it
+	// has lost the last one; nil = nobody is counting.
+	liveness livenessRecorder
+}
+
+// livenessRecorder is the offsets retention as a coordinator sees it (offsetexpiry.go).
+// Each method is called with the coordinator's lock held.
+type livenessRecorder interface {
+	// joining is called before a member is seated, with the kind of member it is and
+	// its session. An error means the group could not be recorded as having members,
+	// and the member is refused: its commits would be in a store that says nobody is
+	// there to read them.
+	joining(group string, classic bool, session time.Duration) error
+	// emptied is called when the last member has gone; classic is the kind of group
+	// it was.
+	emptied(group string, classic bool)
+	// consumerOnly is called when the last classic member of a consumer group has
+	// gone and others remain.
+	consumerOnly(group string, session time.Duration)
 }
 
 // stop makes every timer a no-op. After shutdown a session timer would otherwise
@@ -369,7 +385,22 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 		gm.mu.Unlock()
 		return refuse(kerr.InconsistentGroupProtocol.Code)
 	}
+	created := g == nil
 	g = gm.getOrCreate(r.Group)
+	// The group is recorded as having members before it has this one (offsetexpiry.go).
+	// A coordinator that cannot write that down is not available, and says so.
+	if gm.liveness != nil {
+		if err := gm.liveness.joining(g.id, true, time.Duration(r.SessionTimeoutMillis)*time.Millisecond); err != nil {
+			if len(g.members) == 0 {
+				gm.claims.release(g.id, protoClassic)
+				if created {
+					delete(gm.groups, g.id)
+				}
+			}
+			gm.mu.Unlock()
+			return refuse(kerr.CoordinatorNotAvailable.Code)
+		}
+	}
 
 	// Everyone in a group must be the same kind of member and share at least one
 	// protocol (assignor). A joiner that cannot agree is refused; it used to be
@@ -420,9 +451,6 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 
 	if g.state != statePreparingRebalance {
 		wasEmpty := g.state == stateEmpty
-		if wasEmpty && gm.activated != nil {
-			gm.activated(g.id)
-		}
 		g.beginRebalance()
 		// A member the group did not have is "a member joined"; one it already had, asking in
 		// again, is "a member rejoined".
@@ -885,8 +913,8 @@ func (gm *groupManager) dropIfUnused(g *group) {
 	if gm.groups[g.id] != g || len(g.members) != 0 {
 		return
 	}
-	if gm.emptied != nil {
-		gm.emptied(g.id)
+	if gm.liveness != nil {
+		gm.liveness.emptied(g.id, true)
 	}
 	// No members: the id is free for either protocol again.
 	gm.claims.release(g.id, protoClassic)

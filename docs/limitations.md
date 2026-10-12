@@ -168,8 +168,17 @@ implement it.
   and latest offset as two entries of one request, so this stays until it asks differently.
 - **Group membership is not kept across a restart.** Committed offsets are; the members,
   their generation and their assignments are not. After a restart every member must
-  rejoin, and a commit that carries the old generation is `ILLEGAL_GENERATION`, where
-  Kafka (which reloads its groups) accepts it until the session times out.
+  rejoin: its heartbeat is `UNKNOWN_MEMBER_ID` and a commit that carries the old
+  generation is `ILLEGAL_GENERATION`, where Kafka (which reloads its groups) accepts
+  both until the session times out. Until somebody rejoins, the group is listed and
+  described `Empty`, as a classic group with no protocol type whatever it was, where
+  Kafka shows it `Stable` with the members it loaded. What is kept is that the group
+  had members, so its committed offsets expire when Kafka's would
+  ([consumer groups](consumer-groups.md#when-committed-offsets-expire); recorded:
+  `offsets-retention-restart.json`), with one difference on the side of keeping:
+  while the members a real broker would have loaded could still be there, nothing of
+  the group expires, where Kafka goes on expiring the offsets of topics those members
+  were not subscribed to.
 - **On-disk format is doze-kafka's own.** Record batches are stored verbatim (so
   compression round-trips), but the segment/index file layout is not byte-compatible
   with Apache Kafka's. Only doze-kafka reads its own files.

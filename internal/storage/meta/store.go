@@ -140,13 +140,19 @@ type Store interface {
 	// that has no commit time, written before they were kept, is given the time of this
 	// call, so a retention starts counting from the first sweep that saw it.
 	ExpireOffsets(group string, expire func(topic string, partition int32, committedAt int64) bool) (int, error)
-	// SetGroupEmptySince records when a group lost its last member, in unix
-	// milliseconds, or forgets it (0): offsets that outlive their group's members are
-	// kept for a retention from then. It is kept across a restart, which forgets the
-	// members themselves.
-	SetGroupEmptySince(group string, at int64) error
-	// GroupsEmptySince is every recorded group and when it became empty.
-	GroupsEmptySince() (map[string]int64, error)
+	// SetGroupLiveness records what the offsets retention must still know about a
+	// group after a restart, which forgets the members themselves: that it has
+	// members (and the longest session any of them asked for), or when it lost the
+	// last one. A nil state forgets the group.
+	SetGroupLiveness(group string, state *GroupLiveness) error
+	// GroupLiveness is every recorded group.
+	GroupLiveness() (map[string]GroupLiveness, error)
+	// AdoptGroupsWithOffsets is run when the store is opened by a broker: the first
+	// time, on a store written before groups with members were recorded, it records
+	// every group that has offsets and no state as one that has members with this
+	// session, because which of them had is not known and an offset is kept when
+	// that is in doubt. It reports how many it recorded; afterwards it does nothing.
+	AdoptGroupsWithOffsets(session time.Duration) (int, error)
 
 	// CommitOffsets stores several offsets of one group in a single transaction.
 	// Each bolt transaction is an fsync, so committing 20 partitions one at a time
@@ -700,37 +706,111 @@ func (s *boltStore) SetPartitions(name string, count int32) (Topic, error) {
 	return cloneTopic(t), nil
 }
 
-// emptySincePrefix keys, in the meta bucket, when a group lost its last member.
+// GroupLiveness is what is kept about a group's members across a restart.
+type GroupLiveness struct {
+	// EmptySince is when the group lost its last member, in unix milliseconds; 0 for
+	// a group that is Live.
+	EmptySince int64
+	// Live is a group that has members. Classic says one of them joined by the classic
+	// protocol, and Session is the longest session timeout any of them has.
+	Live    bool
+	Classic bool
+	Session time.Duration
+}
+
+// emptySincePrefix keys, in the meta bucket, what is kept about a group's members: 8
+// bytes are when it lost the last one, 9 bytes are a group that has some (the kind of
+// group, then its session in milliseconds).
 var emptySincePrefix = []byte("empty_since\x00")
+
+// keyGroupsAdopted is set once AdoptGroupsWithOffsets has run.
+var keyGroupsAdopted = []byte("groups_adopted")
+
+const (
+	liveClassic  byte = 'c'
+	liveConsumer byte = 'n'
+)
 
 func emptySinceKey(group string) []byte {
 	return append(append([]byte(nil), emptySincePrefix...), group...)
 }
 
-func (s *boltStore) SetGroupEmptySince(group string, at int64) error {
+func encodeGroupLiveness(st GroupLiveness) []byte {
+	if !st.Live {
+		return binary.BigEndian.AppendUint64(nil, uint64(st.EmptySince))
+	}
+	kind := liveConsumer
+	if st.Classic {
+		kind = liveClassic
+	}
+	return binary.BigEndian.AppendUint64([]byte{kind}, uint64(st.Session.Milliseconds()))
+}
+
+func decodeGroupLiveness(v []byte) (GroupLiveness, bool) {
+	switch {
+	case len(v) == 8:
+		return GroupLiveness{EmptySince: int64(binary.BigEndian.Uint64(v))}, true
+	case len(v) == 9 && (v[0] == liveClassic || v[0] == liveConsumer):
+		return GroupLiveness{Live: true, Classic: v[0] == liveClassic,
+			Session: time.Duration(binary.BigEndian.Uint64(v[1:])) * time.Millisecond}, true
+	}
+	return GroupLiveness{}, false
+}
+
+func (s *boltStore) SetGroupLiveness(group string, state *GroupLiveness) error {
 	return s.update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucketMeta)
-		if at == 0 {
+		if state == nil || !state.Live && state.EmptySince == 0 {
 			return b.Delete(emptySinceKey(group))
 		}
-		var v [8]byte
-		binary.BigEndian.PutUint64(v[:], uint64(at))
-		return b.Put(emptySinceKey(group), v[:])
+		return b.Put(emptySinceKey(group), encodeGroupLiveness(*state))
 	})
 }
 
-func (s *boltStore) GroupsEmptySince() (map[string]int64, error) {
-	out := map[string]int64{}
+func (s *boltStore) GroupLiveness() (map[string]GroupLiveness, error) {
+	out := map[string]GroupLiveness{}
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		c := tx.Bucket(bucketMeta).Cursor()
 		for k, v := c.Seek(emptySincePrefix); k != nil && bytes.HasPrefix(k, emptySincePrefix); k, v = c.Next() {
-			if len(v) == 8 {
-				out[string(k[len(emptySincePrefix):])] = int64(binary.BigEndian.Uint64(v))
+			if st, ok := decodeGroupLiveness(v); ok {
+				out[string(k[len(emptySincePrefix):])] = st
 			}
 		}
 		return nil
 	})
 	return out, err
+}
+
+func (s *boltStore) AdoptGroupsWithOffsets(session time.Duration) (int, error) {
+	done := false
+	if err := s.db.View(func(tx *bbolt.Tx) error {
+		done = tx.Bucket(bucketMeta).Get(keyGroupsAdopted) != nil
+		return nil
+	}); err != nil || done {
+		return 0, err
+	}
+	n := 0
+	err := s.update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(bucketMeta)
+		var last []byte
+		c := tx.Bucket(bucketOffsets).Cursor()
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			i := bytes.IndexByte(k, 0)
+			if i < 0 || bytes.Equal(k[:i], last) {
+				continue
+			}
+			last = append(last[:0], k[:i]...)
+			if b.Get(emptySinceKey(string(last))) != nil {
+				continue
+			}
+			if err := b.Put(emptySinceKey(string(last)), encodeGroupLiveness(GroupLiveness{Live: true, Classic: true, Session: session})); err != nil {
+				return err
+			}
+			n++
+		}
+		return b.Put(keyGroupsAdopted, []byte{1})
+	})
+	return n, err
 }
 
 func (s *boltStore) ExpireOffsets(group string, expire func(topic string, partition int32, committedAt int64) bool) (int, error) {

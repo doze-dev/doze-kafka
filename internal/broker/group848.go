@@ -131,9 +131,9 @@ type cg848Manager struct {
 	stopped        bool           // the broker is shutting down: timers do nothing.
 	sink           GroupEventSink // told what happens in groups; nil = nobody is watching.
 
-	// emptied and activated tell the offsets retention when a group lost its last
-	// member and when it got one again; nil = nobody is counting.
-	emptied, activated func(group string)
+	// liveness is the offsets retention, told when a group gets members and when it
+	// has lost the last one; nil = nobody is counting.
+	liveness livenessRecorder
 
 	// bridge is the classic coordinator, for moving a group between the two when a
 	// member of the other protocol joins (groupmigrate.go); nil when there is none.
@@ -297,6 +297,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 	}
 
 	g := m.groups[r.Group]
+	created := false
 	if g == nil {
 		if r.MemberEpoch != 0 {
 			// Unknown here (after a broker restart, say): the member must rejoin.
@@ -313,6 +314,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 			// is the first epoch Kafka gives a member of a new group (recorded).
 			adopted = &cg848Group{id: r.Group, epoch: 1, assignor: assignorUniform, members: make(map[string]*cg848Member)}
 			m.groups[r.Group] = adopted
+			created = true
 		}
 		g = adopted
 	} else if len(g.members) == 0 && r.MemberEpoch == 0 {
@@ -354,10 +356,20 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 		}
 		switch {
 		case mem == nil:
-			mem = &cg848Member{id: r.MemberID, target: tpSet{}, assigned: tpSet{}}
-			if len(g.members) == 0 && m.activated != nil {
-				m.activated(g.id)
+			// The group is recorded as having members before it has this one
+			// (offsetexpiry.go).
+			if m.liveness != nil {
+				if err := m.liveness.joining(g.id, false, m.sessionTimeout); err != nil {
+					if len(g.members) == 0 {
+						m.claims.release(g.id, protoConsumer)
+						if created {
+							delete(m.groups, g.id)
+						}
+					}
+					return cg848Error(kerr.CoordinatorNotAvailable.Code, "the group's members could not be recorded; try again")
+				}
 			}
+			mem = &cg848Member{id: r.MemberID, target: tpSet{}, assigned: tpSet{}}
 			g.members[r.MemberID] = mem
 			changed = true
 			m.emit(g, "joined", r.MemberID, "client "+who.clientID, "")
@@ -540,20 +552,34 @@ func (m *cg848Manager) sessionExpired(g *cg848Group, mem *cg848Member, gen uint6
 }
 
 func (m *cg848Manager) removeMember(g *cg848Group, id string) {
-	if mem := g.members[id]; mem != nil {
+	mem := g.members[id]
+	if mem != nil {
 		mem.stopTimers()
 	}
 	delete(g.members, id)
+	if mem != nil && mem.classic != nil && len(g.members) > 0 && m.liveness != nil && !g.hasClassic() {
+		m.liveness.consumerOnly(g.id, m.sessionTimeout)
+	}
 	if len(g.members) == 0 {
 		// Nobody left: either protocol may use the id now. The emptied group is
 		// kept so it still lists as a consumer group for as long as this broker
 		// runs; forget drops it.
 		g.epoch++
 		m.claims.release(g.id, protoConsumer)
-		if m.emptied != nil {
-			m.emptied(g.id)
+		if m.liveness != nil {
+			m.liveness.emptied(g.id, false)
 		}
 	}
+}
+
+// hasClassic reports whether any member arrived by the classic protocol.
+func (g *cg848Group) hasClassic() bool {
+	for _, mem := range g.members {
+		if mem.classic != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // forget drops an emptied group, reporting whether there was one.

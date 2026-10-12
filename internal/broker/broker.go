@@ -106,16 +106,16 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 	// Only a broker with a console keeps what clients report: the console is its one
 	// reader, and a broker without one advertises nothing for clients to push into.
 	b.cg848.bridge = b.groups
-	if cfg.OffsetsRetention > 0 {
-		exp, err := newOffsetExpiry(b, cfg.OffsetsRetention)
-		if err != nil {
-			return nil, fmt.Errorf("broker: read when groups became empty: %w", err)
-		}
-		b.expiry = exp
-		b.groups.emptied, b.groups.activated = exp.markEmpty, exp.markActive
-		b.cg848.emptied, b.cg848.activated = exp.markEmpty, exp.markActive
-		exp.start()
+	// Which groups have members is recorded whatever the retention is, zero included:
+	// a broker run for a while with the retention off and then with it on must not
+	// take the groups of that while for groups nobody ever joined.
+	exp, err := newOffsetExpiry(b, cfg.OffsetsRetention)
+	if err != nil {
+		return nil, fmt.Errorf("broker: read what is recorded of the groups' members: %w", err)
 	}
+	b.expiry = exp
+	b.groups.liveness, b.cg848.liveness = exp, exp
+	exp.start()
 	if cfg.ClientTelemetry && cfg.Console {
 		b.telemetry = telemetry.NewStore()
 		b.telemetry.SetPushInterval(telemetryPushMillis * time.Millisecond)
@@ -388,9 +388,7 @@ func (b *Broker) advertised() []protocol.AdvertisedAPI {
 // a member's session timer firing afterwards would run an assignment against a
 // closed metadata store.
 func (b *Broker) Stop() {
-	if b.expiry != nil {
-		b.expiry.stopAndFlush()
-	}
+	b.expiry.stopAndFlush()
 	b.groups.stop()
 	b.cg848.stop()
 }
