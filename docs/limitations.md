@@ -90,8 +90,11 @@ implement it.
 
 - **No `CLIENT_METRICS` resource.** Real Kafka subscribes a client (KIP-714) to nothing
   until an operator defines one and runs a plugin to take the metrics; the resource can be
-  set with `IncrementalAlterConfigs` and read back. Here the resource is not kept: the
-  setting round-trips nowhere and nothing is exported.
+  set with `IncrementalAlterConfigs` and read back. Here there is no such resource.
+  Setting one with `IncrementalAlterConfigs` is refused `INVALID_REQUEST` (Kafka answers
+  0; recorded as the first step of `conformance/recordings/telemetry-interval.json`),
+  a subscription therefore never changes under a client (what Kafka does when one
+  does is `telemetry-subscription-change.json`, evidence only), and nothing is exported.
 - **A subscription is the same for every client: the standard metric set, every five seconds, cumulative.**
   Kafka with nothing configured answers a client's subscription request with no metrics, an
   interval of five minutes and delta temporality, so that a client pushes nothing (recorded:
@@ -104,8 +107,15 @@ implement it.
   `ApiVersions` only when a broker plugin that implements `ClientTelemetry` is configured,
   and until then a client never subscribes (recorded:
   `conformance/recordings/client-telemetry.json`). The point of the page is that clients do.
+  A Kafka that does not advertise the two calls still answers them when they are sent;
+  a broker without a console closes the connection of a client that sends them, as it
+  does for any API it does not advertise (recorded:
+  `conformance/recordings/telemetry-no-console.json`). No client sends a call a broker
+  did not advertise, so this is seen only by a hand-written request.
 - **Answered as Kafka does, recorded.** A push before its interval has passed, a second
-  subscription request within it, the push after a terminating one, a push for an
+  subscription request within it, the pushes after a terminating one (every push is
+  refused while the push before it said it was terminating, whatever became of that
+  one), a push for an
   instance the broker has not seen (it is made, and a push that holds the subscription id
   it would have given is taken, which is what a client finds after a restart), a push from
   another connection or principal, an unsupported compression type, a payload over

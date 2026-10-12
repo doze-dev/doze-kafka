@@ -162,10 +162,11 @@ type instance struct {
 	// What the gate (Subscribe, Arrive) remembers, as Apache Kafka's
 	// ClientMetricsInstance does: when a subscription was last given and a push
 	// last taken, and that the last push said it was the client's last, which the
-	// next push is told once (recorded: conformance/recordings/telemetry-throttle.json).
+	// next push is refused for (recorded: conformance/recordings/telemetry-terminating.json).
 	lastGet, lastPush time.Time
 	hasGet, hasPush   bool
-	afterTerminating  bool
+	saidTerminating   bool
+	askAgain          bool // the last push was refused in a way that tells the client to ask again.
 }
 
 // Store keeps the instances, bounded: at most maxInstances, each with at most
@@ -300,41 +301,79 @@ const (
 // a second request within the push interval of the last request it took from the
 // instance, a subscription or a push, THROTTLING_QUOTA_EXCEEDED; a refused request does
 // not postpone the next (recorded: conformance/recordings/telemetry-interval.json).
+//
+// One request is answered although it is early: the one that follows a push refused
+// for its subscription id or its compression type (AskAgain), which is the client
+// doing what the refusal told it to. It is answered once and sets no clock, so the push
+// straight after it is still early (recorded:
+// conformance/recordings/telemetry-ask-again.json).
 func (s *Store) Subscribe(id [16]byte, who Who) Verdict {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	in := s.touch(id, who)
 	now := s.now()
+	asked := in.askAgain
+	in.askAgain = false
 	if last, ok := in.lastRequest(); ok && now.Sub(last) < s.interval {
+		if asked {
+			return Accepted
+		}
 		return Early
 	}
 	in.lastGet, in.hasGet = now, true
 	return Accepted
 }
 
-// Arrive is the gate for a push, applied before anything else is looked at. The push
-// that follows a terminating one is refused once. A push is early, and refused, when the
-// instance's previous push is less than an interval old, except the first after a
-// subscription was given, and a terminating push, which is the client's last word. A
-// push that passes sets the clock whatever becomes of it after (an unknown subscription
-// id still counts), and one that does not leaves it (recorded:
-// conformance/recordings/telemetry-throttle.json and telemetry-interval.json).
+// AskAgain notes that the push just let through by Arrive was refused for its
+// subscription id or its compression type. Both tell the client to ask for its
+// subscription again; see Subscribe.
+func (s *Store) AskAgain(id [16]byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if in := s.instances[id]; in != nil {
+		in.askAgain = true
+	}
+}
+
+// Arrive is the gate for a push, applied before anything else is looked at, as Apache
+// Kafka's ClientMetricsManager applies it (recorded:
+// conformance/recordings/telemetry-terminating.json, telemetry-throttle.json and
+// telemetry-interval.json).
+//
+// The instance remembers whether the last push it was sent said it was terminating,
+// whatever became of that push: taken, refused further on for its subscription id or
+// its compression, or refused here. While it does, a push is refused
+// (AfterTerminating), and the push's own word replaces the memory. So terminating
+// pushes in a row are refused from the second on for as long as they come, a
+// terminating push that was itself refused still closes the instance, and an ordinary
+// push after one is refused once.
+//
+// A push is on time when a subscription was given since the last push that set the
+// clock, or that push is an interval old; a push on time sets the clock, whatever
+// becomes of it after (an unknown subscription id still counts). One that is not on
+// time is early and refused, unless it is terminating, which is the client's last word
+// and is taken without setting the clock.
 func (s *Store) Arrive(id [16]byte, who Who, terminating bool) Verdict {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	in := s.touch(id, who)
-	if in.afterTerminating {
-		in.afterTerminating = false
+	was := in.saidTerminating
+	in.saidTerminating = terminating
+	in.askAgain = false // this push's own outcome decides it (AskAgain).
+	if was {
 		return AfterTerminating
 	}
 	now := s.now()
-	afterSubscribe := in.hasGet && (!in.hasPush || in.lastPush.Before(in.lastGet))
-	if !terminating && !afterSubscribe && in.hasPush && now.Sub(in.lastPush) < s.interval {
-		in.Skipped++
-		return Early
+	onTime := !in.hasPush || (in.hasGet && in.lastPush.Before(in.lastGet)) || now.Sub(in.lastPush) >= s.interval
+	if onTime {
+		in.lastPush, in.hasPush = now, true
+		return Accepted
 	}
-	in.lastPush, in.hasPush = now, true
-	return Accepted
+	if terminating {
+		return Accepted
+	}
+	in.Skipped++
+	return Early
 }
 
 // lastRequest is when the instance's last accepted request, a subscription or a push,
@@ -365,7 +404,6 @@ func (s *Store) Push(id [16]byte, who Who, p Payload, terminating bool) {
 	in := s.touch(id, who)
 	in.Pushes++
 	in.Terminated = terminating
-	in.afterTerminating = terminating
 	for k, v := range p.Resource {
 		setResource(in.Resource, k, v)
 	}

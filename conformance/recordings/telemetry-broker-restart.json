@@ -43,9 +43,57 @@
       }
     },
     {
+      "label": "subscribe-second-instance",
+      "api": "GetTelemetrySubscriptions",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003czero-id\u003e"
+      },
+      "response": {
+        "AcceptedCompressionTypes": [
+          4,
+          3,
+          1,
+          2
+        ],
+        "ClientInstanceID": "\u003cinstance:2\u003e",
+        "DeltaTemporality": true,
+        "ErrorCode": 0,
+        "PushIntervalMillis": 300000,
+        "RequestedMetrics": null,
+        "SubscriptionID": "\u003csubscription:2\u003e",
+        "TelemetryMaxBytes": 1048576,
+        "ThrottleMillis": 0
+      }
+    },
+    {
       "label": "restart",
       "api": "(restart)",
       "version": 0
+    },
+    {
+      "label": "second-instance-asks-first-after-restart",
+      "api": "GetTelemetrySubscriptions",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:2\u003e"
+      },
+      "response": {
+        "AcceptedCompressionTypes": [
+          4,
+          3,
+          1,
+          2
+        ],
+        "ClientInstanceID": "\u003cinstance:2\u003e",
+        "DeltaTemporality": true,
+        "ErrorCode": 0,
+        "PushIntervalMillis": 300000,
+        "RequestedMetrics": null,
+        "SubscriptionID": "\u003csubscription:2\u003e",
+        "TelemetryMaxBytes": 1048576,
+        "ThrottleMillis": 0
+      }
     },
     {
       "label": "push-old-subscription-after-restart",
@@ -77,7 +125,7 @@
         "ErrorCode": 89,
         "PushIntervalMillis": 0,
         "RequestedMetrics": null,
-        "SubscriptionID": "\u003csubscription:2\u003e",
+        "SubscriptionID": "\u003csubscription:3\u003e",
         "TelemetryMaxBytes": 0,
         "ThrottleMillis": 0
       }
@@ -90,7 +138,7 @@
         "ClientInstanceID": "\u003cinstance:1\u003e",
         "CompressionType": 0,
         "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
-        "SubscriptionID": "\u003csubscription:2\u003e",
+        "SubscriptionID": "\u003csubscription:3\u003e",
         "Terminating": false
       },
       "response": {
