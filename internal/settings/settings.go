@@ -368,7 +368,16 @@ func topicSettings() []Setting {
 			s.Default = func(config.Config) string { return "delete" }
 			return s
 		}(),
-		choice(stored("compression.type", "", "", oneOf("uncompressed", "zstd", "lz4", "snappy", "gzip", "producer"), "the codec of records the cleaner rewrites"),
+		// compression.type acts in two places and not in a third. The log cleaner writes
+		// the batches it rewrites in the codec it names (topiclimits.go; "producer" and
+		// "uncompressed" both mean none). The produce handler holds a compressed batch
+		// on an "uncompressed" topic to max.message.bytes at the size it inflates to, as
+		// Kafka does (produce.go; recorded: produce-decompressed-size). What a producer
+		// sends is stored as it came: it is not re-compressed (docs/limitations.md).
+		// The record said "stored only" from before either existed.
+		choice(t("compression.type", "", "", oneOf("uncompressed", "zstd", "lz4", "snappy", "gzip", "producer"), Applied,
+			"log cleaner (the codec it rewrites in), produce handler (uncompressed: MESSAGE_TOO_LARGE by inflated size)",
+			"the codec of records the cleaner rewrites; uncompressed also holds a compressed batch to max.message.bytes as it inflates"),
 			"uncompressed", "zstd", "lz4", "snappy", "gzip", "producer"),
 		stored("compression.gzip.level", "", "-1 or more", isInt(-1), "gzip level when the broker compresses"),
 		stored("compression.lz4.level", "", "1 or more", isInt(1), "lz4 level when the broker compresses"),

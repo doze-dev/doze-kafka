@@ -66,13 +66,11 @@ type metricRow struct {
 	Spark template.HTML
 }
 
-// metricsShown is how many series a card lists before folding the rest away.
-const metricsShown = 10
-
 // metricPriority is what to put first, most useful first: errors and retries, how long
 // requests take, how much is being sent, whether the consumer is keeping up. A real Java
 // client reports well over a hundred metrics a producer; these are the ones that answer
-// "is this client healthy", and the rest follow in name order, folded away.
+// "is this client healthy", and the rest follow in name order, folded away (the fold is
+// clientMetricsView's, in traffic_inspect.go: four of each list, then "All N metrics").
 var metricPriority = []string{
 	"request.latency.avg", "request.latency.max", "fetch.latency.avg",
 	"record.send.rate", "record.queue.time.avg", "requests.in.flight",

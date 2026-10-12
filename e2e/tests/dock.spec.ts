@@ -30,6 +30,44 @@ test('a group ends with its own requests, and has a pause control', async ({ pag
   await expect(dock).toHaveAttribute('data-live', /\/dock\?group=g-timeline&t=1$/);
 });
 
+// The dock pages by its cursor: Older is the rows after the last one shown, and the
+// page it lands on keeps polling that window (a refresh does not put the newest rows
+// back); Newest returns to the head.
+test('Older pages the dock in place, the older page survives its own refresh, and Newest goes back', async ({ page }) => {
+  await page.goto('topics/seed-orders');
+  const dock = page.locator('#wire-dock');
+  const ids = () => dock.locator('.r').evaluateAll((rows) => rows.map((r) => r.id));
+  await expect(dock.locator('.r')).toHaveCount(8);
+  await expect(dock).toHaveAttribute('data-live', /\/dock\?topic=seed-orders$/);
+  await expect(dock.locator('.dh .note')).toHaveText('requests that touched seed-orders');
+  await expect(dock.locator('[data-dock-newest]')).toHaveCount(0);
+  const first = await ids();
+
+  await dock.locator('[data-dock-older]').click();
+  await expect(dock).toHaveAttribute('data-live', /\/dock\?after=[^&]+&topic=seed-orders$/);
+  await expect(dock.locator('.dh .note')).toHaveText('older requests that touched seed-orders');
+  const second = await ids();
+  expect(second.length).toBeGreaterThan(0);
+  expect(second.filter((id) => first.includes(id))).toEqual([]);
+  // The cursor is the last row of the page before.
+  const live = await dock.getAttribute('data-live');
+  expect(new URL(live!, 'http://x').searchParams.get('after')).toBe(first[first.length - 1].replace(/^wd-/, ''));
+  // Two polls later (3 s each) it is still the older page.
+  await page.waitForTimeout(7_000);
+  expect(await ids()).toEqual(second);
+  await expect(dock.locator('.dh .note')).toHaveText('older requests that touched seed-orders');
+  // A row of the older page opens in the inspector like any other.
+  await dock.locator('.r').first().click();
+  await expect(page.locator('#inspector .inspector-h')).toHaveAttribute('data-inspector-kind', 'request');
+  await page.keyboard.press('Escape');
+
+  await dock.locator('[data-dock-newest]').click();
+  await expect(dock).toHaveAttribute('data-live', /\/dock\?topic=seed-orders$/);
+  await expect(dock.locator('[data-dock-newest]')).toHaveCount(0);
+  await expect(dock.locator('.r')).toHaveCount(8);
+  expect((await ids()).filter((id) => second.includes(id))).toEqual([]);
+});
+
 // The dock shows the latest eight; the rest are on the Traffic page, filtered to the
 // same topic. The link used to carry "topic%3dseed-orders", which is no filter: it
 // landed on every request the broker holds.

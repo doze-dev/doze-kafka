@@ -458,8 +458,11 @@ on the code before the fix and was run again with the fix reverted by hand.
   `UNKNOWN_SUBSCRIPTION_ID` (C2), and the Java client uses one connection in a one-broker
   cluster (C1). `telemetry-interval` and `telemetry-instance-binding-spaced` are evidence
   only, because they define a `CLIENT_METRICS` resource.
-- **The dock endpoint** is the existing `/dock`, which now pages by the recorder's row ids
-  (the contract's cursor); no `/traffic/dock` was added.
+- **The dock endpoint** is the existing `/dock`, which pages by the recorder's row ids
+  (the contract's cursor): `/dock?topic=…&after=<row id>` is the rows after that one,
+  and the dock's Older and Newest use it (AD20). Until the fixes of 2026-10-12 the
+  handler passed `after=""` whatever it was asked, so this sentence was not true; no
+  `/traffic/dock` was added.
 - **Per (client, topic, direction) totals** for the map (W5) were not built; the map stage
   owns them.
 - **Decoded fields use Kafka's JSON specification names** ("TransactionalId",

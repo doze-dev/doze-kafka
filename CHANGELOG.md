@@ -6,6 +6,9 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Console: the wire dock at the foot of a topic or group page pages back through the
+  requests it holds (Older, Newest); it showed the newest eight and no more.
+
 - Console: with the list of keys (`?`) open, the page's keys are off. They used to act
   on the page behind it: `p` paused the live view, `j` and `k` moved the cursor, `c`
   and the `g` chords left the page.

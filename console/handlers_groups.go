@@ -285,10 +285,9 @@ func (c *Console) groupDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	list, _ := c.be.ListGroups(r.Context())
 	data["Groups"], data["Page"], data["Title"] = c.groupRows(r.Context(), list), "groups", id
-	maps.Copy(data, c.dockData(DockFilter{Group: id}))
 	// The group page has no pause control of its own, so its dock carries one, and
 	// says so to its poll.
-	data["DockToggle"], data["DockLive"] = true, c.dockLiveURL(DockFilter{Group: id}, true)
+	maps.Copy(data, c.dockPage(dockView{DockFilter: DockFilter{Group: id}, Toggle: true}))
 	c.render(w, r, "group_detail", data)
 }
 

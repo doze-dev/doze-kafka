@@ -64,6 +64,8 @@ type DockEvent struct {
 // DockSource is what a dock needs: the events for one resource, newest first, at
 // most limit, those after the cursor (the ID of the last row already shown; empty
 // for the first page), and the cursor for the next page ("" when there is none).
+// A cursor whose row the source no longer holds has nothing after it: what is kept
+// is all newer.
 type DockSource interface {
 	DockEvents(f DockFilter, limit int, after string) (events []DockEvent, next string)
 }
@@ -144,12 +146,42 @@ func (c *Console) dockSource() DockSource {
 	return nil
 }
 
-// dockData is what a dock shows for one resource. It is the same for the page that
-// ends with it and for its poll, so they cannot disagree.
-func (c *Console) dockData(f DockFilter) map[string]any {
+// dockView is which dock is asked for: the resource, the cursor (the id of the last
+// row of the page before; empty for the newest rows) and whether it carries the pause
+// control (a page with none of its own).
+type dockView struct {
+	DockFilter
+	After  string
+	Toggle bool
+}
+
+// maxDockCursor bounds a cursor. It is a row id, which is a dozen bytes.
+const maxDockCursor = 64
+
+// url is the address of a dock: what it polls, and what Older and Newest ask for.
+func (c *Console) dockURL(v dockView) template.URL {
+	q := v.values()
+	if v.After != "" {
+		q.Set("after", v.After)
+	}
+	if v.Toggle {
+		q.Set("t", "1")
+	}
+	return template.URL(c.prefix + "/dock?" + q.Encode())
+}
+
+// dockData is what a dock shows for one resource: its newest rows, as a page ends
+// with them.
+func (c *Console) dockData(f DockFilter) map[string]any { return c.dockPage(dockView{DockFilter: f}) }
+
+// dockPage is what a dock shows for one resource, from its cursor on. It is the same
+// for the page that ends with it and for its poll, so they cannot disagree; a dock
+// that has been paged polls the page it shows, not the newest rows.
+func (c *Console) dockPage(v dockView) map[string]any {
+	f := v.DockFilter
 	src := c.dockSource()
-	d := map[string]any{"Prefix": c.prefix, "DockFilter": f, "HasDock": src != nil, "DockShown": dockRows}
-	d["DockLive"] = c.dockLiveURL(f, false)
+	d := map[string]any{"Prefix": c.prefix, "DockFilter": f, "HasDock": src != nil, "DockToggle": v.Toggle, "DockPaged": v.After != ""}
+	d["DockLive"] = c.dockURL(v)
 	// The Traffic page filters by topic and by group. It has no filter for a subject,
 	// so a subject's dock does not link there as if it had.
 	if f.Subject == "" {
@@ -158,29 +190,28 @@ func (c *Console) dockData(f DockFilter) map[string]any {
 	if src == nil {
 		return d
 	}
-	events, next := src.DockEvents(f, dockRows, "")
+	events, next := src.DockEvents(f, dockRows, v.After)
 	rows := make([]dockRow, 0, len(events))
 	h := fnv.New64a()
+	fmt.Fprint(h, v.After, "|")
 	for _, e := range events {
 		rows = append(rows, dockRow{DockEvent: e})
 		fmt.Fprint(h, e.ID, e.Count, e.Error, ";")
 	}
+	fmt.Fprint(h, "|", next)
 	d["DockRows"], d["DockMore"], d["DockHash"] = rows, next != "", fmt.Sprintf("%x", h.Sum64())
+	if next != "" {
+		d["DockOlder"] = c.dockURL(dockView{DockFilter: f, After: next, Toggle: v.Toggle})
+	}
+	if v.After != "" {
+		d["DockNewest"] = c.dockURL(dockView{DockFilter: f, Toggle: v.Toggle})
+	}
 	d["DockKnown"] = f.Subject == "" || c.dock != nil // a subject has no source until the registry records its requests.
 	return d
 }
 
-// dockLiveURL is the address the dock polls: its filter, and whether it carries the
-// pause control (a page with none of its own).
-func (c *Console) dockLiveURL(f DockFilter, toggle bool) template.URL {
-	v := f.values()
-	if toggle {
-		v.Set("t", "1")
-	}
-	return template.URL(c.prefix + "/dock?" + v.Encode())
-}
-
-// dockLive answers the dock's own poll: the same rows, or 204 when nothing moved.
+// dockLive answers the dock's own poll, and its Older and Newest: the rows from the
+// cursor on (after=, the contract's cursor: foundation A4), or 204 when nothing moved.
 func (c *Console) dockLive(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	f := DockFilter{Topic: q.Get("topic"), Group: q.Get("group"), Subject: q.Get("subject")}
@@ -188,10 +219,12 @@ func (c *Console) dockLive(w http.ResponseWriter, r *http.Request) {
 		c.fail(w, r, badInput("a dock is about one topic, group or subject"))
 		return
 	}
-	d := c.dockData(f)
-	if q.Get("t") == "1" {
-		d["DockToggle"], d["DockLive"] = true, c.dockLiveURL(f, true)
+	v := dockView{DockFilter: f, After: q.Get("after"), Toggle: q.Get("t") == "1"}
+	if len(v.After) > maxDockCursor {
+		c.fail(w, r, badInput("a dock's cursor is a row id"))
+		return
 	}
+	d := c.dockPage(v)
 	if !d["HasDock"].(bool) {
 		c.fail(w, r, fmt.Errorf("%w: there is no wire dock in this console", errNotFound))
 		return

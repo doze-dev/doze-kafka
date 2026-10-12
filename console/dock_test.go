@@ -264,7 +264,7 @@ func TestTheGroupPagesDockPollKeepsItsPauseControl(t *testing.T) {
 }
 
 // A subject has no filter on the Traffic page, so its dock does not link there as if
-// it had.
+// it had: its older rows are the dock's own next page (dockcursor_test.go).
 func TestASubjectsDockDoesNotLinkToAnUnfilteredTrafficPage(t *testing.T) {
 	src := &fakeDock{}
 	for i := 0; i < 9; i++ {
@@ -272,7 +272,7 @@ func TestASubjectsDockDoesNotLinkToAnUnfilteredTrafficPage(t *testing.T) {
 	}
 	c, _, _ := newRegistryConsole(t, func(o *Options) { o.Dock = src })
 	dock := req(t, c, "GET", "/_console/dock?subject=orders-value", nil).Body.String()
-	if strings.Contains(dock, "/traffic") || !strings.Contains(dock, "Only the latest 8 are shown.") {
+	if strings.Contains(dock, "/traffic") || !strings.Contains(dock, "data-dock-older") {
 		t.Errorf("a subject's dock:\n%s", dock)
 	}
 }

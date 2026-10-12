@@ -191,7 +191,9 @@ to paste and how to check it.
 ## The wire dock and neighbours
 
 A topic or group page ends with the requests that touched it, live, with the same
-pause control as the tape. Under a topic's title one sentence says who writes it, who
+pause control as the tape. It shows the newest eight; **Older** pages back through the
+rest in place (the older page keeps refreshing as itself) and **Newest** returns, and
+"Traffic page" opens Traffic filtered to that topic or group. Under a topic's title one sentence says who writes it, who
 reads it and which schema subject describes it ("Written by checkout-api, read by
 g-order-validator, schema subject orders-value"), each name a link.
 

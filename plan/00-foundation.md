@@ -419,6 +419,7 @@ add to the boards. None of them contradicts a board.
 | AD17 | Keys **e** (errors only, and back), **u** (unfold), **m** (all of a client's metrics) and **c** (copy the decoded fields) on Traffic, in the key map and the help overlay. | Traf-03, 04, 05, 07, Sy-06 | The boards' key strips draw them; Sy-06's table does not list them. |
 | AD18 | The **Unfold** list, and the all-metrics list, open inside the inspector, not on a page of their own. | Traf-05, Traf-07 | The boards name "Unfold these 42" and "m all 136 metrics" and draw no screen for them. |
 | AD19 | A telemetry client's inspector says how many reports **came too fast to be read** and how many series were **not kept**. | Traf-07 | The store's bounds are real and a count that silently stops is the kind of thing that costs an afternoon. |
+| AD20 | The wire dock has **Older** and **Newest** at its foot when there is more than it shows, and says "older requests that touched …" on an older page; a topic's or group's dock also links to the Traffic page filtered to it. | Sy-01 part 8 | The board draws three rows and no end. A4's contract has a cursor, which the endpoint never passed on (the paging half of `DockEvents` was dead); a subject's dock has no Traffic page to send anyone to, so the cursor is its only way back. |
 
 ## Deviations from the boards
 
