@@ -684,3 +684,30 @@ test('Main: page padding is the board\'s 16 20 0 with the 10 px gap, whatever th
     await expect(main, path).toHaveCSS('row-gap', '10px');
   }
 });
+
+test('Main: with the inspector open Took is whole and the card does not scroll sideways at 1180, 1280, 1366 and 1440', async ({ page }) => {
+  await lightTraffic(page);
+  for (const width of [1180, 1280, 1366, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('traffic');
+    const row = page.locator('#traffic-table tbody tr[id]').first();
+    await expect(row).toBeVisible({ timeout: 30_000 });
+    await row.click();
+    await expect(page.locator('#inspector')).toBeVisible();
+    const m = await page.evaluate(() => {
+      const t = document.querySelector('#traffic-table') as HTMLElement;
+      const wrap = t.closest('.tbl-wrap') as HTMLElement;
+      const took = t.querySelector('tbody td.cell-took') as HTMLElement;
+      const w = wrap.getBoundingClientRect(), k = took.getBoundingClientRect();
+      const heads = Array.from(t.querySelectorAll('thead th')).map((th) => Math.round(th.getBoundingClientRect().width));
+      return { scroll: wrap.scrollWidth, client: wrap.clientWidth, wrapRight: w.right, tookRight: k.right, tookCut: took.scrollWidth > took.clientWidth, doc: document.documentElement.scrollWidth - document.documentElement.clientWidth, heads };
+    });
+    expect(m.scroll, `${width}: ${JSON.stringify(m)}`).toBeLessThanOrEqual(m.client);
+    expect(m.tookRight, `${width}: ${JSON.stringify(m)}`).toBeLessThanOrEqual(m.wrapRight + 0.5);
+    expect(m.tookCut, `${width}`).toBe(false);
+    // Client and Topic keep room to read (the Detail column, not drawn under 1300, is what gave).
+    expect(m.heads[1], `${width}: ${JSON.stringify(m.heads)}`).toBeGreaterThanOrEqual(60);
+    expect(m.heads[3], `${width}: ${JSON.stringify(m.heads)}`).toBeGreaterThanOrEqual(60);
+    expect(m.doc, `${width}`).toBeLessThanOrEqual(0);
+  }
+});

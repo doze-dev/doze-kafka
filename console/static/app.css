@@ -1089,7 +1089,20 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
    "FindCoordinator v4" is 130 at the board's font), Result (118, AD5) and Took; Client,
    Topic and Detail share what is left as shares of the table, growing with the window,
    and nothing is pushed off the right edge. */
-@media (min-width: 641px) { .tf-table { min-width: 740px; } }
+/* Below 1180 the card may scroll sideways (the table keeps 740); from 1180 up the tracks fit the
+   card beside the 400 px inspector (542 at 1180, 642 at 1280, 728 at 1366, 802 at 1440): under 1300
+   the Detail column (what the inspector says in full) is not drawn, and under 1240 Time, Request
+   and Took give a few pixels, so Took is whole at every width. */
+@media (min-width: 641px) and (max-width: 1179px) { .tf-table { min-width: 740px; } }
+@media (min-width: 1180px) and (max-width: 1299px) {
+  .tf-table th:nth-child(5), .tf-table td.cell-detail { display: none; }
+  .tf-table.tbl th:nth-child(2), .tf-table.tbl th:nth-child(4) { width: auto; }
+}
+@media (min-width: 1180px) and (max-width: 1239px) {
+  .tf-table.tbl th:nth-child(1) { width: 100px; }
+  .tf-table.tbl th:nth-child(3) { width: 112px; }
+  .tf-table.tbl th:nth-child(7) { width: 64px; }
+}
 table.tbl.tf-table th, table.tbl.tf-table td { padding-left: 7px; padding-right: 7px; }
 table.tbl.tf-table th:first-child, table.tbl.tf-table td:first-child { padding-left: 12px; }
 table.tbl.tf-table th:last-child, table.tbl.tf-table td:last-child { padding-right: 12px; }
