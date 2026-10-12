@@ -249,8 +249,9 @@ resolve on this machine. With `--listen :9092` it gives the advertised address
 broker cleanly: it stops accepting, flushes the logs and exits 0. With
 `--log-format json` it is a single `ready` record instead, and with
 `--log-level warn` or `error` it is not printed. The first run on a machine without `.doze`
-set up asks once (root installs without asking; a terminal gets a Y/n prompt; with neither,
-it prints the command and exits).
+set up asks once: root installs without asking; a terminal (both stdin and stderr) gets a
+Y/n prompt, where Enter, `y` or `yes` runs one `sudo` and anything else, end of input
+included, changes nothing; with neither, it prints the command and exits 1.
 
 ## A note on `--advertised-host`
 

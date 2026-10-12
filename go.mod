@@ -8,6 +8,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/IBM/sarama v1.61.1
 	github.com/bufbuild/protocompile v0.14.1
+	github.com/creack/pty v1.1.24
 	github.com/doze-dev/doze-names v0.1.1-0.20261010121557-dc00aeec3013
 	github.com/golang/snappy v1.0.0
 	github.com/hamba/avro/v2 v2.31.0
@@ -17,6 +18,7 @@ require (
 	github.com/twmb/franz-go v1.22.1
 	github.com/twmb/franz-go/pkg/kmsg v1.14.0
 	go.etcd.io/bbolt v1.5.0
+	golang.org/x/term v0.46.0
 	google.golang.org/protobuf v1.36.12
 )
 
@@ -155,7 +157,6 @@ require (
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.49.0 // indirect

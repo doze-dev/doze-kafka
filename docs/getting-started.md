@@ -48,9 +48,11 @@ You'll see it come up, with everything you need to connect:
 ```
 
 The first time, if `.doze` names are not set up on the machine, it asks once
-(`Set it up now? [Y/n]`, one `sudo`, per machine rather than per project). With no
-terminal to ask on it prints the command to run and exits rather than waiting on a
-password. `doze-kafka --listen 127.0.0.1:9092` skips names entirely.
+(`Set it up now? [Y/n]`, one `sudo`, per machine rather than per project). It asks
+only when both its input and its error output are a terminal, and only Enter, `y` or
+`yes` runs `sudo`. Started any other way (a service manager, CI, `nohup`,
+`</dev/null`, a pipe) it prints the command to run and exits 1 rather than waiting
+on a password; it never runs `sudo` there. `doze-kafka --listen 127.0.0.1:9092` skips names entirely.
 
 That's it — there's a Kafka broker at that name, and a web console at the URL on the
 next line ([Console](console.md)). Run `eval "$(doze-kafka env)"` in the client

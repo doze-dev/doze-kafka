@@ -17,8 +17,10 @@ doze-kafka dns-setup --print # the script, to read or run yourself
 `doctor` also lists which process holds which name: "my name stopped working" is usually
 another instance with the same name (start this one with `--name <other>`). When the name
 does not resolve on the machine the broker is on, it advertises its address instead, so
-clients still reach it. With no terminal and no setup, the broker prints the command and
-exits; it never waits on a password. `--listen host:port` serves an address and needs none
+clients still reach it. With no setup and no terminal (its input or its error output is
+something else: a pipe, a file, `/dev/null`), the broker prints the command and
+exits 1; it never runs `sudo` and never waits on a password. At a terminal it asks, and
+input that ends without an answer (Ctrl-D) changes nothing. `--listen host:port` serves an address and needs none
 of this.
 
 ## The client connects, then hangs or fails on the next request
