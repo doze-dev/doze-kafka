@@ -1212,6 +1212,7 @@ table.tbl.tf-table th:last-child, table.tbl.tf-table td:last-child { padding-rig
 :root[data-theme="contrast"] :focus-visible { outline-width: 3px; }
 
 /* The keys overlay (Sy-06), generated from the declared key map: three columns. */
+#help.overlay { padding-top: 10vh; } /* Sy-06's sheet is 90 px down at 900 high */
 .help { width: min(900px, 94vw); max-width: none; max-height: 86vh; display: flex; flex-direction: column; background: var(--card); }
 .help-h { padding: 12px 18px; border-bottom: 1px solid var(--line); flex: none; }
 .help-b { padding: 16px 18px; overflow-y: auto; display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }

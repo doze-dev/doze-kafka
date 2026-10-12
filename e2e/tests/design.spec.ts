@@ -826,6 +826,8 @@ test('the shortcuts sheet is three columns in a 900 px dialog, with no scroll (S
   const body = await page.locator('#help .help-b').evaluate((b) => ({ ch: b.clientHeight, sh: b.scrollHeight, cw: b.clientWidth, sw: b.scrollWidth }));
   expect(body.sh).toBeLessThanOrEqual(body.ch);
   expect(body.sw).toBeLessThanOrEqual(body.cw);
+  // The board's sheet starts 90 px down at 900 high (10vh), not 108.
+  await expect.poll(async () => Math.round((await help.boundingBox())!.y)).toBe(90);
 });
 
 test('Sy-05: the palette says the chord to a section on the first row of each group that is not the selected one', async ({ page, openPalette }) => {
