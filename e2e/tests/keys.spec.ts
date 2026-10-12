@@ -36,7 +36,9 @@ test('/ focuses the filter and c opens the create form', async ({ page }) => {
   await expect(page.locator('.list input[data-filter-target]')).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.locator('.list input[data-filter-target]')).not.toBeFocused();
-  await page.locator('body').click({ position: { x: 600, y: 400 } });
+  // (Not a click on the page to drop focus: where a click lands depends on how many
+  // topics the list holds, and on a row it opens that topic.)
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press('c');
   await expect(page).toHaveURL(/new\/topic$/);
 });
@@ -61,7 +63,7 @@ test('p pauses and resumes the live view on Traffic, and is produce on a topic',
 
 test('g then a letter goes to a section, and the chord lapses', async ({ page }) => {
   await page.goto('topics');
-  await page.locator('body').click({ position: { x: 700, y: 400 } });
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press('g');
   await page.keyboard.press('g');
   await expect(page).toHaveURL(/\/groups$/);

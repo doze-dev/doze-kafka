@@ -7,9 +7,18 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/config"
 )
 
+// lazilyChecked says TestBuiltLazily has run in this process.
+var lazilyChecked bool
+
 // The table is built on first use, not at start-up (the idle heap is held by B9).
 // This test must run before anything else here asks for a record.
 func TestBuiltLazily(t *testing.T) {
+	// The table is unbuilt once in a process. Under -count=2 the second run finds what
+	// the first one built, which is not the table being built at start-up.
+	if lazilyChecked {
+		t.Skip("checked on the first run of this process; the table stays built after it")
+	}
+	lazilyChecked = true
 	if byKey != nil || order != nil {
 		t.Fatal("the table was built before anything asked for it")
 	}
