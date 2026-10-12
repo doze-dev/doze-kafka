@@ -105,6 +105,8 @@ func (a *authenticator) step(conn *protocol.Conn, mechanism string, in []byte) (
 }
 
 // plainStep verifies a SASL/PLAIN response: [authzid] NUL authcid NUL password.
+//
+//fuzz:parser class=sasl FuzzSASLPlain
 func (a *authenticator) plainStep(in []byte) (out []byte, done bool, user string, err error) {
 	parts := bytes.Split(in, []byte{0})
 	if len(parts) != 3 {

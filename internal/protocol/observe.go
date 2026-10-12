@@ -129,6 +129,8 @@ func (r *Request) Noted(q kmsg.Request, resp kmsg.Response) { r.decoded, r.answe
 
 // Describe is what the API table says this request was about. Safe with a nil
 // request or response (a handler that failed, an acks=0 produce).
+//
+//fuzz:parser FuzzDescribe
 func (r *Request) Describe() Summary {
 	var s Summary
 	for i := range APIs {

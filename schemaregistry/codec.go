@@ -33,6 +33,8 @@ import (
 )
 
 // WireID reports the schema id a value in Confluent's wire format names.
+//
+//fuzz:parser FuzzDecode
 func WireID(value []byte) (id int, ok bool) {
 	if len(value) < 5 || value[0] != 0 {
 		return 0, false
@@ -70,6 +72,8 @@ func (c *Codec) Type() string { return c.p.Type() }
 var avroLimits = avro.Config{MaxByteSliceSize: 8 << 20, MaxSliceAllocSize: 1 << 20}.Freeze()
 
 // Decode turns a whole record value (header included) into JSON text.
+//
+//fuzz:parser FuzzDecode
 func (c *Codec) Decode(value []byte) (out string, err error) {
 	// The bytes are whatever a producer wrote; a decoder that trips over them must say
 	// so, not take the caller down with it.
@@ -122,6 +126,8 @@ func (c *Codec) Decode(value []byte) (out string, err error) {
 }
 
 // Encode turns JSON text into a record value for schema id.
+//
+//fuzz:parser FuzzEncode
 func (c *Codec) Encode(id int, doc string) ([]byte, error) {
 	head := make([]byte, 5)
 	binary.BigEndian.PutUint32(head[1:], uint32(id))
@@ -176,6 +182,8 @@ func (c *Codec) Encode(id int, doc string) ([]byte, error) {
 
 // readMessageIndex reads Protobuf's message-index list: a zigzag-varint count, then
 // that many zigzag varints. A count of zero stands for [0].
+//
+//fuzz:parser FuzzDecode
 func readMessageIndex(b []byte) (idx []int, rest []byte, err error) {
 	n, k := binary.Varint(b)
 	if k <= 0 {
@@ -213,6 +221,7 @@ func messageAt(msgs protoreflect.MessageDescriptors, idx []int) (protoreflect.Me
 	return md, nil
 }
 
+//fuzz:parser FuzzEncode
 func parseJSONValue(doc string) (any, error) {
 	dec := json.NewDecoder(strings.NewReader(doc))
 	dec.UseNumber()

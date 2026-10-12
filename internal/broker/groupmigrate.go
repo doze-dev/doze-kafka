@@ -160,6 +160,8 @@ func (gm *groupManager) giveClassic(id string, snap classicSnapshot) bool {
 
 // decodeClassicAssignment reads a classic consumer's assignment (version, topics with
 // their partitions, user data) as topic names with partitions.
+//
+//fuzz:parser FuzzDecodeConsumerProtocol
 func decodeClassicAssignment(b []byte) map[string][]int32 {
 	if len(b) < 6 {
 		return nil

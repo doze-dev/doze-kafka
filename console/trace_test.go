@@ -70,6 +70,36 @@ func TestTraceIDsAreReadFromEveryConvention(t *testing.T) {
 	}
 }
 
+// Found by FuzzTraceHeaders' seeds: a B3 span or parent id was taken from the header
+// as it stood, of any length and content, and shown on the trace page as a span id.
+// The trace id still finds the record; what is not a span id is left out.
+func TestAB3SpanThatIsNotASpanIDIsLeftOut(t *testing.T) {
+	long := strings.Repeat("a", 1<<16)
+	for _, tc := range []struct {
+		name         string
+		h            []MessageHeader
+		span, parent string
+	}{
+		{"b3 single, markup for a span", []MessageHeader{hdr("b3", traceA+"-<script>alert(1)</script>")}, "", ""},
+		{"b3 single, an oversized span", []MessageHeader{hdr("b3", traceA+"-"+long)}, "", ""},
+		{"b3 single, an empty span", []MessageHeader{hdr("b3", traceA+"-")}, "", ""},
+		{"b3 single, a bad span and a good parent", []MessageHeader{hdr("b3", traceA+"-zz-1-"+parentA)}, "", parentA},
+		{"b3 single, a good span and a bad parent", []MessageHeader{hdr("b3", traceA+"-"+spanA+"-1-"+parentA+"0")}, spanA, ""},
+		{"b3 multi, a span with a line break", []MessageHeader{hdr("X-B3-TraceId", traceA), hdr("X-B3-SpanId", "x\r\nX-Injected: 1"), hdr("X-B3-ParentSpanId", parentA)}, "", parentA},
+		{"b3 multi, an oversized parent", []MessageHeader{hdr("X-B3-TraceId", traceA), hdr("X-B3-SpanId", strings.ToUpper(spanA)), hdr("X-B3-ParentSpanId", long)}, spanA, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ref := traceOf(tc.h, "")
+			if ref == nil || ref.ID != traceA || ref.Kind != "B3" {
+				t.Fatalf("got %+v, want the B3 trace %s", ref, traceA)
+			}
+			if ref.Span != tc.span || ref.Parent != tc.parent {
+				t.Errorf("span %q parent %q, want %q and %q", clip(ref.Span), clip(ref.Parent), tc.span, tc.parent)
+			}
+		})
+	}
+}
+
 // B3 may carry the 64-bit form of a 128-bit id: the two name one trace.
 func TestAShortB3IDMatchesTheLongOne(t *testing.T) {
 	long := "0000000000000000463ac35c9f6413ad"

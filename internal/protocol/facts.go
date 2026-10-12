@@ -58,6 +58,8 @@ type Facts struct {
 
 // DescribeFacts reads what it can from a decoded request and the response the handler
 // filled in (nil for a request that was not answered).
+//
+//fuzz:parser FuzzDescribe
 func DescribeFacts(q kmsg.Request, r kmsg.Response) Facts {
 	var f Facts
 	if q == nil {

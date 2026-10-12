@@ -25,9 +25,15 @@ import (
 // hostAllowed reports whether a request's Host header names somewhere this
 // console should answer. extra holds additional hostnames the operator allowed
 // (--console-allow-host); "*" disables the check.
+//
+// Only digits after the last colon are a port. Anything else there is part of
+// what the header names ("localhost:pw@evil.example" names evil.example, not
+// localhost), so the whole text is judged, and refused.
+//
+//fuzz:parser FuzzHostGuard
 func hostAllowed(hostport string, extra []string) bool {
 	host := hostport
-	if h, _, err := net.SplitHostPort(hostport); err == nil {
+	if h, port, err := net.SplitHostPort(hostport); err == nil && strings.Trim(port, "0123456789") == "" {
 		host = h
 	}
 	host = strings.TrimSuffix(strings.ToLower(strings.Trim(host, "[]")), ".")

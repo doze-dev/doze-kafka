@@ -227,6 +227,8 @@ func cg848Error(code int16, msg string) cg848Result {
 
 // heartbeat processes one ConsumerGroupHeartbeat: join (epoch 0), poll (epoch > 0),
 // or leave (epoch -1, or -2 for a static member that will be back).
+//
+//fuzz:parser FuzzGroupSequence
 func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clientRef) cg848Result {
 	if r.Group == "" || meta.ValidateGroupID(r.Group) != nil {
 		return cg848Error(kerr.InvalidRequest.Code, "the group id is empty or not usable")

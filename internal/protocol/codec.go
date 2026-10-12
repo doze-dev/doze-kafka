@@ -11,6 +11,8 @@ import (
 // skipping the request-header tagged fields on flexible versions. Handlers that
 // need the request (e.g. Metadata) call this; ApiVersions does not, since it only
 // builds a response.
+//
+//fuzz:parser class=request-body FuzzParseAndDecodeRequest, FuzzDescribe
 func DecodeRequest(header RequestHeader, body []byte) (kmsg.Request, error) {
 	req := kmsg.RequestForKey(int16(header.APIKey))
 	if req == nil {
@@ -71,6 +73,8 @@ func flexibleResponse(key APIKey, version int16) bool {
 // count followed by that many {tag, size, bytes} entries — and returns the
 // remainder. It is defensive: a malformed section returns whatever is left rather
 // than panicking.
+//
+//fuzz:parser class=request-body FuzzSkipTaggedFields, FuzzParseAndDecodeRequest
 func skipTaggedFields(b []byte) []byte {
 	n, adv := binary.Uvarint(b)
 	if adv <= 0 {

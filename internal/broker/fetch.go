@@ -172,6 +172,8 @@ func newFetchBudget(maxBytes int32) *fetchBudget {
 }
 
 // readPartition fills rp from one partition and returns the record bytes read.
+//
+//fuzz:not-a-parser reads a partition's stored batches for a Fetch; its string is a topic name already resolved, and no bytes from outside are parsed here
 func (b *Broker) readPartition(topic string, part kmsg.FetchRequestTopicPartition, fr *kmsg.FetchRequest, rp *kmsg.FetchResponseTopicPartition, budget *fetchBudget) int {
 	plog, err := b.logs.ExistingPartition(topic, part.Partition)
 	if errors.Is(err, log.ErrNoSuchPartition) {

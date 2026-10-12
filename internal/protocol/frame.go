@@ -41,6 +41,8 @@ const (
 
 // ReadFrame reads one length-prefixed Kafka message — a 4-byte big-endian length
 // followed by that many bytes — and returns the payload without the prefix.
+//
+//fuzz:parser class=frame FuzzReadFrame
 func ReadFrame(r io.Reader) ([]byte, error) { return ReadFrameLimit(r, maxFrameBytes) }
 
 // ReadFrameLimit is ReadFrame with a caller-chosen size cap, refusing an
@@ -51,6 +53,8 @@ func ReadFrame(r io.Reader) ([]byte, error) { return ReadFrameLimit(r, maxFrameB
 // pin up to the cap of memory per connection (and a few hundred connections
 // exhaust the machine). Past frameChunk the buffer therefore grows as data
 // arrives: a peer that claims 100 MiB and sends nothing costs one chunk.
+//
+//fuzz:parser class=frame FuzzReadFrame
 func ReadFrameLimit(r io.Reader, limit int) ([]byte, error) {
 	var lenBuf [4]byte
 	if _, err := io.ReadFull(r, lenBuf[:]); err != nil {

@@ -41,6 +41,8 @@ var topicSettings = []topicSetting{
 }
 
 // parseChoice accepts exactly one of the given values.
+//
+//fuzz:parser class=console-forms FuzzConsoleForms
 func parseChoice(options ...string) func(string) (string, error) {
 	return func(raw string) (string, error) {
 		for _, o := range options {
@@ -82,6 +84,7 @@ func scaled(raw string, units map[string]int64, what, examples string) (string, 
 	return strconv.FormatInt(n*mult, 10), nil
 }
 
+//fuzz:parser class=console-forms FuzzConsoleForms
 func parseDuration(raw string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "forever", "-1", "unlimited":
@@ -90,6 +93,7 @@ func parseDuration(raw string) (string, error) {
 	return scaled(raw, map[string]int64{"": 1, "ms": 1, "s": 1000, "m": 60_000, "h": 3_600_000, "d": 86_400_000}, "a length of time", "7d, 12h, 30m, 90s, or forever")
 }
 
+//fuzz:parser class=console-forms FuzzConsoleForms
 func parseSize(raw string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "unlimited", "-1", "forever":
@@ -98,6 +102,7 @@ func parseSize(raw string) (string, error) {
 	return sizeValue(raw)
 }
 
+//fuzz:parser class=console-forms FuzzConsoleForms
 func parseSegment(raw string) (string, error) { return sizeValue(raw) }
 
 func sizeValue(raw string) (string, error) {

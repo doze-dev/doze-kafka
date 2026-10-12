@@ -29,6 +29,8 @@ func badInput(format string, args ...any) error {
 }
 
 // decodeField turns a form field into bytes under its declared encoding.
+//
+//fuzz:parser class=console-forms FuzzConsoleForms
 func decodeField(name, raw, enc string) ([]byte, error) {
 	switch enc {
 	case "", "text":
@@ -62,6 +64,8 @@ func trimPadding(s string) string {
 // parseProduceForm validates what the compose panel sent. Every problem is
 // reported, where it used to be quietly coerced: bad header JSON dropped every
 // header, and a partition that was not a number became partition 0.
+//
+//fuzz:parser class=console-forms FuzzConsoleForms
 func parseProduceForm(r *http.Request, partitions int32) (produceInput, error) {
 	var in produceInput
 

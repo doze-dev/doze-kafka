@@ -242,6 +242,8 @@ func (e *offsetExpiry) forgetGroup(id string) {
 
 // decodeConsumerSubscription reads the topics out of a classic consumer's protocol
 // metadata (version 0 to 3: int16 version, array of topic names, user data).
+//
+//fuzz:parser FuzzDecodeConsumerProtocol
 func decodeConsumerSubscription(b []byte) (topics []string, ok bool) {
 	if len(b) < 6 {
 		return nil, false

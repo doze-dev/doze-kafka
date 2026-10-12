@@ -1,7 +1,6 @@
 package docs
 
 import (
-	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -10,75 +9,75 @@ import (
 	"testing"
 )
 
+// repoFuzzRules is what checkFuzzMarkers holds this repository to.
+func repoFuzzRules() fuzzRules {
+	return fuzzRules{
+		List: "testdata/fuzz-targets.txt",
+		// The packages that face the network: a function in one of these that is
+		// named and shaped like a parser must say which fuzz target reaches it, or
+		// why it is not a parser of untrusted bytes.
+		Net: []string{
+			"internal/protocol", "internal/storage/log", "internal/telemetry", "internal/broker",
+			"internal/config", "schemaregistry", "console", "internal/storage/meta",
+		},
+		// B12's list of parsers. Each needs a function marked class=<name>.
+		Classes: []string{
+			"frame", "request-header", "request-body", "record-batch", "record-reader",
+			"decompression", "otlp", "sasl", "acl-filters", "config-values",
+			"registry-rest", "schema-texts", "trace-headers", "console-forms",
+		},
+		Owned: ownedElsewhere,
+	}
+}
+
+// ownedElsewhere holds the markers of functions in files this work could not
+// edit (internal/storage/log's non-test files, console/traffic*.go). Each entry
+// is a //fuzz: marker in waiting: move it into the function's doc comment and
+// delete it here (the test says so once the function has a marker).
+var ownedElsewhere = []fuzzOwned{
+	// internal/storage/log: the record batch, the record reader, decompression.
+	{File: "internal/storage/log/batch.go", Func: "ValidateBatches", Targets: []string{"FuzzValidateBatches"}, Class: "record-batch",
+		Reason: "the target calls it on the fuzzed payload"},
+	{File: "internal/storage/log/batch.go", Func: "parseHeader", Targets: []string{"FuzzValidateBatches", "FuzzScanLog", "FuzzCheckRecords"}, Class: "record-batch",
+		Reason: "ValidateBatches, scanLog and CheckRecords all walk a payload with it"},
+	{File: "internal/storage/log/batch.go", Func: "ParseBatch", Targets: []string{"FuzzValidateBatches"}, Class: "record-batch",
+		Reason: "the target calls it on every batch ValidateBatches accepted"},
+	{File: "internal/storage/log/recovery.go", Func: "scanLog", Targets: []string{"FuzzScanLog"}, Class: "record-batch",
+		Reason: "the target calls it over the fuzzed bytes as a segment file"},
+	{File: "internal/storage/log/recordcodec.go", Func: "DecodeRecords", Targets: []string{"FuzzDecodeRecords"}, Class: "record-reader",
+		Reason: "the target calls it on the fuzzed batch"},
+	{File: "internal/storage/log/compact.go", Func: "CheckRecords", Targets: []string{"FuzzCheckRecords"}, Class: "record-reader",
+		Reason: "the target calls it on the fuzzed payload"},
+	{File: "internal/storage/log/records.go", Func: "Decompress", Targets: []string{"FuzzDecompress"}, Class: "decompression",
+		Reason: "the target calls it with every codec"},
+	{File: "internal/storage/log/records.go", Func: "xerialReader.Read", Targets: []string{"FuzzDecompress"}, Class: "decompression",
+		Reason: "Decompress with codec 2 and a xerial header reads its blocks through it (the target's xerial seeds)"},
+	{File: "internal/storage/log/records.go", Func: "readAllInflated", Targets: []string{"FuzzDecompress"}, Class: "decompression",
+		Reason: "Decompress reads every codec's stream whole through it"},
+	{File: "internal/storage/log/records.go", Func: "boundedReader.Read",
+		NotParser: "an io.Reader that counts what a decompressor produced against a limit; its []byte is the buffer it fills, and it parses nothing"},
+	{File: "internal/storage/log/logstart.go", Func: "readLogStart",
+		NotParser: "reads the log-start file this broker wrote itself (writeLogStart) in its own data directory; its string is that directory's path"},
+	// console/traffic*.go.
+	{File: "console/traffic_inspect.go", Func: "decodedView",
+		NotParser: "indents the JSON the broker's own recorder wrote about a request (protocol.DescribeFacts, at most 1 KiB) with encoding/json, and shows it as it stands when that fails"},
+}
+
 // Foundation B12: every parser of untrusted bytes has a fuzz target, and the three
 // places that say so agree: the Fuzz functions in the source, testdata/fuzz-targets.txt
 // (which `task fuzz` and the weekly workflow read), and the parser table in
-// architecture.md.
+// architecture.md. And in the direction that matters: every function that reads
+// bytes from outside names a target that exists and is run, every target is named
+// by such a function, every class of parser the plan lists has one, and nothing
+// in a package that faces the network is shaped like a parser and unmarked
+// (checkFuzzMarkers, which fuzzmarkers_selftest_test.go shows failing on each).
 func TestEveryFuzzTargetIsRunAndDocumented(t *testing.T) {
-	root := ".."
-	fuzzFunc := regexp.MustCompile(`(?m)^func (Fuzz\w+)\(\w+ \*testing\.F\)`)
-	inSource := map[string]bool{} // "./pkg Name"
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			if n := d.Name(); path != root && strings.HasPrefix(n, ".") {
-				return filepath.SkipDir // .git, .claude (agent worktrees), .audit
-			}
-			switch d.Name() {
-			case "node_modules", ".git", "kmsg", "module", "e2e", "testdata":
-				return filepath.SkipDir
-			}
-			if strings.HasPrefix(d.Name(), ".embeddoc-") {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		for _, m := range fuzzFunc.FindAllSubmatch(raw, -1) {
-			rel, _ := filepath.Rel(root, filepath.Dir(path))
-			inSource["./"+filepath.ToSlash(rel)+" "+string(m[1])] = true
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	rep := checkFuzzMarkers(os.DirFS(".."), repoFuzzRules())
+	inSource := rep.Targets
 	if len(inSource) < 20 {
 		t.Fatalf("found %d fuzz targets in the source; the walk is broken", len(inSource))
 	}
-
-	listed := map[string]bool{}
-	raw, err := os.ReadFile(filepath.Join(root, "testdata", "fuzz-targets.txt"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, line := range strings.Split(string(raw), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		listed[strings.Join(strings.Fields(line), " ")] = true
-	}
-
-	var problems []string
-	for k := range inSource {
-		if !listed[k] {
-			problems = append(problems, "is a Fuzz function and is not in testdata/fuzz-targets.txt: "+k)
-		}
-	}
-	for k := range listed {
-		if !inSource[k] {
-			problems = append(problems, "is in testdata/fuzz-targets.txt and no such Fuzz function exists: "+k)
-		}
-	}
+	problems := rep.Problems
 	arch, err := os.ReadFile("architecture.md")
 	if err != nil {
 		t.Fatal(err)

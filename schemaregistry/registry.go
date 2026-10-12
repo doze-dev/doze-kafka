@@ -220,6 +220,8 @@ func typeField(t string) string {
 
 // resolve follows references to the schemas they name, dependencies first. Following
 // stops at a cycle, which is reported.
+//
+//fuzz:parser FuzzRegisterReferences
 func (r *Registry) resolve(refs []Reference) ([]resolvedRef, *Error) {
 	var out []resolvedRef
 	seen := map[string]bool{}
@@ -389,6 +391,8 @@ func canRead(reader, writer parsedSchema) []string {
 // Register stores a schema under a subject and returns its id. A schema the subject
 // already holds is not stored again. Anything else must be compatible with the subject's
 // history, at the level in force.
+//
+//fuzz:parser FuzzRegisterAndCompare, FuzzRegisterReferences, FuzzAPIBody
 func (r *Registry) Register(subject string, in SchemaInput, normalize bool) (RegisterResult, *Error) {
 	if subject == "" {
 		return RegisterResult{}, newErr(422, codeInvalidRequest, "Subject may not be empty")
@@ -499,6 +503,8 @@ func (r *Registry) Lookup(subject string, in SchemaInput, normalize, deleted boo
 }
 
 // parseVersion reads a version path element: a number, "latest", or -1.
+//
+//fuzz:parser class=registry-rest FuzzVersionPath
 func parseVersion(s string) (int, bool, *Error) {
 	if s == "latest" || s == "-1" {
 		return 0, true, nil

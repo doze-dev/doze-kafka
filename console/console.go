@@ -203,6 +203,7 @@ func (c *Console) templates() *template.Template {
 // Close releases the console's Kafka client.
 func (c *Console) Close() { c.be.close() }
 
+//fuzz:parser class=console-forms FuzzConsoleForms
 func (c *Console) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// DNS rebinding: refuse any Host name we were not expecting, for every
 	// method — a rebound GET reads the whole console too (hostguard.go).

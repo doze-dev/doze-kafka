@@ -27,6 +27,8 @@ type ACL struct {
 }
 
 // key is what makes two entries the same entry. Every field takes part.
+//
+//fuzz:parser FuzzACLKey
 func (a ACL) key() []byte {
 	return []byte(strings.Join([]string{
 		strconv.Itoa(int(a.ResourceType)), a.Name, strconv.Itoa(int(a.PatternType)),

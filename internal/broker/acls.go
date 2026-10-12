@@ -44,6 +44,8 @@ const (
 func known(v int8, max int8) bool { return v >= 1 && v <= max }
 
 // validateFilter says why a filter cannot be used, or "" if it can.
+//
+//fuzz:parser class=acl-filters FuzzACLFilterMatches
 func (f aclFilter) validate() string {
 	switch {
 	case !known(f.resourceType, 7):
@@ -59,6 +61,8 @@ func (f aclFilter) validate() string {
 }
 
 // matches is Kafka's AclBindingFilter.matches.
+//
+//fuzz:parser class=acl-filters FuzzACLFilterMatches
 func (f aclFilter) matches(a meta.ACL) bool {
 	if f.resourceType != aclAny && f.resourceType != a.ResourceType {
 		return false
@@ -95,6 +99,8 @@ func (f aclFilter) matches(a meta.ACL) bool {
 
 // validateCreation says why an entry cannot be stored, or "" if it can: a stored
 // entry is concrete (no "any", no "match"), and its principal says what kind it is.
+//
+//fuzz:parser FuzzACLFilterMatches
 func validateCreation(a meta.ACL) string {
 	switch {
 	case !known(a.ResourceType, 7) || a.ResourceType == aclAny:

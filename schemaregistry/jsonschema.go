@@ -24,6 +24,7 @@ func jsonRefURL(name string) string {
 	return "mem:///" + strings.TrimPrefix(name, "/")
 }
 
+//fuzz:parser class=schema-texts FuzzRegisterAndCompare
 func parseJSONSchema(text string, refs []resolvedRef) (parsedSchema, error) {
 	compiler := jsonschema.NewCompiler()
 	compiler.DefaultDraft(jsonschema.Draft7) // Confluent's default when a schema names no draft.

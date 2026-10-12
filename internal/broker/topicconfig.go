@@ -14,4 +14,6 @@ import "github.com/doze-dev/doze-kafka/internal/settings"
 
 // validateTopicConfig reports the first key that is not a Kafka topic config, or
 // whose value Kafka would refuse.
+//
+//fuzz:parser class=config-values FuzzTopicConfigValues
 func validateTopicConfig(config map[string]string) error { return settings.ValidateTopic(config) }

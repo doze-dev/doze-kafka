@@ -57,6 +57,8 @@ func recordMatches(m Message, needle []byte) bool {
 // scanPartition reads up to budget records of one partition ending just before
 // `before` (-1 = the end of the log), newest chunk first, and returns the matches
 // with the range it read: [from, to).
+//
+//fuzz:not-a-parser fetches records with the Kafka client and compares their bytes with the needle; the needle is searched for, never parsed
 func (c *Console) scanPartition(ctx context.Context, topic string, partition int32, needle []byte, before int64, budget int) (hits []Message, from, to, earliest int64, err error) {
 	earliest, latest, err := c.be.PartitionOffsets(ctx, topic, partition)
 	if err != nil {

@@ -54,6 +54,13 @@ func headerValue(h []MessageHeader, name string) (string, bool) {
 // traceRefs reads every trace id a record carries, most specific first. custom is the
 // name of an extra header whose whole value is the id (a request id, a correlation id).
 // A record may carry several conventions; all of them find it.
+//
+// Record headers are whatever a producer wrote, so every id returned is checked:
+// a W3C or B3 trace id is lower-case hex of the right length and not all zeros, a
+// span or parent id is 16 lower-case hex digits or absent, and the configured
+// header's value is at most 128 bytes of text.
+//
+//fuzz:parser class=trace-headers FuzzTraceHeaders
 func traceRefs(h []MessageHeader, custom string) []traceRef {
 	var out []traceRef
 	if v, ok := headerValue(h, "traceparent"); ok {
@@ -66,7 +73,13 @@ func traceRefs(h []MessageHeader, custom string) []traceRef {
 		// is only a sampling decision.
 		parts := strings.Split(strings.ToLower(v), "-")
 		if len(parts) >= 2 && b3IDRE.MatchString(parts[0]) && !isZeros(parts[0]) {
-			ref := traceRef{ID: parts[0], Kind: "B3", Span: parts[1]}
+			// The trace id is what the scan matches on; a span or parent that is not a
+			// span id (a producer may write anything, of any length) is left out
+			// instead of being shown as one.
+			ref := traceRef{ID: parts[0], Kind: "B3"}
+			if spanIDRE.MatchString(parts[1]) {
+				ref.Span = parts[1]
+			}
 			if len(parts) >= 4 && spanIDRE.MatchString(parts[3]) {
 				ref.Parent = parts[3]
 			}
@@ -76,10 +89,10 @@ func traceRefs(h []MessageHeader, custom string) []traceRef {
 	if v, ok := headerValue(h, "x-b3-traceid"); ok {
 		if id := strings.ToLower(v); b3IDRE.MatchString(id) && !isZeros(id) {
 			ref := traceRef{ID: id, Kind: "B3"}
-			if s, ok := headerValue(h, "x-b3-spanid"); ok {
+			if s, ok := headerValue(h, "x-b3-spanid"); ok && spanIDRE.MatchString(strings.ToLower(s)) {
 				ref.Span = strings.ToLower(s)
 			}
-			if p, ok := headerValue(h, "x-b3-parentspanid"); ok {
+			if p, ok := headerValue(h, "x-b3-parentspanid"); ok && spanIDRE.MatchString(strings.ToLower(p)) {
 				ref.Parent = strings.ToLower(p)
 			}
 			out = append(out, ref)

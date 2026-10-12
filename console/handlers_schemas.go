@@ -422,6 +422,8 @@ func (c *Console) msgView(ctx context.Context, topic string, m Message) msgView 
 
 // readThroughRegistry replaces the display of a value that a registry-aware serializer
 // wrote with the JSON it decodes to.
+//
+//fuzz:not-a-parser hands the record value to registryClient.decode and lays out the JSON that comes back; it reads no bytes itself
 func (c *Console) readThroughRegistry(ctx context.Context, topic string, v bytesView, raw []byte) bytesView {
 	if c.reg == nil || v.Null || v.Empty {
 		return v

@@ -6,6 +6,14 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Console: a B3 span or parent id in a record's headers is shown only when it is one (16
+  hex digits). A producer can write anything there, of any length, and the Trace page
+  printed it as "span …"; such a value is now left out, and the trace id still finds
+  the record. The console's Host check takes only digits after the last colon as a
+  port: a `Host` like `localhost:x@other.example` was judged as `localhost` and served,
+  and is now refused. Both were found by fuzz targets added for the trace-header parser
+  and the Host check.
+
 - Console: every button reads weight 400 whether it is a button or a link drawn as one (the
   boards draw them all as buttons). A request that took under a millisecond shows its
   measured time (`42 µs`, `0.4 ms`) rather than the design boards' `0 ms`: a broker

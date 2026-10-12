@@ -86,6 +86,8 @@ type scramConversation struct {
 // scramFirst handles the client-first message and produces the server-first
 // message (r=<nonce>,s=<salt>,i=<iters>), returning the conversation state to
 // carry into the final step.
+//
+//fuzz:parser class=sasl FuzzSCRAMClientFirst
 func (a *authenticator) scramFirst(mechanism string, in []byte) ([]byte, *scramConversation, error) {
 	newHash := scramHashFor(mechanism)
 	s := string(in)
@@ -140,6 +142,8 @@ func (a *authenticator) scramFirst(mechanism string, in []byte) ([]byte, *scramC
 
 // scramFinal verifies the client-final message's proof and produces the
 // server-final message (v=<server-signature>).
+//
+//fuzz:parser class=sasl FuzzSCRAMClientFinal
 func scramFinal(conv *scramConversation, in []byte) ([]byte, error) {
 	attrs := scramAttrs(string(in))
 	channel, nonce, proofB64 := attrs['c'], attrs['r'], attrs['p']
@@ -193,6 +197,8 @@ func randomNonce() (string, error) {
 
 // scramAttrs parses a comma-separated SCRAM message into single-letter attributes
 // (a=…,b=…). A malformed field is skipped.
+//
+//fuzz:parser class=sasl FuzzSCRAMUsernameEscaping, FuzzSCRAMClientFirst, FuzzSCRAMClientFinal
 func scramAttrs(s string) map[byte]string {
 	out := make(map[byte]string)
 	for _, part := range strings.Split(s, ",") {
@@ -204,6 +210,8 @@ func scramAttrs(s string) map[byte]string {
 }
 
 // scramUnescape reverses SCRAM username escaping (=2C for ',' and =3D for '=').
+//
+//fuzz:parser class=sasl FuzzSCRAMUsernameEscaping, FuzzSCRAMClientFirst
 func scramUnescape(s string) string {
 	s = strings.ReplaceAll(s, "=2C", ",")
 	s = strings.ReplaceAll(s, "=3D", "=")

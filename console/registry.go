@@ -378,6 +378,8 @@ type decoded struct {
 // decode reads a value written by a registry-aware serializer. ok is false for
 // anything else (a plain string, a binary of another kind, an id the registry does not
 // know), which is then shown as it always was.
+//
+//fuzz:not-a-parser looks up the codec for the id and hands the value to schemaregistry.WireID and Codec.Decode, which parse it and are fuzzed there (FuzzDecode)
 func (rc *registryClient) decode(ctx context.Context, topic string, value []byte) (decoded, bool) {
 	id, ok := schemaregistry.WireID(value)
 	if !ok {

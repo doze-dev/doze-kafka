@@ -117,6 +117,17 @@ is the list); the weekly workflow runs each for at least 60 seconds, and a test
 (`docs/fuzz_test.go`) fails when a `Fuzz` function is missing from the list or from
 this table.
 
+The same test holds the code to the list. A function that reads bytes from outside
+says which targets reach it in the last line of its doc comment
+(`//fuzz:parser class=frame FuzzReadFrame`), and the test fails when a marker names
+a target that does not exist, when a listed target is named by no marker, when one
+of the classes of parser below has no marked function, and when a function in a
+package that faces the network is named and shaped like a parser (`Parse…`,
+`Decode…`, `Unmarshal…`, `Read…`, `Scan…` taking a `[]byte`, `string`, `io.Reader`
+or `*http.Request`) and carries neither that marker nor
+`//fuzz:not-a-parser <why>`. The net is by name: a parser written inline, or called
+something else, is still its author's to mark.
+
 | Parser | Where | Fuzz target |
 |---|---|---|
 | Frame (length prefix, size cap) | `internal/protocol` | `FuzzReadFrame` |
@@ -139,13 +150,18 @@ this table.
 | Registry REST bodies, every route | `schemaregistry` | `FuzzAPIBody` |
 | Protobuf descriptors | `schemaregistry` | `FuzzDescriptor` |
 | Schema references (graph shapes) | `schemaregistry` | `FuzzRegisterReferences` |
+| A JSON document to encode under a schema (the console's compose panel) | `schemaregistry` | `FuzzEncode` |
+| The version in a registry path | `schemaregistry` | `FuzzVersionPath` |
 | The console's form inputs and query strings | `console` (driven through its handler) | `FuzzConsoleForms` |
+| Trace headers in a record (W3C `traceparent`, B3, the configured header) | `console` | `FuzzTraceHeaders` |
+| The Host header (the DNS-rebinding guard) | `console` | `FuzzHostGuard` |
 
-Not yet covered, with the reason: the console's trace-header parser and its
-consumer-protocol decoder (member metadata and assignment bytes) are unexported
-inside `console/`, which the foundation work does not touch; their targets
-(`FuzzTraceRefs`, `FuzzConsumerProtocolDecode`) are owed to the Trace and Groups
-stages.
+Not yet covered, with the reason: the console reads a classic group member's
+assignment bytes inline in `describeGroupClassic` (`console/backend_groups.go`),
+with the Kafka client library's decoder, behind a DescribeGroups call; a target
+for it needs a group whose leader sends fuzzed bytes, and is owed to the Groups
+stage. The console's schema forms (`/schemas/…`) need a registry behind the
+console, which `FuzzConsoleForms` does not start.
 
 ## Why this stays small
 

@@ -22,6 +22,7 @@ func (a *avroSchema) Canonical(normalize bool) string {
 	return a.text
 }
 
+//fuzz:parser class=schema-texts FuzzRegisterAndCompare
 func parseAvro(text string, refs []resolvedRef) (parsedSchema, error) {
 	cache := &avro.SchemaCache{}
 	for _, r := range refs {

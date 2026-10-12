@@ -66,6 +66,8 @@ type tlsFile struct {
 // LoadFile reads a TOML config file and overlays it onto cfg: keys present in the
 // file replace cfg's current values; absent keys are left as-is. Unknown keys are
 // rejected so a typo ("retention_ms") fails loudly instead of being silently ignored.
+//
+//fuzz:parser class=config-values FuzzConfigFile
 func LoadFile(path string, cfg *Config) error {
 	var fc fileConfig
 	md, err := toml.DecodeFile(path, &fc)

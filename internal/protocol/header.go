@@ -17,6 +17,8 @@ type RequestHeader struct {
 
 // ParseRequestHeader decodes the request header from a frame payload and returns
 // the header together with the byte offset at which the request body begins.
+//
+//fuzz:parser class=request-header FuzzParseAndDecodeRequest, FuzzDescribe
 func ParseRequestHeader(frame []byte) (RequestHeader, int, error) {
 	r := NewReader(frame)
 	h := RequestHeader{

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"testing"
 
+	"github.com/golang/snappy"
 	"github.com/klauspost/compress/zstd"
 )
 
@@ -100,6 +101,20 @@ func FuzzDecompress(f *testing.F) {
 	f.Add(uint8(codecGzip), good, uint16(10))
 	f.Add(uint8(codecSnappy), append(append([]byte(nil), xerialMagic...), 0, 0, 0), uint16(100))
 	f.Add(uint8(codecSnappy), xerialMagic, uint16(100))
+	// A whole xerial stream (the 16 byte header, then length-prefixed snappy blocks, as
+	// the Java client writes it), the same cut inside its second block, and one whose
+	// block length claims more than is there: what the block reader has to walk. Without
+	// these no seed got past the header.
+	xerial := append(append([]byte(nil), xerialMagic...), 0, 0, 0, 1, 0, 0, 0, 1)
+	for _, part := range []string{"hello hello hello hello", "world world world"} {
+		block := snappy.Encode(nil, []byte(part))
+		xerial = binary.BigEndian.AppendUint32(xerial, uint32(len(block)))
+		xerial = append(xerial, block...)
+	}
+	f.Add(uint8(codecSnappy), xerial, uint16(100))
+	f.Add(uint8(codecSnappy), xerial, uint16(30))
+	f.Add(uint8(codecSnappy), xerial[:len(xerial)-5], uint16(100))
+	f.Add(uint8(codecSnappy), append(append([]byte(nil), xerial[:16]...), 0x7f, 0xff, 0xff, 0xff, 1), uint16(100))
 	// A zstd frame declaring a 64 MiB window over a megabyte of zeros: refused before the
 	// window is allocated (the produce path's bomb), and a tiny snappy block that claims
 	// the whole limit.

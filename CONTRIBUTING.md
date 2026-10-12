@@ -58,7 +58,13 @@ first and watch it fail.
   fixed. `go tool task fuzz` runs every target in `testdata/fuzz-targets.txt` for 30s
   each (`FUZZ_TIME=5m` for longer; `task fuzz -- Scram` for some); a new parser of
   untrusted bytes gets a target there and a row in `docs/architecture.md` (a test
-  fails otherwise). `soak` and `chaos` run the long harnesses.
+  fails otherwise). The parser says which target reaches it in the last line of its
+  doc comment, `//fuzz:parser [class=<class>] FuzzTarget[, FuzzOther]`; a function
+  that only looks like one (`Parse…`, `Decode…`, `Read…` taking bytes, text, a reader
+  or a request, in a package that faces the network) says
+  `//fuzz:not-a-parser <why>`. `docs/fuzz_test.go` fails on a parser-shaped function
+  with neither, and on a marker or a listed target with nothing at its other end.
+  `soak` and `chaos` run the long harnesses.
 - Tests notice when the code is wrong, not only when it runs: `go tool task
   mutate:check -- ./internal/protocol` fails on a surviving mutant that
   `testdata/mutation.json` does not list (`mutate:record` after killing or

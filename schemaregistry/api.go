@@ -37,6 +37,7 @@ func NewAPI(reg *Registry, opts Options) *API {
 // Registry is the store behind the API.
 func (a *API) Registry() *Registry { return a.reg }
 
+//fuzz:parser class=registry-rest FuzzAPIBody
 func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if a.opts.Auth != nil {
 		u, p, ok := r.BasicAuth()
@@ -105,6 +106,7 @@ func prefixParam(r *http.Request) string {
 	return p
 }
 
+//fuzz:parser class=registry-rest FuzzAPIBody
 func readInput(r *http.Request) (SchemaInput, *Error) {
 	var in SchemaInput
 	body, err := io.ReadAll(io.LimitReader(r.Body, 8<<20))

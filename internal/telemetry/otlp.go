@@ -67,6 +67,8 @@ type Payload struct {
 var ErrMalformed = errors.New("telemetry: not a valid OTLP metrics payload")
 
 // Decode reads an ExportMetricsServiceRequest.
+//
+//fuzz:parser class=otlp FuzzDecode
 func Decode(b []byte) (Payload, error) {
 	p := Payload{Resource: map[string]string{}}
 	err := eachField(b, func(num protowire.Number, typ protowire.Type, v []byte, _ uint64) error {
@@ -132,6 +134,8 @@ func eachField(b []byte, fn func(num protowire.Number, typ protowire.Type, bytes
 }
 
 // ResourceMetrics { Resource resource = 1; repeated ScopeMetrics scope_metrics = 2; }
+//
+//fuzz:parser class=otlp FuzzDecode
 func decodeResourceMetrics(b []byte, out *Payload) error {
 	return eachField(b, func(num protowire.Number, typ protowire.Type, v []byte, _ uint64) error {
 		if typ != protowire.BytesType {
@@ -159,6 +163,8 @@ func decodeResourceMetrics(b []byte, out *Payload) error {
 }
 
 // ScopeMetrics { InstrumentationScope scope = 1; repeated Metric metrics = 2; }
+//
+//fuzz:parser class=otlp FuzzDecode
 func decodeScopeMetrics(b []byte, out *Payload) error {
 	return eachField(b, func(num protowire.Number, typ protowire.Type, v []byte, _ uint64) error {
 		if num == 2 && typ == protowire.BytesType {
@@ -176,6 +182,8 @@ func decodeScopeMetrics(b []byte, out *Payload) error {
 
 // Metric { string name = 1; string description = 2; string unit = 3;
 // oneof data { Gauge gauge = 5; Sum sum = 7; Histogram histogram = 9; ... } }
+//
+//fuzz:parser class=otlp FuzzDecode
 func decodeMetric(b []byte) (Metric, error) {
 	var m Metric
 	err := eachField(b, func(num protowire.Number, typ protowire.Type, v []byte, _ uint64) error {
@@ -231,6 +239,8 @@ func decodeMetric(b []byte) (Metric, error) {
 
 // NumberDataPoint { repeated KeyValue attributes = 7; fixed64 time_unix_nano = 3;
 // oneof value { double as_double = 4; sfixed64 as_int = 6; } }
+//
+//fuzz:parser class=otlp FuzzDecode
 func decodeNumberPoint(b []byte) (Point, error) {
 	var p Point
 	var attrs []string
@@ -262,6 +272,8 @@ func decodeNumberPoint(b []byte) (Point, error) {
 
 // HistogramDataPoint { repeated KeyValue attributes = 9; fixed64 time_unix_nano = 3;
 // fixed64 count = 4; optional double sum = 5; }
+//
+//fuzz:parser class=otlp FuzzDecode
 func decodeHistogramPoint(b []byte) (Point, error) {
 	var p Point
 	var attrs []string
@@ -303,6 +315,8 @@ func joinAttrs(a []string) string {
 // KeyValue { string key = 1; AnyValue value = 2; }
 // AnyValue { oneof value { string string_value = 1; bool bool_value = 2; int64 int_value = 3;
 // double double_value = 4; ... } }
+//
+//fuzz:parser class=otlp FuzzDecode
 func decodeKeyValue(b []byte) (key, val string, ok bool, err error) {
 	err = eachField(b, func(num protowire.Number, typ protowire.Type, v []byte, _ uint64) error {
 		switch {

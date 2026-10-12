@@ -33,6 +33,8 @@ import (
 // map field is a repeated nested *Entry message with map_entry set (not map<k, v>), and a
 // proto2 file has no syntax line. It is not compiled (the compiler refuses map_entry written
 // out); the descriptor itself is the checked form.
+//
+//fuzz:parser class=schema-texts FuzzDescriptor
 func parseDescriptor(s string) (parsedSchema, bool) {
 	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(s))
 	if err != nil || len(raw) == 0 {
