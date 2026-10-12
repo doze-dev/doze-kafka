@@ -131,6 +131,45 @@ async function freePort(): Promise<number> {
   });
 }
 
+test('Sy-08 at 320 with a 60-character console prefix: an address is never broken mid-word, it scrolls in its own box', async ({ page }) => {
+  test.setTimeout(90_000);
+  const dir = mkdtempSync(join(tmpdir(), 'doze-first-run-prefix-'));
+  const bin = join(dir, 'doze-kafka');
+  execFileSync('go', ['build', '-o', bin, './cmd/doze-kafka'], { cwd: '..', env: { ...process.env, GOWORK: 'off' }, stdio: 'inherit' });
+  const consolePort = await freePort();
+  const prefix = '/' + 'p'.repeat(59);
+  let child: ChildProcess | undefined;
+  try {
+    child = spawn(bin, ['--listen', '127.0.0.1:0', '--console-addr', `127.0.0.1:${consolePort}`, '--console-prefix', prefix, '--schema-registry-addr', `127.0.0.1:${await freePort()}`, '--data-dir', join(dir, 'data')],
+      { env: { ...process.env, DOZE_ZONE: 'off' }, stdio: 'ignore' });
+    for (let i = 0; i < 100; i++) {
+      try { if ((await fetch(`http://127.0.0.1:${consolePort}/healthz`)).ok) break; } catch { /* not up yet */ }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    await page.setViewportSize({ width: 320, height: 800 });
+    await page.goto(`http://127.0.0.1:${consolePort}${prefix}/`);
+    await expect(page.locator('h1')).toHaveText('Your broker is up');
+    const values = page.locator('section.card .kv.kv-stack > .m');
+    expect(await values.count()).toBeGreaterThan(0);
+    let withPrefix = 0;
+    for (const v of await values.all()) {
+      const m = await v.evaluate((el) => {
+        const cs = getComputedStyle(el);
+        return { lines: Math.round(el.getBoundingClientRect().height / parseFloat(cs.lineHeight)), wrap: cs.overflowWrap, text: el.textContent!.trim(), scroll: el.scrollWidth > el.clientWidth };
+      });
+      expect(m.lines, `"${m.text}" is one line`).toBe(1);
+      expect(m.wrap, m.text).not.toBe('anywhere');
+      if (m.text.includes(prefix)) { withPrefix++; expect(m.scroll, `"${m.text}" scrolls in its own box`).toBe(true); }
+    }
+    expect(withPrefix, 'an address carrying the prefix is drawn').toBeGreaterThan(0);
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(over, 'the page does not scroll sideways').toBeLessThanOrEqual(0);
+  } finally {
+    child?.kill('SIGTERM');
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('a fresh empty broker lands on "Your broker is up", with the three steps', async ({ page }) => {
   test.setTimeout(90_000);
   const dir = mkdtempSync(join(tmpdir(), 'doze-first-run-'));

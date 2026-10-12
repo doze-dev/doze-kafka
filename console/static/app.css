@@ -321,8 +321,8 @@ span.num {
    beside its label, the label goes above the value, so an address is never broken
    mid-word (Sy-08 at 1440). */
 .steps > .card { container-type: inline-size; }
-.kv-stack > span { overflow-wrap: normal; }
-@container (max-width: 440px) { .kv-stack { grid-template-columns: 1fr; row-gap: 0; } .kv-stack > :nth-child(even) { margin-bottom: 5px; overflow-wrap: anywhere; } }
+.kv.kv-stack > span { overflow-wrap: normal; }
+@container (max-width: 440px) { .kv-stack { grid-template-columns: 1fr; row-gap: 0; } .kv-stack > :nth-child(even) { margin-bottom: 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; } }
 .snippets { align-items: flex-start; }
 @media (max-width: 1100px) { .steps { flex-wrap: wrap; } .firstrun { padding: 24px 20px 0; } }
 .workspace { flex: 1; min-width: 0; display: flex; flex-direction: column; }
