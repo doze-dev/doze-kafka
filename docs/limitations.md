@@ -177,7 +177,19 @@ implement it.
   isn't the sticky, cross-topic-balanced reference assignor. Static membership
   (`group.instance.id`) is accepted on the wire but not acted on.
 - **SASL details.** No Kerberos/GSSAPI, no OAUTHBEARER, no delegation tokens, and no
-  `SASLprep` normalization (use ASCII credentials).
+  `SASLprep` normalization (use ASCII credentials). `SaslHandshake` is served at v1
+  only: v0, after which a client sends its tokens without Kafka's framing, closes
+  the connection. Every answer to a login, right or wrong, in order or out of it,
+  is otherwise the one `apache/kafka:4.3.1` gives (`conformance/claims/auth.md`),
+  with two exceptions, both the stricter choice:
+  - A request sent in the middle of a login closes the connection without an answer.
+    Kafka first answers it `ILLEGAL_SASL_STATE` in that request's own error shape and
+    then closes. `ApiVersions` and `SaslHandshake`, the two a client could plausibly
+    send there, are answered as Kafka answers them.
+  - A SCRAM client-final message whose channel binding is not the header the exchange opened with is refused.
+    Kafka does not compare the two; RFC 5802 has a server do it.
+- **ApiVersions lists the APIs and versions this broker serves, not Kafka's.** See
+  `docs/api-support.md` for the table and how it is held to a real broker's.
 
 ## If you hit a wall
 

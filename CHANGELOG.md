@@ -6,6 +6,28 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- **Security: SASL.** A connection logs in once, as the user whose password it proved,
+  and stays that user. Before this (a) a PLAIN token naming another user as its
+  authorization id (`bob NUL alice NUL alice's password`) was accepted, where Kafka
+  refuses it; SCRAM ignored `a=` the same way; (b) a connection that had logged in could
+  send a second `SaslAuthenticate` and become that token's user (alice became bob with
+  bob's password), and a wrong password on it logged the connection out; (c) a refused
+  `SaslHandshake` left the connection open for another try. Every answer to a login now
+  is the one `apache/kafka:4.3.1` gives, from two recordings of it (`sasl-plain`, 143
+  steps; `sasl-scram`, 293 steps; `conformance/claims/auth.md`): the authorization id
+  must be empty or the user's own name; after a login `SaslHandshake` and
+  `SaslAuthenticate` are `ILLEGAL_SASL_STATE` and change nothing; a `SaslAuthenticate`
+  with no handshake, a second `ApiVersions` before the handshake and a request in the
+  middle of a login close the connection; a second handshake mid-login is
+  `ILLEGAL_SASL_STATE` and closed; the refusal texts are Kafka's ("Authentication
+  failed: Invalid username or password", the same for an unknown user); an accepted
+  token answers an empty error message, not a null one; SCRAM takes only the `n`
+  channel-binding flag (it accepted `y`), does not sign a reserved `m=` attribute,
+  refuses a bad `=XX` escape in a user name and anything around the three attributes of
+  a client-final message, and closes without an answer on a proof of the wrong length.
+  Two answers stay stricter than Kafka's and are written in `docs/limitations.md`.
+  `CreateAcls` answers an empty error message for an ACL it created, as Kafka does.
+
 - Console: every button reads weight 400 whether it is a button or a link drawn as one (the
   boards draw them all as buttons). A request that took under a millisecond shows its
   measured time (`42 µs`, `0.4 ms`) rather than the design boards' `0 ms`: a broker

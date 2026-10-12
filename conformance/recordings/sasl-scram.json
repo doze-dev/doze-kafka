@@ -1,0 +1,5877 @@
+{
+  "scenario": "sasl-scram",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "fixture-topics",
+      "conn": "admin",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "for-alice"
+          },
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "for-bob"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "for-alice",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          },
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "for-bob",
+            "TopicID": "\u003ctopic-id:2\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "fixture-acls",
+      "conn": "admin",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": [
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "DESCRIBE",
+            "PermissionType": "ALLOW",
+            "Principal": "User:alice",
+            "ResourceName": "for-alice",
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "TOPIC"
+          },
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "DESCRIBE",
+            "PermissionType": "ALLOW",
+            "Principal": "User:bob",
+            "ResourceName": "for-bob",
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": ""
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": ""
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "good-256-handshake",
+      "conn": "good-256",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "good-256-client-first",
+      "conn": "good-256",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-good-256."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-good-256.\u003cserver-nonce:1\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "good-256-client-final",
+      "conn": "good-256",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-good-256.\u003cserver-nonce:1\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "v=\u003cserver-signature\u003e",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "good-256-who",
+      "conn": "good-256",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "wrong-password-256-handshake",
+      "conn": "wrong-password-256",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "wrong-password-256-client-first",
+      "conn": "wrong-password-256",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-wrong-password-256."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-wrong-password-256.\u003cserver-nonce:2\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "wrong-password-256-client-final",
+      "conn": "wrong-password-256",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-wrong-password-256.\u003cserver-nonce:2\u003e,p=\u003cproof of nope\u003e"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "wrong-password-256-who",
+      "conn": "wrong-password-256",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "other-users-password-256-handshake",
+      "conn": "other-users-password-256",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "other-users-password-256-client-first",
+      "conn": "other-users-password-256",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-other-users-password-256."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-other-users-password-256.\u003cserver-nonce:3\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "other-users-password-256-client-final",
+      "conn": "other-users-password-256",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-other-users-password-256.\u003cserver-nonce:3\u003e,p=\u003cproof of bob-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "other-users-password-256-who",
+      "conn": "other-users-password-256",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "unknown-user-256-handshake",
+      "conn": "unknown-user-256",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "unknown-user-256-client-first",
+      "conn": "unknown-user-256",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=mallory,r=nonce-of-unknown-user-256."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "unknown-user-256-client-final",
+      "conn": "unknown-user-256",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-unknown-user-256.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "unknown-user-256-who",
+      "conn": "unknown-user-256",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "authzid-same-256-handshake",
+      "conn": "authzid-same-256",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "authzid-same-256-client-first",
+      "conn": "authzid-same-256",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,a=alice,n=alice,r=nonce-of-authzid-same-256."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-authzid-same-256.\u003cserver-nonce:4\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authzid-same-256-client-final",
+      "conn": "authzid-same-256",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=bixhPWFsaWNlLA==,r=nonce-of-authzid-same-256.\u003cserver-nonce:4\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "v=\u003cserver-signature\u003e",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authzid-same-256-who",
+      "conn": "authzid-same-256",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "authzid-other-user-256-handshake",
+      "conn": "authzid-other-user-256",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "authzid-other-user-256-client-first",
+      "conn": "authzid-other-user-256",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,a=bob,n=alice,r=nonce-of-authzid-other-user-256."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Client requested an authorization id that is different from username",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authzid-other-user-256-client-final",
+      "conn": "authzid-other-user-256",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=bixhPWJvYiw=,r=nonce-of-authzid-other-user-256.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "authzid-other-user-256-who",
+      "conn": "authzid-other-user-256",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "authzid-admin-256-handshake",
+      "conn": "authzid-admin-256",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "authzid-admin-256-client-first",
+      "conn": "authzid-admin-256",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,a=admin,n=alice,r=nonce-of-authzid-admin-256."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Client requested an authorization id that is different from username",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authzid-admin-256-client-final",
+      "conn": "authzid-admin-256",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=bixhPWFkbWluLA==,r=nonce-of-authzid-admin-256.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "authzid-admin-256-who",
+      "conn": "authzid-admin-256",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "authzid-other-user-unknown-user-256-handshake",
+      "conn": "authzid-other-user-unknown-user-256",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "authzid-other-user-unknown-user-256-client-first",
+      "conn": "authzid-other-user-unknown-user-256",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,a=bob,n=mallory,r=nonce-of-authzid-other-user-unknown-user-256."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authzid-other-user-unknown-user-256-who",
+      "conn": "authzid-other-user-unknown-user-256",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "good-512-handshake",
+      "conn": "good-512",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-512"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "good-512-client-first",
+      "conn": "good-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-good-512."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-good-512.\u003cserver-nonce:5\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "good-512-client-final",
+      "conn": "good-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-good-512.\u003cserver-nonce:5\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "v=\u003cserver-signature\u003e",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "good-512-who",
+      "conn": "good-512",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "wrong-password-512-handshake",
+      "conn": "wrong-password-512",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-512"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "wrong-password-512-client-first",
+      "conn": "wrong-password-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-wrong-password-512."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-wrong-password-512.\u003cserver-nonce:6\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "wrong-password-512-client-final",
+      "conn": "wrong-password-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-wrong-password-512.\u003cserver-nonce:6\u003e,p=\u003cproof of nope\u003e"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-512",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "wrong-password-512-who",
+      "conn": "wrong-password-512",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "other-users-password-512-handshake",
+      "conn": "other-users-password-512",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-512"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "other-users-password-512-client-first",
+      "conn": "other-users-password-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-other-users-password-512."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-other-users-password-512.\u003cserver-nonce:7\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "other-users-password-512-client-final",
+      "conn": "other-users-password-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-other-users-password-512.\u003cserver-nonce:7\u003e,p=\u003cproof of bob-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-512",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "other-users-password-512-who",
+      "conn": "other-users-password-512",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "unknown-user-512-handshake",
+      "conn": "unknown-user-512",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-512"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "unknown-user-512-client-first",
+      "conn": "unknown-user-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=mallory,r=nonce-of-unknown-user-512."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-512",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "unknown-user-512-client-final",
+      "conn": "unknown-user-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-unknown-user-512.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "unknown-user-512-who",
+      "conn": "unknown-user-512",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "authzid-same-512-handshake",
+      "conn": "authzid-same-512",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-512"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "authzid-same-512-client-first",
+      "conn": "authzid-same-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,a=alice,n=alice,r=nonce-of-authzid-same-512."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-authzid-same-512.\u003cserver-nonce:8\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authzid-same-512-client-final",
+      "conn": "authzid-same-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=bixhPWFsaWNlLA==,r=nonce-of-authzid-same-512.\u003cserver-nonce:8\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "v=\u003cserver-signature\u003e",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authzid-same-512-who",
+      "conn": "authzid-same-512",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "authzid-other-user-512-handshake",
+      "conn": "authzid-other-user-512",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-512"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "authzid-other-user-512-client-first",
+      "conn": "authzid-other-user-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,a=bob,n=alice,r=nonce-of-authzid-other-user-512."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Client requested an authorization id that is different from username",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authzid-other-user-512-client-final",
+      "conn": "authzid-other-user-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=bixhPWJvYiw=,r=nonce-of-authzid-other-user-512.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "authzid-other-user-512-who",
+      "conn": "authzid-other-user-512",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "authzid-admin-512-handshake",
+      "conn": "authzid-admin-512",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-512"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "authzid-admin-512-client-first",
+      "conn": "authzid-admin-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,a=admin,n=alice,r=nonce-of-authzid-admin-512."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Client requested an authorization id that is different from username",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authzid-admin-512-client-final",
+      "conn": "authzid-admin-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=bixhPWFkbWluLA==,r=nonce-of-authzid-admin-512.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "authzid-admin-512-who",
+      "conn": "authzid-admin-512",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "authzid-other-user-unknown-user-512-handshake",
+      "conn": "authzid-other-user-unknown-user-512",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-512"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "authzid-other-user-unknown-user-512-client-first",
+      "conn": "authzid-other-user-unknown-user-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,a=bob,n=mallory,r=nonce-of-authzid-other-user-unknown-user-512."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-512",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authzid-other-user-unknown-user-512-who",
+      "conn": "authzid-other-user-unknown-user-512",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-empty-handshake",
+      "conn": "first-empty",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-empty-client-first",
+      "conn": "first-empty",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": ""
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-empty-client-final",
+      "conn": "first-empty",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=,r=nonce-of-first-empty.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-empty-who",
+      "conn": "first-empty",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-garbage-handshake",
+      "conn": "first-garbage",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-garbage-client-first",
+      "conn": "first-garbage",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "this is not a scram message"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-garbage-client-final",
+      "conn": "first-garbage",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=,r=nonce-of-first-garbage.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-garbage-who",
+      "conn": "first-garbage",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-no-gs2-header-handshake",
+      "conn": "first-no-gs2-header",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-no-gs2-header-client-first",
+      "conn": "first-no-gs2-header",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n=alice,r=nonce-of-first-no-gs2-header."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-no-gs2-header-client-final",
+      "conn": "first-no-gs2-header",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=,r=nonce-of-first-no-gs2-header.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-no-gs2-header-who",
+      "conn": "first-no-gs2-header",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-no-nonce-handshake",
+      "conn": "first-no-nonce",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-no-nonce-client-first",
+      "conn": "first-no-nonce",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-no-nonce-client-final",
+      "conn": "first-no-nonce",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-first-no-nonce.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-no-nonce-who",
+      "conn": "first-no-nonce",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-empty-nonce-handshake",
+      "conn": "first-empty-nonce",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-empty-nonce-client-first",
+      "conn": "first-empty-nonce",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r="
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-empty-nonce-client-final",
+      "conn": "first-empty-nonce",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-first-empty-nonce.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-empty-nonce-who",
+      "conn": "first-empty-nonce",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-no-user-handshake",
+      "conn": "first-no-user",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-no-user-client-first",
+      "conn": "first-no-user",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,r=nonce-of-first-no-user."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-no-user-client-final",
+      "conn": "first-no-user",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-first-no-user.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-no-user-who",
+      "conn": "first-no-user",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-empty-user-handshake",
+      "conn": "first-empty-user",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-empty-user-client-first",
+      "conn": "first-empty-user",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=,r=nonce-of-first-empty-user."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-empty-user-client-final",
+      "conn": "first-empty-user",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-first-empty-user.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-empty-user-who",
+      "conn": "first-empty-user",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-nonce-before-user-handshake",
+      "conn": "first-nonce-before-user",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-nonce-before-user-client-first",
+      "conn": "first-nonce-before-user",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,r=nonce-of-first-nonce-before-user.,n=alice"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-nonce-before-user-client-final",
+      "conn": "first-nonce-before-user",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-first-nonce-before-user.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-nonce-before-user-who",
+      "conn": "first-nonce-before-user",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-channel-binding-required-handshake",
+      "conn": "first-channel-binding-required",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-channel-binding-required-client-first",
+      "conn": "first-channel-binding-required",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "p=tls-unique,,n=alice,r=nonce-of-first-channel-binding-required."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-channel-binding-required-client-final",
+      "conn": "first-channel-binding-required",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=cD10bHMtdW5pcXVlLCw=,r=nonce-of-first-channel-binding-required.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-channel-binding-required-who",
+      "conn": "first-channel-binding-required",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-channel-binding-y-handshake",
+      "conn": "first-channel-binding-y",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-channel-binding-y-client-first",
+      "conn": "first-channel-binding-y",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "y,,n=alice,r=nonce-of-first-channel-binding-y."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-channel-binding-y-client-final",
+      "conn": "first-channel-binding-y",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=eSws,r=nonce-of-first-channel-binding-y.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-channel-binding-y-who",
+      "conn": "first-channel-binding-y",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-unknown-gs2-flag-handshake",
+      "conn": "first-unknown-gs2-flag",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-unknown-gs2-flag-client-first",
+      "conn": "first-unknown-gs2-flag",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "x,,n=alice,r=nonce-of-first-unknown-gs2-flag."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-unknown-gs2-flag-client-final",
+      "conn": "first-unknown-gs2-flag",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=eCws,r=nonce-of-first-unknown-gs2-flag.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-unknown-gs2-flag-who",
+      "conn": "first-unknown-gs2-flag",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-mandatory-extension-handshake",
+      "conn": "first-mandatory-extension",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-mandatory-extension-client-first",
+      "conn": "first-mandatory-extension",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,m=ext,n=alice,r=nonce-of-first-mandatory-extension."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-first-mandatory-extension.\u003cserver-nonce:9\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-mandatory-extension-client-final",
+      "conn": "first-mandatory-extension",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-first-mandatory-extension.\u003cserver-nonce:9\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-mandatory-extension-who",
+      "conn": "first-mandatory-extension",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-optional-extension-handshake",
+      "conn": "first-optional-extension",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-optional-extension-client-first",
+      "conn": "first-optional-extension",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-first-optional-extension.,x=ext"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-first-optional-extension.\u003cserver-nonce:10\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-optional-extension-client-final",
+      "conn": "first-optional-extension",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-first-optional-extension.\u003cserver-nonce:10\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "v=\u003cserver-signature\u003e",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-optional-extension-who",
+      "conn": "first-optional-extension",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "first-user-bad-escape-handshake",
+      "conn": "first-user-bad-escape",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-user-bad-escape-client-first",
+      "conn": "first-user-bad-escape",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=al=ice,r=nonce-of-first-user-bad-escape."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-user-bad-escape-client-final",
+      "conn": "first-user-bad-escape",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-first-user-bad-escape.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-user-bad-escape-who",
+      "conn": "first-user-bad-escape",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-user-escaped-handshake",
+      "conn": "first-user-escaped",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-user-escaped-client-first",
+      "conn": "first-user-escaped",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=al=2Cice,r=nonce-of-first-user-escaped."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-user-escaped-client-final",
+      "conn": "first-user-escaped",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-first-user-escaped.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-user-escaped-who",
+      "conn": "first-user-escaped",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-user-escaped-equals-sign-as-alice-handshake",
+      "conn": "first-user-escaped-equals-sign-as-alice",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-user-escaped-equals-sign-as-alice-client-first",
+      "conn": "first-user-escaped-equals-sign-as-alice",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alic=65,r=nonce-of-first-user-escaped-equals-sign-as-alice."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-user-escaped-equals-sign-as-alice-client-final",
+      "conn": "first-user-escaped-equals-sign-as-alice",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-first-user-escaped-equals-sign-as-alice.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-user-escaped-equals-sign-as-alice-who",
+      "conn": "first-user-escaped-equals-sign-as-alice",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-nonce-with-comma-handshake",
+      "conn": "first-nonce-with-comma",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-nonce-with-comma-client-first",
+      "conn": "first-nonce-with-comma",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-first-nonce-with-comma.,,"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-nonce-with-comma-client-final",
+      "conn": "first-nonce-with-comma",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-first-nonce-with-comma.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-nonce-with-comma-who",
+      "conn": "first-nonce-with-comma",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-not-utf8-handshake",
+      "conn": "first-not-utf8",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-not-utf8-client-first",
+      "conn": "first-not-utf8",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "base64:biwsbj1hbGljZSxyPW5vbmNlLW9mLWZpcnN0LW5vdC11dGY4Lv8="
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-not-utf8-client-final",
+      "conn": "first-not-utf8",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-first-not-utf8.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-not-utf8-who",
+      "conn": "first-not-utf8",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-plain-token-handshake",
+      "conn": "first-plain-token",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-plain-token-client-first",
+      "conn": "first-plain-token",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-plain-token-client-final",
+      "conn": "first-plain-token",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=,r=nonce-of-first-plain-token.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-plain-token-who",
+      "conn": "first-plain-token",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "final-empty-handshake",
+      "conn": "final-empty",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "final-empty-client-first",
+      "conn": "final-empty",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-final-empty."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-final-empty.\u003cserver-nonce:11\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-empty-client-final",
+      "conn": "final-empty",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": ""
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-empty-who",
+      "conn": "final-empty",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "final-garbage-handshake",
+      "conn": "final-garbage",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "final-garbage-client-first",
+      "conn": "final-garbage",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-final-garbage."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-final-garbage.\u003cserver-nonce:12\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-garbage-client-final",
+      "conn": "final-garbage",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "this is not a scram message"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-garbage-who",
+      "conn": "final-garbage",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "final-no-proof-handshake",
+      "conn": "final-no-proof",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "final-no-proof-client-first",
+      "conn": "final-no-proof",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-final-no-proof."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-final-no-proof.\u003cserver-nonce:13\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-no-proof-client-final",
+      "conn": "final-no-proof",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-final-no-proof.\u003cserver-nonce:13\u003e"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-no-proof-who",
+      "conn": "final-no-proof",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "final-proof-not-base64-handshake",
+      "conn": "final-proof-not-base64",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "final-proof-not-base64-client-first",
+      "conn": "final-proof-not-base64",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-final-proof-not-base64."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-final-proof-not-base64.\u003cserver-nonce:14\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-proof-not-base64-client-final",
+      "conn": "final-proof-not-base64",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-final-proof-not-base64.\u003cserver-nonce:14\u003e,p=!!!not-base64!!!"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-proof-not-base64-who",
+      "conn": "final-proof-not-base64",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "final-proof-too-short-handshake",
+      "conn": "final-proof-too-short",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "final-proof-too-short-client-first",
+      "conn": "final-proof-too-short",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-final-proof-too-short."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-final-proof-too-short.\u003cserver-nonce:15\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-proof-too-short-client-final",
+      "conn": "final-proof-too-short",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-final-proof-too-short.\u003cserver-nonce:15\u003e,p=AAAA"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "final-proof-too-short-who",
+      "conn": "final-proof-too-short",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "final-proof-empty-handshake",
+      "conn": "final-proof-empty",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "final-proof-empty-client-first",
+      "conn": "final-proof-empty",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-final-proof-empty."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-final-proof-empty.\u003cserver-nonce:16\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-proof-empty-client-final",
+      "conn": "final-proof-empty",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-final-proof-empty.\u003cserver-nonce:16\u003e,p="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "final-proof-empty-who",
+      "conn": "final-proof-empty",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "final-no-nonce-handshake",
+      "conn": "final-no-nonce",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "final-no-nonce-client-first",
+      "conn": "final-no-nonce",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-final-no-nonce."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-final-no-nonce.\u003cserver-nonce:17\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-no-nonce-client-final",
+      "conn": "final-no-nonce",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-no-nonce-who",
+      "conn": "final-no-nonce",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "final-no-channel-binding-handshake",
+      "conn": "final-no-channel-binding",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "final-no-channel-binding-client-first",
+      "conn": "final-no-channel-binding",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-final-no-channel-binding."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-final-no-channel-binding.\u003cserver-nonce:18\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-no-channel-binding-client-final",
+      "conn": "final-no-channel-binding",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "r=nonce-of-final-no-channel-binding.\u003cserver-nonce:18\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-no-channel-binding-who",
+      "conn": "final-no-channel-binding",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "final-wrong-channel-binding-handshake",
+      "conn": "final-wrong-channel-binding",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "final-wrong-channel-binding-client-first",
+      "conn": "final-wrong-channel-binding",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-final-wrong-channel-binding."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-final-wrong-channel-binding.\u003cserver-nonce:19\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-wrong-channel-binding-client-final",
+      "conn": "final-wrong-channel-binding",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=eSws,r=nonce-of-final-wrong-channel-binding.\u003cserver-nonce:19\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "v=\u003cserver-signature\u003e",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-wrong-channel-binding-who",
+      "conn": "final-wrong-channel-binding",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "final-channel-binding-not-base64-handshake",
+      "conn": "final-channel-binding-not-base64",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "final-channel-binding-not-base64-client-first",
+      "conn": "final-channel-binding-not-base64",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-final-channel-binding-not-base64."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-final-channel-binding-not-base64.\u003cserver-nonce:20\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-channel-binding-not-base64-client-final",
+      "conn": "final-channel-binding-not-base64",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=!!!,r=nonce-of-final-channel-binding-not-base64.\u003cserver-nonce:20\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-channel-binding-not-base64-who",
+      "conn": "final-channel-binding-not-base64",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "final-wrong-nonce-handshake",
+      "conn": "final-wrong-nonce",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "final-wrong-nonce-client-first",
+      "conn": "final-wrong-nonce",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-final-wrong-nonce."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-final-wrong-nonce.\u003cserver-nonce:21\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-wrong-nonce-client-final",
+      "conn": "final-wrong-nonce",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-final-wrong-nonce.not-the-servers-half,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-wrong-nonce-who",
+      "conn": "final-wrong-nonce",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "final-client-nonce-only-handshake",
+      "conn": "final-client-nonce-only",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "final-client-nonce-only-client-first",
+      "conn": "final-client-nonce-only",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-final-client-nonce-only."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-final-client-nonce-only.\u003cserver-nonce:22\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-client-nonce-only-client-final",
+      "conn": "final-client-nonce-only",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-final-client-nonce-only.,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-client-nonce-only-who",
+      "conn": "final-client-nonce-only",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "final-nonce-with-suffix-handshake",
+      "conn": "final-nonce-with-suffix",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "final-nonce-with-suffix-client-first",
+      "conn": "final-nonce-with-suffix",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-final-nonce-with-suffix."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-final-nonce-with-suffix.\u003cserver-nonce:23\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-nonce-with-suffix-client-final",
+      "conn": "final-nonce-with-suffix",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-final-nonce-with-suffix.\u003cserver-nonce:23\u003ex,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-nonce-with-suffix-who",
+      "conn": "final-nonce-with-suffix",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "final-extension-before-proof-handshake",
+      "conn": "final-extension-before-proof",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "final-extension-before-proof-client-first",
+      "conn": "final-extension-before-proof",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-final-extension-before-proof."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-final-extension-before-proof.\u003cserver-nonce:24\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-extension-before-proof-client-final",
+      "conn": "final-extension-before-proof",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-final-extension-before-proof.\u003cserver-nonce:24\u003e,x=ext,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-extension-before-proof-who",
+      "conn": "final-extension-before-proof",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "final-trailing-attribute-handshake",
+      "conn": "final-trailing-attribute",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "final-trailing-attribute-client-first",
+      "conn": "final-trailing-attribute",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-final-trailing-attribute."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-final-trailing-attribute.\u003cserver-nonce:25\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-trailing-attribute-client-final",
+      "conn": "final-trailing-attribute",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-final-trailing-attribute.\u003cserver-nonce:25\u003e,p=\u003cproof of alice-secret\u003e,x=ext"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-trailing-attribute-who",
+      "conn": "final-trailing-attribute",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "replay-handshake",
+      "conn": "replay",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "replay-client-first",
+      "conn": "replay",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-replay."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-replay.\u003cserver-nonce:26\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "replay-client-final",
+      "conn": "replay",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-replay.\u003cserver-nonce:26\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "v=\u003cserver-signature\u003e",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "replay-who",
+      "conn": "replay",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "replay-client-final-again",
+      "conn": "replay",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-replay.\u003cserver-nonce:26\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 34,
+        "ErrorMessage": "SaslAuthenticate request received after successful authentication",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "replay-who-after",
+      "conn": "replay",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "replay-elsewhere-handshake",
+      "conn": "replay-elsewhere",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "replay-elsewhere-client-first",
+      "conn": "replay-elsewhere",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-replay-elsewhere."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-replay-elsewhere.\u003cserver-nonce:27\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "replay-elsewhere-client-final",
+      "conn": "replay-elsewhere",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-replay.\u003cserver-nonce:26\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "replay-elsewhere-who",
+      "conn": "replay-elsewhere",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "reauth-handshake",
+      "conn": "reauth",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "reauth-client-first",
+      "conn": "reauth",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-reauth."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-reauth.\u003cserver-nonce:28\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "reauth-client-final",
+      "conn": "reauth",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-reauth.\u003cserver-nonce:28\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "v=\u003cserver-signature\u003e",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "reauth-who",
+      "conn": "reauth",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "reauth-client-first-as-bob",
+      "conn": "reauth",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=bob,r=nonce-of-reauth."
+      },
+      "response": {
+        "ErrorCode": 34,
+        "ErrorMessage": "SaslAuthenticate request received after successful authentication",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "reauth-client-final-as-bob",
+      "conn": "reauth",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-reauth.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "ErrorCode": 34,
+        "ErrorMessage": "SaslAuthenticate request received after successful authentication",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "reauth-who-after-bob",
+      "conn": "reauth",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "reauth-handshake-again",
+      "conn": "reauth",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 34,
+        "SupportedMechanisms": null
+      }
+    },
+    {
+      "label": "reauth-client-first-after-handshake",
+      "conn": "reauth",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=bob,r=nonce-of-reauth."
+      },
+      "response": {
+        "ErrorCode": 34,
+        "ErrorMessage": "SaslAuthenticate request received after successful authentication",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "reauth-who-after-handshake",
+      "conn": "reauth",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "reauth-handshake-plain",
+      "conn": "reauth",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 34,
+        "SupportedMechanisms": null
+      }
+    },
+    {
+      "label": "reauth-plain-as-bob",
+      "conn": "reauth",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000bob\u0000bob-secret"
+      },
+      "response": {
+        "ErrorCode": 34,
+        "ErrorMessage": "SaslAuthenticate request received after successful authentication",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "reauth-who-at-the-end",
+      "conn": "reauth",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "switch-to-plain-handshake",
+      "conn": "switch-to-plain",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "switch-to-plain-client-first",
+      "conn": "switch-to-plain",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-switch-to-plain."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-switch-to-plain.\u003cserver-nonce:29\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "switch-to-plain-handshake-plain",
+      "conn": "switch-to-plain",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 34,
+        "SupportedMechanisms": null
+      }
+    },
+    {
+      "label": "switch-to-plain-token",
+      "conn": "switch-to-plain",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000bob\u0000bob-secret"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "switch-to-plain-who",
+      "conn": "switch-to-plain",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "switch-to-512-handshake",
+      "conn": "switch-to-512",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "switch-to-512-client-first",
+      "conn": "switch-to-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-switch-to-512."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-switch-to-512.\u003cserver-nonce:30\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "switch-to-512-handshake-512",
+      "conn": "switch-to-512",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-512"
+      },
+      "response": {
+        "ErrorCode": 34,
+        "SupportedMechanisms": null
+      }
+    },
+    {
+      "label": "switch-to-512-client-final",
+      "conn": "switch-to-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-switch-to-512.\u003cserver-nonce:30\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "switch-to-512-who",
+      "conn": "switch-to-512",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "handshake-256-then-512-handshake",
+      "conn": "handshake-256-then-512",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "handshake-256-then-512-second",
+      "conn": "handshake-256-then-512",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-512"
+      },
+      "response": {
+        "ErrorCode": 34,
+        "SupportedMechanisms": null
+      }
+    },
+    {
+      "label": "handshake-256-then-512-client-first",
+      "conn": "handshake-256-then-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-handshake-256-then-512."
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "handshake-256-then-512-client-final",
+      "conn": "handshake-256-then-512",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-handshake-256-then-512.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "handshake-256-then-512-who",
+      "conn": "handshake-256-then-512",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "proof-of-512-under-256-handshake",
+      "conn": "proof-of-512-under-256",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "proof-of-512-under-256-client-first",
+      "conn": "proof-of-512-under-256",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-proof-of-512-under-256."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-proof-of-512-under-256.\u003cserver-nonce:31\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "proof-of-512-under-256-client-final",
+      "conn": "proof-of-512-under-256",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-proof-of-512-under-256.\u003cserver-nonce:31\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "proof-of-512-under-256-who",
+      "conn": "proof-of-512-under-256",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "plain-token-as-final-handshake",
+      "conn": "plain-token-as-final",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "plain-token-as-final-client-first",
+      "conn": "plain-token-as-final",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-plain-token-as-final."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-plain-token-as-final.\u003cserver-nonce:32\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "plain-token-as-final-token",
+      "conn": "plain-token-as-final",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "plain-token-as-final-who",
+      "conn": "plain-token-as-final",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "request-before-final-handshake",
+      "conn": "request-before-final",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "request-before-final-client-first",
+      "conn": "request-before-final",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-request-before-final."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-request-before-final.\u003cserver-nonce:33\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "request-before-final-who",
+      "conn": "request-before-final",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": null,
+        "ClusterID": null,
+        "ControllerID": -1,
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 34,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 34,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "request-before-final-who-again",
+      "conn": "request-before-final",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "request-before-final-client-final",
+      "conn": "request-before-final",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-request-before-final.\u003cserver-nonce:33\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "request-before-final-who-at-the-end",
+      "conn": "request-before-final",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "request-before-first-handshake",
+      "conn": "request-before-first",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "request-before-first-who",
+      "conn": "request-before-first",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": null,
+        "ClusterID": null,
+        "ControllerID": -1,
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 34,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 34,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "request-before-first-client-first",
+      "conn": "request-before-first",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-request-before-first."
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "request-before-first-client-final",
+      "conn": "request-before-first",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-request-before-first.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "request-before-first-who-at-the-end",
+      "conn": "request-before-first",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "versions-before-final-handshake",
+      "conn": "versions-before-final",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "versions-before-final-client-first",
+      "conn": "versions-before-final",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-versions-before-final."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-versions-before-final.\u003cserver-nonce:34\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "versions-before-final-versions",
+      "conn": "versions-before-final",
+      "api": "ApiVersions",
+      "version": 0,
+      "request": {
+        "ClientSoftwareName": "",
+        "ClientSoftwareVersion": "",
+        "ClusterID": null,
+        "NodeID": -1
+      },
+      "response": {
+        "ApiKeys": null,
+        "ErrorCode": 34,
+        "FinalizedFeatures": null,
+        "FinalizedFeaturesEpoch": -1,
+        "SupportedFeatures": null,
+        "ThrottleMillis": 0,
+        "ZkMigrationReady": false
+      }
+    },
+    {
+      "label": "versions-before-final-client-final",
+      "conn": "versions-before-final",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-versions-before-final.\u003cserver-nonce:34\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "versions-before-final-who",
+      "conn": "versions-before-final",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "final-without-first-handshake",
+      "conn": "final-without-first",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "final-without-first-client-final",
+      "conn": "final-without-first",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-final-without-first.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "final-without-first-who",
+      "conn": "final-without-first",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-twice-handshake",
+      "conn": "first-twice",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "first-twice-client-first",
+      "conn": "first-twice",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-first-twice."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-first-twice.\u003cserver-nonce:35\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-twice-client-first-again",
+      "conn": "first-twice",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-first-twice."
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "first-twice-client-final",
+      "conn": "first-twice",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-first-twice.,p=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "first-twice-who",
+      "conn": "first-twice",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "scram-no-handshake-client-first",
+      "conn": "scram-no-handshake",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-with-no-handshake"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "scram-no-handshake-who",
+      "conn": "scram-no-handshake",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "third-message-handshake",
+      "conn": "third-message",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "third-message-client-first",
+      "conn": "third-message",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-third-message."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-third-message.\u003cserver-nonce:36\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "third-message-client-final",
+      "conn": "third-message",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-third-message.\u003cserver-nonce:36\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "v=\u003cserver-signature\u003e",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "third-message-empty",
+      "conn": "third-message",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": null
+      },
+      "response": {
+        "ErrorCode": 34,
+        "ErrorMessage": "SaslAuthenticate request received after successful authentication",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "third-message-who",
+      "conn": "third-message",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "scram-authenticate-v0-handshake",
+      "conn": "scram-authenticate-v0",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "scram-authenticate-v0-client-first",
+      "conn": "scram-authenticate-v0",
+      "api": "SASLAuthenticate",
+      "version": 0,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-scram-authenticate-v0."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-scram-authenticate-v0.\u003cserver-nonce:37\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "scram-authenticate-v0-client-final",
+      "conn": "scram-authenticate-v0",
+      "api": "SASLAuthenticate",
+      "version": 0,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-scram-authenticate-v0.\u003cserver-nonce:37\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "v=\u003cserver-signature\u003e",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "scram-authenticate-v0-who",
+      "conn": "scram-authenticate-v0",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "scram-authenticate-v0-wrong-handshake",
+      "conn": "scram-authenticate-v0-wrong",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "scram-authenticate-v0-wrong-client-first",
+      "conn": "scram-authenticate-v0-wrong",
+      "api": "SASLAuthenticate",
+      "version": 0,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-scram-authenticate-v0-wrong."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-scram-authenticate-v0-wrong.\u003cserver-nonce:38\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "scram-authenticate-v0-wrong-client-final",
+      "conn": "scram-authenticate-v0-wrong",
+      "api": "SASLAuthenticate",
+      "version": 0,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-scram-authenticate-v0-wrong.\u003cserver-nonce:38\u003e,p=\u003cproof of nope\u003e"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "scram-authenticate-v0-wrong-who",
+      "conn": "scram-authenticate-v0-wrong",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "scram-authenticate-v1-handshake",
+      "conn": "scram-authenticate-v1",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "scram-authenticate-v1-client-first",
+      "conn": "scram-authenticate-v1",
+      "api": "SASLAuthenticate",
+      "version": 1,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-scram-authenticate-v1."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-scram-authenticate-v1.\u003cserver-nonce:39\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "scram-authenticate-v1-client-final",
+      "conn": "scram-authenticate-v1",
+      "api": "SASLAuthenticate",
+      "version": 1,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-scram-authenticate-v1.\u003cserver-nonce:39\u003e,p=\u003cproof of alice-secret\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "v=\u003cserver-signature\u003e",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "scram-authenticate-v1-who",
+      "conn": "scram-authenticate-v1",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "scram-authenticate-v1-wrong-handshake",
+      "conn": "scram-authenticate-v1-wrong",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN",
+          "SCRAM-SHA-512",
+          "SCRAM-SHA-256"
+        ]
+      }
+    },
+    {
+      "label": "scram-authenticate-v1-wrong-client-first",
+      "conn": "scram-authenticate-v1-wrong",
+      "api": "SASLAuthenticate",
+      "version": 1,
+      "request": {
+        "SASLAuthBytes": "n,,n=alice,r=nonce-of-scram-authenticate-v1-wrong."
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "r=nonce-of-scram-authenticate-v1-wrong.\u003cserver-nonce:40\u003e,s=\u003csalt\u003e,i=4096",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "scram-authenticate-v1-wrong-client-final",
+      "conn": "scram-authenticate-v1-wrong",
+      "api": "SASLAuthenticate",
+      "version": 1,
+      "request": {
+        "SASLAuthBytes": "c=biws,r=nonce-of-scram-authenticate-v1-wrong.\u003cserver-nonce:40\u003e,p=\u003cproof of nope\u003e"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-256",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "scram-authenticate-v1-wrong-who",
+      "conn": "scram-authenticate-v1-wrong",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    }
+  ]
+}

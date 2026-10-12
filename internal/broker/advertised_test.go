@@ -195,8 +195,11 @@ func (r *rawConn) metadataWorks() bool {
 }
 
 // A failed authentication ends the connection, so each guess costs a new one. It
-// used to stay open: 5,000 wrong passwords were tried on one connection in 144 ms,
-// and a failed re-authentication left an authenticated connection authenticated.
+// used to stay open: 5,000 wrong passwords were tried on one connection in 144 ms.
+// A connection that has logged in cannot log in again, as itself or as anybody
+// else: the second attempt is ILLEGAL_SASL_STATE (34) whatever its password, and
+// the connection stays the user it was (claim: auth A7; who it is afterwards is
+// held by the replay of conformance/recordings/sasl-plain.json, steps twice-*).
 func TestFailedAuthenticationClosesTheConnection(t *testing.T) {
 	addr := startAuthBroker(t, []string{"PLAIN"}, map[string]string{"alice": "secret"}, "", "")
 
@@ -208,17 +211,32 @@ func TestFailedAuthenticationClosesTheConnection(t *testing.T) {
 		t.Fatal("the connection was still usable after a failed authentication")
 	}
 
-	// A good login, then a failed re-authentication: the connection must not stay
-	// authenticated.
-	c = openRaw(t, addr)
-	if code, open := c.plain("alice", "secret"); !open || code != 0 {
-		t.Fatalf("a correct login: code %d, answered %v", code, open)
-	}
-	if !c.metadataWorks() {
-		t.Fatal("an authenticated connection should be served")
-	}
-	c.plain("alice", "wrong")
-	if c.metadataWorks() {
-		t.Fatal("after a failed re-authentication the connection was still authenticated")
+	// A good login, then another attempt: refused whatever the password, and the
+	// connection is still served.
+	for _, pass := range []string{"wrong", "secret"} {
+		c = openRaw(t, addr)
+		if code, open := c.plain("alice", "secret"); !open || code != 0 {
+			t.Fatalf("a correct login: code %d, answered %v", code, open)
+		}
+		if !c.metadataWorks() {
+			t.Fatal("an authenticated connection should be served")
+		}
+		au := kmsg.NewPtrSASLAuthenticateRequest()
+		au.SetVersion(1)
+		au.SASLAuthBytes = []byte("\x00alice\x00" + pass)
+		var ar kmsg.SASLAuthenticateResponse
+		if !c.do(au, &ar) || ar.ErrorCode != 34 {
+			t.Fatalf("a second SaslAuthenticate (password %q) on a logged-in connection: code %d, want ILLEGAL_SASL_STATE (34), answered", pass, ar.ErrorCode)
+		}
+		hs := kmsg.NewPtrSASLHandshakeRequest()
+		hs.SetVersion(1)
+		hs.Mechanism = "PLAIN"
+		var hr kmsg.SASLHandshakeResponse
+		if !c.do(hs, &hr) || hr.ErrorCode != 34 || len(hr.SupportedMechanisms) != 0 {
+			t.Fatalf("a second SaslHandshake on a logged-in connection: code %d, mechanisms %v; want 34 and none", hr.ErrorCode, hr.SupportedMechanisms)
+		}
+		if !c.metadataWorks() {
+			t.Fatal("a logged-in connection was closed or logged out by a second login attempt")
+		}
 	}
 }

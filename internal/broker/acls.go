@@ -172,6 +172,9 @@ func (b *Broker) handleCreateACLs(ctx context.Context, req *protocol.Request, cr
 		} else {
 			accepted = append(accepted, a)
 			valid[i] = true
+			// An empty message, not a null one, as Kafka sends with an ACL it
+			// created (claim: auth A1).
+			rr.ErrorMessage = new(string)
 		}
 		resp.Results = append(resp.Results, rr)
 	}

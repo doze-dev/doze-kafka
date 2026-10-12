@@ -31,6 +31,38 @@ is a `user:password` pair.
   the wire. (The broker itself still has it: credentials are configured in plain text,
   in the file or on the command line.)
 
+### What a login is held to
+
+Every answer to a login is the one `apache/kafka:4.3.1` gives, from recordings of it
+(`conformance/claims/auth.md`; the two written exceptions, both stricter, are in
+[limitations](limitations.md)):
+
+- **A connection logs in once, as one user.** After a successful login a second
+  `SaslHandshake` or `SaslAuthenticate` is `ILLEGAL_SASL_STATE` and changes nothing:
+  the connection is who it was until it closes. To be somebody else, open another
+  connection.
+- **Nobody acts as anybody else.** The authorization id of a PLAIN token
+  (`authzid NUL user NUL password`) and of a SCRAM client-first message (`n,a=authzid,`)
+  must be empty or the user's own name. Anything else is refused
+  (`SASL_AUTHENTICATION_FAILED`, "Client requested an authorization id that is
+  different from username"), with the right password too. ACLs are always decided for
+  the user whose password was proven.
+- **A refused login ends the connection.** The client is told why, in Kafka's words
+  ("Authentication failed: Invalid username or password" for a wrong password and for
+  a user that does not exist alike), and the connection is closed, so each guess costs
+  a connection. A mechanism the listener does not offer is
+  `UNSUPPORTED_SASL_MECHANISM` with the list of those it does, and then closed as well.
+  With SCRAM a user that does not exist is refused at the first message and a wrong
+  password at the second, as on Kafka: SCRAM does say which users exist.
+- **The order is fixed.** One `ApiVersions` if the client wants it, `SaslHandshake`,
+  then `SaslAuthenticate` until the exchange is over. A `SaslAuthenticate` with no
+  handshake, a second `ApiVersions` before the handshake, or any other request closes
+  the connection; a second `SaslHandshake` before the login is over is
+  `ILLEGAL_SASL_STATE` and then closed.
+- **SCRAM messages are held to RFC 5802.** No channel binding (`n,,` only: `y,,` and
+  `p=...` are refused), the user then the nonce, the client-final message exactly
+  `c=,r=,p=` with the binding the exchange opened with and the nonce the server sent.
+
 Enable several at once and let the client pick:
 
 ```sh

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // defaultPreAuthTimeout is how long a connection that must authenticate may sit
@@ -65,6 +66,7 @@ type Conn struct {
 	accepted       time.Time // when the connection was accepted; the pre-auth budget runs from here.
 	closeAfter     bool      // close once the current response is written (a failed authentication).
 	saslMechanism  string
+	versionsSeen   bool   // an ApiVersions request was answered before the SaslHandshake (one is allowed).
 	saslState      any    // opaque per-connection state owned by the SASL handler (e.g. SCRAM step).
 	software       string // the client's own name and version, from ApiVersions, e.g. "apache-kafka-java 3.7.0".
 	principal      string // who this connection authenticated as ("User:alice"); empty until it has.
@@ -150,6 +152,12 @@ func (c *Conn) RemoteIP() string {
 // exchange, lifting the pre-auth gate.
 func (c *Conn) SetAuthenticated(v bool) { c.authenticated = v }
 
+// Authenticated reports whether a SASL exchange has completed on this connection.
+// From then on the connection is that principal until it closes: Kafka answers a
+// further SaslHandshake or SaslAuthenticate ILLEGAL_SASL_STATE and changes nothing
+// (claim: auth A7).
+func (c *Conn) Authenticated() bool { return c.authenticated }
+
 // SASLMechanism returns the mechanism negotiated by SaslHandshake, if any.
 func (c *Conn) SASLMechanism() string { return c.saslMechanism }
 
@@ -172,15 +180,73 @@ func (c *Conn) CloseAfterResponse() { c.closeAfter = true }
 // unblock a connection parked in a blocking read so its serve loop can exit.
 func (c *Conn) close() error { return c.raw.Close() }
 
-// preAuthAllowed reports whether an API may be sent before authentication: the
-// version handshake and the SASL exchange itself.
-func preAuthAllowed(key APIKey) bool {
-	switch key {
-	case kmsg.ApiVersions, kmsg.SASLHandshake, kmsg.SASLAuthenticate:
-		return true
-	default:
-		return false
+// What the gate does with a request on a connection that has still to log in.
+type preAuthVerdict int
+
+const (
+	preAuthServe  preAuthVerdict = iota // hand it to its handler.
+	preAuthClose                        // close the connection, with no answer.
+	preAuthRefuse                       // answer ILLEGAL_SASL_STATE, then close.
+)
+
+// preAuth is the order a login must come in, which is the order Apache Kafka holds
+// a connection to (recorded: conformance/recordings/sasl-plain.json and
+// sasl-scram.json; claims: auth A8, A9, A10):
+//
+//   - before the SaslHandshake: one ApiVersions, then the SaslHandshake. A second
+//     ApiVersions, a SaslAuthenticate with no handshake, and any other request
+//     close the connection with no answer.
+//   - after an accepted SaslHandshake, until the exchange is over: SaslAuthenticate
+//     only. A second SaslHandshake and an ApiVersions are answered
+//     ILLEGAL_SASL_STATE and the connection is closed. Any other request closes it
+//     too; Kafka first answers that request's own error shape with
+//     ILLEGAL_SASL_STATE, which this broker does not (docs/limitations.md).
+//
+// It is asked only while the connection is not authenticated.
+func (c *Conn) preAuth(key APIKey) preAuthVerdict {
+	if c.saslMechanism != "" {
+		switch key {
+		case kmsg.SASLAuthenticate:
+			return preAuthServe
+		case kmsg.SASLHandshake, kmsg.ApiVersions:
+			return preAuthRefuse
+		}
+		return preAuthClose
 	}
+	switch key {
+	case kmsg.ApiVersions:
+		if c.versionsSeen {
+			return preAuthClose
+		}
+		c.versionsSeen = true
+		return preAuthServe
+	case kmsg.SASLHandshake:
+		return preAuthServe
+	}
+	return preAuthClose
+}
+
+// illegalSASLState is the answer to a SaslHandshake or an ApiVersions that came in
+// the middle of a login: the error and nothing else (no mechanisms, no APIs).
+func illegalSASLState(h RequestHeader) []byte {
+	var resp kmsg.Response
+	switch h.APIKey {
+	case kmsg.SASLHandshake:
+		r := kmsg.NewPtrSASLHandshakeResponse()
+		r.ErrorCode = kerr.IllegalSaslState.Code
+		resp = r
+	case kmsg.ApiVersions:
+		r := kmsg.NewPtrApiVersionsResponse()
+		r.ErrorCode = kerr.IllegalSaslState.Code
+		resp = r
+	default:
+		return nil
+	}
+	if h.APIVersion < 0 || h.APIVersion > resp.MaxVersion() {
+		return nil // a version there is no shape for: the connection is closed without an answer.
+	}
+	resp.SetVersion(h.APIVersion)
+	return EncodeResponse(h, resp)
 }
 
 // serve reads, dispatches, and replies until the peer closes the connection or
@@ -258,10 +324,23 @@ func (c *Conn) serve(ctx context.Context) {
 		// Enforce the SASL gate: until the connection authenticates, only the
 		// version handshake and the SASL exchange are allowed. A violation is a
 		// misbehaving or unauthenticated client — drop the connection.
-		if c.authRequired && !c.authenticated && !preAuthAllowed(header.APIKey) {
-			c.log.Warn("unauthenticated request rejected", "api", APIName(header.APIKey))
-			c.observeClosed(&header, time.Now(), len(frame), "the request came before authentication")
-			return
+		if c.authRequired && !c.authenticated {
+			switch c.preAuth(header.APIKey) {
+			case preAuthClose:
+				c.log.Warn("unauthenticated request rejected", "api", APIName(header.APIKey))
+				c.observeClosed(&header, time.Now(), len(frame), "the request came before authentication")
+				return
+			case preAuthRefuse:
+				c.log.Warn("request out of order during authentication; closing the connection", "api", APIName(header.APIKey))
+				if resp := illegalSASLState(header); resp != nil {
+					_ = c.raw.SetWriteDeadline(time.Now().Add(c.writeTimeout))
+					if WriteFrame(c.w, resp) == nil {
+						_ = c.w.Flush()
+					}
+				}
+				c.observeClosed(&header, time.Now(), len(frame), "the request came in the middle of authentication")
+				return
+			}
 		}
 
 		req := &Request{Header: header, Body: frame[bodyOffset:], Conn: c}
@@ -274,6 +353,12 @@ func (c *Conn) serve(ctx context.Context) {
 			c.log.Error("handler panicked; closing the connection", "api", APIName(header.APIKey),
 				"version", header.APIVersion, "client_id", header.ClientID, "panic", pe.value, "stack", pe.stack)
 			c.observeClosed(&header, began, len(frame), "the broker's handler panicked")
+			return
+		}
+		var ce *CloseError
+		if errors.As(err, &ce) {
+			c.log.Warn("closing connection", "api", APIName(header.APIKey), "reason", ce.Reason)
+			c.observeClosed(&header, began, len(frame), ce.Reason)
 			return
 		}
 		if err != nil {
@@ -343,6 +428,14 @@ func (c *Conn) observeClosed(h *RequestHeader, began time.Time, reqBytes int, re
 		Summary: Summary{Class: class, Kind: Kind(h.APIKey), Detail: "closed the connection: " + reason},
 	})
 }
+
+// CloseError is what a handler returns to end the connection with no answer, for
+// the cases where that is what Apache Kafka does (a SCRAM proof of the wrong
+// length, claim: auth A14). Reason is for the log and the console; it must not
+// hold anything the client sent.
+type CloseError struct{ Reason string }
+
+func (e *CloseError) Error() string { return "closing the connection: " + e.Reason }
 
 // handlerPanic is a recovered panic from a request handler.
 type handlerPanic struct {

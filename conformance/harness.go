@@ -60,6 +60,12 @@ type Scenario struct {
 	// connection then logs in with Env.Open.
 	Users map[string]string
 	Admin string
+	// Mechanisms are the SASL mechanisms both brokers offer when Users is set, in
+	// the order Apache Kafka lists them in a SaslHandshake answer; nil is PLAIN
+	// alone. PLAIN must be among them (the recorder and the readiness probe log in
+	// with it), and with a SCRAM mechanism the recorder gives every user a SCRAM
+	// credential of the same password before the script starts (targets.go).
+	Mechanisms []string
 	// NoReplay, when it says why, makes the scenario evidence only: it is
 	// recorded against Apache Kafka and not replayed against doze-kafka.
 	NoReplay string
@@ -199,6 +205,55 @@ func (e *Env) Wait(d time.Duration) {
 // traffic of a script (a member that must not be expired while the script waits).
 func (e *Env) Quiet(req kmsg.Request, version int16) {
 	e.w.roundTrip(req, version)
+}
+
+// Scrub makes literal read as placeholder in every SASL token recorded from here
+// on: for the part of a token a script computed from something the broker made up
+// (a SCRAM proof), named for what it is.
+func (e *Env) Scrub(literal, placeholder string) {
+	e.norm.scrub = append(e.norm.scrub, [2]string{literal, placeholder})
+}
+
+// ClientNonce tells the normaliser a nonce the script will open a SCRAM exchange
+// with, so that what a broker appends to it is known to be the server's half.
+func (e *Env) ClientNonce(nonce string) {
+	e.norm.clientNonces = append(e.norm.clientNonces, nonce)
+}
+
+// lastWasClosed reports whether the broker answered the last step by closing the
+// connection (Do then returns an empty response, which is not an answer of 0).
+func (e *Env) lastWasClosed() bool {
+	if len(e.steps) == 0 {
+		return false
+	}
+	m, _ := e.steps[len(e.steps)-1].Response.(map[string]any)
+	_, closed := m["(connection)"]
+	return closed
+}
+
+// Await sends req over the current connection, again and again for up to thirty
+// seconds, until done is true of the answer. It is a wait and not a step: nothing
+// is recorded, so nothing it sees can be evidence, and what is the same on every
+// run is the state the next step finds. It is how a script waits for something a
+// broker finishes after it has answered (an ACL applied, a leader elected) before
+// the step that depends on it, instead of letting that step race it.
+func (e *Env) Await(what string, req kmsg.Request, version int16, done func(kmsg.Response) bool) {
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		resp, err := e.w.roundTrip(req, version)
+		if err != nil {
+			e.fail("waiting until %s: %v", what, err)
+			return
+		}
+		if done(resp) {
+			return
+		}
+		if time.Now().After(deadline) {
+			e.fail("waited 30s until %s", what)
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 // Steps are the recorded steps so far.
