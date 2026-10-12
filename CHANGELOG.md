@@ -27,6 +27,13 @@ here that contains "server API"; `task api` fails without it.
   a client-final message, and closes without an answer on a proof of the wrong length.
   Two answers stay stricter than Kafka's and are written in `docs/limitations.md`.
   `CreateAcls` answers an empty error message for an ACL it created, as Kafka does.
+- Config file errors name the line and the key and never repeat what the file says. An
+  unquoted value outside `[credentials]` used to be quoted back (`expected value but
+  found "hunter2"`), as did a bad duration, and a password typed where the user's name
+  goes was printed whole; under `[credentials]` the key is no longer named, only the
+  line. `credentials` written as anything but a table (`credentials = "..."`) is refused:
+  it used to load as a broker with no users.
+
 - Credentials: `--pprof-addr` no longer serves `/debug/pprof/cmdline` (the command line,
   which is where `--sasl-user user:password` is); the other profiles are unchanged. The log
   line for a handler that panicked during a SASL exchange names the type of the panic's

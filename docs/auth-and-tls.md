@@ -159,6 +159,9 @@ nothing the process puts out:
 - the start-up summary, `env`, `doctor`, `--help` and `config print` (which writes
   `"<redacted>"`; `config print --show-secrets` is the one command that writes a
   password, and it is how to get a file the broker starts from);
+- an error about the config file: it names the line and the key and repeats nothing that
+  is written there, and under `[credentials]` not the key either (see
+  [Configuration](configuration.md));
 - the console, the Traffic inspector included, the schema registry's answers and
   `/healthz`;
 - the data directory. Credentials are not stored at all: they are read from the
@@ -174,6 +177,10 @@ data, and reads all of the above for them.
 The command line itself is outside this: `--sasl-user alice:s3cret` is in your shell
 history and in `ps` for as long as the broker runs. `[credentials]` in the config file
 avoids both.
+
+So is a setting that was read and then refused: `log-level = "verbose"` or an unknown
+SASL mechanism is quoted back in the error, from a flag or from the file, because the
+value is what is wrong with it. A password is never such a setting; a user's name is.
 
 ## What's not here
 

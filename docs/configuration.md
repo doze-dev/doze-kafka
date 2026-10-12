@@ -40,6 +40,18 @@ override, so you can commit a `doze-kafka.toml` for your project and still run
 `./doze-kafka --kafka-version 3` for a quick experiment. A mistyped key is rejected
 rather than silently ignored.
 
+An error about the file names the line and the key and never repeats what is written
+there, because the file that fails to load is often one with a password in the wrong
+place:
+
+```
+doze-kafka: read doze-kafka.toml: toml: line 7 (key "tls.key"): this is not valid TOML (a string is written in quotes); what was written is not repeated, because this file can hold passwords
+```
+
+Under `[credentials]` the key is not named either (it is where a user's name goes, and
+a password on a line of its own is read as one): the error gives the line. `credentials`
+written as anything but a table (`credentials = "..."`) is refused.
+
 Two things a file does better than flags: it keeps a **list of SASL users** readable
 (and keeps passwords out of your shell history and `ps` output), and it's
 **committable** — check `doze-kafka.toml` into your repo and the whole team gets the
