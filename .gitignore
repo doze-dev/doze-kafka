@@ -27,3 +27,6 @@ compat/**/node_modules/
 compat/**/target/
 compat/**/.venv/
 console/cm6/node_modules/
+
+# Mutation runs: every mutant of the last run of each unit (scripts/mutate), for a person to read.
+/.mutate/
