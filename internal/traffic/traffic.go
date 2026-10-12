@@ -508,7 +508,7 @@ func (r *Recorder) Request(o protocol.Observation) {
 	ev.Seq = r.seq
 	ev.ID = r.epoch + "." + strconv.FormatUint(r.seq, 36)
 	if o.Req != nil {
-		ev.Facts = protocol.DescribeFacts(o.Req, o.Resp)
+		ev.Facts = protocol.DescribeFactsNamed(o.Req, o.Resp, r.resolve)
 	}
 	stored := &row{Event: ev, foldKey: foldKey(ev), lastReq: r.reqs}
 	if len(r.byID) >= r.limit && r.tail != nil {

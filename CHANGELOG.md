@@ -11,6 +11,13 @@ here that contains "server API"; `task api` fails without it.
   measured time (`42 µs`, `0.4 ms`) rather than the design boards' `0 ms`: a broker
   answering from memory does that constantly, and `0 ms` says nothing was measured (AD6).
 
+- Traffic inspector: "Result per partition" pairs each partition with its own answer. A
+  fetch of several topics used to give every topic the result of the last topic that had
+  a partition of the same number (a refused `b-0` read as a refused `a-0`, with its
+  record count and bytes). A fetch that names its topics by id (v13) now lists each
+  partition under its topic's name; they were blank. ListOffsets, OffsetFetch,
+  TxnOffsetCommit, DeleteRecords and OffsetDelete list their partitions and results too.
+
 - Client telemetry answers as Apache Kafka 4.3.1 does, from recordings of it
   (`conformance/recordings/telemetry-*.json`, `client-telemetry.json`): a push before the
   interval has passed, and a second subscription request inside it, is
