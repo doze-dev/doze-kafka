@@ -45,6 +45,11 @@ func defaultRequest(key int16, version int16) kmsg.Request {
 		r.Acks = 1 // the default, 0, is fire-and-forget: Kafka answers it with nothing.
 	case *kmsg.ConsumerGroupHeartbeatRequest:
 		r.Group = "matrix"
+	case *kmsg.ApiVersionsRequest:
+		// From v3 a client names itself, and a request that does not is refused
+		// INVALID_REQUEST with no list, as Kafka refuses it: that answer would decode
+		// and round-trip and prove nothing about the list.
+		r.ClientSoftwareName, r.ClientSoftwareVersion = "matrix", "1"
 	}
 	req.SetVersion(version)
 	return req

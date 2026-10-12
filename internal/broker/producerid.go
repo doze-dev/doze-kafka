@@ -43,6 +43,12 @@ func (b *Broker) nextProducerID() (int64, error) {
 func (b *Broker) handleInitProducerID(ctx context.Context, req *protocol.Request, ir *kmsg.InitProducerIDRequest, resp *kmsg.InitProducerIDResponse) error {
 	// A transactional id makes the caller the owner of that id's transactions (txn.go).
 	if ir.TransactionalID != nil && *ir.TransactionalID != "" {
+		// A transactional id is kept, in memory and on disk, for good (bounds.go).
+		if tooLong(*ir.TransactionalID) {
+			resp.ErrorCode = kerr.InvalidRequest.Code
+			resp.ProducerID, resp.ProducerEpoch = -1, -1
+			return nil
+		}
 		if !b.canTxnID(req.Conn, *ir.TransactionalID, opWrite) {
 			resp.ErrorCode = kerr.TransactionalIDAuthorizationFailed.Code
 			resp.ProducerID, resp.ProducerEpoch = -1, -1

@@ -6,6 +6,7 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
+	"github.com/doze-dev/doze-kafka/internal/storage/meta"
 
 	"github.com/twmb/franz-go/pkg/kerr"
 )
@@ -107,6 +108,20 @@ func (b *Broker) handleJoinGroup(ctx context.Context, req *protocol.Request, jr 
 	if !b.canGroup(req.Conn, jr.Group, opRead) {
 		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
 		resp.Generation = -1
+		return nil
+	}
+	// What the request names is kept for as long as the group or the member is, so it
+	// is bounded before either coordinator sees it (bounds.go).
+	if meta.ValidateGroupID(jr.Group) != nil {
+		resp.ErrorCode, resp.Generation = kerr.InvalidGroupID.Code, -1
+		return nil
+	}
+	long := len(jr.MemberID) > maxMemberIDBytes || tooLong(deref(jr.InstanceID), jr.ProtocolType)
+	for _, p := range jr.Protocols {
+		long = long || tooLong(p.Name)
+	}
+	if long {
+		resp.ErrorCode, resp.Generation = kerr.InvalidRequest.Code, -1
 		return nil
 	}
 	// A group running under KIP-848 takes a classic client in as one of its members

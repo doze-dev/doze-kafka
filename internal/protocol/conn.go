@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 )
@@ -123,11 +124,65 @@ func (c *Conn) ClientSoftware() string {
 	return c.software
 }
 
-// SetClientSoftware records the client's name and version from its ApiVersions request.
-func (c *Conn) SetClientSoftware(s string) {
+// SetClientSoftware records the client's name and version from its ApiVersions
+// request. What is kept is bounded here, where it is kept (ClientSoftware), whatever
+// the caller was sent.
+func (c *Conn) SetClientSoftware(name, version string) {
 	if c != nil {
-		c.software = s
+		c.software = ClientSoftware(name, version)
 	}
+}
+
+// MaxClientSoftware is how many bytes of a client's software name and version are
+// kept. Kafka refuses a name for its characters and never for its length (recorded:
+// 20,000 characters are taken), so a name may fill a frame, and it is kept for as long
+// as the connection is open: 300 connections that each sent a 1 MiB name held half a
+// gigabyte. It is for people to read, so what is kept is its beginning.
+const MaxClientSoftware = 128
+
+// ClientSoftware is "name version" as it is kept and shown: cut to MaxClientSoftware
+// bytes, ending in an ellipsis when it was cut, and a copy, so that it does not keep
+// the request it came from alive.
+func ClientSoftware(name, version string) string {
+	const dots = "…"
+	// Only the beginning can be kept, so only the beginning is put together: one byte
+	// past the bound, so that what was cut here is still seen to be too long below.
+	if len(name) > MaxClientSoftware+1 {
+		name = name[:MaxClientSoftware+1]
+	}
+	if len(version) > MaxClientSoftware+1 {
+		version = version[:MaxClientSoftware+1]
+	}
+	s := strings.TrimSpace(name + " " + version)
+	if len(s) <= MaxClientSoftware {
+		return strings.Clone(s)
+	}
+	cut := MaxClientSoftware - len(dots)
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + dots
+}
+
+// ValidClientSoftware reports whether s is a client software name or version that
+// Apache Kafka accepts in ApiVersions v3 and later: letters and digits, with dots and
+// dashes allowed between them, and at least one character (its
+// ApiVersionsRequest.isValid; recorded against 4.3.1 in
+// conformance/recordings/apiversions-client-software.json). Kafka answers anything
+// else INVALID_REQUEST.
+func ValidClientSoftware(s string) bool {
+	alnum := func(c byte) bool {
+		return 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9'
+	}
+	if s == "" || !alnum(s[0]) || !alnum(s[len(s)-1]) {
+		return false
+	}
+	for i := 1; i < len(s)-1; i++ {
+		if c := s[i]; !alnum(c) && c != '-' && c != '.' {
+			return false
+		}
+	}
+	return true
 }
 
 // SetPrincipal records who the SASL exchange authenticated. An empty string clears it.

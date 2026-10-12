@@ -34,6 +34,10 @@ func TestARecordedJoinReasonIsClipped(t *testing.T) {
 	req.MemberID = "m-1"
 	ask(t, c, req, 9, kmsg.NewPtrJoinGroupResponse())
 
+	// The row is made after the answer is written: wait for it.
+	eventually(t, 5*time.Second, "the JoinGroup row", func() bool {
+		return len(serverhook.Traffic(srv).Events(traffic.Filter{API: "JoinGroup"}, 1)) == 1
+	})
 	var join *traffic.Event
 	for _, e := range serverhook.Traffic(srv).Events(traffic.Filter{}, 0) {
 		if e.API == "JoinGroup" {

@@ -74,6 +74,17 @@ implement it.
   `group.min.session.timeout.ms` and `group.max.session.timeout.ms` do (recorded:
   `conformance/recordings/joingroup-session-timeout.json`). The bounds are not
   settable here; a broker run with different bounds would differ.
+- **A name longer than 4,096 bytes is refused.** A group id (`INVALID_GROUP_ID`), and a
+  group instance id, a rack id, a member id a client chose (4,160 bytes, so a static
+  member can come back with the id it was given), a protocol type or name, a subscribed
+  topic name or pattern, and a transactional id (`INVALID_REQUEST`). The first message
+  of a SCRAM login is held to 4,096 bytes too (`SASL_AUTHENTICATION_FAILED`). Kafka has
+  no such bounds: it takes a name as long as its request size allows (100 MB by
+  default). These names are kept, in memory and some on disk, for as long as the group,
+  the member or the transaction is, and a single request could otherwise leave a
+  megabyte behind in each; no client sends a name near the bound. A client id may be
+  32,767 bytes, the most its place in the request header can say, and a member's is
+  kept whole.
 
 ## Client telemetry and the Traffic page
 

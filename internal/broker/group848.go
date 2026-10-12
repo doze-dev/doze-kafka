@@ -234,6 +234,14 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 	if r.MemberEpoch < -2 {
 		return cg848Error(kerr.InvalidRequest.Code, "the member epoch is not a valid value")
 	}
+	// What a member names is kept for as long as it is a member (bounds.go).
+	long := len(r.MemberID) > maxMemberIDBytes || tooLong(deref(r.InstanceID), deref(r.RackID), deref(r.SubscribedTopicRegex))
+	for _, name := range r.SubscribedTopicNames {
+		long = long || tooLong(name)
+	}
+	if long {
+		return cg848Error(kerr.InvalidRequest.Code, "a member id, instance id, rack id, topic name or pattern is longer than this broker keeps")
+	}
 	static := r.InstanceID != nil && *r.InstanceID != ""
 
 	m.mu.Lock()

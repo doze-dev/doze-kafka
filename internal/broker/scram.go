@@ -87,6 +87,12 @@ type scramConversation struct {
 // message (r=<nonce>,s=<salt>,i=<iters>), returning the conversation state to
 // carry into the final step.
 func (a *authenticator) scramFirst(mechanism string, in []byte) ([]byte, *scramConversation, error) {
+	// This message is kept on the connection until the client's second: a user name and
+	// a nonce the client made up. A megabyte of nonce, on every connection that has
+	// not logged in yet, is not a login (bounds.go).
+	if len(in) > maxSCRAMFirstBytes {
+		return nil, nil, fmt.Errorf("scram: client-first of %d bytes, more than %d", len(in), maxSCRAMFirstBytes)
+	}
 	newHash := scramHashFor(mechanism)
 	s := string(in)
 

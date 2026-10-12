@@ -24,6 +24,21 @@ here that contains "server API"; `task api` fails without it.
   16 µs) and runs outside the lock. A Traffic page poll copies the rows it draws (about
   110 KB) where it copied everything held, twice (3.5 MB each time), under that lock.
   The paused page's "N new requests" now honours the search field as the table does.
+- `ApiVersions` answers as Apache Kafka 4.3.1 does, from recordings of it
+  (`conformance/recordings/apiversions-*.json`). From v3, a client software name or
+  version that is empty, or is not letters and digits with dots and dashes only between
+  them, is `INVALID_REQUEST` with no APIs listed (it was answered 0 and the whole list;
+  a client that sends ApiVersions v3 by hand with no name is now refused, as it is by
+  Kafka). A version of ApiVersions that is not served is answered `UNSUPPORTED_VERSION`
+  with one row, ApiVersions itself (it was the whole table). ApiVersions is offered to
+  v4 when emulating Kafka 4.
+- What a client can make the broker keep is bounded. A client's software name and
+  version are kept to 128 bytes (300 connections each sending a 1 MiB name held 500 MB).
+  A group id, group instance id, rack id, client-chosen member id, protocol name,
+  subscribed topic name or pattern, or transactional id longer than 4,096 bytes is
+  refused, and so is a SCRAM first message that long (Kafka has no such bounds:
+  `docs/limitations.md`). A group id with a NUL byte is refused by a classic JoinGroup
+  as it already was by a commit.
 
 - Client telemetry answers as Apache Kafka 4.3.1 does, from recordings of it
   (`conformance/recordings/telemetry-*.json`, `client-telemetry.json`): a push before the

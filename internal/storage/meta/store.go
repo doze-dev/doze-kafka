@@ -77,10 +77,20 @@ func metricKey(name string) string { return strings.ReplaceAll(name, ".", "_") }
 // id containing one would read and delete another group's offsets.
 var ErrInvalidGroupID = errors.New("meta: invalid group id")
 
+// MaxGroupIDBytes is the longest group id that is stored. A group id is part of a key
+// of the offsets bucket (group, topic, partition), and a key there cannot be longer
+// than 32,768 bytes: a longer id could be joined and never committed for. It is also
+// kept in memory for as long as the group is, and a flexible request can carry one a
+// megabyte long. 4,096 bytes is far past any real group id and leaves a key room.
+const MaxGroupIDBytes = 4096
+
 // ValidateGroupID reports whether a group id can be stored.
 func ValidateGroupID(group string) error {
 	if strings.IndexByte(group, 0) >= 0 {
 		return fmt.Errorf("%w: contains a NUL byte", ErrInvalidGroupID)
+	}
+	if len(group) > MaxGroupIDBytes {
+		return fmt.Errorf("%w: %d bytes, more than %d", ErrInvalidGroupID, len(group), MaxGroupIDBytes)
 	}
 	return nil
 }

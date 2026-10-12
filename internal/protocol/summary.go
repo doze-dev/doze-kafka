@@ -668,15 +668,28 @@ func sumTelemetry(q kmsg.Request, r kmsg.Response) Summary {
 	return Summary{}
 }
 
-func sumApiVersions(q kmsg.Request, _ kmsg.Response) Summary {
-	if req, ok := q.(*kmsg.ApiVersionsRequest); ok && req.ClientSoftwareName != "" {
-		sw := req.ClientSoftwareName
-		if req.ClientSoftwareVersion != "" {
-			sw += " " + req.ClientSoftwareVersion
-		}
-		return Summary{Software: sw, Detail: sw}
+func sumApiVersions(q kmsg.Request, r kmsg.Response) Summary {
+	req, ok := q.(*kmsg.ApiVersionsRequest)
+	if !ok {
+		return Summary{}
 	}
-	return Summary{}
+	// A name or version Kafka does not take is refused, and is not what the client is
+	// then known as: the row says what was sent and why it was not taken.
+	if resp, ok := r.(*kmsg.ApiVersionsResponse); ok && resp.ErrorCode == kerr.InvalidRequest.Code {
+		short := func(s string) string {
+			if len(s) > 48 {
+				s = strings.ToValidUTF8(s[:48], "") + "…"
+			}
+			return strconv.Quote(s)
+		}
+		return Summary{Detail: "client software " + short(req.ClientSoftwareName) + " version " + short(req.ClientSoftwareVersion) +
+			": each must be letters and digits, with dots and dashes only between them"}
+	}
+	if req.ClientSoftwareName == "" {
+		return Summary{}
+	}
+	sw := ClientSoftware(req.ClientSoftwareName, req.ClientSoftwareVersion)
+	return Summary{Software: sw, Detail: sw}
 }
 
 // firstError is the first non-zero error code in a response, found by walking its
