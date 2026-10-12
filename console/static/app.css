@@ -71,7 +71,7 @@
   --sh: none; --sh-lg: var(--shadow-modal);
 
   --radius-sm: 3px; --radius-md: 4px; --radius: 4px; --radius-xl: 6px; --radius-pill: 3px;
-  --fs-3xs: 8px; --fs-2xs: 10px; --fs-chip: 9px; --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-base: 14px; --fs-lg: 16px; --fs-xl: 18px; --fs-2xl: 26px;
+  --fs-3xs: 8px; --fs-2xs: 10px; --fs-chip: 9px; --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-base: 14px; --fs-lg: 16px; --fs-xl: 18px; --fs-2xl: 26px; --fs-phone-h1: 15px;
   --sans: "IBM Plex Sans Variable", ui-sans-serif, system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --pad: 20px; /* the page's side padding; the dock bleeds out by the same */
@@ -993,7 +993,7 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .insp-sel .inspector-acts { position: sticky; bottom: 0; margin: auto -16px -12px; padding: 10px 16px 14px; background: var(--card); border-top: 1px solid var(--line2); }
   /* Sy-04: the title is 15 px on its own row, then the action the width of the page with
      the menu beside it. */
-  .idband h1, .idband h1.m, .idband h1.page-title { font-size: 15px; line-height: 20px; flex: 1 1 100%; }
+  .idband h1, .idband h1.m, .idband h1.page-title { font-size: var(--fs-phone-h1); line-height: 20px; flex: 1 1 100%; }
   .idband > .idband-acts { flex: 1 1 100%; flex-wrap: nowrap; }
   .idband-acts > .btn.pri { flex: 1; }
   /* Sy-04: 400 of 844 (47%), so the page's own tabs and first card stay in view under
