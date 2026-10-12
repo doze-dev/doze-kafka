@@ -773,12 +773,16 @@ test('the title of a topic, a group and a subject is the boards\' .h1.m: Plex Sa
   }
 });
 
-test('a <button class="btn"> is weight 400 as on every board, and an <a class="btn"> is 500', async ({ page }) => {
+test('every .btn is weight 400, <button> or <a> (the boards draw them all as buttons); only Cl-Home\'s "Connect an app" is 500', async ({ page }) => {
   await page.goto('topics/seed-orders');
   await expect(page.locator('main button.btn.pri').first()).toHaveCSS('font-weight', '400');
   await expect(page.locator('main button.btn').first()).toHaveCSS('font-weight', '400');
   await page.goto('topics');
-  await expect(page.locator('main a.btn.pri').first()).toHaveCSS('font-weight', '500');
+  await expect(page.locator('a.btn', { hasText: '+ New' })).toHaveCSS('font-weight', '400');
+  await page.goto('groups/g-lag');
+  await expect(page.locator('main a.btn', { hasText: 'Reset offsets' }).first()).toHaveCSS('font-weight', '400');
+  await page.goto('cluster');
+  await expect(page.locator('main a.btn', { hasText: 'Connect an app' }).first()).toHaveCSS('font-weight', '500');
 });
 
 test('Sy-01: the record table is P, Offset, Key, Value, Age, in rows of 28 with the offset a plain 12 px mono', async ({ page }) => {

@@ -500,13 +500,15 @@ table.tbl tbody tr.hl td { animation: rowflash 2.2s ease 1; }
 /* Buttons (the boards' .btn): one solid ink primary per page, the rest outlined. */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: var(--radius-md);
-  border: 1px solid var(--line); background: var(--card); cursor: pointer; font-weight: 500; font-size: var(--fs-md);
+  border: 1px solid var(--line); background: var(--card); cursor: pointer; font-weight: 400; font-size: var(--fs-md);
   color: var(--ink); white-space: nowrap;
 }
 .btn:hover { background: var(--well); }
-/* The boards' `.app button { font: inherit }` outranks `.btn { font-weight: 500 }`, so
-   a <button class="btn"> is 400 on every board and only an <a class="btn"> is 500. */
-button.btn { font-weight: 400; }
+/* The boards draw every control as a <button>, where `.app button { font: inherit }` outranks
+   `.btn { font-weight: 500 }`: 400. The console draws many as <a class="btn"> (navigation) and
+   they match, so one row never mixes weights. Only Cl-Home's "Connect an app" is an <a> on the
+   board, and so 500 (.w5). */
+.btn.w5 { font-weight: 500; }
 .btn.pri { background: var(--ink); border-color: var(--ink); color: var(--card); }
 .btn.pri:hover { background: var(--ink); opacity: .88; }
 .btn.danger { color: var(--bad); border-color: var(--bad); }
