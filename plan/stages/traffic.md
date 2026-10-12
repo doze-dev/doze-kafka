@@ -436,7 +436,7 @@ on the code before the fix and was run again with the fix reverted by hand.
 | TRF-14 | fixed, red | `TestEmbeddedBrokerDoesNotAdvertiseTelemetry`, `TestNoConsoleMeansNoTelemetry` |
 | TRF-15 | fixed | "N of M requests match" (requests among those kept); the table says when it is cut at 200 rows |
 | TRF-16 | cells written and run | `compat/java-telemetry`, `compat/kcat-telemetry`: the client's card on the page. The cells now grep the `Traffic` page's client list; see the compat note below. |
-| TRF-17 | fixed | `TestSummarisersReportWhatTheRequestNames` (22 rows) and the summariser coverage |
+| TRF-17 | fixed | `TestSummarisersReportWhatTheRequestNames` (22 rows) and, since the review of 2026-10-12 found the two sub-targets unmet (`summary.go` 89.7% against 92, `observe.go` 94.4% against 100), `TestSummarisersNameWhatAdminAndTransactionRequestsAreAbout` (21 more rows), `TestASummariserHandedAnotherAPIsRequestSaysNothing`, `TestFirstErrorLooksAtABoundedAmountOfAResponse`, `TestReplySizedFramesAndKeepsTheAnswerAsReplyDoes` (it is the fetch path, not dead code), `TestAnAnswerThatCannotBeWrittenIsObserved`, `TestAnObservationNamesWhoTheConnectionIs`: `summary.go` 100%, `observe.go` 100%, the observer paths of `conn.go` 100%, package 91.2% (`go test ./internal/protocol -cover`) |
 | TRF-18 | fixed, red | `TestGroupFilterIncludesItsMembersFetches` |
 | TRF-19 | fixed, red | `TestGroupEventsAreKeptInOrderPerGroup` (a noisy group), `TestTheQuietestGroupIsTheOneForgotten` |
 | TRF-20 | decided | a row's time is when it began, and the table is ordered by it; the row appears when the request ends |
