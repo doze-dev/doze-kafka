@@ -17,6 +17,13 @@ here that contains "server API"; `task api` fails without it.
   record count and bytes). A fetch that names its topics by id (v13) now lists each
   partition under its topic's name; they were blank. ListOffsets, OffsetFetch,
   TxnOffsetCommit, DeleteRecords and OffsetDelete list their partitions and results too.
+- Traffic recorder: a request naming thousands of partitions no longer stalls every
+  other connection. Describing a request was quadratic in its partitions (48 ms for a
+  4,000-partition fetch) and ran under the recorder's one lock, which every connection
+  takes after every request; it now costs the same whatever the request names (about
+  16 µs) and runs outside the lock. A Traffic page poll copies the rows it draws (about
+  110 KB) where it copied everything held, twice (3.5 MB each time), under that lock.
+  The paused page's "N new requests" now honours the search field as the table does.
 
 - Client telemetry answers as Apache Kafka 4.3.1 does, from recordings of it
   (`conformance/recordings/telemetry-*.json`, `client-telemetry.json`): a push before the

@@ -30,7 +30,7 @@ func trafficFor(rec *traffic.Recorder) console.TrafficSource {
 }
 
 func filterOf(f console.TrafficFilter) traffic.Filter {
-	return traffic.Filter{Client: f.Client, API: f.API, Topic: f.Topic, Group: f.Group, Kind: f.Kind, ErrorsOnly: f.ErrorsOnly}
+	return traffic.Filter{Client: f.Client, API: f.API, Topic: f.Topic, Group: f.Group, Kind: f.Kind, ErrorsOnly: f.ErrorsOnly, Any: f.Any}
 }
 
 func eventOf(e traffic.Event) console.TrafficEvent {
@@ -65,6 +65,12 @@ func eventsOf(evs []traffic.Event) []console.TrafficEvent {
 
 func (s trafficSource) Events(f console.TrafficFilter, limit int) []console.TrafficEvent {
 	return eventsOf(s.rec.Events(filterOf(f), limit))
+}
+
+func (s trafficSource) Query(f console.TrafficFilter, limit int) console.TrafficResult {
+	res := s.rec.Query(traffic.Query{Filter: filterOf(f), Limit: limit})
+	return console.TrafficResult{Rows: eventsOf(res.Rows), Total: res.Total, Requests: res.Requests, Held: res.Held,
+		Newest: res.Newest, Oldest: res.Oldest}
 }
 
 func (s trafficSource) Row(id string) (console.TrafficEvent, bool) {

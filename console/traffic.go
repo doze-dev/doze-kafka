@@ -29,8 +29,13 @@ import (
 // TrafficSource is what the broker remembers of its clients' requests and of what its
 // consumer groups did.
 type TrafficSource interface {
-	// Events are the requests matching f, latest activity first, at most limit.
+	// Events are the requests matching f, newest first by when they began, at most limit
+	// (0: all of them).
 	Events(f TrafficFilter, limit int) []TrafficEvent
+	// Query is Events with what matched in all: one walk of what the recorder holds,
+	// which copies only the rows it returns. A page that lists the newest rows and
+	// counts the rest asks this once.
+	Query(f TrafficFilter, limit int) TrafficResult
 	// Row is one request by its id, while the recorder still holds it.
 	Row(id string) (TrafficEvent, bool)
 	// NewSince counts the requests matching f that began after t: what a paused page
@@ -62,6 +67,21 @@ type TrafficFilter struct {
 	// Kind is produce, fetch, groups or admin.
 	Kind       string
 	ErrorsOnly bool
+	// Any is the page's one search field: a row whose client, software, address,
+	// principal, request, topics, group, transactional id or error contains it. It is
+	// not part of a filter's address (the page carries it as q).
+	Any string
+}
+
+// TrafficResult is the rows a query found and what matched in all.
+type TrafficResult struct {
+	Rows []TrafficEvent
+	// Total is how many rows matched, whatever the limit; Requests how many requests
+	// they stand for; Held how many requests everything the recorder holds stands for.
+	Total, Requests, Held int
+	// Newest is when the newest matching row began; Oldest when the oldest matching
+	// row's first request did.
+	Newest, Oldest time.Time
 }
 
 // TrafficEvent is one row: a request, or a run of identical idle ones folded together.
@@ -264,9 +284,12 @@ func (v trafficView) empty() bool {
 }
 
 // source is the filter the recorder is asked: the kind chip is its own filter, except
-// "errors", which is the recorder's errors-only.
+// "errors", which is the recorder's errors-only, and the one search field is its Any.
+// The recorder does all of the narrowing, so it can count what matched without
+// handing over the rows.
 func (v trafficView) source() TrafficFilter {
 	f := v.TrafficFilter
+	f.Any = v.Q
 	switch v.Kind {
 	case "errors":
 		f.ErrorsOnly = true
@@ -279,23 +302,6 @@ func (v trafficView) source() TrafficFilter {
 // trafficKinds are the board's segmented control, in its order.
 var trafficKinds = []struct{ Key, Label string }{
 	{"", "all"}, {"errors", "errors"}, {"produce", "produce"}, {"fetch", "fetch"}, {"groups", "groups"}, {"admin", "admin"},
-}
-
-// matches is the board's one field: any of the client, its software, the address, the
-// request, a topic or the group contains what was typed.
-func (v trafficView) matches(e TrafficEvent) bool {
-	if v.Q == "" {
-		return true
-	}
-	q := strings.ToLower(v.Q)
-	hay := []string{e.ClientID, e.Software, e.Remote, e.API, e.Group, e.ViaGroup, e.TxnID, e.Principal, e.Error}
-	hay = append(hay, e.Topics...)
-	for _, h := range hay {
-		if strings.Contains(strings.ToLower(h), q) {
-			return true
-		}
-	}
-	return false
 }
 
 // query is the filter as a URL query (without the leading "?").
@@ -692,22 +698,16 @@ func (c *Console) clientRow(cl TrafficClient, now time.Time) clientRow {
 // requests the broker keeps in memory, the oldest of which is so old. short is the
 // words beside the number, long is what the tooltip says.
 func (c *Console) ringText(now time.Time) (short, long string) {
-	events := c.traffic.Events(TrafficFilter{}, 0)
+	held := c.traffic.Query(TrafficFilter{}, 1) // how far back it reaches; the rows are not wanted.
 	kept := "the recent requests the broker keeps in memory"
 	if n := c.traffic.Capacity(); n > 0 {
 		kept = "the last " + groupDigits(int64(n)) + " requests the broker keeps in memory"
 	}
-	if len(events) == 0 {
+	if held.Total == 0 {
 		return "from recent requests; none are kept yet",
 			"Written by is counted from " + kept + ", and none are kept yet. It does not survive a restart."
 	}
-	oldest := events[0].First
-	for _, e := range events {
-		if e.First.Before(oldest) {
-			oldest = e.First
-		}
-	}
-	age := spanText(now.Sub(oldest))
+	age := spanText(now.Sub(held.Oldest))
 	return "from recent requests, the oldest " + age + " old",
 		"Written by is counted from " + kept + ". It reaches back " + age + ": a client that wrote earlier, or whose requests have been pushed out, is not listed. It does not survive a restart."
 }
@@ -776,23 +776,14 @@ func (c *Console) trafficData(r *http.Request) map[string]any {
 	// The rows: everything the recorder holds that the page's filter lets through,
 	// newest first; the table shows the first trafficRows of them, and the heading says
 	// how many matched.
-	all := c.traffic.Events(TrafficFilter{}, 0)
-	events := c.traffic.Events(v.source(), 0)
-	totalReq := 0
-	for _, e := range all {
-		totalReq += max(e.Count, 1)
-	}
+	//
+	// One question to the recorder, which hands over the rows shown and counts the rest
+	// where they lie. (This asked for every row it held, twice, to count them here: two
+	// copies of the whole ring under the lock every client's request waits on, each poll.)
+	res := c.traffic.Query(v.source(), trafficRows)
+	totalReq, matchedRows, matchedReq := res.Held, res.Total, res.Requests
 	var rows []trafficRow
-	matchedRows, matchedReq := 0, 0
-	for _, e := range events {
-		if !v.matches(e) {
-			continue
-		}
-		matchedRows++
-		matchedReq += max(e.Count, 1)
-		if len(rows) >= trafficRows {
-			continue
-		}
+	for _, e := range res.Rows {
 		row := c.trafficRow(e)
 		if open[e.Conn] {
 			row.ConnKey = strconv.FormatUint(e.Conn, 10)

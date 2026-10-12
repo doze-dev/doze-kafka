@@ -115,6 +115,15 @@ timings and error names. It holds **no record bytes, no header value and no secr
 the decoded fields give byte strings as their length, a batch as "1 batch, 2 records,
 412 B", and hide the value of a configuration whose name says it is a secret.
 
+**What recording costs a client.** Every connection tells the recorder about every
+request it finishes, and the recorder has one lock. What is done with it held does not
+grow with what the client sent: the connection is found, the request is counted, and
+one row goes on the list. Describing the request (the partitions kept and their
+results, the decoded fields, the names of topics sent as ids) is done before the lock is
+taken, and costs the same for 4,000 partitions as for the 16 that are kept. A request
+that folds into the row before it is not described at all. A page that reads takes the
+lock for reading, alongside other pages, and copies only the rows it draws.
+
 ## Group timeline: why does my consumer keep rebalancing?
 
 A **consumer group's page** has a **Timeline**: what the group's coordinator did, in
