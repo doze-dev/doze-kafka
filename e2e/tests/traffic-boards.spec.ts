@@ -685,6 +685,26 @@ test('Main: page padding is the board\'s 16 20 0 with the 10 px gap, whatever th
   }
 });
 
+test('Traf-12: the filter row is one row at 1440 beside the inspector; the pill, clear and the count are never cut', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await lightTraffic(page, `traffic?group=${GROUP}`);
+  await expect(page.locator('#story-count')).toBeVisible({ timeout: 30_000 });
+  const m = await page.evaluate(() => {
+    const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+    const row = r('.filterrow'), field = r('.filterrow input[name=q]'), seg = r('.filterrow .seg'), pill = r('.filterrow .pill');
+    const clear = r('.filterrow a.b'), count = r('#story-count');
+    const cy = (b: DOMRect) => b.top + b.height / 2;
+    const count_el = document.querySelector('#story-count') as HTMLElement;
+    return { row, field, seg, pill, clear, count, ys: [cy(field), cy(seg), cy(pill), cy(clear)], countCut: count_el.scrollWidth > count_el.clientWidth };
+  });
+  const ys = m.ys;
+  expect(Math.max(...ys) - Math.min(...ys), JSON.stringify(m.ys)).toBeLessThanOrEqual(4);
+  expect(m.count.right).toBeLessThanOrEqual(m.row.right + 1);
+  expect(m.count.left).toBeGreaterThanOrEqual(m.clear.right - 1);
+  expect(m.countCut).toBe(false);
+  expect(m.field.width).toBeGreaterThanOrEqual(96);
+});
+
 test('Main: with the inspector open Took is whole and the card does not scroll sideways at 1180, 1280, 1366 and 1440', async ({ page }) => {
   await lightTraffic(page);
   for (const width of [1180, 1280, 1366, 1440]) {
