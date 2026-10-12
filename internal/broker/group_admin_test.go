@@ -340,3 +340,29 @@ func TestGroupAdmin_OffsetDeleteRemovesAnOffsetWhoseTopicIsGone(t *testing.T) {
 		t.Errorf("another topic's offset was disturbed: %d", off)
 	}
 }
+
+// ConsumerGroupDescribe of a group that is a classic group is GROUP_ID_NOT_FOUND, and
+// the message says why (Kafka's own words), so a tool tells "no such group" from "ask
+// DescribeGroups".
+func TestGroupAdmin_ConsumerGroupDescribeOfAClassicGroup(t *testing.T) {
+	addr := startBroker(t, 4)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cl := newClient(t, addr)
+	defer cl.Close()
+	stableGroupOfOne(t, ctx, cl, "classic-g", 30000, 30000)
+
+	req := kmsg.NewPtrConsumerGroupDescribeRequest()
+	req.Groups = []string{"classic-g", "nobody-at-all"}
+	resp, err := req.RequestWith(ctx, cl)
+	if err != nil || len(resp.Groups) != 2 {
+		t.Fatalf("ConsumerGroupDescribe: %v %+v", err, resp)
+	}
+	classic, none := resp.Groups[0], resp.Groups[1]
+	if classic.ErrorCode != kerr.GroupIDNotFound.Code || classic.ErrorMessage == nil || *classic.ErrorMessage != "Group classic-g is not a consumer group." {
+		t.Errorf("a classic group: code %d message %v", classic.ErrorCode, classic.ErrorMessage)
+	}
+	if none.ErrorCode != kerr.GroupIDNotFound.Code || none.ErrorMessage != nil {
+		t.Errorf("a group that does not exist: code %d message %v", none.ErrorCode, none.ErrorMessage)
+	}
+}

@@ -361,3 +361,103 @@ func TestMixedGroupOnlyConsumerGroupsAreTaken(t *testing.T) {
 		t.Errorf("a refused join changed the owner to %q", owner)
 	}
 }
+
+// An emptied consumer group is kept for listing; when a consumer-protocol member joins
+// it again the id must be claimed again, and what holds it then decides: a classic group
+// of consumers is taken over with its members, one that is not a consumer group refuses.
+func TestMixedGroupEmptiedGroupIsClaimedAgain(t *testing.T) {
+	shortSessions(t)
+	r := newExpiryRig(t, t.TempDir(), time.Now(), "t")
+	r.withPartitions(t, "t", 2)
+	ctx := context.Background()
+
+	empty := func(group string) {
+		t.Helper()
+		r.join848(t, group, "gone", "t")
+		if res := r.hb848(group, "gone", -1, nil); res.errorCode != 0 {
+			t.Fatalf("leave: %+v", res)
+		}
+		if m := r.members(group); len(m) != 0 {
+			t.Fatalf("%s still has %v", group, m)
+		}
+	}
+	classicJoin := func(group, ptype string) string {
+		t.Helper()
+		meta := subscriptionBytes("t")
+		first, err := r.b.groups.join(ctx, joinReqSeat(group, "", time.Minute, time.Minute, ptype, meta), clientRef{})
+		if err != nil || first.errorCode != kerr.MemberIDRequired.Code {
+			t.Fatalf("first join: %v %+v", err, first)
+		}
+		res, err := r.b.groups.join(ctx, joinReqSeat(group, first.memberID, time.Minute, time.Minute, ptype, meta), clientRef{})
+		if err != nil || res.errorCode != 0 {
+			t.Fatalf("join: %v %+v", err, res)
+		}
+		return res.memberID
+	}
+
+	empty("consumers")
+	classic := classicJoin("consumers", "consumer")
+	req := kmsg.NewPtrConsumerGroupHeartbeatRequest()
+	req.Group, req.MemberID, req.MemberEpoch = "consumers", "new", 0
+	req.RebalanceTimeoutMillis = 60_000
+	req.SubscribedTopicNames = []string{"t"}
+	req.Topics = []kmsg.ConsumerGroupHeartbeatRequestTopic{}
+	if got := r.b.cg848.heartbeat(req, clientRef{"c", "h"}); got.errorCode != 0 {
+		t.Fatalf("a consumer-protocol member joining a classic group of consumers: %+v", got)
+	}
+	if m := r.members("consumers"); len(m) != 2 || !m[classic] || m["new"] {
+		t.Errorf("the group after the takeover: %v (want the classic member, as classic, and the new one)", m)
+	}
+
+	empty("connect")
+	classicJoin("connect", "connect")
+	req.Group, req.MemberID = "connect", "new"
+	if got := r.b.cg848.heartbeat(req, clientRef{"c", "h"}); got.errorCode != kerr.GroupIDNotFound.Code {
+		t.Errorf("a consumer-protocol member joining a classic group that is not of consumers: %+v", got)
+	}
+	if m := r.members("connect"); len(m) != 0 {
+		t.Errorf("the refused member was seated: %v", m)
+	}
+}
+
+// Member ids handed out to classic joins of different groups are each kept until used,
+// and an id nobody came back with is dropped with its group once it is old.
+func TestMixedGroupSeatsOfSeveralGroups(t *testing.T) {
+	shortSessions(t)
+	r := newExpiryRig(t, t.TempDir(), time.Now(), "t")
+	r.join848(t, "g1", "n", "t")
+	r.join848(t, "g2", "n", "t")
+	m := r.b.cg848
+
+	seat := func(group, member string) joinResult {
+		t.Helper()
+		res, handled := m.classicJoin(joinReqSeat(group, member, time.Second, time.Second, "consumer", subscriptionBytes("t")), clientRef{})
+		if !handled {
+			t.Fatal("not handled")
+		}
+		return res
+	}
+	// An id issued long ago for a group nobody has come back to.
+	m.mu.Lock()
+	m.pending = map[string]map[string]time.Time{"stale": {"old": time.Now().Add(-2 * pendingMemberTTL)}}
+	m.mu.Unlock()
+
+	a := seat("g1", "")
+	b := seat("g2", "")
+	if a.errorCode != kerr.MemberIDRequired.Code || b.errorCode != kerr.MemberIDRequired.Code {
+		t.Fatalf("first joins: %+v %+v", a, b)
+	}
+	m.mu.Lock()
+	_, staleKept := m.pending["stale"]
+	m.mu.Unlock()
+	if staleKept {
+		t.Error("a group whose only seat expired is still remembered")
+	}
+	// The second group's seat was issued after the first's: the first must still be good.
+	if res := seat("g1", a.memberID); res.errorCode != 0 {
+		t.Errorf("the first group's seat after another group was issued one: %+v", res)
+	}
+	if res := seat("g2", b.memberID); res.errorCode != 0 {
+		t.Errorf("the second group's seat: %+v", res)
+	}
+}
