@@ -2,30 +2,26 @@ package main
 
 import (
 	"bytes"
-	"context"
-	"crypto/tls"
+	"encoding/base64"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"net/http"
+	"net/http/httputil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/twmb/franz-go/pkg/kgo"
-	"github.com/twmb/franz-go/pkg/kmsg"
-	"github.com/twmb/franz-go/pkg/sasl/plain"
 )
 
 // D6. The secrets of a configuration are the SASL passwords, the key a TLS certificate
 // is served with, and the credential the console logs in with. This plants a distinctive
-// value of each and reads every surface the process has for it: `config print`, the log
-// at debug (every request), the start-up summary, every console page it links to and its
-// JSON, what a client is answered to DescribeConfigs and to a failed login, and the
-// errors the command line and the config file give for a bad value.
+// value of each and reads every surface the process has for it. The surfaces, and how
+// each is known to have been reached, are listed where they are read:
+// secrets_surfaces_test.go for a running broker, this file for the configuration.
+//
+// A surface that was not reached is a failure, never a log line: a guard that can pass
+// without having looked is not one.
 const (
 	plantedPassword = "PLANTEDsecret-Zq7-93f1"
 	plantedWrong    = "Nope-WRONGpw-51aa-Xk"
@@ -36,10 +32,15 @@ func plantConsoleSecret(t *testing.T) string {
 	t.Helper()
 	src := []byte("CONSOLE-SECRET-xyz!") // 19 bytes; 18 are read.
 	old := credentialRand
-	credentialRand = bytes.NewReader(src)
+	credentialRand = sameBytes(src) // every broker this test starts gets the same one.
 	t.Cleanup(func() { credentialRand = old })
 	return hex.EncodeToString(src[:18])
 }
+
+// sameBytes reads as b from its start, every time it is read.
+type sameBytes []byte
+
+func (b sameBytes) Read(p []byte) (int, error) { return copy(p, b), nil }
 
 func keyMaterial(t *testing.T, keyFile string) (whole, fragment string) {
 	t.Helper()
@@ -60,15 +61,39 @@ func keyMaterial(t *testing.T, keyFile string) (whole, fragment string) {
 	return whole, whole[20:52]
 }
 
+// fetch is the whole answer to a GET: the status line, the headers and the body.
 func fetch(t *testing.T, url string) string {
 	t.Helper()
-	resp, err := http.Get(url)
+	_, text := httpGet(t, url, "", "")
+	return text
+}
+
+// httpGet is fetch with HTTP Basic credentials (when user is not "") and the status.
+func httpGet(t *testing.T, url, user, pass string) (status int, text string) {
+	t.Helper()
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user != "" {
+		req.SetBasicAuth(user, pass)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("GET %s: %v", url, err)
 	}
 	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
-	return string(b)
+	// The headers as they were sent, and the body read whole: a dump of both writes a
+	// chunked body in chunks, and a secret across a chunk boundary would not be found.
+	head, err := httputil.DumpResponse(resp, false)
+	if err != nil {
+		t.Fatalf("GET %s: reading the answer: %v", url, err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("GET %s: reading the answer: %v", url, err)
+	}
+	return resp.StatusCode, string(head) + string(body)
 }
 
 var linkRe = regexp.MustCompile(`(?:href|hx-get|data-href|data-url)="(/[^"#]*)"`)
@@ -78,7 +103,7 @@ func crawl(t *testing.T, base string, seeds ...string) map[string]string {
 	t.Helper()
 	pages := map[string]string{}
 	queue := append([]string(nil), seeds...)
-	for len(queue) > 0 && len(pages) < 120 {
+	for len(queue) > 0 && len(pages) < 400 {
 		p := queue[0]
 		queue = queue[1:]
 		if _, seen := pages[p]; seen || !strings.HasPrefix(p, "/_console") {
@@ -99,23 +124,45 @@ func crawl(t *testing.T, base string, seeds ...string) map[string]string {
 	return pages
 }
 
+// guard is the planted secrets and every form of them a surface might carry.
+type guard struct{ secrets map[string]string }
+
+// plant is the guard for these secrets. A password is also looked for as a program
+// would have re-encoded it: in base64 (an Authorization header, a SASL token written
+// out) and in hex.
+func plant(consolePass, keyWhole, keyFragment string) guard {
+	g := guard{secrets: map[string]string{
+		"a SASL password": plantedPassword, "the start of a SASL password": "PLANTEDsecret", "a wrong password": plantedWrong,
+		"the console credential": consolePass, "the TLS key": keyWhole, "a piece of the TLS key": keyFragment,
+	}}
+	for what, who := range map[string][2]string{
+		"a SASL password": {"alice", plantedPassword}, "a wrong password": {"alice", plantedWrong}, "the console credential": {consoleUserName, consolePass},
+	} {
+		user, pass := who[0], who[1]
+		g.secrets[what+", in base64"] = base64.StdEncoding.EncodeToString([]byte(pass))
+		g.secrets[what+", in hex"] = hex.EncodeToString([]byte(pass))
+		g.secrets[what+", as HTTP Basic credentials"] = base64.StdEncoding.EncodeToString([]byte(user + ":" + pass))
+		g.secrets[what+", as a SASL/PLAIN token in base64"] = base64.StdEncoding.EncodeToString([]byte("\x00" + user + "\x00" + pass))
+	}
+	return g
+}
+
+// check fails the test if text shows any of the secrets.
+func (g guard) check(t *testing.T, surface, text string) {
+	t.Helper()
+	for what, s := range g.secrets {
+		if i := strings.Index(text, s); i >= 0 {
+			t.Errorf("%s shows %s: ...%q...", surface, what, text[max(0, i-60):min(len(text), i+len(s)+20)])
+		}
+	}
+}
+
 func TestNoSecretReachesAnyOutput(t *testing.T) {
 	consolePass := plantConsoleSecret(t)
 	certFile, keyFile := selfSigned(t)
 	keyWhole, keyFragment := keyMaterial(t, keyFile)
-	secrets := map[string]string{
-		"a SASL password": plantedPassword, "the start of a SASL password": "PLANTEDsecret", "a wrong password": plantedWrong,
-		"the console credential": consolePass, "the TLS key": keyWhole, "a piece of the TLS key": keyFragment,
-	}
-	check := func(surface, text string) {
-		t.Helper()
-		for what, s := range secrets {
-			if strings.Contains(text, s) {
-				i := strings.Index(text, s)
-				t.Errorf("%s shows %s: ...%s...", surface, what, text[max(0, i-40):min(len(text), i+len(s)+20)])
-			}
-		}
-	}
+	g := plant(consolePass, keyWhole, keyFragment)
+	check := func(surface, text string) { t.Helper(); g.check(t, surface, text) }
 
 	// The configuration: `config print` redacts by default; --show-secrets says it
 	// outright and is the only way to the password.
@@ -148,6 +195,8 @@ func TestNoSecretReachesAnyOutput(t *testing.T) {
 	}
 
 	// Errors the command line and the file give for a bad value never carry the value.
+	// Every one of these IS an error: a row that loaded would be a row that checked
+	// nothing.
 	dir := t.TempDir()
 	write := func(name, content string) string {
 		p := filepath.Join(dir, name)
@@ -160,109 +209,32 @@ func TestNoSecretReachesAnyOutput(t *testing.T) {
 		"a password where a number was written": {"--config", write("b.toml", "[credentials]\nalice = 12"+plantedPassword+"\n")},
 		"a password of the wrong type":          {"--config", write("c.toml", "[credentials]\nalice = [\""+plantedPassword+"\"]\n")},
 		"a password in an unknown key":          {"--config", write("d.toml", "[credentials]\nalice = \""+plantedPassword+"\"\n[other]\nx = \""+plantedPassword+"\"\n")},
-		"a TLS key that is not a key":           {"--tls-cert", certFile, "--tls-key", write("k.pem", "-----BEGIN PRIVATE KEY-----\n"+keyWhole+"\n-----END PRIVATE KEY-----\n")},
+		"a TLS key that is not a key":           {"--tls-cert", certFile, "--tls-key", write("k.pem", "-----BEGIN PRIVATE KEY-----\n"+keyWhole[:len(keyWhole)-8]+"\n-----END PRIVATE KEY-----\n")},
 		"a mechanism that is not known":         {"--sasl-mechanisms", "NOPE", "--sasl-user", "alice:" + plantedPassword},
 		"a SASL user with an empty password":    {"--sasl-mechanisms", "PLAIN", "--sasl-user", "alice:" + plantedPassword, "--sasl-user", "bob:"},
 		"credentials with no mechanism":         {"--sasl-user", "alice:" + plantedPassword},
 	} {
 		_, err := loadConfig(a)
 		if err == nil {
+			t.Errorf("%s: the configuration loaded, so no error was read for it", name)
 			continue
 		}
 		check(name+" (loadConfig)", err.Error())
 		var eb bytes.Buffer
-		runConfig(append([]string{"print"}, a...), io.Discard, &eb)
+		if code := runConfig(append([]string{"print"}, a...), io.Discard, &eb); code == 0 || eb.Len() == 0 {
+			t.Errorf("%s: config print exited %d and wrote %q, so no error was read for it", name, code, eb.String())
+		}
 		check(name+" (config print)", eb.String())
 	}
 
-	// The running broker, at debug, with the password used and a wrong one tried.
-	out, stop := start(t, "--log-level", "debug", "--sasl-mechanisms", "PLAIN", "--sasl-user", "alice:"+plantedPassword,
-		"--tls-cert", certFile, "--tls-key", keyFile)
-	waitFor(t, "the summary", func() bool { return strings.Contains(out.String(), "doze-kafka is up") })
-	text := out.String()
-	kafkaAddr := regexp.MustCompile(`kafka +(127\.0\.0\.1:\d+)`).FindStringSubmatch(text)
-	base := regexp.MustCompile(`http://127\.0\.0\.1:\d+`).FindString(text)
-	if kafkaAddr == nil || base == "" {
-		t.Fatalf("the summary does not name the addresses:\n%s", text)
-	}
-	client := func(pass string) *kgo.Client {
-		cl, err := kgo.NewClient(kgo.SeedBrokers(kafkaAddr[1]), kgo.DialTLSConfig(&tls.Config{InsecureSkipVerify: true}),
-			kgo.SASL(plain.Auth{User: "alice", Pass: pass}.AsMechanism()), kgo.WithLogger(nil))
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(cl.Close)
-		return cl
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-
-	var answers strings.Builder
-	bad := client(plantedWrong)
-	if _, err := kmsg.NewPtrMetadataRequest().RequestWith(ctx, bad); err != nil {
-		answers.WriteString(err.Error())
-	} else {
-		t.Error("a wrong password was accepted")
-	}
-	good := client(plantedPassword)
-	ct := kmsg.NewCreateTopicsRequest()
-	ctt := kmsg.NewCreateTopicsRequestTopic()
-	ctt.Topic, ctt.NumPartitions, ctt.ReplicationFactor = "orders", 1, 1
-	ct.Topics = append(ct.Topics, ctt)
-	if _, err := ct.RequestWith(ctx, good); err != nil {
-		t.Fatal(err)
-	}
-	md, err := kmsg.NewPtrMetadataRequest().RequestWith(ctx, good)
-	if err != nil || len(md.Brokers) == 0 {
-		t.Fatalf("metadata: %v", err)
-	}
-	dc := kmsg.NewDescribeConfigsRequest()
-	for _, r := range []struct {
-		typ  kmsg.ConfigResourceType
-		name string
-	}{{kmsg.ConfigResourceTypeBroker, fmt.Sprint(md.Brokers[0].NodeID)}, {kmsg.ConfigResourceTypeTopic, "orders"}} {
-		res := kmsg.NewDescribeConfigsRequestResource()
-		res.ResourceType, res.ResourceName = r.typ, r.name
-		dc.Resources = append(dc.Resources, res)
-	}
-	resp, err := dc.RequestWith(ctx, good)
-	if err != nil {
-		t.Fatal(err)
-	}
-	answers.WriteString(fmt.Sprintf("%+v", resp))
-	check("DescribeConfigs and a failed login", answers.String())
-	for _, r := range resp.Resources {
-		for _, c := range r.Configs {
-			low := strings.ToLower(c.Name)
-			if (strings.Contains(low, "password") || strings.Contains(low, "key") || strings.Contains(low, "jaas")) && c.Value != nil && *c.Value != "" {
-				t.Errorf("DescribeConfigs gives a value for %s on %s %q", c.Name, r.ResourceType, r.ResourceName)
-			}
+	// The running broker: every log format at every level, with every mechanism.
+	for _, format := range []string{"text", "json"} {
+		for _, level := range []string{"debug", "info", "warn", "error"} {
+			t.Run(format+" logs at "+level, func(t *testing.T) {
+				runningBrokerSurfaces(t, g, format, level, certFile, keyFile)
+			})
 		}
 	}
-
-	// The console, from the cluster page and the traffic page outward.
-	pages := crawl(t, base, "/_console/cluster", "/_console/traffic", "/_console/traffic/live", "/_console/connect",
-		"/_console/access", "/_console/topics", "/_console/groups", "/_console/schemas", "/_console/api/palette", "/_console/api/counts")
-	if len(pages) < 8 {
-		t.Errorf("the crawl reached only %d pages", len(pages))
-	}
-	for p, body := range pages {
-		check("the console page "+p, body)
-	}
-	if !strings.Contains(strings.Join(mapValues(pages), "\n"), "SaslAuthenticate") {
-		t.Log("the traffic page did not list a SaslAuthenticate request; the crawl still covered the pages it reached")
-	}
-
-	if err := stop(); err != nil {
-		t.Errorf("shutdown: %v", err)
-	}
-	check("the log and the summary", out.String())
-}
-
-func mapValues(m map[string]string) []string {
-	out := make([]string, 0, len(m))
-	for _, v := range m {
-		out = append(out, v)
-	}
-	return out
+	t.Run("pprof", func(t *testing.T) { pprofSurfaces(t, g, certFile, keyFile) })
+	t.Run("the commands", func(t *testing.T) { commandSurfaces(t, g, certFile, keyFile) })
 }

@@ -351,7 +351,7 @@ func (c *Conn) serve(ctx context.Context) {
 			// The handler's bug must cost this connection, not the broker: every
 			// other client keeps being served.
 			c.log.Error("handler panicked; closing the connection", "api", APIName(header.APIKey),
-				"version", header.APIVersion, "client_id", header.ClientID, "panic", pe.value, "stack", pe.stack)
+				"version", header.APIVersion, "client_id", header.ClientID, "panic", pe.logValue(header.APIKey), "stack", pe.stack)
 			c.observeClosed(&header, began, len(frame), "the broker's handler panicked")
 			return
 		}
@@ -445,6 +445,18 @@ type handlerPanic struct {
 
 func (p *handlerPanic) Error() string { return fmt.Sprintf("handler panic: %v", p.value) }
 
+// logValue is what the log says the handler panicked with. A panic's value is
+// whatever the code that panicked put in it, and a handler reading a SASL token can
+// put the token there (a formatted "unexpected ..." with its input, an index that is
+// the token's length). So for a request that carries a credential the log names the
+// value's type and leaves the stack to say where; the stack holds no values.
+func (p *handlerPanic) logValue(api APIKey) any {
+	if IsAuthAPI(api) {
+		return fmt.Sprintf("a %T (its text is not logged for a request that carries a credential)", p.value)
+	}
+	return p.value
+}
+
 // route dispatches a request, converting a handler panic into an error so one
 // connection's bad request cannot take the process down.
 func (c *Conn) route(ctx context.Context, req *Request) (resp []byte, err error) {
@@ -453,6 +465,9 @@ func (c *Conn) route(ctx context.Context, req *Request) (resp []byte, err error)
 			resp, err = nil, &handlerPanic{value: v, stack: string(debug.Stack())}
 		}
 	}()
+	if hook := routeHook.Load(); hook != nil {
+		(*hook)(req)
+	}
 	return c.router.Route(ctx, req)
 }
 

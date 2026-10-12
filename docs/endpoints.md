@@ -16,7 +16,7 @@ on purpose: one experience across the doze tools.
 | Kafka wire protocol | `kafka.<name>.doze:9092` | `--name`, `--listen` | On the name's own loopback address: nothing on your network can reach it. |
 | Web console and `/healthz` | `http://kafka.<name>.doze` (port-less, via the front door); the listener is port 9093 on the name's address | `--console-addr`, `--console=false` | HTTP. Kafka's protocol cannot share a port with HTTP, so this is separate. |
 | Schema registry | `http://schema.<name>.doze` (port-less, via the front door); the listener is port 8081 on the name's address | `--schema-registry-addr`, `--schema-registry=false` | HTTP, Confluent's REST API. See [Schema Registry](schema-registry.md). |
-| Profiling (off) | — | `--pprof-addr` | `net/http/pprof`, only if you set it. |
+| Profiling (off) | — | `--pprof-addr` | `net/http/pprof`, only if you set it. Without `/debug/pprof/cmdline`: the command line is where `--sasl-user` is. |
 
 `kafka.doze`, the machine-wide apex, is deliberately **not** claimed: an address under it
 would mean whichever instance started first. If you want a short name, name the instance

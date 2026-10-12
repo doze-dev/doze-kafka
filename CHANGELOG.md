@@ -27,6 +27,16 @@ here that contains "server API"; `task api` fails without it.
   a client-final message, and closes without an answer on a proof of the wrong length.
   Two answers stay stricter than Kafka's and are written in `docs/limitations.md`.
   `CreateAcls` answers an empty error message for an ACL it created, as Kafka does.
+- Credentials: `--pprof-addr` no longer serves `/debug/pprof/cmdline` (the command line,
+  which is where `--sasl-user user:password` is); the other profiles are unchanged. The log
+  line for a handler that panicked during a SASL exchange names the type of the panic's
+  value and the stack, not its text. The test that reads every output for a planted
+  password now reads text and JSON logs at every level, logins with PLAIN and both SCRAM
+  mechanisms (right and wrong password), malformed SASL input, the panic line, the pprof
+  pages, the schema registry's answers to HTTP Basic credentials, `/healthz`, the console
+  and its Traffic inspector, every file of the data directory (and its mode), `env`,
+  `doctor`, `--help`, `config print`, and a restart over the same data; a surface it did
+  not reach fails it.
 
 - Console: every button reads weight 400 whether it is a button or a link drawn as one (the
   boards draw them all as buttons). A request that took under a millisecond shows its

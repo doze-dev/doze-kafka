@@ -147,6 +147,34 @@ approximation of a locked-down cluster:
 
 Clients use `SASL_SSL` as their security protocol.
 
+## Where a credential is never shown
+
+A SASL password, the credential the console logs in with and the TLS key are written to
+nothing the process puts out:
+
+- the log, as text or as JSON, at any level. That includes the line for a handler that
+  panicked during a SASL exchange: it names the type of what the handler panicked with
+  and the stack, and not its text, because the text is whatever the failing code had in
+  hand;
+- the start-up summary, `env`, `doctor`, `--help` and `config print` (which writes
+  `"<redacted>"`; `config print --show-secrets` is the one command that writes a
+  password, and it is how to get a file the broker starts from);
+- the console, the Traffic inspector included, the schema registry's answers and
+  `/healthz`;
+- the data directory. Credentials are not stored at all: they are read from the
+  configuration at every start. The metadata database is created readable by its owner
+  only (`0600`);
+- the profiling pages of `--pprof-addr`. `/debug/pprof/cmdline`, which is the command
+  line the process was started with and so holds `--sasl-user`, is not served.
+
+A test plants a password, a wrong one, the console's credential and a TLS key, logs in
+with every mechanism, sends malformed SASL input, restarts the broker over the same
+data, and reads all of the above for them.
+
+The command line itself is outside this: `--sasl-user alice:s3cret` is in your shell
+history and in `ps` for as long as the broker runs. `[credentials]` in the config file
+avoids both.
+
 ## What's not here
 
 No Kerberos/GSSAPI, no OAUTHBEARER, and no delegation tokens. Authorization is by ACL,
