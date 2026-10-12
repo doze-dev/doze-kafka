@@ -159,8 +159,11 @@ func (b *Broker) handleSyncGroup(ctx context.Context, req *protocol.Request, sr 
 	if assignment, code, taken := b.cg848.classicSync(sr); taken {
 		resp.ErrorCode = code
 		resp.MemberAssignment = assignment
-		resp.ProtocolType = sr.ProtocolType
-		resp.Protocol = sr.Protocol
+		// A refusal names no protocol (recorded: mixed-protocol-parked, ps-b-sync-parked).
+		if code == errNone {
+			resp.ProtocolType = sr.ProtocolType
+			resp.Protocol = sr.Protocol
+		}
 		return nil
 	}
 	res, err := b.groups.sync(ctx, sr)
@@ -170,8 +173,10 @@ func (b *Broker) handleSyncGroup(ctx context.Context, req *protocol.Request, sr 
 
 	resp.ErrorCode = res.errorCode
 	resp.MemberAssignment = res.assignment
-	resp.ProtocolType = sr.ProtocolType // v5+; nil echoes to nothing on older versions.
-	resp.Protocol = sr.Protocol
+	if res.errorCode == errNone {
+		resp.ProtocolType = sr.ProtocolType // v5+; nil echoes to nothing on older versions.
+		resp.Protocol = sr.Protocol
+	}
 	return nil
 }
 

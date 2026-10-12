@@ -480,3 +480,33 @@ func TestGroupClassic_EmptyGroupsAreForgottenUnlessTheyHoldOffsets(t *testing.T)
 		t.Errorf("a group with committed offsets should stay listed as Empty: %v", got)
 	}
 }
+
+// A SyncGroup that is refused names no protocol type and no protocol, where one that
+// succeeds echoes the request's (recorded: mixed-protocol-parked, ps-b-sync-parked and
+// ps-a-leader-sync against pj-b-sync).
+func TestGroupClassic_ARefusedSyncGroupNamesNoProtocol(t *testing.T) {
+	addr := startBroker(t, 4)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cl := newClient(t, addr)
+	defer cl.Close()
+	id, gen := stableGroupOfOne(t, ctx, cl, "g", testSessionMs, testRebalanceMsDefault)
+
+	sync := func(member string) *kmsg.SyncGroupResponse {
+		req := kmsg.NewPtrSyncGroupRequest()
+		req.Group, req.MemberID, req.Generation = "g", member, gen
+		ptype, protocol := "consumer", "range"
+		req.ProtocolType, req.Protocol = &ptype, &protocol
+		resp, err := req.RequestWith(ctx, cl)
+		if err != nil {
+			t.Fatalf("SyncGroup: %v", err)
+		}
+		return resp
+	}
+	if ok := sync(id); ok.ErrorCode != 0 || ok.ProtocolType == nil || *ok.ProtocolType != "consumer" || ok.Protocol == nil || *ok.Protocol != "range" {
+		t.Errorf("a SyncGroup that succeeds: code %d type %v protocol %v, want the request's echoed", ok.ErrorCode, ok.ProtocolType, ok.Protocol)
+	}
+	if refused := sync("nobody"); refused.ErrorCode != kerr.UnknownMemberID.Code || refused.ProtocolType != nil || refused.Protocol != nil {
+		t.Errorf("a refused SyncGroup: code %d type %v protocol %v, want UNKNOWN_MEMBER_ID and neither", refused.ErrorCode, refused.ProtocolType, refused.Protocol)
+	}
+}

@@ -51,6 +51,13 @@ Kafka does, recorded in `conformance/recordings/mixed-protocol-groups.json` and
 - A consumer-protocol member joining a classic group (protocol type `consumer`) turns it
   into a consumer group. The classic members stay in it, holding the partitions they
   held, until they rejoin; the new member waits for what they give up.
+- A classic group that is in the middle of a rebalance when that happens is taken as it
+  is. A `JoinGroup` or `SyncGroup` that was waiting on the rebalance is answered
+  `REBALANCE_IN_PROGRESS`, and the member that sent it is a member of the consumer
+  group, under the id it has, with nothing assigned: it asks again and is given its
+  partitions. A member whose new generation had no assignments yet keeps what it held
+  in the one before. A `SyncGroup` from a member the group has moved on from is
+  `REBALANCE_IN_PROGRESS` too: it has to join again first.
 - A classic client joining a consumer group becomes one of its members. Nobody relays
   its assignment: its `JoinGroup` is answered with no leader and no member list, and its
   `SyncGroup` carries the partitions it may have now.

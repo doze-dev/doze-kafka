@@ -6,6 +6,19 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Groups: a classic group upgraded in the middle of a rebalance answers what it had
+  parked as Apache Kafka 4.3.1 does (recorded: `mixed-protocol-parked`). A `JoinGroup`
+  waiting for the others to rejoin was answered `UNKNOWN_MEMBER_ID`, which makes a
+  client throw its member id away, while that id was kept as a member of the new
+  consumer group and held a share of the partitions until its session ran out (45 s
+  for a Java client). It is now `REBALANCE_IN_PROGRESS`, the member keeps its id and
+  its next `JoinGroup` finds its seat. A group upgraded between its `JoinGroup`s and
+  the leader's `SyncGroup` keeps each member's partitions of the generation before
+  (they were dropped, which freed them for the new member while a cooperative consumer
+  was still reading them), and the `SyncGroup`s that follow are
+  `REBALANCE_IN_PROGRESS`. A refused `SyncGroup` carries no protocol type and no
+  protocol name.
+
 - Offsets retention: a group that is gone leaves nothing behind. `DeleteGroups` removed
   the group's offsets and left "empty since" in memory, so the same id used afterwards
   by a standalone committer had its new offsets judged by when the deleted group had

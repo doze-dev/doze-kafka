@@ -15,13 +15,16 @@ import (
 // Kafka 4's default group.consumer.migration.policy is bidirectional, which is what a
 // rolling upgrade of an application needs: one instance at a time moves to
 // group.protocol=consumer while the others are still classic. What a real broker
-// answers is recorded in conformance/recordings/mixed-protocol-groups.json and
-// mixed-protocol-rolling.json, and this is what they say:
+// answers is recorded in conformance/recordings/mixed-protocol-groups.json,
+// mixed-protocol-rolling.json and mixed-protocol-parked.json, and this is what they say:
 //
 //   - A consumer-protocol member joining a classic group whose protocol type is
 //     "consumer" turns it into a consumer group: the classic members stay, as members
 //     of it, with the partitions they held, until they rejoin. A group of any other
 //     protocol type (Connect) is refused, GROUP_ID_NOT_FOUND.
+//   - A group in the middle of a rebalance is upgraded all the same. What it had parked
+//     is answered REBALANCE_IN_PROGRESS, and the members that sent it are members of
+//     the consumer group like the others, under the ids they have.
 //   - A classic client joining a consumer group becomes a member of it: its JoinGroup is
 //     answered with no leader and no member list (nobody relays assignments, the broker
 //     computes them) and its SyncGroup carries the partitions it may have now.
@@ -113,17 +116,25 @@ func (gm *groupManager) takeClassic(id string) (classicSnapshot, takeStatus) {
 	}
 	snap := classicSnapshot{generation: g.generation}
 	g.join.stop()
-	// What is parked is answered: a join or sync that was waiting on this group's
-	// rebalance has nothing to wait on now; the member retries and finds the group
-	// where it is.
+	// What is parked is answered REBALANCE_IN_PROGRESS, a JoinGroup and a SyncGroup alike
+	// (recorded: mixed-protocol-parked). The rebalance it waited on is over; the member
+	// keeps its id, asks again with it, and finds itself a member of the consumer group,
+	// which is why every member is carried over, the ones that had only just joined too.
 	g.failPendingSyncs(kerr.RebalanceInProgress.Code)
 	for _, mid := range sortedMemberIDs(g) {
 		m := g.members[mid]
 		m.session.stop()
-		m.failPendingJoin()
+		m.answerPendingJoin(kerr.RebalanceInProgress.Code)
+		// Between its JoinGroups and the leader's SyncGroup a generation has no
+		// assignments yet, and a member still has what the one before gave it
+		// (recorded: ps-describe): a cooperative consumer is reading it.
+		held := m.assignment
+		if g.state == stateCompletingRebalance {
+			held = m.previous
+		}
 		snap.members = append(snap.members, classicSnapshotMember{
 			id: m.id, instanceID: m.instanceID, client: m.client, protocols: m.protocols, protocol: g.protocol,
-			assignment: m.assignment, session: m.sessionTimeout, rebalanceTimeout: m.rebalanceTimeout,
+			assignment: held, session: m.sessionTimeout, rebalanceTimeout: m.rebalanceTimeout,
 		})
 	}
 	delete(gm.groups, id)
@@ -396,6 +407,11 @@ func (m *cg848Manager) classicSync(r *kmsg.SyncGroupRequest) (assignment []byte,
 		return nil, kerr.UnknownMemberID.Code, true
 	case r.Generation != mem.epoch:
 		return nil, kerr.IllegalGeneration.Code, true
+	case mem.epoch != g.epoch && len(mem.revoking) == 0:
+		// The group has moved on since this member joined, and it is not in the middle
+		// of giving partitions up: there is nothing for it to collect, it must join
+		// again (recorded: ps-a-leader-sync is 27, co-a-resync-1 is not).
+		return nil, kerr.RebalanceInProgress.Code, true
 	}
 	m.resetSession(g, mem)
 	mem.sent = mem.assigned.clone()

@@ -246,6 +246,7 @@ type groupMember struct {
 	instanceID     *string
 	protocols      []groupProtocolEntry // ordered by client preference.
 	assignment     []byte               // from the leader's SyncGroup.
+	previous       []byte               // what it held in the generation before this one; read only until the leader's SyncGroup.
 	rejoined       bool
 	sessionTimeout time.Duration
 	session        expiry // evicts the member if it stops heartbeating.
@@ -792,10 +793,14 @@ func (g *group) failPendingSyncs(code int16) {
 	}
 }
 
-// failPendingJoin answers a JoinGroup still parked for this member, if any.
-func (m *groupMember) failPendingJoin() {
+// failPendingJoin answers a JoinGroup still parked for this member, if any, with
+// UNKNOWN_MEMBER_ID: the member is gone, or a later JoinGroup of its own took its place.
+func (m *groupMember) failPendingJoin() { m.answerPendingJoin(kerr.UnknownMemberID.Code) }
+
+// answerPendingJoin answers a JoinGroup still parked for this member, if any, with code.
+func (m *groupMember) answerPendingJoin(code int16) {
 	if m.awaitingJoin && m.joinResult != nil {
-		m.joinResult <- joinResult{errorCode: kerr.UnknownMemberID.Code, memberID: m.id, generation: -1}
+		m.joinResult <- joinResult{errorCode: code, memberID: m.id, generation: -1}
 	}
 	m.awaitingJoin = false
 }
@@ -862,7 +867,7 @@ func (g *group) completeJoin() (dropped []string) {
 	// omits a member, it must get an empty assignment — not the previous
 	// generation's, which would hand it partitions another member now owns.
 	for _, m := range g.members {
-		m.assignment = nil
+		m.previous, m.assignment = m.assignment, nil
 	}
 	g.protocol = g.selectProtocol()
 	g.leader = g.electLeader()
