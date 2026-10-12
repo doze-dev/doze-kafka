@@ -134,12 +134,14 @@ type Server struct {
 	stop    context.CancelFunc // ends the Serve in progress; nil until one is.
 	served  chan struct{}      // closed when that Serve has released everything.
 
+	bindMu sync.Mutex // Bind, or Close's release: never the two at once.
+
 	dirLock io.Closer // held for the life of the server: one broker per data directory.
 
 	closeOnce sync.Once
 	closeErr  error
 
-	ready     chan struct{} // closed once the listener is bound, or Serve has returned.
+	ready     chan struct{} // closed once the listener is bound, or the server has ended without one.
 	readyOnce sync.Once
 }
 
@@ -352,6 +354,10 @@ func reconcileDisk(cfg config.Config, logger *slog.Logger, logs *log.Manager, to
 // it is not used with ServeListener. If it fails the server still holds its
 // storage and any AlsoListen listener: Close releases them.
 func (s *Server) Bind(ctx context.Context) (net.Addr, error) {
+	// Not while Close is releasing: a listener opened as Close ran would be told to
+	// a waiter on Ready after it had been told the server never bound.
+	s.bindMu.Lock()
+	defer s.bindMu.Unlock()
 	addr, err := s.srv.Bind(ctx)
 	if err != nil {
 		return nil, err
@@ -366,10 +372,18 @@ func (s *Server) Bind(ctx context.Context) (net.Addr, error) {
 
 func (s *Server) markReady() { s.readyOnce.Do(func() { close(s.ready) }) }
 
-// Ready is closed once the broker's listener is bound, so Addr is valid and
-// clients can connect: a goroutine running Serve can be waited on without a
-// sleep or a retry loop. It is also closed if Serve returns first (a failed bind,
-// an immediate cancel), so waiting on it never hangs; check Addr for nil.
+// Ready is closed when the outcome of starting is known, whichever it is, so a
+// goroutine running Serve can be waited on without a sleep or a retry loop and the
+// wait never hangs. It is closed
+//
+//   - once the listener is bound (by Bind, Serve or ServeListener): Addr is then
+//     not nil, and a client that dials it is served as soon as Serve accepts; or
+//   - once the server has ended without ever binding: Serve returned first (a
+//     failed bind, a context already cancelled) or Close was called. Addr is then
+//     nil, and stays nil.
+//
+// So after <-srv.Ready(), Addr() != nil means ready and Addr() == nil means the
+// server ended without becoming ready (the error is the one Serve returned).
 func (s *Server) Ready() <-chan struct{} { return s.ready }
 
 // AlsoListen opens another TCP listener, on addr, that serves this same broker —
@@ -382,9 +396,9 @@ func (s *Server) AlsoListen(ctx context.Context, addr string) (net.Addr, error) 
 	return s.srv.AlsoListen(ctx, addr)
 }
 
-// Addr is the address the listener is bound to, or nil before Bind (or Serve)
-// has run. Metadata advertises this port, so a client dialling it is told to
-// stay on it.
+// Addr is the address the listener is bound to, or nil if none has been: before
+// Bind (or Serve) has run, and for good on a server that ended without binding.
+// Metadata advertises this port, so a client dialling it is told to stay on it.
 func (s *Server) Addr() net.Addr {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -429,6 +443,12 @@ func (s *Server) ServeListener(ctx context.Context, ln net.Listener) (err error)
 	defer s.release(&err)
 	s.srv.UseListener(ln)
 	s.mu.Lock()
+	if s.closed {
+		// Close ran between the claim and here; it has told Ready's waiters that
+		// this server never bound, and that stays true.
+		s.mu.Unlock()
+		return protocol.ErrServerClosed
+	}
 	if _, ok := ln.Addr().(*net.TCPAddr); ok {
 		// Metadata used to advertise the default port (9092) for a listener the
 		// broker did not bind itself, so a client that bootstrapped fine was then
@@ -514,7 +534,7 @@ func (s *Server) closeStorage(err *error) {
 // all there is to do. On one that is serving it also stops it, exactly as
 // cancelling Serve's context does, and returns once Serve has drained its
 // connections and closed storage, with what that reported. It is safe to call more
-// than once, from any goroutine, and after Serve.
+// than once, from any goroutine, and after Serve. A waiter on Ready is released.
 func (s *Server) Close() error {
 	s.mu.Lock()
 	s.closed = true
@@ -528,11 +548,16 @@ func (s *Server) Close() error {
 		s.closeStorage(&err)
 		return err
 	}
+	// A Bind in progress finishes first (and what it opened is closed here); one
+	// that comes after is refused, the listeners being closed.
+	s.bindMu.Lock()
+	defer s.bindMu.Unlock()
 	// The listeners first: Bind opens one, and it used to stay bound (and
 	// accepting into a backlog nobody served) for the life of the process.
 	lerr := s.srv.Close()
 	var err error
 	s.closeStorage(&err)
+	s.markReady()
 	if err == nil {
 		err = lerr
 	}

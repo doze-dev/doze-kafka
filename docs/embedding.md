@@ -47,14 +47,65 @@ is compiled and run by `TestEmbeddingDocCompiles`, so it cannot rot.
 
 | Call | What it does |
 |---|---|
-| `New(opts)` | Validates, opens storage. Does not listen. |
-| `Bind(ctx)` | Opens the listener and returns its address. Optional: `Serve` binds if you did not. |
-| `AlsoListen(ctx, addr)` | Opens a second address serving the same broker. Before `Serve` only; afterwards it returns an error. Clients are still told the main listener's port. |
-| `Serve(ctx)` | Accepts until `ctx` is cancelled, drains connections, flushes the logs and closes storage. Returns the first error from that, including a failed final fsync. A server is served once: a second `Serve` returns an error. |
-| `Ready()` | A channel closed once the listener is bound (or `Serve` has returned), so waiting on it never hangs. Check `Addr() != nil`. |
-| `Addr()` | The bound address, or nil before `Bind`/`Serve`. |
-| `Close()` | For a server that was built but never served: closes any listener `Bind` or `AlsoListen` opened and releases storage and the lock on the data directory. Idempotent, and safe after `Serve`. To stop a running server, cancel its context. |
-| `ServeListener(ctx, ln)` | `Serve` on a listener you provide, such as a unix socket. Kafka framing does not care what carries it. Given a TCP listener, clients are told its port. |
+| `New(opts)` | Validates, opens storage. Does not listen. If it returns an error it has closed whatever it had opened: the same data directory can be used at once. |
+| `Bind(ctx)` | Opens the listener and returns its address. Optional: `Serve` binds if you did not. If it fails, the server still holds its storage: call `Close`. |
+| `AlsoListen(ctx, addr)` | Opens a second address serving the same broker. Before `Serve` only; afterwards it returns an error. Clients are still told the main listener's port. Closed when `Serve` returns, or by `Close`. |
+| `Serve(ctx)` | Accepts until `ctx` is cancelled (or `Close` is called), drains connections, flushes the logs and closes storage. Returns the first error from that, including a failed final fsync. However it returns, error or not, it has closed every listener (the `AlsoListen` ones too), storage and the lock on the data directory. A server is served once: a second `Serve` returns an error. |
+| `Ready()` | A channel closed when the outcome of starting is known: once the listener is bound, or once the server has ended without ever binding (`Serve` returned first, or `Close` was called). Waiting on it never hangs. Afterwards `Addr() != nil` means ready, and `Addr() == nil` means it ended without becoming ready. |
+| `Addr()` | The bound address. Nil before `Bind`/`Serve`, and for good on a server that ended without binding. |
+| `Close()` | Releases everything: any listener `Bind` or `AlsoListen` opened, storage and the lock on the data directory. On a server that is serving it also stops it, as cancelling the context does, and returns once `Serve` has drained and closed storage. Idempotent, safe from any goroutine and after `Serve`; a waiter on `Ready` is released. |
+| `ServeListener(ctx, ln)` | `Serve` on a listener you provide, such as a unix socket. Kafka framing does not care what carries it. Given a TCP listener, clients are told its port. The listener becomes the server's and is closed when the call returns, except when the call is refused (already serving, or closed): then it was not touched. |
+
+Waiting for a broker that may fail to start:
+
+```go
+import (
+	"context"
+	"net"
+	"testing"
+
+	"github.com/doze-dev/doze-kafka/server"
+)
+
+// start serves a broker and returns its address, or why it never came up.
+func start(ctx context.Context, opts server.Options) (addr string, done <-chan error, err error) {
+	srv, err := server.New(opts)
+	if err != nil {
+		return "", nil, err
+	}
+	served := make(chan error, 1)
+	go func() { served <- srv.Serve(ctx) }()
+	<-srv.Ready()
+	if srv.Addr() == nil {
+		return "", nil, <-served // it ended without binding: this is why
+	}
+	return srv.Addr().String(), served, nil
+}
+
+func TestABrokerThatCannotStartSaysWhy(t *testing.T) {
+	taken, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer taken.Close()
+	if _, _, err := start(context.Background(), server.Options{DataDir: t.TempDir(), ListenAddr: taken.Addr().String()}); err == nil {
+		t.Fatal("a broker on a port in use started")
+	}
+
+	ctx, stop := context.WithCancel(context.Background())
+	addr, done, err := start(ctx, server.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("serving on", addr)
+	stop()
+	<-done
+}
+```
+
+Every exit is held by a test: `TestAFailureAtAnyStepOfConstructionReleasesEverything`
+fails each step of `New`, `Bind` and `Serve` in turn and then counts goroutines and
+open file descriptors and opens the same data directory again.
 | `Config()` | The effective configuration as a plain `server.Config`. |
 
 ## Options

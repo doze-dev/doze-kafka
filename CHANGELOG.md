@@ -6,6 +6,18 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Embedding (`server/`): nothing outlives a failure. A `Serve` that cannot bind closes the
+  `AlsoListen` listeners too (they stayed bound and accepting); a `New` that fails closes
+  what it had opened, the lock on the data directory included (a broken record in the
+  metadata database left the directory "in use" by a broker that did not exist).
+  `Close` on a server that is serving now stops it, as cancelling its context does, and
+  returns once `Serve` has drained and closed storage; before, it closed storage under
+  the connections still using it. `Ready()` is closed by `Close` as well, so waiting on it
+  never hangs, and what it means is read from `Addr()`: not nil, the listener is bound;
+  nil, the server ended without ever binding. `ServeListener` owns the listener it is
+  given and closes it when it returns, except when the call is refused. No change to the
+  exported surface.
+
 - Console: every button reads weight 400 whether it is a button or a link drawn as one (the
   boards draw them all as buttons). A request that took under a millisecond shows its
   measured time (`42 µs`, `0.4 ms`) rather than the design boards' `0 ms`: a broker
