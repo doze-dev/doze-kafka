@@ -162,7 +162,12 @@ nothing the process puts out:
 - an error about the config file: it names the line and the key and repeats nothing that
   is written there, and under `[credentials]` not the key either (see
   [Configuration](configuration.md));
-- the console, the Traffic inspector included, the schema registry's answers and
+- the Traffic inspector, which shows of a login only the fields on a list (the
+  mechanism; for the SCRAM-credential and delegation-token requests a name, an iteration
+  count, a lifetime) and neither a token nor how long it is: a `SaslAuthenticate` row has
+  `"AuthBytes": "(hidden)"` and `0 B in`, since the length of a PLAIN token is the length
+  of the password;
+- the rest of the console, the schema registry's answers and
   `/healthz`;
 - the data directory. Credentials are not stored at all: they are read from the
   configuration at every start. The metadata database is created readable by its owner

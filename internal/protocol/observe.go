@@ -76,6 +76,8 @@ type Observation struct {
 	Version   int16
 	Start     time.Time
 	Duration  time.Duration
+	// ReqBytes is 0 for a SASLAuthenticate request, whose size is the length of its
+	// token and so, with PLAIN, of the password (observedSize).
 	ReqBytes  int
 	RespBytes int
 	// Correlation is the request's correlation id: what the client's own log carries.

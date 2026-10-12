@@ -403,7 +403,7 @@ func (c *Conn) observe(req *Request, began time.Time, reqBytes, respBytes int) {
 	c.observer.Request(Observation{
 		Conn: c.id, Remote: c.raw.RemoteAddr().String(), Principal: c.Principal(),
 		ClientID: req.Header.ClientID, API: req.Header.APIKey, Version: req.Header.APIVersion,
-		Start: began, Duration: time.Since(began), ReqBytes: reqBytes, RespBytes: respBytes,
+		Start: began, Duration: time.Since(began), ReqBytes: observedSize(req.Header.APIKey, reqBytes), RespBytes: respBytes,
 		Correlation: req.Header.CorrelationID, Req: req.decoded, Resp: req.answered,
 		Summary: req.Describe(),
 	})
@@ -423,7 +423,7 @@ func (c *Conn) observeClosed(h *RequestHeader, began time.Time, reqBytes int, re
 	c.observer.Request(Observation{
 		Conn: c.id, Remote: c.raw.RemoteAddr().String(), Principal: c.Principal(),
 		ClientID: h.ClientID, API: h.APIKey, Version: h.APIVersion,
-		Start: began, Duration: time.Since(began), ReqBytes: reqBytes,
+		Start: began, Duration: time.Since(began), ReqBytes: observedSize(h.APIKey, reqBytes),
 		Correlation: h.CorrelationID, Closed: reason,
 		Summary: Summary{Class: class, Kind: Kind(h.APIKey), Detail: "closed the connection: " + reason},
 	})

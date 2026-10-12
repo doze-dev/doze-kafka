@@ -105,6 +105,13 @@ implement it.
 - **Memory only.** The Traffic page keeps the last 2,000 requests and 200 events per
   group, and a restart empties it: it is the last few minutes of a laptop's traffic, not
   an audit log.
+- **A login is shown without what it carried.** For `SaslHandshake`, `SaslAuthenticate`
+  and the SCRAM-credential and delegation-token requests, the inspector's decoded fields
+  are a list of what may be shown (the mechanism, a user's or a principal's name, an
+  iteration count, a lifetime); every other field is `"(hidden)"`, set or not, and a run
+  of bytes never shows its length. A `SaslAuthenticate` row reads `0 B in`: the size of
+  the request is not recorded, because with PLAIN it is the length of the password plus
+  what the row already shows.
 
 ## Deliberately out of scope
 

@@ -41,6 +41,7 @@ import (
 //	    the good one is answered Metadata, the wrong one is not, and the Traffic
 //	    inspector holds a SASLAuthenticate row for each of the six clients and a
 //	    SASLHandshake row naming each mechanism
+//	    (and no SASLAuthenticate row shows a length: of its token, or of the request)
 //	malformed SASL input (tokens with the password where nothing should be)
 //	    the Traffic inspector holds a row for each connection that sent one
 //	a request before authentication, and a frame that is no request
@@ -248,6 +249,11 @@ var logLevels = []string{"debug", "info", "warn", "error"}
 // inspectorKey is the key of a row of the Traffic page, as its inspector is asked for.
 var inspectorKey = regexp.MustCompile(`/inspect/request\?key=([^"&]+)`)
 
+var (
+	tokenLength = regexp.MustCompile(`\d+ bytes`)
+	sizeLine    = regexp.MustCompile(`[\d.]+ \w+ in · [\d.]+ \w+ out`)
+)
+
 // inspectors is the inspector of every row the Traffic page lists under a filter.
 func (in instance) inspectors(t *testing.T, g guard, filter string) []string {
 	t.Helper()
@@ -262,6 +268,16 @@ func (in instance) inspectors(t *testing.T, g guard, filter string) []string {
 		seen[m[1]] = true
 		body := fetch(t, in.console+"/_console/inspect/request?key="+m[1])
 		g.check(t, "the Traffic inspector of a "+filter+" request", body)
+		// Not the length of a SASL token either, as a count of bytes or as the size of
+		// the request: the length of a PLAIN token is the length of the password.
+		if strings.Contains(body, "SASLAuthenticate v") {
+			if m := tokenLength.FindString(body); m != "" {
+				t.Errorf("the Traffic inspector of a %s request shows a length (%q)", filter, m)
+			}
+			if !strings.HasPrefix(sizeLine.FindString(body), "0 B in ") {
+				t.Errorf("the Traffic inspector of a %s request shows the size of a SASLAuthenticate request: %s", filter, sizeLine.FindString(body))
+			}
+		}
 		out = append(out, body)
 	}
 	return out

@@ -27,6 +27,13 @@ here that contains "server API"; `task api` fails without it.
   a client-final message, and closes without an answer on a proof of the wrong length.
   Two answers stay stricter than Kafka's and are written in `docs/limitations.md`.
   `CreateAcls` answers an empty error message for an ACL it created, as Kafka does.
+- Traffic inspector: for the requests that carry a credential (`SaslHandshake`,
+  `SaslAuthenticate`, the SCRAM-credential and delegation-token requests) the decoded
+  fields are held to a list of what may be shown; every other field reads `"(hidden)"`.
+  The length of a SASL token is no longer shown (`"AuthBytes": "29 bytes"` gave the
+  length of a PLAIN password), and neither is the size of a `SaslAuthenticate` request,
+  which gave it too: its row reads `0 B in`.
+
 - Config file errors name the line and the key and never repeat what the file says. An
   unquoted value outside `[credentials]` used to be quoted back (`expected value but
   found "hunter2"`), as did a bad duration, and a password typed where the user's name
