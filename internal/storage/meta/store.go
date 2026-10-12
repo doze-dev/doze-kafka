@@ -12,7 +12,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -195,6 +198,8 @@ func OpenWithClock(path string, clock func() time.Time) (Store, error) {
 	// bbolt takes an exclusive file lock. With no timeout a second broker on the
 	// same file (a forgotten terminal, a crashed run still shutting down) blocks
 	// forever in silence; a short timeout turns it into an error that says why.
+	_, statErr := os.Stat(path)
+	isNew := errors.Is(statErr, fs.ErrNotExist)
 	db, err := bbolt.Open(path, 0o600, &bbolt.Options{Timeout: lockTimeout})
 	if err != nil {
 		if errors.Is(err, bbolt.ErrTimeout) {
@@ -202,7 +207,8 @@ func OpenWithClock(path string, clock func() time.Time) (Store, error) {
 		}
 		return nil, fmt.Errorf("meta: open %s: %w", path, err)
 	}
-	err = db.Update(func(tx *bbolt.Tx) error {
+	s := &boltStore{db: db, byName: map[string]Topic{}, byID: map[TopicID]string{}, clock: clock}
+	err = s.commit(func(tx *bbolt.Tx) error {
 		for _, name := range [][]byte{bucketTopics, bucketTopicsByID, bucketOffsets, bucketMeta, bucketACLs, bucketTxns, bucketRegistry} {
 			if _, err := tx.CreateBucketIfNotExists(name); err != nil {
 				return err
@@ -214,7 +220,18 @@ func OpenWithClock(path string, clock func() time.Time) (Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("meta: init buckets: %w", err)
 	}
-	s := &boltStore{db: db, byName: map[string]Topic{}, byID: map[TopicID]string{}, clock: clock}
+	if isNew {
+		// bbolt flushes the file on every commit and never its directory. A database
+		// created a moment ago is a name in a directory nobody has flushed: every
+		// topic, offset and transaction committed to it since would go with that
+		// name in a power cut.
+		dir := filepath.Dir(path)
+		if err := syncDirectory(dir); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("meta: make %s durable: %w", path, err)
+		}
+		durable("dirsync", dir)
+	}
 	if err := s.loadCache(); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("meta: load topic registry: %w", err)
@@ -279,7 +296,39 @@ func (s *boltStore) update(fn func(tx *bbolt.Tx) error) error {
 	if err := faultAt("meta.write"); err != nil {
 		return err
 	}
-	return s.db.Update(fn)
+	return s.commit(fn)
+}
+
+// commit runs one bbolt write transaction. bbolt fsyncs the file before Update
+// returns unless it was opened with NoSync, and every answer this broker gives
+// about a committed offset, a transaction's state or a topic rests on that; the
+// hook is told so only when it is true, which is how a power-cut test notices a
+// store that was opened not to sync.
+func (s *boltStore) commit(fn func(tx *bbolt.Tx) error) error {
+	if err := s.db.Update(fn); err != nil {
+		return err
+	}
+	if !s.db.NoSync {
+		durable("commit", s.db.Path())
+	}
+	return nil
+}
+
+var durabilityHook atomic.Pointer[func(event, path string)]
+
+// SetDurabilityHookForTest installs a function that is told each time the store
+// has made something durable: "commit" with the database's path after a
+// transaction it fsynced, "dirsync" with a directory after flushing it. It
+// returns a func that removes the hook. Nothing in the broker calls it.
+func SetDurabilityHookForTest(fn func(event, path string)) (restore func()) {
+	old := durabilityHook.Swap(&fn)
+	return func() { durabilityHook.Store(old) }
+}
+
+func durable(event, path string) {
+	if h := durabilityHook.Load(); h != nil && *h != nil {
+		(*h)(event, path)
+	}
 }
 
 type topicRecord struct {

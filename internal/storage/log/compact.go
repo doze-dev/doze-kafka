@@ -8,6 +8,7 @@ import (
 	"hash/fnv"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -176,12 +177,15 @@ func (p *Partition) cleanedToLocked() int64 {
 func (p *Partition) setCleanedTo(offset int64) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.cleanedTo, p.cleanedLoaded = offset, true
-	tmp := filepath.Join(p.dir, cleanedFile+".tmp")
-	if err := os.WriteFile(tmp, []byte(strconv.FormatInt(offset, 10)+"\n"), 0o644); err != nil {
+	// Durably, and before it is believed: the offset says which segments have been
+	// cleaned once already, which is what lets a tombstone in them be dropped. One
+	// that is too high (a file whose bytes never reached the disk, read back as
+	// something else) drops tombstones a pass early and brings old values back.
+	if err := writeFileDurably(filepath.Join(p.dir, cleanedFile), []byte(strconv.FormatInt(offset, 10)+"\n")); err != nil {
 		return err
 	}
-	return os.Rename(tmp, filepath.Join(p.dir, cleanedFile))
+	p.cleanedTo, p.cleanedLoaded = offset, true
+	return nil
 }
 
 // LastClean is the most recent pass that did anything or looked.
@@ -443,12 +447,12 @@ type segmentStats struct {
 func (p *Partition) rewriteSegment(s *Segment, first bool, c rewriteCtx) (segmentStats, error) {
 	base := filepath.Join(p.dir, segmentName(s.baseOffset))
 	logTmp, idxTmp := base+".log"+cleanedExt, base+cleanerIndex+cleanedExt
-	f, err := os.OpenFile(logTmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	f, _, err := fsOpenFile(logTmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		return segmentStats{}, err
 	}
-	cleanup := func() { f.Close(); os.Remove(logTmp); os.Remove(idxTmp) }
-	w := bufio.NewWriterSize(f, 1<<20)
+	cleanup := func() { f.Close(); _ = fsRemove(logTmp); _ = fsRemove(idxTmp) }
+	w := bufio.NewWriterSize(cleanedWriter{f}, 1<<20)
 
 	// A tombstone is dropped once its segment has been cleaned before and is older than
 	// delete.retention.ms. Cleaned before is what makes that safe: a pass over a tombstone
@@ -537,18 +541,20 @@ func (p *Partition) rewriteSegment(s *Segment, first bool, c rewriteCtx) (segmen
 		cleanup()
 		return segmentStats{}, err
 	}
-	if err := f.Sync(); err != nil {
+	// The cleaned segment is flushed before it can replace the one it was made
+	// from: once the names are swapped it is the only copy of every record in it.
+	if err := fsSync(f); err != nil {
 		cleanup()
 		return segmentStats{}, err
 	}
 	if err := f.Close(); err != nil {
-		os.Remove(logTmp)
-		os.Remove(idxTmp)
+		_ = fsRemove(logTmp)
+		_ = fsRemove(idxTmp)
 		return segmentStats{}, err
 	}
 	if err := writeIndexFile(idxTmp, entries); err != nil {
-		os.Remove(logTmp)
-		os.Remove(idxTmp)
+		_ = fsRemove(logTmp)
+		_ = fsRemove(idxTmp)
 		return segmentStats{}, err
 	}
 	empty := written == 0
@@ -564,21 +570,38 @@ func (p *Partition) rewriteSegment(s *Segment, first bool, c rewriteCtx) (segmen
 	return stats, nil
 }
 
+// cleanedWriter writes a cleaned segment through the file seam and the fault
+// seam's "log.file.write" point.
+type cleanedWriter struct{ f *os.File }
+
+func (w cleanedWriter) Write(b []byte) (int, error) {
+	if err := faultAt("log.file.write"); err != nil {
+		return 0, err
+	}
+	return fsWriter(w).Write(b)
+}
+
 func writeIndexFile(path string, entries []indexEntry) error {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	f, _, err := fsOpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		return err
 	}
-	var buf [indexEntryBytes]byte
-	for i, e := range entries {
-		binary.BigEndian.PutUint64(buf[0:], uint64(e.offset))
-		binary.BigEndian.PutUint64(buf[8:], uint64(e.position))
-		if _, err := f.WriteAt(buf[:], int64(i)*indexEntryBytes); err != nil {
+	raw := make([]byte, 0, len(entries)*indexEntryBytes)
+	for _, e := range entries {
+		raw = binary.BigEndian.AppendUint64(raw, uint64(e.offset))
+		raw = binary.BigEndian.AppendUint64(raw, uint64(e.position))
+	}
+	if err := fsTruncate(f, 0); err != nil { // O_TRUNC, said at the seam.
+		f.Close()
+		return err
+	}
+	if len(raw) > 0 {
+		if _, err := (cleanedWriter{f}).Write(raw); err != nil {
 			f.Close()
 			return err
 		}
 	}
-	if err := f.Sync(); err != nil {
+	if err := fsSync(f); err != nil {
 		f.Close()
 		return err
 	}
@@ -595,55 +618,61 @@ func writeIndexFile(path string, entries []indexEntry) error {
 func (p *Partition) swapSegment(old *Segment, logTmp, idxTmp string, remove bool) (bool, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	i := -1
-	for j, s := range p.segments {
-		if s == old {
-			i = j
-		}
-	}
+	i := slices.Index(p.segments, old)
 	if i < 0 || i == len(p.segments)-1 {
-		os.Remove(logTmp)
-		os.Remove(idxTmp)
+		_ = fsRemove(logTmp)
+		_ = fsRemove(idxTmp)
 		return false, nil
 	}
 	if remove {
-		os.Remove(logTmp)
-		os.Remove(idxTmp)
-		if err := old.close(); err != nil {
+		_ = fsRemove(logTmp)
+		_ = fsRemove(idxTmp)
+		if err := old.retire(); err != nil {
 			return false, err
 		}
 		if err := removeSegmentFiles(p.dir, old.baseOffset); err != nil {
 			return false, err
 		}
-		p.segments = append(p.segments[:i], p.segments[i+1:]...)
+		p.forgetUnsynced(old)
+		p.segments = slices.Delete(p.segments, i, i+1)
+		p.dirSeq++
 		return true, nil
 	}
 
 	base := filepath.Join(p.dir, segmentName(old.baseOffset))
 	mtime := old.lastModified
-	if err := old.close(); err != nil {
+	if err := old.retire(); err != nil {
 		return false, err
 	}
 	mark := base + swapMarkExt
-	if err := os.WriteFile(mark, nil, 0o644); err != nil {
+	mf, _, err := fsOpenFile(mark, os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
 		return false, err
 	}
-	syncDir(p.dir)
-	if err := os.Rename(logTmp, base+".log"); err != nil {
+	mf.Close()
+	p.dirSeq++
+	if err := p.syncDirLocked(); err != nil {
 		return false, err
 	}
-	if err := os.Rename(idxTmp, base+cleanerIndex); err != nil {
+	if err := fsRename(logTmp, base+".log"); err != nil {
+		return false, err
+	}
+	if err := fsRename(idxTmp, base+cleanerIndex); err != nil {
 		return false, err
 	}
 	// The modification time is the segment's age for retention: rewriting it is not new
 	// data, and must not postpone the day it is deleted.
 	_ = os.Chtimes(base+".log", mtime, mtime)
-	syncDir(p.dir)
-	os.Remove(mark)
-	ns, err := openSegment(p.dir, old.baseOffset, p.indexInterval, p.beforeSync)
+	p.dirSeq++
+	if err := p.syncDirLocked(); err != nil {
+		return false, err
+	}
+	_ = fsRemove(mark)
+	ns, _, err := openSegment(p.dir, old.baseOffset, p.indexInterval, p.beforeSync)
 	if err != nil {
 		return false, fmt.Errorf("log: reopening a cleaned segment: %w", err)
 	}
+	p.forgetUnsynced(old)
 	p.segments[i] = ns
 	return true, nil
 }
@@ -660,16 +689,16 @@ func recoverSwaps(dir string) error {
 	for _, e := range entries {
 		name := e.Name()
 		switch {
-		case strings.HasSuffix(name, cleanedExt):
-			_ = os.Remove(filepath.Join(dir, name))
-		case strings.HasSuffix(name, ".tmp") && strings.HasPrefix(name, cleanedFile):
-			_ = os.Remove(filepath.Join(dir, name))
+		case strings.HasSuffix(name, cleanedExt), strings.HasSuffix(name, ".tmp"):
+			// A cleaned segment that was never swapped in, or a small file's
+			// replacement that was never renamed over it (writeFileDurably).
+			_ = fsRemove(filepath.Join(dir, name))
 		case strings.HasSuffix(name, swapMarkExt):
 			base := strings.TrimSuffix(name, swapMarkExt)
 			if err := rebuildIndex(filepath.Join(dir, base)); err != nil {
 				return err
 			}
-			if err := os.Remove(filepath.Join(dir, name)); err != nil {
+			if err := fsRemove(filepath.Join(dir, name)); err != nil {
 				return err
 			}
 		}

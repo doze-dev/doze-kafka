@@ -42,6 +42,10 @@ type Segment struct {
 	// partition's writes, is offline until the broker restarts and recovery
 	// decides from what is really on disk (BAD-3).
 	failed atomic.Pointer[error]
+
+	// retired is set when the segment has left the partition and its files are
+	// closed; see retire.
+	retired atomic.Bool
 }
 
 // ErrStorageOffline is returned for every write to, and every flush of, a segment
@@ -55,47 +59,42 @@ func (s *Segment) offline() error {
 	return nil
 }
 
-// flushFile is fsyncFile behind the fault seam's "log.fsync" point, which models
-// the fsync syscall itself failing (as opposed to "log.sync", which fails the
-// request before any fsync is issued).
-func flushFile(f *os.File) error {
-	if err := faultAt("log.fsync"); err != nil {
-		return err
-	}
-	return fsyncFile(f)
-}
-
-// fsyncFile flushes a file to stable storage. A variable so tests can make an
-// fsync fail or stall, which no real disk will do on request.
-var fsyncFile = func(f *os.File) error { return f.Sync() }
-
 // segmentName is the 20-digit zero-padded base offset used for a segment's files.
 func segmentName(baseOffset int64) string { return fmt.Sprintf("%020d", baseOffset) }
 
 // openSegment opens (creating if needed) the .log and .index files for a segment.
-func openSegment(dir string, baseOffset, indexInterval int64, beforeSync func() error) (*Segment, error) {
+// created reports that it made either file: the names are then only in memory
+// until the caller has flushed the directory (Partition.addSegment does), and a
+// fully fsynced segment whose name was never flushed vanishes in a power cut.
+func openSegment(dir string, baseOffset, indexInterval int64, beforeSync func() error) (seg *Segment, created bool, err error) {
 	base := filepath.Join(dir, segmentName(baseOffset))
-	_, statErr := os.Stat(base + ".log")
-	created := os.IsNotExist(statErr)
-	logFile, err := os.OpenFile(base+".log", os.O_RDWR|os.O_CREATE, 0o644)
+	return openSegmentFiles(base+".log", base+".index", baseOffset, indexInterval, beforeSync)
+}
+
+// openSegmentAt opens a segment whose two files are not (yet) under their own
+// names: the cleaner's, before it renames them into place.
+func openSegmentAt(logPath, indexPath string, baseOffset, indexInterval int64, beforeSync func() error) (*Segment, error) {
+	seg, _, err := openSegmentFiles(logPath, indexPath, baseOffset, indexInterval, beforeSync)
+	return seg, err
+}
+
+func openSegmentFiles(logPath, indexPath string, baseOffset, indexInterval int64, beforeSync func() error) (seg *Segment, created bool, err error) {
+	logFile, madeLog, err := fsOpenFile(logPath, os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	info, err := logFile.Stat()
 	if err != nil {
 		logFile.Close()
-		return nil, err
+		return nil, false, err
 	}
-	index, err := openIndex(base + ".index")
+	index, madeIndex, err := openIndex(indexPath)
 	if err != nil {
 		logFile.Close()
-		return nil, err
-	}
-	if created {
-		// A new file is only a directory entry until the directory is flushed: an
-		// fsynced segment can still vanish in a power cut if its name was never
-		// persisted.
-		syncDir(dir)
+		if madeLog {
+			_ = fsRemove(logPath)
+		}
+		return nil, false, err
 	}
 	return &Segment{
 		beforeSync:    beforeSync,
@@ -105,7 +104,7 @@ func openSegment(dir string, baseOffset, indexInterval int64, beforeSync func() 
 		sizeBytes:     info.Size(),
 		indexInterval: indexInterval,
 		lastModified:  info.ModTime(),
-	}, nil
+	}, madeLog || madeIndex, nil
 }
 
 // append writes raw batch bytes at the end of the log and, on crossing the index
@@ -119,10 +118,13 @@ func (s *Segment) append(offset int64, batch []byte) error {
 	if err := faultAt("log.write"); err != nil {
 		return err
 	}
-	if _, err := s.log.WriteAt(batch, pos); err != nil {
+	// Dirty before the write, not after: a write that fails part-way has still
+	// changed the file, and the truncation that undoes it has to reach the disk.
+	s.logDirty.Store(true)
+	if err := fsWriteAt(s.log, batch, pos); err != nil {
+		_ = fsTruncate(s.log, pos) // a short write leaves bytes the log does not count.
 		return err
 	}
-	s.logDirty.Store(true)
 	s.sizeBytes += int64(len(batch))
 	s.sinceIndex += int64(len(batch))
 	s.lastModified = time.Now()
@@ -134,7 +136,7 @@ func (s *Segment) append(offset int64, batch []byte) error {
 			// after them — two batches claiming one offset, forever.
 			s.sizeBytes = pos
 			s.sinceIndex -= int64(len(batch))
-			_ = s.log.Truncate(pos)
+			_ = fsTruncate(s.log, pos)
 			return err
 		}
 		s.sinceIndex = 0
@@ -148,6 +150,12 @@ func (s *Segment) append(offset int64, batch []byte) error {
 func (s *Segment) sync() error {
 	s.syncMu.Lock()
 	defer s.syncMu.Unlock()
+	if s.retired.Load() {
+		// The cleaner replaced this segment (with files it flushed) or retention
+		// removed it, after the caller picked it up: there is nothing of it left to
+		// flush, and its files are closed.
+		return nil
+	}
 	if err := s.offline(); err != nil {
 		return err
 	}
@@ -167,7 +175,7 @@ func (s *Segment) sync() error {
 	// partition's log and index whether or not anything had been written, which on
 	// an idle broker is pure waste.
 	if s.logDirty.Swap(false) {
-		if err := flushFile(s.log); err != nil {
+		if err := fsSync(s.log); err != nil {
 			s.logDirty.Store(true)
 			s.failed.Store(&err)
 			return err
@@ -193,25 +201,22 @@ func (s *Segment) readAt(pos int64, n int) ([]byte, error) {
 
 // truncate cuts the log file to size bytes (used by recovery to drop a torn tail).
 func (s *Segment) truncate(size int64) error {
-	if err := s.log.Truncate(size); err != nil {
+	if err := fsTruncate(s.log, size); err != nil {
 		return err
 	}
 	s.sizeBytes = size
 	// Make the cut durable: otherwise a second crash resurrects the torn bytes
 	// that this recovery just decided were not part of the log.
-	return fsyncFile(s.log)
+	return fsSync(s.log)
 }
 
-// syncDir flushes a directory's entries to stable storage. Best effort: some
-// platforms and filesystems cannot fsync a directory (Windows, certain network
-// mounts), and refusing to run there would be worse than the gap it closes.
-func syncDir(path string) {
-	d, err := os.Open(path)
-	if err != nil {
-		return
-	}
-	_ = d.Sync()
-	_ = d.Close()
+// retire marks a segment that is leaving the partition (replaced by the cleaner,
+// or deleted) and closes its files, after any flush of it that is in progress.
+func (s *Segment) retire() error {
+	s.syncMu.Lock()
+	defer s.syncMu.Unlock()
+	s.retired.Store(true)
+	return s.close()
 }
 
 func (s *Segment) close() error {
@@ -221,14 +226,4 @@ func (s *Segment) close() error {
 		return errIndex
 	}
 	return errLog
-}
-
-// SetFsyncForTest replaces the function every log and index fsync goes through,
-// and returns a func that puts the real one back. It exists for crash models in
-// other packages' tests (a power cut is "drop everything not fsynced", which needs
-// to see every fsync); nothing in the broker calls it.
-func SetFsyncForTest(fn func(f *os.File) error) (restore func()) {
-	old := fsyncFile
-	fsyncFile = fn
-	return func() { fsyncFile = old }
 }
