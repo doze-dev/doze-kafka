@@ -6,6 +6,11 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Console: a client flagged because most of its requests in five minutes were refused is
+  told so ("was refused 3 of its 5 requests in the last five minutes"). The page said
+  "has been refused 0 times in a row" whenever its latest request had gone well. A streak
+  on one of a client's several connections says it is one connection's.
+
 - Console: the wire dock's "Traffic page" link lands on that topic's or group's requests
   (it carried `topic%3dorders`, which is no filter, and showed everything). The Older,
   Newer and Latest links of a topic's committed-only view keep the view; they wrote

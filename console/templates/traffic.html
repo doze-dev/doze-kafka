@@ -179,7 +179,7 @@
     </table>
   </div>
   {{if .Attention}}
-  <div class="callout warn" id="attention"><span class="b">{{.Attention.Who}} has been refused {{.Attention.Streak}} times in a row</span><span class="note">{{if .Attention.Why}}{{.Attention.Why}} {{end}}<a href="{{.Attention.URL}}">See the refusals</a></span></div>
+  <div class="callout warn" id="attention"><span class="b">{{.Attention.Who}} {{.Attention.Head}}</span><span class="note">{{if .Attention.Why}}{{.Attention.Why}} {{end}}<a href="{{.Attention.URL}}">See the refusals</a></span></div>
   {{end}}
   {{else}}
   <div class="honest">{{icon "info"}}<div>No client is connected. An app that uses the broker appears here for as long as its connection stays open.</div></div>
@@ -222,7 +222,7 @@
   <div class="insp-client" id="icl-{{.Conn}}" data-row data-open-keys="{{.Keys}}">
     <a class="insp-client-open" href="{{.Href}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"><span class="b el">{{.Who}}</span><span class="m mut">{{when .Opened "since"}}</span><span class="m mut ra">{{when .Last "since"}}</span></a>
     <span class="m mut">{{if .Software}}{{.Software}}{{else}}software not reported{{end}} · {{.Principal}} · {{.Remote}}{{if gt .Conns 1}} · {{.Conns}} connections{{end}}</span>
-    <span class="note{{if .NeedsALook}} bad{{end}}">{{if .NeedsALook}}last {{.Streak}} requests refused{{else if .Doing}}{{.Doing}}{{else}}no requests kept{{end}}</span>
+    <span class="note{{if .NeedsALook}} bad{{end}}">{{if .NeedsALook}}{{.LookNote}}{{else if .Doing}}{{.Doing}}{{else}}no requests kept{{end}}</span>
   </div>
   {{else}}
   <div class="callout spaced"><span class="b">No client is connected</span><span class="note">An app that uses the broker appears here for as long as its connection stays open.</span></div>

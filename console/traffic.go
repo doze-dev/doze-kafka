@@ -533,8 +533,11 @@ type clientRow struct {
 	// NeedsALook marks a client the page raises: refused several times in a row, or
 	// most of what it asked was refused.
 	NeedsALook bool
-	Groups     string
-	Metrics    bool
+	// LookHead and LookNote say why, when it does (lookWords): the callout's sentence
+	// after the client's name, and the line under it in the connected-clients list.
+	LookHead, LookNote string
+	Groups             string
+	Metrics            bool
 	// Conns says how many connections the client has open (a client is its client id:
 	// one app often holds several connections, and the page counts apps). Members are
 	// those connections, oldest first, and Keys the inspector keys of them, so that a
@@ -620,6 +623,7 @@ func (c *Console) groupClients(cls []TrafficClient, now time.Time) []clientRow {
 		for _, mem := range members {
 			cr.NeedsALook = cr.NeedsALook || mem.NeedsALook
 		}
+		cr.LookHead, cr.LookNote = lookWords(m, len(conns))
 		cr.Conns, cr.More, cr.Members, cr.Keys = len(conns), len(conns)-1, members, strings.Join(keys, " ")
 		out = append(out, cr)
 	}
@@ -646,6 +650,27 @@ func needsALook(c TrafficClient) bool {
 	return c.Streak >= 3 || (c.Err5m >= 3 && c.Req5m > 0 && c.Err5m*2 >= c.Req5m)
 }
 
+// lookWords says why a client needs a look, as the callout's sentence (after the
+// client's name) and as the line under it in the connected-clients list. The board
+// (Traf-06) draws the streak: "has been refused 4 times in a row", "last 4 requests
+// refused". A client raised by the five-minute rule alone has no such streak (its
+// latest request may have gone well, and the streak is then 0), so it is told by the
+// count the rule read. conns is how many connections the client is: a streak is one
+// connection's, the count is all of them.
+func lookWords(c TrafficClient, conns int) (head, note string) {
+	if c.Streak >= 3 {
+		head = fmt.Sprintf("has been refused %d times in a row", c.Streak)
+		note = fmt.Sprintf("last %d requests refused", c.Streak)
+		if conns > 1 {
+			head += fmt.Sprintf(" on one of its %d connections", conns)
+			note += " on one connection"
+		}
+		return head, note
+	}
+	return fmt.Sprintf("was refused %d of its %d requests in the last five minutes", c.Err5m, c.Req5m),
+		fmt.Sprintf("%d of %d requests refused in the last 5 minutes", c.Err5m, c.Req5m)
+}
+
 func (c *Console) clientRow(cl TrafficClient, now time.Time) clientRow {
 	cr := clientRow{TrafficClient: cl, Who: cl.ClientID, Age: spanText(now.Sub(cl.Opened)), Idle: spanText(now.Sub(cl.Last))}
 	if cr.Who == "" {
@@ -666,6 +691,7 @@ func (c *Console) clientRow(cl TrafficClient, now time.Time) clientRow {
 	does = append(does, cl.Groups...)
 	cr.Doing = strings.Join(does, " · ")
 	cr.NeedsALook = needsALook(cl)
+	cr.LookHead, cr.LookNote = lookWords(cl, 1)
 	switch {
 	case cl.Req5m == 0:
 		cr.Rate, cr.RateTon = "—", "mut"
@@ -922,13 +948,13 @@ func (c *Console) trafficKindsData(data map[string]any, v trafficView) {
 }
 
 // attention is the line under the clients table that names the client needing a look
-// (Traf-06): who, how many refusals in a row, and what the error means.
+// (Traf-06): who, why it is raised (lookWords), and what the error means.
 func (c *Console) attention(rows []clientRow) map[string]any {
 	for _, r := range rows {
 		if !r.NeedsALook {
 			continue
 		}
-		a := map[string]any{"Who": r.Who, "Streak": r.Streak, "Err": r.LastError, "URL": c.prefix + "/traffic?kind=errors&" + TrafficFilter{Client: r.Who}.query()}
+		a := map[string]any{"Who": r.Who, "Head": r.LookHead, "Err": r.LastError, "URL": c.prefix + "/traffic?kind=errors&" + TrafficFilter{Client: r.Who}.query()}
 		a["Why"] = refusalWhy(r.LastError)
 		return a
 	}

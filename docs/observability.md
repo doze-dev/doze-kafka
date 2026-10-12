@@ -78,7 +78,9 @@ seconds. *N of M requests match* counts requests among those the recorder keeps.
 - **Clients** (`?view=clients`): who is connected, their software, principal and address,
   requests a minute, groups and error rate. A client is flagged when it was refused three
   times in a row, or when three or more of its requests in five minutes make up at least
-  half of what it asked.
+  half of what it asked. The page says which: "refused 4 times in a row", or "refused 3
+  of its 5 requests in the last five minutes" for a client whose latest request went
+  well.
 - **Pause** stops the table (`p`). The broker is not paused: the page counts the requests
   it has missed since the newest row it shows, and says so.
 - **A group filter** shows the group's rebalances in order, with the requests that
