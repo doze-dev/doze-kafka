@@ -983,9 +983,19 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .tb-spacer { display: none; }
   .panes > .main { padding: 10px 12px 0; gap: 8px; }
   .panes > .insp:has(.insp-sel:not([hidden])) {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; margin: 0; max-height: 47vh; border: 0; border-top: 1px solid var(--line);
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; margin: 0; height: 400px; max-height: 90vh; overflow: hidden; border: 0; border-top: 1px solid var(--line);
     border-radius: 12px 12px 0 0; box-shadow: 0 0 0 100vmax var(--scrim);
   }
+  /* The board's sheet is a fixed 400 px: the record scrolls inside it and its actions
+     stay pinned at the foot (the sheet's own padding is 14 at the foot). */
+  .insp-sel { overflow: hidden; }
+  .insp-sel .inspector-b { flex: 1; min-height: 0; overflow-y: auto; }
+  .insp-sel .inspector-acts { position: sticky; bottom: 0; margin: auto -16px -12px; padding: 10px 16px 14px; background: var(--card); border-top: 1px solid var(--line2); }
+  /* Sy-04: the title is 15 px on its own row, then the action the width of the page with
+     the menu beside it. */
+  .idband h1, .idband h1.m, .idband h1.page-title { font-size: 15px; line-height: 20px; flex: 1 1 100%; }
+  .idband > .idband-acts { flex: 1 1 100%; flex-wrap: nowrap; }
+  .idband-acts > .btn.pri { flex: 1; }
   /* Sy-04: 400 of 844 (47%), so the page's own tabs and first card stay in view under
      it, and the grab handle the board draws: 36 x 4, centred, 8 px from the top. */
   /* Sy-04 draws the name, the action, one sentence and the tabs; the neighbours are one

@@ -864,6 +864,25 @@ test('Sy-04: the message sheet is 47% of the phone, has its grab handle, and lea
   expect(tabs.y + tabs.height).toBeLessThanOrEqual(box.y + 1);
   const firstCard = (await page.locator('tbody tr[id^="msg-"]').first().boundingBox())!;
   expect(firstCard.y).toBeLessThan(box.y);
+  // The board's sheet is a fixed 400 px, its actions pinned at the foot whatever the value.
+  expect(Math.round(box.height)).toBe(400);
+  const acts = (await sheet.locator('.inspector-acts').boundingBox())!;
+  expect(box.y + box.height - (acts.y + acts.height), 'actions at the sheet\'s foot').toBeLessThanOrEqual(16);
+  expect(acts.y).toBeGreaterThan(box.y + 100);
+});
+
+test('Sy-04: at 390 the title is 15 px on its own row, then a full-width Produce a message with the menu beside it', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('topics/seed-orders?partition=0');
+  const h1 = page.locator('main h1').first();
+  await expect(h1).toHaveCSS('font-size', '15px');
+  const t = (await h1.boundingBox())!;
+  const produce = (await page.locator('#produce-open').boundingBox())!;
+  const more = (await page.locator('[data-more]').first().boundingBox())!;
+  expect(produce.y, 'the action is under the title').toBeGreaterThanOrEqual(t.y + t.height - 1);
+  expect(produce.width, 'full width, with the menu beside it').toBeGreaterThan(300);
+  expect(more.x).toBeGreaterThanOrEqual(produce.x + produce.width);
+  expect(Math.abs(more.y - produce.y)).toBeLessThan(4);
 });
 
 test('Cl-Home: the compacted partitions are counted from the topics\' own cleanup.policy, and what this broker is not is drawn', async ({ page }) => {
