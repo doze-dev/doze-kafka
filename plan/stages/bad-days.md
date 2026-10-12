@@ -438,7 +438,7 @@ fencing and SASL branches above).
 
 ## 8. Recording queue
 
-Scenarios against `apache/kafka:4.0.0` in Docker; none of these is acted on until
+Scenarios against `apache/kafka:4.3.1` in Docker; none of these is acted on until
 recorded. A full disk in the container: `docker run --tmpfs
 /var/lib/kafka/data:size=16m ...`.
 

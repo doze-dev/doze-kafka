@@ -40,7 +40,7 @@ registry; offsets and ACL tables belong to groups and access), the broker's
 
 **What the work finds.** Method: read every board's text as a claim, read the
 code beneath, then run a built binary (`topbrk`, a copy of `dkbin`, on its own
-port) with franz-go scripts under the scratchpad. 39 findings (2 P1, 19 P2, 18 P3), 11 reproduced
+port) with franz-go scripts under the scratchpad. 40 findings (3 P1, 19 P2, 18 P3), 12 reproduced
 against the binary. The headline ones:
 
 - `CreateTopics` ignores the replication factor (TOP-1): replication factor 3
@@ -169,6 +169,7 @@ The first test named is the one to write red first.
 |---|---|---|---|---|---|---|
 | TOP-1 | P1 | `CreateTopics` never reads `ReplicationFactor`: factors 3, 0 and -2 all return code 0 and `ReplicationFactor: 1`. Tp-02 says a higher factor is refused `INVALID_REPLICATION_FACTOR`; a one-broker Kafka refuses it. | `internal/broker/topics.go:51-125` | run | board, memory | Raw kmsg: create with factor 3, 0, -2 expects code 38 each and nothing created (layer: broker). |
 | TOP-2 | P1 | `DescribeConfigs` on a topic returns 7 keys (cleanup.policy, index.interval.bytes, message.timestamp.type, retention.bytes, retention.ms, segment.bytes, and max.message.bytes only if set). Kafka returns about 30, with source and default flags. Tp-18's 14-row table, Connect and Terraform readers cannot be satisfied. Also the board's "max.message.bytes 1048588 acts" is false: unset, nothing is enforced (a 3 MiB batch was accepted, run). | `internal/broker/configs.go:75-83` | run | board, memory | Table-driven: every key in `topicConfigs` is returned with a default, and `IsDefault` is true until overridden (layer: broker, after foundation B7). |
+| TOP-39 | P1 | More forgiving than Kafka: the broker accepts three topic configs that `apache/kafka:4.3.1` refuses. `kafka-configs.sh --alter --add-config` on a real 4.3.1 broker answers `InvalidConfigurationException: Unknown topic config name` for `message.downconversion.enable`, `message.format.version` and `message.timestamp.difference.max.ms` (all removed in Kafka 4.0); doze-kafka stores each (`stored(...)` records in the settings table). Found on 2026-10-12 while checking `kafkaTopicConfigs` against a 4.3.1 container (its `--describe --all` lists 33 names; the test's list had 36). Not fixed in that pass: it changes what a client sees, so it goes red-first here, with a recording. | `internal/settings/settings.go:401,402,405`; `internal/broker/settings_table_test.go` (`notKafka431TopicConfigs` names them) | run | run (CLI against the image), not yet a recording | Record `IncrementalAlterConfigs` and `CreateTopics` with each of the three names; replay expects `INVALID_CONFIG` and nothing stored; then drop the three records and move the names to the never-configs in the test (broker + settings). |
 | TOP-2a | P2 | `validateOnly` returns before the existence and case-collision checks: validate-only on existing topic `mm` and on `case` (collides with `Case`) both return 0. | `topics.go:85-90` | run | memory | Raw kmsg validateOnly against an existing name expects `TOPIC_ALREADY_EXISTS` (broker). |
 | TOP-5 | P2 | Two names Kafka refuses as colliding (`a.b` then `a_b`) are both created. The case-insensitive refusal (`Case` vs `case`) that does exist is Kafka-stricter and is in no document. | `meta/store.go:264-270` | run | memory | Store test for `.`/`_` collision; docs line in limitations (meta). |
 | TOP-8 | P3 | Board says "the same message as Kafka" six times; none matches. Code: `invalid topic name: "bad/name" contains "/"; only ASCII letters...`; `invalid topic name: 250 characters is longer than the maximum of 249`; `2000 partitions is above this broker's limit of 1000 (--max-partitions)`; `invalid value for retention.ms: "abc" is not a number`; `unknown topic config "retention.mss"`; `the topic already has 1 partitions`. Board: `Topic name is invalid: 'harbour/orders' contains one or more characters other than ASCII alphanumerics, '.', '_' and '-'`; `Number of partitions is 1500; at most 1000 are allowed.`; `Invalid value abc for configuration retention.ms: Not a number of type LONG`; `Unknown topic config name: retention.mss`; `Topic currently has 3 partitions, which is higher than the requested 2.` Fix the code to Kafka's text once recorded (R3, R4), or cut "same message" from the board. | `meta/names.go:28-41`, `topicconfig.go:20-46`, `topics.go:78-82`, `createpartitions.go:62-66` | run | board, memory | Replay of R3/R4 compares strings (differential). |
@@ -227,8 +228,8 @@ The first test named is the one to write red first.
 | TOP-37 | P2 | Tp-30's "Retention was changed to 1 d at 14:38 (the change)" needs a history of config changes; the registry stores only the current config. Cut the sentence or add an append-only change log (name, key, old, new, time, client) in `meta`. | `meta/store.go:329-362` | read | board | Meta: SetTopicConfig appends a change row; survives restart. |
 | TOP-38 | P2 | Tp-11 "Valid against ...-value v3 ... live check; today the broker checks on send" and "Resulting schema id", and Tp-08 "id 9 is not registered": the encode in `registry.encode` runs only on send; the decode path does not distinguish "not framed" from "framed with an unknown id". | `console/registry.go:359-376` | read | board | Console: preview endpoint returns the encoded bytes and id; decode of framing with unknown id says so. |
 
-Counts: 39 findings. P1: 2 (TOP-1, TOP-2). P2: 19. P3: 18. Reproduced (`run`): 11
-(TOP-1, 2, 2a, 5, 8, 10, 11, 14, 16, 17, 19). The sub-id `TOP-2a` is a separate
+Counts: 40 findings. P1: 3 (TOP-1, TOP-2, TOP-39). P2: 19. P3: 18. Reproduced (`run`): 12
+(TOP-1, 2, 2a, 5, 8, 10, 11, 14, 16, 17, 19, and TOP-39 against a real Kafka). The sub-id `TOP-2a` is a separate
 finding; IDs are not contiguous because they were assigned in the order found.
 
 ## 5. What to check
@@ -441,7 +442,7 @@ Every finding gets its red test first (protocol step 2). By layer:
 
 **Differential vs real Kafka (B2)**
 - Scenarios R1 to R17 in section 8, each recorded once against
-  `apache/kafka:4.0.0` and replayed. Target: replay reports zero "answered
+  `apache/kafka:4.3.1` and replayed. Target: replay reports zero "answered
   differently" for the F rows, or each difference is fixed or in limitations.
 
 **Coverage targets (never below baseline)**
@@ -465,7 +466,7 @@ guards in retention (the active segment must survive), `offset > p.logEndOffset`
 
 ## 8. Recording queue
 
-Each runs on `apache/kafka:4.0.0` through the B2 harness, normalised, stored as
+Each runs on `apache/kafka:4.3.1` through the B2 harness, normalised, stored as
 `conformance/recordings/topics-<n>.json`, and replayed in Go. Until recorded,
 the claim is `memory` and its test is written and skipped.
 

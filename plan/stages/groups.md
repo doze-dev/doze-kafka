@@ -345,7 +345,7 @@ Mutation (B3): `go tool task mutate:check -- ./internal/broker/ ./internal/stora
 
 ## 8. Recording queue
 
-Docker: `apache/kafka:4.0.0`; each scenario is a script that issues the request with a raw client and stores the response bytes.
+Docker: `apache/kafka:4.3.1`; each scenario is a script that issues the request with a raw client and stores the response bytes.
 
 | # | Claim (currently `memory` or `doc`) | Scenario |
 |---|---|---|
@@ -419,7 +419,7 @@ and three P2s are `memory` until recorded.
 
 | # | Work | Files | hd |
 |---|---|---|---|
-| 1 | Record R1-R20 against `apache/kafka:4.0.0`; settle GRP-8, 10, 12, 14, 16, 19 questions | `conformance/` | 3 |
+| 1 | Record R1-R20 against `apache/kafka:4.3.1`; settle GRP-8, 10, 12, 14, 16, 19 questions | `conformance/` | 3 |
 | 2 | Red tests for GRP-1, 2, 3, 7, 11, 27, 28, 29 (raw kmsg, every version) then fixes | `group.go`, `groups.go`, `offsets.go`, `groupadmin.go` | 5 |
 | 3 | GRP-4: subscription-aware OffsetDelete (848 subscribed set; classic decode of `ConsumerProtocolSubscription`); GRP-17 | `groupdelete.go` | 2 |
 | 4 | GRP-5: DescribeGroups for consumer-protocol groups | `groupadmin.go`, `group848.go` | 2 |

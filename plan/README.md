@@ -67,7 +67,7 @@ row 1 (see D1).
 | 0 | [Foundation](00-foundation.md) | 12 shell, 15 machinery, 2 names, 19 asks | | | | | shell, Sy-* | 12 |
 | 1 | Durability first (the P0 and P1 items of [bad-days](stages/bad-days.md): BAD-1, 2, 3, 4, 13, 29) | 6 | 1 | 5 | | | none | 3 |
 | 2 | [Traffic](stages/traffic.md) | 31 | 0 | 4 | 14 | 13 | 12 | 20 |
-| 3 | [Topics](stages/topics.md) | 39 | 0 | 2 | 19 | 18 | 32 | 28 |
+| 3 | [Topics](stages/topics.md) | 40 | 0 | 3 | 19 | 18 | 32 | 28 |
 | 4 | [Groups](stages/groups.md) | 34 | 0 | 9 | 15 | 10 | 19 | 26 |
 | 5 | [Schemas](stages/schemas.md) | 38 | 0 | 7 | 22 | 9 | 19 | 18 |
 | 6 | [Trace](stages/trace.md) | 27 | 0 | 0 | 14 | 13 | 9 | 7 |
@@ -78,7 +78,7 @@ row 1 (see D1).
 | 11 | [Map](stages/map.md) | 17 | 0 | 0 | 13 | 4 | 2 | 15 |
 | 12 | [Integration](90-integration.md) | | | | | | | 7 |
 
-**330 findings in the ten stage documents: 1 P0, 40 P1, 178 P2, 111 P3.** About
+**331 findings in the ten stage documents: 1 P0, 41 P1, 178 P2, 111 P3.** About
 **190 focused days** of work in all (12 for the foundation, 3 for durability, 7
 for integration and the rest in the stages; Access counted at 10.5, or 16 with
 review, recordings and CI). That is not a promise: the
@@ -138,7 +138,7 @@ Updated when a stage meets its criteria, in the same commit as the work.
 |---|---|---|---|
 | D1 | A known data-loss bug does not wait five stages. **BAD-1** (a duplicate idempotent `acks=all` batch is acknowledged without an fsync) and the other P0 and P1 items of the Bad days stage are fixed straight after the foundation as their own stage, and the rest of Bad days stays where the order puts it. | **Proposed.** Say if you want BAD-1 fixed before even the foundation. | README order, stage 1 |
 | D2 | Move to the latest `doze-names` in doze-kafka, doze-aws and doze, and delete the merged remote `zone-hardening` branch. | **Decided** (you said so). Not yet done: scheduled as foundation C1 and C2. | Foundation C |
-| D3 | A recording of a real Apache Kafka 4.0 becomes the oracle, as Confluent's registry is for the schema work. Claims stay `memory` until recorded; a fix resting on `memory` is a skipped test. | **Proposed.** | Protocol, foundation B2 |
+| D3 | A recording of a real Apache Kafka 4.3.1 (`apache/kafka:4.3.1`) becomes the oracle, as Confluent's registry is for the schema work. Claims stay `memory` until recorded; a fix resting on `memory` is a skipped test. | **Proposed.** | Protocol, foundation B2 |
 | D4 | The plan's definition of done includes coverage floors, mutation baselines and a lightness budget, not only passing tests. | **Proposed.** | Protocol step 4, foundation B3, B4, B9 |
 | D5 | A board that cannot be built truthfully is cut or rewritten, with a sentence, rather than built as drawn. Several already say so in their stage document (invented sample values, the unverified `.doze` names). | **Proposed.** | Integration section 2 |
 | D6 | `doze-kafka config` redacting credentials breaks round-tripping a valid config file. Redact by default and add `config --show-secrets`? | **Decided and built.** `config print` writes `"<redacted>"`; `--show-secrets` writes the file to run from; a file holding the placeholder is refused at load, by user. `TestNoSecretReachesAnyOutput` plants a password, a wrong one, the console credential and TLS key material and reads every surface. | [connect.md](stages/connect.md) |

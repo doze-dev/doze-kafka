@@ -118,12 +118,12 @@ This is the evidence every board snippet is compared to (section 6 does the comp
 
 | Cell | Toolchain pin | Security keys it uses (scram-tls) | Notes |
 |---|---|---|---|
-| `java` | `kafka-clients` 4.0.0 (`pom.xml`; `KAFKA_VERSION` env overrides, no cell sets it); Confluent serializers 8.0.0; JDK 21 image | `security.protocol=SASL_SSL`, `sasl.mechanism`, `sasl.jaas.config` (one line), `ssl.truststore.type=PEM`, `ssl.truststore.location` (`Check.java:26-33`) | registry: `basic.auth.credentials.source=USER_INFO`, `basic.auth.user.info` (`SerdeCheck.java:45-46`) |
+| `java` | `kafka-clients` 4.3.1 (`pom.xml`; `KAFKA_VERSION` env overrides, no cell sets it); Confluent serializers 8.0.0; JDK 21 image | `security.protocol=SASL_SSL`, `sasl.mechanism`, `sasl.jaas.config` (one line), `ssl.truststore.type=PEM`, `ssl.truststore.location` (`Check.java:26-33`) | registry: `basic.auth.credentials.source=USER_INFO`, `basic.auth.user.info` (`SerdeCheck.java:45-46`) |
 | `spring` | Boot 3.4.4 (`pom.xml`) | `spring.kafka.security.protocol`, `spring.kafka.properties.sasl.mechanism`, `...sasl.jaas.config`, `spring.kafka.ssl.trust-store-type=PEM`, `...trust-store-location=file:` (`Check.java:57-65`) | passed as command-line args, not a yaml file, not `${ENV}` placeholders |
 | `python` | `confluent-kafka` **unpinned** (`uv run --with confluent-kafka`) | `security.protocol=SASL_SSL`, `sasl.mechanism` (singular), `sasl.username`, `sasl.password`, `ssl.ca.location` (`check.py:15-18`) | registry `basic.auth.user.info`; Protobuf from a dynamically built descriptor (`descriptor_pb2`), not generated classes |
 | `kcat` | whatever is on `PATH` | `-X security.protocol=SASL_SSL -X sasl.mechanism ... -X ssl.ca.location` (`run.sh:8`) | never `-F`, never `sasl.mechanisms` |
 | `kafkajs` | 2.2.4 (`package.json`) | `ssl: {ca}`, `sasl: {mechanism: 'scram-sha-512'}` | no board |
-| `connect` | Kafka 4.0.0 image | `security.protocol`, `sasl.*`, `ssl.*` repeated with `producer.`, `consumer.`, `admin.` prefixes (`connect/run.sh:11-17`) | no board; `docs/frameworks.md` shows none of it |
+| `connect` | `apache/kafka:4.3.1` image | `security.protocol`, `sasl.*`, `ssl.*` repeated with `producer.`, `consumer.`, `admin.` prefixes (`connect/run.sh:11-17`) | no board; `docs/frameworks.md` shows none of it |
 | `confluent-sr`, `apicurio`, `kafbat-ui`, `redpanda-console` | pinned images | each has its own SASL/TLS spelling | no board |
 
 Harness shape (`compat/run.sh`): two modes only, `plain` (no auth, no TLS) and
@@ -465,9 +465,9 @@ None of these is acted on until `doc` or `recorded`.
 | Claim | Scenario to record | Source now |
 |---|---|---|
 | librdkafka accepts `sasl.mechanisms` and `sasl.mechanism` as the same property, in `-X`, `-F` and the Python dict | not Kafka: the client library's own docs/config dump; run `kcat -X dump` with both spellings (Docker not needed) | memory |
-| Real Kafka's wording for a failed SCRAM login (Cn-07: "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-512") | `apache/kafka:4.0.0` with `KAFKA_SASL_ENABLED_MECHANISMS=SCRAM-SHA-512`, create a user via `kafka-configs.sh --alter --add-config 'SCRAM-SHA-512=[password=...]'`, send a wrong password with the Java client and with a raw `kmsg` `SaslAuthenticate`; record the `ErrorMessage` for v0..v2 | memory; doze sends `scram: invalid credentials` at `scram.go:120,172` (what the client prints is the client's own wrapper) |
-| Real Kafka's `INVALID_PARTITIONS` text on decrease ("Topic currently has 6 partitions, which is higher than the requested 3.") | `apache/kafka:4.0.0`, `CreatePartitions` 6 -> 3 and 6 -> 6 | memory |
-| `group.protocol=consumer` is "not the default even in Kafka 4.x" | Kafka 4.0.0 Java client default, read from `ConsumerConfig` and a run against `apache/kafka:4.0.0` | doc (clients.md) |
+| Real Kafka's wording for a failed SCRAM login (Cn-07: "Authentication failed during authentication due to invalid credentials with SASL mechanism SCRAM-SHA-512") | `apache/kafka:4.3.1` with `KAFKA_SASL_ENABLED_MECHANISMS=SCRAM-SHA-512`, create a user via `kafka-configs.sh --alter --add-config 'SCRAM-SHA-512=[password=...]'`, send a wrong password with the Java client and with a raw `kmsg` `SaslAuthenticate`; record the `ErrorMessage` for v0..v2 | memory; doze sends `scram: invalid credentials` at `scram.go:120,172` (what the client prints is the client's own wrapper) |
+| Real Kafka's `INVALID_PARTITIONS` text on decrease ("Topic currently has 6 partitions, which is higher than the requested 3.") | `apache/kafka:4.3.1`, `CreatePartitions` 6 -> 3 and 6 -> 6 | memory |
+| `group.protocol=consumer` is "not the default even in Kafka 4.x" | Kafka 4.3.1 Java client default, read from `ConsumerConfig` and a run against `apache/kafka:4.3.1` | doc (clients.md) |
 | Max transaction timeout is 15 minutes | the real broker's `transaction.max.timeout.ms` default and the error code on 15 min + 1 ms | doc (matches `txn.go:52`) |
 | Java client keeps `acks=all` with idempotence by default | client source / run | memory |
 | `PLAIN` over plaintext sends the password in the clear; SCRAM never does | wire capture of both, from a raw `kmsg` exchange | doc |

@@ -289,7 +289,7 @@ Fuzz
 Browser (e2e)
 - `cluster.spec.ts` (new), one test per board: overview sentence matches Metadata; config table with a redaction check on a broker with a credential; API page for each profile and counts 37/39/41; storage sizes within 10% of `du`; transaction list with a live open transaction started by a test producer, detail, abort with confirm, producer fenced; compaction table after a roll; zone and listener cards at name mode and at `--listen`; broker-down overlay; 960 and 390 widths; keyboard `j k Enter / r`.
 
-Differential vs a real broker (apache/kafka:4.0.0)
+Differential vs a real broker (apache/kafka:4.3.1)
 - R1, R2, R3, R4, R5, R6, R7, R8, R10, R11, R13 below; each becomes a `conformance/` scenario when B2 exists.
 
 Coverage targets: per section 3.1, with functions named there.
@@ -303,10 +303,10 @@ Coverage targets: per section 3.1, with functions named there.
 | R3 | `EndTxn(abort)` at the current epoch from a second connection leaves the first producer able to begin a new transaction. | Two connections, same pid/epoch; abort from B; A sends AddPartitionsToTxn and Produce. |
 | R4 | Unknown `StateFilters` are returned in `UnknownStateFilters`; `DescribeTransactions` of an unknown id is `TRANSACTIONAL_ID_NOT_FOUND`. | ListTransactions with `["Bogus"]`; DescribeTransactions `["nope"]`. |
 | R5 | `DescribeConfigs` for broker "99" and for a non-numeric name; the key set and `ConfigSource` of a KRaft broker. | DescribeConfigs for brokers "", "1", "99", "x" with no names; record keys and sources. |
-| R6 | A cluster id is a 22-character base64 UUID. | Metadata and DescribeCluster `ClusterID` from `apache/kafka:4.0.0`. |
+| R6 | A cluster id is a 22-character base64 UUID. | Metadata and DescribeCluster `ClusterID` from `apache/kafka:4.3.1`. |
 | R7 | The message text and per-record error for a keyless record on a compacted topic; whether the whole batch is rejected. | Produce one keyless and one keyed record in one batch. |
 | R8 | AlterConfigs/IncrementalAlterConfigs on a broker resource, including a static key and an unknown broker id. | Same requests against node 1. |
-| R9 | A request for an unsupported version of a non-ApiVersions API closes the connection. | Fetch v14, Produce v2 against `apache/kafka:4.0.0` (read EOF vs error response). |
+| R9 | A request for an unsupported version of a non-ApiVersions API closes the connection. | Fetch v14, Produce v2 against `apache/kafka:4.3.1` (read EOF vs error response). |
 | R10 | `DescribeProducers` `CurrentTxnStartOffset` and `CoordinatorEpoch` values; `StartTimestamp` after completion. | Open, commit, describe at each stage. |
 | R11 | Transactional ids expire after 7 days (`transactional.id.expiration.ms`) and then disappear from ListTransactions. | Start a broker with `transactional.id.expiration.ms=2000`, finish a transaction, list at 1 s, 3 s. |
 | R12 | `min.cleanable.dirty.ratio` default 0.5; `delete.retention.ms` default 24 h; tombstones are kept until segment cleaned once and older than that. | `DescribeConfigs` of a compacted topic; produce key/tombstone; observe fetch after cleaning. |

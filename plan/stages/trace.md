@@ -182,7 +182,7 @@ Coverage targets: `console` >= 90.0% (baseline 87.8%): `newReader` >= 90% (SASL 
 
 ## 8. Recording queue
 
-Scenarios run on `apache/kafka:4.0.0` with a small Go or kcat script, stored under `conformance/recordings/` (B2), replayed in Go.
+Scenarios run on `apache/kafka:4.3.1` with a small Go or kcat script, stored under `conformance/recordings/` (B2), replayed in Go.
 
 | # | Claim | Source now | Scenario that would record it |
 |---|---|---|---|
@@ -191,7 +191,7 @@ Scenarios run on `apache/kafka:4.0.0` with a small Go or kcat script, stored und
 | R-3 | ListOffsets by timestamp across a compacted topic, a topic after `DeleteRecords`, and after retention deletes the head segment (log-start moves) | memory | Create `cleanup.policy=compact` with tiny `segment.bytes`, write keys repeatedly, wait for the cleaner; `DeleteRecords` to 5; ask timestamps below, at and above the survivors. |
 | R-4 | The ListOffsets answer on a partition whose last offset is a transaction marker (end offset vs. last record) and `isolation_level=1` | memory | One committed and one aborted transaction; `-1` at both isolation levels; a timestamp lookup past the last data record. |
 | R-5 | Which B3/W3C conventions real tracers write: does a 128-bit W3C id downgraded to B3 64-bit keep the low 64 bits, and do Java/OTel producers write `traceparent` and `b3` as UTF-8 text headers on Kafka records | memory | Compat Java cell with OpenTelemetry's Kafka client instrumentation and Brave's Kafka tracing producing; dump the headers with kcat `-f '%h'`. Decides TRC-15. |
-| R-6 | A fetch of a range whose last offset is a control batch: `kgo` does not deliver it; `ConsumePartitions(At(n))` with `n` below the log start resets to the start | memory | franz-go against Kafka 4.0 with a committed transaction at the tail; `DeleteRecords` below `n`. Settles TRC-2 and TRC-26 (this one is the client library, but the broker's answer to the out-of-range Fetch is the part to record). |
+| R-6 | A fetch of a range whose last offset is a control batch: `kgo` does not deliver it; `ConsumePartitions(At(n))` with `n` below the log start resets to the start | memory | franz-go against `apache/kafka:4.3.1` with a committed transaction at the tail; `DeleteRecords` below `n`. Settles TRC-2 and TRC-26 (this one is the client library, but the broker's answer to the out-of-range Fetch is the part to record). |
 
 ## 9. Owed to integration
 

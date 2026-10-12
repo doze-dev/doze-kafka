@@ -17,7 +17,7 @@ where it came from. There are four sources, and they are not interchangeable.
 | Source | Meaning | Good enough to |
 |---|---|---|
 | `spec` | The wire protocol's own message definitions (the `kmsg` structs and the JSON specs they are generated from): fields, versions, flexible or not, nullable, tagged, error codes. For the registry: its published REST reference. | Enforce a shape and name its error. |
-| `recorded` | A scenario run against a **real** `apache/kafka:4.0.0` (or Confluent SR 7.7.1) in Docker and stored under `conformance/recordings/`, replayed without Docker. | Settle a question. This is the oracle. |
+| `recorded` | A scenario run against a **real** `apache/kafka:4.3.1` (or Confluent SR 7.7.1) in Docker and stored under `conformance/recordings/`, replayed without Docker. | Settle a question. This is the oracle. |
 | `doc` | The Kafka documentation or a named KIP, with the page or number. | Implement against, with the claim queued for recording. |
 | `memory` | Somebody (a person or a model) recalls it. | Nothing. It goes on the recording queue and is not acted on until it is `doc` or `recorded`. |
 

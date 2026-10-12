@@ -385,10 +385,10 @@ Coverage targets and what must be covered to reach them:
 
 | ID | Claim | Source now | Scenario that would record it |
 |---|---|---|---|
-| R1 | `OffsetFetch` v8+ with several groups in one request returns each group's committed offsets, and an authorization failure on one group does not fail the others | memory | Docker `apache/kafka:4.0.0`: commit offsets for three groups, one with a deny ACL for the console user; one OffsetFetch with all three; record per-group error codes. Needed before the lag batch (MAP-16) is promised. |
+| R1 | `OffsetFetch` v8+ with several groups in one request returns each group's committed offsets, and an authorization failure on one group does not fail the others | memory | Docker `apache/kafka:4.3.1`: commit offsets for three groups, one with a deny ACL for the console user; one OffsetFetch with all three; record per-group error codes. Needed before the lag batch (MAP-16) is promised. |
 | R2 | Which subject names the Confluent serializers register under `TopicNameStrategy`, `RecordNameStrategy`, `TopicRecordNameStrategy` | doc (Confluent serializer docs) | Confluent SR 7.7.1 plus the Java Avro serializer in the compat Java cell, once per strategy; record the subjects created. Settles MAP-9's guessed rule. |
 | R3 | `kafka-topics.sh --describe`, `kafka-consumer-groups.sh --describe` and `kcat -L` issue only the non-edge APIs (Metadata, DescribeConfigs, ListOffsets, OffsetFetch) and so add no edge | memory | run each tool against doze-kafka and record the API sequence from `/traffic` into the compat harness; note `kafka-consumer-groups.sh` does issue OffsetFetch, so a human looking up a group briefly looks like a reader (see section 9). |
-| R4 | A KIP-848 member's `SubscribedTopicNames` is sent on join and on change only, not on every beat | memory | Docker Kafka 4.0, a franz-go and a Java 848 consumer, record the heartbeat request bodies. If it is sent only on change, the reads edge for 848 comes from OffsetCommit alone. |
+| R4 | A KIP-848 member's `SubscribedTopicNames` is sent on join and on change only, not on every beat | memory | Docker `apache/kafka:4.3.1`, a franz-go and a Java 848 consumer, record the heartbeat request bodies. If it is sent only on change, the reads edge for 848 comes from OffsetCommit alone. |
 
 ## 9. Owed to integration
 

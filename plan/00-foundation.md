@@ -176,7 +176,7 @@ The registry has a recorded oracle; the broker has none. Docker is available, so
 this is cheap to build and it is the most valuable item in the plan.
 
 A scenario is a short Go script of requests (raw `kmsg` or franz-go). A recorder
-runs it against `apache/kafka:4.0.0` (and Confluent SR 7.7.1 for the registry),
+runs it against `apache/kafka:4.3.1` (and Confluent SR 7.7.1 for the registry),
 normalises the nondeterministic parts (broker ids, topic ids, timestamps,
 producer ids, member ids), and writes `conformance/recordings/<scenario>.json`.
 A replay test runs the same script against doze-kafka and compares.
@@ -222,12 +222,14 @@ subprocess kill test for one acknowledged `acks=all` write.
 ### B6. Nothing absent in the API
 
 The version-matrix test checks every advertised API at its minimum, middle and
-maximum version. The inverse is missing: a list of every API in the Kafka 4.0
+maximum version. The inverse is missing: a list of every API in the Kafka 4.x
 protocol with its tier.
 
 **Done when.** `docs/api-support.md` has one row for every API key in the
-4.0 specification (about 90), with F, C or S, generated and checked by a test
-against the `kmsg` table; every S row has its reason.
+4.x specification as the protocol library has it (`internal/kmsg`, franz-go
+`kmsg` v1.13.1 patched, older than Kafka 4.3: keys 0 to 92, about 90), with F, C
+or S, generated and checked by a test against the `kmsg` table; every S row has
+its reason.
 
 ### B7. Settings tables the console can read
 

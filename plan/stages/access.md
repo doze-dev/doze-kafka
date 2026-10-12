@@ -222,7 +222,7 @@ Nothing on these boards is decorative-only: the "new" tags on Create, Checker, R
 
 **Fuzz.** `FuzzSASLPlain`, `FuzzSCRAMClientFirst`, `FuzzSCRAMClientFinal`, `FuzzACLFilterMatches` (against the reference model), `FuzzACLKey`.
 
-**Differential vs real Kafka.** The authorization matrix (R9) and the ACL API scenarios (R6, R7) recorded against `apache/kafka:4.0.0` configured with `StandardAuthorizer` (KRaft's authorizer; this is what 4.0 uses), replayed in Go with zero "answered differently".
+**Differential vs real Kafka.** The authorization matrix (R9) and the ACL API scenarios (R6, R7) recorded against `apache/kafka:4.3.1` configured with `StandardAuthorizer` (KRaft's authorizer; this is what Kafka 4.x in KRaft mode uses), replayed in Go with zero "answered differently".
 
 **e2e (Playwright).** Replace the single spec with: `access.spec.ts` list, grouping, filters, empty vs filtered-empty vs none stored; create ACL (keyboard `c`, `Cmd+Enter`, refusal states, preview equals the request); delete with confirm (Cancel focused; the sentence's list equals the requests refused afterwards, run by a real client); the checker (the four-step trace for allowed, denied by DENY, denied by no-allow, default); refusals page (a client refused produces a row within one poll); principals; the default page. Run with SASL on, under a console prefix, at 960 and 390 px, with the broker stopped.
 
@@ -230,7 +230,7 @@ Nothing on these boards is decorative-only: the "new" tags on Create, Checker, R
 
 ## 8. Recording queue
 
-All scenarios run against `apache/kafka:4.0.0` in KRaft mode with `authorizer.class.name=org.apache.kafka.metadata.authorizer.StandardAuthorizer`, `super.users=User:admin`, `allow.everyone.if.no.acl.found=false` (and `true` where noted), SASL/PLAIN and SCRAM listeners. Driven by franz-go or raw kmsg, normalised, stored under `conformance/recordings/`.
+All scenarios run against `apache/kafka:4.3.1` in KRaft mode with `authorizer.class.name=org.apache.kafka.metadata.authorizer.StandardAuthorizer`, `super.users=User:admin`, `allow.everyone.if.no.acl.found=false` (and `true` where noted), SASL/PLAIN and SCRAM listeners. Driven by franz-go or raw kmsg, normalised, stored under `conformance/recordings/`.
 
 | ID | Claim (currently `memory` or `doc`) | Scenario |
 |---|---|---|

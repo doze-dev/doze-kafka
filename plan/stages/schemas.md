@@ -262,7 +262,7 @@ Coverage targets (never below baseline): `schemaregistry` 88.4% to **92%**, with
 
 ## 8. Recording queue
 
-Each is a Docker scenario against `confluentinc/cp-schema-registry:7.7.1` (the method of `TestRecordConformance`, `SR_RECORD_URL=...`); only R-numbers marked "broker" need `apache/kafka:4.0.0`, and none do: this stage makes no claim about Kafka broker behaviour. Everything below is `memory` or `doc` until recorded.
+Each is a Docker scenario against `confluentinc/cp-schema-registry:7.7.1` (the method of `TestRecordConformance`, `SR_RECORD_URL=...`); only R-numbers marked "broker" need `apache/kafka:4.3.1`, and none do: this stage makes no claim about Kafka broker behaviour. Everything below is `memory` or `doc` until recorded.
 
 | # | Claim and scenario | Settles |
 |---|---|---|
