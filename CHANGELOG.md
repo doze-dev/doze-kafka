@@ -6,6 +6,10 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Console: a topic's message tape draws its own marks again (8 px, the recent ones
+  inked). The Traffic inspector's fold tick had the same class name and redrew them as
+  4 px of ink. The cards of the create forms are 12 px apart, as on the boards.
+
 - Console: a client flagged because most of its requests in five minutes were refused is
   told so ("was refused 3 of its 5 requests in the last five minutes"). The page said
   "has been refused 0 times in a row" whenever its latest request had gone well. A streak

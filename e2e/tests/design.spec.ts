@@ -940,3 +940,48 @@ test('Cl-Home: the compacted partitions are counted from the topics\' own cleanu
   await expect(panel.locator('.pill')).toHaveText(['single node', 'replication factor reported as 1', 'no leader election, no ISR', 'no KRaft, no ZooKeeper', 'not durable against disk loss']);
   await expect(panel.locator('a')).toHaveText('All limits');
 });
+
+// One name, one component. `.tick` was the message tape's mark (8 px, the input
+// colour, the recent ones inked) and, 700 lines later in the stylesheet, the fold
+// tick of the Traffic inspector (the boards' 3 px of ink); the later rule redrew the
+// tape as 4 px of ink at .55. Each is now its own rule, said by where it stands.
+// `.form-sec`, `.note` and `.panes` had a second definition each: what is held here
+// is the one that was meant.
+test('the message tape draws its own marks, which the inspector\'s fold ticks do not restyle', async ({ page }) => {
+  await useTheme(page, 'light');
+  await page.goto('topics/seed-orders?tab=messages');
+  const strip = page.locator('.tape-strip');
+  await expect(strip.locator('.tick').first()).toBeVisible();
+  // An older record's mark: the input colour (the line token), 8 px, rounded on top.
+  const old = strip.locator('.tick:not(.hot)').first();
+  await expect(old).toHaveCSS('width', '8px');
+  await expect(old).toHaveCSS('background-color', 'rgb(217, 216, 210)');
+  await expect(old).toHaveCSS('border-top-left-radius', '2px');
+  await expect(old).toHaveCSS('border-top-right-radius', '2px');
+  await expect(old).toHaveCSS('border-bottom-left-radius', '0px');
+  await expect(old).toHaveCSS('opacity', '0.55');
+  // The most recent are inked, and the newest is whole.
+  const hot = strip.locator('.tick.hot');
+  await expect(hot.first()).toHaveCSS('background-color', 'rgb(23, 25, 28)');
+  await expect(hot.first()).toHaveCSS('opacity', '0.8');
+  await expect(hot.first()).toHaveCSS('width', '8px');
+  await expect(hot.last()).toHaveCSS('background-color', 'rgb(23, 25, 28)');
+  await expect(hot.last()).toHaveCSS('opacity', '1');
+  // The page is the Sy-01 grid, and a note is the muted ink.
+  await expect(page.locator('.panes')).toHaveCSS('display', 'grid');
+  await expect(page.locator('.tape-foot').first()).toBeVisible();
+  await expect(page.locator('#wire-dock .dh .note')).toHaveCSS('color', 'rgb(86, 91, 99)');
+  await expect(page.locator('#wire-dock .dh .note')).toHaveCSS('font-size', '12px');
+});
+
+// Tp-02 stacks the form's cards 12 px apart.
+test('Tp-02: the create form\'s cards are 12 px apart', async ({ page }) => {
+  await page.goto('new/topic');
+  const cards = page.locator('#create-topic .form-sec');
+  await expect(cards.first()).toHaveCSS('margin-bottom', '12px');
+  const a = (await cards.nth(0).boundingBox())!;
+  const b = (await cards.nth(1).boundingBox())!;
+  expect(Math.round(b.y - (a.y + a.height))).toBe(12);
+  await page.goto('new/schema');
+  await expect(page.locator('form.form-page .form-sec').first()).toHaveCSS('margin-bottom', '12px');
+});

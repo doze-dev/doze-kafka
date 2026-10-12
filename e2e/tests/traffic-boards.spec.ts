@@ -170,6 +170,13 @@ test('Traf-05: a folded row says why it folded, draws a tick per repeat and unfo
   await expect(insp.locator('.kv > span:nth-child(odd)')).toContainText(['First', 'Last', 'Interval', 'Result']);
   await expect(insp.locator('#fold-ticks .cap')).toContainText('Each tick is one heartbeat');
   expect(await insp.locator('#fold-ticks i.tick').count()).toBeGreaterThanOrEqual(2);
+  // The board's tick: 3 px of ink, a 1 px corner (and not the message tape's mark).
+  const tick = insp.locator('#fold-ticks i.tick').first();
+  await expect(tick).toHaveCSS('width', '3px');
+  await expect(tick).toHaveCSS('border-top-left-radius', '1px');
+  await expect(tick).toHaveCSS('border-bottom-left-radius', '1px');
+  await expect(tick).toHaveCSS('background-color', 'rgb(23, 25, 28)');
+  await expect(tick).toHaveCSS('opacity', '1');
   await expect(insp).toContainText('Why it folded');
   await expect(insp).toContainText('Idle repeats fold; any change breaks the fold.');
   await expect(insp.locator('a.btn', { hasText: /^Unfold these \d+$/ })).toBeVisible();
