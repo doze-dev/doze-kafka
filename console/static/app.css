@@ -1262,17 +1262,23 @@ table.tbl tbody tr.errrow.failed td { background: var(--badbg); }
 .filter-note { white-space: normal; text-align: right; }
 @media (min-width: 641px) {
   #detail[data-traffic-view] .filterrow { flex-wrap: nowrap; }
-  /* A story's row holds the field, the kinds, the group's pill, "clear" and the count: one
-     row, as the board draws it. Beside the inspector (804 px) the field is what gives (it
-     shrinks to 96 px and ellipsises its text), the count wraps inside itself as the board's
-     does; the kinds, the pill, "clear" and the count are never cut. */
-  #detail[data-traffic-view] .filterrow.story { flex-wrap: nowrap; }
-  #detail[data-traffic-view] .filterrow.story > .grow { flex: 0 0 0; min-width: 0; }
+  /* A story's row holds the field, the kinds, the group's pill, "clear" and the count. Under
+     1400 the count wraps to a second row at the right rather than run off the edge; from
+     1400 (below) it is one row, as the board draws it. */
+  #detail[data-traffic-view] .filterrow.story { flex-wrap: wrap; }
+  #detail[data-traffic-view] .filterrow.story > .grow { flex: 1 1 0; min-width: 0; }
   #detail[data-traffic-view] .filterrow > *, #detail[data-traffic-view] .filterrow .inp, #detail[data-traffic-view] .filterrow .seg { flex: none; }
-  #detail[data-traffic-view] .filterrow.story .inp { flex: 1 1 96px; min-width: 96px; width: auto; max-width: 300px; text-overflow: ellipsis; }
-  #detail[data-traffic-view] .filterrow.story > #story-count { flex: 1 1 auto; min-width: 0; text-align: right; }
   #detail[data-traffic-view] .filterrow > .grow { flex: 1 1 0; min-width: 0; }
   #detail[data-traffic-view] .filterrow > .filter-note { flex: 0 1 auto; min-width: 0; }
+}
+@media (min-width: 1400px) {
+  /* Beside the 400 px inspector the card is 804 px: the field is what gives (it shrinks and
+     ellipsises its text), the count is 150 px and wraps in two lines as the board's does;
+     the kinds, the pill, "clear" and the count are never cut. */
+  #detail[data-traffic-view] .filterrow.story { flex-wrap: nowrap; }
+  #detail[data-traffic-view] .filterrow.story > .grow { flex: 0 0 0; }
+  #detail[data-traffic-view] .filterrow.story .inp { flex: 1 1 64px; min-width: 64px; width: auto; max-width: 300px; text-overflow: ellipsis; }
+  #detail[data-traffic-view] .filterrow.story > #story-count { flex: 0 0 150px; min-width: 0; text-align: right; }
 }
 .tf-cut { margin: 0 0 6px; }
 .tf-story .r.kid { color: var(--mut); }

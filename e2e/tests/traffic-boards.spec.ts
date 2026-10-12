@@ -706,7 +706,8 @@ test('Traf-12: the filter row is one row at 1440 beside the inspector; the pill,
   expect(m.count.right).toBeLessThanOrEqual(m.row.right + 1);
   expect(m.count.left).toBeGreaterThanOrEqual(m.clear.right - 1);
   expect(m.countCut).toBe(false);
-  expect(m.field.width).toBeGreaterThanOrEqual(96);
+  expect(m.field.width).toBeGreaterThanOrEqual(64);
+  expect(m.count.height, "the count wraps in at most two lines").toBeLessThanOrEqual(42);
 });
 
 test('Main: with the inspector open Took is whole and the card does not scroll sideways at 1180, 1280, 1366 and 1440', async ({ page }) => {
