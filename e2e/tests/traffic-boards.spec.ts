@@ -642,6 +642,10 @@ test('Main: the fold count is never cut, a long name gives way to it, and the ti
     await expect(longest).toHaveAttribute('title', /^GetTelemetrySubscriptions v\d+/);
     await expect(longest.locator('.req-n')).toHaveCSS('text-overflow', 'ellipsis');
   }
+  // The whole request name, its version too, is the board's 600 ("Produce v9"), the count is not.
+  const nameWeight = await folded.locator('.req-n .b').evaluate((e) => ({ w: getComputedStyle(e).fontWeight, t: e.textContent }));
+  expect(nameWeight.w).toBe('600');
+  expect(nameWeight.t).toMatch(/^\S+ v\d+$/);
   // The count is the board's plain 11 px tag, not a pill.
   const count = folded.locator('.tf-count');
   await expect(count).toHaveCSS('font-size', '11px');
@@ -682,5 +686,53 @@ test('Main: page padding is the board\'s 16 20 0 with the 10 px gap, whatever th
     const main = page.locator('main.main');
     await expect(main, path).toHaveCSS('padding', '16px 20px 0px');
     await expect(main, path).toHaveCSS('row-gap', '10px');
+  }
+});
+
+test('Traf-12: the filter row is one row at 1440 beside the inspector; the pill, clear and the count are never cut', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await lightTraffic(page, `traffic?group=${GROUP}`);
+  await expect(page.locator('#story-count')).toBeVisible({ timeout: 30_000 });
+  const m = await page.evaluate(() => {
+    const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+    const row = r('.filterrow'), field = r('.filterrow input[name=q]'), seg = r('.filterrow .seg'), pill = r('.filterrow .pill');
+    const clear = r('.filterrow a.b'), count = r('#story-count');
+    const cy = (b: DOMRect) => b.top + b.height / 2;
+    const count_el = document.querySelector('#story-count') as HTMLElement;
+    return { row, field, seg, pill, clear, count, ys: [cy(field), cy(seg), cy(pill), cy(clear)], countCut: count_el.scrollWidth > count_el.clientWidth };
+  });
+  const ys = m.ys;
+  expect(Math.max(...ys) - Math.min(...ys), JSON.stringify(m.ys)).toBeLessThanOrEqual(4);
+  expect(m.count.right).toBeLessThanOrEqual(m.row.right + 1);
+  expect(m.count.left).toBeGreaterThanOrEqual(m.clear.right - 1);
+  expect(m.countCut).toBe(false);
+  expect(m.field.width).toBeGreaterThanOrEqual(64);
+  expect(m.count.height, "the count wraps in at most two lines").toBeLessThanOrEqual(42);
+});
+
+test('Main: with the inspector open Took is whole and the card does not scroll sideways at 1180, 1280, 1366 and 1440', async ({ page }) => {
+  await lightTraffic(page);
+  for (const width of [1180, 1280, 1366, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('traffic');
+    const row = page.locator('#traffic-table tbody tr[id]').first();
+    await expect(row).toBeVisible({ timeout: 30_000 });
+    await row.click();
+    await expect(page.locator('#inspector')).toBeVisible();
+    const m = await page.evaluate(() => {
+      const t = document.querySelector('#traffic-table') as HTMLElement;
+      const wrap = t.closest('.tbl-wrap') as HTMLElement;
+      const took = t.querySelector('tbody td.cell-took') as HTMLElement;
+      const w = wrap.getBoundingClientRect(), k = took.getBoundingClientRect();
+      const heads = Array.from(t.querySelectorAll('thead th')).map((th) => Math.round(th.getBoundingClientRect().width));
+      return { scroll: wrap.scrollWidth, client: wrap.clientWidth, wrapRight: w.right, tookRight: k.right, tookCut: took.scrollWidth > took.clientWidth, doc: document.documentElement.scrollWidth - document.documentElement.clientWidth, heads };
+    });
+    expect(m.scroll, `${width}: ${JSON.stringify(m)}`).toBeLessThanOrEqual(m.client);
+    expect(m.tookRight, `${width}: ${JSON.stringify(m)}`).toBeLessThanOrEqual(m.wrapRight + 0.5);
+    expect(m.tookCut, `${width}`).toBe(false);
+    // Client and Topic keep room to read (the Detail column, not drawn under 1300, is what gave).
+    expect(m.heads[1], `${width}: ${JSON.stringify(m.heads)}`).toBeGreaterThanOrEqual(60);
+    expect(m.heads[3], `${width}: ${JSON.stringify(m.heads)}`).toBeGreaterThanOrEqual(60);
+    expect(m.doc, `${width}`).toBeLessThanOrEqual(0);
   }
 });
