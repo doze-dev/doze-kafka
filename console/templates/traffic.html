@@ -132,7 +132,7 @@
           hx-get="{{$.P}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
         <td class="m nw cell-time">{{when .Time "clockms"}}</td>
         <td class="m nw cell-client" title="{{.Remote}}{{if .Software}} · {{.Software}}{{end}}">{{if .ConnKey}}<a href="{{$.P}}/traffic?client={{.Who}}" data-inspector-open hx-get="{{$.P}}/inspect/client?key={{.ConnKey}}" hx-trigger="click consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false">{{.Who}}</a>{{else}}{{.Who}}{{end}}</td>
-        <td class="m nw cell-req" title="{{.API}} v{{.Version}}{{if .Correlation}} · correlation {{.Correlation}}{{end}}"><span class="req"><span class="req-n"><span class="b">{{.API}}</span> <span class="mut">v{{.Version}}</span></span>{{if .Folded}}<span class="tag tf-count" title="{{.Count}} identical requests, {{.SameSpan}}">×{{.Count}}</span>{{end}}</span></td>
+        <td class="m nw cell-req" title="{{.API}} v{{.Version}}{{if .Correlation}} · correlation {{.Correlation}}{{end}}"><span class="req"><span class="req-n"><span class="b">{{.API}} v{{.Version}}</span></span>{{if .Folded}}<span class="tag tf-count" title="{{.Count}} identical requests, {{.SameSpan}}">×{{.Count}}</span>{{end}}</span></td>
         <td class="m cell-topic"{{if .Target}} title="{{.Target}}"{{end}}>{{if .Target}}{{.Target}}{{else}}<span class="mut">—</span>{{end}}</td>
         <td class="mut cell-detail" title="{{if .Rhythm}}{{.Interval}}{{else}}{{.DetailText}}{{end}}">{{if .Rhythm}}{{.Interval}}, since {{when .First "clock"}}{{else if .DetailText}}{{.DetailText}}{{else}}—{{end}}</td>
         <td class="m cell-result"><span class="{{.Tone}}" title="{{.ResultTitle}}">{{wrapName .Result}}</span></td>
@@ -205,7 +205,7 @@
 {{define "story_row"}}{{with .R}}<div class="r {{if not .Nested}}kid{{end}} {{.RowClass}}" id="rq-{{.OpenKey}}" tabindex="0" data-inspector-open data-open-keys="request:{{.OpenKey}}" data-row hx-get="{{$.P}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
   <span class="m">{{if and .Folded (not .Nested)}}{{when .First "clock"}}{{else}}{{when .Time "clockms"}}{{end}}</span>
   <span class="m">{{if .Nested}}<span class="tree" aria-hidden="true">└─</span> {{end}}{{.Who}}</span>
-  <span class="m req" title="{{.API}} v{{.Version}}"><span class="req-n"><span class="b">{{.API}}</span> <span class="mut">v{{.Version}}</span></span>{{if .Folded}}<span class="tag tf-count" title="{{.Count}} identical requests">×{{.Count}}</span>{{end}}</span>
+  <span class="m req" title="{{.API}} v{{.Version}}"><span class="req-n"><span class="b">{{.API}} v{{.Version}}</span></span>{{if .Folded}}<span class="tag tf-count" title="{{.Count}} identical requests">×{{.Count}}</span>{{end}}</span>
   <span class="mut el" title="{{if .Rhythm}}{{.Interval}}{{else}}{{.DetailText}}{{end}}">{{if .Rhythm}}{{.Interval}}, since {{when .First "clock"}}{{else}}{{.DetailText}}{{if .ViaGroup}}{{if not .DetailText}}fetch by a member{{end}}{{end}}{{end}}</span>
   <span class="m cell-result {{.Tone}}" title="{{.ResultTitle}}">{{wrapName .Result}}</span>
   <span class="m ra">{{.Dur}}</span>

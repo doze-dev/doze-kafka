@@ -642,6 +642,10 @@ test('Main: the fold count is never cut, a long name gives way to it, and the ti
     await expect(longest).toHaveAttribute('title', /^GetTelemetrySubscriptions v\d+/);
     await expect(longest.locator('.req-n')).toHaveCSS('text-overflow', 'ellipsis');
   }
+  // The whole request name, its version too, is the board's 600 ("Produce v9"), the count is not.
+  const nameWeight = await folded.locator('.req-n .b').evaluate((e) => ({ w: getComputedStyle(e).fontWeight, t: e.textContent }));
+  expect(nameWeight.w).toBe('600');
+  expect(nameWeight.t).toMatch(/^\S+ v\d+$/);
   // The count is the board's plain 11 px tag, not a pill.
   const count = folded.locator('.tf-count');
   await expect(count).toHaveCSS('font-size', '11px');
