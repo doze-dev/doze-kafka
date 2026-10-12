@@ -12,7 +12,9 @@ package console
 import (
 	"fmt"
 	"hash/fnv"
+	"html/template"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -24,17 +26,21 @@ type DockFilter struct {
 
 func (f DockFilter) empty() bool { return f == DockFilter{} }
 
-// query is the filter as a query string, for the dock's own poll.
-func (f DockFilter) query() string {
+// values is the filter as query parameters: the dock's own poll and its link to the
+// Traffic page are both built from them, and each is written into the page as a
+// whole address. A query string interpolated after a "?" in a template is escaped a
+// second time ("topic%3dorders"), which the server reads as no filter at all.
+func (f DockFilter) values() url.Values {
+	v := url.Values{}
 	switch {
 	case f.Topic != "":
-		return "topic=" + queryEscape(f.Topic)
+		v.Set("topic", f.Topic)
 	case f.Group != "":
-		return "group=" + queryEscape(f.Group)
+		v.Set("group", f.Group)
 	case f.Subject != "":
-		return "subject=" + queryEscape(f.Subject)
+		v.Set("subject", f.Subject)
 	}
-	return ""
+	return v
 }
 
 // DockEvent is one row of a dock. Source says whose request it was: the Kafka
@@ -142,7 +148,13 @@ func (c *Console) dockSource() DockSource {
 // ends with it and for its poll, so they cannot disagree.
 func (c *Console) dockData(f DockFilter) map[string]any {
 	src := c.dockSource()
-	d := map[string]any{"Prefix": c.prefix, "DockFilter": f, "DockQuery": f.query(), "HasDock": src != nil}
+	d := map[string]any{"Prefix": c.prefix, "DockFilter": f, "HasDock": src != nil, "DockShown": dockRows}
+	d["DockLive"] = c.dockLiveURL(f, false)
+	// The Traffic page filters by topic and by group. It has no filter for a subject,
+	// so a subject's dock does not link there as if it had.
+	if f.Subject == "" {
+		d["DockTraffic"] = template.URL(c.prefix + "/traffic?" + f.values().Encode())
+	}
 	if src == nil {
 		return d
 	}
@@ -158,6 +170,16 @@ func (c *Console) dockData(f DockFilter) map[string]any {
 	return d
 }
 
+// dockLiveURL is the address the dock polls: its filter, and whether it carries the
+// pause control (a page with none of its own).
+func (c *Console) dockLiveURL(f DockFilter, toggle bool) template.URL {
+	v := f.values()
+	if toggle {
+		v.Set("t", "1")
+	}
+	return template.URL(c.prefix + "/dock?" + v.Encode())
+}
+
 // dockLive answers the dock's own poll: the same rows, or 204 when nothing moved.
 func (c *Console) dockLive(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
@@ -167,7 +189,9 @@ func (c *Console) dockLive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d := c.dockData(f)
-	d["DockToggle"] = q.Get("t") == "1"
+	if q.Get("t") == "1" {
+		d["DockToggle"], d["DockLive"] = true, c.dockLiveURL(f, true)
+	}
 	if !d["HasDock"].(bool) {
 		c.fail(w, r, fmt.Errorf("%w: there is no wire dock in this console", errNotFound))
 		return

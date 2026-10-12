@@ -39,6 +39,9 @@ func (f *fakeTraffic) find(flt TrafficFilter) []TrafficEvent {
 		if flt.Topic != "" && !slices.Contains(e.Topics, flt.Topic) {
 			continue
 		}
+		if flt.Group != "" && e.Group != flt.Group && e.ViaGroup != flt.Group {
+			continue
+		}
 		if flt.ErrorsOnly && (e.Class == "" || e.Class == "expected") && !(e.Error != "" && e.Class == "") {
 			continue
 		}

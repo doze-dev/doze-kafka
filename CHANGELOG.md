@@ -6,6 +6,12 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Console: the wire dock's "Traffic page" link lands on that topic's or group's requests
+  (it carried `topic%3dorders`, which is no filter, and showed everything). The Older,
+  Newer and Latest links of a topic's committed-only view keep the view; they wrote
+  `from=0%26committed%3d1`. A subject's dock no longer links to a Traffic page that has
+  no filter for a subject.
+
 - Console: every button reads weight 400 whether it is a button or a link drawn as one (the
   boards draw them all as buttons). A request that took under a millisecond shows its
   measured time (`42 µs`, `0.4 ms`) rather than the design boards' `0 ms`: a broker
