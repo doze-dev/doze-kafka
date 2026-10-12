@@ -185,7 +185,10 @@ avoids both.
 
 So is a setting that was read and then refused: `log-level = "verbose"` or an unknown
 SASL mechanism is quoted back in the error, from a flag or from the file, because the
-value is what is wrong with it. A password is never such a setting; a user's name is.
+value is what is wrong with it. A password is never such a setting. A user's name
+given with `--sasl-user` is (an empty password names the user); a name under
+`[credentials]` in the file is not, because a password typed where the name goes
+(`"s3cret" = ""`) is read as one: the file's error counts such users and names none.
 
 ## What's not here
 

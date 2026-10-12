@@ -150,3 +150,31 @@ func unwrapAll(err error) error {
 		err = u.Unwrap()
 	}
 }
+
+// A password typed where the user's name goes, with nothing after the equals sign
+// ("hunter2" = ""), parses: it is a user with an empty password. Validate names such a
+// user, which is right for --sasl-user and wrong for the file: the file's own check
+// comes first and names nobody.
+func TestAUserWithAnEmptyPasswordInTheFileIsNotNamed(t *testing.T) {
+	const p = "PLANTEDsecret-Zq7-93f1"
+	path := filepath.Join(t.TempDir(), "doze-kafka.toml")
+	if err := os.WriteFile(path, []byte("sasl-mechanisms = [\"PLAIN\"]\n[credentials]\nalice = \"x\"\n\""+p+"\" = \"\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Default()
+	err := LoadFile(path, &cfg)
+	if err == nil {
+		// Whatever LoadFile lets through, Validate is what a caller runs next.
+		err = cfg.Validate()
+	}
+	if err == nil {
+		t.Fatal("a user with an empty password was accepted")
+	}
+	if strings.Contains(err.Error(), p) || strings.Contains(err.Error(), p[:4]) {
+		t.Fatalf("the error repeats what was written where the user's name goes: %v", err)
+	}
+	want := "config: " + path + ": 1 user under [credentials] has an empty password (not named: a name there may be a password); what was written is not repeated, because this file can hold passwords"
+	if err.Error() != want {
+		t.Fatalf("the error is\n  %v\nwant\n  %s", err, want)
+	}
+}

@@ -89,6 +89,22 @@ func LoadFile(path string, cfg *Config) error {
 		}
 		return fmt.Errorf("config: %s: unknown key(s): %s", path, unknownKeys(keys))
 	}
+	// A user with an empty password is refused by Validate, which names the user. Here
+	// the name may be a password typed in the wrong place ("hunter2" = ""), so the file
+	// refuses it first and names nobody.
+	empty := 0
+	for _, pass := range fc.Credentials {
+		if pass == "" {
+			empty++
+		}
+	}
+	if empty > 0 {
+		noun := "user under [credentials] has"
+		if empty > 1 {
+			noun = "users under [credentials] have"
+		}
+		return fmt.Errorf("config: %s: %d %s an empty password (not named: a name there may be a password)%s", path, empty, noun, notRepeated)
+	}
 	if err := fc.applyTo(cfg); err != nil {
 		return fmt.Errorf("config: %s: %w", path, err)
 	}
