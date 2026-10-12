@@ -225,6 +225,12 @@ func newFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
+	// Read now, before anything is opened, so that nothing below the broker can
+	// fail: it starts a goroutine of its own.
+	tlsCfg, err := cfg.TLSConfig()
+	if err != nil {
+		return nil, err
+	}
 	// bbolt creates the file but not its directory, and the log manager creates
 	// the data dir only after the metadata store is open — so a fresh data dir
 	// failed with "no such file or directory", including the example in this
@@ -234,6 +240,20 @@ func newFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 			return nil, fmt.Errorf("create %s: %w", dir, err)
 		}
 	}
+	// Whatever is opened below is closed again, newest first, if a later step
+	// fails. (The lock on the data directory used to be kept by a failure after the
+	// log manager opened, so the directory stayed "in use" for the life of the
+	// process.)
+	var opened []func()
+	built := false
+	defer func() {
+		if built {
+			return
+		}
+		for i := len(opened) - 1; i >= 0; i-- {
+			opened[i]()
+		}
+	}()
 	// One broker per data directory. The metadata database is locked by whoever
 	// opens it, but it can live elsewhere (--meta-db), and two brokers with
 	// different databases over one data directory would write the same log files.
@@ -241,17 +261,16 @@ func newFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	opened = append(opened, func() { dirLock.Close() })
 	metaStore, err := meta.Open(cfg.MetaDB)
 	if err != nil {
-		dirLock.Close()
 		return nil, err
 	}
+	opened = append(opened, func() { metaStore.Close() })
 	// Topics with a segment size or retention of their own, in place before the
 	// log manager's first retention sweep.
 	registered, err := metaStore.ListTopics()
 	if err != nil {
-		metaStore.Close()
-		dirLock.Close()
 		return nil, err
 	}
 	topicConfigs := make(map[string]map[string]string, len(registered))
@@ -267,34 +286,22 @@ func newFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		Logger:             logger,
 	})
 	if err != nil {
-		metaStore.Close()
-		dirLock.Close()
 		return nil, err
 	}
-	if err := reconcileDisk(cfg, logger, logs, metaStore); err != nil {
-		logs.Close()
-		metaStore.Close()
-		return nil, err
-	}
+	opened = append(opened, func() { logs.Close() })
+	reconcileDisk(cfg, logger, logs, registered)
 	b, err := broker.New(cfg, logger, logs, metaStore)
 	if err != nil {
-		logs.Close()
-		metaStore.Close()
 		return nil, err
 	}
+	opened = append(opened, b.Stop)
 	router := protocol.NewRouter()
 	b.Register(router)
 	b.AnnounceACLs()
 	b.RecoverTransactions() // finish what a stop left half done, before anyone connects.
 
 	srv := protocol.NewServer(cfg.ListenAddr, router, logger)
-	if cfg.TLSEnabled() {
-		tlsCfg, err := cfg.TLSConfig()
-		if err != nil {
-			logs.Close()
-			metaStore.Close()
-			return nil, err
-		}
+	if tlsCfg != nil {
 		srv.UseTLS(tlsCfg)
 	}
 	if cfg.AuthEnabled() {
@@ -308,6 +315,7 @@ func newFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		srv.SetObserver(rec)
 		b.SetGroupEvents(rec)
 	}
+	built = true
 	return &Server{cfg: cfg, log: logger, meta: metaStore, logs: logs, srv: srv, b: b, rec: rec, tls: cfg.TLSEnabled(), dirLock: dirLock, ready: make(chan struct{})}, nil
 }
 
@@ -319,11 +327,7 @@ func newFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 // touched: they are what is left when the metadata database was lost or the broker
 // was pointed at a different one, and saying nothing made that look like an empty
 // broker.
-func reconcileDisk(cfg config.Config, logger *slog.Logger, logs *log.Manager, store meta.Store) error {
-	topics, err := store.ListTopics()
-	if err != nil {
-		return err
-	}
+func reconcileDisk(cfg config.Config, logger *slog.Logger, logs *log.Manager, topics []meta.Topic) {
 	counts := make(map[string]int32, len(topics))
 	for _, t := range topics {
 		counts[t.Name] = t.Partitions
@@ -341,7 +345,6 @@ func reconcileDisk(cfg config.Config, logger *slog.Logger, logs *log.Manager, st
 			"if the database was moved, point at it with --meta-db (the data is left untouched until a topic of the same name is created)",
 			"data_dir", cfg.DataDir, "meta_db", cfg.MetaDB, "directories", len(stray), "examples", strings.Join(sample, ", "))
 	}
-	return nil
 }
 
 // Bind opens the TCP listener without accepting and returns the bound address
