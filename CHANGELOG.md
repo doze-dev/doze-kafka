@@ -6,6 +6,19 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- API versions: no `--kafka-version` profile offers a version the real broker of that
+  major does not serve. At the default, `--kafka-version 4`, nine old versions that
+  Kafka 4 removed (KIP-896) are no longer served: ListOffsets v0, OffsetCommit v0–1,
+  OffsetFetch v0, CreateTopics v0–1, DeleteTopics v0, DescribeAcls, CreateAcls and
+  DeleteAcls v0, DescribeConfigs v0. A request at one closes the connection, as on
+  `apache/kafka:4.3.1` (recorded: `versions-not-served`). A client that old works at
+  `--kafka-version 3`, as it does against a Kafka 3 broker. At `--kafka-version 1`,
+  six maxima come down to what Kafka 1.1.1 has (Metadata v5, FindCoordinator v1,
+  ListGroups v1, InitProducerId v0, SaslAuthenticate v0, DeleteGroups v0). Every
+  column of the version table is now held by a test to the recorded `ApiVersions`
+  answer of a real broker of that major (`conformance/recordings/api-versions.json`;
+  `docs/api-support.md` says which image stands for which).
+
 - **Security: SASL.** A connection logs in once, as the user whose password it proved,
   and stays that user. Before this (a) a PLAIN token naming another user as its
   authorization id (`bob NUL alice NUL alice's password`) was accepted, where Kafka

@@ -1,0 +1,1443 @@
+{
+  "note": "ApiVersions v0 of a real broker of each Kafka major, on the client listener of a single node with nothing configured (conformance/apiversions_test.go says which image stands for which major and why). SaslHandshake and SaslAuthenticate are listed whether or not SASL is on.",
+  "brokers": [
+    {
+      "major": 1,
+      "image": "confluentinc/cp-kafka:4.1.4",
+      "jar": "kafka_2.11-1.1.1-cp4.jar",
+      "apis": [
+        {
+          "key": 0,
+          "name": "Produce",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 1,
+          "name": "Fetch",
+          "min": 0,
+          "max": 7
+        },
+        {
+          "key": 2,
+          "name": "ListOffsets",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 3,
+          "name": "Metadata",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 4,
+          "name": "LeaderAndISR",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 5,
+          "name": "StopReplica",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 6,
+          "name": "UpdateMetadata",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 7,
+          "name": "ControlledShutdown",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 8,
+          "name": "OffsetCommit",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 9,
+          "name": "OffsetFetch",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 10,
+          "name": "FindCoordinator",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 11,
+          "name": "JoinGroup",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 12,
+          "name": "Heartbeat",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 13,
+          "name": "LeaveGroup",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 14,
+          "name": "SyncGroup",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 15,
+          "name": "DescribeGroups",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 16,
+          "name": "ListGroups",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 17,
+          "name": "SASLHandshake",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 18,
+          "name": "ApiVersions",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 19,
+          "name": "CreateTopics",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 20,
+          "name": "DeleteTopics",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 21,
+          "name": "DeleteRecords",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 22,
+          "name": "InitProducerID",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 23,
+          "name": "OffsetForLeaderEpoch",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 24,
+          "name": "AddPartitionsToTxn",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 25,
+          "name": "AddOffsetsToTxn",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 26,
+          "name": "EndTxn",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 27,
+          "name": "WriteTxnMarkers",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 28,
+          "name": "TxnOffsetCommit",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 29,
+          "name": "DescribeACLs",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 30,
+          "name": "CreateACLs",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 31,
+          "name": "DeleteACLs",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 32,
+          "name": "DescribeConfigs",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 33,
+          "name": "AlterConfigs",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 34,
+          "name": "AlterReplicaLogDirs",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 35,
+          "name": "DescribeLogDirs",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 36,
+          "name": "SASLAuthenticate",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 37,
+          "name": "CreatePartitions",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 38,
+          "name": "CreateDelegationToken",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 39,
+          "name": "RenewDelegationToken",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 40,
+          "name": "ExpireDelegationToken",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 41,
+          "name": "DescribeDelegationToken",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 42,
+          "name": "DeleteGroups",
+          "min": 0,
+          "max": 0
+        }
+      ]
+    },
+    {
+      "major": 2,
+      "image": "confluentinc/cp-kafka:6.2.15",
+      "jar": "kafka_2.13-6.2.15-ccs.jar",
+      "apis": [
+        {
+          "key": 0,
+          "name": "Produce",
+          "min": 0,
+          "max": 9
+        },
+        {
+          "key": 1,
+          "name": "Fetch",
+          "min": 0,
+          "max": 12
+        },
+        {
+          "key": 2,
+          "name": "ListOffsets",
+          "min": 0,
+          "max": 6
+        },
+        {
+          "key": 3,
+          "name": "Metadata",
+          "min": 0,
+          "max": 11
+        },
+        {
+          "key": 4,
+          "name": "LeaderAndISR",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 5,
+          "name": "StopReplica",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 6,
+          "name": "UpdateMetadata",
+          "min": 0,
+          "max": 7
+        },
+        {
+          "key": 7,
+          "name": "ControlledShutdown",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 8,
+          "name": "OffsetCommit",
+          "min": 0,
+          "max": 8
+        },
+        {
+          "key": 9,
+          "name": "OffsetFetch",
+          "min": 0,
+          "max": 7
+        },
+        {
+          "key": 10,
+          "name": "FindCoordinator",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 11,
+          "name": "JoinGroup",
+          "min": 0,
+          "max": 7
+        },
+        {
+          "key": 12,
+          "name": "Heartbeat",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 13,
+          "name": "LeaveGroup",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 14,
+          "name": "SyncGroup",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 15,
+          "name": "DescribeGroups",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 16,
+          "name": "ListGroups",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 17,
+          "name": "SASLHandshake",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 18,
+          "name": "ApiVersions",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 19,
+          "name": "CreateTopics",
+          "min": 0,
+          "max": 7
+        },
+        {
+          "key": 20,
+          "name": "DeleteTopics",
+          "min": 0,
+          "max": 6
+        },
+        {
+          "key": 21,
+          "name": "DeleteRecords",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 22,
+          "name": "InitProducerID",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 23,
+          "name": "OffsetForLeaderEpoch",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 24,
+          "name": "AddPartitionsToTxn",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 25,
+          "name": "AddOffsetsToTxn",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 26,
+          "name": "EndTxn",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 27,
+          "name": "WriteTxnMarkers",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 28,
+          "name": "TxnOffsetCommit",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 29,
+          "name": "DescribeACLs",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 30,
+          "name": "CreateACLs",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 31,
+          "name": "DeleteACLs",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 32,
+          "name": "DescribeConfigs",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 33,
+          "name": "AlterConfigs",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 34,
+          "name": "AlterReplicaLogDirs",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 35,
+          "name": "DescribeLogDirs",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 36,
+          "name": "SASLAuthenticate",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 37,
+          "name": "CreatePartitions",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 38,
+          "name": "CreateDelegationToken",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 39,
+          "name": "RenewDelegationToken",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 40,
+          "name": "ExpireDelegationToken",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 41,
+          "name": "DescribeDelegationToken",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 42,
+          "name": "DeleteGroups",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 43,
+          "name": "ElectLeaders",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 44,
+          "name": "IncrementalAlterConfigs",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 45,
+          "name": "AlterPartitionAssignments",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 46,
+          "name": "ListPartitionReassignments",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 47,
+          "name": "OffsetDelete",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 48,
+          "name": "DescribeClientQuotas",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 49,
+          "name": "AlterClientQuotas",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 50,
+          "name": "DescribeUserSCRAMCredentials",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 51,
+          "name": "AlterUserSCRAMCredentials",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 56,
+          "name": "AlterPartition",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 57,
+          "name": "UpdateFeatures",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 60,
+          "name": "DescribeCluster",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 61,
+          "name": "DescribeProducers",
+          "min": 0,
+          "max": 0
+        }
+      ]
+    },
+    {
+      "major": 3,
+      "image": "apache/kafka:3.9.1",
+      "jar": "kafka_2.13-3.9.1.jar",
+      "apis": [
+        {
+          "key": 0,
+          "name": "Produce",
+          "min": 0,
+          "max": 11
+        },
+        {
+          "key": 1,
+          "name": "Fetch",
+          "min": 0,
+          "max": 17
+        },
+        {
+          "key": 2,
+          "name": "ListOffsets",
+          "min": 0,
+          "max": 9
+        },
+        {
+          "key": 3,
+          "name": "Metadata",
+          "min": 0,
+          "max": 12
+        },
+        {
+          "key": 8,
+          "name": "OffsetCommit",
+          "min": 0,
+          "max": 9
+        },
+        {
+          "key": 9,
+          "name": "OffsetFetch",
+          "min": 0,
+          "max": 9
+        },
+        {
+          "key": 10,
+          "name": "FindCoordinator",
+          "min": 0,
+          "max": 6
+        },
+        {
+          "key": 11,
+          "name": "JoinGroup",
+          "min": 0,
+          "max": 9
+        },
+        {
+          "key": 12,
+          "name": "Heartbeat",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 13,
+          "name": "LeaveGroup",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 14,
+          "name": "SyncGroup",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 15,
+          "name": "DescribeGroups",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 16,
+          "name": "ListGroups",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 17,
+          "name": "SASLHandshake",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 18,
+          "name": "ApiVersions",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 19,
+          "name": "CreateTopics",
+          "min": 0,
+          "max": 7
+        },
+        {
+          "key": 20,
+          "name": "DeleteTopics",
+          "min": 0,
+          "max": 6
+        },
+        {
+          "key": 21,
+          "name": "DeleteRecords",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 22,
+          "name": "InitProducerID",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 23,
+          "name": "OffsetForLeaderEpoch",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 24,
+          "name": "AddPartitionsToTxn",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 25,
+          "name": "AddOffsetsToTxn",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 26,
+          "name": "EndTxn",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 27,
+          "name": "WriteTxnMarkers",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 28,
+          "name": "TxnOffsetCommit",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 29,
+          "name": "DescribeACLs",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 30,
+          "name": "CreateACLs",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 31,
+          "name": "DeleteACLs",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 32,
+          "name": "DescribeConfigs",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 33,
+          "name": "AlterConfigs",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 34,
+          "name": "AlterReplicaLogDirs",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 35,
+          "name": "DescribeLogDirs",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 36,
+          "name": "SASLAuthenticate",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 37,
+          "name": "CreatePartitions",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 38,
+          "name": "CreateDelegationToken",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 39,
+          "name": "RenewDelegationToken",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 40,
+          "name": "ExpireDelegationToken",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 41,
+          "name": "DescribeDelegationToken",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 42,
+          "name": "DeleteGroups",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 43,
+          "name": "ElectLeaders",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 44,
+          "name": "IncrementalAlterConfigs",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 45,
+          "name": "AlterPartitionAssignments",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 46,
+          "name": "ListPartitionReassignments",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 47,
+          "name": "OffsetDelete",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 48,
+          "name": "DescribeClientQuotas",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 49,
+          "name": "AlterClientQuotas",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 50,
+          "name": "DescribeUserSCRAMCredentials",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 51,
+          "name": "AlterUserSCRAMCredentials",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 55,
+          "name": "DescribeQuorum",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 57,
+          "name": "UpdateFeatures",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 60,
+          "name": "DescribeCluster",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 61,
+          "name": "DescribeProducers",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 64,
+          "name": "UnregisterBroker",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 65,
+          "name": "DescribeTransactions",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 66,
+          "name": "ListTransactions",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 68,
+          "name": "ConsumerGroupHeartbeat",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 69,
+          "name": "ConsumerGroupDescribe",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 74,
+          "name": "ListConfigResources",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 75,
+          "name": "DescribeTopicPartitions",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 80,
+          "name": "AddRaftVoter",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 81,
+          "name": "RemoveRaftVoter",
+          "min": 0,
+          "max": 0
+        }
+      ]
+    },
+    {
+      "major": 4,
+      "image": "apache/kafka:4.3.1",
+      "jar": "kafka_2.13-4.3.1.jar",
+      "apis": [
+        {
+          "key": 0,
+          "name": "Produce",
+          "min": 0,
+          "max": 13
+        },
+        {
+          "key": 1,
+          "name": "Fetch",
+          "min": 4,
+          "max": 18
+        },
+        {
+          "key": 2,
+          "name": "ListOffsets",
+          "min": 1,
+          "max": 11
+        },
+        {
+          "key": 3,
+          "name": "Metadata",
+          "min": 0,
+          "max": 13
+        },
+        {
+          "key": 8,
+          "name": "OffsetCommit",
+          "min": 2,
+          "max": 10
+        },
+        {
+          "key": 9,
+          "name": "OffsetFetch",
+          "min": 1,
+          "max": 10
+        },
+        {
+          "key": 10,
+          "name": "FindCoordinator",
+          "min": 0,
+          "max": 6
+        },
+        {
+          "key": 11,
+          "name": "JoinGroup",
+          "min": 0,
+          "max": 9
+        },
+        {
+          "key": 12,
+          "name": "Heartbeat",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 13,
+          "name": "LeaveGroup",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 14,
+          "name": "SyncGroup",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 15,
+          "name": "DescribeGroups",
+          "min": 0,
+          "max": 6
+        },
+        {
+          "key": 16,
+          "name": "ListGroups",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 17,
+          "name": "SASLHandshake",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 18,
+          "name": "ApiVersions",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 19,
+          "name": "CreateTopics",
+          "min": 2,
+          "max": 7
+        },
+        {
+          "key": 20,
+          "name": "DeleteTopics",
+          "min": 1,
+          "max": 6
+        },
+        {
+          "key": 21,
+          "name": "DeleteRecords",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 22,
+          "name": "InitProducerID",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 23,
+          "name": "OffsetForLeaderEpoch",
+          "min": 2,
+          "max": 4
+        },
+        {
+          "key": 24,
+          "name": "AddPartitionsToTxn",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 25,
+          "name": "AddOffsetsToTxn",
+          "min": 0,
+          "max": 4
+        },
+        {
+          "key": 26,
+          "name": "EndTxn",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 27,
+          "name": "WriteTxnMarkers",
+          "min": 1,
+          "max": 2
+        },
+        {
+          "key": 28,
+          "name": "TxnOffsetCommit",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "key": 29,
+          "name": "DescribeACLs",
+          "min": 1,
+          "max": 3
+        },
+        {
+          "key": 30,
+          "name": "CreateACLs",
+          "min": 1,
+          "max": 3
+        },
+        {
+          "key": 31,
+          "name": "DeleteACLs",
+          "min": 1,
+          "max": 3
+        },
+        {
+          "key": 32,
+          "name": "DescribeConfigs",
+          "min": 1,
+          "max": 4
+        },
+        {
+          "key": 33,
+          "name": "AlterConfigs",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 34,
+          "name": "AlterReplicaLogDirs",
+          "min": 1,
+          "max": 2
+        },
+        {
+          "key": 35,
+          "name": "DescribeLogDirs",
+          "min": 1,
+          "max": 5
+        },
+        {
+          "key": 36,
+          "name": "SASLAuthenticate",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 37,
+          "name": "CreatePartitions",
+          "min": 0,
+          "max": 3
+        },
+        {
+          "key": 38,
+          "name": "CreateDelegationToken",
+          "min": 1,
+          "max": 3
+        },
+        {
+          "key": 39,
+          "name": "RenewDelegationToken",
+          "min": 1,
+          "max": 2
+        },
+        {
+          "key": 40,
+          "name": "ExpireDelegationToken",
+          "min": 1,
+          "max": 2
+        },
+        {
+          "key": 41,
+          "name": "DescribeDelegationToken",
+          "min": 1,
+          "max": 3
+        },
+        {
+          "key": 42,
+          "name": "DeleteGroups",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 43,
+          "name": "ElectLeaders",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 44,
+          "name": "IncrementalAlterConfigs",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 45,
+          "name": "AlterPartitionAssignments",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 46,
+          "name": "ListPartitionReassignments",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 47,
+          "name": "OffsetDelete",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 48,
+          "name": "DescribeClientQuotas",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 49,
+          "name": "AlterClientQuotas",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 50,
+          "name": "DescribeUserSCRAMCredentials",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 51,
+          "name": "AlterUserSCRAMCredentials",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 55,
+          "name": "DescribeQuorum",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 57,
+          "name": "UpdateFeatures",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 60,
+          "name": "DescribeCluster",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 61,
+          "name": "DescribeProducers",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 64,
+          "name": "UnregisterBroker",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 65,
+          "name": "DescribeTransactions",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 66,
+          "name": "ListTransactions",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": 68,
+          "name": "ConsumerGroupHeartbeat",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 69,
+          "name": "ConsumerGroupDescribe",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 74,
+          "name": "ListConfigResources",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 75,
+          "name": "DescribeTopicPartitions",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 76,
+          "name": "ShareGroupHeartbeat",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "key": 77,
+          "name": "ShareGroupDescribe",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "key": 78,
+          "name": "ShareFetch",
+          "min": 1,
+          "max": 2
+        },
+        {
+          "key": 79,
+          "name": "ShareAcknowledge",
+          "min": 1,
+          "max": 2
+        },
+        {
+          "key": 80,
+          "name": "AddRaftVoter",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 81,
+          "name": "RemoveRaftVoter",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 83,
+          "name": "InitializeShareGroupState",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 84,
+          "name": "ReadShareGroupState",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 85,
+          "name": "WriteShareGroupState",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 86,
+          "name": "DeleteShareGroupState",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 87,
+          "name": "ReadShareGroupStateSummary",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 88,
+          "name": "StreamsGroupHeartbeat",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 89,
+          "name": "StreamsGroupDescribe",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 90,
+          "name": "DescribeShareGroupOffsets",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "key": 91,
+          "name": "AlterShareGroupOffsets",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "key": 92,
+          "name": "DeleteShareGroupOffsets",
+          "min": 0,
+          "max": 0
+        }
+      ]
+    }
+  ]
+}
