@@ -743,3 +743,128 @@ test('Main: with the inspector open Took is whole and the card does not scroll s
     expect(m.doc, `${width}`).toBeLessThanOrEqual(0);
   }
 });
+
+// Sy-06, on Traffic: with the key sheet open, the page's keys are off. p used to pause
+// the tail behind the sheet, e switched to errors only, u unfolded the open row, m
+// opened all of a client's metrics, c copied the open request and r retried. Each key
+// is pressed behind the sheet (nothing happens), then again with it closed (it acts),
+// so the test is not one that passes because the key had nothing to act on.
+async function countKeyClicks(page: Page) {
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__keyClicks = [];
+    document.addEventListener('click', (e) => {
+      for (const sel of ['data-unfold', 'data-all-metrics', 'data-copy-decoded', 'data-retry']) {
+        if ((e.target as Element).closest(`[${sel}]`)) w.__keyClicks.push(sel);
+      }
+    }, true);
+  });
+}
+const keyClicks = (page: Page) => page.evaluate(() => (window as any).__keyClicks as string[]);
+
+async function sheet(page: Page) {
+  await page.keyboard.press('?');
+  await expect(page.locator('#help')).toBeVisible();
+}
+
+test('Sy-06: behind the key sheet Traffic ignores p, e, r, j and k', async ({ page }) => {
+  await lightTraffic(page);
+  await expect(page.locator('#traffic-table tbody tr').first()).toBeVisible();
+  await countKeyClicks(page);
+  const toggle = page.locator('[data-live-toggle]').first();
+  await page.locator('main h1').click();
+  // r is Retry now while the broker is lost; say it is, as the shell does.
+  await page.evaluate(() => document.documentElement.setAttribute('data-connection-lost', ''));
+  await sheet(page);
+  for (const k of ['p', 'e', 'r', 'j', 'k', 'u', 'm', 'c']) {
+    await page.keyboard.press(k);
+    await page.waitForTimeout(250);
+    await expect(page.locator('#help'), `after ${k}`).toBeVisible();
+    await expect(toggle, `after ${k}`).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('html'), `after ${k}`).not.toHaveAttribute('data-paused', '');
+    await expect(page, `after ${k}`).not.toHaveURL(/kind=errors/);
+    await expect(page.locator('.cursor'), `after ${k}`).toHaveCount(0);
+    expect(await keyClicks(page), `after ${k}`).toEqual([]);
+  }
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#help')).toBeHidden();
+  // With the sheet closed each of them acts.
+  await page.keyboard.press('r');
+  expect(await keyClicks(page)).toEqual(['data-retry']);
+  await page.evaluate(() => document.documentElement.removeAttribute('data-connection-lost'));
+  await page.keyboard.press('p');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('p');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press('j');
+  await expect(page.locator('tr.cursor')).toHaveCount(1);
+  await page.keyboard.press('e');
+  await expect(page).toHaveURL(/kind=errors/);
+});
+
+test('Sy-06: behind the key sheet u does not unfold, m does not open the metrics and c does not copy', async ({ page }) => {
+  // u: a folded row is open.
+  await lightTraffic(page, `traffic?q=${GROUP}&kind=groups`);
+  const folded = page.locator('#traffic-table tbody tr', { hasText: 'Heartbeat' }).filter({ hasText: /×\d+/ }).first();
+  await expect(folded).toBeVisible({ timeout: 20_000 });
+  await folded.click();
+  const insp = page.locator('#inspector');
+  await expect(insp.locator('[data-unfold]')).toBeVisible();
+  await countKeyClicks(page);
+  await sheet(page);
+  await page.keyboard.press('u');
+  await page.waitForTimeout(400);
+  await expect(page.locator('#help')).toBeVisible();
+  expect(await keyClicks(page)).toEqual([]);
+  await expect(insp.locator('#unfolded')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#help')).toBeHidden();
+  await expect(insp.locator('[data-unfold]')).toBeVisible(); // esc closed the sheet, not the panel.
+  await page.keyboard.press('u');
+  await expect(insp.locator('#unfolded')).toBeVisible();
+
+  // c: a request is open, with its decoded fields.
+  await page.goto('traffic?kind=produce&topic=seed-orders');
+  await page.locator('#traffic-table tbody tr', { hasText: 'Produce' }).first().click();
+  await expect(insp.locator('[data-copy-decoded]')).toBeVisible();
+  await countKeyClicks(page);
+  await sheet(page);
+  await page.keyboard.press('c');
+  await page.waitForTimeout(400);
+  await expect(page.locator('#help')).toBeVisible();
+  expect(await keyClicks(page)).toEqual([]);
+  await expect(page).toHaveURL(/\/traffic\?kind=produce&topic=seed-orders&open=request/); // not the create form.
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('c');
+  expect(await keyClicks(page)).toEqual(['data-copy-decoded']);
+
+  // m: a client that reports more metrics than the panel lists is open (the two
+  // clients above report three; this one reports eleven).
+  await holdOne('trf-many', 'trf-many-group', { HOLD_TELEMETRY: 'many' });
+  await page.goto('traffic?view=clients');
+  const rows = page.locator('#clients-table tbody tr', { hasText: 'trf-many' });
+  await expect(rows.first()).toBeVisible();
+  const more = insp.locator('[data-all-metrics]');
+  await expect.poll(async () => {
+    const n = await rows.count();
+    for (let i = 0; i < n; i++) {
+      await page.keyboard.press('Escape');
+      await rows.nth(i).click();
+      await expect(page.locator('#client-inspector')).toBeVisible();
+      if (await more.count()) return true;
+    }
+    return false;
+  }, { timeout: 30_000, intervals: [1_000] }).toBe(true);
+  await countKeyClicks(page);
+  await sheet(page);
+  await page.keyboard.press('m');
+  await page.waitForTimeout(400);
+  await expect(page.locator('#help')).toBeVisible();
+  expect(await keyClicks(page)).toEqual([]);
+  await expect(more).toHaveText('All 11 metrics');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('m');
+  expect(await keyClicks(page)).toEqual(['data-all-metrics']);
+  await expect(more).toHaveCount(0);
+  await expect(page.locator('#client-inspector .metric-list.rest')).toContainText('consumer.records.lag.max');
+});

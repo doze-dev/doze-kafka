@@ -6,6 +6,10 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Console: with the list of keys (`?`) open, the page's keys are off. They used to act
+  on the page behind it: `p` paused the live view, `j` and `k` moved the cursor, `c`
+  and the `g` chords left the page.
+
 - Console: a topic's message tape draws its own marks again (8 px, the recent ones
   inked). The Traffic inspector's fold tick had the same class name and redrew them as
   4 px of ink. The cards of the create forms are 12 px apart, as on the boards.

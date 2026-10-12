@@ -217,7 +217,9 @@ matter on the page you are on.
 | `Esc` | Close a dialog or the inspector, or clear the filter |
 
 Single keys act only when you are not typing in a field, with no modifier held, and
-no dialog open.
+no dialog open. The list of keys is a dialog too: while it is open only `Esc` and `?`
+(close it), `Tab` and `⌘K` (the palette instead) do anything. The inspector is not a
+dialog; it is part of the page, and the page's keys work beside it.
 
 ## The palette
 
