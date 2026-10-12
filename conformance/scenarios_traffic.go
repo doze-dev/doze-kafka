@@ -739,21 +739,76 @@ func produceMixedPartitionErrors(e *Env) {
 			p.Partition, p.Records = pt.p, pt.data
 			r.Topics[i].Partitions = append(r.Topics[i].Partitions, p)
 		}
-		// A partition that has just been created is not led for a moment (6).
-		e.DoUntil(label, r, 9, func(resp kmsg.Response) bool {
-			for _, t := range resp.(*kmsg.ProduceResponse).Topics {
+		// Sent once, never again: this Produce is not idempotent, and one that is
+		// repeated because one partition was not led yet (6) is appended a second
+		// time to the partitions that were. The partitions are led before the
+		// first request (awaitPartitionLeaders); a 6 here is a broken run.
+		resp := e.Do(label, r, 9)
+		if pr, ok := resp.(*kmsg.ProduceResponse); ok {
+			for _, t := range pr.Topics {
 				for _, p := range t.Partitions {
 					if p.ErrorCode == 6 {
-						return false
+						e.fail("%s: %s/%d answered NOT_LEADER_OR_FOLLOWER after its leader was waited for", label, t.Topic, p.Partition)
 					}
 				}
 			}
-			return true
-		})
+		}
 	}
+	awaitPartitionLeaders(e, map[string]int32{"pm-a": 2, "pm-b": 1})
 	produce("all-ok", part{"pm-a", 0, ok}, part{"pm-a", 1, ok})
 	produce("unknown-partition-then-too-large", part{"pm-a", 0, ok}, part{"pm-a", 7, ok}, part{"pm-b", 0, big})
 	produce("too-large-then-unknown-partition", part{"pm-b", 0, big}, part{"pm-a", 7, ok}, part{"pm-a", 0, ok})
 	produce("unknown-topic-first", part{"pm-nosuch", 0, ok}, part{"pm-b", 0, big}, part{"pm-a", 0, corrupt})
 	produce("corrupt-first", part{"pm-a", 0, corrupt}, part{"pm-nosuch", 0, ok}, part{"pm-b", 0, big})
+}
+
+// awaitPartitionLeaders returns once the broker serves every partition of the
+// topics (name to partition count) as their leader. A partition that has just
+// been created is not led for a moment: Apache Kafka answers
+// NOT_LEADER_OR_FOLLOWER (6), or UNKNOWN_TOPIC_OR_PARTITION (3), until the
+// broker has applied the new topic. The question is a ListOffsets (latest),
+// which reads nothing and writes nothing and is answered by the same replica
+// manager a Produce goes to, so it can be asked again; it is not a step. It
+// gives up, failing the run, after thirty seconds.
+func awaitPartitionLeaders(e *Env, topics map[string]int32) {
+	r := kmsg.NewPtrListOffsetsRequest()
+	r.ReplicaID = -1
+	want := 0
+	for _, name := range sortedKeys(topics) {
+		rt := kmsg.NewListOffsetsRequestTopic()
+		rt.Topic = name
+		for p := int32(0); p < topics[name]; p++ {
+			rp := kmsg.NewListOffsetsRequestTopicPartition()
+			rp.Partition, rp.Timestamp, rp.CurrentLeaderEpoch = p, -1, -1
+			rt.Partitions = append(rt.Partitions, rp)
+			want++
+		}
+		r.Topics = append(r.Topics, rt)
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		resp, err := e.w.roundTrip(r, 7)
+		if err != nil {
+			e.fail("waiting for partition leaders: %v", err)
+			return
+		}
+		led, last := 0, int16(0)
+		for _, t := range resp.(*kmsg.ListOffsetsResponse).Topics {
+			for _, p := range t.Partitions {
+				if p.ErrorCode == 0 {
+					led++
+				} else {
+					last = p.ErrorCode
+				}
+			}
+		}
+		if led == want {
+			return
+		}
+		if time.Now().After(deadline) {
+			e.fail("waiting for partition leaders: %d of %d led after 30s (last error code %d)", led, want, last)
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }

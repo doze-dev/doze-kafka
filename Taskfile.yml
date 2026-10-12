@@ -135,9 +135,16 @@ tasks:
       - go test ./conformance -count=1 -v -run 'TestReplay|TestKnown'
 
   conformance:record:
-    desc: 'Record the scenarios against apache/kafka:4.3.1 in Docker and rewrite conformance/recordings. One scenario: task conformance:record -- -only=listoffsets'
+    desc: 'Record the scenarios against apache/kafka:4.3.1 in Docker and rewrite conformance/recordings. One scenario: task conformance:record -- -only=listoffsets. The client runs are conformance:record:clients'
     cmds:
-      - go test ./conformance -count=1 -v -run TestRecord -record {{.CLI_ARGS}}
+      # Anchored: an unanchored TestRecord also matches TestRecordClientTelemetry, so
+      # recording one scenario rewrote client-telemetry.json as well (its counts vary).
+      - go test ./conformance -count=1 -v -run '^TestRecord$' -record {{.CLI_ARGS}}
+
+  conformance:record:clients:
+    desc: 'Record what real clients send for client telemetry (conformance/recordings/client-telemetry.json): Docker, and kcat 2.5 or newer for the librdkafka run'
+    cmds:
+      - go test ./conformance -count=1 -v -run '^TestRecordClientTelemetry$' -record
 
   test:kcat:
     desc: 'kcat (librdkafka) against the real binary; needs kcat installed'
