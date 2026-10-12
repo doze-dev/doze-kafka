@@ -7,7 +7,8 @@ belong.
 ## The inner loop
 
 ```sh
-go tool task check        # the gate: gofmt, go vet, Windows cross-vet, the whole suite with -race
+go tool task check        # the gate: gofmt, go vet, Windows cross-vet, the whole suite with -race, every benchmark once
+go tool task vuln         # govulncheck (needs the network); CI runs it on every push and daily
 go tool task test:unit    # ~seconds: storage, codec, handlers; no sockets (-short)
 go test ./internal/broker -run TestThing -count=1     # one test
 go tool task dev          # run the broker with the console read live from disk

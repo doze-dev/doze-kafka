@@ -6,6 +6,21 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Security: an Avro value is checked against its schema before the Avro decoder sees it.
+  The console decodes registry-framed record values, which any producer can write, with
+  `hamba/avro`, which is archived and has three open advisories against its decoder
+  (GO-2026-5046, 5047, 5048; no fixed release). 328 bytes naming 64 arrays of a million
+  nulls made the console allocate 5 GiB, and a registered `fixed` of 512 MiB allocated
+  2 GiB for a seven-byte value. Every length and count is now checked first: the arrays
+  and maps of one value hold at most 1,048,576 elements between them, nothing nests more
+  than 1,024 deep, and nothing claims more bytes than are there. A truncated value is no
+  longer shown as if it had decoded. `go tool task vuln` (govulncheck, in CI on every push
+  and daily) fails on any reachable vulnerability that is not accepted with a guarding
+  test in `testdata/vulncheck-accepted.txt`; it found five more in the doze module's
+  dependencies, fixed by upgrades (`golang.org/x/net` 0.60.0, `google.golang.org/grpc`
+  1.83.2).
+- `go tool task check` runs every benchmark once (`bench:smoke`).
+
 - The doze module's console (the one `doze` starts beside a `kafka` instance) has the
   Traffic page and the clients' own metrics, as the `doze-kafka` command's console has.
   Its broker was built as one with no console, so nothing was recorded, `/traffic` was a

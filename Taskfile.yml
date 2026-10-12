@@ -75,6 +75,11 @@ tasks:
       # The fault seam (internal/faultinject) exists only behind its tag, so its tests only run with it.
       - go test -tags faultinject ./internal/faultinject/ ./internal/storage/... ./internal/broker/ -run 'FaultSeam|^Test(Parse|HitAfterAndClear|Delay|FileIsRead)'
 
+  vuln:
+    desc: 'govulncheck over this module and module/: fails on any reachable vulnerability not accepted, with its guarding test, in testdata/vulncheck-accepted.txt. Needs the network (vuln.go.dev), so it is its own workflow and not part of check'
+    cmds:
+      - go run ./scripts/vulncheck . module
+
   bench:smoke:
     desc: 'Run every benchmark for one iteration, so a benchmark that has stopped working fails the gate'
     cmds:

@@ -1,0 +1,32 @@
+name: Vulnerabilities
+
+# govulncheck over this module and the doze module (module/), on every push and pull
+# request, and every day: an advisory is published against code that has not changed.
+#
+# It fails on any vulnerability the code can reach. The only way past it is an entry in
+# testdata/vulncheck-accepted.txt, which names the test that keeps hostile input away
+# from the vulnerable code, and which itself fails the run when the advisory gains a
+# fixed version, when it is no longer reported, or when that test is gone
+# (scripts/vulncheck). Nothing is skipped when the vulnerability database cannot be
+# reached: that is a failure too.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 6 * * *" # daily, 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: govulncheck (this module and module/)
+        run: go run ./scripts/vulncheck . module
