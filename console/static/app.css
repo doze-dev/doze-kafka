@@ -989,8 +989,8 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   /* The board's sheet is a fixed 400 px: the record scrolls inside it and its actions
      stay pinned at the foot (the sheet's own padding is 14 at the foot). */
   .insp-sel { overflow: hidden; }
-  .insp-sel .inspector-b { flex: 1; min-height: 0; overflow-y: auto; }
-  .insp-sel .inspector-acts { position: sticky; bottom: 0; margin: auto -16px -12px; padding: 10px 16px 14px; background: var(--card); border-top: 1px solid var(--line2); }
+  .insp-sel .inspector-b { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 0; }
+  .insp-sel .inspector-acts { position: sticky; bottom: 0; margin: auto -16px 0; padding: 10px 16px 14px; background: var(--card); border-top: 1px solid var(--line2); }
   /* Sy-04: the title is 15 px on its own row, then the action the width of the page with
      the menu beside it. */
   .idband h1, .idband h1.m, .idband h1.page-title { font-size: var(--fs-phone-h1); line-height: 20px; flex: 1 1 100%; }

@@ -906,7 +906,7 @@ test('Sy-04: the message sheet is 47% of the phone, has its grab handle, and lea
   // The board's sheet is a fixed 400 px, its actions pinned at the foot whatever the value.
   expect(Math.round(box.height)).toBe(400);
   const acts = (await sheet.locator('.inspector-acts').boundingBox())!;
-  expect(box.y + box.height - (acts.y + acts.height), 'actions at the sheet\'s foot').toBeLessThanOrEqual(16);
+  expect(box.y + box.height - (acts.y + acts.height), 'actions end at the sheet\'s foot, nothing of the value under them').toBeLessThanOrEqual(1);
   expect(acts.y).toBeGreaterThan(box.y + 100);
 });
 
