@@ -18,6 +18,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 
 	"go.etcd.io/bbolt"
 )
@@ -53,8 +54,8 @@ func (e *CollisionError) Error() string {
 func (e *CollisionError) Is(target error) bool { return target == ErrTopicCollides }
 
 // FindCollision reports the first of existing that name may not live beside, or nil.
-// CreateTopic applies the same rule; this is for a caller that must say so without
-// creating anything (CreateTopics with validate_only).
+// It is the rule spelled out over a list; the store answers the same question for the
+// topics it holds from an index (TopicCollision), without looking at each of them.
 func FindCollision(name string, existing []string) *CollisionError {
 	for _, e := range existing {
 		if e == name {
@@ -71,6 +72,69 @@ func FindCollision(name string, existing []string) *CollisionError {
 // metricKey is a name with '.' written as '_': Kafka's metric names cannot tell
 // the two apart, so it refuses a topic whose key is one that exists.
 func metricKey(name string) string { return strings.ReplaceAll(name, ".", "_") }
+
+// foldKey is a name with every letter replaced by the least of the letters it equals
+// without regard to case, so two names have one key exactly when strings.EqualFold
+// says they are equal.
+func foldKey(name string) string {
+	return strings.Map(func(r rune) rune {
+		least := r
+		for f := unicode.SimpleFold(r); f != r; f = unicode.SimpleFold(f) {
+			least = min(least, f)
+		}
+		return least
+	}, name)
+}
+
+// nameIndex answers "which topic may this name not live beside" without looking at
+// every topic: the names under each key the two rules compare. Creating n topics
+// used to compare each with all that existed, n squared comparisons for a batch.
+type nameIndex struct {
+	byFold, byMetric map[string][]string
+}
+
+func newNameIndex() nameIndex {
+	return nameIndex{byFold: map[string][]string{}, byMetric: map[string][]string{}}
+}
+
+func (x nameIndex) add(name string) {
+	x.byFold[foldKey(name)] = append(x.byFold[foldKey(name)], name)
+	x.byMetric[metricKey(name)] = append(x.byMetric[metricKey(name)], name)
+}
+
+func (x nameIndex) remove(name string) {
+	drop := func(m map[string][]string, key string) {
+		names := m[key]
+		if i := slices.Index(names, name); i >= 0 {
+			names = slices.Delete(names, i, i+1)
+		}
+		if len(names) == 0 {
+			delete(m, key)
+			return
+		}
+		m[key] = names
+	}
+	drop(x.byFold, foldKey(name))
+	drop(x.byMetric, metricKey(name))
+}
+
+// collision is the topic name may not live beside, or nil. Names in beside are let
+// off the '.' against '_' rule (and only that one): see Store.CreateTopicBeside.
+func (x nameIndex) collision(name string, beside map[string]struct{}) *CollisionError {
+	for _, e := range x.byFold[foldKey(name)] {
+		if e != name {
+			return &CollisionError{Name: name, Existing: e, CaseOnly: true}
+		}
+	}
+	// The newest first: of several topics a name collides with (they can only have
+	// come from one request), Kafka names the one created last.
+	for _, e := range slices.Backward(x.byMetric[metricKey(name)]) {
+		if _, let := beside[e]; e != name && !let {
+			return &CollisionError{Name: name, Existing: e}
+		}
+	}
+	return nil
+}
 
 // ErrInvalidGroupID is returned for a group id that cannot be a key: NUL is the
 // separator between group, topic and partition in the offsets bucket, so a group
@@ -111,6 +175,18 @@ type Topic struct {
 // Store is the metadata persistence contract: single-writer, small, durable.
 type Store interface {
 	CreateTopic(name string, partitions int32, config map[string]string) (Topic, error)
+	// CreateTopicBeside is CreateTopic for one topic of a CreateTopics request that
+	// names several. Apache Kafka checks each name of a request against the topics
+	// that existed before it, not against the others in it, so "a.b" and "a_b" sent
+	// together are both created (recorded: createtopics-collisions): beside is the
+	// names this request has already created, which the '.' against '_' rule does
+	// not count. Names that differ only in letter case are refused all the same:
+	// that rule is about the directory two topics would share.
+	CreateTopicBeside(name string, partitions int32, config map[string]string, beside map[string]struct{}) (Topic, error)
+	// TopicCollision is the registered topic a new topic called name could not live
+	// beside (CreateTopicBeside's rule and its beside), or nil: what CreateTopics
+	// with validate_only has to say without creating anything.
+	TopicCollision(name string, beside map[string]struct{}) *CollisionError
 	Topic(name string) (Topic, bool, error)
 	TopicByID(id TopicID) (Topic, bool, error)
 	ListTopics() ([]Topic, error)
@@ -214,7 +290,7 @@ func OpenWithClock(path string, clock func() time.Time) (Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("meta: init buckets: %w", err)
 	}
-	s := &boltStore{db: db, byName: map[string]Topic{}, byID: map[TopicID]string{}, clock: clock}
+	s := &boltStore{db: db, byName: map[string]Topic{}, byID: map[TopicID]string{}, names: newNameIndex(), clock: clock}
 	if err := s.loadCache(); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("meta: load topic registry: %w", err)
@@ -232,6 +308,7 @@ func (s *boltStore) loadCache() error {
 			t := Topic{Name: string(k), ID: rec.ID, Partitions: rec.Partitions, Config: rec.Config}
 			s.byName[t.Name] = t
 			s.byID[t.ID] = t.Name
+			s.names.add(t.Name)
 			return nil
 		})
 	})
@@ -270,6 +347,7 @@ type boltStore struct {
 	mu      sync.RWMutex
 	byName  map[string]Topic
 	byID    map[TopicID]string
+	names   nameIndex // the names of byName, by what the collision rules compare.
 }
 
 // update runs one write transaction (one fsync) and counts it, so a test can pin
@@ -308,6 +386,16 @@ type OffsetEntry struct {
 }
 
 func (s *boltStore) CreateTopic(name string, partitions int32, config map[string]string) (Topic, error) {
+	return s.CreateTopicBeside(name, partitions, config, nil)
+}
+
+func (s *boltStore) TopicCollision(name string, beside map[string]struct{}) *CollisionError {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.names.collision(name, beside)
+}
+
+func (s *boltStore) CreateTopicBeside(name string, partitions int32, config map[string]string, beside map[string]struct{}) (Topic, error) {
 	if err := ValidateTopicName(name); err != nil {
 		return Topic{}, err
 	}
@@ -325,21 +413,12 @@ func (s *boltStore) CreateTopic(name string, partitions int32, config map[string
 	// topic the store has and the cache does not (invisible, yet uncreatable).
 	s.topicMu.Lock()
 	defer s.topicMu.Unlock()
-	s.mu.RLock()
-	for existing := range s.byName {
-		if existing == name {
-			continue
-		}
-		// Kafka's own rule: "a.b" and "a_b" would share metric names, so they
-		// may not both exist. Ours, beside it: names that differ only in letter
-		// case would share a directory on a case-insensitive file system.
-		caseOnly := strings.EqualFold(existing, name)
-		if caseOnly || metricKey(existing) == metricKey(name) {
-			s.mu.RUnlock()
-			return Topic{}, &CollisionError{Name: name, Existing: existing, CaseOnly: caseOnly}
-		}
+	// Kafka's own rule: "a.b" and "a_b" would share metric names, so they may not
+	// both exist. Ours, beside it: names that differ only in letter case would share
+	// a directory on a case-insensitive file system.
+	if c := s.TopicCollision(name, beside); c != nil {
+		return Topic{}, c
 	}
-	s.mu.RUnlock()
 	err := s.update(func(tx *bbolt.Tx) error {
 		topics := tx.Bucket(bucketTopics)
 		if topics.Get([]byte(name)) != nil {
@@ -364,6 +443,7 @@ func (s *boltStore) CreateTopic(name string, partitions int32, config map[string
 	s.mu.Lock()
 	s.byName[name] = cloneTopic(t)
 	s.byID[id] = name
+	s.names.add(name)
 	s.mu.Unlock()
 	return t, nil
 }
@@ -478,6 +558,7 @@ func (s *boltStore) DeleteTopic(name string) error {
 	if t, ok := s.byName[name]; ok {
 		delete(s.byID, t.ID)
 		delete(s.byName, name)
+		s.names.remove(name)
 	}
 	s.mu.Unlock()
 	return nil

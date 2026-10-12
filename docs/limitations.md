@@ -157,7 +157,11 @@ implement it.
 - **Topic names that differ only in letter case are refused.** Kafka lets `Orders` and
   `orders` live side by side; here the second is `INVALID_TOPIC_EXCEPTION`, because
   partition directories are named after topics and the macOS and Windows file systems
-  do not tell the two apart. (Kafka's own rule, that `a.b` and `a_b` collide, applies too.)
+  do not tell the two apart, and that holds for two such names in one request as well.
+  (Kafka's own rule, that `a.b` and `a_b` collide, applies too, and as Kafka applies it:
+  a name is held against the topics that existed before the request, so `a.b` and `a_b`
+  sent in one `CreateTopics` request are both created. Recorded:
+  `conformance/recordings/createtopics-collisions.json`.)
 - **Validation messages are doze-kafka's own words.** For a refused topic name, partition
   count, topic config value and a broker config change, the error code is Kafka's and the
   `error_message` text is this broker's (it names what to do about it). A Produce batch

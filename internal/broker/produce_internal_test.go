@@ -247,7 +247,7 @@ func TestTopicCreationAndOffsetListingDoNotOpenPartitions(t *testing.T) {
 
 	ct := kmsg.NewCreateTopicsRequestTopic()
 	ct.Topic, ct.NumPartitions, ct.ReplicationFactor = "wide", 40, 1
-	if got := b.createTopic(ct, false); got.ErrorCode != 0 {
+	if got := b.createTopic(ct, false, nil); got.ErrorCode != 0 {
 		t.Fatalf("createTopic: %d", got.ErrorCode)
 	}
 	if n := logs.OpenPartitions(); n != 0 {
@@ -411,7 +411,7 @@ func TestDeletingATopicForgetsItsProducerState(t *testing.T) {
 	}
 	ct := kmsg.NewCreateTopicsRequestTopic()
 	ct.Topic, ct.NumPartitions, ct.ReplicationFactor = "t", 1, 1
-	if got := b.createTopic(ct, false); got.ErrorCode != 0 {
+	if got := b.createTopic(ct, false, nil); got.ErrorCode != 0 {
 		t.Fatal(got.ErrorCode)
 	}
 	p := produceOnce(t, b, 1, idemBatch(5, 0, 0, 3, 0)).Topics[0].Partitions[0]

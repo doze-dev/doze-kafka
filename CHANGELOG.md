@@ -6,6 +6,16 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- CreateTopics: a request for many topics no longer compares each name with every topic
+  (twice: the handler listed them all and the store looked at them all, so a batch was
+  quadratic); both ask an index kept by the metadata store. Which names collide is now
+  exactly Apache Kafka's, from a recording of 4.3.1 (`createtopics-collisions`): a name is
+  held against the topics that existed before the request and not against the others in
+  it, so `a.b` and `a_b` sent in one request are both created, where this broker used to
+  refuse the second with `INVALID_TOPIC_EXCEPTION`. A name that collides with an existing
+  topic is still refused, with or without `validate_only`, and names that differ only in
+  letter case are refused everywhere.
+
 - Embedding (`server/`): nothing outlives a failure. A `Serve` that cannot bind closes the
   `AlsoListen` listeners too (they stayed bound and accepting); a `New` that fails closes
   what it had opened, the lock on the data directory included (a broken record in the
