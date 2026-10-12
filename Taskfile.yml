@@ -68,8 +68,17 @@ tasks:
       # Windows ships in the release and nobody here runs it; this at least proves it compiles.
       - GOOS=windows GOARCH=amd64 go vet ./...
       - go test -race ./...
+      # Every benchmark once: one that no longer runs (BenchmarkInitProducerID sent a body
+      # its handler could not decode, and nobody noticed) fails here, not when somebody
+      # next wants a number from it.
+      - task: bench:smoke
       # The fault seam (internal/faultinject) exists only behind its tag, so its tests only run with it.
       - go test -tags faultinject ./internal/faultinject/ ./internal/storage/... ./internal/broker/ -run 'FaultSeam|^Test(Parse|HitAfterAndClear|Delay|FileIsRead)'
+
+  bench:smoke:
+    desc: 'Run every benchmark for one iteration, so a benchmark that has stopped working fails the gate'
+    cmds:
+      - go test -run '^$' -bench . -benchtime=1x ./...
 
   hooks:install:
     desc: Install a git pre-push hook that runs `task check`.
