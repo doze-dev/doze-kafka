@@ -74,6 +74,16 @@ here that contains "server API"; `task api` fails without it.
   Kafka's JSON specification of the request ("TransactionalId", "TopicData") and no
   longer the client library's. A Produce partition that does not exist answers a base
   offset of -1.
+- Client telemetry, two more answers made Kafka's (`telemetry-terminating.json`,
+  `telemetry-ask-again.json`): every push is `INVALID_REQUEST` while the push before it
+  said it was terminating, whatever became of that one (the third terminating push in a
+  row was taken; a push after a refused terminating one was throttled), and a
+  terminating push inside the interval no longer sets the push clock; the subscription
+  request a client sends after a push refused `UNKNOWN_SUBSCRIPTION_ID` or
+  `UNSUPPORTED_COMPRESSION_TYPE` is answered, once, where it was
+  `THROTTLING_QUOTA_EXCEEDED`. Setting a `CLIENT_METRICS` resource is refused, and a
+  broker without a console closes the connection of a client that sends the two calls;
+  both are in `docs/limitations.md`.
 
 - Groups: classic and consumer-protocol members can share a group id, as on Kafka 4 with
   its default migration policy (a rolling upgrade or downgrade of an application, one

@@ -366,7 +366,7 @@ On top of the common list in [01-protocol.md](../01-protocol.md).
 **Real clients**
 
 - [ ] Compat cells `java-telemetry`, `kcat-telemetry`, `kcat-traffic` pass, plain and SCRAM over TLS where applicable; the existing 20 cells still pass.
-- [ ] Recording scenarios R1 to R9 are recorded and replayed with zero "answered differently", or each difference is in `docs/limitations.md`; the count at `doc` or `memory` is written here: 0 (R9b, the first release of each client to push, is `spec` from KIP-714 and the release notes).
+- [ ] Recording scenarios R1 to R9 are recorded and replayed with zero "answered differently", or each difference is in `docs/limitations.md`; the count at `doc` or `memory` is written here: 2 (R9b, the first release of each client to push, is `doc`: KIP-714 and the release notes; R7b, the order of a Produce response, is `memory` until the harness records it).
 
 **Boards**
 
@@ -452,12 +452,20 @@ on the code before the fix and was run again with the fix reverted by hand.
 
 **Not done, with the reason.**
 
-- **R1 to R9, C1 and C2 are recorded** against `apache/kafka:4.3.1`; none is left at
-  `doc` or `memory`. Three of the claims were wrong as the plan wrote them: the broker
-  does not advertise the two APIs without a plugin (R5), a restart does not make a push
-  `UNKNOWN_SUBSCRIPTION_ID` (C2), and the Java client uses one connection in a one-broker
-  cluster (C1). `telemetry-interval` and `telemetry-instance-binding-spaced` are evidence
-  only, because they define a `CLIENT_METRICS` resource.
+- **R1 to R9, C1 and C2 are recorded** against `apache/kafka:4.3.1`, with two left
+  that are not: R9b (the first release of each client to push) is `doc`, and R7b (the
+  order of a Produce response's partitions) is `memory`, because the harness sorts a
+  Produce response before it stores it. Three of the claims were wrong as the plan wrote
+  them: the broker does not advertise the two APIs without a plugin (R5), a restart does
+  not make a push `UNKNOWN_SUBSCRIPTION_ID` (C2), and the Java client uses one connection
+  in a one-broker cluster (C1). `telemetry-interval` and
+  `telemetry-instance-binding-spaced` were evidence only and are now replayed: Kafka is
+  recorded with the five-second interval this broker uses, in real time. Only
+  `telemetry-subscription-change` is evidence only. Recording them that way, and three
+  scenarios added after a review (`telemetry-terminating`, `telemetry-ask-again`,
+  `telemetry-no-console`: R10 to R12), found two differences, both fixed red-first: a
+  terminated instance was not kept terminated, and the subscription request after a push
+  refused for its subscription id or compression was throttled.
 - **The dock endpoint** is the existing `/dock`, which pages by the recorder's row ids
   (the contract's cursor): `/dock?topic=…&after=<row id>` is the rows after that one,
   and the dock's Older and Newest use it (AD20). Until the fixes of 2026-10-12 the

@@ -223,8 +223,9 @@ configs) are listed in [Limitations](limitations.md), not here.
 
 ## Not implemented (by design)
 
-`OffsetForLeaderEpoch`, `DescribeLogDirs`, quota APIs, and
-the client-metrics/telemetry APIs. The broker serves exactly what it advertises: a
+`OffsetForLeaderEpoch`, `DescribeLogDirs`, the quota APIs, and the `CLIENT_METRICS`
+config resource (client telemetry itself, APIs 71 and 72, is implemented: see the
+table above). The broker serves exactly what it advertises: a
 request for an API it does not have, or at a version outside the advertised range,
 gets no response and its connection is closed, rather than being left to hang. See
 [Limitations](limitations.md).
