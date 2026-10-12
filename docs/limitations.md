@@ -59,10 +59,12 @@ implement it.
   new targets are there when the join is answered, the group is never `Assigning`, and
   that generation is one higher. Which request is answered with which code is the same
   (recorded: `mixed-protocol-groups.json`, `mixed-protocol-rolling.json`).
-- **An empty group with no committed offsets is forgotten at once.** Kafka keeps it
-  listed, `Empty`, until its offsets retention has passed; here a group that holds
-  nothing is not worth listing, and a console that showed every consumer that ever
-  came and went would be a long page.
+- **How often committed offsets are checked is not a setting.** Kafka has
+  `offsets.retention.check.interval.ms` (10 minutes); here the check runs every
+  hundredth of `--offsets-retention`, between 50 ms and 10 minutes, so it is Kafka's
+  default at the default retention and sooner with a short one. It is the same check
+  that drops a group with no members and no offsets, on both
+  (recorded: `offsets-retention-recreate.json`).
 - **A batch whose `acks=all` fsync failed stays in the log.** The producer is told
   `KAFKA_STORAGE_ERROR` with no offset, but the batch was already appended: a consumer
   can read it, and a non-idempotent retry stores it again (an idempotent retry is

@@ -293,3 +293,27 @@ func TestExpiryOnlyTheCurrentArmingActs(t *testing.T) {
 	}
 	e.stop()
 }
+
+// A group losing its last member is a generation of its own, as on Kafka: the member
+// that joins the emptied group is in the generation two on from the last one's
+// (recorded: offsets-retention-recreate, again-join-g-rejoin answers 3).
+func TestAnEmptiedClassicGroupHasMovedOnAGeneration(t *testing.T) {
+	noDelay(t)
+	gm := newGroupManager(func(string) bool { return true }, nil) // kept when empty, as in a broker.
+	first, err := gm.join(context.Background(), joinReq("g", ""), clientRef{})
+	if err != nil || first.errorCode != 0 || first.generation != 1 {
+		t.Fatalf("first join: %v %+v", err, first)
+	}
+	leave := kmsg.NewPtrLeaveGroupRequest()
+	leave.Group, leave.MemberID = "g", first.memberID
+	if res := gm.leave(leave); len(res) != 1 || res[0].errorCode != 0 {
+		t.Fatalf("leave: %+v", res)
+	}
+	again, err := gm.join(context.Background(), joinReq("g", ""), clientRef{})
+	if err != nil || again.errorCode != 0 {
+		t.Fatalf("second join: %v %+v", err, again)
+	}
+	if again.generation != 3 {
+		t.Fatalf("the member joining the emptied group is in generation %d, want 3", again.generation)
+	}
+}

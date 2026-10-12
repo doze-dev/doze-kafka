@@ -23,8 +23,10 @@ import (
 //     offsets of a topic it is not subscribed to expire from their own commit, which
 //     is how an application that stopped reading one topic stops carrying it. A group
 //     in the middle of a rebalance is not looked at at all.
-//   - A group whose offsets are all gone is gone: it is not listed, and DescribeGroups
-//     says Dead.
+//   - A group with no members and no offsets is gone at the next sweep: it is not
+//     listed, DescribeGroups says Dead, and its id, used again, is a new group. Until
+//     that sweep it is the group it was: a commit made into it in between is a commit
+//     into an empty group.
 //   - A restart changes none of this. A real broker has its members again when it is
 //     back, and a member that does not return runs out of session: the group is
 //     without members from then, not from the restart.
@@ -243,15 +245,47 @@ func (e *offsetExpiry) sweep() {
 	}
 	e.mu.Lock()
 	for g := range e.groups {
-		st := e.settle(g, now)
-		// A group that went empty with no offsets, and has none a retention later, is
-		// forgotten: its entry would otherwise outlive anything that could use it.
-		if !st.Live && st.EmptySince != 0 && !hasOffsets[g] && retention > 0 && now-st.EmptySince >= retention {
-			delete(e.groups, g)
-			e.markDirty(g)
+		e.settle(g, now)
+	}
+	e.mu.Unlock()
+	for _, id := range e.unused(hasOffsets) {
+		e.forgetGroup(id)
+	}
+}
+
+// unused is the groups that have no members and no offsets: whatever the retention is,
+// such a group is gone at the sweep that finds it so (recorded: offsets-retention-recreate,
+// g-offdel-late, g-none, g-c-none). hasOffsets was read before this, so a group that
+// was committed into since is dropped all the same and its new offset starts a new
+// group, which keeps the offset longer and never shorter.
+func (e *offsetExpiry) unused(hasOffsets map[string]bool) []string {
+	b := e.b
+	seen := map[string]bool{}
+	var ids []string
+	add := func(id string) {
+		if !hasOffsets[id] && !seen[id] {
+			seen[id] = true
+			ids = append(ids, id)
+		}
+	}
+	for _, g := range b.groups.list() {
+		if g.members == 0 {
+			add(g.id)
+		}
+	}
+	for _, g := range b.cg848.list() {
+		if g.members == 0 {
+			add(g.id)
+		}
+	}
+	e.mu.Lock()
+	for id, st := range e.groups {
+		if !st.Live {
+			add(id)
 		}
 	}
 	e.mu.Unlock()
+	return ids
 }
 
 // settle is the group's record at now: a group presumed to have the members it had
@@ -362,8 +396,9 @@ func (e *offsetExpiry) expireOffsets(id string, expire func(topic string, partit
 	return err == nil && len(rest) == 0
 }
 
-// forgetGroup drops an emptied group whose last offset has expired: it is no longer
-// listed, and its id is free of both protocols. Called with no lock held.
+// forgetGroup drops a group with no members that holds no offsets (its last one has
+// expired or been deleted, or it never had one): it is no longer listed, and its id is
+// free of both protocols. Called with no lock held.
 func (e *offsetExpiry) forgetGroup(id string) {
 	b := e.b
 	const expiring = "expiring"
@@ -377,13 +412,23 @@ func (e *offsetExpiry) forgetGroup(id string) {
 }
 
 // forget drops what is recorded of a group that is gone, so that the id, used again,
-// starts as a group that never had a member.
-func (e *offsetExpiry) forget(id string) {
+// starts as a group that never had a member. It returns what was recorded, for a caller
+// that has to put it back (restore).
+func (e *offsetExpiry) forget(id string) (was groupLiveness, known bool) {
 	e.mu.Lock()
-	if _, ok := e.groups[id]; ok {
+	defer e.mu.Unlock()
+	if was, known = e.groups[id]; known {
 		delete(e.groups, id)
 		e.markDirty(id)
 	}
+	return was, known
+}
+
+// restore puts back what forget took, when the group turned out not to be gone.
+func (e *offsetExpiry) restore(id string, was groupLiveness) {
+	e.mu.Lock()
+	e.groups[id] = was
+	e.markDirty(id)
 	e.mu.Unlock()
 }
 

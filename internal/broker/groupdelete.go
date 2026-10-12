@@ -53,8 +53,15 @@ func (b *Broker) deleteGroup(id string) int16 {
 	if b.cg848.forget(id) {
 		existed = true
 	}
+	// When the group became empty goes with it, and before its offsets do: the id used
+	// again is a group nobody has joined (recorded: offsets-retention-recreate, g-del),
+	// and nothing still waiting to be written may put the old group back in the store.
+	was, known := b.expiry.forget(id)
 	n, err := b.meta.DeleteGroupOffsets(id)
 	if err != nil {
+		if known {
+			b.expiry.restore(id, was)
+		}
 		return b.storageFault("delete group: remove committed offsets", err, "group", id)
 	}
 	if !existed && n == 0 {

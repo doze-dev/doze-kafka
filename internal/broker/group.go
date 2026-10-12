@@ -100,10 +100,11 @@ type groupManager struct {
 	mu     sync.Mutex
 	groups map[string]*group
 
-	// hasOffsets reports whether a group has committed offsets. An empty group
-	// that has none holds nothing worth keeping and is forgotten; one that has
-	// some stays listed (as Empty) because its offsets are durable.
-	hasOffsets func(group string) bool
+	// kept reports whether a group that has just emptied stays, listed as Empty, for
+	// somebody else to drop. In a broker that is the offsets retention's sweep, which
+	// drops a group with no members once it holds no offsets (as Kafka's does:
+	// recorded, offsets-retention-recreate). nil = nobody will, so it is dropped here.
+	kept func(group string) bool
 
 	claims *groupClaims
 
@@ -151,11 +152,11 @@ func (gm *groupManager) stop() {
 	}
 }
 
-func newGroupManager(hasOffsets func(string) bool, claims *groupClaims) *groupManager {
+func newGroupManager(kept func(string) bool, claims *groupClaims) *groupManager {
 	if claims == nil {
 		claims = newGroupClaims()
 	}
-	return &groupManager{groups: make(map[string]*group), hasOffsets: hasOffsets, claims: claims,
+	return &groupManager{groups: make(map[string]*group), kept: kept, claims: claims,
 		pending: make(map[string]map[string]time.Time)}
 }
 
@@ -847,8 +848,7 @@ func (g *group) completeJoin() (dropped []string) {
 		}
 	}
 	if len(g.members) == 0 {
-		g.state = stateEmpty
-		g.leader = ""
+		g.becomeEmpty()
 		return dropped
 	}
 	for inst, id := range g.static {
@@ -886,6 +886,15 @@ func (g *group) completeJoin() (dropped []string) {
 	return dropped
 }
 
+// becomeEmpty is the group with its last member gone. That is a generation of its own,
+// as on Kafka: the next member to join finds the generation two on from the one the
+// last member had (recorded: offsets-retention-recreate, again-join-g-rejoin).
+func (g *group) becomeEmpty() {
+	g.state = stateEmpty
+	g.leader = ""
+	g.generation++
+}
+
 // completeJoin closes the rebalance and forgets the group if nobody was left.
 func (gm *groupManager) completeJoin(g *group) {
 	for _, id := range g.completeJoin() {
@@ -906,9 +915,8 @@ func (gm *groupManager) completeJoin(g *group) {
 	}
 }
 
-// dropIfUnused forgets an Empty group that has no committed offsets. A group
-// that still has offsets stays, because those are durable and a consumer
-// resuming under the same id expects to find them.
+// dropIfUnused is a group having lost its last member: the offsets retention is told,
+// the id is free, and the group object goes unless somebody keeps it (kept).
 func (gm *groupManager) dropIfUnused(g *group) {
 	if gm.groups[g.id] != g || len(g.members) != 0 {
 		return
@@ -918,7 +926,7 @@ func (gm *groupManager) dropIfUnused(g *group) {
 	}
 	// No members: the id is free for either protocol again.
 	gm.claims.release(g.id, protoClassic)
-	if gm.hasOffsets != nil && gm.hasOffsets(g.id) {
+	if gm.kept != nil && gm.kept(g.id) {
 		return
 	}
 	delete(gm.groups, g.id)
@@ -1002,8 +1010,7 @@ func (gm *groupManager) removeMember(g *group, id string) {
 func (gm *groupManager) rebalanceAfterChange(g *group, why string) {
 	if len(g.members) == 0 {
 		g.join.stop()
-		g.state = stateEmpty
-		g.leader = ""
+		g.becomeEmpty()
 		gm.dropIfUnused(g)
 		return
 	}

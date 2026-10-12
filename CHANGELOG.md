@@ -6,6 +6,21 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Offsets retention: a group that is gone leaves nothing behind. `DeleteGroups` removed
+  the group's offsets and left "empty since" in memory, so the same id used afterwards
+  by a standalone committer had its new offsets judged by when the deleted group had
+  emptied, and lost them early. The record now goes with the group, before its offsets
+  do. As on Apache Kafka 4.3.1 (recorded: `offsets-retention-recreate`), a group with no
+  members and no offsets is dropped by the next sweep, classic or consumer-protocol:
+  until then it is listed `Empty` and a commit made into it is a commit into an empty
+  group; after it, the id is a new group. Before this a classic group with no offsets
+  was unlisted the moment its last member left (Kafka lists it until its next check),
+  an emptied consumer-protocol group with no offsets stayed listed until the broker
+  restarted, and the emptiness of a group that then lost its last offset was counted
+  against later commits for a whole retention. A classic group that empties moves on a
+  generation, as Kafka's does: the next member to join is told two more than the last
+  one had.
+
 - Offsets retention: a restart no longer expires the offsets of a group that was live
   when the broker stopped. Members are not kept across a restart, and a group with none
   in memory and no record of having emptied was taken for one nobody had ever joined:

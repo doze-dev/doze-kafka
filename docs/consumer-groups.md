@@ -73,7 +73,8 @@ group is shown `Assigning`; this broker computes it first.
 Offsets are not kept for ever: as on Kafka (`offsets.retention.minutes`), they expire
 after `--offsets-retention` (default 7 days; `0` keeps them for ever). Which clock
 applies is Kafka's, recorded against `apache/kafka:4.3.1`
-(`conformance/recordings/offsets-retention.json`, `offsets-retention-restart.json`):
+(`conformance/recordings/offsets-retention.json`, `offsets-retention-restart.json`,
+`offsets-retention-recreate.json`):
 
 - A **classic group that had members and has none now** keeps its offsets for the
   retention from the moment it became empty, however late its last commit was. A commit
@@ -84,7 +85,16 @@ applies is Kafka's, recorded against `apache/kafka:4.3.1`
 - A group **with members** never loses the offsets of the topics it is subscribed to;
   those of a topic it is not subscribed to expire from their own commit. A group in the
   middle of a rebalance is not looked at.
-- A group whose offsets are all gone is gone: it is no longer listed.
+- A group with **no members and no offsets** is gone at the next sweep: its last offset
+  expired or was deleted, or it never committed one. It is no longer listed, and its id,
+  used again, is a new group that nothing of the old one counts against. Until that
+  sweep it is listed `Empty` and is still the group it was, so a commit made into it in
+  between is a commit into an empty group. `DeleteGroups` does the same at once.
+
+The sweep runs every hundredth of the retention, at least every 50 ms and at most every
+ten minutes, which is Kafka's `offsets.retention.check.interval.ms` default and what a
+default broker gets. With `--offsets-retention 0` it runs every ten minutes and only
+drops the groups that hold nothing.
 
 **Across a restart** a real broker has its groups' members again when it is back. A
 member that does not return runs out of session, and the group is without members from

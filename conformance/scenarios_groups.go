@@ -336,7 +336,6 @@ const limHeartbeatInterval = "A consumer-protocol member is asked to heartbeat e
 // targets a describe taken between shows.
 const (
 	limAssignAfter  = "A consumer group's target assignment is computed before the request that causes it"
-	limEmptyForgot  = "An empty group with no committed offsets is forgotten at once"
 	pathGroups      = "Groups"
 	pathRequest     = "request"
 	pathGeneration  = "Generation"
@@ -368,13 +367,13 @@ func mixedRollingKnown() []Known {
 		"up-n-join", "up-n-heartbeat-1", "up-n-heartbeat-2", "up-n-heartbeat-3", "up-n-heartbeat-4",
 		"down-n-join", "down-n-heartbeat-1", "down-n-heartbeat-2", "down-n-heartbeat-3",
 		"emptyup-n-join", "emptydown-n-join")...)
-	k = append(k, knownSteps(limAssignAfter, pathGroups, "up-describe-after-leave", "up-list", "down-describe", "down-list")...)
+	k = append(k, knownSteps(limAssignAfter, pathGroups, "up-describe-after-leave", "up-list", "down-describe", "down-list",
+		"down-list-after-leave", "emptydown-list")...)
 	k = append(k, knownSteps(limAssignAfter, pathGeneration, "down-c-join", "down-c-rejoin")...)
 	k = append(k, knownSteps(limAssignAfter, pathRequest,
 		"down-c-sync", "down-c-heartbeat-1", "down-c-heartbeat-2", "down-c-resync", "down-c-heartbeat-3")...)
 	k = append(k, knownSteps(limAssignAfter, pathAssignment, "up-n-heartbeat-4", "down-n-heartbeat-2")...)
 	k = append(k, knownSteps(limAssignAfter, pathMemberEpoch, "up-n-heartbeat-4")...)
-	k = append(k, knownSteps(limEmptyForgot, pathGroups, "down-list-after-leave", "emptydown-list")...)
 	return k
 }
 

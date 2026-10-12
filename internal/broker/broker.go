@@ -93,10 +93,9 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 		logs:   logs,
 		meta:   m,
 		claims: claims,
-		groups: newGroupManager(func(group string) bool {
-			entries, err := m.ListOffsets(group)
-			return err == nil && len(entries) > 0
-		}, claims),
+		// An emptied group stays until the offsets retention's sweep finds it holds
+		// nothing (offsetexpiry.go).
+		groups:  newGroupManager(func(string) bool { return true }, claims),
 		cg848:   newCG848Manager(m, logger, cfg.ConsumerSessionTimeout, claims),
 		auth:    auth,
 		idem:    newIdempotency(),

@@ -337,7 +337,7 @@ func TestOffsetRetentionSweepsOnItsOwn(t *testing.T) {
 	if _, ok := known["solo"]; ok {
 		t.Errorf("an entry for a group that never had members: %v", known)
 	}
-	if st := known["g"]; st.Live || st.EmptySince == 0 {
-		t.Errorf("the group that emptied is recorded as %+v", st)
+	if st, ok := known["g"]; ok {
+		t.Errorf("an entry for a group with no members and no offsets, which a sweep drops: %+v", st)
 	}
 }

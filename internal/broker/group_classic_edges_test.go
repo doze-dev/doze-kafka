@@ -2,8 +2,11 @@ package broker_test
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/doze-dev/doze-kafka/internal/config"
 
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
@@ -434,10 +437,20 @@ func TestGroupClassic_ParkedJoinsAreReleased(t *testing.T) {
 	}
 }
 
-// An empty group with nothing committed is not worth listing; one with offsets
-// is, because those are durable and a consumer will come back for them.
+// A group that has just emptied is listed Empty, whether or not it holds offsets, as on
+// Kafka (recorded: mixed-protocol-rolling, down-list-after-leave). One with nothing
+// committed is gone at the next sweep of the offsets retention (recorded:
+// offsets-retention-recreate, g-none); one with offsets stays, because those are durable
+// and a consumer will come back for them.
 func TestGroupClassic_EmptyGroupsAreForgottenUnlessTheyHoldOffsets(t *testing.T) {
-	addr := startBroker(t, 4)
+	dir := t.TempDir()
+	cfg := config.Default()
+	cfg.ListenAddr = "127.0.0.1:0"
+	cfg.DataDir = filepath.Join(dir, "data")
+	cfg.MetaDB = filepath.Join(dir, "meta.db")
+	cfg.OffsetsRetention = time.Minute // the sweep runs every 600 ms.
+	addr, stop := boot(t, cfg)
+	t.Cleanup(stop)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cl := newClient(t, addr)
@@ -454,8 +467,14 @@ func TestGroupClassic_EmptyGroupsAreForgottenUnlessTheyHoldOffsets(t *testing.T)
 	}
 
 	got := listedGroups(t, ctx, cl)
+	for deadline := time.Now().Add(10 * time.Second); got["ghost"] != "" && time.Now().Before(deadline); got = listedGroups(t, ctx, cl) {
+		if got["ghost"] != "Empty" {
+			t.Fatalf("an emptied group is listed as %q until it is dropped, want Empty", got["ghost"])
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 	if got["ghost"] != "" {
-		t.Errorf("an empty group with no offsets is still listed: %v", got)
+		t.Errorf("an empty group with no offsets is still listed after several sweeps: %v", got)
 	}
 	if got["keeper"] != "Empty" {
 		t.Errorf("a group with committed offsets should stay listed as Empty: %v", got)
