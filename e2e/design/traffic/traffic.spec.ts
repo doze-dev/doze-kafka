@@ -69,7 +69,7 @@ async function enter(want: 'empty' | 'traffic' | 'lost') {
     const lostBoard = BOARDS.find((b) => b.phase === 'lost')!;
     for (const theme of THEMES) {
       const page = await livePage(theme, 1440);
-      await lostBoard.state(page, base);
+      await lostBoard.state(page, base, ledger);
       lostPages.set(theme, page);
     }
     await world!.stopBroker();
@@ -98,8 +98,9 @@ async function readSettled(page: Page, board: Board, sels: string[]) {
   for (let attempt = 0; attempt < 8; attempt++) {
     const snap = await snapshot(page, [...sels, ...truthSels]);
     const at = Date.now();
-    await page.waitForTimeout(400); // the clients write their ledger after each answer.
-    ledger.read();
+    await page.waitForTimeout(400); // a connection that opened or closed near `at` is in the ledger by now.
+    // The ledger as of one moment after the page was read, the same for every client.
+    ledger.read(world ? await world.sync() : undefined);
     const problems: string[] = [];
     let again = '';
     for (const t of board.truths) {
@@ -132,7 +133,7 @@ test('the Traffic pages are the boards, element by element, at 1440 in light and
         await boardPage.context().close();
 
         const page = lostPages.get(theme) ?? (await livePage(theme, width));
-        if (!lostPages.has(theme)) await board.state(page, base);
+        if (!lostPages.has(theme)) await board.state(page, base, ledger);
         await page.evaluate(() => document.fonts.ready);
         // Lost: the page has noticed (its first poll after the stop failed).
         if (want === 'lost') await page.locator('html[data-connection-lost]').waitFor({ timeout: 15_000 });

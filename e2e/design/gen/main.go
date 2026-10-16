@@ -9,6 +9,10 @@
 //	  one per request the client sent (kgo.HookBrokerE2E): start is when its first byte
 //	  was written, end when its answer was read.
 //	{"ev":"connect","local":"127.0.0.1:55102","t":<unix ms>}, {"ev":"disconnect",...}
+//	{"ev":"sync","t":<unix ms>,"open":[{"api":...,"start":...}]}
+//	  written when the process gets SIGUSR1: every request that ended before it is above
+//	  it in this file, and "open" lists the ones written to the broker and not yet answered
+//	  (the broker may have read them and the console shown them).
 //	{"ev":"software","name":"kgo","version":"v1.22.1"}  what it says in ApiVersions.
 //	{"ev":"push","t":<unix ms>,"metrics":[{"name":...,"unit":...,"value":...}]}
 //	  a telemetry report it pushed and the broker took.
@@ -60,7 +64,16 @@ import (
 type ledger struct {
 	mu sync.Mutex
 	f  *os.File
+	// The requests written to the broker and not yet answered, by broker and API key, in
+	// the order they were written (a connection answers in order): what a sync line lists.
+	flying map[[2]int32][]float64
 }
+
+// ledgers are the clients of this process, which SIGUSR1 asks to sync.
+var (
+	ledgersMu sync.Mutex
+	ledgers   []*ledger
+)
 
 func newLedger(id string) *ledger {
 	dir := os.Getenv("LEDGER")
@@ -72,7 +85,28 @@ func newLedger(id string) *ledger {
 		fmt.Fprintln(os.Stderr, "gen:", err)
 		os.Exit(1)
 	}
-	return &ledger{f: f}
+	l := &ledger{f: f, flying: map[[2]int32][]float64{}}
+	ledgersMu.Lock()
+	ledgers = append(ledgers, l)
+	ledgersMu.Unlock()
+	return l
+}
+
+// sync writes the line the gate waits for: every request that ended before it is in the
+// ledger above it (a request's end is stamped under the same lock that writes it), and
+// the requests the client has written to the broker and not had answered are listed
+// with it, since the broker may already have read them and the page shown them.
+func (l *ledger) sync() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	var open []map[string]any
+	for k, starts := range l.flying {
+		for _, s := range starts {
+			open = append(open, map[string]any{"key": k[1], "api": kmsg.NameForKey(int16(k[1])), "start": s})
+		}
+	}
+	b, _ := json.Marshal(map[string]any{"ev": "sync", "t": ms(time.Now()), "open": open})
+	l.f.Write(append(b, '\n'))
 }
 
 func ms(t time.Time) float64 { return float64(t.UnixMicro()) / 1000 }
@@ -80,6 +114,11 @@ func ms(t time.Time) float64 { return float64(t.UnixMicro()) / 1000 }
 func (l *ledger) write(m map[string]any) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	l.line(m)
+}
+
+// line writes one line; the caller holds the lock.
+func (l *ledger) line(m map[string]any) {
 	if _, ok := m["t"]; !ok {
 		m["t"] = ms(time.Now())
 	}
@@ -91,14 +130,28 @@ func (l *ledger) write(m map[string]any) {
 // when its first byte was written (kgo's end-to-end duration starts there, after the
 // time the request waited in the client's queue); the broker's time for it is when it
 // read it, which is in between.
-func (l *ledger) OnBrokerE2E(_ kgo.BrokerMetadata, key int16, e kgo.BrokerE2E) {
+func (l *ledger) OnBrokerE2E(b kgo.BrokerMetadata, key int16, e kgo.BrokerE2E) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	end := time.Now()
 	start := end.Add(-e.DurationE2E())
-	m := map[string]any{"ev": "req", "key": key, "api": kmsg.NameForKey(key), "start": ms(start), "end": ms(end), "wr": e.BytesWritten, "rd": e.BytesRead}
+	k := [2]int32{b.NodeID, int32(key)}
+	if q := l.flying[k]; len(q) > 0 {
+		l.flying[k] = q[1:]
+	}
+	m := map[string]any{"ev": "req", "key": key, "api": kmsg.NameForKey(key), "start": ms(start), "end": ms(end), "t": ms(end), "wr": e.BytesWritten, "rd": e.BytesRead}
 	if err := e.Err(); err != nil {
 		m["err"] = err.Error()
 	}
-	l.write(m)
+	l.line(m)
+}
+
+// OnBrokerWrite notes a request as flying from the moment its first byte was written.
+func (l *ledger) OnBrokerWrite(b kgo.BrokerMetadata, key int16, _ int, _, timeToWrite time.Duration, _ error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	k := [2]int32{b.NodeID, int32(key)}
+	l.flying[k] = append(l.flying[k], ms(time.Now().Add(-timeToWrite)))
 }
 
 func (l *ledger) OnBrokerConnect(_ kgo.BrokerMetadata, _ time.Duration, c net.Conn, err error) {
@@ -162,6 +215,19 @@ func main() {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	// SIGUSR1: the gate asks every client of this process to write a sync line.
+	usr := make(chan os.Signal, 4)
+	signal.Notify(usr, syscall.SIGUSR1)
+	go func() {
+		for range usr {
+			ledgersMu.Lock()
+			ls := append([]*ledger(nil), ledgers...)
+			ledgersMu.Unlock()
+			for _, l := range ls {
+				l.sync()
+			}
+		}
+	}()
 	cmd, addr, id, a := os.Args[1], os.Args[2], os.Args[3], os.Args[4:]
 	switch cmd {
 	case "seed":

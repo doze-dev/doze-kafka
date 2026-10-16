@@ -8,6 +8,10 @@
 import type { El } from '../lib/measure';
 import type { Ledger, Req } from '../lib/ledger';
 
+/** What a paused page asked (GET traffic/new) and was told, as the spec saw it. */
+export type Poll = { sent: number; got?: number; n: number; atLeast: boolean };
+export const polls: Poll[] = [];
+
 export type Snap = Record<string, El[]>;
 export type Verdict = { problems: string[]; again?: string };
 export type Truth = {
@@ -121,12 +125,18 @@ export const TRUTHS: Record<string, Truth> = {
         const [, api, , count] = m;
         const first = ms(c[per === 7 ? 4 : 3]?.attrs?.datetime);
         seen.push({ client, api, at, first: Number.isNaN(first) ? at : first, count: Number(count ?? 1), rhythm: !Number.isNaN(first) });
-        if (at > latest - 50) continue; // the ledger is written after the answer: too new to judge.
+        // The ledger is a cut taken after the page was read (ledger.read(cut)): every
+        // request the page shows is in it, ended or flying. Without a cut (a world
+        // already running) the ledger is written after the answer: the newest are too new to judge.
+        if (ledger.cut === undefined && at > latest - 50) continue;
         // A client killed with a request in flight never wrote it down; the broker read it.
         const killed = ledger.killedAt(client);
         if (killed !== undefined && at <= killed && at > killed - 1000) continue;
         const sent = ledger.reqs.filter((r) => r.client === client && r.api === api && at >= r.start - SKEW && at <= r.upper + SKEW);
-        if (!sent.length) p.push(`row ${i}: ${client} ${api} at ${c[0].attrs?.datetime}: the ledger has no such request`);
+        if (!sent.length) {
+          const near = ledger.reqs.filter((r) => r.client === client && Math.abs(r.start - at) < 3000).map((r) => `${new Date(r.start).toISOString()}..+${(r.end - r.start).toFixed(0)}ms ${r.api}`);
+          p.push(`row ${i}: ${client} ${api} at ${c[0].attrs?.datetime}: the ledger has no such request (latest in the ledger ${new Date(latest).toISOString()}; ${client}'s near it: ${near.join(' | ') || 'none'})`);
+        }
       }
       // The counts. A client's requests of one kind fold one row a connection, and the
       // ledger does not say which connection carried a request; so for a client and a
@@ -146,7 +156,7 @@ export const TRUTHS: Record<string, Truth> = {
         if (!whole) break; // a filtered list leaves rows out: its counts are not the client's.
         if (rs.some((r) => r.count > 1 && !r.rhythm)) continue; // a folded fetch does not say when it began.
         const from = Math.min(...rs.map((r) => r.first)), to = Math.max(...rs.map((r) => r.at));
-        if (from < oldest || to > latest - 50) continue;
+        if (from < oldest || (ledger.cut === undefined && to > latest - 50)) continue;
         const [client, api] = k.split('\u0000');
         const n = bounds(ledger.reqs.filter((r: Req) => r.client === client && r.api === api), from, to + 1);
         const said = rs.reduce((a, r) => a + r.count, 0);
@@ -313,6 +323,7 @@ export const TRUTHS: Record<string, Truth> = {
       const sent = ledger.reqs.filter((r) => r.client === client && r.api === api && at >= r.start - SKEW && at <= r.upper + SKEW);
       if (sent.length !== 1) { p.push(`${client} ${api} at ${hd[hd.length - 1]?.attrs?.datetime}: ${sent.length} such requests in the ledger`); return { problems: p }; }
       const r = sent[0];
+      if (r.flying) return { problems: p, again: `${client} ${api} had not been answered when the ledger was cut` };
       const sw = ledger.software.get(client);
       if (sw && get('Software') !== `${sw.name} ${sw.version}`) p.push(`software "${get('Software')}"`);
       if (get('Principal') !== 'User:ANONYMOUS') p.push(`principal "${get('Principal')}"`);
@@ -436,17 +447,27 @@ export const TRUTHS: Record<string, Truth> = {
     },
   },
 
-  // Paused (Traf-08): how many requests came after the newest row shown.
+  // Paused (Traf-08): how many requests came after the newest row shown. The banner is
+  // asked every 2.5 s, so what it says moves with time: it is the number the broker gave
+  // at one of the page's last questions (`polls`, noted by the spec as the page asks), and
+  // that number is checked against the ledger over the span of that question, from when
+  // the page asked to when it was answered: the requests certainly in it, to the ones
+  // possibly in it.
   paused: {
     sels: ['#paused-banner [data-new-n]', '#paused-banner [data-paused-since]', '#traffic-live'],
     check(snap, ledger, at) {
       const p: string[] = [];
       const since = Number(snap['#traffic-live'][0]?.attrs?.['data-since']);
-      const said = Number(/^(?:at least )?(\d+)$/.exec(snap['#paused-banner [data-new-n]'][0]?.t ?? '')?.[1]);
-      // The banner is asked every 2.5 s: what it says is the count at its last answer.
-      const b = bounds(ledger.reqs, since + 0.001, at);
-      const lo = bounds(ledger.reqs, since + 0.001, at - 3000).lo;
-      if (!(said >= lo && said <= b.hi)) p.push(`"${said} new requests": the ledger has ${lo} to ${b.hi} since ${new Date(since).toISOString()}`);
+      const text = snap['#paused-banner [data-new-n]'][0]?.t ?? '';
+      const said = Number(/^(?:at least )?(\d+)$/.exec(text)?.[1]);
+      const asked = polls.filter((q) => q.sent <= at).slice(-3);
+      if (!asked.length) return { problems: [], again: 'the paused page has not asked how many it missed' };
+      const q = asked.reverse().find((x) => x.n === said && (x.atLeast ? `at least ${x.n}` : `${x.n}`) === text);
+      if (!q && asked.some((x) => Number.isNaN(x.n))) return { problems: [], again: 'an answer to the paused page had not been read yet' };
+      if (!q) { p.push(`"${text} new requests": the page's last answers were ${asked.map((x) => (x.atLeast ? 'at least ' : '') + x.n).join(', ')}`); return { problems: p }; }
+      const b = bounds(ledger.reqs, since + 0.001, q.got ?? Date.now());
+      const lo = bounds(ledger.reqs, since + 0.001, q.sent).lo;
+      if (!(q.atLeast ? said <= b.hi : said >= lo && said <= b.hi)) p.push(`"${said} new requests": the ledger has ${lo} to ${b.hi} since ${new Date(since).toISOString()} over the question asked at ${new Date(q.sent).toISOString()}`);
       return { problems: p };
     },
   },

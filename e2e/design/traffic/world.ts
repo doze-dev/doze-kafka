@@ -38,6 +38,12 @@ export type World = {
   stopAll(): Promise<void>;
   /** Kills one of the scenario's clients (SIGKILL: it leaves nothing behind). */
   kill(client: string, signal?: NodeJS.Signals): Promise<void>;
+  /**
+   * Asks every client still running to write a sync line (SIGUSR1) and waits for all of
+   * them: the cut to read the ledger at (ledger.read(cut)), after which every request a
+   * client has had answered is in its file and the ones it has not are listed.
+   */
+  sync(): Promise<number>;
   /** Runs the scenario: the clients start, join, leave and die as the boards' world does. */
   scenario(): Promise<void>;
 };
@@ -116,6 +122,17 @@ export async function startWorld(base: number, prefix: string): Promise<World> {
     await stopBroker();
   };
 
+  const sync = async () => {
+    const cut = Date.now();
+    const live = [...procs.entries()].filter(([, c]) => c.exitCode === null && c.signalCode === null);
+    for (const [, c] of live) c.kill('SIGUSR1');
+    await until(async () => {
+      world.ledger.read();
+      return live.every(([id]) => (world.ledger.syncs.get(id) ?? 0) >= cut);
+    }, 30_000, 'every client writing its sync line');
+    return cut;
+  };
+
   const scenario = async () => {
     try {
       world.began = Date.now();
@@ -150,6 +167,6 @@ export async function startWorld(base: number, prefix: string): Promise<World> {
 
   await startBroker();
   appendFileSync(join(ledgerDir, 'broker.jsonl'), JSON.stringify({ ev: 'note', what: 'world', kafka, t: Date.now() }) + '\n');
-  const world: World = { console: consoleURL, kafka, ledger: new Ledger(ledgerDir), began: 0, stopBroker, startBroker, stopAll, kill, scenario };
+  const world: World = { console: consoleURL, kafka, ledger: new Ledger(ledgerDir), began: 0, stopBroker, startBroker, stopAll, kill, sync, scenario };
   return world;
 }

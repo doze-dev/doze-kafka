@@ -4,13 +4,15 @@
 
 import type { Page } from '@playwright/test';
 import type { Pair } from '../lib/diff';
+import type { Ledger } from '../lib/ledger';
+import { polls } from './truth';
 
 export type Board = {
   id: string;
   /** The board's file under e2e/design/boards, without .dc.html. */
   file: string;
   /** Puts the live page into the board's state. */
-  state: (page: Page, base: string) => Promise<void>;
+  state: (page: Page, base: string, ledger: Ledger) => Promise<void>;
   pairs: Pair[];
   /** The truth checks this board's data pairs name. */
   truths: string[];
@@ -105,30 +107,39 @@ const connected: Pair[] = [
   { id: 'metrics callout lines', board: `${I} > .bd > .callout > *`, live: `${P} #clients-list > .callout > *`, data: { truth: 'connected', geometry: ['y'] } },
 ];
 
-// Opens the first row of a client's request (a folded one, or not).
-// The row is one in view, as a person would click it: the table is not scrolled to find
-// it (a page that waits a moment has a newer one at the top).
-async function openRow(page: Page, client: string, api: string, folded: boolean, result = '') {
+// Opens the newest row of a client's request (a folded one, or not) that the client's
+// ledger vouches for: the row is picked by what it is (the client, the API, and the time
+// the broker read the request, which must lie within a request of that client and API in
+// the ledger), never by where it is on the page. The page puts a new row at the top every
+// few hundred milliseconds, so a row that is in view now is gone from view by the next
+// poll; the click scrolls the table to the row (it stays among the page's 200 until a
+// hundred newer ones come) and the table goes back to its top before the page is measured.
+async function openRow(page: Page, ledger: Ledger, client: string, api: string, folded: boolean, result = '') {
   const want = new RegExp(`^${api} v\\d+${folded ? ' ×\\d+' : ''}$`);
+  let last = '';
   for (let i = 0; i < 60; i++) {
-    const at = await page.evaluate(([c, re, res]) => {
-      const box = document.querySelector('#traffic-live .tf-rows')!.getBoundingClientRect();
-      const rows = Array.from(document.querySelectorAll('#traffic-live .tf-rows > .r[data-row]')) as HTMLElement[];
-      const hit = rows.find((r) => {
-        const s = r.children;
-        const b = r.getBoundingClientRect();
-        return (s[1] as HTMLElement).innerText.trim() === c && new RegExp(re).test((s[2] as HTMLElement).innerText.trim()) && (!res || (s[5] as HTMLElement).innerText.trim() === res) && b.top >= box.top && b.bottom <= box.bottom;
+    const rows = await page.evaluate(() => Array.from(document.querySelectorAll('#traffic-live .tf-rows > .r[data-row]')).map((r) => {
+      const s = r.children as unknown as HTMLElement[];
+      return { id: r.id, client: s[1].innerText.trim(), request: s[2].innerText.trim(), result: s[5]?.innerText.trim() ?? '', at: Date.parse(s[0].querySelector('time')?.getAttribute('datetime') ?? s[0].getAttribute('datetime') ?? '') };
+    }));
+    ledger.read();
+    const mine = ledger.reqs.filter((r) => r.client === client && r.api === api && !r.err);
+    const hit = rows.find((r) => r.client === client && want.test(r.request) && (!result || r.result === result) && mine.some((q) => r.at >= q.start - 1 && r.at <= q.upper + 1));
+    last = `${rows.length} rows on the page, ${mine.length} such requests in the ledger`;
+    if (hit) {
+      try {
+        await page.locator(`[id="${hit.id}"]`).click({ timeout: 3000 });
+        await page.locator('#inspector [data-traffic-insp]').waitFor({ timeout: 3000 });
+      } catch { await page.waitForTimeout(200); continue; } // a poll replaced the row under the click: pick again.
+      await page.evaluate(() => {
+        for (let el: Element | null = document.querySelector('#traffic-live .tf-rows'); el; el = el.parentElement) el.scrollTop = 0;
+        window.scrollTo(0, 0);
       });
-      return hit ? hit.id : '';
-    }, [client, want.source, result] as const);
-    if (at) {
-      await page.locator(`[id="${at}"]`).click();
-      await page.locator('#inspector [data-traffic-insp]').waitFor();
       return;
     }
     await page.waitForTimeout(500);
   }
-  throw new Error(`no ${client} ${api} row came into view`);
+  throw new Error(`no ${client} ${api} row the ledger vouches for was on the page (${last})`);
 }
 
 async function openClient(page: Page, client: string) {
@@ -217,7 +228,7 @@ export const BOARDS: Board[] = [
   },
   {
     id: 'Traf-04', file: 'Traf-04-Request',
-    state: async (page, base) => { await page.goto(`${base}traffic`); await openRow(page, 'checkout-api', 'Produce', false, 'ok'); },
+    state: async (page, base, ledger) => { await page.goto(`${base}traffic`); await openRow(page, ledger, 'checkout-api', 'Produce', false, 'ok'); },
     pairs: [
       ...head, ...summary, ...filter([foldNote]), ...table({ okRow: '.r:not(.h):not(.on):not([style])' }), foot,
       ...insp(PS, { headData: 'request', bodyData: true }),
@@ -233,7 +244,7 @@ export const BOARDS: Board[] = [
   },
   {
     id: 'Traf-05', file: 'Traf-05-Folded',
-    state: async (page, base) => { await page.goto(`${base}traffic`); await openRow(page, 'order-validator', 'Heartbeat', true); },
+    state: async (page, base, ledger) => { await page.goto(`${base}traffic`); await openRow(page, ledger, 'order-validator', 'Heartbeat', true); },
     pairs: [
       ...head, ...summary, ...filter([foldNote]), ...table({ okRow: '.r:not(.h):not(.on):not([style])' }), foot,
       ...insp(PS, { headData: 'folded' }),
@@ -282,9 +293,16 @@ export const BOARDS: Board[] = [
   },
   {
     id: 'Traf-08', file: 'Traf-08-Paused',
-    state: async (page, base) => {
+    state: async (page, base, ledger) => {
+      polls.length = 0;
+      page.on('request', (r) => {
+        if (!r.url().includes('/traffic/new')) return;
+        const q: { sent: number; got?: number; n: number; atLeast: boolean } = { sent: Date.now(), n: NaN, atLeast: false };
+        r.response().then(async (res) => { const j = await res?.json(); q.n = j?.n; q.atLeast = !!j?.atLeast; q.got = Date.now(); }).catch(() => {});
+        polls.push(q);
+      });
       await page.goto(`${base}traffic`);
-      await openRow(page, 'depot-router', 'OffsetCommit', false);
+      await openRow(page, ledger, 'depot-router', 'OffsetCommit', false);
       await page.locator('#detail .h1').click();
       await page.keyboard.press('p');
       await page.waitForTimeout(3000);
