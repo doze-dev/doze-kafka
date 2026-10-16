@@ -171,7 +171,7 @@ where this one says `kafka-version`; that spelling is still read.
 | Command | Does |
 |---|---|
 | `doze-kafka version` / `--version` / `-v` | Print doze-kafka's version and the Kafka range it speaks. |
-| `doze-kafka env` | Print the shell block that points a client at this instance (`eval "$(doze-kafka env)"`): `KAFKA_BOOTSTRAP_SERVERS` and `KAFKA_BROKERS`. |
+| `doze-kafka env` | Print the shell block that points a client at this instance (`eval "$(doze-kafka env)"`): `KAFKA_BOOTSTRAP_SERVERS` and `KAFKA_BROKERS`, `SCHEMA_REGISTRY_URL` while the registry is on, and `KAFKA_SASL_MECHANISM` (the first of `--sasl-mechanisms`) under SASL; never a password. It reads its own flags and `doze-kafka.toml`, not a running broker: under `--listen`, run the one the start-up summary prints. |
 | `doze-kafka doctor` | Report what is set up for `.doze` names and what is not, and which process holds which name. Needs no privilege. |
 | `doze-kafka config print [--show-secrets] [flags]` | Print the effective configuration as TOML, passwords as `"<redacted>"` unless `--show-secrets`. |
 | `doze-kafka dns-setup` | One-time setup for the shared `.doze` names. See [Endpoints](endpoints.md). |

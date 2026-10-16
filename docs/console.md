@@ -248,8 +248,10 @@ Times are shown in your browser's zone, with the zone and the UTC instant on hov
   addresses, `*.doze`, and anything you add with `--console-allow-host` — and
   refuses state-changing requests from other origins. That keeps a web page open in
   your browser from reaching it through DNS rebinding or a forged form.
-- `DOZE_KAFKA_CONSOLE_PREFIX` mounts it somewhere other than `/_console` (behind a
-  reverse proxy, or to prove in a test that nothing assumes the default).
+- `--console-prefix` (`console-prefix` in the file) mounts it somewhere other than
+  `/_console`, behind a reverse proxy; `/` serves it at the root of its port.
+  `DOZE_KAFKA_CONSOLE_PREFIX` does the same when neither is set (the test suites use it
+  to show nothing assumes the default).
 - It is plain HTTP with no login of its own, and with SASL on it acts on the broker as
   a super user. It listens on loopback. With SASL or TLS on, a `--console-addr` beyond
   loopback is refused at start-up unless `--console-unprotected` accepts it; what to

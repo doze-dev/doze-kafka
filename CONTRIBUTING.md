@@ -108,7 +108,8 @@ front-end libraries are vendored (`console/static/VERSIONS`).
 Guards keep it consistent, and they fail with instructions: every template class
 must be styled, every `var(--x)` defined, font sizes come from the `--fs-*` tokens, and
 inline styles are on a ratchet (`console/cssguard_test.go`); every text colour holds
-4.5:1 on every surface in both themes (`TestThemeContrast`). Every GET route must render
+4.5:1 on every surface in all three themes, light, dark and high contrast
+(`TestEveryTextAndBackgroundPairHoldsItsContrastInAllThreeThemes`). Every GET route must render
 (also with the broker down) and every POST must refuse a foreign origin and fail with a
 4xx (`console/surfaces_test.go`); both read the route table from `console.go`, so a new
 route is covered automatically.

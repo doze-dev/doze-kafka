@@ -71,7 +71,7 @@ Auto-create is on by default, so producing to a new topic creates it. If you ran
 `--auto-create-topics=false`, create it explicitly first:
 
 ```sh
-kafka-topics.sh --bootstrap-server localhost:9092 --create --topic demo --partitions 1
+kafka-topics.sh --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --create --topic demo --partitions 1
 ```
 
 ## My data disappeared after a restart
@@ -79,7 +79,7 @@ kafka-topics.sh --bootstrap-server localhost:9092 --create --topic demo --partit
 doze-kafka only persists what's under `--data-dir` (the logs, and `meta.db` inside
 it). If you didn't set it, it defaults to `./data` **relative to the current working
 directory** — start the broker from a different directory and it looks like a fresh
-broker. The start-up summary prints the absolute `Data` path it is using. Pin an
+broker. The start-up summary prints the absolute `data` path it is using. Pin an
 absolute path to avoid this:
 
 ```sh

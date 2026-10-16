@@ -99,8 +99,9 @@ kafka-console-consumer.sh --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --topic 
 ## Things worth knowing
 
 - **Reconnect address.** Clients bootstrap to the address you give them, then
-  reconnect to the address the broker *advertises*. On one machine that's
-  `localhost` and everything just works. Across container/host boundaries, set
+  reconnect to the address the broker *advertises*. On one machine that's the
+  instance's name (`kafka.<name>.doze`), or `127.0.0.1` under a loopback `--listen`,
+  and everything just works. Across container/host boundaries, set
   `--advertised-host` — see [Configuration](configuration.md).
 - **Idempotent producers just work.** Modern producers default to idempotent writes
   (`InitProducerId` + a per-batch sequence number, and `acks=all`). doze-kafka
