@@ -51,6 +51,11 @@ func defaultRequest(key int16, version int16) kmsg.Request {
 		r.Acks = 1 // the default, 0, is fire-and-forget: Kafka answers it with nothing.
 	case *kmsg.ConsumerGroupHeartbeatRequest:
 		r.Group = "matrix"
+	case *kmsg.DescribeACLsRequest:
+		// Every code at its default is UNKNOWN (0), on which Kafka, and this
+		// broker, close the connection (conformance/claims/api.md V5, and the
+		// version-matrix recording); ANY is the filter that is answered.
+		r.ResourceType, r.ResourcePatternType, r.Operation, r.PermissionType = 1, 1, 1, 1
 	}
 	req.SetVersion(version)
 	return req
