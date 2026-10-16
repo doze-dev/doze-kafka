@@ -40,7 +40,7 @@
         "ErrorCode": 89,
         "PushIntervalMillis": 0,
         "RequestedMetrics": null,
-        "SubscriptionID": "\u003csubscription:2\u003e",
+        "SubscriptionID": 0,
         "TelemetryMaxBytes": 0,
         "ThrottleMillis": 0
       }

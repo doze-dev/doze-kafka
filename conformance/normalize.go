@@ -108,9 +108,12 @@ func (n *normalizer) walk(v any, key string) any {
 			return "<node>"
 		case key == "Port":
 			return "<port>"
-		case key == "SubscriptionID":
+		case key == "SubscriptionID" && x.String() != "0":
 			// Kafka makes it up from the subscription's content, a client of this
 			// repository from a random number: only whether two are the same matters.
+			// Zero stays zero: it is "no subscription" (a client's first
+			// GetTelemetrySubscriptions), and a made-up id where Kafka sent 0 must
+			// show (TestZeroSubscriptionIDIsKeptByTheNormalizer).
 			if p, ok := n.subscriptions[x.String()]; ok {
 				return p
 			}

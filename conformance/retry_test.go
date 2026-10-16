@@ -1,6 +1,7 @@
 package conformance
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -26,5 +27,25 @@ func TestAReplayNeverAsksTwice(t *testing.T) {
 	e.DoUntil("never done", kmsg.NewPtrMetadataRequest(), 9, func(kmsg.Response) bool { return false })
 	if e.asked != 0 || len(e.Steps()) != 1 {
 		t.Fatalf("against doze-kafka a step was asked %d more times (%d steps recorded, %v)", e.asked, len(e.Steps()), time.Since(began))
+	}
+}
+
+// SubscriptionID 0 is "no subscription": the normaliser numbers the made-up ids
+// by first appearance and keeps 0 as 0, so doze-kafka inventing an id where
+// Kafka sent 0 is a difference.
+func TestZeroSubscriptionIDIsKeptByTheNormalizer(t *testing.T) {
+	n := newNormalizer()
+	r := kmsg.NewPtrPushTelemetryRequest()
+	got, err := n.normalize(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id := got.(map[string]any)["SubscriptionID"]; fmt.Sprint(id) != "0" {
+		t.Fatalf("SubscriptionID 0 normalised to %v", id)
+	}
+	r.SubscriptionID = 7
+	got, _ = n.normalize(r)
+	if id := got.(map[string]any)["SubscriptionID"]; id != "<subscription:1>" {
+		t.Fatalf("SubscriptionID 7 normalised to %v, want the first made-up id", id)
 	}
 }
