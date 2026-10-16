@@ -2,6 +2,7 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { test, expect } from '../fixtures/console';
 import type { Locator, Page } from '@playwright/test';
 import { kafkaAddr } from '../addr';
+import { BASE_URL } from '../playwright.config';
 
 // One inspector, six selections (plus a group's events): a message, a request, a
 // client, a member, a subject and a transaction. Each is selected, closed with Esc
@@ -10,12 +11,17 @@ import { kafkaAddr } from '../addr';
 
 let hold: ChildProcess | undefined;
 
+// The held consumer reads a topic of its own: it fetches all the time, and on a seed topic
+// its requests would be the newest the topic's dock lists (dock.spec.ts expects the seed's).
+const HOLD_TOPIC = 'inspect-hold-topic';
+
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
   // A consumer that stays in its group, so there is a client and a member to look at.
+  await fetch(new URL('new/topic', BASE_URL), { method: 'POST', body: new URLSearchParams({ name: HOLD_TOPIC, partitions: '1' }) });
   execFileSync('go', ['build', '-o', `e2e/.tmp/bin/hold-${process.pid}`, './e2e/hold'], { cwd: '..', env: { ...process.env, GOWORK: 'off' } });
-  hold = spawn(`e2e/.tmp/bin/hold-${process.pid}`, [kafkaAddr(), 'inspect-hold', 'inspect-hold-group', 'seed-orders'], { cwd: '..', stdio: ['ignore', 'pipe', 'inherit'] });
+  hold = spawn(`e2e/.tmp/bin/hold-${process.pid}`, [kafkaAddr(), 'inspect-hold', 'inspect-hold-group', HOLD_TOPIC], { cwd: '..', stdio: ['ignore', 'pipe', 'inherit'] });
   await new Promise<void>((resolve, reject) => {
     const t = setTimeout(() => reject(new Error('the held consumer never joined its group')), 20_000);
     hold!.stdout!.on('data', (b) => { if (String(b).includes('ready')) { clearTimeout(t); resolve(); } });
@@ -83,8 +89,9 @@ test('a client is selected, closed, refreshed and left with Back', async ({ page
 // Enter on a link inside the inspector that opens another selection is the link's own:
 // the shell's key handling for rows must not cancel it.
 test('Enter on the client link inside a request inspector opens the client', async ({ page }) => {
-  await page.goto('traffic');
-  await page.locator('#traffic-table .tf-rows > .r[data-row]', { hasText: 'inspect-hold' }).first().click();
+  // The client's own requests (the page lists the newest 200 of everyone's).
+  await page.goto('traffic?client=inspect-hold');
+  await page.locator('#traffic-table .tf-rows > .r[data-row]').first().click();
   await expect(page.locator('#inspector [data-inspector-kind]')).toHaveAttribute('data-inspector-kind', 'request');
   const link = page.locator('#inspector a[data-inspector-open]', { hasText: 'inspect-hold' }).first();
   await expect(link).toBeVisible();
@@ -102,7 +109,7 @@ test('a member is selected, closed, refreshed and left with Back', async ({ page
   await expect(row).toContainText('inspect-hold');
   await cycle(page, row, 'member');
   await row.click();
-  await expect(overlay(page)).toContainText('seed-orders');
+  await expect(overlay(page)).toContainText(HOLD_TOPIC);
 });
 
 test('a transaction is selected, closed, refreshed and left with Back', async ({ page }) => {
