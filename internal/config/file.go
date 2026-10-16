@@ -21,44 +21,45 @@ const DefaultConfigFile = "doze-kafka.toml"
 // that is what makes the flags > file > defaults precedence work: the file overlays
 // only what it names. Durations are written as human strings ("500ms", "45s").
 type fileConfig struct {
-	KafkaVersion           *int              `toml:"kafka-version"`
-	Version                *int              `toml:"version"` // the earlier spelling of kafka-version; still read.
-	Listen                 *string           `toml:"listen"`
-	AdvertisedHost         *string           `toml:"advertised-host"`
-	AdvertisedPort         *int              `toml:"advertised-port"`
-	DataDir                *string           `toml:"data-dir"`
-	MetaDB                 *string           `toml:"meta-db"`
-	SegmentBytes           *int64            `toml:"segment-bytes"`
-	IndexIntervalBytes     *int64            `toml:"index-interval-bytes"`
-	RetentionBytes         *int64            `toml:"retention-bytes"`
-	RetentionMs            *int64            `toml:"retention-ms"`
-	FsyncInterval          *string           `toml:"fsync-interval"`
-	ConsumerSessionTimeout *string           `toml:"consumer-session-timeout"`
-	OffsetsRetention       *string           `toml:"offsets-retention"`
-	AutoCreateTopics       *bool             `toml:"auto-create-topics"`
-	DefaultPartitions      *int              `toml:"default-partitions"`
-	MaxPartitions          *int              `toml:"max-partitions"`
-	MessageMaxBytes        *int64            `toml:"message-max-bytes"`
-	SASLMechanisms         []string          `toml:"sasl-mechanisms"`
-	Credentials            map[string]string `toml:"credentials"`
-	TLS                    *tlsFile          `toml:"tls"`
-	ACLDefault             *string           `toml:"acl-default"`
-	ACLSuperUsers          []string          `toml:"acl-super-user"`
-	Console                *bool             `toml:"console"`
-	ConsoleAddr            *string           `toml:"console-addr"`
-	ConsolePrefix          *string           `toml:"console-prefix"`
-	ConsoleAllowHost       []string          `toml:"console-allow-host"`
-	ConsoleUnprotected     *bool             `toml:"console-unprotected"`
-	TraceHeader            *string           `toml:"trace-header"`
-	ClientTelemetry        *bool             `toml:"client-telemetry"`
-	Zone                   *bool             `toml:"zone"`
-	SchemaRegistry         *bool             `toml:"schema-registry"`
-	SchemaRegistryAddr     *string           `toml:"schema-registry-addr"`
-	SchemaRegistryTLS      *bool             `toml:"schema-registry-tls"`
-	PprofAddr              *string           `toml:"pprof-addr"`
-	Name                   *string           `toml:"name"`
-	LogLevel               *string           `toml:"log-level"`
-	LogFormat              *string           `toml:"log-format"`
+	KafkaVersion               *int              `toml:"kafka-version"`
+	Version                    *int              `toml:"version"` // the earlier spelling of kafka-version; still read.
+	Listen                     *string           `toml:"listen"`
+	AdvertisedHost             *string           `toml:"advertised-host"`
+	AdvertisedPort             *int              `toml:"advertised-port"`
+	DataDir                    *string           `toml:"data-dir"`
+	MetaDB                     *string           `toml:"meta-db"`
+	SegmentBytes               *int64            `toml:"segment-bytes"`
+	IndexIntervalBytes         *int64            `toml:"index-interval-bytes"`
+	RetentionBytes             *int64            `toml:"retention-bytes"`
+	RetentionMs                *int64            `toml:"retention-ms"`
+	FsyncInterval              *string           `toml:"fsync-interval"`
+	ConsumerSessionTimeout     *string           `toml:"consumer-session-timeout"`
+	GroupInitialRebalanceDelay *string           `toml:"group-initial-rebalance-delay"`
+	OffsetsRetention           *string           `toml:"offsets-retention"`
+	AutoCreateTopics           *bool             `toml:"auto-create-topics"`
+	DefaultPartitions          *int              `toml:"default-partitions"`
+	MaxPartitions              *int              `toml:"max-partitions"`
+	MessageMaxBytes            *int64            `toml:"message-max-bytes"`
+	SASLMechanisms             []string          `toml:"sasl-mechanisms"`
+	Credentials                map[string]string `toml:"credentials"`
+	TLS                        *tlsFile          `toml:"tls"`
+	ACLDefault                 *string           `toml:"acl-default"`
+	ACLSuperUsers              []string          `toml:"acl-super-user"`
+	Console                    *bool             `toml:"console"`
+	ConsoleAddr                *string           `toml:"console-addr"`
+	ConsolePrefix              *string           `toml:"console-prefix"`
+	ConsoleAllowHost           []string          `toml:"console-allow-host"`
+	ConsoleUnprotected         *bool             `toml:"console-unprotected"`
+	TraceHeader                *string           `toml:"trace-header"`
+	ClientTelemetry            *bool             `toml:"client-telemetry"`
+	Zone                       *bool             `toml:"zone"`
+	SchemaRegistry             *bool             `toml:"schema-registry"`
+	SchemaRegistryAddr         *string           `toml:"schema-registry-addr"`
+	SchemaRegistryTLS          *bool             `toml:"schema-registry-tls"`
+	PprofAddr                  *string           `toml:"pprof-addr"`
+	Name                       *string           `toml:"name"`
+	LogLevel                   *string           `toml:"log-level"`
+	LogFormat                  *string           `toml:"log-format"`
 }
 
 type tlsFile struct {
@@ -132,6 +133,13 @@ func (fc fileConfig) applyTo(cfg *Config) error {
 			return fmt.Errorf("config: consumer-session-timeout: %w", err)
 		}
 		cfg.ConsumerSessionTimeout = d
+	}
+	if fc.GroupInitialRebalanceDelay != nil {
+		d, err := time.ParseDuration(*fc.GroupInitialRebalanceDelay)
+		if err != nil {
+			return fmt.Errorf("config: group-initial-rebalance-delay: %w", err)
+		}
+		cfg.GroupInitialRebalanceDelay = d
 	}
 	if fc.OffsetsRetention != nil {
 		d, err := time.ParseDuration(*fc.OffsetsRetention)
@@ -242,35 +250,36 @@ func WriteTOMLWithSecrets(w io.Writer, cfg Config) error { return writeTOML(w, c
 
 func writeTOML(w io.Writer, cfg Config, secrets bool) error {
 	fc := fileConfig{
-		KafkaVersion:           &cfg.Version,
-		Listen:                 &cfg.ListenAddr,
-		AdvertisedHost:         &cfg.AdvertisedHost,
-		AdvertisedPort:         &cfg.AdvertisedPort,
-		DataDir:                &cfg.DataDir,
-		MetaDB:                 &cfg.MetaDB,
-		SegmentBytes:           &cfg.SegmentBytes,
-		IndexIntervalBytes:     &cfg.IndexIntervalBytes,
-		RetentionBytes:         &cfg.RetentionBytes,
-		RetentionMs:            &cfg.RetentionMs,
-		FsyncInterval:          strp(cfg.FsyncInterval.String()),
-		ConsumerSessionTimeout: strp(cfg.ConsumerSessionTimeout.String()),
-		OffsetsRetention:       strp(cfg.OffsetsRetention.String()),
-		AutoCreateTopics:       &cfg.AutoCreateTopics,
-		DefaultPartitions:      &cfg.DefaultPartitions,
-		MaxPartitions:          &cfg.MaxPartitions,
-		MessageMaxBytes:        &cfg.MessageMaxBytes,
-		Console:                &cfg.Console,
-		ConsoleAddr:            &cfg.ConsoleAddr,
-		TraceHeader:            &cfg.TraceHeader,
-		ClientTelemetry:        &cfg.ClientTelemetry,
-		Zone:                   &cfg.Zone,
-		SchemaRegistry:         &cfg.SchemaRegistry,
-		SchemaRegistryAddr:     &cfg.SchemaRegistryAddr,
-		SchemaRegistryTLS:      &cfg.SchemaRegistryTLS,
-		ConsoleUnprotected:     &cfg.ConsoleUnprotected,
-		Name:                   &cfg.Name,
-		LogLevel:               &cfg.LogLevel,
-		LogFormat:              &cfg.LogFormat,
+		KafkaVersion:               &cfg.Version,
+		Listen:                     &cfg.ListenAddr,
+		AdvertisedHost:             &cfg.AdvertisedHost,
+		AdvertisedPort:             &cfg.AdvertisedPort,
+		DataDir:                    &cfg.DataDir,
+		MetaDB:                     &cfg.MetaDB,
+		SegmentBytes:               &cfg.SegmentBytes,
+		IndexIntervalBytes:         &cfg.IndexIntervalBytes,
+		RetentionBytes:             &cfg.RetentionBytes,
+		RetentionMs:                &cfg.RetentionMs,
+		FsyncInterval:              strp(cfg.FsyncInterval.String()),
+		ConsumerSessionTimeout:     strp(cfg.ConsumerSessionTimeout.String()),
+		OffsetsRetention:           strp(cfg.OffsetsRetention.String()),
+		GroupInitialRebalanceDelay: strp(cfg.GroupInitialRebalanceDelay.String()),
+		AutoCreateTopics:           &cfg.AutoCreateTopics,
+		DefaultPartitions:          &cfg.DefaultPartitions,
+		MaxPartitions:              &cfg.MaxPartitions,
+		MessageMaxBytes:            &cfg.MessageMaxBytes,
+		Console:                    &cfg.Console,
+		ConsoleAddr:                &cfg.ConsoleAddr,
+		TraceHeader:                &cfg.TraceHeader,
+		ClientTelemetry:            &cfg.ClientTelemetry,
+		Zone:                       &cfg.Zone,
+		SchemaRegistry:             &cfg.SchemaRegistry,
+		SchemaRegistryAddr:         &cfg.SchemaRegistryAddr,
+		SchemaRegistryTLS:          &cfg.SchemaRegistryTLS,
+		ConsoleUnprotected:         &cfg.ConsoleUnprotected,
+		Name:                       &cfg.Name,
+		LogLevel:                   &cfg.LogLevel,
+		LogFormat:                  &cfg.LogFormat,
 	}
 	// MetaDB is only written when it differs from the default, so a printed file
 	// stays valid after the data directory moves.

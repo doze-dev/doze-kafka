@@ -58,6 +58,14 @@ implement it.
   UNKNOWN_SERVER_ERROR as this does). A batch stored by an earlier version that cannot
   be read is kept, and skipped by the readers that look inside (timestamp lookups and
   the cleaner use its header), so such a log still opens and serves.
+- **The first rebalance of an empty classic group waits 200 ms for more members**,
+  where Kafka's `group.initial.rebalance.delay.ms` is 3 seconds. Every application
+  that starts with the classic protocol waits it before its first partitions; 200 ms is
+  long enough for the consumers of one process to arrive together. How it waits is
+  Kafka's: a member that joins during the wait starts another, cut to what the
+  rebalance timeout leaves, and the first member to join leads
+  (recorded at Kafka's 3 s: `classic-initial-rebalance-delay.json`, replayed with
+  `--group-initial-rebalance-delay=3s`, which gives Kafka's wait).
 - **A consumer-protocol member is asked to heartbeat every second**, where Kafka's
   `group.consumer.heartbeat.interval.ms` is 5 seconds: rebalances settle in a couple of
   seconds on a development machine instead of ten.

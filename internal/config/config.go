@@ -65,6 +65,11 @@ type Config struct {
 	// as Kafka's default; 0 computes at every heartbeat, which Kafka allows too). It
 	// has no flag or file key: the broker tests of reconciliation set it to 0.
 	ConsumerAssignmentInterval time.Duration
+	// GroupInitialRebalanceDelay is how long the first rebalance of an empty classic
+	// group waits for more members, started again while members keep joining, up to
+	// the rebalance timeout (group.initial.rebalance.delay.ms). Kafka's default is 3 s;
+	// this broker's is 200 ms (docs/limitations.md). Zero completes it at once.
+	GroupInitialRebalanceDelay time.Duration
 	// OffsetsRetention is how long a group's committed offsets are kept once nothing is
 	// reading them (offsets.retention.minutes: 7 days). Zero keeps them for ever.
 	OffsetsRetention time.Duration
@@ -197,6 +202,7 @@ func Default() Config {
 		FsyncInterval:              500 * time.Millisecond,
 		ConsumerSessionTimeout:     45 * time.Second,
 		ConsumerAssignmentInterval: time.Second,
+		GroupInitialRebalanceDelay: 200 * time.Millisecond,
 		OffsetsRetention:           7 * 24 * time.Hour,
 		AutoCreateTopics:           true,
 		DefaultPartitions:          1,
@@ -437,6 +443,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: offsets-retention must not be negative, got %s (0 keeps offsets for ever)", c.OffsetsRetention)
 	case c.OffsetsRetentionCheckInterval < 0:
 		return fmt.Errorf("config: the offsets retention check interval must not be negative, got %s", c.OffsetsRetentionCheckInterval)
+	case c.GroupInitialRebalanceDelay < 0:
+		return fmt.Errorf("config: group-initial-rebalance-delay must not be negative, got %s (0 does not wait)", c.GroupInitialRebalanceDelay)
 	case c.ConsumerAssignmentInterval < 0:
 		return fmt.Errorf("config: the consumer group assignment interval must not be negative, got %s", c.ConsumerAssignmentInterval)
 	case c.ConsumerSessionTimeout <= 0:

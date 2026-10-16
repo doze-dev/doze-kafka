@@ -18,13 +18,10 @@ import (
 // defaultSessionTimeout is used when a client requests a non-positive one.
 const defaultSessionTimeout = 30 * time.Second
 
-// initialRebalanceDelay is how long the first rebalance of an empty group waits
-// for more members before completing (Kafka's group.initial.rebalance.delay.ms).
-// Without it the first consumer of an application forms a generation alone within
-// microseconds, and each of the others starting beside it forces another: N
-// consumers, N rebalances. Kafka waits three seconds; a local broker need not, but
-// it must wait long enough for the rest of one process's consumers to arrive.
-var initialRebalanceDelay = 200 * time.Millisecond
+// defaultInitialRebalanceDelay is the initial rebalance delay of a groupManager made
+// by newGroupManager; a broker sets its config's. A variable so a test of the timers
+// can do without one.
+var defaultInitialRebalanceDelay = 200 * time.Millisecond
 
 // The bounds on a classic member's session.timeout.ms: Apache Kafka's defaults of
 // group.min.session.timeout.ms (6 s) and group.max.session.timeout.ms (30 min),
@@ -108,6 +105,10 @@ type groupManager struct {
 
 	claims *groupClaims
 
+	// initialDelay is the initial rebalance delay (config.GroupInitialRebalanceDelay;
+	// see hold); 0 completes a first rebalance as soon as everyone has joined.
+	initialDelay time.Duration
+
 	// pending holds member ids handed out with MEMBER_ID_REQUIRED and not yet
 	// used: group -> member id -> when issued. The join that follows must bring
 	// one of these (or the id of an existing member); any other id is unknown.
@@ -156,7 +157,7 @@ func newGroupManager(kept func(string) bool, claims *groupClaims) *groupManager 
 	if claims == nil {
 		claims = newGroupClaims()
 	}
-	return &groupManager{groups: make(map[string]*group), kept: kept, claims: claims,
+	return &groupManager{groups: make(map[string]*group), kept: kept, claims: claims, initialDelay: defaultInitialRebalanceDelay,
 		pending: make(map[string]map[string]time.Time)}
 }
 
@@ -231,6 +232,8 @@ type group struct {
 	members      map[string]*groupMember
 	static       map[string]string // group.instance.id -> member id, for static members.
 	holding      bool              // the initial rebalance delay is running: wait for it even if everyone has joined.
+	holdJoined   bool              // a member the group did not have joined during this window of the delay.
+	holdLeft     time.Duration     // what the rebalance timeout leaves for further windows.
 	pendingSync  map[string]chan syncResult
 	join         expiry // how long the rebalance waits for members to rejoin.
 }
@@ -436,6 +439,11 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 	if m == nil {
 		m = &groupMember{id: r.MemberID}
 		g.members[r.MemberID] = m
+		if g.leader == "" {
+			// The first member a group without a leader is given leads it (claim:
+			// groups R23b).
+			g.leader = r.MemberID
+		}
 		gm.redeem(r.Group, r.MemberID)
 		gm.emit(g, "joined", m.id, "client "+who.clientID, "")
 	}
@@ -465,7 +473,11 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 		} else {
 			gm.emit(g, "rebalance", m.id, "a member rejoined", "a member rejoined")
 		}
-		g.holding = wasEmpty && initialRebalanceDelay > 0
+		if wasEmpty && gm.initialDelay > 0 {
+			gm.hold(g)
+		}
+	} else if isNew && g.holding {
+		g.holdJoined = true
 	}
 	m.rejoined = true
 	m.awaitingJoin = true
@@ -965,11 +977,21 @@ func (gm *groupManager) armJoinTimer(g *group) {
 	if g.join.armed() {
 		return
 	}
-	wait := g.rebalanceTimeout()
-	if g.holding {
-		wait = min(wait, initialRebalanceDelay)
-	}
-	g.join.arm(wait, func(gen uint64) { gm.joinExpired(g, gen) })
+	g.join.arm(g.rebalanceTimeout(), func(gen uint64) { gm.joinExpired(g, gen) })
+}
+
+// hold starts the initial rebalance delay of a group that was empty
+// (group.initial.rebalance.delay.ms). Without it the first consumer of an application
+// forms a generation alone within microseconds, and each of the others starting beside
+// it forces another: N consumers, N rebalances. As Kafka does it (claim: groups R23a):
+// the rebalance waits one delay; if a member the group did not have joined during it,
+// it waits another, cut to what the rebalance timeout leaves, and so on; it completes
+// at the end of a window nobody new joined in.
+// Caller holds gm.mu.
+func (gm *groupManager) hold(g *group) {
+	g.holding, g.holdJoined = true, false
+	g.holdLeft = max(g.rebalanceTimeout()-gm.initialDelay, 0)
+	g.join.arm(gm.initialDelay, func(gen uint64) { gm.joinExpired(g, gen) })
 }
 
 // joinExpired is the join timer firing: the rebalance stops waiting for members
@@ -979,6 +1001,12 @@ func (gm *groupManager) joinExpired(g *group, gen uint64) {
 	gm.mu.Lock()
 	defer gm.mu.Unlock()
 	if gm.stopped || !g.join.current(gen) || g.state != statePreparingRebalance {
+		return
+	}
+	if g.holding && g.holdJoined && g.holdLeft > 0 {
+		wait := min(gm.initialDelay, g.holdLeft)
+		g.holdJoined, g.holdLeft = false, max(g.holdLeft-gm.initialDelay, 0)
+		g.join.arm(wait, func(gen uint64) { gm.joinExpired(g, gen) })
 		return
 	}
 	gm.completeJoin(g)

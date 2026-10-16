@@ -105,6 +105,7 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 	// Only a broker with a console keeps what clients report: the console is its one
 	// reader, and a broker without one advertises nothing for clients to push into.
 	b.cg848.bridge = b.groups
+	b.groups.initialDelay = cfg.GroupInitialRebalanceDelay
 	// Which groups have members is recorded whatever the retention is, zero included:
 	// a broker run for a while with the retention off and then with it on must not
 	// take the groups of that while for groups nobody ever joined.

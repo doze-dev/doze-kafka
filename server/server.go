@@ -92,6 +92,11 @@ type Options struct {
 	// heartbeat before it is evicted; 0 uses the default (45s). Tests of failure
 	// handling set it low.
 	ConsumerSessionTimeout time.Duration
+	// GroupInitialRebalanceDelay is how long the first rebalance of an empty classic
+	// group waits for more members, as the CLI's --group-initial-rebalance-delay and
+	// Kafka's group.initial.rebalance.delay.ms. Zero uses the default (200ms); a
+	// negative value does not wait, which a test that forms groups quickly wants.
+	GroupInitialRebalanceDelay time.Duration
 	// OffsetsRetention is how long a group's committed offsets are kept once nothing
 	// is reading them, as the CLI's --offsets-retention and Kafka's
 	// offsets.retention.minutes. Zero uses the default (7 days); a negative value
@@ -200,6 +205,9 @@ func newFromOptions(opts Options, console bool) (*Server, error) {
 	}
 	if opts.ConsumerSessionTimeout != 0 {
 		cfg.ConsumerSessionTimeout = opts.ConsumerSessionTimeout
+	}
+	if opts.GroupInitialRebalanceDelay != 0 {
+		cfg.GroupInitialRebalanceDelay = max(opts.GroupInitialRebalanceDelay, 0)
 	}
 	if opts.OffsetsRetention != 0 {
 		cfg.OffsetsRetention = max(opts.OffsetsRetention, 0)

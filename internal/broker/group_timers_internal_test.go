@@ -31,9 +31,9 @@ func joinReq(group, member string) *kmsg.JoinGroupRequest {
 
 func noDelay(t *testing.T) {
 	t.Helper()
-	old := initialRebalanceDelay
-	initialRebalanceDelay = 0
-	t.Cleanup(func() { initialRebalanceDelay = old })
+	old := defaultInitialRebalanceDelay
+	defaultInitialRebalanceDelay = 0
+	t.Cleanup(func() { defaultInitialRebalanceDelay = old })
 }
 
 func TestStaleSessionTimerDoesNotEvictALiveMember(t *testing.T) {

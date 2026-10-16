@@ -6,6 +6,16 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Groups: the first rebalance of an empty classic group waits as Kafka's does: a member
+  that joins during the delay starts another (cut to what the rebalance timeout
+  leaves), and the first member to join is the leader; it used to wait one delay from
+  the first join and pick a leader by member id. The delay is a setting,
+  `--group-initial-rebalance-delay` (TOML `group-initial-rebalance-delay`; Kafka's
+  `group.initial.rebalance.delay.ms`), 200 ms by default where Kafka's is 3 s. server API:
+  `Options.GroupInitialRebalanceDelay` (0 is the default, negative does not wait).
+  DescribeGroups shows a group's protocol and its members' metadata only once it is
+  Stable, as Kafka does (recorded: classic-initial-rebalance-delay).
+
 - Groups: a consumer group's new targets are computed at most once a second, by a
   member's heartbeat (or a classic member's JoinGroup), as on Kafka
   (`group.consumer.assignment.interval.ms`). A member that joins or leaves within a
