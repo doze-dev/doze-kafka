@@ -97,7 +97,7 @@ const DRIVERS: Record<string, (page: Page, size: Size) => Promise<void>> = {
     await open(p, 'topics/seed-orders');
     await p.locator('#palette-open').click();
     await expect(p.locator('#pal-q')).toBeFocused();
-    await p.keyboard.type('e');
+    await p.keyboard.type('ord');
     await expect(p.locator('.pal-item').first()).toBeVisible();
   },
   'Sy-06': async (p) => {
@@ -341,7 +341,7 @@ test('reference: the boards rendered as the design draws them', async ({ browser
 
 const FIELDS = ['w', 'h', 'padding', 'gap', 'font', 'family', 'radius', 'color', 'background'] as const; // family: h1 only, gap: main only
 // Widths that follow the window are not facts of the board.
-const FLUID_W = new Set(['top bar', 'main', 'h1', 'table header row', 'first table row', 'keys strip', 'callout', 'segment', 'dialog', 'tab', 'primary button', 'pill']);
+const FLUID_W = new Set(['top bar', 'main', 'h1', 'table header row', 'first table row', 'open row', 'keys strip', 'callout', 'segment', 'dialog', 'tab', 'primary button', 'pill']);
 
 function diffs(id: string, m: MeasFile[string]): string[] {
   const b = board(id);
@@ -393,6 +393,7 @@ test('index: plan/evidence/README.md', async () => {
       if (g('first table row', 'h')) key.push(`row ${g('first table row', 'h')}`);
       const cols = (live.probes['first table row'] as { columns?: number[] } | null)?.columns;
       if (cols) key.push(`cols ${cols.join(' ')}`);
+      if (g('open row', 'background')) key.push(`open row ${g('open row', 'background')}`);
     }
     rows.push(`| ${b.id} | ${b.state} | ${files.join(', ')} | ${key.join('; ') || 'n/a'} | ${b.verdict} |`);
     const d = diffs(b.id, m);
@@ -416,8 +417,12 @@ Screenshots of the live console beside the design's boards, for the review that
   Plex), when the run had DESIGN_DIR; \`measurements.json\` holds the numbers read
   off the board and off the live page by the same function (e2e/evidence/measure.ts).
 - The verdict is the one in \`plan/00-foundation.md\`, "Deviations from the boards";
-  this run does not change it. A difference measured below that the table does not
-  explain is added there.
+  this run does not change it. For Stage 0 (Sy-01 to Sy-08, the section homes and
+  Tp-24) the verdict is the design gate's (\`e2e/design\`, \`go tool task test:design\`):
+  it compares every probed element of the board and the console, in light and dark,
+  and holds each difference to its reason in an allow-list. The differences listed
+  below are this run's coarser measure (a few fixed sizes and colours per page),
+  kept as a record beside the pictures; the gate is what holds the console.
 
 To reproduce: \`go tool task evidence\` from the repository root (it boots its own
 seeded broker on E2E_PORT and a second one on E2E_PORT+20 for the first-run, empty
