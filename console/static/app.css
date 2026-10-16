@@ -959,7 +959,9 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
 @media (max-width: 640px) {
   :root { --pad: 12px; }
   .topbar { gap: 10px; padding: 0 10px; }
-  .brand .sub, .brand-name, .tb-right .pill.live { display: none; } /* the endpoint is on the Cluster page */
+  .brand .sub, .tb-right .pill.live { display: none; } /* the endpoint is on the Cluster page */
+  /* The name is not drawn on a phone but the link keeps it: it is the link's name. */
+  .brand-name { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .menu-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); color: var(--ink); cursor: pointer; flex: none; }
   .pg-title { display: block; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tb-palette { flex: none; width: auto; padding: 0 8px; }

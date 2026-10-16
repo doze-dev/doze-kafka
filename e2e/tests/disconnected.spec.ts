@@ -2,7 +2,19 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { mkdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { test, expect } from '../fixtures/console';
+import { createRequire } from 'node:module';
+import type { Page } from '@playwright/test';
 import { PREFIX } from '../playwright.config';
+
+const AXE = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
+/** Every violation axe finds but the minor ones, of the page as it is now. */
+async function axeProblems(page: Page, dimmedRows = false): Promise<string[]> {
+  await page.addScriptTag({ path: AXE });
+  // The frozen rows are dimmed to .55 as Traf-10 draws them (plan/00-foundation.md): those rows are left out of this one sweep (every other state checks rows).
+  const res = await page.evaluate(async (dimmed) => (window as any).axe.run(dimmed ? { exclude: [['#traffic-table .tf-rows']] } : document, { resultTypes: ['violations'] }), dimmedRows);
+  return (res.violations as any[]).filter((v) => v.impact !== 'minor')
+    .map((v) => `${v.impact} ${v.id}: ${v.help} e.g. ${v.nodes.slice(0, 3).map((n: any) => n.target.join(' ')).join(' | ')}`);
+}
 
 // The console when the broker is not there. This spec runs its own broker (its own
 // ports, and a data directory whose path has a space in it), kills it in the middle
@@ -152,6 +164,7 @@ test('Traffic when the broker is lost: the pill, the callout, the frozen line, R
   await expect(page.locator('header.topbar #pill-retry')).toHaveCount(0);
   expect((await page.locator('header.topbar #palette-open').boundingBox())!.width).toBe(420);
   await expect(page.locator('.tf-frozen')).toContainText('Nothing newer than this line is known.');
+  expect(await axeProblems(page, true), 'the lost page, accessible').toEqual([]);
   // Traf-10 draws it as the row under the header, not above it.
   const below = await page.evaluate(() => {
     const head = document.querySelector('#traffic-table .r.h > span')!.getBoundingClientRect();
@@ -197,6 +210,7 @@ test('Traf-09: nothing has reached the broker, and Traf-10 over it', async ({ pa
   await expect(empty).toBeVisible();
   await expect(empty.locator('.h2')).toHaveText('Nothing has reached this broker yet');
   await expect(empty.locator('.up-only')).toBeVisible();
+  expect(await axeProblems(page), 'the empty page, accessible').toEqual([]);
   // The board draws no filter, no kinds, no connected clients and no "select a row".
   await expect(page.locator('.filterrow')).toBeHidden();
   await expect(page.locator('.seg')).toBeHidden();
