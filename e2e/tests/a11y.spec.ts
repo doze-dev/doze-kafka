@@ -28,6 +28,39 @@ async function axe(page: Page): Promise<string[]> {
     .map((v) => `${v.impact} ${v.id}: ${v.help} (${v.nodes.length}) e.g. ${v.nodes.slice(0, 4).map((n: any) => n.target.join(' ')).join(' | ')}`);
 }
 
+// A11 on what is drawn: axe measures text, not a field's placeholder, which is text
+// too. Each visible placeholder's colour, with its opacity, over its field's
+// background, is held to 4.5:1.
+async function placeholders(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const rgb = (c: string) => (c.match(/[\d.]+/g) || []).map(Number);
+    const lum = (c: number[]) => {
+      const f = (v: number) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+      return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
+    };
+    const bgOf = (el: Element | null): number[] => {
+      for (; el; el = el.parentElement) {
+        const c = rgb(getComputedStyle(el).backgroundColor);
+        if (c.length >= 3 && (c.length < 4 || c[3] > 0)) return c.slice(0, 3);
+      }
+      return [255, 255, 255];
+    };
+    const out: string[] = [];
+    document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input[placeholder]:not([type=hidden]), textarea[placeholder]').forEach((el) => {
+      if (!el.placeholder || el.value || !el.getClientRects().length || getComputedStyle(el).visibility === 'hidden') return;
+      const ps = getComputedStyle(el, '::placeholder');
+      const c = rgb(ps.color);
+      const a = (c[3] ?? 1) * parseFloat(ps.opacity || '1');
+      const bg = bgOf(el);
+      const fg = [0, 1, 2].map((i) => c[i] * a + bg[i] * (1 - a));
+      const [x, y] = [lum(fg), lum(bg)].sort((p, q) => q - p);
+      const r = (x + 0.05) / (y + 0.05);
+      if (r < 4.5) out.push(`placeholder of ${el.id ? '#' + el.id : el.name || el.tagName.toLowerCase()} is ${r.toFixed(2)}:1`);
+    });
+    return out;
+  });
+}
+
 async function settle(page: Page) {
   await page.waitForLoadState('load');
   await page.mouse.move(0, 0);
@@ -52,6 +85,7 @@ for (const width of [1440, 960, 390]) {
         await settle(page);
         await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
         for (const v of await axe(page)) problems.push(`${path || '(home)'}: ${v}`);
+        for (const v of await placeholders(page)) problems.push(`${path || '(home)'}: ${v}`);
       }
       for (const [name, path, go] of STATES) {
         await page.goto(path);
@@ -59,6 +93,7 @@ for (const width of [1440, 960, 390]) {
         await go(page, width);
         await settle(page);
         for (const v of await axe(page)) problems.push(`${name} (${path}): ${v}`);
+        for (const v of await placeholders(page)) problems.push(`${name} (${path}): ${v}`);
       }
       await page.context().close();
       expect(problems, problems.join('\n')).toEqual([]);
