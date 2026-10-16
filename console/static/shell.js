@@ -856,8 +856,9 @@
     // ⌘⏎ sends from the composer, from a plain field or from inside the editor.
     // Once per press: a held key repeats, and each repeat used to send a record.
     if (mod && e.key === "Enter") {
-      var form = active.closest ? active.closest("form") : null;
-      if (form && form.querySelector("textarea, .cm-editor")) {
+      // A create form (data-mod-enter, Ac-03) is sent from anywhere on its page.
+      var form = (active.closest ? active.closest("form") : null) || document.querySelector("main form[data-mod-enter]");
+      if (form && (form.hasAttribute("data-mod-enter") || form.querySelector("textarea, .cm-editor"))) {
         e.preventDefault();
         if (!e.repeat && !form.classList.contains("htmx-request")) form.requestSubmit();
       }
@@ -917,10 +918,13 @@
     return out;
   }
   var pageActions = {
+    // / is the page's own field: the trace id on Trace (data-slash), else the filter of
+    // the table or of the list. A page with neither has no / (its strip does not name
+    // one); it was the palette, which ⌘K already is.
     filter: function (e) {
-      var f = document.querySelector("main input[data-filter-target]") || document.querySelector(".list input[data-filter-target]");
-      if (f && visible(f)) { f.focus(); e.preventDefault(); return; }
-      openPalette();
+      var f = document.querySelector("main [data-slash]") || document.querySelector("main input[data-filter-target]") || document.querySelector(".list input[data-filter-target]");
+      if (!f || !visible(f)) return false;
+      f.focus();
       e.preventDefault();
     },
     next: function () { moveCursor(1); },
@@ -934,7 +938,12 @@
         // same Enter then activates that button and shuts what it just opened.
         e.preventDefault();
         cursorEl.click();
+        return;
       }
+      // A page that is one question (Ac-05's checker, data-enter) asks it.
+      var ask = document.querySelector("main form[data-enter]");
+      if (ask) { e.preventDefault(); ask.requestSubmit(); return; }
+      return false;
     },
     create: function () {
       var nb = document.querySelector("[data-create]");
@@ -981,6 +990,9 @@
       if (inspectorIsOpen()) { closeInspector(); e.preventDefault(); return; }
       var f = document.querySelector("input[data-filter-target]");
       if (f && f.value) { f.value = ""; f.dispatchEvent(new Event("input", { bubbles: true })); e.preventDefault(); return; }
+      // A page reached from a list goes back to it (Ac-03's cancel, Ac-05's back).
+      var back = document.querySelector("main [data-esc]");
+      if (back) { e.preventDefault(); back.click(); return; }
       return false;
     },
     // The chord's own binding is handled where the chord is; these have no key alone.

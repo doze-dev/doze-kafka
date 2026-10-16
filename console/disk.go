@@ -60,6 +60,33 @@ func (c *Console) topicDisk(topic string, partitions int) (topicDisk, bool) {
 	return d, true
 }
 
+// dataDirSize is every file under the data directory, and the metadata database in
+// it (meta.db, where the broker keeps it unless told otherwise; -1 when it is not
+// there). ok is false when the console was not told the data directory.
+func (c *Console) dataDirSize() (total, meta int64, ok bool) {
+	dir := c.facts.DataDir
+	if dir == "" {
+		return 0, -1, false
+	}
+	meta = -1
+	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil // a file removed while it was read is not an error here.
+		}
+		if !d.Type().IsRegular() {
+			return nil
+		}
+		if info, err := d.Info(); err == nil {
+			total += info.Size()
+			if filepath.Dir(path) == filepath.Clean(dir) && d.Name() == "meta.db" {
+				meta = info.Size()
+			}
+		}
+		return nil
+	})
+	return total, meta, err == nil
+}
+
 // countWord writes a small count as the boards' headings do ("Two topics are
 // compacted"), and a larger one in digits.
 func countWord(n int) string {

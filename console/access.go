@@ -308,7 +308,7 @@ func (c *Console) accessCheck(w http.ResponseWriter, r *http.Request) {
 	if ask.Host == "" {
 		ask.Host = c.checkHost()
 	}
-	data := map[string]any{"Page": "access", "Title": "Check a request", "Check": ask, "Operations": aclOperations(), "Resources": aclResources,
+	data := map[string]any{"Page": "access", "View": "access_check", "Title": "Check a request", "Check": ask, "Operations": aclOperations(), "Resources": aclResources,
 		"AllACLs": rows, "SuperUserList": rules.SuperUsers}
 	asked := ask.Principal != "" && ask.Operation != "" && ask.Resource != "" && (ask.Name != "" || ask.Resource == "cluster")
 	if asked {
@@ -401,7 +401,7 @@ func (c *Console) aclCreatePage(w http.ResponseWriter, r *http.Request) {
 		a.Permission = "allow"
 	}
 	rows, _ := c.be.ListACLs(ctx)
-	c.render(w, r, "access_create", map[string]any{"Page": "access", "Title": "Create an ACL", "A": a, "Operations": aclOperations(), "Resources": aclResources,
+	c.render(w, r, "access_create", map[string]any{"Page": "access", "View": "acl_create", "Title": "Create an ACL", "A": a, "Operations": aclOperations(), "Resources": aclResources,
 		"AllACLs": rows, "SuperUserList": rules.SuperUsers, "Console": c.consolePrincipal(), "ConsoleSuper": contains(rules.SuperUsers, c.consolePrincipal()),
 		"Command": aclCommand(c.connectFacts(r), a), "Effect": aclEffect(rules, a)})
 }

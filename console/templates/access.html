@@ -74,10 +74,10 @@
   <main class="main gap12" id="detail">
     <div class="row sb ce idband">
       <div class="col"><h1 class="h1">Check a request</h1><span class="note">Read by the rules the broker enforces, in its order, without sending the request. Nothing is changed or logged as a refusal.</span></div>
-      <div class="row g8 ce"><a class="btn" href="{{prefix}}/access">Back to the list</a></div>
+      <div class="row g8 ce"><a class="btn" href="{{prefix}}/access" data-esc>Back to the list</a></div>
     </div>
 
-    <form class="card pad col g8" method="get" action="{{prefix}}/access/check">
+    <form class="card pad col g8" method="get" action="{{prefix}}/access/check" data-enter>
       <h2 class="h2">Could this principal do this?</h2>
       <div class="row ce g8 wrap">
         <div class="col g4 w170"><label class="note" for="cp">Principal</label><input id="cp" class="inp m" name="principal" value="{{.Check.Principal}}" required spellcheck="false" autocomplete="off"></div>
@@ -121,10 +121,10 @@
       <div class="col"><h1 class="h1">Create an ACL</h1><span class="note">The same fields <span class="m">CreateAcls</span> has. The console sends it as <span class="m">{{.Console}}</span>{{if .ConsoleSuper}}, a super user{{end}}.</span></div>
       <div class="row g8 ce"><a class="btn" href="{{prefix}}/access">Back to the list</a></div>
     </div>
-    <form class="col g12" id="create-acl" hx-post="{{prefix}}/new/acl" hx-disabled-elt="find button[type=submit]" x-data="{perm: '{{.A.Permission}}'}">
+    <form class="col g12" id="create-acl" hx-post="{{prefix}}/new/acl" hx-disabled-elt="find button[type=submit]" x-data="{perm: '{{.A.Permission}}'}" data-mod-enter>
       <div class="card pad col g12">
         <div class="row g12">
-          <div class="col g4 grow"><label class="b" for="ap">Principal</label><input id="ap" class="inp m" name="principal" value="{{.A.Principal}}" placeholder="User:alice" required spellcheck="false" autocomplete="off" aria-describedby="ap-teach"><span class="note" id="ap-teach">{{aclNote "principal"}}</span></div>
+          <div class="col g4 grow"><label class="b" for="ap">Principal</label><input id="ap" class="inp m" name="principal" value="{{.A.Principal}}" placeholder="User:alice" required autofocus spellcheck="false" autocomplete="off" aria-describedby="ap-teach"><span class="note" id="ap-teach">{{aclNote "principal"}}</span></div>
           <div class="col g4 w150"><label class="b" for="ah">Host</label><input id="ah" class="inp m" name="host" value="{{.A.Host}}" required spellcheck="false" autocomplete="off" aria-describedby="ah-teach"><span class="note" id="ah-teach">{{aclNote "host"}}</span></div>
         </div>
         <div class="row g12">
@@ -140,7 +140,7 @@
       </div>
       <div id="acl-preview" hx-get="{{prefix}}/new/acl/preview" hx-trigger="input from:#create-acl delay:200ms, change from:#create-acl, click from:#create-acl .seg button" hx-include="#create-acl" hx-target="this" hx-select="unset" hx-swap="innerHTML" class="col g12">{{template "access_create_preview" .}}</div>
       <div class="err form-err" data-err-slot hidden role="alert"></div>
-      <div class="row g8"><button class="btn pri" type="submit">Create ACL</button><a class="btn" href="{{prefix}}/access/check?principal={{urlquery .A.Principal}}&amp;operation={{urlquery .A.Operation}}&amp;resource={{urlquery .A.Resource}}&amp;name={{urlquery .A.Name}}">Check first</a><a class="btn ghost" href="{{prefix}}/access">Cancel</a></div>
+      <div class="row g8"><button class="btn pri" type="submit">Create ACL</button><a class="btn" href="{{prefix}}/access/check?principal={{urlquery .A.Principal}}&amp;operation={{urlquery .A.Operation}}&amp;resource={{urlquery .A.Resource}}&amp;name={{urlquery .A.Name}}">Check first</a><a class="btn ghost" href="{{prefix}}/access" data-esc>Cancel</a></div>
     </form>
   </main>
 {{template "shell_bottom" .}}{{end}}

@@ -83,5 +83,13 @@ func (c *Console) cluster(w http.ResponseWriter, r *http.Request) {
 		data["Declares"] = fmt.Sprintf("Kafka %d.0", m)
 	}
 	data["DataDirText"] = strings.TrimSpace(c.facts.DataDir)
+	// What the data directory takes on disk, and its metadata database, read from the
+	// files (the console is in the broker's process; DescribeLogDirs is not served).
+	if total, meta, ok := c.dataDirSize(); ok {
+		data["DataDirSize"] = diskSize(total)
+		if meta >= 0 {
+			data["MetaSize"] = diskSize(meta)
+		}
+	}
 	c.render(w, r, "cluster_detail", data)
 }

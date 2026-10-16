@@ -61,14 +61,14 @@ var keyMap = []keyBinding{
 
 	{"p", "p", "pause", "Pause or resume the live view", ScopePage, ""},
 	{"p", "p", "produce", "Produce (on a topic)", ScopePage, ""},
-	{"c", "c", "create", "Create (on Topics, Subjects, Access); connect an app (on an empty Traffic)", ScopePage, ""},
+	{"c", "c", "create", "Create (on Topics, Subjects, Access); connect an app (on an empty Traffic); copy the bootstrap address (on Cluster)", ScopePage, ""},
 	{"r", "r", "retry", "Retry now, when the broker is lost (on Traffic)", ScopePage, ""},
 	{"e", "e", "errors", "Errors only, and back (on Traffic)", ScopePage, ""},
 	{"u", "u", "unfold", "Unfold the open folded row (on Traffic)", ScopePage, ""},
 	{"m", "m", "metrics", "All metrics of the open client (on Traffic)", ScopePage, ""},
 	{"c", "c", "copy", "Copy the decoded fields of the open request (on Traffic)", ScopePage, ""},
 	{"?", "?", "help", "This help", ScopePage, ""},
-	{"Mod+Enter", "⌘↵", "send", "Send from the composer", ScopePage, ""},
+	{"Mod+Enter", "⌘↵", "send", "Send from the composer; create, on a create form", ScopePage, ""},
 
 	{"ArrowDown", "↓", "palette-down", "Next result in the palette", ScopeDialogs, ""},
 	{"ArrowUp", "↑", "palette-up", "Previous result in the palette", ScopeDialogs, ""},
@@ -121,7 +121,9 @@ var (
 )
 
 // pageHints are the hints each kind of page draws at its foot. Every key named here is
-// one the page really has (design_test.go in the browser suite presses them).
+// one the page really has: e2e/tests/strip.spec.ts reads the strip of every kind of
+// page, presses each key it shows there and asserts what it does, and fails for a
+// hint whose effect it does not know.
 func pageHints(view string) []keyHint {
 	switch view {
 	case "traffic":
@@ -133,6 +135,13 @@ func pageHints(view string) []keyHint {
 		// Nothing has reached the broker (Traf-09): connect an app, pause, jump.
 		return []keyHint{live(keyHint{Keys: []string{"c"}, Label: "connect an app"}), live(keyHint{Keys: []string{"p"}, Label: "pause"}), live(hintJump),
 			lost(keyHint{Keys: []string{"r"}, Label: "retry now"}), lost(hintJump)}
+	case "traffic_clients":
+		// Traf-06 draws g r and g c for the two views; g c is Cluster in Sy-06, and the
+		// views are the page's tabs, so the strip names the keys that work here.
+		return []keyHint{live(hintMove), live(keyHint{Keys: []string{"↵"}, Label: "open client"}), live(hintJump),
+			lost(keyHint{Keys: []string{"r"}, Label: "retry now"}), lost(hintMove), lost(hintJump)}
+	case "traffic_clients_none":
+		return []keyHint{live(hintJump), lost(keyHint{Keys: []string{"r"}, Label: "retry now"}), lost(hintJump)}
 	case "topics":
 		return []keyHint{hintMove, hintOpen, hintFilter, {Keys: []string{"c"}, Label: "create topic"}, hintJump}
 	case "topic":
@@ -146,11 +155,21 @@ func pageHints(view string) []keyHint {
 	case "schema":
 		return []keyHint{hintMove, hintClose, {Keys: []string{"g", "s"}, Label: "schemas"}, hintHelp}
 	case "cluster":
-		return []keyHint{{Keys: []string{"g", "c"}, Label: "cluster"}, hintOpen, hintJump, hintHelp}
+		// Cl-Home's strip, with j k: ↵ opens the row the cursor is on, and they put it there.
+		return []keyHint{{Keys: []string{"g", "c"}, Label: "cluster"}, hintMove, hintOpen, {Keys: []string{"c"}, Label: "copy bootstrap"}, hintJump}
 	case "access":
 		return []keyHint{hintMove, hintOpen, {Keys: []string{"c"}, Label: "create ACL"}, hintFilter, hintJump}
 	case "trace":
 		return []keyHint{{Keys: []string{"/"}, Label: "trace id"}, hintMove, {Keys: []string{"↵"}, Label: "follow"}, hintJump}
+	case "trace_none":
+		// No recent record carries a trace header: nothing to move over or follow.
+		return []keyHint{{Keys: []string{"/"}, Label: "trace id"}, hintJump}
+	case "access_check":
+		// Ac-05: Enter asks, Esc goes back to the list.
+		return []keyHint{{Keys: []string{"↵"}, Label: "check"}, {Keys: []string{"esc"}, Label: "back"}, hintJump}
+	case "acl_create":
+		// Ac-03: Tab to the next field, ⌘↵ creates, Esc cancels.
+		return []keyHint{{Keys: []string{"tab"}, Label: "next field"}, {Keys: []string{"⌘↵"}, Label: "create"}, {Keys: []string{"esc"}, Label: "cancel"}}
 	case "first_run":
 		return []keyHint{{Keys: []string{"c"}, Label: "create a topic"}, hintJump, hintHelp}
 	}
@@ -165,6 +184,22 @@ func dialogHints() []keyHint {
 		{Keys: []string{"esc"}, Label: "cancel"},
 		{Keys: []string{"↵"}, Label: "press the focused button"},
 	}
+}
+
+// trafficHints are the Traffic page's strip for what it shows: nothing yet (Traf-09),
+// the clients (Traf-06: move and open a client while there are clients; that view has
+// no filter field and no kinds), or the requests.
+func trafficHints(data map[string]any) []keyHint {
+	if e, _ := data["Empty"].(bool); e {
+		return pageHints("traffic_empty")
+	}
+	if v, _ := data["TView"].(string); v == "clients" {
+		if n, _ := data["ClientCount"].(int); n > 0 {
+			return pageHints("traffic_clients")
+		}
+		return pageHints("traffic_clients_none")
+	}
+	return pageHints("traffic")
 }
 
 func live(h keyHint) keyHint { h.Only = "live"; return h }

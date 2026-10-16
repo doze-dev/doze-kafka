@@ -981,8 +981,8 @@ func (c *Console) trafficPage(w http.ResponseWriter, r *http.Request) {
 	if data["ClientCount"].(int) == 0 && data["TView"] == "requests" && !data["Filtered"].(bool) && data["TotalRequests"].(int) == 0 {
 		data["Empty"] = true
 		data["Facts"] = c.connectFacts(r)
-		data["Hints"] = pageHints("traffic_empty")
 	}
+	data["Hints"] = trafficHints(data)
 	c.render(w, r, "traffic_detail", data)
 }
 
@@ -1003,10 +1003,8 @@ func (c *Console) trafficLive(w http.ResponseWriter, r *http.Request) {
 	if data["ClientCount"].(int) == 0 && data["TView"] == "requests" && !data["Filtered"].(bool) && data["TotalRequests"].(int) == 0 {
 		data["Empty"] = true
 		data["Facts"] = c.connectFacts(r)
-		data["Hints"] = pageHints("traffic_empty")
-	} else {
-		data["Hints"] = pageHints("traffic")
 	}
+	data["Hints"] = trafficHints(data)
 	c.partial(w, "traffic_live", data)
 }
 

@@ -1,14 +1,12 @@
-{{/* Tc-Home: ask for a trace id. The board also lists recent messages that carry a
-     trace header, read from the tail of each topic; that needs a scan of its own and
-     belongs to the trace stage, so it is not drawn here (and nothing stands in for it).
-     "Ones you opened" is kept by this tab only (shell.js). */}}
+{{/* Tc-Home: ask for a trace id, or pick a recent record that carries one (read from
+     the tail of each topic, traceRecent). "Recent traces" are the ones this tab
+     followed, kept by this tab only (shell.js). */}}
 {{define "trace_home"}}{{template "shell_top" .}}
-  <aside class="list" aria-label="Traces you opened">
-    <div class="row sb ce list-h"><span class="cap">Ones you opened</span></div>
+  <nav class="list" aria-label="Recent traces">
+    <div class="li"><span class="cap">Recent traces</span></div>
     <div id="trace-recents" data-trace-recents></div>
-    <div class="grow"></div>
-    <div class="note list-note">Ones you opened, newest first. Kept in this tab only.</div>
-  </aside>
+    <div class="li"><span class="note">Ones you opened, newest first. Kept in this tab only.</span></div>
+  </nav>
   <main class="main gap12" id="detail">
     <div class="row sb ce idband">
       <div class="col"><h1 class="h1">Trace</h1><span class="note">Follow one request through every topic it touched, using the trace id your apps already write in a header.</span></div>
@@ -16,13 +14,26 @@
 
     <form class="card pad col g8" method="get" action="{{prefix}}/trace" role="search" id="trace-form">
       <label class="b" for="tid">Trace id</label>
-      <div class="row ce g8"><input id="tid" class="inp m" name="id" placeholder="4bf92f3577b34da6a3ce929d0e0e4736" autocomplete="off" spellcheck="false" required><button class="btn pri" type="submit">Follow</button></div>
+      <div class="row ce g8"><input id="tid" class="inp m" name="id" placeholder="4bf92f3577b34da6a3ce929d0e0e4736" autocomplete="off" spellcheck="false" required data-slash><button class="btn pri" type="submit">Follow</button></div>
       <span class="note">Or paste a whole header value. <span class="m">00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01</span> is read as the trace id <span class="m">4bf92f3577b34da6a3ce929d0e0e4736</span>.</span>
     </form>
 
+    <div class="card" id="trace-recent">
+      <div class="pad row sb ce trace-recent-h"><h2 class="h2">Or pick a recent message that carries a trace header</h2><span class="note">newest first, read from the tail of each topic</span></div>
+      {{if .Recent}}
+      <div class="r h"><span>Time</span><span>Topic</span><span>Partition</span><span>Trace id</span><span class="ra"></span></div>
+      {{range .Recent}}
+      {{if .Trace}}<a class="r" href="{{.URL}}" data-row title="{{.Kind}}"><span class="m">{{when .Time "clockms"}}</span><span class="m" title="{{.Topic}}">{{.Topic}}</span><span class="m">p{{.Partition}} {{num .Offset}}</span><span class="m" title="{{.Trace}}">{{.Trace}}</span><span class="ra"><span class="btn sm">Follow</span></span></a>
+      {{else}}<div class="r"><span class="m">{{when .Time "clockms"}}</span><span class="m" title="{{.Topic}}">{{.Topic}}</span><span class="m">p{{.Partition}} {{num .Offset}}</span><span class="mut">no trace header</span><span></span></div>{{end}}
+      {{end}}
+      {{else}}
+      <div class="pad note">No topic holds a record yet.</div>
+      {{end}}
+    </div>
+
     <div class="row g12 steps">
       <div class="card pad col g6 grow"><span class="h2">Header formats it reads</span>
-        <div class="kv" style="--c: 140px 1fr"><span class="m">traceparent</span><span class="m">00-&lt;trace id&gt;-&lt;span id&gt;-01</span><span class="m">b3</span><span class="m">&lt;trace id&gt;-&lt;span id&gt;-1</span><span class="m">X-B3-TraceId</span><span class="m">&lt;trace id&gt; (multi-header)</span><span class="m">--trace-header</span><span class="m">{{if .TraceHeader}}{{.TraceHeader}}{{else}}a header name you choose{{end}}</span></div>
+        <div class="kv trace-formats"><span class="m">traceparent</span><span class="m">00-4bf92f35…4736-00f067aa0ba902b7-01</span><span class="m">b3</span><span class="m">4bf92f35…4736-00f067aa0ba902b7-1</span><span class="m">X-B3-TraceId</span><span class="m">4bf92f35…4736 (multi-header)</span><span class="m">--trace-header</span><span class="m">{{if .TraceHeader}}{{.TraceHeader}}{{else}}a header name you choose{{end}}</span></div>
       </div>
       <div class="callout warn grow"><span class="b">It only shows what your apps propagate</span><span class="note">A message with no trace header is invisible here, and so is a service that receives the header but does not pass it on. It reads the records written around the message's time, up to {{.MaxRecords}} records or {{.MaxSeconds}} seconds, and says so when it stops short.</span></div>
     </div>

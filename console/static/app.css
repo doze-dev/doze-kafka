@@ -422,6 +422,10 @@ span.num {
 .nomatch { padding: 14px 12px; color: var(--mut); }
 
 .r.denyrow { background: var(--denybg); }
+/* Tc-Home: the recent records that carry a trace header, and the formats it reads. */
+#trace-recent .r { --c: 92px 1fr 70px 1fr 90px; }
+#trace-recent .trace-recent-h { padding-bottom: 6px; }
+.kv.trace-formats { --c: 120px 1fr; }
 /* Access (Ac-Home, Ac-03, Ac-05): the boards' tracks and the widths of their fields. */
 #acl-table { --c: 120px 80px 1fr 80px 84px 84px 44px; }
 #check-decided { --c: 120px 1fr 80px 84px 84px 44px; }
@@ -431,6 +435,7 @@ span.num-off { background: var(--mut); } /* a rule the check did not reach (Ac-0
 .r.totalrow { background: var(--well); }
 .list.wide { width: 232px; }
 .list.narrow { width: 220px; }
+.list .li.list-tall { height: 34px; } /* Cl-Home's "This broker" */
 .card.side { width: 340px; max-width: 100%; }
 .callout.spaced { margin: 14px; }
 .stack { display: flex; flex-direction: column; gap: 10px; min-width: 0; }

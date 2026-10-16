@@ -387,7 +387,8 @@ test('every section has the board\'s home: its title, its summary line and its t
   await expect(page.locator('#cluster-sentence')).toContainText(/^Node \d+/);
   await expect(page.locator('#cluster-identity .r.h')).toContainText('Identity');
   await expect(page.locator('#cluster-counts .r.h')).toContainText('Counts');
-  await expect(page.locator('aside.list .li').first()).toHaveText(/Overview/);
+  await expect(page.locator('aside.list .li').first()).toHaveText('This broker');
+  await expect(page.locator('aside.list a.li').first()).toHaveText(/Overview/);
   await page.goto('access');
   await expect(page.locator('#acl-table .r.h span')).toHaveText(['Principal', 'Type', 'Name', 'Pattern', 'Operation', 'Permission', 'Host']);
   await expect(page.locator('main .callout').first()).toContainText('These are enforced');

@@ -2,6 +2,7 @@
      that the console can draw from what the broker reports. */}}
 {{define "cluster_detail"}}{{template "shell_top" .}}
   <aside class="list narrow" aria-label="Cluster pages">
+    <div class="li list-tall"><span class="cap">This broker</span></div>
     {{range .Views}}
     <a class="li {{if .On}}on{{end}}" href="{{.URL}}"{{if .On}} aria-current="page"{{end}}>{{.Label}}<span class="grow"></span>{{if .Count}}<span class="m {{if .Warn}}warn{{else}}mut{{end}}">{{.Count}}</span>{{end}}</a>
     {{end}}
@@ -9,11 +10,11 @@
   <main class="main gap12" id="detail">
     <div class="row sb ce idband">
       <div class="col"><h1 class="h1">Cluster</h1><span class="note">One broker. No replication, no controller quorum. That is the whole point.</span></div>
-      <div class="row g8 ce"><a class="btn pri w5" href="{{prefix}}/connect">Connect an app</a></div>
+      <div class="row g8 ce"><a class="btn pri w5" href="{{prefix}}/connect">Connect an app</a>{{/* The page's c (Cl-Home's strip): copy the bootstrap address. */}}<button type="button" hidden data-create data-copy="{{.Facts.Bootstrap}}" aria-label="Copy the bootstrap address"></button></div>
     </div>
 
     {{if eq .ClusterView "overview"}}
-    <div class="card pad cluster-sentence" id="cluster-sentence">Node <span class="m b">{{.Cluster.NodeID}}</span>{{if .UpFor}} has been up <span class="m b">{{.UpFor}}</span>{{end}}{{if .Declares}} serving <span class="m b">{{.Declares}}</span>{{end}} on <span class="m b">{{.Cluster.Host}}:{{.Cluster.Port}}</span>, with <span class="m b">{{.TopicCount}}</span> topic{{if ne .TopicCount 1}}s{{end}} in <span class="m b">{{.PartitionCount}}</span> partition{{if ne .PartitionCount 1}}s{{end}}, <span class="m b">{{.GroupCount}}</span> group{{if ne .GroupCount 1}}s{{end}} and <span class="m b {{if .Cluster.Transactions}}warn{{end}}">{{len .Cluster.Transactions}}</span> open transaction{{if ne (len .Cluster.Transactions) 1}}s{{end}}{{if .DataDirText}}, in <span class="m b">{{.DataDirText}}</span>{{end}}.</div>
+    <div class="card pad cluster-sentence" id="cluster-sentence">Node <span class="m b">{{.Cluster.NodeID}}</span>{{if .UpFor}} has been up <span class="m b">{{.UpFor}}</span>{{end}}{{if .Declares}} serving <span class="m b">{{.Declares}}</span>{{end}} on <span class="m b">{{.Cluster.Host}}:{{.Cluster.Port}}</span>, with <span class="m b">{{.TopicCount}}</span> topic{{if ne .TopicCount 1}}s{{end}} in <span class="m b">{{.PartitionCount}}</span> partition{{if ne .PartitionCount 1}}s{{end}}, <span class="m b">{{.GroupCount}}</span> group{{if ne .GroupCount 1}}s{{end}} and <span class="m b {{if .Cluster.Transactions}}warn{{end}}">{{len .Cluster.Transactions}}</span> open transaction{{if ne (len .Cluster.Transactions) 1}}s{{end}}{{if .DataDirText}}, in <span class="m b">{{.DataDirText}}</span>{{if .DataDirSize}} (<span class="m b">{{.DataDirSize}}</span>){{end}}{{end}}.</div>
 
     <div class="row g12 wrap steps">
       <div class="card grow" id="cluster-identity">
@@ -22,7 +23,7 @@
         <div class="r" style="--c: 130px 1fr"><span class="mut">Cluster ID</span><span class="m">{{.Cluster.ClusterID}}</span></div>
         {{if .Version}}<div class="r" style="--c: 130px 1fr"><span class="mut">doze-kafka</span><span class="m">{{.Version}}{{if .Declares}} · declares {{.Declares}}{{end}}</span></div>{{end}}
         <div class="r" style="--c: 130px 1fr"><span class="mut">Listener</span><span class="m">{{.Facts.Protocol}}{{if .Facts.Mechanisms}} · {{range $i, $m := .Facts.Mechanisms}}{{if $i}}, {{end}}{{$m}}{{end}}{{end}}</span></div>
-        {{if .DataDirText}}<div class="r" style="--c: 130px 1fr"><span class="mut">Data directory</span><span class="m">{{.DataDirText}}</span></div>{{end}}
+        {{if .DataDirText}}<div class="r" style="--c: 130px 1fr"><span class="mut">Data directory</span><span class="m">{{.DataDirText}}{{if .DataDirSize}} · {{.DataDirSize}}{{end}}{{if .MetaSize}} · meta.db {{.MetaSize}}{{end}}</span></div>{{end}}
         <div class="r" style="--c: 130px 1fr"><span class="mut">Console</span><span class="m">{{.Facts.Console}}</span></div>
         {{if .Facts.Registry}}<div class="r" style="--c: 130px 1fr"><span class="mut">Schema registry</span><span class="m">{{.Facts.Registry}} · built in</span></div>{{end}}
         <div class="r" style="--c: 130px 1fr"><span class="mut">This connection</span><span class="m">{{if .Cluster.AuthMech}}SASL {{.Cluster.AuthMech}}{{else}}no authentication{{end}} · {{if .Cluster.TLS}}TLS{{else}}plaintext{{end}}</span></div>
@@ -50,7 +51,7 @@
         <span class="pill">not durable against disk loss</span>
         <a href="https://github.com/doze-dev/doze-kafka/blob/main/docs/limitations.md" target="_blank" rel="noopener">All limits</a></div>
     </div>
-    <div class="note">Replication factor 1 is what every topic here reports, because there is nowhere to put a second copy. Every API the broker does not implement closes the connection cleanly on that call; everything else keeps working. See <a href="https://github.com/doze-dev/doze-kafka/blob/main/docs/limitations.md" target="_blank" rel="noopener">limitations</a>.</div>
+    <div class="note">Replication factor 1 is what every topic here reports, because there is nowhere to put a second copy.</div>
 
     {{else if eq .ClusterView "apis"}}
     <div class="callout"><span class="b">Supported APIs · {{len .Cluster.SupportedAPIs}}</span>
