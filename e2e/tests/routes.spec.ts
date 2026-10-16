@@ -21,7 +21,7 @@ test("a record's value downloads from the inspector, byte for byte", async ({ pa
 
 test('the old per-request address still answers, so a saved link keeps working', async ({ page, request }) => {
   await page.goto('traffic');
-  const row = page.locator('#traffic-table tbody tr').first();
+  const row = page.locator('#traffic-table .tf-rows > .r[data-row]').first();
   const key = ((await row.getAttribute('id')) ?? '').replace(/^rq-/, '');
   const res = await request.get(new URL(`traffic/request?key=${encodeURIComponent(key)}`, page.url()).toString());
   expect(res.status()).toBe(200);

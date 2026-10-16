@@ -481,6 +481,10 @@ func (c *Console) trafficRow(e TrafficEvent, v trafficView) trafficRow {
 		row.DetailText = c.metadataDetail(e)
 	case groupAPIs[e.API] && e.Group != "":
 		row.Target = e.Group
+		if len(e.Topics) > 0 && v.Topic == "" {
+			// A filter by topic lists this row because of the topics it names.
+			row.TargetTitle = e.Group + " · " + topics
+		}
 		if e.API == "OffsetCommit" {
 			row.DetailText = row.TopicParts
 		}

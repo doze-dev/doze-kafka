@@ -94,3 +94,13 @@ func TestAMetadataRowsCountIsTitledByItsNames(t *testing.T) {
 		t.Errorf("Target %q, title %q", r.Target, r.TargetTitle)
 	}
 }
+
+// A group request that names topics (a heartbeat of the consumer protocol subscribes to
+// them) is listed by a topic filter: its title says so, as its text says only the group.
+func TestAGroupRowsTitleNamesTheTopicsItIsListedFor(t *testing.T) {
+	c := &Console{}
+	r := c.trafficRow(TrafficEvent{API: "ConsumerGroupHeartbeat", Group: "g", Topics: []string{"orders"}}, trafficView{})
+	if r.Target != "g" || r.TargetTitle != "g · orders" {
+		t.Errorf("Target %q, title %q", r.Target, r.TargetTitle)
+	}
+}
