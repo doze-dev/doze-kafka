@@ -107,7 +107,7 @@
                 "ErrorRecords": null,
                 "LogAppendTime": -1,
                 "LogStartOffset": 0,
-                "Partition": 1
+                "Partition": 0
               },
               {
                 "BaseOffset": 0,
@@ -120,7 +120,7 @@
                 "ErrorRecords": null,
                 "LogAppendTime": -1,
                 "LogStartOffset": 0,
-                "Partition": 0
+                "Partition": 1
               }
             ],
             "Topic": "pm-a",
@@ -171,25 +171,6 @@
           {
             "Partitions": [
               {
-                "BaseOffset": -1,
-                "CurrentLeader": {
-                  "LeaderEpoch": -1,
-                  "LeaderID": -1
-                },
-                "ErrorCode": 10,
-                "ErrorMessage": null,
-                "ErrorRecords": null,
-                "LogAppendTime": -1,
-                "LogStartOffset": -1,
-                "Partition": 0
-              }
-            ],
-            "Topic": "pm-b",
-            "TopicID": "\u003czero-id\u003e"
-          },
-          {
-            "Partitions": [
-              {
                 "BaseOffset": 1,
                 "CurrentLeader": {
                   "LeaderEpoch": -1,
@@ -217,6 +198,25 @@
               }
             ],
             "Topic": "pm-a",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Partitions": [
+              {
+                "BaseOffset": -1,
+                "CurrentLeader": {
+                  "LeaderEpoch": -1,
+                  "LeaderID": -1
+                },
+                "ErrorCode": 10,
+                "ErrorMessage": null,
+                "ErrorRecords": null,
+                "LogAppendTime": -1,
+                "LogStartOffset": -1,
+                "Partition": 0
+              }
+            ],
+            "Topic": "pm-b",
             "TopicID": "\u003czero-id\u003e"
           }
         ]
@@ -264,25 +264,6 @@
           {
             "Partitions": [
               {
-                "BaseOffset": -1,
-                "CurrentLeader": {
-                  "LeaderEpoch": -1,
-                  "LeaderID": -1
-                },
-                "ErrorCode": 10,
-                "ErrorMessage": null,
-                "ErrorRecords": null,
-                "LogAppendTime": -1,
-                "LogStartOffset": -1,
-                "Partition": 0
-              }
-            ],
-            "Topic": "pm-b",
-            "TopicID": "\u003czero-id\u003e"
-          },
-          {
-            "Partitions": [
-              {
                 "BaseOffset": 2,
                 "CurrentLeader": {
                   "LeaderEpoch": -1,
@@ -310,6 +291,25 @@
               }
             ],
             "Topic": "pm-a",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Partitions": [
+              {
+                "BaseOffset": -1,
+                "CurrentLeader": {
+                  "LeaderEpoch": -1,
+                  "LeaderID": -1
+                },
+                "ErrorCode": 10,
+                "ErrorMessage": null,
+                "ErrorRecords": null,
+                "LogAppendTime": -1,
+                "LogStartOffset": -1,
+                "Partition": 0
+              }
+            ],
+            "Topic": "pm-b",
             "TopicID": "\u003czero-id\u003e"
           }
         ]
@@ -368,7 +368,7 @@
                   "LeaderEpoch": -1,
                   "LeaderID": -1
                 },
-                "ErrorCode": 10,
+                "ErrorCode": 2,
                 "ErrorMessage": null,
                 "ErrorRecords": null,
                 "LogAppendTime": -1,
@@ -376,7 +376,7 @@
                 "Partition": 0
               }
             ],
-            "Topic": "pm-b",
+            "Topic": "pm-a",
             "TopicID": "\u003czero-id\u003e"
           },
           {
@@ -387,7 +387,7 @@
                   "LeaderEpoch": -1,
                   "LeaderID": -1
                 },
-                "ErrorCode": 2,
+                "ErrorCode": 10,
                 "ErrorMessage": null,
                 "ErrorRecords": null,
                 "LogAppendTime": -1,
@@ -395,7 +395,7 @@
                 "Partition": 0
               }
             ],
-            "Topic": "pm-a",
+            "Topic": "pm-b",
             "TopicID": "\u003czero-id\u003e"
           },
           {
@@ -473,7 +473,7 @@
                   "LeaderEpoch": -1,
                   "LeaderID": -1
                 },
-                "ErrorCode": 10,
+                "ErrorCode": 2,
                 "ErrorMessage": null,
                 "ErrorRecords": null,
                 "LogAppendTime": -1,
@@ -481,7 +481,7 @@
                 "Partition": 0
               }
             ],
-            "Topic": "pm-b",
+            "Topic": "pm-a",
             "TopicID": "\u003czero-id\u003e"
           },
           {
@@ -492,7 +492,7 @@
                   "LeaderEpoch": -1,
                   "LeaderID": -1
                 },
-                "ErrorCode": 2,
+                "ErrorCode": 10,
                 "ErrorMessage": null,
                 "ErrorRecords": null,
                 "LogAppendTime": -1,
@@ -500,7 +500,7 @@
                 "Partition": 0
               }
             ],
-            "Topic": "pm-a",
+            "Topic": "pm-b",
             "TopicID": "\u003czero-id\u003e"
           },
           {

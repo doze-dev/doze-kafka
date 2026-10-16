@@ -195,11 +195,6 @@ implement it.
     send there, are answered as Kafka answers them.
   - A SCRAM client-final message whose channel binding is not the header the exchange opened with is refused.
     Kafka does not compare the two; RFC 5802 has a server do it.
-- **A Produce answer lists its topics and partitions in the order of the request.**
-  Apache Kafka lists them in the order of a hash map, the same for both orders of one
-  request (`conformance/recordings/produce-mixed-partition-errors.json`). Every
-  client matches an answer to a partition by topic and number, so neither order is
-  something it can see; the replay compares the content and lists the order apart.
 - **TxnOffsetCommit sent from outside the consumer group** (generation -1, no member id,
   as a producer that commits a consumer's offsets without being one sends it) is
   answered for the transaction's state: `INVALID_PRODUCER_ID_MAPPING`, `INVALID_TXN_STATE`,
