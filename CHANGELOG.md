@@ -6,6 +6,28 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Produce reads every batch before storing it, as Apache Kafka does, on every kind of
+  topic and every Produce version (recorded against `apache/kafka:4.3.1`:
+  `produce-validation`, `produce-inflated-size`). Batches Kafka refuses used to be
+  acknowledged and stored on any topic that did not compact: a records section that is
+  not the codec it names (now UNKNOWN_SERVER_ERROR, as Kafka answers), a header claiming
+  more or fewer records than it holds (it advanced the log by the claimed count), two
+  batches for one partition, an empty record set, a base offset other than 0, a producer
+  id with sequence -1 (INVALID_RECORD); a transactional batch with no transactional id
+  (TRANSACTIONAL_ID_AUTHORIZATION_FAILED); a timestamp outside
+  `message.timestamp.before.max.ms` / `after.max.ms`, now applied, or a client-set
+  LogAppendTime bit (INVALID_TIMESTAMP). Refusals Kafka also made now carry Kafka's code
+  (INVALID_RECORD where this said CORRUPT_MESSAGE for a zero-count batch, a legacy magic, a
+  control batch or a short record set), base offset -1 and Kafka's message or none.
+  **A topic with no `max.message.bytes` is now held to the broker's `message.max.bytes`,
+  Kafka's default of 1048588** (`--message-max-bytes`, `message-max-bytes` in the file):
+  a batch over 1 MB was accepted here and refused by every production broker. A topic
+  whose `compression.type` is not the batch's stores it re-written in its codec and holds
+  that size to the limit. A batch inflating past 64 MiB, a zstd window past 8 MiB and a
+  compressed record whose length disagrees with its fields are refused here and kept by
+  Kafka (`docs/limitations.md`). A log from an earlier version holding an unreadable batch
+  still opens: compaction and timestamp lookups go past it instead of failing for good.
+  A retry of an idempotent batch is answered with the timestamp it was stored with.
 - Security: an Avro value is checked against its schema before the Avro decoder sees it.
   The console decodes registry-framed record values, which any producer can write, with
   `hamba/avro`, which is archived and has three open advisories against its decoder

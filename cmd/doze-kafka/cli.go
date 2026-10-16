@@ -90,7 +90,7 @@ var helpGroups = []struct {
 	{"Network", []string{"name", "listen", "advertised-host", "advertised-port", "zone"}},
 	{"Storage", []string{"data-dir", "meta-db", "segment-bytes", "index-interval-bytes"}},
 	{"Retention and durability", []string{"retention-bytes", "retention-ms", "fsync-interval"}},
-	{"Topics and groups", []string{"kafka-version", "auto-create-topics", "default-partitions", "max-partitions", "consumer-session-timeout", "offsets-retention", "client-telemetry"}},
+	{"Topics and groups", []string{"kafka-version", "auto-create-topics", "default-partitions", "max-partitions", "message-max-bytes", "consumer-session-timeout", "offsets-retention", "client-telemetry"}},
 	{"Security", []string{"sasl-mechanisms", "sasl-user", "tls-cert", "tls-key", "acl-default", "acl-super-user"}},
 	{"Console", []string{"console", "console-addr", "console-prefix", "console-allow-host", "trace-header"}},
 	{"Schema registry", []string{"schema-registry", "schema-registry-addr"}},
@@ -355,6 +355,7 @@ func registerFlags(fs *flag.FlagSet, cfg *config.Config) {
 	fs.BoolVar(&cfg.AutoCreateTopics, "auto-create-topics", cfg.AutoCreateTopics, "create unknown topics on first reference")
 	fs.IntVar(&cfg.DefaultPartitions, "default-partitions", cfg.DefaultPartitions, "partition count for auto-created topics")
 	fs.IntVar(&cfg.MaxPartitions, "max-partitions", cfg.MaxPartitions, "most partitions one topic may have (each is a directory and open files)")
+	fs.Int64Var(&cfg.MessageMaxBytes, "message-max-bytes", cfg.MessageMaxBytes, "largest record batch a topic accepts unless it sets max.message.bytes, as Kafka's message.max.bytes")
 	fs.DurationVar(&cfg.ConsumerSessionTimeout, "consumer-session-timeout", cfg.ConsumerSessionTimeout, "KIP-848 group session timeout before evicting a silent member")
 	fs.DurationVar(&cfg.OffsetsRetention, "offsets-retention", cfg.OffsetsRetention, "how long a group's committed offsets are kept once nothing is reading them, as Kafka's offsets.retention.minutes (0 = for ever)")
 

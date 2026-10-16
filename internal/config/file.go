@@ -38,6 +38,7 @@ type fileConfig struct {
 	AutoCreateTopics       *bool             `toml:"auto-create-topics"`
 	DefaultPartitions      *int              `toml:"default-partitions"`
 	MaxPartitions          *int              `toml:"max-partitions"`
+	MessageMaxBytes        *int64            `toml:"message-max-bytes"`
 	SASLMechanisms         []string          `toml:"sasl-mechanisms"`
 	Credentials            map[string]string `toml:"credentials"`
 	TLS                    *tlsFile          `toml:"tls"`
@@ -146,6 +147,9 @@ func (fc fileConfig) applyTo(cfg *Config) error {
 	if fc.MaxPartitions != nil {
 		cfg.MaxPartitions = *fc.MaxPartitions
 	}
+	if fc.MessageMaxBytes != nil {
+		cfg.MessageMaxBytes = *fc.MessageMaxBytes
+	}
 	if fc.SASLMechanisms != nil {
 		cfg.SASLMechanisms = fc.SASLMechanisms
 	}
@@ -246,6 +250,7 @@ func writeTOML(w io.Writer, cfg Config, secrets bool) error {
 		AutoCreateTopics:       &cfg.AutoCreateTopics,
 		DefaultPartitions:      &cfg.DefaultPartitions,
 		MaxPartitions:          &cfg.MaxPartitions,
+		MessageMaxBytes:        &cfg.MessageMaxBytes,
 		Console:                &cfg.Console,
 		ConsoleAddr:            &cfg.ConsoleAddr,
 		TraceHeader:            &cfg.TraceHeader,

@@ -68,6 +68,9 @@ type Config struct {
 	AutoCreateTopics  bool
 	DefaultPartitions int // partition count for auto-created topics.
 	MaxPartitions     int // most partitions a single topic may have; every one is open files and a directory.
+	// MessageMaxBytes is the largest record batch a topic accepts unless it sets
+	// max.message.bytes itself: Kafka's message.max.bytes, with Kafka's default.
+	MessageMaxBytes int64
 
 	// Auth (all optional; empty = disabled). SASL gates the listener behind a
 	// handshake; TLS encrypts it. The two are independent — SASL over plaintext,
@@ -139,6 +142,13 @@ const (
 	defaultSegmentBytes = 128 << 20 // 128 MiB
 	defaultIndexStride  = 4 << 10   // 4 KiB
 
+	// DefaultMessageMaxBytes is Kafka's default for message.max.bytes: the largest
+	// record batch a topic with no limit of its own accepts. A development broker
+	// that took any size let an application ship a batch size production refuses
+	// (recorded against apache/kafka:4.3.1: 1048588 bytes is stored, 1048589 is
+	// MESSAGE_TOO_LARGE; conformance/recordings/produce-validation.json).
+	DefaultMessageMaxBytes = 1048588
+
 	// defaultMaxPartitions bounds one topic, not the broker. A partition is a
 	// directory and two open files, so an unbounded count lets a typo take the
 	// process out: a 5,000-partition topic measured ~10,000 file descriptors and
@@ -169,6 +179,7 @@ func Default() Config {
 		AutoCreateTopics:       true,
 		DefaultPartitions:      1,
 		MaxPartitions:          defaultMaxPartitions,
+		MessageMaxBytes:        DefaultMessageMaxBytes,
 		Console:                true,
 		ClientTelemetry:        true,
 		Zone:                   true,
@@ -363,6 +374,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: max-partitions must be positive, got %d", c.MaxPartitions)
 	case c.DefaultPartitions > c.MaxPartitions:
 		return fmt.Errorf("config: default-partitions (%d) is above max-partitions (%d)", c.DefaultPartitions, c.MaxPartitions)
+	case c.MessageMaxBytes <= 0:
+		return fmt.Errorf("config: message-max-bytes must be positive, got %d (Kafka's default is %d)", c.MessageMaxBytes, DefaultMessageMaxBytes)
 	case c.RetentionBytes < 0:
 		return fmt.Errorf("config: retention-bytes must be non-negative (0 disables), got %d", c.RetentionBytes)
 	case c.RetentionMs < 0:

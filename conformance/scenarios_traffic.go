@@ -71,14 +71,7 @@ var (
 	knownTelemetryACL       = knownSubscription("subscribe")
 	knownClassicJoin        []Known
 	knownClassicGenerations []Known
-	knownProduceMixed       = []Known{
-		{Step: "unknown-partition-then-too-large", Path: "Topics[1].Partitions[0].ErrorMessage", Limitation: limMessages},
-		{Step: "too-large-then-unknown-partition", Path: "Topics[1].Partitions[0].ErrorMessage", Limitation: limMessages},
-		{Step: "unknown-topic-first", Path: "Topics[0].Partitions[0].ErrorMessage", Limitation: limMessages},
-		{Step: "unknown-topic-first", Path: "Topics[1].Partitions[0].ErrorMessage", Limitation: limMessages},
-		{Step: "corrupt-first", Path: "Topics[0].Partitions[0].ErrorMessage", Limitation: limMessages},
-		{Step: "corrupt-first", Path: "Topics[1].Partitions[0].ErrorMessage", Limitation: limMessages},
-	}
+	knownProduceMixed       []Known
 )
 
 // --- KIP-714 helpers ---

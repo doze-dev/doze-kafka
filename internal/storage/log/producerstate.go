@@ -1,6 +1,9 @@
 package log
 
-import "math"
+import (
+	"encoding/binary"
+	"math"
+)
 
 // ProducerBatch is one idempotent producer's batch as the log holds it: who wrote it,
 // which sequence numbers it covers, and where it is.
@@ -10,6 +13,17 @@ type ProducerBatch struct {
 	FirstSeq   int32
 	LastSeq    int32
 	BaseOffset int64
+	// MaxTimestamp is the batch's maximum timestamp as stored: what a producer that
+	// sends the batch again is answered with.
+	MaxTimestamp int64
+}
+
+// MaxTimestampOf is the maximum timestamp in a complete batch's header.
+func MaxTimestampOf(batch []byte) int64 {
+	if len(batch) < batchFullHeaderBytes {
+		return -1
+	}
+	return int64(binary.BigEndian.Uint64(batch[batchMaxTimestampOff:]))
 }
 
 // ProducerHistory lists, oldest first, the idempotent batches in roughly the last
@@ -48,7 +62,7 @@ func (p *Partition) ProducerHistory(maxBytes int64) ([]ProducerBatch, error) {
 				out = append(out, ProducerBatch{
 					ProducerID: h.ProducerID, Epoch: h.ProducerEpoch, FirstSeq: h.BaseSequence,
 					LastSeq:    int32((int64(h.BaseSequence) + int64(h.RecordCount) - 1) & math.MaxInt32),
-					BaseOffset: info.baseOffset,
+					BaseOffset: info.baseOffset, MaxTimestamp: MaxTimestampOf(head),
 				})
 			}
 			pos += info.totalBytes
