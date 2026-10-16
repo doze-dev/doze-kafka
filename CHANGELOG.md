@@ -6,6 +6,14 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- A Fetch at an offset out of range (above the log end or below its start) answers
+  `OFFSET_OUT_OF_RANGE` with high watermark, last stable offset and log start offset
+  -1, as `apache/kafka:4.3.1` does (it used to carry the partition's real offsets), and
+  DescribeConfigs answers a resource with an empty error message rather than null
+  (recorded: `fetch-above-the-end`, `list-config-append`; `conformance/claims/api.md`
+  V6, V7). Every code comment that says what Kafka does now names the claims row
+  that shows it, and a test holds new ones to that.
+
 - Transactions and ACLs refuse malformed requests as `apache/kafka:4.3.1` does
   (recorded: `txn-empty-id`, `acl-unknown-codes`; `conformance/claims/api.md` V4, V5).
   An empty transactional id is `INVALID_REQUEST` in EndTxn, AddOffsetsToTxn,

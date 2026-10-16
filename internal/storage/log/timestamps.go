@@ -165,8 +165,8 @@ func (p *Partition) offsetForTimestamp(target int64) (offset, timestamp int64, f
 }
 
 // OffsetOfMaxTimestamp returns the offset and timestamp of the visible record with
-// the largest timestamp (the first of them if several tie), as Kafka does for the
-// "max timestamp" ListOffsets query.
+// the largest timestamp, as Kafka answers the "max timestamp" ListOffsets query
+// (claim: topics R9). Of several that tie it is the first: no recording has a tie.
 func (p *Partition) OffsetOfMaxTimestamp() (offset, timestamp int64, found bool, err error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()

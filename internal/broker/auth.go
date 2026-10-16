@@ -93,7 +93,7 @@ func msgScramRefused(mechanism string) string {
 type saslRefusal struct {
 	wire string
 	why  string
-	// silent closes the connection with no answer at all, where Kafka does.
+	// silent closes the connection with no answer at all, where Kafka does (claim: auth A8).
 	silent bool
 }
 
@@ -229,7 +229,7 @@ func (b *Broker) handleSASLAuthenticate(ctx context.Context, req *protocol.Reque
 		return nil
 	}
 
-	// Kafka sends an empty message, not a null one, with every accepted token.
+	// Kafka sends an empty message, not a null one, with every accepted token (claim: auth A1).
 	empty := ""
 	resp.ErrorMessage = &empty
 	resp.SASLAuthBytes = out

@@ -28,20 +28,23 @@ func (b *Broker) handleDescribeConfigs(ctx context.Context, req *protocol.Reques
 		rr := kmsg.NewDescribeConfigsResponseResource()
 		rr.ResourceType = res.ResourceType
 		rr.ResourceName = res.ResourceName
+		// An empty message, not a null one, where Kafka answers a resource
+		// (claim: api V6).
+		rr.ErrorMessage = new(string)
 
 		switch res.ResourceType {
 		case kmsg.ConfigResourceTypeTopic:
 			t, ok, err := b.meta.Topic(res.ResourceName)
 			if !b.canTopic(req.Conn, res.ResourceName, opDescribeConfig) {
-				rr.ErrorCode = kerr.TopicAuthorizationFailed.Code
+				rr.ErrorCode, rr.ErrorMessage = kerr.TopicAuthorizationFailed.Code, nil
 			} else if err != nil || !ok {
-				rr.ErrorCode = kerr.UnknownTopicOrPartition.Code
+				rr.ErrorCode, rr.ErrorMessage = kerr.UnknownTopicOrPartition.Code, nil
 			} else {
 				rr.Configs = b.topicConfigEntries(t, res.ConfigNames)
 			}
 		case kmsg.ConfigResourceTypeBroker:
 			if !b.canCluster(req.Conn, opDescribeConfig) {
-				rr.ErrorCode = kerr.ClusterAuthorizationFailed.Code
+				rr.ErrorCode, rr.ErrorMessage = kerr.ClusterAuthorizationFailed.Code, nil
 				break
 			}
 			rr.Configs = b.brokerConfigEntries(res.ConfigNames)

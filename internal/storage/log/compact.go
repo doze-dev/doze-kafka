@@ -31,7 +31,8 @@ import (
 //     until its segment has been cleaned before and is older than delete.retention.ms.
 //  4. Each rewritten segment is swapped in without a window in which the log is
 //     unreadable (see swapSegment). Offsets never move: a rewritten batch keeps its base
-//     offset and last offset delta, so records leave gaps, as on a real broker.
+//     offset and last offset delta, so records leave gaps, as on a real broker
+//     (claim: topics R11).
 //
 // A segment the cleaner empties is deleted, except the first, whose base offset is the
 // log-start offset: removing it would move the start and send consumers to reset.
@@ -41,14 +42,16 @@ var ErrNoKey = errors.New("log: a compacted topic cannot accept a message withou
 
 // RequireKeys checks that every record in a Produce payload that has passed
 // ValidateBatches has a key, which a compacted topic needs: the key is what a record
-// replaces. Kafka refuses the batch (INVALID_RECORD) and so does this.
+// replaces. Kafka refuses the batch (INVALID_RECORD) and so does this (claim: topics R13,
+// still memory).
 func RequireKeys(records []byte) error {
 	return CheckRecords(records, RecordCheck{RequireKeys: true})
 }
 
 // ErrStoredTooLarge is returned for a batch that Kafka would store, uncompressed, at
 // more than the topic's max.message.bytes (the topic has compression.type=uncompressed,
-// so the broker inflates what a producer compressed). Kafka answers MESSAGE_TOO_LARGE.
+// so the broker inflates what a producer compressed). Kafka answers MESSAGE_TOO_LARGE
+// (claim: bad-days Q10b).
 var ErrStoredTooLarge = errors.New("log: the batch, stored uncompressed, is larger than the topic allows")
 
 // RecordCheck is what a Produce payload is looked at for beyond its shape.

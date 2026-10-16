@@ -22,7 +22,7 @@ import (
 // crash and is sent again is recognised rather than appended twice.
 
 // maxTrackedBatches is how many recent batches per producer we keep for dedup. It
-// matches Kafka's five-in-flight window for idempotent producers.
+// matches Kafka's five-in-flight window for idempotent producers (claim: api V9).
 const maxTrackedBatches = 5
 
 // idempotency holds per-partition producer sequence state.
@@ -102,7 +102,7 @@ type producerSequence struct {
 	lastUsed time.Time
 }
 
-// Producer state is dropped by idle time, as Kafka does, not by count. A producer
+// Producer state is dropped by idle time, as Kafka does (claim: api V9), not by count. A producer
 // retries a batch within its delivery timeout (two minutes by default); state
 // that has been idle far longer than that can go. Evicting by count instead meant
 // that after a thousand other producers had written, an early producer's retry

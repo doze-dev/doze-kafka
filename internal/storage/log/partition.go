@@ -175,7 +175,7 @@ func (p *Partition) appendLocked(records []byte) (int64, error) {
 //
 // Above the LEO matters: a consumer holding an offset the log never reached (a
 // committed offset from a topic that was deleted and recreated, say) must be
-// told so it can reset, as it would on real Kafka. Answering "no data" instead
+// told so it can reset, as on Kafka (claim: api V7). Answering "no data" instead
 // makes it wait, then silently skip every record up to that offset.
 func (p *Partition) Read(fetchOffset, maxBytes int64) ([]byte, error) {
 	p.mu.Lock()

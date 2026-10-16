@@ -20,14 +20,14 @@ import (
 // partition directories with LEO=0. Single-node: replication factor is always 1.
 func (b *Broker) handleCreateTopics(ctx context.Context, req *protocol.Request, cr *kmsg.CreateTopicsRequest, resp *kmsg.CreateTopicsResponse) error {
 	// A name listed twice is a malformed request: neither entry is acted on, and
-	// Kafka answers once per name ("Duplicate topic name.").
+	// Kafka answers once per name ("Duplicate topic name."; claim: api V10).
 	count := map[string]int{}
 	for _, t := range cr.Topics {
 		count[t.Topic]++
 	}
 	answered := map[string]bool{}
 	defer func() {
-		// Kafka answers an error with an empty list of configs, never null.
+		// Kafka answers an error with an empty list of configs, never null (claim: api V10).
 		for i := range resp.Topics {
 			if resp.Topics[i].Configs == nil {
 				resp.Topics[i].Configs = []kmsg.CreateTopicsResponseTopicConfig{}
@@ -156,7 +156,7 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 	}
 	if validateOnly {
 		// Kafka answers a validation with an id it made up for the topic that
-		// was not created.
+		// was not created (claim: api V10).
 		var id meta.TopicID
 		_, _ = rand.Read(id[:])
 		rt.TopicID = id

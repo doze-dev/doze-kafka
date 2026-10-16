@@ -195,6 +195,13 @@ implement it.
     send there, are answered as Kafka answers them.
   - A SCRAM client-final message whose channel binding is not the header the exchange opened with is refused.
     Kafka does not compare the two; RFC 5802 has a server do it.
+- **DescribeConfigs does not say a config's type** (`ConfigType` is UNKNOWN, 0); Kafka
+  names it (`LIST` for `cleanup.policy`, `conformance/recordings/list-config-append.json`).
+  Names, values and sources are Kafka's.
+- **An empty cleanup.policy is refused** with `INVALID_CONFIG`. Kafka 4.3.1 takes it
+  (SUBTRACT `delete` from an unset `cleanup.policy` leaves `""`, recorded in
+  `list-config-append`), for a log that is neither deleted nor compacted; this broker's
+  log has no such mode, so it refuses what it would not do.
 - **TxnOffsetCommit sent from outside the consumer group** (generation -1, no member id,
   as a producer that commits a consumer's offsets without being one sends it) is
   answered for the transaction's state: `INVALID_PRODUCER_ID_MAPPING`, `INVALID_TXN_STATE`,
