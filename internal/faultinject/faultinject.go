@@ -26,6 +26,7 @@ const (
 	LogTruncate  = "log.truncate"
 	LogMkdir     = "log.mkdir"
 	LogFileWrite = "log.file.write"
+	LogRead      = "log.read"
 	MetaWrite    = "meta.write"
 )
 

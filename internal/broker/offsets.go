@@ -63,7 +63,7 @@ func (b *Broker) handleOffsetCommit(ctx context.Context, req *protocol.Request, 
 		resp.Topics = append(resp.Topics, rt)
 	}
 	if err := b.meta.CommitOffsets(oc.Group, commits); err != nil {
-		code := b.storageFault("offset commit", err, "group", oc.Group, "partitions", len(commits))
+		code := b.coordinatorFault("offset commit", err, "group", oc.Group, "partitions", len(commits))
 		for _, s := range slots {
 			resp.Topics[s.topic].Partitions[s.part].ErrorCode = code
 		}

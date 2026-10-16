@@ -6,13 +6,12 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
-// The full-disk scenario (Q2) is recorded against Apache Kafka only: it needs a
-// volume that fills, which one process cannot give doze-kafka. doze-kafka's side
-// is the size-limited volume test (internal/broker/volume_test.go) and the write
-// seam (TestFullDiskProduceIsKafkaStorageError_FaultSeam). It lives in a test
-// file because nothing replays it: the recorder is a test.
+// The full-disk scenario (Q2) needs a volume that fills. Against Apache Kafka it
+// is a tmpfs; against doze-kafka, which shares this process, the fault seam stands
+// in for it (TestReplayFullDisk, go test -tags faultinject).
 func init() {
-	Scenarios = append(Scenarios, Scenario{Name: "full-disk", Run: fullDisk, DiskMiB: 24})
+	Scenarios = append(Scenarios, Scenario{Name: "full-disk", Run: fullDisk, DiskMiB: 24, Known: []Known{
+		{Step: "list-earliest-after", Limitation: staysUp}, {Step: "create-after", Limitation: staysUp}}})
 }
 
 // fullDisk is Q2: the data volume fills while a producer writes. It records
@@ -36,6 +35,14 @@ func fullDisk(e *Env) {
 		t.Partitions = append(t.Partitions, p)
 		r.Topics = append(r.Topics, t)
 		return r
+	}
+	// doze-kafka shares this process: the fault seam stands in for the volume.
+	if _, real := e.target.(Execer); !real {
+		if armDiskFull == nil {
+			e.fail("filling doze-kafka's disk needs the fault seam (go test -tags faultinject)")
+			return
+		}
+		armDiskFull()
 	}
 	// Fill until the first refusal. The count depends on the filesystem, not on
 	// the broker, so only the refusal is recorded, with a stub request.

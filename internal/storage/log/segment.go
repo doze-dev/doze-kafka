@@ -191,6 +191,9 @@ func (s *Segment) sync() error {
 // readAt returns up to n raw bytes at position pos via pread, serving reads from
 // the OS page cache without pulling the log into the heap.
 func (s *Segment) readAt(pos int64, n int) ([]byte, error) {
+	if err := faultAt("log.read"); err != nil {
+		return nil, err
+	}
 	buf := make([]byte, n)
 	m, err := s.log.ReadAt(buf, pos)
 	if err != nil && err != io.EOF {

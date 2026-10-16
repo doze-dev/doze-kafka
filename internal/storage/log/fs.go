@@ -240,6 +240,9 @@ func writeFileDurably(path string, data []byte) error {
 	if err := fsTruncate(f, 0); err != nil { // O_TRUNC, said at the seam.
 		return fail(err)
 	}
+	if err := faultAt("log.file.write"); err != nil {
+		return fail(err)
+	}
 	if _, err := (fsWriter{f}).Write(data); err != nil {
 		return fail(err)
 	}

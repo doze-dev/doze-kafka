@@ -23,7 +23,7 @@
 // "log.mkdir", and "log.file.write" (a write to anything that is not a batch
 // appended to a segment: an index entry, a cleaned segment, one of the small
 // files). "log.fsync" is every file fsync the log makes, of a segment or of one
-// of those.
+// of those. "log.read" is a read of a segment's records (a fetch).
 //
 // Arming from the environment (DOZE_FAULTS, and DOZE_FAULTS_FILE, which is read
 // again on every hit so a test can change the fault while the process runs):

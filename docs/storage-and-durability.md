@@ -142,10 +142,17 @@ without a sync (BAD-1).
 
 ### When the disk misbehaves
 
-- **A full or failing disk** answers every write `KAFKA_STORAGE_ERROR`, which clients
-  treat as retriable; `acks=0` produces get the connection closed instead. Reads and
-  group traffic carry on and writes resume when space is freed. Nothing acknowledged
-  is lost and a refused write leaves no offset behind.
+- **A full or failing disk** refuses every write with a retriable code: Produce and
+  the admin APIs answer `KAFKA_STORAGE_ERROR`; OffsetCommit and the transaction APIs
+  (InitProducerId with a transactional id, AddPartitionsToTxn, AddOffsetsToTxn,
+  TxnOffsetCommit, EndTxn) answer `NOT_COORDINATOR`, as Apache Kafka does when the
+  append to its offsets or transaction log fails, so the client finds the coordinator
+  again and retries; a Metadata request that would create a topic answers
+  `UNKNOWN_TOPIC_OR_PARTITION`. `acks=0` produces get the connection closed instead.
+  What Kafka answers on each is recorded (`conformance/recordings/full-disk-*.json`)
+  and the differences are in [limitations](limitations.md). Reads and group traffic
+  carry on and writes resume when space is freed. Nothing acknowledged is lost and a
+  refused write leaves no offset behind.
 - **A failed fsync** (as opposed to a failed write) is not retried. The kernel may
   have thrown the unflushed pages away and reported the error once, so a second
   `fsync` returning success would acknowledge data that is gone. The partition's log
