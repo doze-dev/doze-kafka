@@ -21,7 +21,7 @@ func TestTrafficSummaryCountsEveryNumberInItsOwnWindow(t *testing.T) {
 	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = src })
 	body := req(t, c, "GET", "/_console/traffic", nil).Body.String()
 	sum := between(body, `id="traffic-summary"`, "kept:")
-	for _, want := range []string{"2 requests in the last minute", "1 error<", "Errors among the requests of the last minute"} {
+	for _, want := range []string{"2 requests in the last minute", "1 error<", "Errors among the requests of that minute"} {
 		if !strings.Contains(sum, want) {
 			t.Errorf("the summary does not say %q:\n%s", want, sum)
 		}
@@ -41,7 +41,8 @@ func TestClientRefusedInARowIsFlagged(t *testing.T) {
 		events: []TrafficEvent{
 			{ID: "r2", Seq: 2, First: now, Time: now, Count: 1, Conn: 1, ClientID: "a", Remote: "r1", API: "CreateTopics", Error: "TOPIC_ALREADY_EXISTS", Class: "refused"},
 		},
-		clients: []TrafficClient{{Conn: 1, Remote: "r1", ClientID: "a", Opened: now.Add(-time.Hour), Last: now, Requests: 4, Streak: 4, Req5m: 4, Err5m: 4, LastError: "TOPIC_ALREADY_EXISTS"}},
+		clients: []TrafficClient{{Conn: 1, Remote: "r1", ClientID: "a", Opened: now.Add(-time.Hour), Last: now, Requests: 4, Streak: 4, Req5m: 4, Err5m: 4, LastError: "TOPIC_ALREADY_EXISTS",
+			ClientStreak: 4, ClientLastError: "TOPIC_ALREADY_EXISTS", ClientLastClass: "refused", ClientReq5m: 4, ClientErr5m: 4}},
 	}
 	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = src })
 	body := req(t, c, "GET", "/_console/traffic", nil).Body.String()

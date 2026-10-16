@@ -31,11 +31,12 @@ func boardsTraffic() *fakeTraffic {
 	}
 	src.clients = []TrafficClient{
 		{Conn: 1, ClientID: "checkout-api", Software: "Apache Kafka Java 4.0.0", Principal: "User:checkout", Remote: "127.0.0.1:55102", Opened: now.Add(-2 * time.Hour), Last: now.Add(-3 * time.Second),
-			Requests: 12, Produces: true, TxnID: "checkout-1", Req1m: 186, Req5m: 930, Err5m: 1},
+			Requests: 12, Produces: true, TxnID: "checkout-1", Req1m: 186, Req5m: 930, Err5m: 1, ClientReq1m: 186, ClientReq5m: 930, ClientErr5m: 1},
 		{Conn: 2, ClientID: "loyalty-etl", Software: "librdkafka 2.5.3", Principal: "User:loyalty", Remote: "127.0.0.1:55127", Opened: now.Add(-time.Hour), Last: now.Add(-5 * time.Second),
-			Requests: 4, Groups: []string{"g-loyalty-etl"}, Fetches: true, Req1m: 4, Req5m: 4, Err5m: 4, Streak: 4, LastError: "GROUP_AUTHORIZATION_FAILED"},
+			Requests: 4, Groups: []string{"g-loyalty-etl"}, Fetches: true, Req1m: 4, Req5m: 4, Err5m: 4, Streak: 4, LastError: "GROUP_AUTHORIZATION_FAILED",
+			ClientReq1m: 4, ClientReq5m: 4, ClientErr5m: 4, ClientStreak: 4, ClientLastError: "GROUP_AUTHORIZATION_FAILED", ClientLastClass: "denied"},
 		{Conn: 3, ClientID: "order-validator", Software: "librdkafka 2.5.3", Principal: "User:validator", Remote: "127.0.0.1:55110", Opened: now.Add(-2 * time.Hour), Last: now.Add(-4 * time.Second),
-			Requests: 15, Groups: []string{"g-order-validator"}, Fetches: true, Req1m: 118, Req5m: 590},
+			Requests: 15, Groups: []string{"g-order-validator"}, Fetches: true, Req1m: 118, Req5m: 590, ClientReq1m: 118, ClientReq5m: 590},
 	}
 	src.story = TrafficStory{Group: "g-order-validator", Protocol: "classic", Requests: 15, Folded: 12, Topics: []string{"harbour.checkout.orders"},
 		Rebalances: []TrafficRebalance{{Start: now.Add(-50 * time.Second), End: now.Add(-44 * time.Second), Done: true, From: 6, To: 7, Cause: "a member joined", Members: 3, MembersBefore: 2,
@@ -54,12 +55,14 @@ func TestTrafficBoardsRenderWhatTheRecorderHolds(t *testing.T) {
 	// Main: a folded heartbeat reads as a rhythm, a refusal in the board's purple, normal
 	// flow is not an error, a closed connection says why.
 	body := strings.ReplaceAll(req(t, c, "GET", "/_console/traffic", nil).Body.String(), "<wbr>", "") // a result wraps at its underscores.
-	for _, want := range []string{"every 3 s", `class="errrow refused"`, `class="errrow denied"`, `class="errrow failed"`, "MEMBER_ID_REQUIRED", "CONNECTION_CLOSED", "3 clients connected", "last 4 requests refused", "producer · tx checkout-1"} {
+	// The streak is the client's, and its word is the class of the no (A2): an ACL's is
+	// "denied".
+	for _, want := range []string{"every 3 s", `errrow refused"`, `errrow denied"`, `errrow failed"`, "MEMBER_ID_REQUIRED", "CONNECTION_CLOSED", "3 clients connected", "last 4 requests denied", "producer · tx checkout-1"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("Main does not show %q", want)
 		}
 	}
-	if strings.Contains(between(body, "MEMBER_ID_REQUIRED", "</tr>"), "errrow") {
+	if strings.Contains(between(body, `id="rq-e2"`, ">"), "errrow") || !strings.Contains(body, `<div class="r " role="row" id="rq-e2"`) {
 		t.Error("a first join is shown as an error")
 	}
 
@@ -91,7 +94,7 @@ func TestTrafficBoardsRenderWhatTheRecorderHolds(t *testing.T) {
 	}
 	// Traf-12 draws one row above the story: the field, the kinds, the group's pill, clear
 	// and the count; no summary line, no Filters row; its foot note and the way out.
-	for _, want := range []string{`class="seg"`, `class="pill pill-name"`, `class="b">clear</a>`, `id="story-count"`} {
+	for _, want := range []string{`class="seg"`, `class="pill tf-pill"`, `class="b">clear</a>`, `id="story-count"`} {
 		if !strings.Contains(st, want) {
 			t.Errorf("the story's filter row does not show %q", want)
 		}
@@ -106,7 +109,7 @@ func TestTrafficBoardsRenderWhatTheRecorderHolds(t *testing.T) {
 	}
 	if flat := req(t, c, "GET", "/_console/traffic?group=g-order-validator&flat=1", nil).Body.String(); strings.Contains(flat, `id="traffic-story"`) {
 		t.Error("flat still shows the story")
-	} else if !strings.Contains(flat, `id="traffic-summary"`) || strings.Contains(flat, `class="filterrow story"`) {
+	} else if !strings.Contains(flat, `id="traffic-summary"`) || strings.Contains(flat, `tf-filter story"`) {
 		t.Error("a plain list is the Traffic page with its summary and its own filter row")
 	}
 	// The generations table draws the newest generation as the board's .on row, and only that.
@@ -125,14 +128,14 @@ func TestTrafficBoardsRenderWhatTheRecorderHolds(t *testing.T) {
 		t.Error("a refusal's name does not offer a break after each underscore")
 	}
 	// The frozen line is the row under the header, not above the table.
-	if main := req(t, c, "GET", "/_console/traffic", nil).Body.String(); !strings.Contains(main, `</tr>
-      <tr class="frozen-line lost-only">`) {
-		t.Error("the frozen line is not the table's second header row")
+	if main := req(t, c, "GET", "/_console/traffic", nil).Body.String(); !strings.Contains(main, `</span></div>
+    <div class="r tf-frozen lost-only" role="row">`) {
+		t.Error("the frozen line is not the row under the table's header")
 	}
 
 	// Clients: needs a look, the callout with what it means.
 	cl := req(t, c, "GET", "/_console/traffic?view=clients", nil).Body.String()
-	for _, want := range []string{"1 client needs a look", "loyalty-etl has been refused 4 times in a row", "100 %", "none (producer)", "g-loyalty-etl, refused"} {
+	for _, want := range []string{"1 client needs a look", "loyalty-etl has been denied 4 times in a row", "100 %", "none (producer)", "g-loyalty-etl, denied"} {
 		if !strings.Contains(cl, want) {
 			t.Errorf("the clients view does not show %q", want)
 		}
@@ -143,7 +146,7 @@ func TestRequestInspectorShowsPartitionsDecodedFieldsAndWhyARefusalHappened(t *t
 	src := boardsTraffic()
 	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = src })
 	one := req(t, c, "GET", "/_console/inspect/request?key=e5", nil).Body.String()
-	for _, want := range []string{"Produce v9", "Refused", "Real Kafka would refuse the same call.", "Result per partition", "harbour.checkout.invoices",
+	for _, want := range []string{`Produce <span class="mut">v9</span>`, "Refused", "Real Kafka would refuse the same call.", "Result per partition", "harbour.checkout.invoices",
 		"Decoded fields", "Acks", "-1 (all)", "Record bytes are shown on the topic page, not here.", "correlation"} {
 		if !strings.Contains(one, want) {
 			t.Errorf("the request inspector does not show %q", want)

@@ -41,6 +41,7 @@ func eventOf(e traffic.Event) console.TrafficEvent {
 		Topics: e.Topics, TopicsMore: e.TopicsMore, Group: e.Group, ViaGroup: e.ViaGroup, TxnID: e.TxnID,
 		Detail: e.Detail, Error: e.Error, ErrorCode: e.ErrorCode, Class: string(e.Class), Closed: e.Closed,
 		Duration: e.Duration, ReqBytes: e.ReqBytes, RespBytes: e.RespBytes,
+		Parts: e.Parts, Gen: e.Gen, HasGen: e.HasGen, AutoCreate: e.AutoCreate,
 	}
 	out.Facts = console.TrafficFacts{Acks: int(e.Facts.Acks), HasAcks: e.Facts.HasAcks, PartitionsMore: e.Facts.PartitionsMore, Decoded: e.Facts.Decoded}
 	for _, p := range e.Facts.Partitions {
@@ -91,7 +92,7 @@ func (s trafficSource) Since() time.Time { return s.started }
 
 func (s trafficSource) Window(d time.Duration) console.TrafficWindow {
 	w := s.rec.Last(d)
-	return console.TrafficWindow{Requests: w.Requests, Errors: w.Errors}
+	return console.TrafficWindow{Requests: w.Requests, Errors: w.Errors, From: w.From, To: w.To}
 }
 
 func (s trafficSource) Refusals() []console.TrafficRefusal {
@@ -116,6 +117,8 @@ func (s trafficSource) Clients() []console.TrafficClient {
 			Opened: c.Opened, Last: c.Last, Requests: c.Requests, Groups: c.Groups, TxnID: c.TxnID,
 			Produces: c.Produces, Fetches: c.Fetches, AskedTelemetry: c.AskedTelemetry,
 			Req1m: c.Req1m, Req5m: c.Req5m, Err5m: c.Err5m, Streak: c.Streak, LastError: c.LastError,
+			ClientStreak: c.ClientStreak, ClientLastError: c.ClientLastError, ClientLastClass: string(c.ClientLastClass),
+			ClientReq1m: c.ClientReq1m, ClientReq5m: c.ClientReq5m, ClientErr5m: c.ClientErr5m,
 		}
 	}
 	return out

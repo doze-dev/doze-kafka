@@ -860,7 +860,12 @@
     unfold: function () { var b = document.querySelector("#inspector [data-unfold]"); if (!b) return false; b.click(); },
     metrics: function () { var b = document.querySelector("#inspector [data-all-metrics]"); if (!b) return false; b.click(); },
     // c copies the decoded request when a request is open (elsewhere c creates).
-    copy: function () { var b = document.querySelector("#inspector [data-copy-decoded]"); if (!b) return false; b.click(); },
+    copy: function () {
+      var b = document.querySelector("#inspector [data-copy-decoded]");
+      if (!b) return false;
+      copyText(b.textContent).then(function () { toast("Copied the decoded fields"); },
+        function () { toast("This browser would not copy that; select the text and copy it by hand.", "err"); });
+    },
     // ] and [ move along the page's tabs.
     "tab-next": function () { return stepTab(1); },
     "tab-prev": function () { return stepTab(-1); },
@@ -982,6 +987,7 @@
     inspector.removeAttribute("aria-busy");
     if (!keepURL) setOpenParam(null, false);
     markOpenRow();
+    trafficSync();
     var back = inspectorOpener;
     inspectorOpener = null;
     if (restoreFocus === false || !back) return;
@@ -1366,20 +1372,30 @@
     var base = banner.getAttribute("data-new-url"), since = region.getAttribute("data-since");
     if (!base || !since) return;
     var live = region.getAttribute("data-live") || "", q = live.indexOf("?") >= 0 ? live.slice(live.indexOf("?") + 1) : "";
+    // Paused, this is the page's only question to the broker, so it is also how a paused
+    // page learns that the broker has gone (B3: the pill stayed green for 40 s and more).
     fetch(base + "?since=" + encodeURIComponent(since) + (q ? "&" + q : ""), { headers: { Accept: "application/json" } })
-      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (r) {
+        if (r.status >= 500) throw new Error("the console could not reach the broker");
+        return r.ok ? r.json() : null;
+      })
       .then(function (j) {
+        setDisconnected(false, "", live);
         if (!j) return;
-        var n = banner.querySelector("[data-new-n]"), pl = banner.querySelector("[data-new-s]");
-        if (n) n.textContent = (j.atLeast ? "at least " : "") + j.n;
-        if (pl) pl.textContent = j.n === 1 && !j.atLeast ? "" : "s";
-      }).catch(function () {});
+        var text = (j.atLeast ? "at least " : "") + j.n, s = j.n === 1 && !j.atLeast ? "" : "s";
+        document.querySelectorAll("[data-new-n], [data-new-n2]").forEach(function (el) { el.textContent = text; });
+        document.querySelectorAll("[data-new-s], [data-new-s2]").forEach(function (el) { el.textContent = s; });
+      }).catch(function () { setDisconnected(true, "can't reach the broker", live); });
   }
   function setPaused(p) {
     var was = livePaused;
     livePaused = p;
     document.documentElement.toggleAttribute("data-paused", p);
     if (p && !was) {
+      // What is open when the page pauses stays open, and says so (Traf-08: "Still
+      // selected from before you paused").
+      var held = document.getElementById("inspector");
+      if (held && !held.hidden) held.setAttribute("data-traffic-kept", "");
       var region = document.getElementById("traffic-live"), since = region && region.getAttribute("data-since");
       document.querySelectorAll("[data-paused-since]").forEach(function (el) {
         el.textContent = since && Number(since) > 0 ? clockText(Number(since)) : clockText(Date.now());
@@ -1403,9 +1419,12 @@
       el.classList.toggle("warn", p);
       var l = el.querySelector("[data-live-state-l]");
       if (l) l.textContent = p ? "paused" : "live";
+      // Traffic's pill is the board's: the dot, then the word as the pill's own text.
+      else if (el.lastChild && el.lastChild.nodeType === 3) el.lastChild.textContent = p ? "paused" : "live";
       var d = el.querySelector(".dot");
       if (d) { d.classList.toggle("off", false); d.classList.toggle("warn", p); }
     });
+    trafficSync();
   }
   document.addEventListener("click", function (e) {
     if (e.target.closest("[data-live-toggle]")) setPaused(!livePaused);
@@ -1459,6 +1478,119 @@
       setupLive();
       setPaused(livePaused); // a replaced region comes back looking unpaused.
     }
+  });
+
+  // ---------- Traffic: the page's states (Main, Traf-02 to Traf-12) ----------
+  // What the boards draw for a state the browser is in: which kind of selection is open
+  // (data-traffic-open on <html>: request, folded, client-metrics, client-none, which
+  // app.css draws the page by), the keys strip of the state as each board draws it
+  // (B2), Esc clearing the filter (B1), and the rows as one tab stop of a grid.
+  function trafficPage() {
+    var d = document.getElementById("detail");
+    return d && d.hasAttribute("data-traffic-view") ? d : null;
+  }
+  function trafficOpenKind() {
+    var insp = document.getElementById("inspector");
+    if (!insp || insp.hidden) return "";
+    var hd = insp.querySelector("[data-traffic-insp]");
+    return hd ? hd.getAttribute("data-traffic-insp") : "request";
+  }
+  // The strip of each state, in the boards' words and order: Main, Traf-02 (a filter),
+  // Traf-03 (errors), Traf-04 (a request open), Traf-05 (a folded row), Traf-06 (the
+  // clients), Traf-07 and Traf-11 (a client open), Traf-08 (paused), Traf-09 (empty),
+  // Traf-12 (a group's story). Traf-10's (lost) is the server's keys-lost hints.
+  function trafficKeys(page, open) {
+    var move = [["j", "k"], "move"], openK = [["↵"], "open"], filter = [["/"], "filter"], jump = [["⌘K"], "jump or act"];
+    var paused = livePaused, pause = [["p"], paused ? "resume" : "pause"], close = [["esc"], "close"];
+    var view = page.getAttribute("data-traffic-view");
+    if (page.hasAttribute("data-traffic-empty")) return [[["c"], "connect an app"], pause, jump];
+    if (open) {
+      var kind = [];
+      var insp = document.getElementById("inspector");
+      if (open === "request" && insp && insp.querySelector("[data-copy-decoded]")) kind.push([["c"], "copy decoded"]);
+      if (open === "folded" && insp && insp.querySelector("[data-unfold]")) kind.push([["u"], "unfold"]);
+      var all = insp && insp.querySelector("[data-all-metrics]");
+      if (open === "client-metrics" && all) kind.push([["m"], all.textContent.trim().replace(/^All/, "all")]);
+      if (view === "clients") return [move, openK].concat(kind, [close, jump]);
+      return paused ? [move, openK].concat(kind, [pause, close, jump]) : [move, openK].concat(kind, [close, pause, jump]);
+    }
+    if (view === "clients") return [move, [["↵"], "open client"], [["g", "r"], "requests"], jump];
+    if (page.hasAttribute("data-traffic-story")) return [move, openK, [["esc"], "clear filter"], jump];
+    if (page.hasAttribute("data-traffic-errors")) return [move, openK, filter, [["e"], "errors only"], pause, jump];
+    if (page.hasAttribute("data-traffic-filtered")) return [move, openK, filter, [["esc"], "clear filter"], pause, jump];
+    return [move, openK, filter, pause, jump];
+  }
+  function renderTrafficKeys(page, open) {
+    var strip = document.getElementById("keys");
+    if (!strip) return;
+    var lost = Array.prototype.filter.call(strip.children, function (s) { return s.classList.contains("keys-lost"); });
+    strip.textContent = "";
+    trafficKeys(page, open).forEach(function (h) {
+      var s = document.createElement("span");
+      s.className = "keys-live";
+      h[0].forEach(function (k) { var b = document.createElement("span"); b.className = "kbd"; b.textContent = k; s.appendChild(b); });
+      s.appendChild(document.createTextNode(h[1]));
+      strip.appendChild(s);
+    });
+    lost.forEach(function (s) { strip.appendChild(s); });
+  }
+  function trafficSync() {
+    var page = trafficPage(), root = document.documentElement;
+    if (!page) { root.removeAttribute("data-traffic-open"); return; }
+    var open = trafficOpenKind();
+    if (open) root.setAttribute("data-traffic-open", open); else root.removeAttribute("data-traffic-open");
+    renderTrafficKeys(page, open);
+  }
+  document.addEventListener("DOMContentLoaded", trafficSync);
+  document.addEventListener("htmx:afterSettle", trafficSync);
+  document.addEventListener("htmx:oobAfterSwap", function (e) { if (e.detail && e.detail.target && e.detail.target.id === "keys") trafficSync(); });
+  document.addEventListener("htmx:afterSwap", function (e) {
+    // A selection opened while paused is not one from before the pause.
+    var t = e.detail.target;
+    if (t && t.id === "inspector") t.removeAttribute("data-traffic-kept");
+  });
+  // Esc clears the filter (Traf-02, Traf-12: "esc clear filter"): with nothing open,
+  // from the page or from the field itself, it goes to the page without the filter.
+  // The field emptied with the filter still applied was B1. With a selection open, Esc
+  // is the shell's: it closes the selection first.
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape" || e.metaKey || e.ctrlKey || e.altKey) return;
+    var page = trafficPage();
+    if (!page || confirmOpen() || paletteOpen() || helpOpen() || inspectorIsOpen()) return;
+    var field = page.querySelector("[data-traffic-filter]"), active = document.activeElement;
+    var typing = active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName);
+    if (typing && active !== field) return;
+    var applied = page.hasAttribute("data-traffic-story") || !!page.querySelector("#filter-pills") || (field && field.defaultValue);
+    if (applied && field) {
+      e.preventDefault(); e.stopPropagation();
+      var to = field.getAttribute("data-clear-url");
+      var link = document.createElement("a");
+      link.href = to; link.setAttribute("hx-boost", "true"); link.hidden = true;
+      page.appendChild(link);
+      if (window.htmx) htmx.process(link);
+      link.click();
+      return;
+    }
+    if (field && field.value) { e.preventDefault(); e.stopPropagation(); field.value = ""; }
+  }, true);
+  // The rows are one tab stop (a grid): the one last focused, or the first, is in the
+  // tab order, and the arrow keys move between them.
+  document.addEventListener("focusin", function (e) {
+    var r = e.target.closest && e.target.closest(".tf-rows > .r");
+    if (!r) return;
+    r.parentNode.querySelectorAll(':scope > .r[tabindex="0"]').forEach(function (x) { if (x !== r) x.tabIndex = -1; });
+    r.tabIndex = 0;
+  });
+  document.addEventListener("keydown", function (e) {
+    var r = e.target.closest && e.target.closest(".tf-rows > .r");
+    if (!r || r !== e.target || e.metaKey || e.ctrlKey || e.altKey) return;
+    var rows = Array.prototype.filter.call(r.parentNode.children, function (x) { return x.classList.contains("r") && x.offsetParent !== null; });
+    var at = rows.indexOf(r), to = -1;
+    if (e.key === "ArrowDown") to = Math.min(rows.length - 1, at + 1);
+    else if (e.key === "ArrowUp") to = Math.max(0, at - 1);
+    if (to < 0) return;
+    e.preventDefault();
+    rows[to].focus();
   });
 
   var liveState = null;

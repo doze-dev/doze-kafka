@@ -97,6 +97,14 @@ tasks:
       - bunx playwright install chromium
       - bunx playwright test
 
+  design:
+    desc: 'The design gate alone: the Traffic pages measured element by element against their boards (e2e/design/README.md), with real traffic, in light and dark'
+    dir: e2e
+    cmds:
+      - bun install --frozen-lockfile
+      - bunx playwright install chromium
+      - bunx playwright test tests/design-traffic.spec.ts
+
   evidence:
     desc: 'Design evidence: screenshots of the live console at each board state (light, dark; 1440, and 960/390 where a board has one) into plan/evidence/, with the index. DESIGN_DIR=<the design artifact''s project/ files> also renders the boards. Not part of test:e2e.'
     dir: e2e

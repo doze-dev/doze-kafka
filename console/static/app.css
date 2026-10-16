@@ -367,12 +367,7 @@ span.num {
 .insp .hd { padding: 12px 16px 10px; border-bottom: 1px solid var(--line2); display: flex; flex-direction: column; gap: 4px; flex: none; }
 .insp .bd { padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
 .insp .bd.flush { padding: 0; gap: 0; }
-.insp-client { padding: 9px 14px; display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid var(--line2); }
-.insp-client a.insp-client-open { display: grid; grid-template-columns: 1fr 72px 72px; column-gap: 12px; align-items: center; text-decoration: none; }
-.insp-client a.insp-client-open:hover .b { text-decoration: underline; }
-.insp-client.on { background: var(--sel); }
-.insp-client > span { min-width: 0; overflow-wrap: anywhere; } /* a long group or transactional id breaks in the panel */
-.insp-default .callout { margin: 14px; }
+#clients-list > .callout { margin: 14px; } /* Main's panel: the board's callout at its foot */
 
 .dock { background: var(--card); border-top: 1px solid var(--line); display: flex; flex-direction: column; flex: none; max-height: 168px; overflow: auto; }
 .dock .dh { height: 30px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 14px; border-bottom: 1px solid var(--line2); }
@@ -388,6 +383,14 @@ span.num {
 }
 .keys .kbd { margin-right: 6px; }
 .keys .kbd + .kbd { margin-left: 0; }
+/* The inspector's title row with its status at the right (inspector.html). */
+.t-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.t-row .t { min-width: 0; }
+.insp-status { flex: none; }
+/* A hint is drawn while the broker answers (keys-live) or while it does not (keys-lost). */
+.keys .keys-lost { display: none; }
+html[data-connection-lost] .keys .keys-lost { display: inline; }
+html[data-connection-lost] .keys .keys-live { display: none; }
 
 /* The row at the head of a page that is reached from a list: at narrow widths the
    list is not drawn, and this is the way back to it (Sy-03). */
@@ -705,7 +708,6 @@ table.tbl td { padding: 4px 12px; min-height: 28px; border-bottom: 1px solid var
 table.tbl tbody tr:last-child td { border-bottom: none; }
 /* The boards' row is 28 px with its rule inside it (.r, min-height 28, border-box); a
    table row's border is added to it, so Traffic's rows give a pixel of padding back. */
-table.tf-table td, table.tf-clients td { padding-bottom: 3px; }
 tr[data-inspector-open] { cursor: pointer; }
 tr[data-inspector-open]:hover td { background: var(--well); }
 tr[data-inspector-open]:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
@@ -1027,27 +1029,7 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .dock-bar .kbd { display: none; }
   .dock-foot { flex-direction: column; align-items: stretch; }
   .crow2 { flex-wrap: wrap; gap: 2px 16px; }
-  /* A phone-width table keeps what identifies a record: offset, key, value. */
-  .tf-table td.cell-req { grid-column: 1; grid-row: 1; font-weight: 600; }
-  .tf-table td.cell-took { grid-column: 2; grid-row: 1; text-align: right; color: var(--mut); }
-  .tf-table td.cell-topic { grid-column: 1; grid-row: 2; }
-  .tf-table td.cell-result { grid-column: 2; grid-row: 2; text-align: right; }
-  .tf-table td.cell-detail { grid-column: 1 / -1; grid-row: 3; }
-  .tbl-wrap table.tbl tbody tr:not(.txnmark) td.cell-detail:empty { display: none; }
-  .tbl-wrap table.tbl tbody tr.errrow:not(.txnmark) { background: var(--badbg); }
-  .tbl-wrap table.tbl tbody tr.errrow:not(.txnmark) td { background: transparent; }
-  .tf-table td.cell-time { grid-column: 1; grid-row: 4; color: var(--mut); font-size: var(--fs-xs); }
-  .tf-table td.cell-client { grid-column: 2; grid-row: 4; color: var(--mut); font-size: var(--fs-xs); max-width: 150px; text-align: right; }
-  /* The card's cells are grid items that a long client id or topic would widen past the card
-     (the rule above that clears a cell's max-width is more specific): each is cut instead. */
-  .tbl-wrap table.tbl.tf-table tbody tr:not(.txnmark) td.cell-client { max-width: 150px; }
-  .tbl-wrap table.tbl.tf-table tbody tr:not(.txnmark) td { overflow: hidden; text-overflow: ellipsis; }
   .keys { display: none; } /* a phone has no keys; Sy-04 draws no strip */
-  /* A group's story at a phone's width: the board's six tracks (546 px and the text) do not
-     fit, so a row is two lines of three: time, client, request; then what happened, the
-     result and how long it took. */
-  #traffic-story.tf-story { --c: 64px minmax(0, 1fr) minmax(0, 1fr) !important; }
-  #traffic-story.tf-story .r { row-gap: 2px; }
   .panes > .insp:not(:has(.insp-sel:not([hidden]))) { display: none; } /* one screen at a time: the summary beside the page waits for a selection */
   .crow .field, .field.w-part, .field.w-acks { flex: 1 1 100%; }
   .cfgfoot { flex-direction: column; align-items: stretch; }
@@ -1092,76 +1074,6 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
 .schema-pick .input { padding: 2px 6px; font-size: var(--fs-xs); font-family: var(--mono); max-width: 22ch; }
 .diff .dt { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 
-/* ---------- traffic ---------- */
-.trafficwrap { max-width: 1280px; }
-/* Main's columns: the board's own tracks, 92 150 118 1fr 190 84 52, with its 14 px
-   gap (7 px each side of a cell) and 12 px at the row's two ends, except the Result,
-   which is 118 (a deviation, taken from the topic's 1fr): a name wraps only after an
-   underscore, and the longest run between two (DESERIALIZATION_, 16 characters at
-   7.2 px) is 116 px; at 84 UNSUPPORTED_ and AUTHORIZATION_ were cut mid-word. The
-   time, the result and the duration are always whole; the client, the request, the
-   topic and the detail are the ones the board cuts with an ellipsis, with their full
-   text on hover. The
-   board's 1fr is 10 px beside a 400 px inspector at 1440; the topic keeps 96 here (its header's words need 109 with the padding) and
-   the card scrolls sideways before it gives that up. */
-.tf-table { table-layout: fixed; }
-/* The board's tracks are 92 150 118 1fr 190 84 52 (906 with the gaps and the row's own
-   padding), and its own render cannot hold them at 1440 beside the inspector: the page
-   is 802 wide and the topic's 1fr is 8 px. So the fixed ones are Time, Request (130:
-   "FindCoordinator v4" is 130 at the board's font), Result (118, AD5) and Took; Client,
-   Topic and Detail share what is left as shares of the table, growing with the window,
-   and nothing is pushed off the right edge. */
-/* Below 1180 the card may scroll sideways (the table keeps 740); from 1180 up the tracks fit the
-   card beside the 400 px inspector (542 at 1180, 642 at 1280, 728 at 1366, 802 at 1440): under 1300
-   the Detail column (what the inspector says in full) is not drawn, and under 1240 Time, Request
-   and Took give a few pixels, so Took is whole at every width. */
-@media (min-width: 641px) and (max-width: 1179px) { .tf-table { min-width: 740px; } }
-@media (min-width: 1180px) and (max-width: 1299px) {
-  .tf-table th:nth-child(5), .tf-table td.cell-detail { display: none; }
-  .tf-table.tbl th:nth-child(2), .tf-table.tbl th:nth-child(4) { width: auto; }
-}
-@media (min-width: 1180px) and (max-width: 1239px) {
-  .tf-table.tbl th:nth-child(1) { width: 100px; }
-  .tf-table.tbl th:nth-child(3) { width: 112px; }
-  .tf-table.tbl th:nth-child(7) { width: 64px; }
-}
-table.tbl.tf-table th, table.tbl.tf-table td { padding-left: 7px; padding-right: 7px; }
-table.tbl.tf-table th:first-child, table.tbl.tf-table td:first-child { padding-left: 12px; }
-table.tbl.tf-table th:last-child, table.tbl.tf-table td:last-child { padding-right: 12px; }
-.tf-table th { overflow: hidden; }
-.tf-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tf-table td.cell-result { white-space: normal; overflow-wrap: break-word; text-overflow: clip; } /* a long error name wraps at its underscores; it is never cut */
-.tf-table td.cell-time, .tf-table td.cell-took { text-overflow: clip; }
-@media (min-width: 641px) { .tf-table td.cell-time { color: var(--ink); } } /* the board's time is plain .m, ink (the phone's card sets it quiet) */
-.tf-table td.cell-client a { text-decoration: none; } /* and so is the client's name: it opens the client without a link's look */
-.tf-table th:nth-child(1) { width: 111px; }  /* 92 + 12 + 7 */
-.tf-table th:nth-child(2) { width: 16%; }    /* the board's 150 */
-.tf-table th:nth-child(3) { width: 144px; }  /* 130 + 14 */
-.tf-table th:nth-child(4) { width: 15%; }    /* the board's 1fr */
-.tf-table th:nth-child(5) { width: 12%; }    /* the board's 190 */
-.tf-table th:nth-child(6) { width: 132px; }  /* 118 + 14 (the board has 84) */
-.tf-table th:nth-child(7) { width: 71px; }   /* 52 + 7 + 12 */
-/* Wide enough for the board's own tracks beside the inspector (962 and up): Client 150
-   and Detail 190 as drawn, and the topic's 1fr takes what is left. */
-@media (min-width: 1600px) {
-  .tf-table th:nth-child(2) { width: 164px; }
-  .tf-table th:nth-child(4) { width: auto; }
-  .tf-table th:nth-child(5) { width: 204px; }
-}
-.tf-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 8px; }
-.tf-f { flex: 1 1 150px; min-width: 130px; }
-.tf-f .input { width: 100%; }
-.tf-chk { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); color: var(--muted-foreground); white-space: nowrap; }
-.tf-table tbody tr { cursor: pointer; }
-.tf-table tbody tr:hover { background: var(--muted); }
-/* The request and its fold count (Main): the name is what gives when the track is
-   short (ellipsis, the whole name in the title), the count is a fixed-width tag that
-   is never cut. The board's .tag is plain 11 px mono. */
-.req { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
-.req-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tf-count { flex: none; }
-.sec-title .livetoggle { margin-left: auto; text-transform: none; letter-spacing: 0; }
-
 /* the group timeline: what the coordinator did, newest first */
 .timeline { list-style: none; margin: 0 0 16px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
 .tl { border-top: 1px solid var(--border); font-size: var(--fs-md); border-left: 3px solid transparent; }
@@ -1196,24 +1108,6 @@ table.tbl.tf-table th:last-child, table.tbl.tf-table td:last-child { padding-rig
 .tr-meta { color: var(--muted-foreground); font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .tr-cons { grid-column: 3 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
 @media (max-width: 900px) { .tr { grid-template-columns: 1fr; } .tr-cons { grid-column: auto; } }
-
-/* ---------- client metrics (KIP-714) ---------- */
-.mcard { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 10px 14px 12px; margin-bottom: 10px; }
-.mc-h { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
-.mc-who { font-weight: 600; }
-.mc-last { margin-left: auto; font-size: var(--fs-sm); }
-.mc-res { font-size: var(--fs-sm); margin-top: 4px; overflow-wrap: anywhere; }
-.mc-none { margin-top: 8px; font-size: var(--fs-md); }
-.mc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 2px 28px; margin-top: 8px; }
-.mrow { display: grid; grid-template-columns: minmax(0, 1fr) 120px 84px; align-items: center; gap: 10px; padding: 4px 0; border-top: 1px solid var(--border); font-size: var(--fs-sm); }
-.mr-n { overflow-wrap: anywhere; }
-.mr-a { color: var(--muted-foreground); }
-.mr-v { text-align: right; white-space: nowrap; }
-.mr-s { display: flex; align-items: center; }
-.spark { display: block; }
-.spark polyline { fill: none; stroke: var(--info); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
-.mc-more { margin-top: 8px; font-size: var(--fs-sm); }
-.mc-more summary { cursor: pointer; color: var(--muted-foreground); }
 
 /* The line under a field, generated from the settings table. */
 .teach { margin: 4px 0 0; font-size: var(--fs-sm); line-height: 1.4; color: var(--muted-foreground); }
@@ -1258,117 +1152,193 @@ table.tbl.tf-table th:last-child, table.tbl.tf-table td:last-child { padding-rig
 
 .nbnote { margin: 4px 0 0; }
 
-/* ---------- Traffic (Main, Traf-02 to Traf-12) ---------- */
-/* A refusal is tinted by what kind of no it is: purple for what real Kafka would also
-   say and for what an ACL decided, amber for not implemented, red only for the broker
-   failing (Traf-03's own note: "anything red is the broker unhappy"). */
-table.tbl tbody tr.errrow td { background: var(--denybg); }
-table.tbl tbody tr.errrow.not-implemented td { background: var(--warnbg); }
-table.tbl tbody tr.errrow.failed td { background: var(--badbg); }
+/* ---------- Traffic (Main, Traf-02 to Traf-12) ----------
+   The page is the boards' own parts (.row, .card, .r, .pill, .seg, .callout, .kv), so
+   most of it is drawn by the primitives above; what is here is what the boards draw
+   that a primitive does not: the columns, the card that fills the page with its rows
+   scrolling under a header that stays, the states (paused, lost, what is open) and
+   the widths no board draws. e2e/design measures each board against the page. */
+
+/* The page itself does not scroll: the title, the summary, the filter and the header
+   stay, and the rows scroll inside the card that fills what is left (Main). */
+.main.tf { overflow: hidden; }
+.main.tf > .tf-live { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.main.tf > .tf-live:has(> .card.grow) { flex: 1 1 0; }
+.tf-live > .card { display: flex; flex-direction: column; min-height: 0; flex: 0 1 auto; }
+.tf-live > .card.grow { flex: 1 1 0; }
+.tf-live > .card > .r { flex: none; }
+/* The boards' rows keep their rule to the last (the shell's .r:last-child drops it). */
+.main.tf .card .r:last-child, .insp .hd ~ .bd .card .r:last-child { border-bottom: 1px solid var(--line2); }
+/* The boards' tabs: `.app a { color: inherit }` outranks .tab's muted colour, so a tab
+   that is not the open one is ink, as the board renders it. */
+.main.tf > .tabs > .tab { color: var(--ink); white-space: normal; }
+.tf-rows { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.tf-rows > .r { cursor: pointer; }
+.tf-rows > .r:hover:not(.on) { background: var(--well); }
+.tf-rows > .r:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; border-radius: 0; }
+/* The j cursor is the row's outline, as the focus is (the board draws neither). */
+.tf-rows > .r.cursor { outline: 2px solid var(--ring); outline-offset: -2px; }
+.tf-foot.pad8 { padding-bottom: 8px; }
+.tf-none { margin-top: 2px; }
+
+/* Main's columns. Time 92, Request 130, Result 118 and Took 52 are whole at every width
+   (the board's are 92 118 84 52: "FindCoordinator v4" is 130 at the board's font, and a
+   result name wraps only after an underscore, the longest run of any being 116 px).
+   Client and Detail are the board's 150 and 190 where they fit, and give way equally
+   down to what is left once the topic has 96; the topic takes the rest, as the board's
+   1fr. */
+.tf-card { --c: 92px minmax(0, 150px) 130px minmax(96px, 1fr) minmax(0, 190px) 118px 52px; }
+.tf-card .r > .tf-result { white-space: normal; overflow: visible; overflow-wrap: break-word; text-overflow: clip; }
+.tf-card .r > .m > .tf-who, .tf-story .r .tf-who { text-decoration: none; color: inherit; }
+.tf-card .r > .b > .mut, .tf-story .r > .b > .mut { font-weight: 400; }
+.tf-card .r.tf-frozen, .tf-story .r.tf-frozen, .tf-clients .r.tf-frozen { display: none; }
+html[data-connection-lost] .tf-live .r.tf-frozen { display: flex; justify-content: center; background: var(--well); color: var(--mut); }
+.tf-card .r.tf-cut { display: flex; background: var(--well); }
+/* A refusal is tinted by what kind of no it is: purple for what real Kafka would also say
+   and for what an ACL decided, amber for not implemented, red only for the broker failing
+   (Traf-03's own note: "anything red is the broker unhappy"). */
 .r.errrow { background: var(--denybg); }
 .r.errrow.not-implemented { background: var(--warnbg); }
 .r.errrow.failed { background: var(--badbg); }
-/* The board's filter row is one row: the field, the kinds, then the note at the right,
-   which wraps inside itself when the page is narrow (Main at 1440 with the inspector
-   open). Below a phone's width it may drop under. */
-.filter-note { white-space: normal; text-align: right; }
-@media (min-width: 641px) {
-  #detail[data-traffic-view] .filterrow { flex-wrap: nowrap; }
-  /* A story's row holds the field, the kinds, the group's pill, "clear" and the count. Under
-     1400 the count wraps to a second row at the right rather than run off the edge; from
-     1400 (below) it is one row, as the board draws it. */
-  #detail[data-traffic-view] .filterrow.story { flex-wrap: wrap; }
-  #detail[data-traffic-view] .filterrow.story > .grow { flex: 1 1 0; min-width: 0; }
-  #detail[data-traffic-view] .filterrow > *, #detail[data-traffic-view] .filterrow .inp, #detail[data-traffic-view] .filterrow .seg { flex: none; }
-  #detail[data-traffic-view] .filterrow > .grow { flex: 1 1 0; min-width: 0; }
-  #detail[data-traffic-view] .filterrow > .filter-note { flex: 0 1 auto; min-width: 0; }
-}
-@media (min-width: 1400px) {
-  /* Beside the 400 px inspector the card is 804 px: the field is what gives (it shrinks and
-     ellipsises its text), the count is 150 px and wraps in two lines as the board's does;
-     the kinds, the pill, "clear" and the count are never cut. */
-  #detail[data-traffic-view] .filterrow.story { flex-wrap: nowrap; }
-  #detail[data-traffic-view] .filterrow.story > .grow { flex: 0 0 0; }
-  #detail[data-traffic-view] .filterrow.story .inp { flex: 1 1 64px; min-width: 64px; width: auto; max-width: 300px; text-overflow: ellipsis; }
-  #detail[data-traffic-view] .filterrow.story > #story-count { flex: 0 0 150px; min-width: 0; text-align: right; }
-}
-/* A filter's pill holds a name a client chose: the name is what gives, cut with an
-   ellipsis (its title has the whole), and the pill's × and "clear" stay on the page. */
-.pill.pill-name { max-width: 100%; min-width: 0; }
-.pill.pill-name > .m { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.pill.pill-name > .mut, .pill.pill-name > .pill-x { flex: none; }
-#detail[data-traffic-view] .filterrow > .story-pills { flex: 0 1 auto; min-width: 0; }
-.story-pills > .pill-name { flex: 0 1 auto; }
-.story-pills > a { flex: none; }
-.tf-cut { margin: 0 0 6px; }
+.tf-rows > .r.errrow:hover:not(.on) { background: var(--denybg); }
+
+/* The story (Traf-12): the board's 92 150 130 1fr 80 56, the Result 118 as Main's. */
+.tf-story { --c: 92px minmax(0, 150px) 130px minmax(120px, 1fr) 118px 56px; }
 .tf-story .r.kid { color: var(--mut); }
-.tf-story .r > .cell-result { white-space: normal; overflow: visible; overflow-wrap: break-word; text-overflow: clip; padding: 3px 0; } /* AD5: never cut; 20 + 6 + the rule is the board's 28 */
-.tf-story .r.rebalance .b { color: var(--ink); }
 .tree { color: var(--line); font-family: var(--mono); }
-/* A folded row's strip (Traf-05): one tick a repeat, the board's 3 px of ink. */
-.ticks .tick { display: inline-block; width: 3px; border-radius: 1px; background: var(--ink); }
-.ticks .tick.deny { background: var(--deny); } .ticks .tick.bad { background: var(--bad); } .ticks .tick.warn { background: var(--warn); }
-.t-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.t-row .t { min-width: 0; }
-.insp-status { flex: none; }
-.metric-list { display: grid; row-gap: 9px; }
-.metric-list.worth { padding: 8px 12px; row-gap: 8px; }
-.metric-list .mrow { display: grid; grid-template-columns: 1fr 76px 72px; column-gap: 10px; align-items: center; }
-.metric-list .mr-s svg.spark { width: 76px; height: 16px; }
-.metric-list .mr-v { text-align: right; }
-/* Fixed tracks: a name a client chose is cut with an ellipsis in its column, the whole
-   of it in the cell's title and the inspector, as the boards cut a long name. */
-.tf-clients { table-layout: fixed; width: 100%; }
-.tf-clients td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tf-clients td, .tf-clients th { padding-left: 7px; padding-right: 7px; }
-.tf-clients td:first-child, .tf-clients th:first-child { padding-left: 12px; }
-.tf-clients tr { cursor: pointer; }
-.tf-clients tr.needs-look td { background: var(--warnbg); }
-/* The board's tracks (150 190 110 130 80 100 90 130) plus the 14 px a cell's padding
-   takes, and no wrapping: "just now" and "+3" are one line each, so a row is 28 px. */
-.tf-clients .c-sw { width: 204px; } .tf-clients .c-pr { width: 124px; } .tf-clients .c-ad { width: 144px; }
-.tf-clients .c-op { width: 94px; } .tf-clients .c-la { width: 114px; } .tf-clients .c-rq { width: 104px; } .tf-clients .c-gr { width: 144px; }
-/* Below 1180 there is no room for nine columns with a client's name: the principal,
-   when it opened and its last request are in its inspector, one click away. */
-@media (min-width: 641px) and (max-width: 1179px) { .tf-clients .c-pr, .tf-clients .c-op, .tf-clients .c-la { display: none; } }
-/* With a client open on the right there is no room for nine columns: the board keeps
-   the client, its software, requests a minute and errors (Traf-07). */
-.panes:has(#inspector:not([hidden])) .tf-clients .c-pr,
-.panes:has(#inspector:not([hidden])) .tf-clients .c-ad,
-.panes:has(#inspector:not([hidden])) .tf-clients .c-op,
-.panes:has(#inspector:not([hidden])) .tf-clients .c-la,
-.panes:has(#inspector:not([hidden])) .tf-clients .c-gr { display: none; }
-/* The paused page (Traf-08) and the lost broker (Traf-10) are the page's two states: the
-   shell says which with an attribute on the document. */
+.tf-story .r > .tf-result { white-space: normal; overflow: visible; overflow-wrap: break-word; text-overflow: clip; }
+.tf-story .r.tf-rebalance > .b { color: var(--ink); }
+
+/* The clients (Traf-06): the board's 150 190 110 130 80 100 90 130 1fr, the named ones
+   giving way equally where the page is narrower than the board. With a client open
+   (Traf-07, Traf-11) the table is the board's four columns: Client, Software, Req/min and
+   Errors. */
+.tf-clients { --c: minmax(0, 150px) minmax(0, 190px) minmax(0, 110px) minmax(0, 130px) 80px 100px 90px minmax(0, 130px) minmax(86px, 1fr); }
+.tf-clients .r > .m > a { text-decoration: none; color: inherit; }
+.tf-clients .r.tf-look { background: var(--warnbg); }
+.tf-open-only { display: none; }
+html[data-traffic-open^="client"] .tf-clients { --c: 150px 1fr 70px 70px; }
+html[data-traffic-open^="client"] .tf-clients .tf-cw { display: none; }
+html[data-traffic-open^="client"] .tf-clients .tf-open-only { display: inline; }
+html[data-traffic-open] .tf-closed-only { display: none; }
+.tf-open-client-metrics { display: none; }
+html[data-traffic-open="client-metrics"] .tf-open-client-metrics { display: inline; }
+/* Traf-07 and Traf-11 draw no summary line and no callout with a client open. */
+html[data-traffic-open^="client"] #detail[data-traffic-view="clients"] #traffic-summary { display: none; }
+
+/* The filter row: one row, the field, the kinds, then the note at the right, each
+   giving way as the board's do (flex's own shrink). */
+.tf-form { display: contents; }
+/* The boards' field is .inp.m, and their own `.app input { font: inherit }` outranks .m:
+   it renders 13 px Plex Sans, and so does this one. */
+.tf-filter .inp { font: inherit; }
+.tf-filter .seg > * { white-space: normal; }
+.tf-pill { min-width: 0; max-width: 100%; }
+.tf-pill > .m { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tf-pill > .mut, .tf-pill > .btn { flex: none; }
+.tf-pill > .btn.ghost.sm { height: 18px; padding: 0 4px; text-align: center; }
+/* The boards' a.well.pad is padded 12 14 (the shell's a.well is a small chip). */
+#error-summary a.well.pad { display: flex; padding: 12px 14px; }
+/* A story's row holds the field, the kinds, the group's pill, "clear" and the count: the
+   field is what gives (it shrinks and cuts its text), and the count never wraps. */
+.tf-filter.story .inp { min-width: 64px; }
+
+/* The connected-clients panel (Main): the board's rows, a client to a block. */
+.insp-default .tf-conns { overflow-y: auto; }
+.tf-conn { padding: 9px 14px; gap: 2px; border-bottom: 1px solid var(--line2); min-width: 0; }
+.tf-conn:has(+ .grow) { border-bottom: 0; }
+.tf-conn.on { background: var(--sel); }
+.tf-conn-open { display: grid; grid-template-columns: minmax(0, 1fr) 70px 56px; column-gap: 14px; align-items: center; color: inherit; text-decoration: none; }
+.tf-conn-open:hover .b { text-decoration: underline; }
+.tf-conn-open > .ra { text-align: right; }
+
+/* The inspector's head (the boards' .hd) with its close control out of flow in the
+   corner, so the head is the board's size. */
+.insp .hd.tf-ihd { position: relative; }
+.tf-ihd > .row .h2 { min-width: 0; overflow-wrap: anywhere; }
+.tf-ihd > .tf-close { position: absolute; top: 6px; right: 6px; height: 20px; width: 20px; padding: 0; font-size: var(--fs-base); line-height: 1; }
+.insp .bd > .btn { align-self: stretch; }
+.tf-ticks > .tick { flex: none; display: inline-block; width: 3px; border-radius: 1px; background: var(--ink); }
+/* The boards' paragraphs have no margin (`.app p { margin: 0 }`). */
+.insp .bd > p { margin: 0; }
+.tf-metrics > :nth-child(3n+1) { min-width: 0; overflow-wrap: anywhere; }
+.tf-metrics .spark { display: inline-flex; align-items: flex-end; gap: 1px; height: 16px; }
+.tf-metrics .spark i { display: block; width: 3px; background: var(--mut); border-radius: 1px; }
+.tf-acts .btn.tf-name { max-width: 100%; min-width: 0; }
+
+/* The page's states: paused (Traf-08) and the broker lost (Traf-10) are attributes on
+   the document, set by the shell. */
 .lost-only, .paused-only { display: none; }
 html[data-paused] .paused-only { display: inline; }
-html[data-paused] .callout.paused-only { display: flex; }
+html[data-paused] .callout.paused-only, html[data-paused] .note.paused-only { display: flex; }
 html[data-paused] .live-only { display: none; }
 #paused-banner { flex-direction: row; align-items: center; justify-content: space-between; }
 html[data-connection-lost] .lost-only { display: inline-flex; }
 html[data-connection-lost] .callout.lost-only { display: flex; }
-html[data-connection-lost] div.frozen-line.lost-only { display: block; }
-/* In the table it is the row under the header, as Traf-10 draws it. */
-html[data-connection-lost] tr.frozen-line.lost-only { display: table-row; }
-tr.frozen-line > td { background: var(--well); color: var(--mut); text-align: center; padding: 5px 12px; border-bottom: 1px solid var(--line2); white-space: normal; }
-table.tbl.tf-table tr.frozen-line > td, table.tbl.tf-clients tr.frozen-line > td { overflow: visible; }
-.frozen-line { background: var(--well); color: var(--mut); text-align: center; padding: 5px 12px; border-bottom: 1px solid var(--line2); }
-html[data-connection-lost] #traffic-controls [data-live-state],
-html[data-connection-lost] #traffic-controls [data-live-toggle]:not(.lost-only) { display: none; }
-html[data-paused] #traffic-controls [data-live-toggle] { display: none; }
-/* The rows are what is old: the header and the frozen line are not dimmed (Traf-10). */
-html[data-connection-lost] #traffic-live .tbl-wrap tbody,
-html[data-connection-lost] #traffic-live .tf-story .r:not(.h) { opacity: .55; }
-/* What is counted from the broker is not known while it is lost, so it is not drawn. */
-html[data-connection-lost] #traffic-summary,
-html[data-connection-lost] .panes:has(#insp-default) > #inspector-panel:has(#inspector[hidden]) { display: none; }
-.keys .keys-lost { display: none; }
-html[data-connection-lost] .keys .keys-lost { display: inline; }
-html[data-connection-lost] .keys .keys-live { display: none; }
+html[data-connection-lost] .live-only, html[data-connection-lost] .paused-only,
 html[data-connection-lost] .up-only { display: none; }
-/* Nothing has reached the broker (Traf-09): no filter, no kinds, no clients, no note. */
-.main:has(#traffic-empty) .filterrow,
-.main:has(#traffic-empty) #traffic-note { display: none; }
-.panes:has(#traffic-empty) > #inspector-panel { display: none; }
-html[data-connection-lost] #traffic-live[data-live].disconnected::after { display: none; }
-.main:has(#traffic-empty) { gap: 12px; }
+html[data-connection-lost] #traffic-controls [data-live-state], html[data-connection-lost] #traffic-controls [data-live-toggle] { display: none; }
+html[data-paused] #traffic-controls [data-live-state] { background: var(--warnbg); color: var(--warn); }
+/* The rows are what is old: the header and the frozen line are not dimmed (Traf-10). */
+html[data-connection-lost] .tf-live .tf-rows { opacity: .55; }
+html[data-connection-lost] .tf-live[data-live].disconnected::after { display: none; }
+/* What is counted from the broker is not known while it is lost, so it is not drawn. */
+html[data-connection-lost] #detail.tf #traffic-summary,
+html[data-connection-lost] #detail.tf #fold-note,
+html[data-connection-lost] .panes:has(#detail.tf) > #inspector-panel:has(#inspector[hidden]) { display: none; }
+/* Paused, the page draws no summary line (Traf-08: the banner is where it was). */
+html[data-paused] #detail.tf #traffic-summary { display: none; }
+.tf-kept { display: none; }
+html[data-paused] #inspector[data-traffic-kept] .tf-kept { display: block; }
+/* Nothing has reached the broker (Traf-09): the board's 12 px gap, and no panel. */
+.main.tf[data-traffic-empty] { gap: 12px; }
+/* The boards' step numbers are ink on white in both themes (the board's .num is
+   #17191c with white digits; the shell's follows the theme and inverts in the dark). */
+:root:not([data-theme="contrast"]) #traffic-empty span.num { background: #17191c; color: #ffffff; }
+.panes:has(#detail[data-traffic-empty]) > #inspector-panel { display: none; }
+
+/* Widths no board draws. The panel of what is selected stays beside the table; the
+   page's own summary (the connected clients, who touched a topic, a group's timeline)
+   is drawn beside it from 1400 px, where the board's tracks are near: below that the
+   summary waits for a selection, as at 390 (AD7), so the table keeps its columns. */
+@media (min-width: 1101px) and (max-width: 1399px) {
+  .panes:has(#detail.tf) > #inspector-panel:has(#inspector[hidden]) { display: none; }
+  /* With a selection open beside it, Main draws no Detail (the inspector says it in
+     full). */
+  .panes:has(#detail.tf):has(#inspector:not([hidden])) .tf-card { --c: 92px minmax(0, 150px) 130px minmax(64px, 1fr) 118px 52px; }
+  .panes:has(#detail.tf):has(#inspector:not([hidden])) .tf-card .tf-c-detail { display: none; }
+}
+@media (min-width: 1101px) and (max-width: 1299px) {
+  /* Under 1300 with a selection open, nor the client (it is in the inspector). */
+  .panes:has(#detail.tf):has(#inspector:not([hidden])) .tf-card { --c: 92px 130px minmax(64px, 1fr) 118px 52px; }
+  .panes:has(#detail.tf):has(#inspector:not([hidden])) .tf-card .r > :nth-child(2) { display: none; }
+  .panes:has(#detail.tf):has(#inspector:not([hidden])) .tf-story { --c: 92px 130px minmax(64px, 1fr) 118px 56px; }
+  .panes:has(#detail.tf):has(#inspector:not([hidden])) .tf-story .r > :nth-child(2) { display: none; }
+}
+/* A phone (Sy-04): a request is a card (AD7): the request and how long, what it is about
+   and how it went, the detail, then the time and the client. */
+@media (max-width: 640px) {
+  .tf-card > .r.h, .tf-story > .r.h, .tf-clients > .r.h { display: none; }
+  .tf-card .tf-rows > .r { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; column-gap: 8px; padding: 8px 10px; }
+  .tf-card .tf-rows > .r > :nth-child(1) { grid-column: 1; grid-row: 4; color: var(--mut); font-size: var(--fs-xs); }
+  .tf-card .tf-rows > .r > :nth-child(2) { grid-column: 2; grid-row: 4; color: var(--mut); font-size: var(--fs-xs); text-align: right; max-width: 150px; }
+  .tf-card .tf-rows > .r > :nth-child(3) { grid-column: 1; grid-row: 1; }
+  .tf-card .tf-rows > .r > :nth-child(4) { grid-column: 1; grid-row: 2; }
+  .tf-card .tf-rows > .r > :nth-child(5) { grid-column: 1 / -1; grid-row: 3; }
+  .tf-card .tf-rows > .r > :nth-child(6) { grid-column: 2; grid-row: 2; text-align: right; }
+  .tf-card .tf-rows > .r > :nth-child(7) { grid-column: 2; grid-row: 1; color: var(--mut); }
+  .tf-story .tf-rows > .r { grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1fr); row-gap: 2px; padding: 8px 10px; }
+  .tf-story .tf-rows > .r > :nth-child(4) { grid-column: 1 / span 2; }
+  .tf-clients .tf-rows > .r { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; column-gap: 8px; padding: 8px 10px; }
+  .tf-clients .tf-rows > .r > .tf-cw { display: none; }
+  .tf-clients .tf-rows > .r > :nth-child(1) { grid-column: 1; grid-row: 1; }
+  .tf-clients .tf-rows > .r > :nth-child(2) { grid-column: 1; grid-row: 2; color: var(--mut); }
+  .tf-clients .tf-rows > .r > :nth-child(7) { grid-column: 2; grid-row: 1; }
+  .tf-clients .tf-rows > .r > :nth-child(7)::after { content: " /min"; color: var(--mut); }
+  .tf-clients .tf-rows > .r > :nth-child(9) { grid-column: 2; grid-row: 2; }
+  .tf-clients .tf-rows > .r > :nth-child(9)::after { content: " errors"; color: var(--mut); }
+  .tf-filter { flex-wrap: wrap; }
+  .tf-filter .inp { flex: 1 1 100%; }
+  .tf-filter > .grow, .tf-filter > .note { display: none; }
+  .main.tf > .row.sb { flex-wrap: wrap; }
+}

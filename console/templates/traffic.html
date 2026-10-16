@@ -1,66 +1,72 @@
-{{/* Traffic: Main and Traf-02 to Traf-12. What the apps have asked the broker, newest
-     first (Main); filtered (Traf-02); errors only, with each refusal explained
-     (Traf-03); the clients (Traf-06); paused (Traf-08); nothing yet (Traf-09); the
-     broker lost (Traf-10); and a group's rebalance told in order (Traf-12). One
-     filter field and one segmented control; the open connections, a request, a folded
-     row or a client are the inspector's, on the right. */}}
+{{/* Traffic: Main and Traf-02 to Traf-12, drawn as the boards draw them (the parts are
+     con.css's: .row, .card, .r, .pill, .seg, .callout, .kv), so a template reads like
+     the board it implements and e2e/design measures one against the other.
+
+     What the apps have asked the broker, newest first (Main); filtered (Traf-02);
+     errors only, with each refusal explained (Traf-03); the clients (Traf-06); paused
+     (Traf-08); nothing yet (Traf-09); the broker lost (Traf-10); and a group's
+     rebalance told in order (Traf-12). One filter field and one segmented control; the
+     open connections, a request, a folded row or a client are the inspector's, on the
+     right.
+
+     The page's states that are the browser's (paused, lost, what the inspector has
+     open) are attributes on <html> (data-paused, data-connection-lost,
+     data-traffic-open); the parts that belong to a state are drawn for it here and
+     shown by app.css, so the page is one template and not a template per state. */}}
 {{define "traffic_detail"}}{{template "shell_top" .}}
-  <main class="main" id="detail" data-traffic-view="{{.TView}}">
-    <div class="row sb ce idband">
+  <main class="main tf" id="detail" data-traffic-view="{{.TView}}"{{if .HasStory}} data-traffic-story{{end}}{{if .Empty}} data-traffic-empty{{end}}{{if .Filtered}} data-traffic-filtered{{end}}{{if eq .KindWord "errors"}} data-traffic-errors{{end}}>
+    <div class="row sb ce tf-head">
       <div class="col"><h1 class="h1">Traffic</h1><span class="note">{{if eq .TView "clients"}}Who is connected to this broker right now, and how each one is behaving.{{else}}What your apps have asked this broker, newest first. The console's own requests are left out.{{end}}</span></div>
       <div class="row g8 ce" id="traffic-controls">
-        <span class="pill ok" data-live-state><span class="dot" aria-hidden="true"></span><span data-live-state-l>live</span></span>
+        <span class="pill ok" data-live-state><span class="dot" aria-hidden="true"></span>live</span>
         <span class="pill bad lost-only" role="status"><span class="dot bad" aria-hidden="true"></span>disconnected · last good <span class="m" data-lastgood></span></span>
-        <button type="button" class="btn" data-live-toggle aria-pressed="false" data-label-off="Pause" data-label-on="Resume" title="Pause live updates (p)">Pause</button>
+        <button type="button" class="btn live-only" data-live-toggle aria-pressed="false" data-label-off="Pause" data-label-on="Resume" title="Pause live updates (p)">Pause</button>
         <button type="button" class="btn pri lost-only" data-retry>Retry now</button>
       </div>
     </div>
 
-    <div class="callout bad lost-only" role="status" id="lost-callout"><span class="b">The console lost the broker</span><span class="note">It stopped answering at <span class="m" data-lastgood></span>. The rows below are the last ones received and are no longer updating. The console retries every 5 s on its own.</span></div>
+    <div class="callout bad lost-only" role="status" id="lost-callout"><span class="b">The console lost the broker</span><span class="note">It stopped answering at <span data-lastgood></span>. The rows below are the last ones received and are no longer updating. The console retries every 5 s on its own.</span></div>
 
-    <div class="callout warn paused-only" role="status" id="paused-banner" data-new-url="{{.Prefix}}/traffic/new"><span class="paused-text"><span class="b">Paused.</span> <span class="m" data-new-n>0</span> new request<span data-new-s>s</span> since <span class="m" data-paused-since></span></span><button type="button" class="btn pri sm" data-live-toggle id="paused-resume">Resume</button></div>
+    <div class="callout warn paused-only" role="status" id="paused-banner" data-new-url="{{.Prefix}}/traffic/new"><span><span class="b">Paused.</span> <span class="m" data-new-n>0</span> new request<span data-new-s>s</span> since <span class="m" data-paused-since></span></span><button type="button" class="btn pri sm" data-live-toggle id="paused-resume">Resume</button></div>
 
     {{if eq .TView "clients"}}
     <nav class="tabs" aria-label="Traffic views">
       <a class="tab" href="{{.TabRequests}}">Requests</a>
-      <a class="tab on" href="{{.TabClients}}" aria-current="page">Clients <span class="m mut">{{.ClientCount}}</span></a>
+      <a class="tab on" href="{{.TabClients}}" aria-current="page">Clients <span class="m mut" id="clients-tab-n">{{.ClientCount}}</span></a>
     </nav>
     {{end}}
 
     {{/* Traf-12 draws no summary line: the filter row is the one row above the story. */}}
     {{if not .HasStory}}{{template "traffic_summary" .}}{{end}}
 
-    {{if eq .TView "requests"}}
-    {{/* The filter is a plain GET form outside the polled region, so what is typed
-         is not thrown away by a refresh. */}}
-    <div class="filterrow{{if .HasStory}} story{{end}}">
-      <form method="get" action="{{.Prefix}}/traffic" role="search" aria-label="Filter requests">
-        <input class="inp m" name="q" value="{{.Filter.Q}}" placeholder="Client, topic, group or request" aria-label="Filter requests" spellcheck="false" autocomplete="off" data-filter-target="requests">
+    {{if and (eq .TView "requests") (not .Empty)}}
+    {{/* The filter is a plain GET form outside the polled region, so what is typed is
+         not thrown away by a refresh. The field holds the filter: what was typed, or
+         the topic or group a pill names (Traf-02, Traf-12). */}}
+    <div class="row ce g8 tf-filter{{if .HasStory}} story{{end}}">
+      <form method="get" action="{{.Prefix}}/traffic" role="search" aria-label="Filter requests" class="tf-form">
+        <input class="inp m" style="width: 300px" name="q" value="{{.FieldValue}}" placeholder="Client, topic, group or request" aria-label="Filter requests" spellcheck="false" autocomplete="off" data-traffic-filter data-clear-url="{{.ClearURL}}">
         {{if .Filter.Kind}}<input type="hidden" name="kind" value="{{.Filter.Kind}}">{{end}}
-        {{if .Filter.Topic}}<input type="hidden" name="topic" value="{{.Filter.Topic}}">{{end}}
-        {{if .Filter.Group}}<input type="hidden" name="group" value="{{.Filter.Group}}">{{end}}
+        {{if and .Filter.Topic (ne .FieldValue .Filter.Topic)}}<input type="hidden" name="topic" value="{{.Filter.Topic}}">{{end}}
+        {{if and .Filter.Group (ne .FieldValue .Filter.Group)}}<input type="hidden" name="group" value="{{.Filter.Group}}">{{end}}
         {{if .Filter.Client}}<input type="hidden" name="client" value="{{.Filter.Client}}">{{end}}
       </form>
       <div class="seg" role="group" aria-label="Kind of request">
-        {{range .Kinds}}<a class="{{if .On}}on{{end}}" href="{{.URL}}" {{if .On}}aria-current="true"{{end}}>{{.Label}}</a>{{end}}
+        {{range .Kinds}}<a class="{{if .On}}on{{end}}" href="{{.URL}}"{{if .On}} aria-current="true"{{end}}>{{.Label}}</a>{{end}}
       </div>
       {{if .HasStory}}
-      <span class="row ce g8 nw story-pills">
-      {{range .Pills}}<span class="pill pill-name"><span class="mut">{{.Name}}</span><span class="m" title="{{.Value}}">{{.Value}}</span><a class="btn ghost sm pill-x" href="{{.URL}}" aria-label="Remove {{.Name}} filter">×</a></span>{{end}}
-      <a href="{{.Prefix}}/traffic" class="b">clear</a>
-      </span>
+      {{range .Pills}}<span class="pill tf-pill"><span class="mut">{{.Name}}</span><span class="m" title="{{.Value}}">{{.Value}}</span><a class="btn ghost sm" href="{{.URL}}" aria-label="Remove {{.Name}} filter">×</a></span>{{end}}
+      <a href="{{.ClearURL}}" class="b">clear</a>
       {{end}}
       <div class="grow"></div>
-      {{if .HasStory}}{{template "story_count" .}}{{else}}
-      <span class="note filter-note" id="filter-note">{{if eq .KindWord "errors"}}<span class="m" id="refused-count">{{.RefusedMatching}} refused</span>{{else}}<span class="live-only">idle heartbeats and empty fetches fold into one row</span><span class="paused-only">the list is frozen, the broker is not</span>{{end}}</span>
-      {{end}}
+      {{if .HasStory}}{{template "story_count" .}}{{else if eq .KindWord "errors"}}<span class="m" id="refused-count">{{.RefusedMatching}} refused</span>{{else}}<span class="note live-only" id="fold-note">idle heartbeats and empty fetches fold into one row</span><span class="note paused-only">the list is frozen, the broker is not</span>{{end}}
     </div>
     {{if and .HasPills (not .HasStory)}}
     <div class="row ce g8 wrap" id="filter-pills">
       <span class="cap">Filters</span>
-      {{range .Pills}}<span class="pill pill-name"><span class="mut">{{.Name}}</span><span class="m" title="{{.Value}}">{{.Value}}</span><a class="btn ghost sm pill-x" href="{{.URL}}" aria-label="Remove {{.Name}} filter">×</a></span>{{end}}
+      {{range .Pills}}<span class="pill tf-pill"><span class="mut">{{.Name}}</span><span class="m" title="{{.Value}}">{{.Value}}</span><a class="btn ghost sm" href="{{.URL}}" aria-label="Remove {{.Name}} filter">×</a></span>{{end}}
       <span class="pill"><span class="mut">kind</span><span class="m">{{.KindWord}}</span></span>
-      <a href="{{.Prefix}}/traffic" class="b">clear</a>
+      <a href="{{.ClearURL}}" class="b">clear</a>
       <div class="grow"></div>
       <span class="m" id="match-count"><span class="b">{{.Matched}}</span> of {{.TotalRequests}} requests match</span>
     </div>
@@ -69,80 +75,86 @@
 
     {{template "traffic_live" .}}
 
-    <div class="tablenote" id="traffic-note">{{template "traffic_note" .}}</div>
-    <div class="note lost-only" id="lost-note">If the broker was stopped on purpose, start it again and this page resumes by itself.</div>
+    {{template "traffic_note" .}}
+    {{if or .HasStory (eq .KindWord "errors") (eq .TView "clients")}}<div class="grow"></div>{{end}}
   </main>
 {{template "shell_bottom" .}}{{end}}
 
 {{/* The summary line: counted from the broker's counters, so each number says what it
      is counted over. It is outside the polled region and is replaced out of band with
-     it. */}}
+     it. data-window-from and data-window-to are the minute the counts are of (the
+     twelve whole five-second buckets before now): what the design gate checks the
+     number against. */}}
 {{define "traffic_summary"}}
-<div class="row ce g8 wrap" id="traffic-summary"{{if .OOB}} hx-swap-oob="true"{{end}}>
-  <span class="m">{{if ne .TView "clients"}}<a href="{{.Prefix}}/traffic?view=clients">{{end}}{{.ClientCount}} client{{if ne .ClientCount 1}}s{{end}} connected{{if ne .TView "clients"}}</a>{{end}}</span><span class="mut">·</span>
-  {{if and .Empty (not .Filtered)}}
-  <span class="m">{{.LastMinute}} requests so far</span>
+<div class="row ce g8 wrap" id="traffic-summary" data-window-from="{{.WindowFrom}}" data-window-to="{{.WindowTo}}"{{if .OOB}} hx-swap-oob="true"{{end}}>
+  <span class="m" id="clients-connected">{{if and (ne .TView "clients") (not .Empty)}}<a href="{{.Prefix}}/traffic?view=clients">{{end}}{{.ClientCount}} client{{if ne .ClientCount 1}}s{{end}} connected{{if and (ne .TView "clients") (not .Empty)}}</a>{{end}}</span><span class="mut">·</span>
+  {{if .Empty}}
+  <span class="m">{{.SoFar}} requests so far</span>
   {{else}}
-  <span class="m">{{.LastMinute}} request{{if ne .LastMinute 1}}s{{end}} in the last minute</span><span class="mut">·</span>
+  <span class="m" id="last-minute" title="Requests that began between {{when .WindowFromT "clock"}} and {{when .WindowToT "clock"}}: the last whole minute the broker has counted, folded repeats one by one.">{{.LastMinute}} request{{if ne .LastMinute 1}}s{{end}} in the last minute</span><span class="mut">·</span>
   {{if eq .TView "clients"}}
-  <span class="m {{if .NeedLook}}warn{{else}}mut{{end}}">{{if .NeedLook}}{{.NeedLook}} client{{if ne .NeedLook 1}}s{{end}} need{{if eq .NeedLook 1}}s{{end}} a look{{else}}no client needs a look{{end}}</span>
+  <span class="m {{if .NeedLook}}warn{{else}}mut{{end}}" id="need-look">{{if .NeedLook}}{{.NeedLook}} client{{if ne .NeedLook 1}}s{{end}} need{{if eq .NeedLook 1}}s{{end}} a look{{else}}no client needs a look{{end}}</span>
   {{else}}
-  <span class="m {{if .ErrorCount}}bad{{else}}mut{{end}}" title="Errors among the requests of the last minute: refused, denied, not implemented or failed. A consumer's first join is part of the protocol and is not counted.">{{.ErrorCount}} error{{if ne .ErrorCount 1}}s{{end}}</span><span class="mut">·</span>
+  <span class="m {{if .ErrorCount}}bad{{else}}mut{{end}}" id="error-count" title="Errors among the requests of that minute: refused, denied, not implemented or failed. A consumer's first join is part of the protocol and is not counted.">{{.ErrorCount}} error{{if ne .ErrorCount 1}}s{{end}}</span><span class="mut">·</span>
   <span class="m mut">kept: the last {{.KeptText}}, in memory only</span>
   {{end}}
   {{end}}
 </div>
 {{end}}
 
-{{define "traffic_note"}}{{if eq .TView "clients"}}Error rate is the requests that were refused, denied or failed over all requests in the last 5 minutes. Select a client to open it on the right.{{else if eq .KindWord "errors"}}{{if .RefusalCount}}{{if .FailedCount}}{{.FailedCount}} of the requests kept ended in the broker failing. Refusals that Kafka would also make are purple.{{else}}Refusals that Kafka would also make are purple. Anything red is the broker unhappy, and there is none.{{end}}{{else}}Nothing was refused in the {{.KeptText}} requests kept. Refusals that Kafka would also make are purple. Anything red is the broker unhappy, and there is none.{{end}}{{else if .HasStory}}Indented rows belong to the rebalance above them. Rows below the last rebalance are from before it. Idle repeats fold; any change breaks the fold. <a href="{{.FlatURL}}">Show them as a plain list</a>{{else if .HasPills}}Filtering looks at the last {{.KeptText}} requests kept in memory.{{if .Filter.Topic}} Group requests that name this topic are included.{{end}}{{else}}Select a row to open it on the right. A client name opens that client. Nothing here is written to disk.{{end}}{{end}}
+{{/* The line under the table, one per view and state (each board's own sentence). It
+     rides with the poll out of band. */}}
+{{define "traffic_note"}}<div class="note tf-foot{{if .FootPad}} pad8{{end}}" id="traffic-note"{{if .OOB}} hx-swap-oob="true"{{end}}>{{if eq .TView "clients"}}{{if .ClientNote}}<span class="tf-closed-only">{{.ClientNote}} Select a client to open it on the right.</span>{{end}}{{if .MetricsOn}}<span class="tf-open-client-metrics">Only clients that support KIP-714 send metrics: the Java client from 3.7 and librdkafka from 2.5. The broker is started with <span class="m">--client-telemetry</span>.</span>{{end}}{{else if .Empty}}{{else if eq .KindWord "errors"}}{{if .Cut}}{{else if .RefusalCount}}Nothing else was refused in the {{.KeptText}} rows kept. {{else}}Nothing was refused in the {{.KeptText}} rows kept. {{end}}Refusals that Kafka would also make are purple. {{if .FailedCount}}Anything red is the broker unhappy: {{.FailedCount}} of these.{{else}}Anything red is the broker unhappy, and there is none.{{end}}{{else if .HasStory}}Indented rows belong to the rebalance above them.{{if .Story.BeforeGen}} Rows before it are {{.Story.BeforeGen}}.{{end}} Idle repeats fold; any change breaks the fold. <a href="{{.FlatURL}}">Show them as a plain list</a>{{else}}<span class="live-only up-only">{{if .HasPills}}Filtering looks at the last {{.KeptText}} rows kept in memory, {{.TotalRequests}} requests in all.{{if .Filter.Topic}} Group requests that name this topic are included.{{end}}{{else}}Select a row to open it on the right. <span class="tf-closed-only">A client name opens that client. </span>Nothing here is written to disk.{{end}}</span><span class="paused-only up-only">Paused rows stay where they are, so the selected one does not move under you. Resume adds the <span data-new-n2>0</span> newer request<span data-new-s2>s</span> at the top.</span><span class="lost-only">If the broker was stopped on purpose, start it again and this page resumes by itself.</span>{{end}}</div>{{end}}
 
 {{/* traffic_live is the polled unit: the request tail, or the clients table. The
-     summary line and the inspector's default ride along out of band. */}}
+     summary line, the line under the table, the inspector's default and the keys ride
+     along out of band. */}}
 {{define "traffic_live"}}
-<div id="traffic-live" data-live="{{.Prefix}}/traffic/live{{if .FilterQ}}?{{.FilterQ}}{{end}}" data-hash="{{.Hash}}" data-live-ms="2500"{{if eq .TView "requests"}} data-since="{{.NewestMs}}"{{end}}>
+<div id="traffic-live" class="tf-live" data-live="{{.Prefix}}/traffic/live{{if .FilterQ}}?{{.FilterQ}}{{end}}" data-hash="{{.Hash}}" data-live-ms="2500" data-since="{{.NewestMs}}">
   {{if .OOB}}{{if not .HasStory}}{{template "traffic_summary" .}}{{else}}{{template "story_count" dict "Story" .Story "OOB" true}}{{end}}
   {{if .InspDefault}}<div class="insp-default" id="insp-default" hx-swap-oob="true"{{if .DefaultHidden}} hidden{{end}}>{{template "insp_default" .}}</div>{{end}}
-  <div class="tablenote" id="traffic-note" hx-swap-oob="true">{{template "traffic_note" .}}</div>
+  {{template "traffic_note" .}}
+  {{if eq .TView "clients"}}<span class="m mut" id="clients-tab-n" hx-swap-oob="true">{{.ClientCount}}</span>{{end}}
   {{template "keys_strip" .}}{{end}}
   {{if eq .TView "clients"}}{{template "traffic_clients_table" .}}
   {{else if .Empty}}{{template "traffic_empty" .}}
   {{else if .HasStory}}{{template "traffic_story" .}}
   {{else if .Rows}}{{template "traffic_rows" .}}
   {{else if .Filtered}}
-  <div class="honest">{{icon "info"}}<div>No request matches the filter. <a href="{{.Prefix}}/traffic">Clear it</a> to see everything.</div></div>
+  <div class="callout tf-none"><span class="b">No request matches the filter</span><span class="note"><a href="{{.ClearURL}}">Clear it</a> to see everything.</span></div>
   {{else}}
-  <div class="honest">{{icon "info"}}<div>Nothing has reached the broker yet. Point an app at it and its requests appear here as they happen.</div></div>
+  <div class="callout tf-none"><span class="b">No request is kept</span><span class="note">Clients are connected, and none of their requests is kept yet. They appear here as they happen.</span></div>
   {{end}}
 </div>
 {{end}}
 
+{{/* The requests (Main): the board's seven columns. One grid, one tab stop: the rows
+     are reached with the arrow keys and j and k (shell.js), and Enter opens one. */}}
 {{define "traffic_rows"}}
-  {{if .Cut}}<div class="note tf-cut" id="rows-cut">Showing the newest {{.Shown}} of {{.MatchedRows}} matching rows.</div>{{end}}
-  <div class="tbl-wrap">
-    <table class="tbl tf-table" id="traffic-table"><thead><tr><th>Time</th><th>Client</th><th>Request</th><th>Topic or group</th><th>Detail</th><th>Result</th><th class="num">Took</th></tr>
-      <tr class="frozen-line lost-only"><td colspan="7" class="m">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</td></tr></thead>
-      <tbody>{{range .Rows}}{{template "traffic_row" dict "R" . "P" $.Prefix}}{{end}}</tbody>
-    </table>
+  <div class="card tf-card{{if not (eq .KindWord "errors")}} grow{{end}}" id="traffic-table" role="grid" aria-label="Requests, newest first" aria-rowcount="{{.RowCount}}">
+    <div class="r h" role="row"><span role="columnheader">Time</span><span role="columnheader">Client</span><span role="columnheader">Request</span><span role="columnheader">Topic or group</span><span role="columnheader" class="tf-c-detail">Detail</span><span role="columnheader">Result</span><span role="columnheader" class="ra">Took</span></div>
+    <div class="r tf-frozen lost-only" role="row"><span class="m" role="gridcell">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</span></div>
+    <div class="tf-rows" role="rowgroup">{{range $i, $r := .Rows}}{{template "traffic_row" dict "R" $r "P" $.Prefix "First" (eq $i 0)}}{{end}}{{if .Cut}}<div class="r tf-cut" role="row"><span class="note" role="gridcell">These are the newest {{.Shown}} of {{.MatchedRows}} matching rows. Narrow the filter to see the others.</span></div>{{end}}</div>
   </div>
 {{end}}
 
-{{/* One request row: the board's seven columns. A folded row counts its repeats; a
-     refusal is tinted by what kind of no it is. */}}
-{{define "traffic_row"}}{{with .R}}<tr id="rq-{{.OpenKey}}" class="{{.RowClass}}" tabindex="0" data-inspector-open data-open-keys="request:{{.OpenKey}}" aria-selected="false"
-          hx-get="{{$.P}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
-        <td class="m nw cell-time">{{when .Time "clockms"}}</td>
-        <td class="m nw cell-client" title="{{.Remote}}{{if .Software}} · {{.Software}}{{end}}">{{if .ConnKey}}<a href="{{$.P}}/traffic?client={{.Who}}" data-inspector-open hx-get="{{$.P}}/inspect/client?key={{.ConnKey}}" hx-trigger="click consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false">{{.Who}}</a>{{else}}{{.Who}}{{end}}</td>
-        <td class="m nw cell-req" title="{{.API}} v{{.Version}}{{if .Correlation}} · correlation {{.Correlation}}{{end}}"><span class="req"><span class="req-n"><span class="b">{{.API}} v{{.Version}}</span></span>{{if .Folded}}<span class="tag tf-count" title="{{.Count}} identical requests, {{.SameSpan}}">×{{.Count}}</span>{{end}}</span></td>
-        <td class="m cell-topic"{{if .Target}} title="{{.Target}}"{{end}}>{{if .Target}}{{.Target}}{{else}}<span class="mut">—</span>{{end}}</td>
-        <td class="mut cell-detail" title="{{if .Rhythm}}{{.Interval}}{{else}}{{.DetailText}}{{end}}">{{if .Rhythm}}{{.Interval}}, since {{when .First "clock"}}{{else if .DetailText}}{{.DetailText}}{{else}}—{{end}}</td>
-        <td class="m cell-result"><span class="{{.Tone}}" title="{{.ResultTitle}}">{{wrapName .Result}}</span></td>
-        <td class="m num nw cell-took">{{.Dur}}</td>
-      </tr>{{end}}{{end}}
+{{/* One request row. A folded row counts its repeats in the board's .tag; a refusal is
+     tinted by what kind of no it is. */}}
+{{define "traffic_row"}}{{with .R}}<div class="r {{.RowClass}}" role="row" id="rq-{{.OpenKey}}" tabindex="{{if $.First}}0{{else}}-1{{end}}" data-row data-inspector-open data-open-keys="request:{{.OpenKey}}" aria-selected="false"
+     hx-get="{{$.P}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
+  <span class="m" role="gridcell">{{when .Time "clockms"}}</span>
+  <span class="m" role="gridcell" title="{{.Who}}{{if .Software}} · {{.Software}}{{end}} · {{.Remote}}">{{if .ConnKey}}<a href="{{$.P}}/traffic?client={{.WhoQ}}" class="tf-who" tabindex="-1" data-inspector-open hx-get="{{$.P}}/inspect/client?key={{.ConnKey}}" hx-trigger="click consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false">{{.Who}}</a>{{else}}{{.Who}}{{end}}</span>
+  <span class="m b" role="gridcell" title="{{.API}} v{{.Version}}{{if .Folded}} ×{{.Count}}{{end}} · correlation {{.Correlation}}">{{.API}} <span class="mut">v{{.Version}}</span>{{if .Folded}} <span class="tag">×{{.Count}}</span>{{end}}</span>
+  <span class="m el" role="gridcell"{{if .Target}} title="{{.Target}}"{{end}}>{{if .Target}}{{.Target}}{{else}}—{{end}}</span>
+  <span class="mut el tf-c-detail" role="gridcell" title="{{if .Rhythm}}{{.Interval}}{{else}}{{.DetailText}}{{end}}">{{if .Rhythm}}{{.Interval}}, since {{when .First "clock"}}{{else if .DetailText}}{{.DetailText}}{{else}}—{{end}}</span>
+  <span class="m {{.Tone}} tf-result" role="gridcell" title="{{.ResultTitle}}">{{wrapName .Result}}</span>
+  <span class="m ra" role="gridcell" title="{{.DurExact}}">{{.Dur}}</span>
+</div>{{end}}{{end}}
 
 {{/* The empty broker (Traf-09): nothing has reached it. The line to point an app at is
      the running configuration's, not a number typed here. */}}
 {{define "traffic_empty"}}
-<div class="card pad col g16 tf-empty" id="traffic-empty" style="max-width: 720px; margin-top: 24px; padding: 22px 24px">
+<div class="card pad col g16" id="traffic-empty" style="max-width: 720px; margin-top: 24px; padding: 22px 24px">
   <div class="col g4"><span class="h2">Nothing has reached this broker yet</span><span class="note">No app has connected, so there is nothing to show. This is not an error: <span class="up-only">the broker is up and listening{{if not .Since.IsZero}}, since {{when .Since "clock"}}{{end}}. A restart empties this page: it keeps its last requests in memory only.</span><span class="lost-only">the console cannot reach the broker right now, so it cannot say whether anything has reached it. It tries again every 5 s.</span></span></div>
   <div class="col g6">
     <span class="cap">Point an app at this line</span>
@@ -155,60 +167,63 @@
     <div class="row g8"><span class="num">2</span><div class="col"><span class="b">Produce something</span><span class="note">Create a topic and send one message. A Produce request will appear here.</span></div></div>
     <div class="row g8"><span class="num">3</span><div class="col"><span class="b">Watch it appear</span><span class="note">Each request shows as a row, newest first, with who sent it and how long it took.</span></div></div>
   </div>
-  <div class="row g8"><a class="btn pri" href="{{.Prefix}}/connect" data-create>Connect an app<span aria-hidden="true">→</span></a><a class="btn" href="{{.Prefix}}/new/topic">Create a topic</a></div>
+  <div class="row g8"><a class="btn pri w5" href="{{.Prefix}}/connect" data-create>Connect an app<span aria-hidden="true">→</span></a><a class="btn w5" href="{{.Prefix}}/new/topic">Create a topic</a></div>
 </div>
 {{end}}
 
-{{/* The clients (Traf-06): who is connected and how each is behaving. */}}
+{{/* The clients (Traf-06): who is connected and how each is behaving. With a client
+     open (Traf-07, Traf-11) the board draws four of the columns: Client, Software,
+     Req/min and Errors. */}}
 {{define "traffic_clients_table"}}
   {{if .Clients}}
-  <div class="tbl-wrap">
-    <table class="tbl tf-clients" id="clients-table"><thead><tr><th>Client</th><th class="c-sw">Software</th><th class="c-pr">Principal</th><th class="c-ad">Address</th><th class="c-op">Open for</th><th class="c-la">Last request</th><th class="num c-rq">Req/min</th><th class="c-gr">Groups</th><th class="num c-er">Error rate</th></tr>
-      <tr class="frozen-line lost-only"><td colspan="9" class="m">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</td></tr></thead>
-      <tbody>{{range .Clients}}<tr id="cl-{{.Conn}}" class="{{if .NeedsALook}}needs-look{{end}}" tabindex="0" data-inspector-open data-open-keys="{{.Keys}}" aria-selected="false" hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
-        <td class="m b nw cell-client"><a class="m b" href="{{.Href}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false" title="{{.Who}}">{{.Who}}</a>{{if gt .Conns 1}} <span class="mut" title="{{.Conns}} open connections from this client id">{{.Conns}} connections</span>{{end}}</td>
-        <td class="m c-sw"{{if .Software}} title="{{.Software}}"{{end}}>{{if .Software}}{{.Software}}{{else}}<span class="mut">not reported</span>{{end}}</td>
-        <td class="m c-pr" title="{{.Principal}}">{{.Principal}}</td>
-        <td class="m c-ad" title="{{.Remote}}">{{.Remote}}{{if gt .Conns 1}} <span class="mut">+{{.More}}</span>{{end}}</td>
-        <td class="m c-op">{{when .Opened "since"}}</td>
-        <td class="m c-la">{{when .Last "clock"}}</td>
-        <td class="m num c-rq">{{.Req1m}}</td>
-        <td title="{{.Groups}}" class="c-gr {{if and .NeedsALook .Groups}}m warn{{else if eq .Groups "none"}}mut{{else if eq .Groups "none (producer)"}}mut{{else}}m{{end}}">{{.Groups}}</td>
-        <td class="m num c-er {{.RateTon}}">{{.Rate}}</td>
-      </tr>{{end}}</tbody>
-    </table>
+  <div class="card tf-clients" id="clients-table" role="grid" aria-label="Clients, by when they connected" aria-rowcount="{{len .Clients}}">
+    <div class="r h" role="row"><span role="columnheader">Client</span><span role="columnheader">Software</span><span role="columnheader" class="tf-cw">Principal</span><span role="columnheader" class="tf-cw">Address</span><span role="columnheader" class="tf-cw">Open for</span><span role="columnheader" class="tf-cw">Last request</span><span role="columnheader" class="ra">Req/min</span><span role="columnheader" class="tf-cw">Groups</span><span role="columnheader" class="ra"><span class="tf-closed-only">Error rate</span><span class="tf-open-only">Errors</span></span></div>
+    <div class="r tf-frozen lost-only" role="row"><span class="m" role="gridcell">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</span></div>
+    <div class="tf-rows" role="rowgroup">{{range $i, $c := .Clients}}<div class="r{{if .NeedsALook}} tf-look{{end}}" role="row" id="cl-{{.Conn}}" tabindex="{{if eq $i 0}}0{{else}}-1{{end}}" data-row data-inspector-open data-open-keys="{{.Keys}}" aria-selected="false" hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
+      <span class="m b" role="gridcell" title="{{.Who}}{{if gt .Conns 1}} · {{.Conns}} connections{{end}}"><a class="m b" href="{{.Href}}" tabindex="-1" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false">{{.Who}}</a></span>
+      <span class="m el" role="gridcell"{{if .Software}} title="{{.Software}}"{{end}}>{{if .Software}}{{.Software}}{{else}}<span class="mut">not reported</span>{{end}}</span>
+      <span class="m tf-cw" role="gridcell" title="{{.Principal}}">{{.Principal}}</span>
+      <span class="m tf-cw" role="gridcell" title="{{.Remote}}{{if gt .Conns 1}} and {{.More}} more{{end}}">{{.Remote}}{{if gt .Conns 1}} <span class="mut">+{{.More}}</span>{{end}}</span>
+      <span class="m tf-cw" role="gridcell">{{.Age}}</span>
+      <span class="m tf-cw" role="gridcell">{{when .Last "clock"}}</span>
+      <span class="m ra" role="gridcell">{{.Req1m}}</span>
+      <span class="tf-cw {{if and .NeedsALook .Groups}}m warn{{else if eq .Groups "none"}}mut{{else if eq .Groups "none (producer)"}}mut{{else}}m{{end}}" role="gridcell" title="{{.Groups}}">{{.Groups}}</span>
+      <span class="m ra {{.RateTon}}" role="gridcell" title="{{.RateTitle}}">{{.Rate}}</span>
+    </div>{{end}}</div>
   </div>
   {{if .Attention}}
-  <div class="callout warn" id="attention"><span class="b">{{.Attention.Who}} {{.Attention.Head}}</span><span class="note">{{if .Attention.Why}}{{.Attention.Why}} {{end}}<a href="{{.Attention.URL}}">See the refusals</a></span></div>
+  <div class="callout warn tf-closed-only" id="attention"><span class="b">{{.Attention.Who}} {{.Attention.Head}}</span><span class="note">{{if .Attention.Why}}{{.Attention.Why}} {{end}}<a href="{{.Attention.URL}}">See the refusals</a></span></div>
   {{end}}
   {{else}}
-  <div class="honest">{{icon "info"}}<div>No client is connected. An app that uses the broker appears here for as long as its connection stays open.</div></div>
+  <div class="callout tf-none"><span class="b">No client is connected</span><span class="note">An app that uses the broker appears here for as long as its connection stays open.</span></div>
   {{end}}
 {{end}}
 
 {{/* A group's rebalance told in order (Traf-12). */}}
 {{define "traffic_story"}}
-<div class="card tf-story" id="traffic-story" style="--c: 92px 150px 130px 1fr 118px 56px">
-  <div class="r h"><span>Time</span><span>Client</span><span>Request</span><span>What happened</span><span>Result</span><span class="ra">Took</span></div>
-  <div class="frozen-line lost-only m">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</div>
-  {{range .Story.Blocks}}
-  <div class="r on rebalance {{if .Done}}done{{else}}going{{end}}" style="background: var(--warnbg)"><span class="m">{{when .Start "clock"}}</span><span class="b">Rebalance</span><span class="m">{{if .Done}}{{if .From}}{{if $.Story.Epochs}}epoch{{else}}generation{{end}} <span class="b">{{.From}} → {{.To}}</span>{{else}}<span class="b">{{if $.Story.Epochs}}epoch{{else}}generation{{end}} {{.To}}</span>{{end}}{{else}}in progress{{end}}</span><span class="el">{{.Title}}</span><span class="m warn">{{if .Done}}finished{{else}}going{{end}}</span><span class="m ra">{{.Dur}}</span></div>
-  {{range .Rows}}{{template "story_row" dict "R" . "P" $.Prefix}}{{end}}
+<div class="card tf-story" id="traffic-story" role="grid" aria-label="The group's requests, by rebalance">
+  <div class="r h" role="row"><span role="columnheader">Time</span><span role="columnheader">Client</span><span role="columnheader">Request</span><span role="columnheader">What happened</span><span role="columnheader">Result</span><span role="columnheader" class="ra">Took</span></div>
+  <div class="r tf-frozen lost-only" role="row"><span class="m" role="gridcell">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</span></div>
+  <div class="tf-rows" role="rowgroup">
+  {{range $bi, $b := .Story.Blocks}}
+  <div class="r on tf-rebalance {{if .Done}}done{{else}}going{{end}}" role="row" style="background: var(--warnbg)"><span class="m" role="gridcell">{{when .Start "clock"}}</span><span class="b" role="gridcell">Rebalance</span><span class="m" role="gridcell">{{if .Done}}{{if .From}}{{if $.Story.Epochs}}epoch{{else}}generation{{end}} <span class="b">{{.From}} → {{.To}}</span>{{else}}{{if $.Story.Epochs}}epoch{{else}}generation{{end}} <span class="b">{{.To}}</span>{{end}}{{else}}in progress{{end}}</span><span class="el" role="gridcell" title="{{.Title}}">{{.Title}}</span><span class="m warn" role="gridcell">{{if .Done}}finished{{else}}going{{end}}</span><span class="m ra" role="gridcell">{{.Dur}}</span></div>
+  {{range $i, $r := .Rows}}{{template "story_row" dict "R" $r "P" $.Prefix "First" (and (eq $bi 0) (eq $i 0))}}{{end}}
   {{end}}
-  {{range .Story.Before}}{{template "story_row" dict "R" . "P" $.Prefix}}{{end}}
+  {{range .Story.Before}}{{template "story_row" dict "R" . "P" $.Prefix "First" false}}{{end}}
+  </div>
 </div>
 {{end}}
 
 {{/* The story's count, at the right of the filter row (Traf-12). */}}
 {{define "story_count"}}<span class="m" id="story-count"{{if .OOB}} hx-swap-oob="true"{{end}}><span class="b">{{.Story.Requests}}</span> requests{{if .Story.Folded}} ({{.Story.Folded}} folded){{end}}, {{.Story.Rebalances}} rebalance{{if ne .Story.Rebalances 1}}s{{end}}</span>{{end}}
 
-{{define "story_row"}}{{with .R}}<div class="r {{if not .Nested}}kid{{end}} {{.RowClass}}" id="rq-{{.OpenKey}}" tabindex="0" data-inspector-open data-open-keys="request:{{.OpenKey}}" data-row hx-get="{{$.P}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
-  <span class="m">{{if and .Folded (not .Nested)}}{{when .First "clock"}}{{else}}{{when .Time "clockms"}}{{end}}</span>
-  <span class="m">{{if .Nested}}<span class="tree" aria-hidden="true">└─</span> {{end}}{{.Who}}</span>
-  <span class="m req" title="{{.API}} v{{.Version}}"><span class="req-n"><span class="b">{{.API}} v{{.Version}}</span></span>{{if .Folded}}<span class="tag tf-count" title="{{.Count}} identical requests">×{{.Count}}</span>{{end}}</span>
-  <span class="mut el" title="{{if .Rhythm}}{{.Interval}}{{else}}{{.DetailText}}{{end}}">{{if .Rhythm}}{{.Interval}}, since {{when .First "clock"}}{{else}}{{.DetailText}}{{if .ViaGroup}}{{if not .DetailText}}fetch by a member{{end}}{{end}}{{end}}</span>
-  <span class="m cell-result {{.Tone}}" title="{{.ResultTitle}}">{{wrapName .Result}}</span>
-  <span class="m ra">{{.Dur}}</span>
+{{define "story_row"}}{{with .R}}<div class="r{{if not .Nested}} kid{{end}} {{.RowClass}}" role="row" id="rq-{{.OpenKey}}" tabindex="{{if $.First}}0{{else}}-1{{end}}" data-row data-inspector-open data-open-keys="request:{{.OpenKey}}" aria-selected="false" hx-get="{{$.P}}/inspect/request?key={{.OpenKey}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
+  <span class="m" role="gridcell">{{if and .Folded (not .Nested)}}{{when .First "clock"}}{{else}}{{when .Time "clockms"}}{{end}}</span>
+  <span class="m" role="gridcell" title="{{.Who}}">{{if .Nested}}<span class="tree" aria-hidden="true">└─</span> {{end}}{{.Who}}</span>
+  <span class="m{{if .Nested}} b{{end}}" role="gridcell" title="{{.API}} v{{.Version}}">{{.API}} <span class="mut">v{{.Version}}</span>{{if .Folded}} <span class="tag">×{{.Count}}</span>{{end}}</span>
+  <span class="{{if .Nested}}mut {{end}}el" role="gridcell" title="{{.StoryText}}">{{.StoryText}}</span>
+  <span class="m {{.Tone}} tf-result" role="gridcell" title="{{.ResultTitle}}">{{wrapName .Result}}</span>
+  <span class="m ra" role="gridcell" title="{{.DurExact}}">{{.Dur}}</span>
 </div>{{end}}{{end}}
 
 {{/* The inspector's default, by what the page is: the open connections (Main), the
@@ -216,16 +231,16 @@
      timeline (Traf-12). A row or a client replaces it, and Esc puts it back. */}}
 {{define "traffic_clients"}}
 <div class="hd"><span class="cap">Connected clients</span><span class="h2">{{if eq .ClientCount .ConnCount}}{{.ConnCount}} open connection{{if ne .ConnCount 1}}s{{end}}{{else}}{{.ClientCount}} client{{if ne .ClientCount 1}}s{{end}} · {{.ConnCount}} connections{{end}}</span></div>
-<div class="bd flush" id="clients-list">
+<div class="bd flush tf-conns" id="clients-list">
   <div class="r h" style="--c: 1fr 70px 56px"><span>Client</span><span>Open for</span><span class="ra">Idle</span></div>
   {{range .Clients}}
-  <div class="insp-client" id="icl-{{.Conn}}" data-row data-open-keys="{{.Keys}}">
-    <a class="insp-client-open" href="{{.Href}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"><span class="b el" title="{{.Who}}">{{.Who}}</span><span class="m mut">{{when .Opened "since"}}</span><span class="m mut ra">{{when .Last "since"}}</span></a>
-    <span class="m mut el" title="{{.Software}} · {{.Principal}} · {{.Remote}}">{{if .Software}}{{.Software}}{{else}}software not reported{{end}} · {{.Principal}} · {{.Remote}}{{if gt .Conns 1}} · {{.Conns}} connections{{end}}</span>
-    <span class="note{{if .NeedsALook}} bad{{end}}">{{if .NeedsALook}}{{.LookNote}}{{else if .Doing}}{{.Doing}}{{else}}no requests kept{{end}}</span>
+  <div class="col tf-conn" id="icl-{{.Conn}}" data-open-keys="{{.Keys}}">
+    <a class="tf-conn-open" href="{{.Href}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"><span class="b el" title="{{.Who}}">{{.Who}}</span><span class="m mut">{{.Age}}</span><span class="m mut ra">{{.Idle}}</span></a>
+    <span class="m mut">{{if .Software}}{{.Software}}{{else}}software not reported{{end}} · {{.Principal}} · {{.Remote}}</span>
+    <span class="note{{if .NeedsALook}} bad{{end}}">{{if .NeedsALook}}{{.LookNote}}{{else if .Doing}}{{.Doing}}{{else}}no requests kept{{end}}{{if gt .Conns 1}} · {{.Conns}} connections{{end}}</span>
   </div>
   {{else}}
-  <div class="callout spaced"><span class="b">No client is connected</span><span class="note">An app that uses the broker appears here for as long as its connection stays open.</span></div>
+  <div class="callout"><span class="b">No client is connected</span><span class="note">An app that uses the broker appears here for as long as its connection stays open.</span></div>
   {{end}}
   <div class="grow"></div>
   {{if .HasClientMetrics}}<div class="callout"><span class="b">Clients that report their own metrics</span><span class="note">Java 3.7+ and librdkafka 2.5+ send request latency and poll idle ratio every few seconds. Open a client to see them.</span></div>{{end}}
@@ -239,7 +254,7 @@
   <div class="callout {{.Tone}}" role="alert"><div class="row g8 ce"><span class="b">{{.ClassWord}}</span><span class="m">{{.Name}}</span></div>
     {{if .Meaning}}<span class="m">{{.Meaning}}</span>{{end}}
     <span class="note">{{.Said}}{{if .Verdict}} {{.Verdict}}{{end}}</span></div>
-  {{if .Cause}}<p>In plain words: {{.Cause}}</p>{{end}}
+  {{if .Cause}}<p>In plain words, {{.Cause}}</p>{{end}}
   <div class="kv" style="--c: 100px 1fr"><span>Client</span><span class="m">{{.Client}}</span><span>Seen</span><span class="m">{{.Seen}}, {{when .SeenAt "clock"}}</span>{{if .Nearest}}<span>Nearest topic</span><span class="m"><a href="{{.NearestURL}}">{{.Nearest}}</a></span>{{end}}</div>
   {{if or .CreateURL .Fix}}
   <div class="col g8">
@@ -270,7 +285,7 @@
     <span>Fetch requests</span><span class="m">{{.Fetches}}{{if .FetchesFolded}} ({{.FetchesFolded}} folded){{end}}</span>
     <span>Errors</span><span class="m {{if .Errors}}bad{{else}}ok{{end}}">{{.Errors}}</span>
   </div>
-  <div class="well pad col g4"><span class="b">Open the topic</span><span class="note">Messages, partitions and the schema are on its own page.</span><a href="{{.TopicURL}}" class="row ce g6 mw0" title="{{.Topic}}"><span class="sv sm c-tp" aria-hidden="true">TP</span><span class="el">{{.Topic}}</span></a></div>
+  {{if .Exists}}<div class="well pad col g4"><span class="b">Open the topic</span><span class="note">Messages, partitions and the schema are on its own page.</span><a href="{{.TopicURL}}" class="row ce g6" title="{{.Topic}}"><span class="sv sm c-tp" aria-hidden="true">TP</span><span class="el">{{.Topic}}</span></a></div>{{end}}
   <div class="note">Select a row to see the whole request.</div>
 </div>
 {{end}}
@@ -278,22 +293,22 @@
 
 {{define "traffic_group_default"}}
 {{with .GroupSummary}}
-<div class="hd"><span class="cap">Group timeline</span><div class="row sb ce"><span class="h2 el" title="{{.Group}}">{{.Group}}</span>{{if .State}}<span class="badge {{stateBadge .State}}">{{.State}}</span>{{end}}</div><span class="m mut">{{.Protocol}}{{range $i, $t := .Topics}}{{if eq $i 0}} · {{end}}{{if $i}}, {{end}}{{$t}}{{end}}</span></div>
+<div class="hd"><span class="cap">Group timeline</span><div class="row sb ce"><span class="h2 el" title="{{.Group}}">{{.Group}}</span>{{if .State}}<span class="pill {{.StateTone}}">{{.State}}</span>{{end}}</div><span class="m mut">{{.Protocol}}{{range $i, $t := .Topics}}{{if eq $i 0}} · {{end}}{{if $i}}, {{end}}{{$t}}{{end}}</span></div>
 <div class="bd" id="group-summary">
-  {{if .Has}}<div class="callout"><span class="b">Why it rebalanced</span><span>{{.Why}}{{if .WhyDetail}} {{.WhyDetail}}{{end}}</span>{{if not .Epochs}}<span class="note">Real Kafka does the same: any join in the classic protocol makes everyone rejoin.</span>{{end}}</div>{{end}}
+  {{if .Has}}<div class="callout"><span class="b">Why it rebalanced</span><span>{{.Why}}{{if .WhyDetail}} {{.WhyDetail}}{{end}}</span>{{if .JoinNote}}<span class="note">Real Kafka does the same: any join in the classic protocol makes everyone rejoin.</span>{{end}}</div>{{end}}
   {{if .Generations}}
   <div class="col g6">
     <span class="cap">{{if .Epochs}}Epochs{{else}}Generations{{end}}</span>
     <div class="card" style="--c: 40px 1fr 62px 72px">
       <div class="r h"><span>{{if .Epochs}}Epoch{{else}}Gen{{end}}</span><span>Cause</span><span class="ra">Members</span><span class="ra">At</span></div>
       {{/* The newest is last, and is the one the group is in: the board's .on row. */}}
-      {{$gens := .Generations}}{{range $i, $g := $gens}}{{with $g}}{{$newest := eq (len (slice $gens $i)) 1}}<div class="r{{if $newest}} on{{end}}"><span class="m{{if $newest}} b{{end}}">{{.Gen}}</span><span class="{{if $newest}}{{else}}mut {{end}}el">{{if .Cause}}{{.Cause}}{{else}}the group formed{{end}}</span><span class="m ra">{{.Members}}</span><span class="m ra">{{when .At "clock"}}</span></div>{{end}}{{end}}
+      {{$gens := .Generations}}{{range $i, $g := $gens}}{{with $g}}{{$newest := eq (len (slice $gens $i)) 1}}<div class="r{{if $newest}} on{{end}}"><span class="m{{if $newest}} b{{end}}">{{.Gen}}</span><span class="{{if $newest}}{{else}}mut {{end}}el" title="{{if .Cause}}{{.Cause}}{{else}}the group formed{{end}}">{{if .Cause}}{{.Cause}}{{else}}the group formed{{end}}</span><span class="m ra">{{.Members}}</span><span class="m ra">{{when .At "clock"}}</span></div>{{end}}{{end}}
     </div>
   </div>
   {{end}}
-  {{if not .Epochs}}<div class="col g4"><span class="cap">What the sequence means</span><span class="note">JoinGroup collects the members. SyncGroup hands out the partitions. Heartbeat and OffsetCommit then carry the new generation.</span></div>{{end}}
+  {{if not .Epochs}}<div class="col g4"><span class="cap">What the sequence means</span><span class="note">JoinGroup collects the members. SyncGroup hands out the partitions. Heartbeat and OffsetCommit then carry the new generation.</span></div>{{else}}<div class="col g4"><span class="cap">What the sequence means</span><span class="note">Each member's ConsumerGroupHeartbeat carries its epoch. The broker assigns the partitions itself and raises the epoch when the membership changes; there is no JoinGroup or SyncGroup.</span></div>{{end}}
   <div class="grow"></div>
-  <a class="btn" href="{{.TimelineURL}}">Open the full timeline<span aria-hidden="true">→</span></a>
+  <a class="btn w5" href="{{.TimelineURL}}">Open the full timeline<span aria-hidden="true">→</span></a>
 </div>
 {{else}}
 <div class="hd"><span class="cap">Group timeline</span><span class="h2">{{.Filter.Group}}</span></div>
@@ -301,10 +316,4 @@
 {{end}}
 {{end}}
 
-{{define "metric_row"}}
-<div class="mrow">
-  <span class="mr-n{{if not .Label}} mono{{end}}" title="{{.Name}}">{{if .Label}}{{.Label}}{{else}}{{.Short}}{{end}}{{if .Attrs}} <span class="mr-a">{{.Attrs}}</span>{{end}}</span>
-  <span class="mr-s">{{.Spark}}</span>
-  <span class="mr-v mono">{{.Last}}</span>
-</div>
-{{end}}
+{{define "metric_row"}}<span title="{{.Name}}{{if .Attrs}} · {{.Attrs}}{{end}}"{{if not .Label}} class="m"{{end}}>{{if .Label}}{{.Label}}{{else}}{{.Short}}{{end}}{{if .Attrs}} <span class="mut">{{.Attrs}}</span>{{end}}</span>{{.Spark}}<span class="m ra{{if .Tone}} {{.Tone}}{{end}}">{{.Last}}</span>{{end}}

@@ -79,7 +79,7 @@ func TestARowsTargetIsWhatTheRequestNames(t *testing.T) {
 		{"transaction", TrafficEvent{TxnID: "t-1"}, "tx t-1"},
 		{"via a group", TrafficEvent{ViaGroup: "g"}, ""},
 	} {
-		if got := c.trafficRow(tc.e).Target; got != tc.want {
+		if got := c.trafficRow(tc.e, trafficView{}).Target; got != tc.want {
 			t.Errorf("%s: Target = %q, want %q", tc.name, got, tc.want)
 		}
 	}
