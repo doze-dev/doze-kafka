@@ -8,13 +8,15 @@
 package console
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"embed"
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"log"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -36,6 +38,7 @@ const defaultPrefix = "/_console"
 // Console is the web-UI http.Handler. Mount it on its own listener — Kafka's
 // wire protocol can't share a port with HTTP.
 type Console struct {
+	log         *slog.Logger // where the console reports its own failures (Options.Logger).
 	be          *backend
 	reg         *registryClient     // nil when there is no schema registry to talk to.
 	traffic     TrafficSource       // nil when the broker's traffic is not available to this console.
@@ -82,6 +85,10 @@ type Options struct {
 	// RegistryUser and RegistryPass are HTTP basic credentials for the registry, when
 	// it requires them.
 	RegistryUser, RegistryPass string
+	// Logger is where the console reports what goes wrong on its side (a page that
+	// could not be drawn, a dev template tree that does not parse). Nil is
+	// slog.Default().
+	Logger *slog.Logger
 	// RegistryTLS, if set, is the trust configuration for a registry served over
 	// https. Nil, an https RegistryURL is verified against the system's roots.
 	RegistryTLS *tls.Config
@@ -155,7 +162,11 @@ func New(opts Options) (*Console, error) {
 	// templates and static files from disk on every request, so an edit shows on
 	// reload without rebuilding the binary (`task dev` sets it).
 	dev := os.Getenv("DOZE_KAFKA_CONSOLE_DEV")
-	c := &Console{prefix: prefix, hosts: opts.AllowedHosts, dev: dev, facts: opts.Facts}
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	c := &Console{log: logger, prefix: prefix, hosts: opts.AllowedHosts, dev: dev, facts: opts.Facts}
 	be, err := newBackend(opts)
 	if err != nil {
 		return nil, err
@@ -187,7 +198,7 @@ func (c *Console) templates() *template.Template {
 		t, err := c.parseTemplates()
 		if err != nil {
 			// The embedded set is checked by the suite; a dev tree can be mid-edit.
-			log.Printf("console: templates: %v", err)
+			c.log.Error("console: the templates do not parse", "err", err)
 			t = template.New("")
 		}
 		c.tmpl = t
@@ -197,7 +208,7 @@ func (c *Console) templates() *template.Template {
 	}
 	t, err := c.parseTemplates()
 	if err != nil {
-		log.Printf("console dev mode: %v", err)
+		c.log.Warn("console dev mode: the templates do not parse; serving the last good set", "dir", c.dev, "err", err)
 		return c.tmpl
 	}
 	return t
@@ -285,11 +296,38 @@ func (c *Console) render(w http.ResponseWriter, r *http.Request, page string, da
 	if f := r.URL.Query().Get("flash"); f != "" {
 		data["Flash"] = f
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := c.templates().ExecuteTemplate(w, page, data); err != nil {
-		http.Error(w, err.Error(), 500)
-	}
+	c.execute(w, http.StatusOK, page, data, true)
 }
+
+// execute draws the template name into a buffer and only then writes it, with
+// status, so a template that fails halfway sends no half page: the browser gets a
+// plain error page (or, for a fragment, a line) with 500, and the console's logger
+// gets the reason. A client that has gone away by the time it is written is not
+// an error worth reporting.
+func (c *Console) execute(w http.ResponseWriter, status int, name string, data any, whole bool) {
+	var buf bytes.Buffer
+	if err := c.templates().ExecuteTemplate(&buf, name, data); err != nil {
+		c.log.Error("console: a page could not be drawn", "template", name, "err", err)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusInternalServerError)
+		if whole {
+			io.WriteString(w, couldNotDrawPage) //nolint:errcheck // the client may have gone
+		} else {
+			io.WriteString(w, couldNotDrawFragment) //nolint:errcheck
+		}
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+	w.Write(buf.Bytes()) //nolint:errcheck // the client may have gone
+}
+
+// What a page or a fragment says when its template failed. They name no detail:
+// that is in the log, and a template's error text is not for the browser.
+const (
+	couldNotDrawPage     = "<!doctype html>\n<meta charset=\"utf-8\"><title>Console error</title>\n<p>The console could not draw this page. The broker's log says why; reload to try again.</p>\n"
+	couldNotDrawFragment = `<div class="err" role="alert">The console could not draw this part of the page. The broker's log says why.</div>`
+)
 
 // shellData adds what every full page needs of the shell around it: the prefix, the
 // broker's address, which sections exist, the rail's numbers and the top bar's
@@ -331,10 +369,7 @@ func (c *Console) partial(w http.ResponseWriter, name string, data map[string]an
 		data = map[string]any{}
 	}
 	data["Prefix"] = c.prefix
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := c.templates().ExecuteTemplate(w, name, data); err != nil {
-		http.Error(w, err.Error(), 500)
-	}
+	c.execute(w, http.StatusOK, name, data, false)
 }
 
 // redirect sends the browser to `to` with an optional flash banner — via

@@ -17,6 +17,9 @@ import (
 // broker starts the embedded broker on a unix socket, as the module does.
 func broker(t *testing.T) engine.Endpoint {
 	t.Helper()
+	// /tmp rather than t.TempDir(): a unix socket's path is capped near 104 bytes,
+	// and the test temp directory (/var/folders/... on macOS) is longer than that.
+	// Removed below.
 	dir, err := os.MkdirTemp("/tmp", "kc")
 	if err != nil {
 		t.Fatal(err)
