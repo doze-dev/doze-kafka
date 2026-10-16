@@ -38,10 +38,12 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   to search every partition's newest records and see the matches together, newest
   first; with no search text that is simply the latest records across the whole
   topic.
-- **Send a message** from the dock at the bottom: key, value, headers, partition
-  (or "auto", which partitions by key exactly as a real client does), acks. The
-  composer stays open while you change partition and closes when you move to another
-  topic. Values
+- **Send a message** from the dock at the bottom. Closed, it is one row: a key, a
+  value and Send (the partition chosen by the key, acks 1). `p` or its title opens the
+  whole form: key, value, headers, partition (or "auto", which partitions by key
+  exactly as a real client does), acks, each acknowledgement saying what this broker
+  does for it (`all` is answered once the partition is on disk). The composer stays
+  open while you change partition and closes when you move to another topic. Values
   can be sent as text, JSON, base64, or a tombstone. **Send again** on any record
   produces an exact copy (the same key, value and headers, byte for byte), and
   **Edit a copy** opens the composer filled in with it, to change first.
@@ -201,7 +203,8 @@ g-order-validator, schema subject orders-value"), each name a link.
 
 Press `?` for the list. It is generated from the one table the console binds its keys
 from, so it is always the keys that work. The strip under the page shows the few that
-matter on the page you are on.
+matter on the page you are on, and while a dialog is open, that dialog's (a confirm's
+`tab`, `esc` and `↵`; the palette's `⌘K`; the list of keys' `?` and `⌘K`).
 
 | Key | Does |
 |---|---|
@@ -209,13 +212,14 @@ matter on the page you are on.
 | `g` then `r` `t` `g` `s` `a` `c` | Go to Traffic, Topics, Groups, Schemas, Access, Cluster |
 | `?` | Show the keys |
 | `/` | Filter this table |
-| `j` / `k`, `Enter` | Move through the list and open |
+| `j` / `k`, `Enter` | Move through the list and open (in the list pane, from the page that is open) |
 | `[` / `]` | Previous or next tab |
-| `c` | New topic, or register a schema |
+| `c` | Create: a topic, a schema, an ACL; on an empty Traffic, connect an app; on Cluster, copy the bootstrap address |
 | `p` | Produce, on a topic; otherwise pause or resume live updates |
 | `e` | On Traffic: errors only, and back |
 | `u` / `m` / `c` | On Traffic, with a request or client open: unfold a folded row, all of a client's metrics, copy a request's decoded fields |
-| `⌘Enter` / `Ctrl+Enter` | Send, from the composer |
+| `r` | Retry now, when the broker is not reachable |
+| `⌘Enter` / `Ctrl+Enter` | Send, from the composer; create, on a create form |
 | `Esc` | Close a dialog or the inspector, or clear the filter |
 
 Single keys act only when you are not typing in a field, with no modifier held, and
@@ -225,23 +229,30 @@ dialog; it is part of the page, and the page's keys work beside it.
 
 ## The palette
 
-`⌘K` opens a palette with results under Topics, Groups, Subjects and Actions. A row
-says what it is (a topic its partitions and messages, a group its state, members and
-lag), the part of the name you typed is bold, and an action carries its key. On a
-topic it offers to produce to it; on a group, to reset its offsets, which still asks
-before it does anything. The sections themselves are not in the palette: the rail
+`⌘K` opens a palette with results under Topics, Groups, Subjects and Actions, and
+`⌘K` again closes it. A row says what it is (a topic its partitions and messages, a
+group its state, members and lag, a subject its versions and compatibility level),
+the part of the name you typed is bold, and an action carries its key. It offers to
+produce to the topic you are on or the first one that matched, and to reset the
+offsets of the group you are on or the first one that matched, which still asks
+before it does anything; pausing, the list of keys and (when traffic is recorded)
+errors only are actions too. The sections themselves are not in the palette: the rail
 and `g` then a letter go to them.
 
 ## Appearance
 
 Light, dark and high-contrast themes, or follow the system (dark, or a request for
 more contrast); the control at the top right is four words: system, light, dark, high
-contrast. High contrast also outlines the selection, so it does not rely on a fill. Every text and background pair is
-measured in all three, and the ratios are in `console/testdata/contrast.txt`. The
-fonts (IBM Plex Sans and Mono) are part of the binary, so the console looks the same
-offline. It works down to phone widths: at 960px the rail is icons and the list is one tap
-away; below 640px each page is one screen, the top bar is a menu, the page title and
-the palette, and messages are cards.
+contrast. High contrast also outlines every selection (a section, a list item, a
+row), so it does not rely on a fill. Every text and background pair is measured in all
+three, and the ratios are in `console/testdata/contrast.txt`; the accessibility sweep
+(`e2e/tests/a11y.spec.ts`) also measures what every page draws, placeholders included,
+at three widths in all three themes. The fonts (IBM Plex Sans and Mono) are part of
+the binary, so the console looks the same offline. It works down to phone widths: at
+960px the rail is icons, the list is one tap away and an open record is a card under
+the records (`esc` closes it); below 640px each page is one screen, the top bar is a
+menu, the page title and the palette, messages are cards, and an open record is a
+sheet that rises from the foot (Close).
 
 Times are shown in your browser's zone, with the zone and the UTC instant on hover;
 "3m ago" keeps counting on a paused page.
@@ -265,9 +276,10 @@ broker does not do it) and **Failed** (the broker is unhappy). It names what sai
 the Kafka error name, the registry's `error_code`, or "by the console" for a rule of
 the console's own, with the broker's own explanation where it gave one.
 
-When the broker is unreachable the live pill at the top right says **Not connected**
-once, with the last time anything was heard and one Retry; what was on screen stays,
-dimmed, and comes back by itself when the broker does. A topic or group that does not
+The console asks the broker every five seconds whether it is there. When it is not,
+the pill at the top right turns red and says **not reachable** beside its address
+(the time of the last answer is its tooltip), with one Retry (`r`); what was on screen
+stays, dimmed, and comes back by itself when the broker does. A topic or group that does not
 exist gives a real 404 page with near-miss suggestions ("did you mean `orders`?").
 
 Every destructive action confirms, and the confirm says what goes with it, measured
