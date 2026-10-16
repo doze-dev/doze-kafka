@@ -6,6 +6,11 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Groups: a classic JoinGroup into a consumer group whose subscription cannot be read is
+  answered UNKNOWN_SERVER_ERROR with no member id, as Kafka answers it (it fails to read
+  it with an exception it does not catch), where doze answered INCONSISTENT_GROUP_PROTOCOL;
+  a static join and a JoinGroup v3 too (recorded: unreadable-subscription).
+
 - Groups: DescribeGroups, ConsumerGroupDescribe and DeleteGroups that name several
   groups answer them in Kafka's order, which is not the request's (it follows the
   groups' __consumer_offsets partitions); doze answered in the request's order. A client

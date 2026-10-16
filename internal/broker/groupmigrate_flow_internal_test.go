@@ -146,12 +146,13 @@ func TestMixedGroupRefusals(t *testing.T) {
 	if res := req(time.Second, "connect", "", subscriptionBytes("t")); res.errorCode != kerr.InconsistentGroupProtocol.Code {
 		t.Errorf("another protocol type: %d", res.errorCode)
 	}
-	// A subscription that cannot be read is found out once the member has an id
-	// (recorded: cm-classic-join-unreadable-subscription*).
+	// A subscription that cannot be read is found out once the member has an id, and
+	// answered as Kafka answers it, UNKNOWN_SERVER_ERROR with no member id (recorded:
+	// unreadable-subscription).
 	if res := req(time.Second, "consumer", "", []byte{9}); res.errorCode != kerr.MemberIDRequired.Code {
 		t.Errorf("a subscription that is not the consumer protocol's, first join: %d", res.errorCode)
-	} else if res := req(time.Second, "consumer", res.memberID, []byte{9}); res.errorCode != kerr.InconsistentGroupProtocol.Code {
-		t.Errorf("a subscription that is not the consumer protocol's: %d", res.errorCode)
+	} else if res := req(time.Second, "consumer", res.memberID, []byte{9}); res.errorCode != kerr.UnknownServerError.Code || res.memberID != "" {
+		t.Errorf("a subscription that is not the consumer protocol's: %d, member id %q", res.errorCode, res.memberID)
 	}
 	if res := req(time.Second, "consumer", "n", subscriptionBytes("t")); res.errorCode != kerr.UnknownMemberID.Code {
 		t.Errorf("a consumer-protocol member's id: %d", res.errorCode)

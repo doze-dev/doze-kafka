@@ -390,11 +390,13 @@ func (m *cg848Manager) classicJoin(r *kmsg.JoinGroupRequest, who clientRef) (res
 		}
 	}
 	// The subscription is read once the member has an id: one that cannot be read is
-	// answered MEMBER_ID_REQUIRED first, as any other (recorded:
-	// cm-classic-join-unreadable-subscription).
+	// answered MEMBER_ID_REQUIRED first, as any other, and then UNKNOWN_SERVER_ERROR with
+	// no member id, and nobody is seated: Kafka fails to read it there, with an exception
+	// it does not catch. The same for a static member and a JoinGroup v3, which join in
+	// one step (claim: groups R26a). A client does not retry either answer.
 	sub, protocol, ok := seatSubscription(protocols)
 	if !ok {
-		return refuse(kerr.InconsistentGroupProtocol.Code)
+		return joinResult{errorCode: kerr.UnknownServerError.Code, generation: -1}, true
 	}
 	mem := g.members[id]
 	switch {

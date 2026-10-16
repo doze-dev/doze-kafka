@@ -69,11 +69,6 @@ implement it.
 - **A consumer-protocol member is asked to heartbeat every second**, where Kafka's
   `group.consumer.heartbeat.interval.ms` is 5 seconds: rebalances settle in a couple of
   seconds on a development machine instead of ten.
-- **A classic member of a consumer group whose subscription cannot be read** is refused
-  `INCONSISTENT_GROUP_PROTOCOL` on the `JoinGroup` that brings its member id. Kafka
-  answers that `JoinGroup` `UNKNOWN_SERVER_ERROR` (an exception it did not catch); both
-  are refusals a client does not retry (recorded: `group-requests-refused.json`, step
-  `cm-classic-join-unreadable-subscription-with-id`).
 - **How often committed offsets are checked is not a setting.** Kafka has
   `offsets.retention.check.interval.ms` (10 minutes); here the check runs every
   hundredth of `--offsets-retention`, between 50 ms and 10 minutes, so it is Kafka's

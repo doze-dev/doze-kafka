@@ -250,8 +250,10 @@ func TestGroupCoordinators_ShareNoGroupID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.ErrorCode != kerr.InconsistentGroupProtocol.Code {
-		t.Errorf("classic join into a live KIP-848 group: code %d, want INCONSISTENT_GROUP_PROTOCOL (%d)", resp.ErrorCode, kerr.InconsistentGroupProtocol.Code)
+	// Its subscription is not one (joinRequest's metadata): Kafka answers that
+	// UNKNOWN_SERVER_ERROR and seats nobody (recorded: unreadable-subscription).
+	if resp.ErrorCode != kerr.UnknownServerError.Code {
+		t.Errorf("classic join into a live KIP-848 group: code %d, want UNKNOWN_SERVER_ERROR (%d)", resp.ErrorCode, kerr.UnknownServerError.Code)
 	}
 
 	// Neither id is listed twice.
