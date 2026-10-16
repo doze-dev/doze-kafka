@@ -452,6 +452,28 @@ func specFieldName(t reflect.Type, field string) string {
 	return field
 }
 
+// snakeCase writes a specification name as Traf-04 does: "TransactionalId" is
+// "transactional_id", "TimeoutMs" "timeout_ms", "V3AndBelowTopics" "v3_and_below_topics".
+func snakeCase(name string) string {
+	var b strings.Builder
+	rs := []rune(name)
+	for i, r := range rs {
+		upper := r >= 'A' && r <= 'Z'
+		if upper && i > 0 {
+			prev := rs[i-1]
+			next := i+1 < len(rs) && rs[i+1] >= 'a' && rs[i+1] <= 'z'
+			if (prev >= 'a' && prev <= 'z') || (prev >= '0' && prev <= '9') || (prev >= 'A' && prev <= 'Z' && next) {
+				b.WriteByte('_')
+			}
+		}
+		if upper {
+			r += 'a' - 'A'
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
 func writeValue(b *strings.Builder, v reflect.Value, items, depth int) {
 	switch v.Kind() {
 	case reflect.Pointer, reflect.Interface:
@@ -549,7 +571,7 @@ func writeValue(b *strings.Builder, v reflect.Value, items, depth int) {
 				b.WriteString(", ")
 			}
 			first = false
-			b.WriteString(strconv.Quote(name))
+			b.WriteString(strconv.Quote(snakeCase(name)))
 			b.WriteString(": ")
 			switch {
 			case hidden && f.Name == "Value":

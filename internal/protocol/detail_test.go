@@ -123,12 +123,12 @@ func TestDecodedFieldsOmitAZeroTopicIDAndDashANonZeroOne(t *testing.T) {
 	tp := kmsg.NewFetchRequestTopic()
 	tp.Topic = "orders"
 	q.Topics = append(q.Topics, tp)
-	if got := decodedFields(q); strings.Contains(got, "TopicId") || strings.Contains(got, "0000000000000000") {
+	if got := decodedFields(q); strings.Contains(got, "topic_id") || strings.Contains(got, "0000000000000000") {
 		t.Errorf("a zero topic id is in the decoded fields: %s", got)
 	}
 	tp.TopicID = [16]byte{0xab, 0xcd, 0xef, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}
 	q.Topics[0] = tp
-	if got := decodedFields(q); !strings.Contains(got, `"TopicId": "abcdef01-0203-0405-0607-08090a0b0c0d"`) {
+	if got := decodedFields(q); !strings.Contains(got, `"topic_id": "abcdef01-0203-0405-0607-08090a0b0c0d"`) {
 		t.Errorf("a topic id is not written as a UUID: %s", got)
 	}
 }

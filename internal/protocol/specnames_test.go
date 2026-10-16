@@ -232,7 +232,7 @@ func TestSpecNamesMatchTheSpecification(t *testing.T) {
 
 // Every field the inspector can write for a request, in the 22 requests the summarisers
 // describe and every other served API, is a name the specification has, and the old
-// snake_case spellings do not appear.
+// library spellings do not appear; it is written in snake case, as Traf-04 writes it.
 func TestDecodedFieldsUseTheSpecificationNames(t *testing.T) {
 	for name, gt := range servedRequests(t) {
 		valid := specKeys(t, name)
@@ -243,7 +243,7 @@ func TestDecodedFieldsUseTheSpecificationNames(t *testing.T) {
 				if n == "" {
 					continue // not in the specification: not shown.
 				}
-				if !valid[n] {
+				if !valid[snakeCase(n)] {
 					t.Errorf("%s.%s is written as %q, which %s does not have", rt.Name(), f.Name, n, name)
 				}
 				if et, ok := elemStruct(f.Type); ok && depth < 6 {
@@ -265,7 +265,7 @@ func specKeys(t *testing.T, request string) map[string]bool {
 	var collect func(fs []specField)
 	collect = func(fs []specField) {
 		for _, f := range fs {
-			valid[f.Name] = true
+			valid[snakeCase(f.Name)] = true // as the page writes it (Traf-04)
 			collect(f.Fields)
 		}
 	}
