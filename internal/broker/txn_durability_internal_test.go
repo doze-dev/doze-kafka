@@ -268,14 +268,14 @@ func TestEndTxnRetryAfterAMarkerThatWasNotFlushedFlushesIt(t *testing.T) {
 	r := newRig(t, 1<<20)
 	x := oneRecordTxn(t, r)
 
-	r.failSync = true
+	r.failSync.Store(true)
 	if c := x.end(true); c != kerr.ConcurrentTransactions.Code {
 		t.Fatalf("EndTxn with the marker's flush failing: %s, want CONCURRENT_TRANSACTIONS (the decision is stored; ask again)", name(c))
 	}
 	if got := r.txnState("tx"); got != txnPrepareCommit {
 		t.Fatalf("stored state %q, want PrepareCommit", got)
 	}
-	r.failSync = false
+	r.failSync.Store(false)
 	before := r.pc.FsyncsOf(".log")
 	if c := x.end(true); c != 0 {
 		t.Fatalf("EndTxn retry: %s", name(c))
@@ -340,11 +340,11 @@ func TestEndTxnIsNotAcknowledgedOnAPartitionWhoseMarkerFsyncFailed(t *testing.T)
 func TestARestartFinishesACommitOnlyWithItsMarkerOnDisk(t *testing.T) {
 	r := newRig(t, 1<<20)
 	x := oneRecordTxn(t, r)
-	r.failSync = true // the process dies before the flush: modelled by a flush that does not happen.
+	r.failSync.Store(true) // the process dies before the flush: modelled by a flush that does not happen.
 	if c := x.end(true); c != kerr.ConcurrentTransactions.Code {
 		t.Fatalf("setup: EndTxn = %s", name(c))
 	}
-	r.failSync = false
+	r.failSync.Store(false)
 	before := r.pc.FsyncsOf(".log")
 	r.restart()
 	if got := r.txnState("tx"); got != txnCompleteCommit {
@@ -362,18 +362,19 @@ func TestARestartFinishesACommitOnlyWithItsMarkerOnDisk(t *testing.T) {
 func TestADecidedTransactionIsFinishedWithoutBeingAskedAgain(t *testing.T) {
 	r := newRig(t, 1<<20)
 	x := oneRecordTxn(t, r)
-	r.failSync = true
+	r.failSync.Store(true)
 	if c := x.end(true); c != kerr.ConcurrentTransactions.Code {
 		t.Fatalf("setup: EndTxn = %s", name(c))
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go r.b.RunTransactions(ctx)
+	stopped := make(chan struct{})
+	go func() { r.b.RunTransactions(ctx); close(stopped) }()
+	defer func() { cancel(); <-stopped }() // before the rig closes the stores under it.
 	time.Sleep(2 * txnCheckEvery)
 	if got := r.txnState("tx"); got != txnPrepareCommit {
 		t.Fatalf("with the disk still failing the stored state is %q", got)
 	}
-	r.failSync = false
+	r.failSync.Store(false)
 	deadline := time.Now().Add(10 * time.Second)
 	for r.txnState("tx") != txnCompleteCommit {
 		if time.Now().After(deadline) {
@@ -466,7 +467,7 @@ func TestEndTxnAnswersTheOppositeDecisionAsKafkaDoes(t *testing.T) {
 			complete := map[bool]string{true: txnCompleteCommit, false: txnCompleteAbort}[commit]
 
 			// The decision is stored and cannot be carried out.
-			r.failSync = true
+			r.failSync.Store(true)
 			if c := x.end(commit); c != kerr.ConcurrentTransactions.Code {
 				t.Fatalf("EndTxn(%s) that cannot be carried out: %s", decision, name(c))
 			}
@@ -488,7 +489,7 @@ func TestEndTxnAnswersTheOppositeDecisionAsKafkaDoes(t *testing.T) {
 
 			// The disk mends. The other decision arrives first: the stored one is
 			// carried out, and the request is told it lost.
-			r.failSync = false
+			r.failSync.Store(false)
 			if c := x.end(!commit); c != kerr.InvalidTxnState.Code {
 				t.Errorf("the other decision once the stored one can be carried out: %s, want INVALID_TXN_STATE", name(c))
 			}

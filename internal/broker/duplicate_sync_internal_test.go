@@ -41,14 +41,14 @@ func TestDuplicateRetryAtAcksAllIsSyncedBeforeTheAck(t *testing.T) {
 	r.mustCreateTopic("t", 1, nil)
 
 	// First send: appended, then the sync fails and the producer is told so.
-	r.failSync = true
+	r.failSync.Store(true)
 	first := r.produce("t", 0, -1, nil, payloadBatch(7, 0, 0, 0, "first send"))
 	if first.ErrorCode != kerr.KafkaStorageError.Code {
 		t.Fatalf("first send with a failing sync: code %d, want KAFKA_STORAGE_ERROR", first.ErrorCode)
 	}
 
 	// The producer retries the same sequence once the disk is back.
-	r.failSync = false
+	r.failSync.Store(false)
 	before := r.pc.FsyncsOf(".log")
 	retry := r.produce("t", 0, -1, nil, payloadBatch(7, 0, 0, 0, "first send"))
 	if retry.ErrorCode != 0 || retry.BaseOffset != 0 {
@@ -117,7 +117,7 @@ func TestDuplicateRetryAfterARestartIsRefusedWhenItCannotBeFlushed(t *testing.T)
 		t.Fatalf("first send: %d", p.ErrorCode)
 	}
 	r.restart()
-	r.failSync = true
+	r.failSync.Store(true)
 	if p := r.produce("t", 0, -1, nil, payloadBatch(12, 0, 0, 0, "x")); p.ErrorCode != kerr.KafkaStorageError.Code || p.BaseOffset != -1 {
 		t.Fatalf("a duplicate retry with every flush failing: code %d offset %d, want KAFKA_STORAGE_ERROR and -1", p.ErrorCode, p.BaseOffset)
 	}

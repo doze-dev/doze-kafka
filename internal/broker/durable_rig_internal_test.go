@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"math/rand"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
@@ -35,7 +36,7 @@ type rig struct {
 	open bool
 
 	// failSync fails every flush before it is tried (the manager's BeforeSync).
-	failSync bool
+	failSync atomic.Bool
 }
 
 // newRig starts a broker on an empty directory with a power-cut model over it.
@@ -84,7 +85,7 @@ func (r *rig) start() {
 	logs, err := log.OpenManager(r.data(), log.ManagerOptions{
 		SegmentBytes: r.seg, IndexIntervalBytes: 64, TopicLimits: InitialTopicLimits(cfg, configs),
 		BeforeSync: func() error {
-			if r.failSync {
+			if r.failSync.Load() {
 				return errDiskOnFire
 			}
 			return nil
