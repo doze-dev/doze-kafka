@@ -10,8 +10,8 @@ import (
 
 // The "Version tested" column of clients.md's compatibility table is what the
 // compat cells run: each number is read from the file that pins it, so a bump
-// there that the page does not follow fails here. kcat is the one installed
-// (apt's in CI) and the page says so rather than giving a number.
+// there that the page does not follow fails here. kcat and its librdkafka are pinned
+// in compat/versions.env too, which scripts/install-kcat.sh builds in CI.
 func TestClientVersionsInTheTableAreThePinnedOnes(t *testing.T) {
 	read := func(parts ...string) string {
 		raw, err := os.ReadFile(filepath.Join(append([]string{"..", "compat"}, parts...)...))
@@ -32,7 +32,10 @@ func TestClientVersionsInTheTableAreThePinnedOnes(t *testing.T) {
 	confluent := find(javaPOM, `<confluent.version>([^<]+)<`, "Confluent serializer version in compat/java/pom.xml")
 	boot := find(read("spring", "pom.xml"), `spring-boot-starter-parent</artifactId>\s*<version>([^<]+)<`, "Spring Boot version in compat/spring/pom.xml")
 	kafkajs := find(read("kafkajs", "package.json"), `"kafkajs":\s*"([^"]+)"`, "kafkajs version in compat/kafkajs/package.json")
-	python := find(read("versions.env"), `(?m)^CONFLUENT_KAFKA_PY=(\S+)$`, "confluent-kafka version in compat/versions.env")
+	versions := read("versions.env")
+	python := find(versions, `(?m)^CONFLUENT_KAFKA_PY=(\S+)$`, "confluent-kafka version in compat/versions.env")
+	kcat := find(versions, `(?m)^KCAT_VERSION=(\S+)$`, "kcat version in compat/versions.env")
+	librdkafka := find(versions, `(?m)^LIBRDKAFKA_VERSION=(\S+)$`, "librdkafka version in compat/versions.env")
 
 	raw, err := os.ReadFile("clients.md")
 	if err != nil {
@@ -54,7 +57,7 @@ func TestClientVersionsInTheTableAreThePinnedOnes(t *testing.T) {
 		"**Spring Kafka**":      "Spring Boot " + boot,
 		"**confluent-kafka**":   python,
 		"**KafkaJS**":           kafkajs,
-		"**kcat** (librdkafka)": "as installed",
+		"**kcat** (librdkafka)": kcat + " with librdkafka " + librdkafka,
 	} {
 		if got := row(client); got != want && !strings.HasPrefix(got, want+" ") {
 			t.Errorf("clients.md gives %s as %q; compat runs %q", client, got, want)

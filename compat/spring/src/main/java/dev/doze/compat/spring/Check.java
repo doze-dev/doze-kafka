@@ -50,10 +50,10 @@ public class Check {
     List<String> a = new ArrayList<>(List.of(
         "--spring.main.web-application-type=none", "--spring.main.banner-mode=off", "--logging.level.root=OFF",
         "--check.partitions=" + partitions,
-        "--spring.kafka.bootstrap-servers=" + System.getenv("BOOTSTRAP"),
-        "--spring.kafka.producer.transaction-id-prefix=tx-" + TAG + "-",
+        // bootstrap-servers, transaction-id-prefix and isolation-level are the page's
+        // (docs/frameworks.md, mounted by run.sh); the rest is this check's own.
+        "--spring.config.import=file:/doc.properties",
         "--spring.kafka.consumer.auto-offset-reset=earliest",
-        "--spring.kafka.consumer.isolation-level=read_committed",
         "--spring.kafka.consumer.enable-auto-commit=false",
         "--spring.kafka.admin.fail-fast=true"));
     if ("scram-tls".equals(System.getenv("SECURITY"))) {
@@ -89,6 +89,14 @@ public class Check {
   public static void main(String[] args) throws Exception {
     // First start: KafkaAdmin creates the three topics from the beans.
     try (ConfigurableApplicationContext ctx = SpringApplication.run(Check.class, props(2))) {
+      // The page's three settings, and nothing in their place: the broker this run
+      // gives, a transaction prefix, read_committed.
+      var env = ctx.getEnvironment();
+      check(System.getenv("BOOTSTRAP").equals(env.getProperty("spring.kafka.bootstrap-servers")), "docs/frameworks.md's bootstrap-servers did not resolve to this run's broker: " + env.getProperty("spring.kafka.bootstrap-servers"));
+      String prefix = env.getProperty("spring.kafka.producer.transaction-id-prefix", "");
+      check(!prefix.isBlank() && !prefix.contains(" "), "docs/frameworks.md's transaction-id-prefix is \"" + prefix + "\" (none, or with a comment in it)");
+      check("read_committed".equals(env.getProperty("spring.kafka.consumer.isolation-level")), "docs/frameworks.md's isolation-level is " + env.getProperty("spring.kafka.consumer.isolation-level"));
+      ok("the Spring settings of docs/frameworks.md are the ones in force");
       check(partitionsOf(TOPIC) == 2, "KafkaAdmin created the topic with 2 partitions");
       ok("KafkaAdmin created the NewTopic beans");
 

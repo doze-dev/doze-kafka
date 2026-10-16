@@ -7,8 +7,8 @@
 # Why not the distribution's package: Ubuntu 24.04's kcat links librdkafka 2.3,
 # so compat/kcat-telemetry skipped itself in CI and the cell never ran. The
 # versions here are the ones the matrix passes with on a developer's machine
-# (kcat 1.7 on librdkafka 2.15.1). Both are fetched by commit, so what is built
-# cannot change under the same script.
+# (kcat 1.7 on librdkafka 2.15.1), pinned in compat/versions.env. Both are fetched
+# by commit, so what is built cannot change under the same file.
 #
 # Needs: a C toolchain, pkg-config, and the headers of zlib, zstd, lz4, OpenSSL,
 # SASL, curl and yajl. On Debian or Ubuntu:
@@ -16,10 +16,10 @@
 #     libssl-dev libsasl2-dev libcurl4-openssl-dev libyajl-dev curl ca-certificates
 set -euo pipefail
 
-LIBRDKAFKA_VERSION=v2.15.1
-LIBRDKAFKA_COMMIT=c58bbed850ebe1cc493259d11e4de6ca930d5120
-KCAT_VERSION=1.7.1
-KCAT_COMMIT=9ca33cdbb8cb1f762d118ef76f96711125ccb091
+# The pins are compat/versions.env's (docs/clients.md's table is held to the same file).
+# shellcheck source=../compat/versions.env
+. "$(cd "$(dirname "$0")/.." && pwd)/compat/versions.env"
+: "${KCAT_VERSION:?}" "${KCAT_COMMIT:?}" "${LIBRDKAFKA_VERSION:?}" "${LIBRDKAFKA_COMMIT:?}"
 
 prefix=${1:-/usr/local}
 sudo=""
@@ -37,7 +37,7 @@ fetch() { # repo commit dir
   curl -fsSL "https://github.com/$1/archive/$2.tar.gz" | tar -xz -C "$3" --strip-components 1
 }
 
-echo "== librdkafka $LIBRDKAFKA_VERSION ($LIBRDKAFKA_COMMIT)"
+echo "== librdkafka v$LIBRDKAFKA_VERSION ($LIBRDKAFKA_COMMIT)"
 fetch confluentinc/librdkafka "$LIBRDKAFKA_COMMIT" "$work/librdkafka"
 name=librdkafka
 ( cd "$work/librdkafka" && ./configure --prefix="$prefix" >"$logs/$name-configure" 2>&1 || { tail -40 "$logs/$name-configure"; exit 1; }
@@ -59,5 +59,5 @@ if command -v ldconfig >/dev/null 2>&1; then $sudo ldconfig 2>/dev/null || true;
 out=$("$prefix/bin/kcat" -V 2>&1) || { echo "$out"; echo "the kcat just built does not run" >&2; exit 1; }
 echo "$out" | sed -n 's/^Version/kcat version/p'
 ver=$(echo "$out" | sed -n 's/.*librdkafka \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' | head -1)
-[ "$ver" = "${LIBRDKAFKA_VERSION#v}" ] || { echo "kcat links librdkafka '$ver', wanted ${LIBRDKAFKA_VERSION#v}" >&2; exit 1; }
+[ "$ver" = "$LIBRDKAFKA_VERSION" ] || { echo "kcat links librdkafka '$ver', wanted $LIBRDKAFKA_VERSION" >&2; exit 1; }
 echo "ok       $prefix/bin/kcat links librdkafka $ver"

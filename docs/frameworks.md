@@ -24,9 +24,13 @@ Nothing special: `bootstrap.servers`, and everything Streams needs is there.
 
 ```properties
 spring.kafka.bootstrap-servers=${KAFKA_BOOTSTRAP_SERVERS}
-spring.kafka.producer.transaction-id-prefix=tx-          # transactions, if you use them
+# transactions, if you use them
+spring.kafka.producer.transaction-id-prefix=tx-
 spring.kafka.consumer.isolation-level=read_committed
 ```
+
+These are the settings `compat/spring` runs with, read from this page (a `#` after a
+value is part of the value in a `.properties` file, so the comment has a line of its own).
 
 - `KafkaAdmin` creates every `NewTopic` bean at start-up and **raises the partition count**
   when a declaration grows (`CreatePartitions`); it never shrinks one.

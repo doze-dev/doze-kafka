@@ -39,7 +39,7 @@ over SASL/SCRAM-SHA-512 and TLS**. The versions are the ones the cells pin (`com
 | **Kafka Streams** | 4.3.1 | a word count with `exactly_once_v2`; its repartition and compacted changelog topics; a new instance restoring its state from the changelog |
 | **Spring Kafka** | Spring Boot 3.4.4 | `KafkaAdmin` creating `NewTopic` beans and growing one; a transactional `@KafkaListener` whose aborted delivery is redelivered with exactly-once output |
 | **confluent-kafka** (Python, librdkafka) | 2.16.0 | admin, idempotent producer, groups that commit and resume, `group.protocol=consumer`, transactions |
-| **kcat** (librdkafka) | as installed (the run prints it; kcat 1.7.0 with librdkafka 2.15.1 here, apt's in CI) | metadata, keys and headers, a group that resumes |
+| **kcat** (librdkafka) | 1.7.1 with librdkafka 2.15.1 (built from pinned sources in CI, `scripts/install-kcat.sh`; the run prints the version it used) | metadata, keys and headers, a group that resumes |
 | **KafkaJS** | 2.2.4 | admin, idempotent producer, group consume and commit |
 
 Confluent's Java Avro, Protobuf and JSON Schema serializers (8.3.2) and confluent-kafka's Avro,
