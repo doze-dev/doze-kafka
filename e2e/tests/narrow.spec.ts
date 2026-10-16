@@ -33,6 +33,64 @@ for (const width of [960, 390]) {
   });
 }
 
+// Fitting is not enough: a home that fits by cutting its table shows nothing (the
+// verification of 82b8752 found the name columns 0 px wide at 390, in a card that hid
+// what it cut, with the list that holds the names hidden too). At 390 each home's rows
+// are cards that show every value whole; at 960 its table does; nothing is cut by a box
+// that hides it.
+const HOME_TABLES: [string, string][] = [['topics', '#topics-table'], ['groups', '#groups-table'], ['schemas', '#schemas-table'], ['access', '#acl-table'], ['cluster', '#cluster-identity'], ['trace', '#trace-recent']];
+for (const width of [960, 390]) {
+  test(`at ${width}px every home shows its names and every value whole`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    for (const [path, table] of HOME_TABLES) {
+      await page.goto(path);
+      const cut = await page.locator(table).evaluate((t, width) => {
+        const out: string[] = [];
+        const rows = Array.from(t.querySelectorAll(':scope > .r:not(.h), :scope > a.r'));
+        if (!rows.length) out.push('no rows');
+        for (const r of rows.slice(0, 6)) {
+          const name = r.firstElementChild as HTMLElement;
+          if (!name || name.getBoundingClientRect().width < 20) out.push(`a name is ${name?.getBoundingClientRect().width} px wide`);
+          // At 390 no value is cut: each cell holds its whole text (no ellipsis, no hidden overflow).
+          if (width === 390) for (const c of Array.from(r.children) as HTMLElement[]) {
+            if (c.scrollWidth > c.clientWidth + 1) out.push(`"${c.textContent?.trim().slice(0, 30)}" is cut`);
+          }
+        }
+        if (t.scrollWidth > t.clientWidth + 1) out.push(`the card is ${t.scrollWidth} px of content in ${t.clientWidth}`);
+        return out;
+      }, width);
+      expect(cut, `${path} at ${width}px`).toEqual([]);
+    }
+  });
+}
+
+// Sy-04's top bar: the menu, the logo, the page, the jump key and the broker's dot; the
+// theme switch (Sy-07) is at the foot of the menu, and the wire is the wide page's.
+test('at 390 the top bar has the dot, the menu has the theme switch, and a topic draws no wire', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('topics/seed-orders');
+  const dot = page.locator('#live-pill .dot');
+  await expect(dot).toBeVisible();
+  expect((await dot.boundingBox())!.width).toBe(7);
+  // The address is not drawn, and is still read: visually hidden, not removed.
+  await expect(page.locator('#live-pill .pill-addr')).toHaveText(/^127\.0\.0\.1:\d+$/);
+  await expect(page.locator('#live-pill .pill-addr')).not.toHaveCSS('display', 'none');
+  await expect(page.locator('header .theme-seg')).toBeHidden();
+  await expect(page.locator('#wire-dock')).toBeHidden();
+  // Cards: each record bordered, with no line beyond its key and offset, its value and its age.
+  const card = page.locator('#messages-table tbody tr:not(.txnmark)').first();
+  const lines = await card.evaluate((tr) => Array.from(tr.children).filter((c) => (c as HTMLElement).offsetParent !== null).map((c) => (c as HTMLElement).className));
+  expect(lines).toEqual(['cell-offset', 'cell-key', 'cell-val', 'cell-age num mut'].map((c) => expect.stringContaining(c.split(' ')[0])));
+  await expect(card).toHaveCSS('border-top-width', '1px');
+  await page.locator('#menu-btn').click();
+  const sw = page.locator('nav.rail .rail-theme');
+  await expect(sw).toBeVisible();
+  await sw.locator('[data-mode="dark"]').click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await sw.locator('[data-mode="light"]').click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+});
+
 // Below ~640px the list and the detail become two screens; nothing may need a
 // sideways scroll at 420 or 360px.
 for (const width of [420, 360]) {

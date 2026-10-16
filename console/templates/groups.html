@@ -63,12 +63,12 @@
       {{range .Groups}}
       <a class="r" href="{{.URL}}" data-row data-name="{{.ID}}" data-text="{{range .Topics}}{{.}} {{end}}" data-seg="{{if .Members}}with-members{{else}}empty{{end}}{{if .Behind}} behind{{end}}">
         <span class="m b">{{.ID}}</span>
-        <span class="m">{{if eq .Protocol "848"}}consumer <span class="tag">KIP-848</span>{{else}}classic{{end}}</span>
-        <span class="m {{if eq .State "Stable"}}ok{{else if eq .State "Dead"}}bad{{else if eq .State "Empty"}}mut{{else}}warn{{end}}">{{.State}}</span>
-        <span class="m ra">{{.Members}}</span>
-        <span class="m el">{{if .Topics}}{{range $i, $t := .Topics}}{{if $i}}, {{end}}{{$t}}{{end}}{{else}}<span class="mut">—</span>{{end}}</span>
-        <span class="m ra {{if .Behind}}warn{{else if .HasOffsets}}ok{{else}}mut{{end}}">{{if .HasOffsets}}{{num .Lag}}{{else}}—{{end}}</span>
-        <span class="m ra {{if not .Members}}mut{{end}}">{{if .Generation}}{{if eq .Protocol "848"}}epoch{{else}}generation{{end}} {{.Generation}}{{else}}<span class="mut">—</span>{{end}}</span>
+        <span class="m" data-l="Protocol">{{if eq .Protocol "848"}}consumer <span class="tag">KIP-848</span>{{else}}classic{{end}}</span>
+        <span class="m {{if eq .State "Stable"}}ok{{else if eq .State "Dead"}}bad{{else if eq .State "Empty"}}mut{{else}}warn{{end}}" data-l="State">{{.State}}</span>
+        <span class="m ra" data-l="Members">{{.Members}}</span>
+        <span class="m el" data-l="Topics">{{if .Topics}}{{range $i, $t := .Topics}}{{if $i}}, {{end}}{{$t}}{{end}}{{else}}<span class="mut">—</span>{{end}}</span>
+        <span class="m ra {{if .Behind}}warn{{else if .HasOffsets}}ok{{else}}mut{{end}}" data-l="Lag">{{if .HasOffsets}}{{num .Lag}}{{else}}—{{end}}</span>
+        <span class="m ra {{if not .Members}}mut{{end}}" data-l="Generation">{{if .Generation}}{{if eq .Protocol "848"}}epoch{{else}}generation{{end}} {{.Generation}}{{else}}<span class="mut">—</span>{{end}}</span>
       </a>
       {{end}}
     </div>
@@ -86,7 +86,7 @@
 {{define "group_detail"}}{{template "shell_top" .}}
   {{template "group_lp" (dict "Groups" .Groups "Sel" .Group.ID)}}
   <main class="main workbench" id="detail">
-    <div class="backrow"><a class="btn sm" href="{{.Prefix}}/groups">‹ Groups</a><span class="note">{{len .Groups}} group{{if ne (len .Groups) 1}}s{{end}}, the list is one tap away</span></div>
+    <div class="backrow"><a class="btn sm" href="{{.Prefix}}/groups">‹ <span class="back-wide">Groups</span><span class="back-narrow">All groups</span></a><span class="note">{{len .Groups}} group{{if ne (len .Groups) 1}}s{{end}}, the list is one tap away</span></div>
     {{template "group_live" .}}
   </main>
   {{template "wire_dock" .}}

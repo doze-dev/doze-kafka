@@ -1067,8 +1067,9 @@
     document.querySelectorAll("[data-open-keys]").forEach(function (el) {
       var on = open != null && (" " + el.getAttribute("data-open-keys") + " ").indexOf(" " + open + " ") >= 0;
       el.classList.toggle("on", on);
-      // A table row is selected; a div that is a row of a list is the current one.
-      if (el.tagName === "TR") el.setAttribute("aria-selected", on ? "true" : "false");
+      // A table row is selected; a row that is a button (a record), or a div that is a
+      // row of a list, is the current one (aria-selected is not a button's).
+      if (el.tagName === "TR" && el.getAttribute("role") !== "button") el.setAttribute("aria-selected", on ? "true" : "false");
       else if (on) el.setAttribute("aria-current", "true");
       else el.removeAttribute("aria-current");
     });
@@ -1089,6 +1090,10 @@
     inspectorPanel.hidden = false;
     var def = document.getElementById("insp-default");
     if (def) def.hidden = true;
+    // Where the panel is stacked under the page (Sy-03) it takes the foot of the screen:
+    // the row that opened it is kept in view above it.
+    var row = from && from.closest && from.closest("tr, .r");
+    if (row) requestAnimationFrame(function () { if (document.contains(row)) row.scrollIntoView({ block: "nearest" }); });
   }
   // closeInspector(restoreFocus, keepURL): the URL loses ?open= unless the close
   // is the answer to the URL having already lost it (Back).
@@ -1188,6 +1193,9 @@
     var isMessage = title && title.hasAttribute("data-offset");
     if (open && (!isMessage || (region && region.hasAttribute("data-msg-base")))) setOpenParam(open, openParamNow() !== open);
     markOpenRow();
+    // The open row stays in view when the panel takes room from the page (Sy-03).
+    var onRow = document.querySelector("main tr.on, main .r.on");
+    if (onRow) requestAnimationFrame(function () { onRow.scrollIntoView({ block: "nearest" }); });
     var again = inspectorRefocus && t.querySelector('button[aria-label="' + inspectorRefocus + '"]:not([disabled])');
     var btn = again || t.querySelector("[data-inspector-close]");
     if (btn) btn.focus();

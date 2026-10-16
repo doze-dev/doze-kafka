@@ -328,6 +328,9 @@ span.num {
 .kv.kv-stack > span { overflow-wrap: normal; }
 @container (max-width: 440px) { .kv-stack { grid-template-columns: 1fr; row-gap: 0; } .kv-stack > :nth-child(even) { margin-bottom: 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; } }
 .snippets { align-items: flex-start; }
+.snippets > .col { min-width: 0; }
+.snippets pre.code { overflow-x: auto; }
+@media (max-width: 640px) { .snippets { flex-direction: column; align-items: stretch; } }
 @media (max-width: 1100px) { .steps { flex-wrap: wrap; } .firstrun { padding: 24px 20px 0; } }
 .workspace { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .workspace > .flash { margin: 12px 16px 0; }
@@ -398,6 +401,9 @@ span.num {
 /* The row at the head of a page that is reached from a list: at narrow widths the
    list is not drawn, and this is the way back to it (Sy-03). */
 .backrow { display: none; align-items: center; gap: 8px; }
+.backrow .back-narrow { display: none; }
+.narrow-only { display: none; }
+@media (max-width: 1100px) { .wide-only { display: none; } .narrow-only { display: inline; } } /* the list is not beside the page */
 
 /* The ··· menu: what is not the page's one action (Delete, Purge) lives under it. */
 .more { position: relative; display: inline-block; }
@@ -422,6 +428,15 @@ span.num {
 .nomatch { padding: 14px 12px; color: var(--mut); }
 
 .r.denyrow { background: var(--denybg); }
+/* Tp-Home's tracks (Size is there when the console can read the data directory). At
+   1100 px and below the board's fixed tracks leave the name nothing, so the name, the
+   readers and the subject share what is left, the name first. */
+#topics-table.sized { --c: 1fr 70px 80px 78px 76px 150px 72px 230px; }
+#topics-table:not(.sized) { --c: 1fr 70px 80px 76px 150px 72px 230px; }
+@media (max-width: 1100px) {
+  #topics-table.sized { --c: minmax(140px, 1.2fr) 70px 80px 78px 76px minmax(0, 1fr) 72px minmax(0, 1fr); }
+  #topics-table:not(.sized) { --c: minmax(140px, 1.2fr) 70px 80px 76px minmax(0, 1fr) 72px minmax(0, 1fr); }
+}
 /* Tc-Home: the recent records that carry a trace header, and the formats it reads. */
 #trace-recent .r { --c: 92px 1fr 70px 1fr 90px; }
 #trace-recent .trace-recent-h { padding-bottom: 6px; }
@@ -436,7 +451,8 @@ span.num-off { background: var(--mut); } /* a rule the check did not reach (Ac-0
 .list.wide { width: 232px; }
 .list.narrow { width: 220px; }
 .list .li.list-tall { height: 34px; } /* Cl-Home's "This broker" */
-.card.side { width: 340px; max-width: 100%; }
+.card.side { width: 420px; max-width: 100%; flex: none; } /* Cl-Home's Counts card */
+@media (max-width: 640px) { .card.side { width: 100%; } }
 .callout.spaced { margin: 14px; }
 .stack { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .stack > * { flex: none; }
@@ -967,6 +983,24 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .panes > .insp:has(.insp-sel:not([hidden])) { border-color: var(--ink); }
   .insp[data-kind="message"] { width: auto; }
   .panes > .dock { grid-column: 1; grid-row: 3; }
+  /* Sy-03 on one screen: the dock is its header and two rows (it scrolls for more), and
+     the stacked card is the board's height, its record's fields beside its value; the
+     rest of the record (headers, actions) is in the card's own scroll. The tape keeps its
+     head (the partitions, live, the log end) and leaves its marks to the wide page. */
+  .panes > .dock { max-height: 87px; }
+  .panes > .insp:has(.insp-sel:not([hidden])) { max-height: 160px; }
+  .insp-sel .inspector-h { padding: 8px 14px; align-items: center; }
+  .insp-sel .inspector-h > div:first-child { flex-direction: row; align-items: baseline; gap: 8px; }
+  .insp-sel .inspector-h .inspector-sub { display: none; } /* Sy-03's card header is one line: what it is and which */
+  /* The records come right after the tape's head; the search and the jumps follow them. */
+  #tape-and-table { display: flex; flex-direction: column; gap: 8px; }
+  #tape-and-table > .secrow { order: 2; }
+  .insp[data-kind="message"] .insp-sel .inspector-b { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 10px 18px; padding: 10px 14px; }
+  .nbnote { display: none; } /* how the neighbours are counted waits for the wide page */
+  .neighbours { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .neighbours a.well { flex: none; }
+  .insp[data-kind="message"] .insp-sel .inspector-b > :not(:first-child):not(:nth-child(2)) { grid-column: 1 / -1; }
+  .tape-strip, .tape-foot { display: none; }
   .backrow { display: flex; }
   .idband { flex-wrap: wrap; }
   .crow { flex-wrap: wrap; }
@@ -979,7 +1013,16 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
 @media (max-width: 640px) {
   :root { --pad: 12px; }
   .topbar { gap: 10px; padding: 0 10px; }
-  .brand .sub, .brand-name, .tb-right .pill.live { display: none; } /* the endpoint is on the Cluster page */
+  .brand .sub, .brand-name { display: none; }
+  /* Sy-04's status: the dot alone (the address is its name, for a screen reader, and
+     its tooltip); when the broker is lost the pill says so in full. */
+  .tb-right .pill.live:not(.disconnected) { border: 0; background: none; padding: 0; height: auto; }
+  .tb-right .pill.live:not(.disconnected) .pill-addr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .backrow > .note, .backrow .back-wide { display: none; }
+  .backrow .back-narrow { display: inline; }
+  .backrow > a.btn { border: 0; background: none; padding: 0; height: auto; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 2px; }
+  #facts-newest { display: none; } /* Sy-04's sentence: partitions, messages, how long they are kept. */
+  .panes > .dock { display: none; } /* Sy-04 draws no wire on a phone; it is the wide page's. */
   .menu-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); color: var(--ink); cursor: pointer; flex: none; }
   .pg-title { display: block; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tb-palette { flex: none; width: auto; padding: 0 8px; }
@@ -992,8 +1035,10 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   :root[data-menu="open"] .rail .nav .nm, :root[data-menu="open"] .rail .nav .n { position: static; width: auto; height: auto; margin: 0; clip: auto; }
   :root[data-menu="open"] .rail .nav .n { margin-left: auto; }
   .tb-right .theme-seg { display: none; }
-  :root[data-menu="open"] .rail .rail-theme { display: inline-flex; flex: none; margin: 8px 0 0; align-self: flex-start; }
-  :root[data-menu="open"] .rail .rail-theme button { padding: 0 7px; }
+  :root[data-menu="open"] .rail .rail-theme { display: grid; grid-template-columns: 1fr 1fr; flex: none; margin: 8px 0 0; align-self: stretch; }
+  :root[data-menu="open"] .rail .rail-theme button { justify-content: center; padding: 0 6px; border-bottom: 1px solid var(--line); }
+  :root[data-menu="open"] .rail .rail-theme button:nth-child(2n) { border-right: 0; }
+  :root[data-menu="open"] .rail .rail-theme button:nth-child(n+3) { border-bottom: 0; }
   /* Messages are cards: the key and offset, the value, then when and from whom. */
   .tbl-wrap table.tbl thead { display: none; }
   .tbl-wrap table.tbl, .tbl-wrap table.tbl tbody { display: block; }
@@ -1005,7 +1050,19 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .tbl-wrap table.tbl td.cell-age { display: block; grid-column: 1 / -1; grid-row: 3; text-align: left; color: var(--mut); font-size: var(--fs-xs); }
   .tbl-wrap table.tbl td.cell-age::after { content: " ago"; }
   .tbl-wrap table.tbl td.cell-age:has(time[data-now])::after { content: none; }
-  .tbl-wrap table.tbl td.col-p { display: none; }
+  .tbl-wrap table.tbl tbody tr:not(.txnmark) td.col-p { display: none; } /* (the cell rule above is more specific than a bare td.col-p) */
+  /* Sy-04's cards: each record its own bordered card, the open one ringed in ink. */
+  .tbl-wrap:has(#messages-table) { border: 0; background: none; overflow: visible; }
+  #messages-table tbody tr:not(.txnmark) { margin-bottom: 8px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); padding: 10px 12px; gap: 4px 8px; }
+  #messages-table tbody tr.on:not(.txnmark) { border-color: var(--ink); }
+  /* A home's table: each row a card, its name first, then each value after its column's name. */
+  main .card > .r.h { display: none; }
+  main .card > .r:not(.h) { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 8px 12px; min-height: 0; }
+  main .card > .r:not(.h) > * { white-space: normal; overflow: visible; overflow-wrap: anywhere; min-width: 0; }
+  main .card > .r:not(.h) > :first-child { flex: 1 1 100%; font-weight: 600; }
+  main .card > .r:not(.h) > [data-l]::before { content: attr(data-l) " "; color: var(--mut); font-family: var(--sans); font-weight: 400; font-size: var(--fs-sm); }
+  main .card > .r:not(.h) > [data-l]:empty { display: none; }
+
   .tbl-wrap table.tbl td.cell-offset .p-inline { display: inline; }
   .tb-right .pill.live.disconnected { display: inline-flex; } /* ...but "not connected" is never hidden */
   .tb-right .pill.live.disconnected .pill-addr { display: none; }
@@ -1019,6 +1076,9 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
      stay pinned at the foot (the sheet's own padding is 14 at the foot). */
   .insp-sel { overflow: hidden; }
   .insp-sel .inspector-b { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 0; }
+  .insp[data-kind="message"] .insp-sel .inspector-b { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 0; } /* the sheet is a column, not 960's two */
+  .insp-sel .inspector-h { padding: 12px 16px 10px; align-items: flex-start; }
+  .insp-sel .inspector-h > div:first-child { flex-direction: column; align-items: stretch; gap: 4px; }
   .insp-sel .inspector-acts { position: sticky; bottom: 0; margin: auto -16px 0; padding: 10px 16px 14px; background: var(--card); border-top: 1px solid var(--line2); }
   /* Sy-04: the title is 15 px on its own row, then the action the width of the page with
      the menu beside it. */
@@ -1389,6 +1449,8 @@ html[data-connection-lost] #traffic-live .tf-story .r:not(.h) { opacity: .55; }
 html[data-connection-lost] #traffic-summary,
 html[data-connection-lost] .panes:has(#insp-default) > #inspector-panel:has(#inspector[hidden]) { display: none; }
 .keys .keys-lost { display: none; }
+.keys > .keys-w-narrow { display: none; }
+@media (max-width: 1100px) { .keys > .keys-w-wide { display: none; } .keys > .keys-w-narrow { display: inline; } }
 /* While the confirm is open the strip says what the keys do in it (Tp-24). */
 .keys .keys-dialog { display: none; }
 html[data-dialog] .keys > span { display: none; }

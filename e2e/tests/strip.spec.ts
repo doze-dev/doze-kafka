@@ -166,6 +166,19 @@ async function effect(page: Page, path: string, h: Hint) {
   throw new Error(`${where}: this spec does not know what "${h.label}" should do; add its effect`);
 }
 
+// Sy-03's strip at 1100 px and below.
+test('every key in the strip of a topic at 960 does what it says', async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 700 });
+  const path = 'topics/seed-orders';
+  await fresh(page, path);
+  const shown = await hints(page);
+  expect(shown.map((h) => h.label)).toEqual(['move', 'open', 'close', 'jump or act']);
+  for (const h of shown) {
+    await fresh(page, path);
+    await effect(page, path, h);
+  }
+});
+
 for (const path of PAGES) {
   test(`every key in the strip of /${path} does what it says`, async ({ page }) => {
     await fresh(page, path);

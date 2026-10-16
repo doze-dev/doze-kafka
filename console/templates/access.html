@@ -41,8 +41,8 @@
       {{range .ACLs}}
       <div class="r{{if eq .Permission "deny"}} denyrow{{end}}" tabindex="0" role="button" data-row data-inspector-open data-open-keys="acl:{{.Key}}"
         hx-get="{{prefix}}/inspect/acl?key={{urlquery .Key}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
-        <span class="m" title="{{.Principal}}">{{.Principal}}</span><span class="m">{{capital .Resource}}</span><span class="m" title="{{.Name}}">{{.Name}}</span><span class="m">{{.Pattern}}</span><span class="m">{{capital .Operation}}</span>
-        <span class="m {{if eq .Permission "deny"}}deny b{{else}}ok{{end}}">{{upper .Permission}}</span><span class="m">{{.Host}}</span>
+        <span class="m" title="{{.Principal}}">{{.Principal}}</span><span class="m" data-l="Type">{{capital .Resource}}</span><span class="m" title="{{.Name}}" data-l="Name">{{.Name}}</span><span class="m" data-l="Pattern">{{.Pattern}}</span><span class="m" data-l="Operation">{{capital .Operation}}</span>
+        <span class="m {{if eq .Permission "deny"}}deny b{{else}}ok{{end}}" data-l="Permission">{{upper .Permission}}</span><span class="m" data-l="Host">{{.Host}}</span>
       </div>
       {{end}}
     </div>

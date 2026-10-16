@@ -38,11 +38,11 @@
       {{range .Rows}}
       <a class="r" href="{{schemaURL .Name}}" data-row>
         <span class="m b">{{.Name}}</span>
-        <span class="m">{{.TypeShort}}</span>
-        <span class="m ra">{{.Versions}}</span>
-        <span class="m ra">{{.ID}}</span>
-        <span class="m {{if not .OwnLevel}}mut{{end}}">{{if .Level}}{{.Level}}{{if not .OwnLevel}} (global){{end}}{{else}}—{{end}}</span>
-        <span class="m el">{{if .Topic}}{{.Topic}}{{else}}<span class="mut">—</span>{{end}}</span>
+        <span class="m" data-l="Type">{{.TypeShort}}</span>
+        <span class="m ra" data-l="Versions">{{.Versions}}</span>
+        <span class="m ra" data-l="Latest id">{{.ID}}</span>
+        <span class="m {{if not .OwnLevel}}mut{{end}}" data-l="Level">{{if .Level}}{{.Level}}{{if not .OwnLevel}} (global){{end}}{{else}}—{{end}}</span>
+        <span class="m el" data-l="Topics using it">{{if .Topic}}{{.Topic}}{{else}}<span class="mut">—</span>{{end}}</span>
       </a>
       {{end}}
     </div>
@@ -90,7 +90,7 @@
 {{define "schema_detail"}}{{template "shell_top" .}}
   {{template "schema_lp" (dict "List" .List "Sel" .Sel)}}
   <main class="main" id="detail">
-    <div class="backrow"><a class="btn sm" href="{{prefix}}/schemas">‹ Schemas</a><span class="note">{{len .List}} subject{{if ne (len .List) 1}}s{{end}}, the list is one tap away</span></div>
+    <div class="backrow"><a class="btn sm" href="{{prefix}}/schemas">‹ <span class="back-wide">Schemas</span><span class="back-narrow">All subjects</span></a><span class="note">{{len .List}} subject{{if ne (len .List) 1}}s{{end}}, the list is one tap away</span></div>
     <div class="row sb ce idband">
       <div class="row ce g8 wrap"><h1 class="h1 m">{{.Subject}}</h1><span class="pill">{{.Cur.TypeLabel}}</span></div>
       <div class="row g8 ce idband-acts">

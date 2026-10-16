@@ -109,7 +109,13 @@ type keyHint struct {
 	// Only says when the hint is drawn: "" always, "live" while the broker answers,
 	// "lost" while it does not (the page's own state, an attribute on the document).
 	Only string
+	// Width says at which widths: "" all, "wide" above 1100 px (Sy-01's strip),
+	// "narrow" at 1100 and below (Sy-03's).
+	Width string
 }
+
+func wide(h keyHint) keyHint   { h.Width = "wide"; return h }
+func narrow(h keyHint) keyHint { h.Width = "narrow"; return h }
 
 var (
 	hintMove   = keyHint{Keys: []string{"j", "k"}, Label: "move"}
@@ -145,7 +151,9 @@ func pageHints(view string) []keyHint {
 	case "topics":
 		return []keyHint{hintMove, hintOpen, hintFilter, {Keys: []string{"c"}, Label: "create topic"}, hintJump}
 	case "topic":
-		return []keyHint{hintMove, hintOpen, hintClose, {Keys: []string{"g", "t"}, Label: "topics"}, {Keys: []string{"p"}, Label: "produce"}, hintHelp}
+		// Sy-01 at full width; Sy-03's four at 1100 px and below.
+		return []keyHint{hintMove, hintOpen, wide(hintClose), narrow(keyHint{Keys: []string{"esc"}, Label: "close"}),
+			wide(keyHint{Keys: []string{"g", "t"}, Label: "topics"}), wide(keyHint{Keys: []string{"p"}, Label: "produce"}), wide(hintHelp), narrow(hintJump)}
 	case "groups":
 		return []keyHint{hintMove, hintOpen, hintFilter, hintJump}
 	case "group":

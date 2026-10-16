@@ -22,7 +22,7 @@
   {{template "topic_lp" (dict "List" .List "Sel" "")}}
   <main class="main gap12" id="detail">
     <div class="row sb ce idband">
-      <div class="col"><h1 class="h1">Topics</h1><span class="note">{{if .Rows}}Nothing selected. Pick a topic on the left, or make one.{{else if .Facts.DataDir}}<span class="m">{{.Facts.DataDir}}</span> holds no topics.{{else}}This broker holds no topics.{{end}}</span></div>
+      <div class="col"><h1 class="h1">Topics</h1><span class="note">{{if .Rows}}Nothing selected. Pick a topic <span class="wide-only">on the left</span><span class="narrow-only">below</span>, or make one.{{else if .Facts.DataDir}}<span class="m">{{.Facts.DataDir}}</span> holds no topics.{{else}}This broker holds no topics.{{end}}</span></div>
       <div class="row g8 ce"><a class="btn pri" href="{{newTopicURL}}">Create topic</a></div>
     </div>
 
@@ -49,18 +49,18 @@
 
     {{/* Tp-Home's tracks. Size is the topic's files under the data directory, when the
          console is told where that is (it runs in the broker's process). */}}
-    <div class="card" id="topics-table" style="--c: {{if .HasSize}}1fr 70px 80px 78px 76px 150px 72px 230px{{else}}1fr 70px 80px 76px 150px 72px 230px{{end}}">
+    <div class="card{{if .HasSize}} sized{{end}}" id="topics-table">
       <div class="r h"><span>Topic</span><span class="ra">Partitions</span><span class="ra">Messages</span>{{if .HasSize}}<span class="ra">Size</span>{{end}}<span>Retention</span><span>Read by</span><span>Compact</span><span>Schema subject</span></div>
       {{range .Rows}}
       <a class="r" href="{{.URL}}" data-row>
         <span class="m b" title="{{.Name}}">{{.Name}}</span>
-        <span class="m ra">{{.Partitions}}</span>
-        <span class="m ra {{if .DeadLetter}}warn{{end}}">{{num .Msgs}}</span>
-        {{if $.HasSize}}<span class="m ra">{{diskSize .Size}}</span>{{end}}
-        <span class="m {{if eq .Retention "kept per key"}}mut{{end}}">{{if .Retention}}{{.Retention}}{{else}}<span class="mut">—</span>{{end}}</span>
-        <span class="m">{{if .ReadBy}}{{range $i, $g := .ReadBy}}{{if $i}}, {{end}}{{$g}}{{end}}{{else}}<span class="mut" title="Read by is the groups that have committed offsets on this topic. A consumer that assigns partitions itself has no group, so it is not counted.">no group has committed</span>{{end}}</span>
-        <span>{{if .Compact}}<span class="pill">compact</span>{{else}}<span class="mut">—</span>{{end}}</span>
-        <span class="m">{{if .Subject}}{{.Subject}}{{else}}<span class="mut">—</span>{{end}}</span>
+        <span class="m ra" data-l="Partitions">{{.Partitions}}</span>
+        <span class="m ra {{if .DeadLetter}}warn{{end}}" data-l="Messages">{{num .Msgs}}</span>
+        {{if $.HasSize}}<span class="m ra" data-l="Size">{{diskSize .Size}}</span>{{end}}
+        <span class="m {{if eq .Retention "kept per key"}}mut{{end}}" data-l="Retention">{{if .Retention}}{{.Retention}}{{else}}<span class="mut">—</span>{{end}}</span>
+        <span class="m" data-l="Read by">{{if .ReadBy}}{{range $i, $g := .ReadBy}}{{if $i}}, {{end}}{{$g}}{{end}}{{else}}<span class="mut" title="Read by is the groups that have committed offsets on this topic. A consumer that assigns partitions itself has no group, so it is not counted.">no group has committed</span>{{end}}</span>
+        <span data-l="Compact">{{if .Compact}}<span class="pill">compact</span>{{else}}<span class="mut">—</span>{{end}}</span>
+        <span class="m" data-l="Schema subject">{{if .Subject}}{{.Subject}}{{else}}<span class="mut">—</span>{{end}}</span>
       </a>
       {{end}}
     </div>
@@ -136,7 +136,7 @@
 {{define "topic_detail"}}{{template "shell_top" .}}
   {{template "topic_lp" (dict "List" .List "Sel" .Topic.Name)}}
   <main class="main workbench gap8" id="detail">
-    <div class="backrow"><a class="btn sm" href="{{.Prefix}}/topics">‹ Topics</a><span class="note">{{.ListCount}} topic{{if ne .ListCount 1}}s{{end}}, the list is one tap away</span></div>
+    <div class="backrow"><a class="btn sm" href="{{.Prefix}}/topics">‹ <span class="back-wide">Topics</span><span class="back-narrow">All topics</span></a><span class="note">{{.ListCount}} topic{{if ne .ListCount 1}}s{{end}}, the list is one tap away</span></div>
 
     <div class="row sb ce idband">
       <h1 class="h1 m">{{.Topic.Name}}</h1>
@@ -326,7 +326,7 @@
           <td colspan="3" class="txnmark-l"title="A commit or abort ends a transaction here. It takes an offset and is not a record.">transaction marker</td>
         </tr>
         {{else}}
-        <tr id="{{if $.Search}}hit-{{.Partition}}-{{.Offset}}{{else}}msg-{{.Offset}}{{end}}" class="{{if and (not $.Search) (eq .Offset $.HL)}}hl{{end}}{{if .Txn}} txn-{{.Txn}}{{end}}" {{if and (not $.Search) (eq .Offset $.HL)}}data-hl{{end}} tabindex="0" role="button" data-inspector-open hx-get="{{topicURL $.Topic.Name}}/message?partition={{.Partition}}&offset={{.Offset}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
+        <tr id="{{if $.Search}}hit-{{.Partition}}-{{.Offset}}{{else}}msg-{{.Offset}}{{end}}" class="{{if and (not $.Search) (eq .Offset $.HL)}}hl{{end}}{{if .Txn}} txn-{{.Txn}}{{end}}" {{if and (not $.Search) (eq .Offset $.HL)}}data-hl{{end}} tabindex="0" role="button" data-inspector-open{{if not $.Search}} data-open-keys="{{.Offset}}"{{end}} hx-get="{{topicURL $.Topic.Name}}/message?partition={{.Partition}}&offset={{.Offset}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
           <td class="m col-p">{{.Partition}}</td>
           <td class="cell-offset"><span class="p-inline">p{{.Partition}} · </span>{{num .Offset}}</td>
           <td class="cell-key {{if or .Key.Null .Key.Empty}}none{{end}}" title="{{if .Key.Null}}null key{{else}}{{.Key.Preview}} · {{.Key.SizeText}}{{end}}">{{if .Key.Null}}no key{{else}}{{.Key.Preview}}{{end}}</td>

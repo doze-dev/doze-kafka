@@ -10,7 +10,7 @@
       <div class="row g8 ce"><button type="button" class="btn pri" id="copy-all" data-copy="{{range .Facts.Properties}}{{.}}&#10;{{end}}">Copy all settings</button></div>
     </div>
 
-    <div class="card pad" id="connect-summary">This broker is at <span class="m b">{{.Facts.Bootstrap}}</span>{{if .Facts.SASL}} with <span class="m b">SASL {{range $i, $m := .Facts.Mechanisms}}{{if $i}} or {{end}}{{$m}}{{end}}</span>{{else}} with no authentication{{end}}, {{if .Facts.TLS}}over TLS{{else}}no TLS{{end}}{{if .Facts.Registry}}, the registry at <span class="m b">{{.Facts.Registry}}</span>{{end}}. A client in the same shell can skip all of it: <span class="m b">eval "$(doze-kafka env)"</span> sets <span class="m">KAFKA_BOOTSTRAP_SERVERS</span> and <span class="m">KAFKA_BROKERS</span>.</div>
+    <div class="card pad" id="connect-summary">This broker is at <span class="m b">{{.Facts.Bootstrap}}</span>{{if .Facts.SASL}} with <span class="m b">SASL {{range $i, $m := .Facts.Mechanisms}}{{if $i}} or {{end}}{{$m}}{{end}}</span>{{else}} with no authentication{{end}}, {{if .Facts.TLS}}over TLS{{else}}no TLS{{end}}{{if .Facts.Registry}}, the registry at <span class="m b">{{.Facts.Registry}}</span>{{if .Facts.SASL}} (it asks for the same user and password, as HTTP basic authentication){{end}}{{end}}. {{if .Facts.SASL}}A client in the same shell gets the addresses from <span class="m b">eval "$(doze-kafka env)"</span>, which sets {{template "envnames" .Facts.EnvNames}}; its user and password are not printed there, and are the client's to set.{{else}}A client in the same shell can skip all of it: <span class="m b">eval "$(doze-kafka env)"</span> sets {{template "envnames" .Facts.EnvNames}}.{{end}}</div>
 
     <div class="card" id="connect-settings" style="--c: 190px 1fr 90px">
       <div class="r h"><span>Setting</span><span>Value</span><span class="ra"></span></div>
@@ -20,15 +20,17 @@
     </div>
 
     <div class="row g12 snippets">
-      <div class="col g8 grow"><span class="cap">Environment</span><pre class="code">{{range .Facts.Env}}{{.}}
+      <div class="col g8 grow"><span class="cap" id="env-l">Environment</span><pre class="code" tabindex="0" aria-labelledby="env-l">{{range .Facts.Env}}{{.}}
 {{end}}</pre></div>
-      <div class="col g8 grow"><span class="cap">client.properties</span><pre class="code">{{range .Facts.Properties}}{{.}}
+      <div class="col g8 grow"><span class="cap" id="props-l">client.properties</span><pre class="code" tabindex="0" aria-labelledby="props-l">{{range .Facts.Properties}}{{.}}
 {{end}}</pre></div>
     </div>
 
     <div class="callout"><span class="b">Two things that catch people</span><span class="note">Clients reconnect to the <span class="b">advertised</span> address, not the bootstrap one: from a container, that address has to be one the container can reach (<span class="m">--advertised-host</span>). And {{if .Facts.SASL}}with SASL on, every client must be configured to match or it will not get past the handshake.{{else}}if you turn SASL or TLS on later, every client must be configured to match or it will not get past the handshake.{{end}}</span></div>
   </main>
 {{template "shell_bottom" .}}{{end}}
+
+{{define "envnames"}}{{range $i, $n := .}}{{if $i}}{{if eq (add $i 1) (len $)}} and {{else}}, {{end}}{{end}}<span class="m">{{$n}}</span>{{end}}{{end}}
 
 {{/* Sy-08: a broker with nothing in it and no one talking to it. Three steps, each a
      command that is real for this broker. */}}
