@@ -34,7 +34,11 @@ func start(t *testing.T, flags ...string) (out *safeBuf, stop func() error) {
 	out = &safeBuf{}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
-	go func() { done <- run(ctx, st, newLogger(st.cfg, out), out) }()
+	logger := newLogger(st.cfg, out)
+	for _, n := range st.notices { // as realMain does, before anything starts.
+		logger.Warn(n)
+	}
+	go func() { done <- run(ctx, st, logger, out) }()
 	var once sync.Once
 	var result error
 	stop = func() error {

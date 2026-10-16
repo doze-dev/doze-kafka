@@ -35,6 +35,7 @@ Where it listens:
 | `--listen` | `127.0.0.1:8081` |
 | `--schema-registry-addr host:port` | wherever you say |
 | `--schema-registry=false` | not served |
+| With `--tls-cert` and `--tls-key` | the same address over `https://`; by name, `https://kafka.<name>.doze:8081` |
 
 A taken port is an error naming `--schema-registry-addr`, not a registry that quietly is
 not there. In a container, publish the port and listen on every interface
@@ -43,6 +44,12 @@ not there. In a container, publish the port and listen on every interface
 With SASL enabled (see [Auth and TLS](auth-and-tls.md)) the registry requires the same
 user names and passwords as HTTP basic authentication; a client sets
 `basic.auth.credentials.source=USER_INFO` and `basic.auth.user.info=user:password`.
+
+When the broker has a TLS certificate the registry is served over HTTPS with the same
+one, so `schema.registry.url` is `https://...` and the client has to trust the
+certificate, as it does for the broker (`curl --cacert cert.pem`).
+`--schema-registry-tls=false` keeps it plain HTTP.
+[What SASL and TLS cover](auth-and-tls.md#what-sasl-and-tls-cover) has the details.
 
 ## What it does
 
@@ -129,6 +136,8 @@ Deliberately, and each is pinned by a test:
   mode, not on `localhost`. Use the address the startup summary prints, or
   `doze-kafka env`.
 - *`401 Unauthorized`*: SASL is on; send the same credentials as HTTP basic auth.
+- *`400 Client sent an HTTP request to an HTTPS server`*: the broker has a TLS
+  certificate, so the registry is on `https://`. Use the URL the start-up summary prints.
 - *`409` on register*: the schema is incompatible with an earlier version at the level in
   force. `?verbose=true` on the compatibility check says why; `PUT /config/{subject}`
   `{"compatibility":"NONE"}` turns checking off for a subject.

@@ -82,6 +82,9 @@ type Options struct {
 	// RegistryUser and RegistryPass are HTTP basic credentials for the registry, when
 	// it requires them.
 	RegistryUser, RegistryPass string
+	// RegistryTLS, if set, is the trust configuration for a registry served over
+	// https. Nil, an https RegistryURL is verified against the system's roots.
+	RegistryTLS *tls.Config
 	// Traffic is what the broker remembers of its clients' requests and its groups'
 	// membership changes. Nil, the Traffic section is not offered: the console cannot
 	// see the wire of a broker it is not part of.
@@ -158,7 +161,7 @@ func New(opts Options) (*Console, error) {
 		return nil, err
 	}
 	c.be = be
-	c.reg = newRegistryClient(opts.RegistryURL, opts.RegistryUser, opts.RegistryPass)
+	c.reg = newRegistryClient(opts.RegistryURL, opts.RegistryUser, opts.RegistryPass, opts.RegistryTLS)
 	c.traffic = opts.Traffic
 	c.metrics = opts.ClientMetrics
 	c.traceHeader = strings.TrimSpace(opts.TraceHeader)

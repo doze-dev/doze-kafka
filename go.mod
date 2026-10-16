@@ -17,6 +17,7 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/twmb/franz-go v1.22.1
 	github.com/twmb/franz-go/pkg/kmsg v1.14.0
+	github.com/twmb/franz-go/pkg/sr v1.8.0
 	go.etcd.io/bbolt v1.5.0
 	golang.org/x/term v0.46.0
 	google.golang.org/protobuf v1.36.12

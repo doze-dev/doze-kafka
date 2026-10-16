@@ -293,7 +293,8 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 	// The registry starts first: the console shows what is in it.
 	registryForConsole := ""
 	if cfg.SchemaRegistry {
-		if cfg.SchemaRegistryAddr == "" {
+		besideTheName := cfg.SchemaRegistryAddr == ""
+		if besideTheName {
 			cfg.SchemaRegistryAddr = registryAddrFor(z.ip())
 		}
 		closeRegistry, registryAddr, err := startRegistry(ctx, cfg, srv, logger)
@@ -301,12 +302,16 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 			return err
 		}
 		defer closeRegistry()
-		ready.registryURL = z.routeRegistry(logger, cfg.InstanceName(), registryAddr)
-		if ready.registryURL == "" {
-			ready.registryURL = httpURL(registryAddr)
+		if cfg.RegistryTLS() {
+			ready.registryURL = registryTLSURL(besideTheName && cfg.ByName(), bind.host, registryAddr)
+		} else {
+			ready.registryURL = z.routeRegistry(logger, cfg.InstanceName(), registryAddr)
+			if ready.registryURL == "" {
+				ready.registryURL = httpURL(registryAddr)
+			}
 		}
 		// The console reaches the registry directly, on the address it bound.
-		registryForConsole = httpURL(registryAddr)
+		registryForConsole = urlFor(registryScheme(cfg), registryAddr)
 	}
 
 	if cfg.Console {
@@ -397,15 +402,18 @@ func announce(out io.Writer, logger *slog.Logger, cfg config.Config, r readyInfo
 // httpURL is the URL to open for an HTTP listener at addr. A wildcard listener's own
 // address ("[::]:8081") is where it listens, not somewhere to browse to; for that the
 // URL names localhost.
-func httpURL(addr string) string {
+func httpURL(addr string) string { return urlFor("http", addr) }
+
+// urlFor is httpURL for a listener that may be serving TLS.
+func urlFor(scheme, addr string) string {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
-		return "http://" + addr
+		return scheme + "://" + addr
 	}
 	if ip := net.ParseIP(host); host == "" || (ip != nil && ip.IsUnspecified()) {
 		host = "localhost"
 	}
-	return "http://" + net.JoinHostPort(host, port)
+	return scheme + "://" + net.JoinHostPort(host, port)
 }
 
 // dialable is the bound address as something to paste into a client. A wildcard
@@ -485,13 +493,18 @@ func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger
 		return nil, "", err
 	}
 
-	var tlsCfg *tls.Config
+	var tlsCfg, registryTLS *tls.Config
 	if cfg.TLSEnabled() {
 		serverTLS, err := cfg.TLSConfig()
 		if err != nil {
 			return nil, "", err
 		}
 		tlsCfg = consoleClientTLS(serverTLS)
+		if cfg.RegistryTLS() {
+			// The registry presents the same certificate, and the console trusts it
+			// the same way: that one certificate, whatever host it names.
+			registryTLS = consoleClientTLS(serverTLS)
+		}
 	}
 
 	ln, err := zoneListen(cfg.ConsoleAddr)
@@ -503,7 +516,7 @@ func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger
 		Addr: dialAddr, SASLUser: user, SASLPass: pass, SASLMechanism: mech, TLSConfig: tlsCfg,
 		AllowedHosts: consoleHosts(cfg), Prefix: cfg.ConsolePrefix,
 		// With SASL the console reaches the registry as the same user it reaches the broker.
-		RegistryURL: registryURL, RegistryUser: user, RegistryPass: pass,
+		RegistryURL: registryURL, RegistryUser: user, RegistryPass: pass, RegistryTLS: registryTLS,
 		Traffic: traffic, TraceHeader: cfg.TraceHeader, ClientMetrics: clientMetrics,
 		Facts: console.BrokerFacts{
 			Workspace: workspaceLabel(cfg.InstanceName()), KafkaMajor: cfg.Version,

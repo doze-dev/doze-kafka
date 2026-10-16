@@ -6,6 +6,20 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- The schema registry is served over TLS when the broker is: with `--tls-cert` and
+  `--tls-key` it answers `https://` with the same certificate (it stayed plain HTTP
+  before, so `schema.registry.url=https://...` failed and basic-auth passwords crossed in
+  the clear beside an encrypted broker). The summary and `doze-kafka env` print the
+  `https://` URL; by name that is `https://kafka.<name>.doze:8081`.
+  `--schema-registry-tls=false` (`schema-registry-tls`) keeps it plain HTTP, with a
+  warning at start-up when it is then reachable from other machines. **If you run with
+  a certificate, change `http://` to `https://` in your registry URL.**
+- With SASL or TLS on, a console address beyond loopback is refused at start-up (exit
+  2): the console has no login, is plain HTTP and acts as a super user.
+  `--console-unprotected` (`console-unprotected`) accepts it, with a warning.
+  [What SASL and TLS cover](docs/auth-and-tls.md#what-sasl-and-tls-cover) says what
+  each setting reaches.
+
 - Console: every button reads weight 400 whether it is a button or a link drawn as one (the
   boards draw them all as buttons). A request that took under a millisecond shows its
   measured time (`42 µs`, `0.4 ms`) rather than the design boards' `0 ms`: a broker

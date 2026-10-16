@@ -131,7 +131,7 @@ where this one says `kafka-version`; that spelling is still read.
 |---|---|---|
 | `--sasl-mechanisms` | *(none)* | Comma-separated SASL mechanisms to require: `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`. Enabling any turns SASL on. A flag replaces the file's list. |
 | `--sasl-user` | *(none)* | A `user:password` credential. Repeatable. Needs `--sasl-mechanisms`: users without a mechanism are an error, not silently ignored. |
-| `--tls-cert` | *(none)* | PEM certificate file. With `--tls-key`, terminates TLS on the listener. |
+| `--tls-cert` | *(none)* | PEM certificate file. With `--tls-key`, terminates TLS on the Kafka listener and on the schema registry (see `--schema-registry-tls`). The console stays plain HTTP. |
 | `--tls-key` | *(none)* | PEM private key file. |
 | `--acl-default` | `allow` | What a resource with no ACL allows: `allow`, or `deny` (Kafka's own default). ACLs you create are enforced either way. See [Authorization](authorization.md). |
 | `--acl-super-user` | *(none)* | A principal ACLs never refuse, as `User:admin`. Repeatable. |
@@ -144,6 +144,7 @@ where this one says `kafka-version`; that spelling is still read.
 | `--console-addr` | *beside the broker* | `host:port` for the console's HTTP listener. Unset, it is port 9093 on the name's own address (and `http://kafka.<name>.doze`, port-less, through the shared front door); under `--listen`, `127.0.0.1:9093`. A taken port is an error naming this flag. |
 | `--console-prefix` | `/_console` | The URL path the console is served under, for a reverse proxy that mounts it below a path of its own. `/` serves it at the root of its port. |
 | `--console-allow-host` | *(none)* | Extra Host names the console answers to, besides `localhost`, IP addresses and `*.doze`. Comma-separated or repeated. A guard against DNS rebinding. |
+| `--console-unprotected` | `false` | Serve the console beyond loopback although SASL or TLS is on. The console has no login, is plain HTTP and, with SASL, acts as a super user, so without this flag that combination is refused at start-up. With it, a warning says what is open. See [What SASL and TLS cover](auth-and-tls.md#what-sasl-and-tls-cover). |
 | `--trace-header` | *(none)* | A record header whose whole value is a trace id (a request or correlation id). The console's **Follow this trace** looks for it in addition to W3C `traceparent` and B3. See [Observability](observability.md). |
 
 ### Schema registry (see [Schema Registry](schema-registry.md))
@@ -152,6 +153,7 @@ where this one says `kafka-version`; that spelling is still read.
 |---|---|---|
 | `--schema-registry` | `true` | Serve the built-in Confluent-compatible schema registry. `--schema-registry=false` to turn it off. |
 | `--schema-registry-addr` | *beside the broker* | `host:port` for the registry's HTTP listener. Unset, it is port 8081 on the name's own address (and `http://schema.<name>.doze`, port-less, through the shared front door); under `--listen`, `127.0.0.1:8081`. A taken port is an error naming this flag. |
+| `--schema-registry-tls` | `true` | Serve the registry over HTTPS, with the broker's certificate, when `--tls-cert` and `--tls-key` are set; without them it changes nothing. `--schema-registry-tls=false` keeps the registry plain HTTP beside a TLS broker, and warns at start-up if it is then on an address other machines can reach. |
 
 ### Process
 

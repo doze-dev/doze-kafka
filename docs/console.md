@@ -250,8 +250,12 @@ Times are shown in your browser's zone, with the zone and the UTC instant on hov
   your browser from reaching it through DNS rebinding or a forged form.
 - `DOZE_KAFKA_CONSOLE_PREFIX` mounts it somewhere other than `/_console` (behind a
   reverse proxy, or to prove in a test that nothing assumes the default).
-- It is plain HTTP with no login of its own. Bind it beyond loopback only on a
-  network you trust.
+- It is plain HTTP with no login of its own, and with SASL on it acts on the broker as
+  a super user. It listens on loopback. With SASL or TLS on, a `--console-addr` beyond
+  loopback is refused at start-up unless `--console-unprotected` accepts it; what to
+  put in front of it instead is in
+  [What SASL and TLS cover](auth-and-tls.md#what-sasl-and-tls-cover). Without either,
+  bind it beyond loopback only on a network you trust.
 
 ## Errors
 

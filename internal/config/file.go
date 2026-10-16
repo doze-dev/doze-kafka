@@ -47,11 +47,13 @@ type fileConfig struct {
 	ConsoleAddr            *string           `toml:"console-addr"`
 	ConsolePrefix          *string           `toml:"console-prefix"`
 	ConsoleAllowHost       []string          `toml:"console-allow-host"`
+	ConsoleUnprotected     *bool             `toml:"console-unprotected"`
 	TraceHeader            *string           `toml:"trace-header"`
 	ClientTelemetry        *bool             `toml:"client-telemetry"`
 	Zone                   *bool             `toml:"zone"`
 	SchemaRegistry         *bool             `toml:"schema-registry"`
 	SchemaRegistryAddr     *string           `toml:"schema-registry-addr"`
+	SchemaRegistryTLS      *bool             `toml:"schema-registry-tls"`
 	PprofAddr              *string           `toml:"pprof-addr"`
 	Name                   *string           `toml:"name"`
 	LogLevel               *string           `toml:"log-level"`
@@ -175,6 +177,12 @@ func (fc fileConfig) applyTo(cfg *Config) error {
 	if fc.SchemaRegistryAddr != nil {
 		cfg.SchemaRegistryAddr = *fc.SchemaRegistryAddr
 	}
+	if fc.SchemaRegistryTLS != nil {
+		cfg.SchemaRegistryTLS = *fc.SchemaRegistryTLS
+	}
+	if fc.ConsoleUnprotected != nil {
+		cfg.ConsoleUnprotected = *fc.ConsoleUnprotected
+	}
 	if fc.ClientTelemetry != nil {
 		cfg.ClientTelemetry = *fc.ClientTelemetry
 	}
@@ -253,6 +261,8 @@ func writeTOML(w io.Writer, cfg Config, secrets bool) error {
 		Zone:                   &cfg.Zone,
 		SchemaRegistry:         &cfg.SchemaRegistry,
 		SchemaRegistryAddr:     &cfg.SchemaRegistryAddr,
+		SchemaRegistryTLS:      &cfg.SchemaRegistryTLS,
+		ConsoleUnprotected:     &cfg.ConsoleUnprotected,
 		Name:                   &cfg.Name,
 		LogLevel:               &cfg.LogLevel,
 		LogFormat:              &cfg.LogFormat,
