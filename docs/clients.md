@@ -30,18 +30,19 @@ topic IDs, modern versions, both group protocols) and [Sarama](https://github.co
 
 **The compatibility matrix** (`compat/`, see its [README](../compat/README.md)) runs real
 clients and frameworks against the built binary, each **twice: with no authentication, and
-over SASL/SCRAM-SHA-512 and TLS**:
+over SASL/SCRAM-SHA-512 and TLS**. The versions are the ones the cells pin (`compat/java/pom.xml`,
+`compat/spring/pom.xml`, `compat/kafkajs/package.json`, `compat/versions.env`):
 
 | Client | Version tested | What it does against the broker |
 |---|---|---|
 | Apache Kafka **Java** client | 4.3.1 | admin (create with config, describe, alter configs, add partitions, delete records, list, delete topics and groups), `offsetsForTimes`, idempotent and transactional producers, `read_committed` and `read_uncommitted`, consume-transform-produce with offsets in the transaction, classic groups and `group.protocol=consumer` |
 | **Kafka Streams** | 4.3.1 | a word count with `exactly_once_v2`; its repartition and compacted changelog topics; a new instance restoring its state from the changelog |
-| **Spring Kafka** | Spring Boot 3.4 | `KafkaAdmin` creating `NewTopic` beans and growing one; a transactional `@KafkaListener` whose aborted delivery is redelivered with exactly-once output |
-| **confluent-kafka** (Python, librdkafka) | 2.16 | admin, idempotent producer, groups that commit and resume, `group.protocol=consumer`, transactions |
-| **kcat** (librdkafka) | 1.7 / 2.15 | metadata, keys and headers, a group that resumes |
-| **KafkaJS** | 2.2 | admin, idempotent producer, group consume and commit |
+| **Spring Kafka** | Spring Boot 3.4.4 | `KafkaAdmin` creating `NewTopic` beans and growing one; a transactional `@KafkaListener` whose aborted delivery is redelivered with exactly-once output |
+| **confluent-kafka** (Python, librdkafka) | 2.16.0 | admin, idempotent producer, groups that commit and resume, `group.protocol=consumer`, transactions |
+| **kcat** (librdkafka) | as installed (the run prints it; kcat 1.7.0 with librdkafka 2.15.1 here, apt's in CI) | metadata, keys and headers, a group that resumes |
+| **KafkaJS** | 2.2.4 | admin, idempotent producer, group consume and commit |
 
-Confluent's Java Avro, Protobuf and JSON Schema serializers (8.3) and confluent-kafka's Avro,
+Confluent's Java Avro, Protobuf and JSON Schema serializers (8.3.2) and confluent-kafka's Avro,
 Protobuf and JSON Schema serializers also run, against the [built-in registry](schema-registry.md).
 See [Frameworks and tools](frameworks.md) for Streams, Spring, Connect, schema registries
 and the UIs.

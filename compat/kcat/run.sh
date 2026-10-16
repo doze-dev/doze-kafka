@@ -8,6 +8,8 @@ A=(-b "$BOOTSTRAP" -X client.id=compat-kcat)
 if [ "$SECURITY" = scram-tls ]; then
   A+=(-X security.protocol=SASL_SSL -X sasl.mechanism="$SASL_MECHANISM" -X sasl.username="$SASL_USER" -X sasl.password="$SASL_PASS" -X ssl.ca.location="$CA_CERT")
 fi
+# kcat is the one installed (apt's in CI), not a pinned version: say which ran.
+echo "ok   kcat $("$KCAT" -V 2>&1 | sed -n 's/^Version \([^ ]*\) .*librdkafka \([^ ]*\).*/\1, librdkafka \2/p')"
 T=kcat-$RANDOM
 "$KCAT" "${A[@]}" -L -t "$T" 2>&1 | grep -q "broker" || { echo "FAIL metadata"; exit 1; }
 printf 'k1:one\nk2:two\nk3:three\n' | "$KCAT" "${A[@]}" -P -t "$T" -K: -H trace=abc 2>&1 | grep -v -E "^%[0-9]" || true
