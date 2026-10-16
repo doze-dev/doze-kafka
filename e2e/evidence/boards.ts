@@ -47,13 +47,13 @@ export const BOARDS: BoardDef[] = [
 
   // Stage 2: Traffic.
   { id: 'Main', stage: 'stage-2', file: 'Main', state: 'Traffic, live, nothing open', sizes: ['1440', '390'], verdict: `${D} (AD4 to AD6, AD14; Request 130, Client/Topic/Detail share the rest beside the inspector)` },
-  { id: 'Traf-02', stage: 'stage-2', file: 'Traf-02-Filter', state: 'filtered to a topic, with "Who touched"', sizes: ['1440'], verdict: M },
+  { id: 'Traf-02', stage: 'stage-2', file: 'Traf-02-Filter', state: 'filtered to a topic, with "Who touched"', sizes: ['1440'], verdict: `${D} (Main's columns and colours; the line under the table says what a filter looks at)` },
   { id: 'Traf-03', stage: 'stage-2', file: 'Traf-03-Errors', state: 'errors only, the most frequent refusal explained', sizes: ['1440'], verdict: `${D} (refusals purple, headline wording)` },
   { id: 'Traf-04', stage: 'stage-2', file: 'Traf-04-Request', state: 'a Produce request open, its decoded fields', sizes: ['1440'], verdict: `${D} (field names in snake case)` },
   { id: 'Traf-05', stage: 'stage-2', file: 'Traf-05-Folded', state: 'a folded heartbeat row open, its ticks', sizes: ['1440'], verdict: `${D} (latest generation, last 64 repeats)` },
   { id: 'Traf-06', stage: 'stage-2', file: 'Traf-06-Clients', state: 'the Clients view, nothing open', sizes: ['1440', '390'], verdict: `${D} (built from CUT; see the table)` },
   { id: 'Traf-07', stage: 'stage-2', file: 'Traf-07-Client', state: 'a client that reports metrics, open', sizes: ['1440'], verdict: `${D} (labels, line not bars, "worth a look" only when non-zero)` },
-  { id: 'Traf-08', stage: 'stage-2', file: 'Traf-08-Paused', state: 'paused, with the count of requests missed', sizes: ['1440'], verdict: M },
+  { id: 'Traf-08', stage: 'stage-2', file: 'Traf-08-Paused', state: 'paused, with the count of requests missed', sizes: ['1440'], verdict: `${D} (Main's columns and colours; the count comes from the broker; the head has a close control)` },
   { id: 'Traf-09', stage: 'stage-2', file: 'Traf-09-Empty', state: 'a broker nothing has asked anything of', sizes: ['1440'], verdict: `${D} (adds start time and the restart sentence)` },
   { id: 'Traf-10', stage: 'stage-2', file: 'Traf-10-Disconnected', state: 'the broker killed under an open page: rows frozen', sizes: ['1440'], verdict: `${D} (no link to Bad-Down; retry every 5 s)` },
   { id: 'Traf-11', stage: 'stage-2', file: 'Traf-11-Metrics-None', state: 'a client that reports no metrics, open', sizes: ['1440'], verdict: `${D} ("asked and got none" is false)` },

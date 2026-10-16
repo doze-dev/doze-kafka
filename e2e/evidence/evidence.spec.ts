@@ -119,30 +119,30 @@ const DRIVERS: Record<string, (page: Page, size: Size) => Promise<void>> = {
     await p.getByRole('button', { name: 'Purge' }).first().click();
     await expect(p.locator('#confirm')).toBeVisible();
   },
-  Main: async (p) => { await open(p, 'traffic'); await expect(p.locator('#traffic-table tbody tr').first()).toBeVisible(); },
+  Main: async (p) => { await open(p, 'traffic'); await expect(p.locator('#traffic-table .tf-rows > .r[data-row]').first()).toBeVisible(); },
   'Traf-02': async (p) => { await open(p, 'traffic?topic=seed-orders'); await expect(p.locator('#touched')).toBeVisible(); },
   'Traf-03': async (p) => { await open(p, 'traffic?kind=errors'); await expect(p.locator('#error-summary')).toBeVisible(); },
   'Traf-04': async (p) => {
     await open(p, 'traffic?kind=produce&topic=seed-orders');
-    await p.locator('#traffic-table tbody tr').first().click();
+    await p.locator('#traffic-table .tf-rows > .r[data-row]').first().click();
     await expect(p.locator('#request-inspector')).toBeVisible();
   },
   'Traf-05': async (p) => {
     await open(p, `traffic?q=${GROUP}&kind=groups`);
-    const folded = p.locator('#traffic-table tbody tr', { hasText: 'Heartbeat' }).filter({ hasText: /×\d+/ }).first();
+    const folded = p.locator('#traffic-table .tf-rows > .r[data-row]', { hasText: 'Heartbeat' }).filter({ hasText: /×\d+/ }).first();
     await expect(folded).toBeVisible({ timeout: 30_000 });
     await folded.click();
     await expect(p.locator('#fold-ticks')).toBeVisible();
   },
-  'Traf-06': async (p) => { await open(p, 'traffic?view=clients'); await expect(p.locator('#clients-table tbody tr').first()).toBeVisible(); },
+  'Traf-06': async (p) => { await open(p, 'traffic?view=clients'); await expect(p.locator('#clients-table .tf-rows > .r[data-row]').first()).toBeVisible(); },
   'Traf-07': async (p) => {
     await open(p, 'traffic?view=clients');
-    const row = p.locator('#clients-table tbody tr', { hasText: CLIENT }).first();
+    const row = p.locator('#clients-table .tf-rows > .r[data-row]', { hasText: CLIENT }).first();
     await expect(row).toBeVisible();
     await expect(async () => {
       await p.keyboard.press('Escape');
       await row.click();
-      await expect(p.locator('#client-inspector .metric-list.worth')).toBeVisible({ timeout: 2_000 });
+      await expect(p.locator('#client-inspector .well.tf-metrics')).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 40_000, intervals: [1_000] });
   },
   'Traf-08': async (p) => {
@@ -155,14 +155,14 @@ const DRIVERS: Record<string, (page: Page, size: Size) => Promise<void>> = {
   },
   'Traf-11': async (p) => {
     await open(p, 'traffic?view=clients');
-    const row = p.locator('#clients-table tbody tr', { hasText: QUIET }).first();
+    const row = p.locator('#clients-table .tf-rows > .r[data-row]', { hasText: QUIET }).first();
     await expect(row).toBeVisible();
     await row.click();
     await expect(p.locator('#no-metrics')).toBeVisible();
   },
   'Traf-12': async (p) => {
     await open(p, `traffic?group=${GROUP}&kind=groups`);
-    await expect(p.locator('#traffic-story .r.rebalance').first()).toBeVisible();
+    await expect(p.locator('#traffic-story .tf-rebalance').first()).toBeVisible();
   },
 };
 
@@ -277,7 +277,7 @@ test('Traf-10: the broker killed under open pages: rows frozen', async ({ browse
       await ctx.addInitScript((t) => { try { localStorage.setItem('theme', t); } catch { /* none */ } }, theme);
       const page = await ctx.newPage();
       await open(page, 'traffic');
-      await expect(page.locator('#traffic-table tbody tr').first()).toBeVisible({ timeout: 20_000 });
+      await expect(page.locator('#traffic-table .tf-rows > .r[data-row]').first()).toBeVisible({ timeout: 20_000 });
       pages.push({ page, size, theme, close: () => ctx.close() });
     }
   }
