@@ -33,18 +33,24 @@ everything under the current directory in `./data`: the partition logs, and
 ./doze-kafka
 ```
 
-You'll see it come up, with everything you need to connect:
+You'll see it come up, with everything you need to connect (the `time=` and `level=`
+lines are the log, on stderr; the block between them is the summary, on stdout):
 
 ```text
+time=2026-10-16T16:12:14.687+01:00 level=INFO msg=doze-kafka version=dev kafka_compat=4
+
   doze-kafka is up.
 
     kafka     kafka.project.doze:9092
     console   http://kafka.project.doze   topics, messages and consumer groups, live
+    registry  http://schema.project.doze   Confluent-compatible schema registry
     data      /home/you/project/data
     serving   Kafka 4 protocol · no auth · plaintext
 
     eval "$(doze-kafka env)" point this shell at it
     doze-kafka doctor        when something looks wrong
+
+time=2026-10-16T16:12:14.721+01:00 level=INFO msg=listening addr=127.0.0.2:9092
 ```
 
 The first time, if `.doze` names are not set up on the machine, it asks once

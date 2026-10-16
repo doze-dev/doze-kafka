@@ -238,6 +238,7 @@ Once everything is bound — and only then — doze-kafka prints where it is:
 
     kafka     kafka.project.doze:9092
     console   http://kafka.project.doze   topics, messages and consumer groups, live
+    registry  http://schema.project.doze   Confluent-compatible schema registry
     data      /home/you/project/data
     serving   Kafka 4 protocol · no auth · plaintext
 
@@ -246,7 +247,10 @@ Once everything is bound — and only then — doze-kafka prints where it is:
 ```
 
 The summary goes to **stdout** and the log lines to stderr, so `doze-kafka 2>/dev/null`
-shows just the summary. The kafka line is the name, or the address where the name does not
+shows just the summary. Under `--listen` its last lines are `point this shell at it:`
+and the whole `eval "$(doze-kafka env --listen … --config '')"` command, carrying this
+broker's bound addresses, since a bare `doze-kafka env` knows only its own flags and
+`doze-kafka.toml`. The kafka line is the name, or the address where the name does not
 resolve on this machine. With `--listen :9092` it gives the advertised address
 (`localhost:9092`) and notes that the broker is listening on every interface, since
 `[::]:9092` is not something to paste into a client. Ctrl-C, `SIGTERM` and closing the terminal (`SIGHUP`) all stop the
