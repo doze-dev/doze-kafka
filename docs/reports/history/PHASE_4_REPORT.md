@@ -9,7 +9,7 @@ restart; two consumers in one group split partitions.
 
 In the classic protocol the broker is a **rendezvous point, not an assignor** — the
 elected client leader runs the assignor and hands the result back as opaque bytes
-(see [the consumer-group docs](../consumer-groups.md)). So the work is a
+(see [the consumer-group docs](../../consumer-groups.md)). So the work is a
 correct state machine + timers that shuttle bytes, not partition math.
 
 - **Coordinator state machine** (`broker/group.go`): the `groupManager` owns all

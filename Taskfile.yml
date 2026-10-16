@@ -152,6 +152,11 @@ tasks:
       - go build -o bin/doze-kafka ./cmd/doze-kafka
       - scripts/kcat-check.sh bin/doze-kafka
 
+  docs:check:
+    desc: 'Every check of the documents: links and anchors in every markdown file outside plan/, getting-started run as written with its output blocks compared, kafka-*.sh lines run in apache/kafka (Docker), and error names and messages the documents quote held to the source'
+    cmds:
+      - scripts/docs-check.sh {{.CLI_ARGS}}
+
   coverage:
     desc: 'Statement coverage per package against the committed floor (testdata/coverage.txt); fails if one fell by more than 0.1 point'
     cmds:

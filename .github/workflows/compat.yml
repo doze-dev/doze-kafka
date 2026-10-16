@@ -38,6 +38,12 @@ jobs:
           scripts/install-kcat.sh /usr/local
       - name: Build
         run: go build -o doze-kafka ./cmd/doze-kafka
+      # The documents' kafka-*.sh lines, in apache/kafka (docs/kafkacli_test.go); the
+      # test job has no Docker on macOS, so they are required here.
+      - name: Documents' Apache Kafka commands
+        env:
+          DOCS_KAFKA_CLI: "1"
+        run: go test -count=1 -run KafkaToolLines ./docs/
       - name: Matrix
         # pipefail: the runner's exit status, not tee's, is the step's.
         shell: bash

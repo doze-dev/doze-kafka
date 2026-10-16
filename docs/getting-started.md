@@ -35,11 +35,13 @@ everything under the current directory in `./data`: the partition logs, and
 
 You'll see it come up, with everything you need to connect:
 
+<!-- output: banner -->
 ```text
   doze-kafka is up.
 
     kafka     kafka.project.doze:9092
     console   http://kafka.project.doze   topics, messages and consumer groups, live
+    registry  http://schema.project.doze   Confluent-compatible schema registry
     data      /home/you/project/data
     serving   Kafka 4 protocol · no auth · plaintext
 
@@ -69,6 +71,7 @@ printf 'one\ntwo\nthree\n' | kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -t demo -P
 kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -t demo -C -o beginning -e
 ```
 
+<!-- output: consume -->
 ```
 one
 two
@@ -91,6 +94,7 @@ kafka-console-consumer.sh --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --topic 
 This is the part a container-in-memory setup can't give you. Stop the broker with
 **Ctrl-C** — it logs a clean shutdown:
 
+<!-- output: shutdown -->
 ```
 level=INFO msg="shutting down: flushing logs to disk"
 ```
@@ -102,6 +106,7 @@ Start it again with the same command, and read the topic once more:
 kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -t demo -C -o beginning -e
 ```
 
+<!-- output: consume -->
 ```
 one
 two
