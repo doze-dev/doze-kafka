@@ -6,6 +6,11 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- server API: `Options.OffsetsRetention` sets how long committed offsets are kept once
+  nothing reads them, as the CLI's `--offsets-retention`. An embedder had expiry at the
+  7-day default with no way to change or turn it off; zero is still that default and a
+  negative value keeps offsets for ever.
+
 - Groups: a classic member of a consumer group that rejoins keeps the partitions its
   `JoinGroup` says it still owns, as Apache Kafka 4.3.1 does (recorded:
   `mixed-protocol-cooperative`). Every rejoin used to give up everything, which is

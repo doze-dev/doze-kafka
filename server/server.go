@@ -92,6 +92,11 @@ type Options struct {
 	// heartbeat before it is evicted; 0 uses the default (45s). Tests of failure
 	// handling set it low.
 	ConsumerSessionTimeout time.Duration
+	// OffsetsRetention is how long a group's committed offsets are kept once nothing
+	// is reading them, as the CLI's --offsets-retention and Kafka's
+	// offsets.retention.minutes. Zero uses the default (7 days); a negative value
+	// keeps them for ever (the CLI's 0).
+	OffsetsRetention time.Duration
 
 	// Auth (all optional). SASL and TLS are independent and composable.
 	SASLMechanisms []string
@@ -182,6 +187,9 @@ func New(opts Options) (*Server, error) {
 	}
 	if opts.ConsumerSessionTimeout != 0 {
 		cfg.ConsumerSessionTimeout = opts.ConsumerSessionTimeout
+	}
+	if opts.OffsetsRetention != 0 {
+		cfg.OffsetsRetention = max(opts.OffsetsRetention, 0)
 	}
 	if opts.FsyncInterval != 0 {
 		cfg.FsyncInterval = opts.FsyncInterval

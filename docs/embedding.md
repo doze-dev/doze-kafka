@@ -71,6 +71,7 @@ is compiled and run by `TestEmbeddingDocCompiles`, so it cannot rot.
 | `SegmentBytes`, `IndexIntervalBytes` | Storage tuning. Set `SegmentBytes` small to test retention or rolling. |
 | `FsyncInterval` | Periodic fsync of active segments. **Zero means the default (500ms), not "off"**: an options struct's zero value is the default. Use a negative value to disable. `acks=all` always fsyncs. |
 | `ConsumerSessionTimeout` | How long a silent group member lives. Set low to test failure handling. |
+| `OffsetsRetention` | How long a group's committed offsets are kept once nothing reads them (the CLI's `--offsets-retention`, Kafka's `offsets.retention.minutes`). **Zero means the default (7 days)**; use a negative value to keep them for ever. |
 | `SASLMechanisms`, `Credentials`, `TLSConfig` | Authentication and TLS; independent and composable. `Config().TLS` reports whether the listener is TLS. |
 | `Logger` | nil discards. Request lines are Debug. |
 
@@ -98,6 +99,6 @@ file has no `CHANGELOG.md` line containing "server API". `Server.Traffic()` and
 this module's own commands could use. `NewFromConfig` is not on it either: it
 took `internal/config.Config`, which an embedder cannot name, so it was never callable
 from outside. `server.New(server.Options{...})` is the one constructor (Options carries
-`SegmentBytes`, `IndexIntervalBytes`, `ConsumerSessionTimeout` and `FsyncInterval`);
+`SegmentBytes`, `IndexIntervalBytes`, `ConsumerSessionTimeout`, `OffsetsRetention` and `FsyncInterval`);
 `Config()` returns the public `server.Config`. This module's commands build from the
 internal config through `internal/embed`.
