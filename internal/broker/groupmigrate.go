@@ -10,7 +10,8 @@ import (
 	"github.com/twmb/franz-go/pkg/kerr"
 )
 
-// Mixed groups: classic and consumer-protocol members on one group id (GRP-8, D7).
+// Mixed groups: classic and consumer-protocol members on one group id (GRP-8, D7;
+// claims: groups R8a to R8j).
 //
 // Kafka 4's default group.consumer.migration.policy is bidirectional, which is what a
 // rolling upgrade of an application needs: one instance at a time moves to
@@ -156,7 +157,7 @@ func (gm *groupManager) giveClassic(id string, snap classicSnapshot) bool {
 		return false
 	}
 	// A generation no member holds: each one's next heartbeat is told so
-	// (ILLEGAL_GENERATION, as Kafka does) and it rejoins.
+	// (ILLEGAL_GENERATION, as Kafka does; claim: groups R8e) and it rejoins.
 	g := &group{id: id, state: statePreparingRebalance, generation: snap.generation + 1, protocolType: "consumer",
 		members: make(map[string]*groupMember), static: make(map[string]string)}
 	gm.groups[id] = g
@@ -310,7 +311,8 @@ func (m *cg848Manager) adopt(id string, snap classicSnapshot) *cg848Group {
 }
 
 // maybeDowngrade turns a consumer group whose members are all classic back into a
-// classic group, as Kafka does when the last consumer-protocol member leaves. Caller
+// classic group, as Kafka does when the last consumer-protocol member leaves
+// (claim: groups R8e). Caller
 // holds m.mu.
 func (m *cg848Manager) maybeDowngrade(g *cg848Group) {
 	if m.bridge == nil || len(g.members) == 0 {

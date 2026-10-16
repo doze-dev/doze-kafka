@@ -53,7 +53,8 @@ const kafkaZstdMaxWindow = 128 << 20
 // stores a batch in the codec it arrived in.
 const TargetProducer = -1
 
-// RefusalKind is why a batch is refused, as the error Kafka answers.
+// RefusalKind is why a batch is refused, as the error Kafka answers (claim: topics R7 for
+// INVALID_RECORD, claim: traffic R7 for CORRUPT_MESSAGE and MESSAGE_TOO_LARGE).
 type RefusalKind int
 
 const (

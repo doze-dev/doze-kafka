@@ -114,7 +114,7 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 				rp.BaseOffset = -1
 			case !ok || part.Partition < 0 || part.Partition >= topic.Partitions:
 				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
-				rp.BaseOffset = -1 // as Apache Kafka answers it (conformance/recordings/produce-mixed-partition-errors.json).
+				rp.BaseOffset = -1 // as Apache Kafka answers it (claim: traffic R7).
 			default:
 				wrote, answered := b.appendRecords(req.Conn, req.Header.APIVersion, pr.TransactionID, name, topic.Config, part, &rp)
 				if wrote {

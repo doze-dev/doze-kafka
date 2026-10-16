@@ -10,7 +10,7 @@ import (
 
 // Committed offsets expire (offsets.retention.minutes, GRP-19 / D7), by the rules a
 // real Kafka applies, which are recorded in conformance/recordings/offsets-retention.json,
-// offsets-retention-restart.json and offsets-retention-recreate.json:
+// offsets-retention-restart.json and offsets-retention-recreate.json (claims: groups R11a to R11q):
 //
 //   - A classic group with no members, one that had some, keeps its offsets for the
 //     retention from the moment it became empty, however late the last commit was: a
@@ -45,7 +45,8 @@ import (
 type groupLiveness struct {
 	meta.GroupLiveness
 	// presumed is a group recorded as having members that nobody has joined since
-	// the broker started: its members are the ones a real broker would have loaded.
+	// the broker started: its members are the ones a real broker would have loaded
+	// (claim: groups R11f).
 	presumed bool
 }
 

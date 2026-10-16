@@ -45,7 +45,7 @@ func (b *Broker) handleFindCoordinator(ctx context.Context, req *protocol.Reques
 
 	// Only a group (0) and a transaction (1) have a coordinator here. A share
 	// group (2) needs v6, which is not offered; anything else is no type at all.
-	// Kafka answers INVALID_REQUEST, and says nothing in the share-group case.
+	// Kafka answers INVALID_REQUEST, and says nothing in the share-group case (claim: cluster FC1).
 	badType := fr.CoordinatorType != 0 && fr.CoordinatorType != 1 && req.Header.APIVersion >= 1
 	badMessage := func() *string {
 		if fr.CoordinatorType == 2 {

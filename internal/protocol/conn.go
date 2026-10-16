@@ -139,7 +139,7 @@ func (c *Conn) SetClientSoftware(name, version string) {
 
 // MaxClientSoftware is how many bytes of a client's software name and version are
 // kept. Kafka refuses a name for its characters and never for its length (recorded:
-// 20,000 characters are taken), so a name may fill a frame, and it is kept for as long
+// 20,000 characters are taken; claim: cluster AV3), so a name may fill a frame, and it is kept for as long
 // as the connection is open: 300 connections that each sent a 1 MiB name held half a
 // gigabyte. It is for people to read, so what is kept is its beginning.
 const MaxClientSoftware = 128
@@ -172,7 +172,7 @@ func ClientSoftware(name, version string) string {
 // Apache Kafka accepts in ApiVersions v3 and later: letters and digits, with dots and
 // dashes allowed between them, and at least one character (its
 // ApiVersionsRequest.isValid; recorded against 4.3.1 in
-// conformance/recordings/apiversions-client-software.json). Kafka answers anything
+// conformance/recordings/apiversions-client-software.json; claim: cluster AV1). Kafka answers anything
 // else INVALID_REQUEST.
 func ValidClientSoftware(s string) bool {
 	alnum := func(c byte) bool {

@@ -28,7 +28,8 @@ var initialRebalanceDelay = 200 * time.Millisecond
 
 // The bounds on a classic member's session.timeout.ms: Apache Kafka's defaults of
 // group.min.session.timeout.ms (6 s) and group.max.session.timeout.ms (30 min),
-// recorded against apache/kafka (conformance/recordings/joingroup-session-timeout.json).
+// recorded against apache/kafka (conformance/recordings/joingroup-session-timeout.json;
+// claim: bad-days Q5a).
 // A session outside them is INVALID_SESSION_TIMEOUT, checked before anything
 // else about the request. A client developed here with a 1 s session would
 // otherwise ship a setting every real broker refuses. Variables so a test of
@@ -319,7 +320,8 @@ func (gm *groupManager) forget(group string) bool {
 // slice of the result. A first-contact member (empty id) gets MEMBER_ID_REQUIRED
 // with a fresh id and must retry (KIP-394) — but only from JoinGroup v4, the
 // first version that knows the code. An older client would not know what to do
-// with it, so it is given an id and joined in one step, as Kafka does.
+// with it, so it is given an id and joined in one step, as Kafka does
+// (claim: groups-requests G3).
 func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who clientRef) (joinResult, error) {
 	refuse := func(code int16) (joinResult, error) {
 		return joinResult{errorCode: int16(code), memberID: r.MemberID, generation: -1}, nil
@@ -441,7 +443,7 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 	}
 	// A retried JoinGroup replaces one still parked: the old request's client is
 	// waiting on an answer that this one supersedes, so release it (Kafka answers
-	// it UNKNOWN_MEMBER_ID) instead of leaving its goroutine blocked.
+	// it UNKNOWN_MEMBER_ID; claim: groups-requests G4) instead of leaving its goroutine blocked.
 	m.failPendingJoin()
 	m.client = who
 	m.instanceID = r.InstanceID
@@ -915,7 +917,7 @@ func (g *group) completeJoin() (dropped []string) {
 
 // becomeEmpty is the group with its last member gone. That is a generation of its own,
 // as on Kafka: the next member to join finds the generation two on from the one the
-// last member had (recorded: offsets-retention-recreate, again-join-g-rejoin).
+// last member had (recorded: offsets-retention-recreate, again-join-g-rejoin; claim: groups R11p).
 func (g *group) becomeEmpty() {
 	g.state = stateEmpty
 	g.leader = ""

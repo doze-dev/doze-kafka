@@ -15,19 +15,12 @@ var kafkaBehaviourRE = regexp.MustCompile(`(?i)(as kafka does|like kafka|real br
 // claimRefRE is how a comment cites a claims row: "claim: groups R11b" or
 // "claims: auth A7 to A9" (the file under conformance/claims, without .md, and
 // the first row's id).
-var claimRefRE = regexp.MustCompile(`claims?: ([a-z-]+) ([A-Z][0-9]+[a-z]?)`)
+var claimRefRE = regexp.MustCompile(`claims?: ([a-z-]+) ([A-Z]+[0-9]+[a-z]?)`)
 
 // commentsOwnedElsewhere are files whose comments other work converts at merge;
-// each is listed so that the list can only shrink. A file here is still scanned
-// for claim ids that name no row.
-var commentsOwnedElsewhere = map[string]bool{
-	"internal/broker/produce.go":      true,
-	"internal/broker/group.go":        true,
-	"internal/broker/groups.go":       true,
-	"internal/broker/groupmigrate.go": true,
-	"internal/broker/groupdelete.go":  true,
-	"internal/telemetry/store.go":     true,
-}
+// each is listed so that the list can only shrink (it is empty now). A file here
+// is still scanned for claim ids that name no row.
+var commentsOwnedElsewhere = map[string]bool{}
 
 // Every comment in the broker's sources that says what Kafka does cites the
 // claims row that shows it, and the row exists: a claim about Kafka cannot sit in
