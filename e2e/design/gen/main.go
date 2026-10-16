@@ -1,3 +1,6 @@
+//go:build !windows
+// (SIGUSR1, which the design gate signals it with, does not exist on Windows; the gate runs on Linux and macOS.)
+
 // Command gen is the design gate's traffic: real franz-go clients that do what the
 // Traffic boards draw (Main, Traf-02 to Traf-12), each writing a ledger of what it
 // sent. The ledger is the truth the page is compared with: the gate counts the
