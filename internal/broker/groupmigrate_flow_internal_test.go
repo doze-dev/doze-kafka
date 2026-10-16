@@ -146,14 +146,19 @@ func TestMixedGroupRefusals(t *testing.T) {
 	if res := req(time.Second, "connect", "", subscriptionBytes("t")); res.errorCode != kerr.InconsistentGroupProtocol.Code {
 		t.Errorf("another protocol type: %d", res.errorCode)
 	}
-	if res := req(time.Second, "consumer", "", []byte{9}); res.errorCode != kerr.InconsistentGroupProtocol.Code {
+	// A subscription that cannot be read is found out once the member has an id
+	// (recorded: cm-classic-join-unreadable-subscription*).
+	if res := req(time.Second, "consumer", "", []byte{9}); res.errorCode != kerr.MemberIDRequired.Code {
+		t.Errorf("a subscription that is not the consumer protocol's, first join: %d", res.errorCode)
+	} else if res := req(time.Second, "consumer", res.memberID, []byte{9}); res.errorCode != kerr.InconsistentGroupProtocol.Code {
 		t.Errorf("a subscription that is not the consumer protocol's: %d", res.errorCode)
 	}
 	if res := req(time.Second, "consumer", "n", subscriptionBytes("t")); res.errorCode != kerr.UnknownMemberID.Code {
 		t.Errorf("a consumer-protocol member's id: %d", res.errorCode)
 	}
-	if res := req(time.Second, "consumer", "never-issued", subscriptionBytes("t")); res.errorCode != kerr.UnknownMemberID.Code {
-		t.Errorf("an id nobody was given: %d", res.errorCode)
+	// An id nobody was given is seated as it comes (recorded: cm-classic-join-unknown-member-id).
+	if res := req(time.Second, "consumer", "never-issued", subscriptionBytes("t")); res.errorCode != errNone || res.memberID != "never-issued" {
+		t.Errorf("an id nobody was given: %+v", res)
 	}
 	first := req(time.Second, "consumer", "", subscriptionBytes("t"))
 	if first.errorCode != kerr.MemberIDRequired.Code || first.memberID == "" {

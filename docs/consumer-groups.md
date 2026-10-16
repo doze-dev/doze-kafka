@@ -190,7 +190,11 @@ picks the right one automatically.
 ## Limits
 
 Single node means every group is coordinated by the one broker, which keeps this
-simple. Not implemented: static membership (`group.instance.id` is accepted but not
-acted on) and the sticky cross-topic balancing of the reference `uniform` assignor —
-doze-kafka's assignor is a straightforward, even round-robin. Neither matters for
-local development.
+simple. Static membership (`group.instance.id`) works as it does on Kafka, on both
+protocols and in a group that mixes them: a restarted instance takes its predecessor's
+place and partitions without a rebalance, the old member id is fenced
+(`FENCED_INSTANCE_ID`), and a consumer-protocol member that leaves with epoch -2 keeps
+its place until its session runs out (recorded: `mixed-protocol-static.json`,
+`group-requests-refused.json`). Not implemented: the sticky cross-topic balancing of the
+reference `uniform` assignor — doze-kafka's assignor is a straightforward, even
+round-robin. That does not matter for local development.

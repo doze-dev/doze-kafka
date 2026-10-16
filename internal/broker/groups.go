@@ -109,6 +109,12 @@ func (b *Broker) handleJoinGroup(ctx context.Context, req *protocol.Request, jr 
 		resp.Generation = -1
 		return nil
 	}
+	// An empty group id is refused before anything else is looked at, the session
+	// timeout included (recorded: group-requests-refused, ej-*).
+	if jr.Group == "" {
+		resp.ErrorCode, resp.Generation = kerr.InvalidGroupID.Code, -1
+		return nil
+	}
 	// A group running under KIP-848 takes a classic client in as one of its members
 	// (the migration policy's default, groupmigrate.go); otherwise the classic
 	// coordinator claims the id on join (groupClaims).
@@ -156,6 +162,10 @@ func (b *Broker) handleSyncGroup(ctx context.Context, req *protocol.Request, sr 
 		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
 		return nil
 	}
+	if sr.Group == "" {
+		resp.ErrorCode = kerr.InvalidGroupID.Code
+		return nil
+	}
 	if assignment, code, taken := b.cg848.classicSync(sr); taken {
 		resp.ErrorCode = code
 		resp.MemberAssignment = assignment
@@ -188,6 +198,10 @@ func (b *Broker) handleHeartbeat(ctx context.Context, req *protocol.Request, hr 
 		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
 		return nil
 	}
+	if hr.Group == "" {
+		resp.ErrorCode = kerr.InvalidGroupID.Code
+		return nil
+	}
 	if code, taken := b.cg848.classicHeartbeat(hr); taken {
 		resp.ErrorCode = code
 		return nil
@@ -209,12 +223,19 @@ func (b *Broker) handleLeaveGroup(ctx context.Context, req *protocol.Request, lr
 		}
 		return nil
 	}
+	if lr.Group == "" {
+		resp.ErrorCode = kerr.InvalidGroupID.Code
+		return nil
+	}
 	results, taken := b.cg848.classicLeave(lr)
 	if !taken {
 		results = b.groups.leave(lr)
 	}
 
-	if len(results) > 0 {
+	// From v3 a request names several members and each has its own code; the
+	// request's is 0 even when none of them, or no group, is there (recorded:
+	// group-requests-refused, cm-leave-unknown-member, lv-unknown-group-v4).
+	if len(results) > 0 && lr.GetVersion() < 3 {
 		resp.ErrorCode = results[0].errorCode
 	}
 	for _, r := range results {

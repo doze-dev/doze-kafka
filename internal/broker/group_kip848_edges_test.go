@@ -48,7 +48,10 @@ func (m *cgMember) heartbeat(t *testing.T, ctx context.Context, subscribe []stri
 	if subscribe != nil {
 		r.SubscribedTopicNames = subscribe
 	}
-	if reportOwned {
+	switch {
+	case m.epoch == 0:
+		r.Topics = []kmsg.ConsumerGroupHeartbeatRequestTopic{} // a join owns nothing, and says so.
+	case reportOwned:
 		r.Topics = []kmsg.ConsumerGroupHeartbeatRequestTopic{}
 		for id, ps := range m.held {
 			if len(ps) == 0 {
@@ -109,6 +112,7 @@ func TestGroupKIP848_BrokerMintsAMemberIDWhenNoneIsGiven(t *testing.T) {
 		r.SetVersion(version)
 		r.Group, r.RebalanceTimeoutMillis = "mint", 60_000
 		r.SubscribedTopicNames = []string{"t"}
+		r.Topics = []kmsg.ConsumerGroupHeartbeatRequestTopic{} // a join owns nothing.
 		var resp kmsg.ConsumerGroupHeartbeatResponse
 		if !c.do(r, &resp) {
 			t.Fatal("connection closed")

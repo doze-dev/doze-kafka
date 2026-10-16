@@ -365,11 +365,13 @@ func (m *cg848Manager) classicJoin(r *kmsg.JoinGroupRequest, who clientRef) (res
 	}
 	protocols := protocolEntries(r.Protocols)
 	// A group of consumers has one protocol type; a Connect worker is not one of them.
-	sub, protocol, ok := seatSubscription(protocols)
-	if r.ProtocolType != "consumer" || len(protocols) == 0 || !ok {
+	// And its classic members share a protocol, as in a classic group (recorded:
+	// group-requests-refused, cm-classic-join-custom-assignor; the first classic member
+	// may bring any, ca-classic-join-custom-assignor-with-id).
+	if r.ProtocolType != "consumer" || len(protocols) == 0 || !g.classicCommonProtocol(r.MemberID, protocols) {
 		return refuse(kerr.InconsistentGroupProtocol.Code)
 	}
-	static := r.InstanceID != nil && *r.InstanceID != ""
+	static := r.InstanceID != nil // "" too (recorded: ei-join-empty-instance).
 
 	id := r.MemberID
 	var predecessor *cg848Member // the member a restarted static instance takes the place of.
@@ -387,17 +389,24 @@ func (m *cg848Manager) classicJoin(r *kmsg.JoinGroupRequest, who clientRef) (res
 			return joinResult{errorCode: kerr.MemberIDRequired.Code, memberID: id, generation: -1}, true
 		}
 	}
+	// The subscription is read once the member has an id: one that cannot be read is
+	// answered MEMBER_ID_REQUIRED first, as any other (recorded:
+	// cm-classic-join-unreadable-subscription).
+	sub, protocol, ok := seatSubscription(protocols)
+	if !ok {
+		return refuse(kerr.InconsistentGroupProtocol.Code)
+	}
 	mem := g.members[id]
 	switch {
 	case mem != nil && mem.classic == nil:
 		return refuse(kerr.UnknownMemberID.Code) // that is a consumer-protocol member's id.
-	case mem == nil && r.MemberID != "" && g.fenced(id, r.InstanceID):
+	case mem == nil && r.MemberID != "" && g.staticCheck(id, r.InstanceID) == kerr.FencedInstanceID.Code:
 		// Its restarted self has the instance now. Answered with no member id
 		// (recorded: sd-s1-join-old-id).
 		return joinResult{errorCode: kerr.FencedInstanceID.Code, generation: -1}, true
-	case mem == nil && r.MemberID != "" && !m.seatIssued(r.Group, id):
-		return refuse(kerr.UnknownMemberID.Code)
 	}
+	// A member id this group did not hand out is taken as it comes: Kafka's consumer
+	// group seats it (recorded: cm-classic-join-unknown-member-id).
 
 	// The group is recorded as having a classic member before it has this one
 	// (offsetexpiry.go). A join refused here has not used its id up: it comes again.
@@ -473,14 +482,42 @@ func (g *cg848Group) holderOf(instance string) *cg848Member {
 	return nil
 }
 
-// fenced reports whether a request naming a static instance comes from a member id that
-// does not hold it: its restarted successor does.
-func (g *cg848Group) fenced(memberID string, instance *string) bool {
-	if instance == nil || *instance == "" {
-		return false
+// staticCheck is what a request naming a static instance is answered when the instance
+// is not this member's: UNKNOWN_MEMBER_ID when nobody holds it, FENCED_INSTANCE_ID when
+// another member id does (recorded: group-requests-refused, cs-heartbeat-wrong-instance,
+// cs-old-member-heartbeat; mixed-protocol-static, sd-s1-heartbeat-old-id).
+func (g *cg848Group) staticCheck(memberID string, instance *string) int16 {
+	if instance == nil {
+		return errNone
 	}
-	holder := g.holderOf(*instance)
-	return holder != nil && holder.id != memberID
+	switch holder := g.holderOf(*instance); {
+	case holder == nil:
+		return kerr.UnknownMemberID.Code
+	case holder.id != memberID:
+		return kerr.FencedInstanceID.Code
+	}
+	return errNone
+}
+
+// classicCommonProtocol reports whether a classic member joining with these protocols
+// shares one with every other classic member of the group.
+func (g *cg848Group) classicCommonProtocol(memberID string, offered []groupProtocolEntry) bool {
+	for _, p := range offered {
+		all := true
+		for id, other := range g.members {
+			if id == memberID || other.classic == nil {
+				continue
+			}
+			if !slices.ContainsFunc(other.classic.protocols, func(o groupProtocolEntry) bool { return o.name == p.name }) {
+				all = false
+				break
+			}
+		}
+		if all {
+			return true
+		}
+	}
+	return false
 }
 
 // partitionsOf is partitions named by topic as a set by topic id; a topic that is not
@@ -510,13 +547,18 @@ func (m *cg848Manager) classicSync(r *kmsg.SyncGroupRequest) (assignment []byte,
 		return nil, 0, false
 	}
 	mem := g.members[r.MemberID]
+	if code := g.staticCheck(r.MemberID, r.InstanceID); code != errNone {
+		return nil, code, true
+	}
 	switch {
-	case mem == nil && g.fenced(r.MemberID, r.InstanceID):
-		return nil, kerr.FencedInstanceID.Code, true
 	case mem == nil || mem.classic == nil:
 		return nil, kerr.UnknownMemberID.Code, true
 	case r.Generation != mem.epoch:
 		return nil, kerr.IllegalGeneration.Code, true
+	case r.ProtocolType != nil && *r.ProtocolType != "consumer",
+		r.Protocol != nil && *r.Protocol != mem.classic.protocol:
+		// recorded: cm-sync-wrong-protocol-type, cm-sync-wrong-protocol-name.
+		return nil, kerr.InconsistentGroupProtocol.Code, true
 	case mem.epoch != g.epoch && len(mem.revoking) == 0:
 		// The group has moved on since this member joined, and it is not in the middle
 		// of giving partitions up: there is nothing for it to collect, it must join
@@ -550,9 +592,10 @@ func (m *cg848Manager) classicHeartbeat(r *kmsg.HeartbeatRequest) (code int16, h
 		return 0, false
 	}
 	mem := g.members[r.MemberID]
+	if code := g.staticCheck(r.MemberID, r.InstanceID); code != errNone {
+		return code, true
+	}
 	switch {
-	case mem == nil && g.fenced(r.MemberID, r.InstanceID):
-		return kerr.FencedInstanceID.Code, true // recorded: sd-s1-heartbeat-old-id.
 	case mem == nil || mem.classic == nil:
 		return kerr.UnknownMemberID.Code, true
 	case r.Generation != mem.epoch:
@@ -594,12 +637,14 @@ func (m *cg848Manager) classicLeave(r *kmsg.LeaveGroupRequest) (results []leaveR
 	for _, who := range membersToLeave(r) {
 		res := leaveResult{memberID: who.memberID, instanceID: who.instanceID, errorCode: kerr.UnknownMemberID.Code}
 		mem := g.members[who.memberID]
-		if who.memberID == "" && who.instanceID != nil && *who.instanceID != "" {
+		if who.memberID == "" && who.instanceID != nil {
 			// A static member is named by its instance id, as an admin tool names it
 			// (recorded: su-leave-by-instance).
 			mem = g.holderOf(*who.instanceID)
 		}
-		if mem != nil && mem.classic != nil {
+		// A consumer-protocol member named here leaves too, as an admin tool removes
+		// one (recorded: cm-classic-leave-consumer-member).
+		if mem != nil {
 			m.emit(g, "left", mem.id, "client "+mem.client.clientID+" left the group", "")
 			m.removeMember(g, mem.id)
 			res.errorCode = errNone
@@ -609,9 +654,11 @@ func (m *cg848Manager) classicLeave(r *kmsg.LeaveGroupRequest) (results []leaveR
 	}
 	if removed {
 		if len(g.members) > 0 {
+			// Not downgraded, even when the member named was the last of the consumer
+			// protocol: Kafka downgrades when such a member leaves by its own protocol
+			// (recorded: cm-describe-after-leave is a consumer group).
 			m.bumpAndReassign(g, "a member left")
 			m.armClassicRevocations(g)
-			m.maybeDowngrade(g)
 		}
 	}
 	return results, true

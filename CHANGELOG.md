@@ -6,6 +6,28 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Groups: requests Kafka refuses are refused, with Kafka's codes (recorded:
+  `group-requests-refused`). An empty group id is `INVALID_GROUP_ID` on every classic
+  group API and `OffsetDelete` (a v0 `JoinGroup` used to join a group named ""). A
+  classic `JoinGroup` with no protocol type is `INCONSISTENT_GROUP_PROTOCOL`. A
+  `ConsumerGroupHeartbeat` join that says it owns partitions, or does not say, is
+  `INVALID_REQUEST`, as is a static leave with no instance id and an empty instance id;
+  a rebalance timeout of 0 is accepted; a later epoch in a group that does not exist is
+  `GROUP_ID_NOT_FOUND`; the messages are Kafka's. `OffsetCommit` below v9 from a
+  consumer-protocol member is `UNSUPPORTED_VERSION`. In a consumer group, a classic
+  `SyncGroup` with the wrong protocol type or name is `INCONSISTENT_GROUP_PROTOCOL`, a
+  classic `JoinGroup` must share a protocol with the other classic members, an unknown
+  member id is seated as Kafka seats it, a classic member's `ConsumerGroupHeartbeat` is
+  answered, and a classic `LeaveGroup` can remove a consumer-protocol member. A
+  `LeaveGroup` from v3 answers 0 at the top level and each member's code beside it.
+- Groups: static membership fencing. A request naming a static instance nobody holds is
+  `UNKNOWN_MEMBER_ID`, and one naming an instance another member holds is
+  `FENCED_INSTANCE_ID`, on `Heartbeat`, `SyncGroup`, `OffsetCommit` and
+  `ConsumerGroupHeartbeat` (a member heartbeating with the wrong instance id used to be
+  answered 0; the member a restarted consumer-protocol instance replaced was
+  `UNKNOWN_MEMBER_ID`). An empty `group.instance.id` is an instance id on a classic
+  `JoinGroup`, as on Kafka. The docs no longer say static membership is not acted on.
+
 - server API: `Options.OffsetsRetention` sets how long committed offsets are kept once
   nothing reads them, as the CLI's `--offsets-retention`. An embedder had expiry at the
   7-day default with no way to change or turn it off; zero is still that default and a

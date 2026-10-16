@@ -198,6 +198,7 @@ func join848(t *testing.T, m *cg848Manager, group, member string) cg848Result {
 	r := kmsg.NewPtrConsumerGroupHeartbeatRequest()
 	r.Group, r.MemberID, r.RebalanceTimeoutMillis = group, member, 60_000
 	r.SubscribedTopicNames = []string{"t"}
+	r.Topics = []kmsg.ConsumerGroupHeartbeatRequestTopic{} // a join owns nothing.
 	res := m.heartbeat(r, clientRef{})
 	if res.errorCode != 0 {
 		t.Fatalf("join: %+v", res)

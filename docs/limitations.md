@@ -59,6 +59,11 @@ implement it.
   new targets are there when the join is answered, the group is never `Assigning`, and
   that generation is one higher. Which request is answered with which code is the same
   (recorded: `mixed-protocol-groups.json`, `mixed-protocol-rolling.json`).
+- **A classic member of a consumer group whose subscription cannot be read** is refused
+  `INCONSISTENT_GROUP_PROTOCOL` on the `JoinGroup` that brings its member id. Kafka
+  answers that `JoinGroup` `UNKNOWN_SERVER_ERROR` (an exception it did not catch); both
+  are refusals a client does not retry (recorded: `group-requests-refused.json`, step
+  `cm-classic-join-unreadable-subscription-with-id`).
 - **How often committed offsets are checked is not a setting.** Kafka has
   `offsets.retention.check.interval.ms` (10 minutes); here the check runs every
   hundredth of `--offsets-retention`, between 50 ms and 10 minutes, so it is Kafka's
@@ -165,6 +170,11 @@ implement it.
   `error_message` text is this broker's (it names what to do about it). A Produce batch
   that is too large or corrupt is refused with Kafka's code and, here, a text where Kafka
   sends none. Match on the code.
+- **Group error messages are Kafka's where a recording has them.** A
+  `ConsumerGroupHeartbeat` refusal carries Kafka's text (recorded:
+  `group-requests-refused.json`, `ch-*`, `cs-*`); a few refusals no recording has seen
+  (a group id that is not storable here, a join that could not be written down) carry
+  this broker's own. Classic group APIs carry no message on either.
 - **A partition named twice in one ListOffsets request is answered twice.** Kafka answers
   such an entry once, with `INVALID_REQUEST`. The console asks for a partition's earliest
   and latest offset as two entries of one request, so this stays until it asks differently.
@@ -185,8 +195,7 @@ implement it.
   compression round-trips), but the segment/index file layout is not byte-compatible
   with Apache Kafka's. Only doze-kafka reads its own files.
 - **Consumer-group assignor** is a plain, even round-robin (`uniform`) or `range`; it
-  isn't the sticky, cross-topic-balanced reference assignor. Static membership
-  (`group.instance.id`) is accepted on the wire but not acted on.
+  isn't the sticky, cross-topic-balanced reference assignor.
 - **SASL details.** No Kerberos/GSSAPI, no OAUTHBEARER, no delegation tokens, and no
   `SASLprep` normalization (use ASCII credentials).
 

@@ -80,6 +80,10 @@ func (b *Broker) handleOffsetDelete(ctx context.Context, req *protocol.Request, 
 		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
 		return nil
 	}
+	if odr.Group == "" {
+		resp.ErrorCode = kerr.InvalidGroupID.Code // recorded: group-requests-refused, ej-offset-delete.
+		return nil
+	}
 	known := b.groupIsActive(odr.Group) || b.groupHasOffsets(odr.Group)
 	if !known {
 		resp.ErrorCode = kerr.GroupIDNotFound.Code

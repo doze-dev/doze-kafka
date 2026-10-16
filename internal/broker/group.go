@@ -333,7 +333,11 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 	if len(r.Protocols) == 0 {
 		return refuse(kerr.InconsistentGroupProtocol.Code)
 	}
-	static := r.InstanceID != nil && *r.InstanceID != ""
+	// The group must say what kind of group it is (recorded: ept-join).
+	if r.ProtocolType == "" {
+		return refuse(kerr.InconsistentGroupProtocol.Code)
+	}
+	static := r.InstanceID != nil // "" too (recorded: ei-join-empty-instance).
 
 	gm.mu.Lock()
 	// A group running under KIP-848 is not a classic group, whatever else is
@@ -533,14 +537,22 @@ func (gm *groupManager) replaceStatic(g *group, oldID string, r *kmsg.JoinGroupR
 	return res, true
 }
 
-// fenced reports whether a request naming a static instance comes from a member
-// id that no longer holds it (its restarted successor does).
-func (g *group) fenced(memberID string, instanceID *string) bool {
-	if instanceID == nil || *instanceID == "" {
-		return false
+// staticCheck is what a request naming a static instance is answered when the
+// instance is not this member's: UNKNOWN_MEMBER_ID when nobody holds it, and
+// FENCED_INSTANCE_ID when another member id does (its restarted successor). An empty
+// instance id is an instance id (recorded: group-requests-refused, st-*-wrong-instance,
+// ei-join-empty-instance).
+func (g *group) staticCheck(memberID string, instanceID *string) int16 {
+	if instanceID == nil {
+		return errNone
 	}
-	cur, held := g.static[*instanceID]
-	return held && cur != memberID
+	switch cur, held := g.static[*instanceID]; {
+	case !held:
+		return kerr.UnknownMemberID.Code
+	case cur != memberID:
+		return kerr.FencedInstanceID.Code
+	}
+	return errNone
 }
 
 // othersThan is the group's members apart from id.
@@ -594,9 +606,9 @@ func (gm *groupManager) sync(ctx context.Context, r *kmsg.SyncGroupRequest) (syn
 		gm.mu.Unlock()
 		return syncResult{errorCode: kerr.UnknownMemberID.Code}, nil
 	}
-	if g.fenced(r.MemberID, r.InstanceID) {
+	if code := g.staticCheck(r.MemberID, r.InstanceID); code != errNone {
 		gm.mu.Unlock()
-		return syncResult{errorCode: kerr.FencedInstanceID.Code}, nil
+		return syncResult{errorCode: code}, nil
 	}
 	m := g.members[r.MemberID]
 	if m == nil {
@@ -664,8 +676,8 @@ func (gm *groupManager) heartbeat(r *kmsg.HeartbeatRequest) int16 {
 	if g == nil {
 		return kerr.UnknownMemberID.Code
 	}
-	if g.fenced(r.MemberID, r.InstanceID) {
-		return kerr.FencedInstanceID.Code
+	if code := g.staticCheck(r.MemberID, r.InstanceID); code != errNone {
+		return code
 	}
 	m := g.members[r.MemberID]
 	if m == nil {
@@ -697,7 +709,7 @@ func (gm *groupManager) leave(r *kmsg.LeaveGroupRequest) []leaveResult {
 		res := leaveResult{memberID: who.memberID, instanceID: who.instanceID, errorCode: kerr.UnknownMemberID.Code}
 		if g != nil {
 			id := who.memberID
-			if who.instanceID != nil && *who.instanceID != "" {
+			if who.instanceID != nil {
 				cur, held := g.static[*who.instanceID]
 				switch {
 				case !held:
@@ -747,8 +759,8 @@ func (gm *groupManager) validateCommit(groupID, memberID string, instanceID *str
 	if generation < 0 && len(g.members) == 0 {
 		return errNone
 	}
-	if g.fenced(memberID, instanceID) {
-		return kerr.FencedInstanceID.Code
+	if code := g.staticCheck(memberID, instanceID); code != errNone {
+		return code
 	}
 	if g.members[memberID] == nil {
 		return kerr.UnknownMemberID.Code
