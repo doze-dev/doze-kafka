@@ -138,6 +138,12 @@ func main() {
 			os.Exit(1)
 		}
 	}
+	// HOLD_KIP848=1 joins with the consumer protocol of KIP-848 (ConsumerGroupHeartbeat,
+	// the broker assigns), where the default is the classic one (JoinGroup, SyncGroup):
+	// a group's story then counts epochs, not generations.
+	if os.Getenv("HOLD_KIP848") != "" {
+		opts = append(opts, kgo.ServerSideBalancer())
+	}
 	cl, err := kgo.NewClient(append(opts, kgo.SeedBrokers(os.Args[1]), kgo.ClientID(os.Args[2]), kgo.ConsumerGroup(os.Args[3]), kgo.ConsumeTopics(os.Args[4]),
 		kgo.OnPartitionsAssigned(func(context.Context, *kgo.Client, map[string][]int32) { fmt.Println("ready") }))...)
 	if err != nil {

@@ -948,8 +948,9 @@
     document.querySelectorAll("[data-open-keys]").forEach(function (el) {
       var on = open != null && (" " + el.getAttribute("data-open-keys") + " ").indexOf(" " + open + " ") >= 0;
       el.classList.toggle("on", on);
-      // A table row is selected; a div that is a row of a list is the current one.
-      if (el.tagName === "TR") el.setAttribute("aria-selected", on ? "true" : "false");
+      // A row of a table or a grid (Traffic's) is selected; a div that is a row of a
+      // list is the current one.
+      if (el.tagName === "TR" || el.getAttribute("role") === "row") el.setAttribute("aria-selected", on ? "true" : "false");
       else if (on) el.setAttribute("aria-current", "true");
       else el.removeAttribute("aria-current");
     });

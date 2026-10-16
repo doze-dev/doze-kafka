@@ -1327,7 +1327,7 @@ html[data-paused] #inspector[data-traffic-kept] .tf-kept { display: block; }
   .tf-card .tf-rows > .r > :nth-child(5) { grid-column: 1 / -1; grid-row: 3; }
   .tf-card .tf-rows > .r > :nth-child(6) { grid-column: 2; grid-row: 2; text-align: right; }
   .tf-card .tf-rows > .r > :nth-child(7) { grid-column: 2; grid-row: 1; color: var(--mut); }
-  .tf-story .tf-rows > .r { grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1fr); row-gap: 2px; padding: 8px 10px; }
+  .tf-story .tf-rows > .r { grid-template-columns: 90px minmax(0, 1fr) minmax(0, 1fr); row-gap: 2px; padding: 8px 10px; }
   .tf-story .tf-rows > .r > :nth-child(4) { grid-column: 1 / span 2; }
   .tf-clients .tf-rows > .r { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; column-gap: 8px; padding: 8px 10px; }
   .tf-clients .tf-rows > .r > .tf-cw { display: none; }
