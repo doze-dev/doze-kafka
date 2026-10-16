@@ -30,6 +30,7 @@ func TestTheEnvCommandInTheSummaryGivesThisBroker(t *testing.T) {
 		"tls":             {"--listen", "127.0.0.1:0", "--tls-cert", cert, "--tls-key", key},
 		"tls, plain reg.": {"--listen", "127.0.0.1:0", "--tls-cert", cert, "--tls-key", key, "--schema-registry-tls=false"},
 		"advertised host": {"--listen", "127.0.0.1:0", "--advertised-host", "localhost"},
+		"every interface": {"--listen", ":0"},
 	}
 	for name, flags := range cases {
 		t.Run(name, func(t *testing.T) {
