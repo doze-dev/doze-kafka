@@ -16,6 +16,13 @@ needs is not installed: **skipped**, never counted as a pass) or anything else (
 every client once with no authentication and once over **SASL/SCRAM-SHA-512 and TLS**, and
 prints a matrix.
 
+The run is green only when every cell (each client, plain and scram-tls: 12 clients,
+24 cells) PASSED: a skipped cell fails it, and so does a cell with no result. On a
+machine that lacks a toolchain on purpose, name the clients that may skip:
+`ALLOW_SKIP="spring connect" compat/run.sh`. That is refused when `CI` is set: in CI
+every cell runs. `compat/runner_test.go` is the runner's own test (fake clients that
+pass, skip and fail).
+
 | Client | Toolchain | Covers |
 |---|---|---|
 | `java` | Docker | Java client 4.3: admin (create with config, describe, alter configs, grow, list, delete, delete records, groups), `offsetsForTimes`, idempotent and transactional producers, `read_committed`, consume-transform-produce, classic groups and `group.protocol=consumer` (KIP-848); **Kafka Streams** word count with `exactly_once_v2`, its compacted changelog, and a fresh instance restoring from it |

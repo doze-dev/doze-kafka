@@ -413,7 +413,7 @@ Binary / process (`cmd/doze-kafka`, via `B5`):
   slow-sync mode (latency of `acks=1`, Fetch and Heartbeat unchanged), and a kill
   during a rebalance and during `EndTxn`.
 
-Compat cell: `SCRAM wrong password` per client (10 clients): each reports its own
+Compat cell: `SCRAM wrong password` per client (12 clients): each reports its own
 authentication error and exits, no hang, no retry storm (a client retrying a bad
 password forever is a finding about that client, recorded).
 

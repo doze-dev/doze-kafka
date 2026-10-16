@@ -35,8 +35,8 @@ checklist is the artefact.
 
 ## 3. The client matrix, widened
 
-The 20 cells that pass today (10 clients, plain and SCRAM over TLS) plus the
-cells the stages asked for.
+The 24 cells of today (12 clients, plain and SCRAM over TLS; `compat/run.sh`
+fails unless every one passes) plus the cells the stages asked for.
 
 | Cell | Asked by |
 |---|---|

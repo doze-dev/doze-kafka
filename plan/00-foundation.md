@@ -16,7 +16,7 @@ Facts, each measured on 2026-10-11 against `main` at `7b0b17e`.
 | Fact | Value |
 |---|---|
 | Statement coverage, full suite | see [README.md](README.md#baseline) |
-| Real-client matrix | 10 clients, plain and SASL/SCRAM over TLS: 20 of 20 cells pass (`compat/run.sh`) |
+| Real-client matrix | 10 clients, plain and SASL/SCRAM over TLS: 20 of 20 cells pass (`compat/run.sh`; at the time of this baseline. Two telemetry clients were added since: 12 clients, 24 cells, `compat/runner_test.go` holds the count to the directories) |
 | Browser suite | 11 specs, 73 tests (`e2e/tests/`) |
 | Fuzz targets | 7: request parse and decode, tagged-field skipping, frame reading, the record reader, registry register-and-compare, registry payload decode, the telemetry decoder (`task fuzz`) |
 | Differential oracle | **Confluent SR only** (about 1,500 schema pairs and 25 request scripts recorded). **There is no recording of a real Apache Kafka broker.** Every claim about broker error codes and edge cases is `read` or `memory`. |

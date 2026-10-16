@@ -109,7 +109,7 @@ header describes for the banner).
 | `internal/config/advertised_test.go` | advertised-host derivation | loopback, wildcard, specific address |
 | `cmd/doze-kafka/names_test.go`, `listen` tests | name vs address, `resolvesHere` | bootstrap in name mode |
 | Go clients | `internal/broker/sarama_test.go` (3 tests: round trip, group commit/resume, transactional producer); franz-go throughout `internal/broker` | **plain only**: no Sarama or franz-go test uses SASL or TLS (grep for `sasl`/`tls` in `sarama_test.go`: none) |
-| `compat/` | 10 clients x (plain, SCRAM-SHA-512 over TLS) = 20 cells; `.github/workflows/compat.yml` runs on push, PR and weekly | see the table below |
+| `compat/` | 12 clients x (plain, SCRAM-SHA-512 over TLS) = 24 cells; `.github/workflows/compat.yml` runs on push, PR and weekly | see the table below |
 | `e2e/tests/` | 11 specs | none for a Connect page |
 
 ### What the matrix actually runs, per client

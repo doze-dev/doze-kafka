@@ -3,7 +3,8 @@ name: Compat
 # The client-compatibility matrix: the clients and frameworks teams actually develop with
 # (the Java client, Kafka Streams, Spring Kafka, librdkafka through Python and kcat, KafkaJS)
 # against the real binary, once without authentication and once over SASL/SCRAM and TLS.
-# See compat/README.md. A toolchain that is missing is reported as skipped, never as passed.
+# See compat/README.md. A cell that skips (a toolchain missing) fails the job: CI is set
+# here, so compat/run.sh refuses ALLOW_SKIP and requires every one of the 24 cells to pass.
 
 on:
   push:
@@ -19,22 +20,28 @@ permissions:
 jobs:
   compat:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: astral-sh/setup-uv@v10
-      - uses: actions/setup-node@v7
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      - name: Install kcat
-        run: sudo apt-get update && sudo apt-get install -y kcat
+      - name: Install kcat (librdkafka 2.15.1, built from pinned sources; Ubuntu's links 2.3, too old for kcat-telemetry)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config zlib1g-dev libzstd-dev liblz4-dev \
+            libssl-dev libsasl2-dev libcurl4-openssl-dev libyajl-dev
+          scripts/install-kcat.sh /usr/local
       - name: Build
         run: go build -o doze-kafka ./cmd/doze-kafka
       - name: Matrix
-        run: compat/run.sh -b "$PWD/doze-kafka" | tee matrix.txt
+        # pipefail: the runner's exit status, not tee's, is the step's.
+        shell: bash
+        run: set -o pipefail; compat/run.sh -b "$PWD/doze-kafka" | tee matrix.txt
       - name: A scheduled run that fails opens an issue
         if: failure() && github.event_name == 'schedule'
         env:
