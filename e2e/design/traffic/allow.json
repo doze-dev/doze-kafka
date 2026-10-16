@@ -2134,5 +2134,41 @@
   "liveValue": "If the broker was stopped on purpose, start it again and this page resumes by itself.",
   "record": "Deviations: Traf-10 Disconnected",
   "quote": "The note's link \"What to check when the broker is down\" is not drawn"
+ },
+ {
+  "board": "Traf-10",
+  "theme": "*",
+  "width": 1440,
+  "element": "rows",
+  "index": 0,
+  "prop": "op",
+  "boardValue": "0.55",
+  "liveValue": "1",
+  "record": "Deviations: Traf-10 Disconnected",
+  "quote": "the page mutes them instead"
+ },
+ {
+  "board": "Traf-10",
+  "theme": "light",
+  "width": 1440,
+  "element": "rows",
+  "index": 0,
+  "prop": "color",
+  "boardValue": "rgb(23, 25, 28)",
+  "liveValue": "rgb(86, 91, 99)",
+  "record": "Deviations: Traf-10 Disconnected",
+  "quote": "the page mutes them instead"
+ },
+ {
+  "board": "Traf-10",
+  "theme": "dark",
+  "width": 1440,
+  "element": "rows",
+  "index": 0,
+  "prop": "color",
+  "boardValue": "rgb(233, 234, 235)",
+  "liveValue": "rgb(163, 169, 176)",
+  "record": "Deviations: Traf-10 Disconnected",
+  "quote": "the page mutes them instead"
  }
 ]

@@ -1,7 +1,8 @@
 import { test, expect } from '../fixtures/console';
 import type { Page } from '@playwright/test';
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
+import { stopAndRemove } from '../cleanup';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -165,8 +166,7 @@ test('Sy-08 at 320 with a 60-character console prefix: an address is never broke
     const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(over, 'the page does not scroll sideways').toBeLessThanOrEqual(0);
   } finally {
-    child?.kill('SIGTERM');
-    rmSync(dir, { recursive: true, force: true });
+    await stopAndRemove(child, dir);
   }
 });
 
@@ -246,9 +246,7 @@ test('a fresh empty broker lands on "Your broker is up", with the three steps', 
     await page.goto(base);
     await expect(page.locator('h1')).not.toHaveText('Your broker is up');
   } finally {
-    child?.kill('SIGTERM');
-    await new Promise((r) => setTimeout(r, 300));
-    rmSync(dir, { recursive: true, force: true });
+    await stopAndRemove(child, dir);
   }
 });
 
@@ -375,7 +373,7 @@ test('the keys strip is at the foot of every page and says keys the page has', a
 test('every section has the board\'s home: its title, its summary line and its table', async ({ page }) => {
   await page.goto('topics');
   await expect(page.locator('#topics-summary')).toContainText(/\d+ topics?/);
-  await expect(page.locator('#topics-table .r.h span')).toHaveText(['Topic', 'Partitions', 'Messages', 'Retention', 'Read by', 'Compact', 'Schema subject']);
+  await expect(page.locator('#topics-table .r.h span')).toHaveText(['Topic', 'Partitions', 'Messages', 'Size', 'Retention', 'Read by', 'Compact', 'Schema subject']);
   await page.goto('groups');
   await expect(page.locator('#groups-summary')).toContainText('records behind in total');
   await expect(page.locator('#groups-table .r.h span')).toHaveText(['Group', 'Protocol', 'State', 'Members', 'Topics', 'Lag', 'Generation']);
@@ -387,7 +385,8 @@ test('every section has the board\'s home: its title, its summary line and its t
   await expect(page.locator('#cluster-sentence')).toContainText(/^Node \d+/);
   await expect(page.locator('#cluster-identity .r.h')).toContainText('Identity');
   await expect(page.locator('#cluster-counts .r.h')).toContainText('Counts');
-  await expect(page.locator('aside.list .li').first()).toHaveText(/Overview/);
+  await expect(page.locator('aside.list .li').first()).toHaveText('This broker');
+  await expect(page.locator('aside.list a.li').first()).toHaveText(/Overview/);
   await page.goto('access');
   await expect(page.locator('#acl-table .r.h span')).toHaveText(['Principal', 'Type', 'Name', 'Pattern', 'Operation', 'Permission', 'Host']);
   await expect(page.locator('main .callout').first()).toContainText('These are enforced');
@@ -569,9 +568,9 @@ test('the Topics table qualifies read by and written by', async ({ page }) => {
   await page.goto('topics');
   await expect(page.locator('#topics-table')).not.toContainText(/^nobody$/m);
   await expect(page.locator('#topics-summary')).toContainText(/written by \d+ clients?/);
-  await expect(page.locator('#topics-summary')).toContainText(/from recent requests, the oldest .+ old/);
+  await expect(page.locator('#topics-summary')).toContainText(/from the last .+ of requests/);
   await page.goto('topics/seed-orders');
-  await expect(page.locator('#neighbours-note')).toContainText('Written by is from recent requests, the oldest');
+  await expect(page.locator('#neighbours-note')).toContainText('Written by is from the last ');
 });
 
 // Gr-02: the Lag tab ends in Try it, the fields OffsetCommit takes.
@@ -719,7 +718,11 @@ test('the title of a topic, a group and a subject is the boards\' .h1.m: Plex Sa
   }
 });
 
-test('every .btn is weight 400, <button> or <a> (the boards draw them all as buttons); only Cl-Home\'s "Connect an app" is 500', async ({ page }) => {
+test('every .btn is weight 400, <button> or <a>; the links the boards draw as links (Cl-Home\'s "Connect an app", Ac-Home\'s "Create ACL", Sc-Home\'s "Register schema") are 500', async ({ page }) => {
+  await page.goto('access');
+  await expect(page.locator('main a.btn', { hasText: 'Create ACL' }).first()).toHaveCSS('font-weight', '500');
+  await page.goto('schemas');
+  await expect(page.locator('main a.btn', { hasText: 'Register schema' }).first()).toHaveCSS('font-weight', '500');
   await page.goto('topics/seed-orders');
   await expect(page.locator('main button.btn.pri').first()).toHaveCSS('font-weight', '400');
   await expect(page.locator('main button.btn').first()).toHaveCSS('font-weight', '400');

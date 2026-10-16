@@ -110,7 +110,10 @@
     // Command-Enter belongs to the page (it sends the composer); the default
     // keymap would use it to insert a blank line.
     var keys = C.defaultKeymap.filter(function (k) { return k.key !== "Mod-Enter"; });
+    // The editable area is named by the field's label ("Value"), as the textarea was.
+    var name = (ta.labels && ta.labels[0] && ta.labels[0].textContent.trim()) || ta.getAttribute("aria-label") || "Value";
     var extensions = [
+      C.EditorView.contentAttributes.of({ "aria-label": name }),
       C.lineNumbers(),
       C.history(),
       C.drawSelection(),

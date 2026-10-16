@@ -124,8 +124,9 @@ type Options struct {
 // shows these in the top bar, on the Connect page and on a first run; it never
 // invents a value for one that was not given.
 type BrokerFacts struct {
-	// Workspace labels the broker in the top bar: the instance's name (the one it
-	// answers to as kafka.<name>.doze), so two brokers on one machine can be told apart.
+	// Workspace labels the broker in the top bar: the instance's name, so two brokers
+	// on one machine can be told apart. With the zone on it is also the name the broker
+	// answers to (kafka.<name>.doze); with DOZE_ZONE=off it is only the label.
 	Workspace string
 	// KafkaMajor is the Kafka major version the broker declares ("Kafka 4.0 compat").
 	KafkaMajor int
@@ -139,6 +140,9 @@ type BrokerFacts struct {
 	// RegistryURL is where clients reach the schema registry, which is not always
 	// where the console does (a name the zone routes, against the loopback port).
 	RegistryURL string
+	// RegistryBuiltIn says the registry is the broker's own, which keeps its schemas in
+	// the broker's metadata database (meta.db), not in a _schemas topic.
+	RegistryBuiltIn bool
 	// AutoCreateTopics says whether a producer that names a topic that does not exist
 	// makes it, with DefaultPartitions partitions.
 	AutoCreateTopics  bool
@@ -468,11 +472,24 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 		// its plain text, for an attribute.
 		"when": when,
 		// the declared key map, for the help overlay and for shell.js (keys.go).
-		"keyGroups":  keyGroups,
-		"keymapJSON": keymapJSON,
-		"whenText":   whenText,
-		"hasPrefix":  strings.HasPrefix,
-		"hasSuffix":  strings.HasSuffix,
+		"keyGroups":       keyGroups,
+		"dialogHints":     dialogHints,
+		"acksChoices":     acksChoices,
+		"topicNameRule":   topicNameRule,
+		"topicNameMax":    topicNameMax,
+		"takenRule":       takenRule,
+		"subjectNameRule": subjectNameRule,
+		"pluralWord":      pluralWord,
+		"aclNote":         func(f string) string { return aclFieldNotes[f] },
+		"add":             func(a, b int) int { return a + b },
+		"segs":            segsHTML,
+		"diskSize":        diskSize,
+		"countWord":       countWord,
+		"groupDot":        groupDot,
+		"keymapJSON":      keymapJSON,
+		"whenText":        whenText,
+		"hasPrefix":       strings.HasPrefix,
+		"hasSuffix":       strings.HasSuffix,
 		"refsJSON": func(refs any) string {
 			b, _ := json.Marshal(refs)
 			return string(b)

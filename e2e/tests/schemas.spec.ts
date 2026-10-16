@@ -60,7 +60,8 @@ test('trying a schema says whether it may be registered, and why not', async ({ 
 
   await editor.fill(`{"type":"record"`);
   await page.getByRole('button', { name: 'Check compatibility' }).click();
-  await expect(result).toContainText('Not a valid schema');
+  // The registry's refusal of a schema it cannot read, said as one (A2): its kind and code.
+  await expect(result.locator('[data-refusal-kind="refused"][data-refusal-source="registry"][data-refusal-name="42201"]')).toBeVisible();
 
   await editor.fill(AVRO(`,{"name":"email","type":["null","string"],"default":null}`));
   await page.getByRole('button', { name: 'Check compatibility' }).click();
@@ -123,7 +124,7 @@ test('deleting a subject asks first, and then it is gone', async ({ page, unique
 
 test('a topic links its schema, and its records are shown as the JSON they mean', async ({ page }) => {
   await page.goto('topics/seed-events');
-  await expect(page.locator('#topic-facts')).toContainText('Avro value with schema seed-events-value v2');
+  await expect(page.locator('#topic-facts')).toContainText('an Avro value with schema seed-events-value v2'); // the newest record's
   // The table shows the decoded value, not a binary blob.
   const row = page.locator('tr[id^="msg-"]').filter({ hasText: 'shipped' });
   await expect(row.locator('.cell-val')).toContainText('"note"');
@@ -160,7 +161,8 @@ test('the composer writes a record encoded with the topic\'s schema, and says wh
   await page.locator('#f-name').fill(topic);
   await page.getByRole('button', { name: 'Create topic' }).click();
   await expect(page.locator('.idband h1')).toHaveText(topic);
-  await expect(page.locator('#topic-facts')).toContainText('value with schema');
+  // Nothing is written yet: a subject named like the topic says nothing about its records.
+  await expect(page.locator('#topic-facts')).not.toContainText('schema');
 
   await page.locator('#compose-head').click();
   const pick = page.locator('select[name="schema_subject"]');

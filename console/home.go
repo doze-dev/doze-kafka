@@ -79,6 +79,16 @@ type connectFacts struct {
 	CommandConfig string
 }
 
+// EnvNames are the variables Env sets, by name.
+func (f connectFacts) EnvNames() []string {
+	var out []string
+	for _, line := range f.Env {
+		name, _, _ := strings.Cut(strings.TrimPrefix(line, "export "), "=")
+		out = append(out, name)
+	}
+	return out
+}
+
 func (c *Console) connectFacts(r *http.Request) connectFacts {
 	f := connectFacts{
 		Bootstrap: c.be.displayAddr(),
@@ -128,8 +138,24 @@ func (c *Console) connectFacts(r *http.Request) connectFacts {
 		f.Properties = append(f.Properties, "security.protocol="+f.Protocol)
 	}
 	if f.SASL {
-		f.Properties = append(f.Properties, "sasl.mechanism="+f.Mechanisms[0])
+		// The login itself: the JAAS line the Java client and the Kafka tools read, with
+		// the login module of the mechanism (the Kafka documentation's security section);
+		// the user and the password are the person's to write in.
+		module := "org.apache.kafka.common.security.plain.PlainLoginModule"
+		if strings.HasPrefix(f.Mechanisms[0], "SCRAM-") {
+			module = "org.apache.kafka.common.security.scram.ScramLoginModule"
+		}
+		f.Properties = append(f.Properties, "sasl.mechanism="+f.Mechanisms[0],
+			"sasl.jaas.config="+module+` required username="<user>" password="<password>";`)
+		for _, m := range f.Mechanisms[1:] {
+			f.Properties = append(f.Properties, "# the listener also takes "+m+": set sasl.mechanism to it (with the matching login module) to use it")
+		}
 		f.CommandConfig = "--command-config client.properties "
+		if f.Registry != "" {
+			// The registry asks for the same users, as HTTP basic authentication
+			// (server/registry.go); a Confluent serializer sends them with these two.
+			f.Properties = append(f.Properties, "basic.auth.credentials.source=USER_INFO", "basic.auth.user.info=<user>:<password>")
+		}
 	} else if f.TLS {
 		f.CommandConfig = "--command-config client.properties "
 	}
@@ -162,6 +188,9 @@ func (c *Console) connectPage(w http.ResponseWriter, r *http.Request) {
 	}
 	if f.Registry != "" {
 		rows = append(rows, connectRow{Key: "schema.registry.url", Value: f.Registry, Copy: true})
+		if f.SASL {
+			rows = append(rows, connectRow{Key: "basic.auth.user.info", Note: "the same user and password, for the registry: it asks for them as HTTP basic authentication"})
+		}
 	}
 	rows = append(rows, connectRow{Key: "console", Value: f.Console, Copy: true})
 	c.render(w, r, "connect_detail", map[string]any{"Facts": f, "Rows": rows, "Page": "connect", "View": "connect", "Title": "Connect an app"})

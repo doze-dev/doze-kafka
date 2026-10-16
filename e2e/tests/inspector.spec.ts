@@ -63,7 +63,8 @@ test('a message is selected, closed, refreshed and left with Back', async ({ pag
 });
 
 test('a request is selected, closed, refreshed and left with Back', async ({ page }) => {
-  await page.goto('traffic');
+  // The seed's own requests (the page lists the newest 200, and a suite asking at the same time pushes them out).
+  await page.goto('traffic?client=doze-seed');
   await cycle(page, page.locator('#traffic-table .tf-rows > .r[data-row]', { hasText: 'Produce' }).filter({ hasText: 'seed-orders' }).first(), 'request');
 });
 

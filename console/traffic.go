@@ -854,9 +854,13 @@ func (c *Console) ringText(now time.Time) (short, long string) {
 		return "from recent requests; none are kept yet",
 			"Written by is counted from " + kept + ", and none are kept yet. It does not survive a restart."
 	}
+	// spanText says "just now" below two seconds; every row held is then that young.
 	age := spanText(now.Sub(held.Oldest))
-	return "from recent requests, the oldest " + age + " old",
-		"Written by is counted from " + kept + ". It reaches back " + age + ": a client that wrote earlier, or whose requests have been pushed out, is not listed. It does not survive a restart."
+	if age == "just now" {
+		age = "2s"
+	}
+	return "from the last " + age + " of requests",
+		"Written by is counted from " + kept + ". They reach back " + age + ": a client that wrote earlier, or whose requests have been pushed out, is not listed. It does not survive a restart."
 }
 
 // autoCreateTopics is the broker's setting, when the console knows it.

@@ -19,7 +19,7 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ROOT } from './board';
+import { ROOT } from './render';
 import { PROPS, type El, type Prop } from './measure';
 
 /** One pair: an element (or a list of them) on the board and its live counterpart. */

@@ -25,7 +25,7 @@
 {{define "inspector_request"}}
 {{if .Fold}}
 <div class="bd" id="request-inspector">
-  <p id="fold-sentence">{{.R.Count}} identical {{.Fold.Unit}}s are shown as one row. Each one asked the same thing and got the same answer.</p>
+  <p id="fold-sentence">{{.R.Count}} identical {{pluralWord .Fold.Unit}} are shown as one row. Each one asked the same thing and got the same answer.</p>
   <div class="kv" style="--c: 108px 1fr">
     <span>First</span><span class="m">{{when .R.First "clockms"}}</span>
     <span>Last</span><span class="m">{{when .R.Time "clockms"}}</span>

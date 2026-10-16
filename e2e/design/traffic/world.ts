@@ -21,9 +21,10 @@
 //   quiet-app       asks Metadata every 2 s and reports no metrics
 
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { appendFileSync, mkdirSync, rmSync } from 'node:fs';
+import { removeDir } from '../../cleanup';
+import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { ROOT } from '../lib/board';
+import { ROOT } from '../lib/render';
 import { Ledger } from '../lib/ledger';
 
 export type World = {
@@ -65,8 +66,8 @@ export async function startWorld(base: number, prefix: string): Promise<World> {
   mkdirSync(join(TMP, 'bin'), { recursive: true });
   execFileSync('go', ['build', '-o', bin, './cmd/doze-kafka'], { cwd: ROOT, env: { ...process.env, GOWORK: 'off' } });
   execFileSync('go', ['build', '-o', gen, './e2e/design/gen'], { cwd: ROOT, env: { ...process.env, GOWORK: 'off' } });
-  rmSync(data, { recursive: true, force: true });
-  rmSync(ledgerDir, { recursive: true, force: true });
+  removeDir(data);
+  removeDir(ledgerDir);
   mkdirSync(data, { recursive: true });
   mkdirSync(ledgerDir, { recursive: true });
 

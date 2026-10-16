@@ -37,5 +37,14 @@ func doRegistry(req *http.Request) (*http.Response, error) {
 	if user := os.Getenv("E2E_SASL_USER"); user != "" {
 		req.SetBasicAuth(user, os.Getenv("E2E_SASL_PASS"))
 	}
-	return http.DefaultClient.Do(req)
+	return registryClient().Do(req)
+}
+
+// registryClient is the HTTP client for the registry: with E2E_TLS=1 the registry
+// serves the identity's self-signed certificate too, and any certificate is accepted.
+func registryClient() *http.Client {
+	if os.Getenv("E2E_TLS") != "1" {
+		return http.DefaultClient
+	}
+	return &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}} //nolint:gosec // a throwaway certificate on loopback.
 }

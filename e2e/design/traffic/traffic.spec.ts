@@ -1,15 +1,15 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, type Browser, type Page } from '@playwright/test';
-import { test, expect } from '../fixtures/console';
-import { PREFIX } from '../playwright.config';
-import { boardURL, ROOT, type Theme } from '../design/lib/board';
-import { snapshot } from '../design/lib/measure';
-import { diffPairs, entryFor, judge, loadAllow, report, selectors, type Diff } from '../design/lib/diff';
-import { Ledger } from '../design/lib/ledger';
-import { BOARDS, type Board } from '../design/traffic/boards';
-import { TRUTHS } from '../design/traffic/truth';
-import { startWorld, type World } from '../design/traffic/world';
+import { test, expect } from '../../fixtures/console';
+import { PREFIX } from '../../playwright.config';
+import { openBoard, ROOT } from '../lib/render';
+import { snapshot } from '../lib/measure';
+import { diffPairs, entryFor, judge, loadAllow, report, selectors, type Diff } from '../lib/diff';
+import { Ledger } from '../lib/ledger';
+import { BOARDS, type Board } from './boards';
+import { TRUTHS } from './truth';
+import { startWorld, type World } from './world';
 
 // The design gate for Traffic (plan/01-protocol.md, "Design conformance"): each board of
 // the design rendered from its own HTML and CSS (e2e/design/boards), the live page put
@@ -20,12 +20,13 @@ import { startWorld, type World } from '../design/traffic/world';
 // fails unless e2e/design/traffic/allow.json names it exactly, with the words of
 // plan/00-foundation.md that record why; an entry no difference uses fails too.
 //
-// `go tool task design` runs this spec alone. DESIGN_WORLD=1 measures a world already
+// `go tool task design` runs it with the rest of the design gate. DESIGN_WORLD=1 measures a world already
 // running (design/traffic/up.ts) instead of starting one.
 
 const PORT = Number(process.env.E2E_PORT ?? 14092) + 40;
 const ALLOW = join(ROOT, 'e2e', 'design', 'traffic', 'allow.json');
 const REPORT = join(ROOT, 'e2e', '.tmp', 'design-traffic-report.json');
+type Theme = 'light' | 'dark';
 const THEMES: Theme[] = ['light', 'dark'];
 
 test.describe.configure({ mode: 'serial' });
@@ -126,9 +127,7 @@ test('the Traffic pages are the boards, element by element, at 1440 in light and
       await test.step(`${board.id} (${theme}, 1440)`, async () => {
         const width = 1440;
         const sels = selectors(board.pairs);
-        const boardPage = await livePage(theme, width);
-        await boardPage.goto(boardURL(board.file, theme));
-        await boardPage.evaluate(() => document.fonts.ready);
+        const boardPage = await openBoard(browser, board.file, width, theme);
         const b = await snapshot(boardPage, sels.board);
         await boardPage.context().close();
 

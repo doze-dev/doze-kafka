@@ -49,10 +49,10 @@ func TestWrittenByReachesBackToTheOldestRequestHeld(t *testing.T) {
 	src := sampleTraffic()
 	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = src })
 	short, long := c.ringText(tt0.Add(90 * time.Second))
-	if short != "from recent requests, the oldest 1 min 30 s old" && !strings.Contains(short, "the oldest 1") {
+	if short != "from the last 1m 30s of requests" {
 		t.Errorf("short = %q", short)
 	}
-	if !strings.Contains(long, "the last 2,000 requests") || !strings.Contains(long, "It reaches back") {
+	if !strings.Contains(long, "the last 2,000 requests") || !strings.Contains(long, "They reach back 1m 30s") {
 		t.Errorf("long = %q", long)
 	}
 	if src.whole != 0 {

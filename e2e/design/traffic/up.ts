@@ -1,14 +1,14 @@
 // Starts the Traffic world and keeps it running, for working on the pages against it:
 //
 //	cd e2e && bun design/traffic/up.ts            # prints the console's address
-//	DESIGN_WORLD=1 bunx playwright test tests/design-traffic.spec.ts
+//	DESIGN_WORLD=1 bunx playwright test -c design/playwright.config.ts traffic
 //
 // The spec then measures this world instead of making its own (the world's address and
 // ledger are in e2e/.tmp/design-world.json). Ctrl-C stops it all.
 
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ROOT } from '../lib/board';
+import { ROOT } from '../lib/render';
 import { startWorld } from './world';
 
 const base = Number(process.env.DESIGN_PORT ?? 14160);

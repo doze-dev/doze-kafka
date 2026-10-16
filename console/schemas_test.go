@@ -2,6 +2,7 @@ package console
 
 import (
 	"context"
+	"encoding/json"
 	"html"
 	"net/http"
 	"net/http/httptest"
@@ -153,7 +154,9 @@ func TestSchemaCheckSaysWhyNot(t *testing.T) {
 	if !strings.Contains(bad, "Not compatible") || !strings.Contains(bad, "email") {
 		t.Errorf("an incompatible schema: %s", bad)
 	}
-	if got := check(`{"type":"record"`); !strings.Contains(got, "Not a valid schema") {
+	// A schema that does not parse is the registry's refusal (42201), said as one (A2:
+	// its kind, its source, its name), in the check's own place.
+	if got := check(`{"type":"record"`); !strings.Contains(got, `data-refusal-kind="refused" data-refusal-source="registry" data-refusal-name="42201"`) {
 		t.Errorf("a broken schema: %s", got)
 	}
 	// Registering the incompatible one is refused with the registry's reason.
@@ -301,6 +304,35 @@ func TestPaletteListsSubjects(t *testing.T) {
 	}
 	if counts := req(t, c, "GET", "/_console/api/counts", nil).Body.String(); !strings.Contains(counts, `"schemas":1`) {
 		t.Errorf("counts = %s, want schemas:1", counts)
+	}
+}
+
+// Sy-05's subject result: its language, its versions and its compatibility level
+// ("Avro · v1-3 · BACKWARD"), read from the registry, the level the subject's own
+// where it has one.
+func TestPaletteSaysASubjectsVersionsAndLevel(t *testing.T) {
+	c, _, _ := newRegistryConsole(t)
+	register(t, c, "orders-value", userV1)
+	register(t, c, "orders-value", userV2)
+	register(t, c, "audit-value", userV1)
+	if err := c.reg.SetCompat(context.Background(), "audit-value", "FULL"); err != nil {
+		t.Fatal(err)
+	}
+	var entries []paletteEntry
+	if err := json.Unmarshal(req(t, c, "GET", "/_console/api/palette", nil).Body.Bytes(), &entries); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"orders-value": "Avro · v1-2 · BACKWARD", "audit-value": "Avro · v1 · FULL"}
+	for _, e := range entries {
+		if w, ok := want[e.N]; ok && e.K == "schema" {
+			if e.D != w {
+				t.Errorf("%s says %q, want %q", e.N, e.D, w)
+			}
+			delete(want, e.N)
+		}
+	}
+	if len(want) != 0 {
+		t.Errorf("not in the palette: %v", want)
 	}
 }
 

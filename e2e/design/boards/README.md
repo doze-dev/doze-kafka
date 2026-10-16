@@ -1,8 +1,36 @@
-# The boards' files
+# The design's boards
 
-Copied unmodified from the design artifact (https://claude.ai/artifact/DFbFCyDEEbRsyFP7DRQuvx),
-its `project/` folder: `Main`, `Traf-02` to `Traf-12`, `Sy-03` to `Sy-06` as `*.dc.html`, and
-`con.css`. To refresh them, read each file from the artifact (the Artifact tool's `read`
-action with `path: project/<name>`, or export `project/`), overwrite the file here, and run
-`go tool task design`; for each new difference fix the page, or record the deviation in
-`plan/00-foundation.md` and add its entry to `../traffic/allow.json`. See `../README.md`.
+These files are the console's design, as the design gate (`e2e/design`) renders it.
+They are the `project/` files of the design artifact
+<https://claude.ai/artifact/DFbFCyDEEbRsyFP7DRQuvx>, read with
+the Artifact tool's `read` action and copied here unchanged. They were read at
+version 1791810435-5010 and read again at 1792149264-d921 on 2026-10-16; every file
+here is byte-identical in both (the hashes are in `SHA256SUMS`).
+
+- `con.css`: the shared stylesheet every board links;
+- `canvas.json`: the artifact's index of boards (names, sizes, order);
+- `<Board>.dc.html`: one board each. Only the boards a committed spec compares or an
+  allow-list entry cites are here: Main and Traf-02 to Traf-12 (the Traffic boards,
+  measured by `traffic/`), Sy-01 to Sy-08, the section homes (Tp-Home,
+  Gr-Home, Sc-Home, Tc-Home, Ac-Home, Cl-Home), Tp-24, the Access boards the Access
+  home builds from (Ac-03 Create, Ac-05 Check), and the topic page's own boards that
+  the Sy allow-list measures where the boards disagree (Tp-05 Messages, Tp-06
+  Message: an entry with `per` is checked against them) or names (Tp-14 Go to
+  offset). Tp-05, Tp-06 and Tp-14 were read at 1792149264-d921 only. The Traffic boards (Main,
+  Traf-02 to Traf-12) were copied from the same artifact's `project/` folder, unmodified;
+  the artifact version they were read at was not recorded.
+
+A board is a static page: it links `./support.js` (the design runtime, which these
+boards do not need: they have no holes to fill; the gate serves an empty file in its
+place) and asks Google Fonts for IBM Plex (the gate serves the console's own vendored
+Plex files instead, `console/static/fonts`, so a difference in type is never a
+difference in font files). Nothing else is loaded.
+
+To take a newer version of a board, read the artifact again, replace the file, and
+run `go tool task design`: every difference the new board makes is reported, and the
+allow-lists (`../shell/allow.ts`, `../homes/allow.ts`, `../traffic/allow.json`) say
+which are known; for each new one fix the page, or record the deviation in
+`plan/00-foundation.md` and add its entry.
+
+SHA-256 of each file as committed is in `SHA256SUMS`; `go tool task design`
+does not check it, a reviewer can (`shasum -a 256 -c SHA256SUMS`).
