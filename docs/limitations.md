@@ -68,10 +68,17 @@ implement it.
   new targets are there when the join is answered, the group is never `Assigning`, and
   that generation is one higher. Which request is answered with which code is the same
   (recorded: `mixed-protocol-groups.json`, `mixed-protocol-rolling.json`).
-- **An empty group with no committed offsets is forgotten at once.** Kafka keeps it
-  listed, `Empty`, until its offsets retention has passed; here a group that holds
-  nothing is not worth listing, and a console that showed every consumer that ever
-  came and went would be a long page.
+- **A classic member of a consumer group whose subscription cannot be read** is refused
+  `INCONSISTENT_GROUP_PROTOCOL` on the `JoinGroup` that brings its member id. Kafka
+  answers that `JoinGroup` `UNKNOWN_SERVER_ERROR` (an exception it did not catch); both
+  are refusals a client does not retry (recorded: `group-requests-refused.json`, step
+  `cm-classic-join-unreadable-subscription-with-id`).
+- **How often committed offsets are checked is not a setting.** Kafka has
+  `offsets.retention.check.interval.ms` (10 minutes); here the check runs every
+  hundredth of `--offsets-retention`, between 50 ms and 10 minutes, so it is Kafka's
+  default at the default retention and sooner with a short one. It is the same check
+  that drops a group with no members and no offsets, on both
+  (recorded: `offsets-retention-recreate.json`).
 - **A batch whose `acks=all` fsync failed stays in the log.** The producer is told
   `KAFKA_STORAGE_ERROR` with no offset, but the batch was already appended: a consumer
   can read it, and a non-idempotent retry stores it again (an idempotent retry is
@@ -218,19 +225,32 @@ implement it.
   `error_message` text is this broker's (it names what to do about it). A Produce batch
   that is too large or corrupt is refused with Kafka's code and, here, a text where Kafka
   sends none. Match on the code.
+- **Group error messages are Kafka's where a recording has them.** A
+  `ConsumerGroupHeartbeat` refusal carries Kafka's text (recorded:
+  `group-requests-refused.json`, `ch-*`, `cs-*`); a few refusals no recording has seen
+  (a group id that is not storable here, a join that could not be written down) carry
+  this broker's own. Classic group APIs carry no message on either.
 - **A partition named twice in one ListOffsets request is answered twice.** Kafka answers
   such an entry once, with `INVALID_REQUEST`. The console asks for a partition's earliest
   and latest offset as two entries of one request, so this stays until it asks differently.
 - **Group membership is not kept across a restart.** Committed offsets are; the members,
   their generation and their assignments are not. After a restart every member must
-  rejoin, and a commit that carries the old generation is `ILLEGAL_GENERATION`, where
-  Kafka (which reloads its groups) accepts it until the session times out.
+  rejoin: its heartbeat is `UNKNOWN_MEMBER_ID` and a commit that carries the old
+  generation is `ILLEGAL_GENERATION`, where Kafka (which reloads its groups) accepts
+  both until the session times out. Until somebody rejoins, the group is listed and
+  described `Empty`, as a classic group with no protocol type whatever it was, where
+  Kafka shows it `Stable` with the members it loaded. What is kept is that the group
+  had members, so its committed offsets expire when Kafka's would
+  ([consumer groups](consumer-groups.md#when-committed-offsets-expire); recorded:
+  `offsets-retention-restart.json`), with one difference on the side of keeping:
+  while the members a real broker would have loaded could still be there, nothing of
+  the group expires, where Kafka goes on expiring the offsets of topics those members
+  were not subscribed to.
 - **On-disk format is doze-kafka's own.** Record batches are stored verbatim (so
   compression round-trips), but the segment/index file layout is not byte-compatible
   with Apache Kafka's. Only doze-kafka reads its own files.
 - **Consumer-group assignor** is a plain, even round-robin (`uniform`) or `range`; it
-  isn't the sticky, cross-topic-balanced reference assignor. Static membership
-  (`group.instance.id`) is accepted on the wire but not acted on.
+  isn't the sticky, cross-topic-balanced reference assignor.
 - **SASL details.** No Kerberos/GSSAPI, no OAUTHBEARER, no delegation tokens, and no
   `SASLprep` normalization (use ASCII credentials).
 

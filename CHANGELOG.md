@@ -143,6 +143,99 @@ here that contains "server API"; `task api` fails without it.
   [What SASL and TLS cover](docs/auth-and-tls.md#what-sasl-and-tls-cover) says what
   each setting reaches.
 
+- Groups: an empty group with committed offsets is listed and described after a restart
+  as before it (recorded: `groups-listed-after-restart`): a classic group kept its
+  offsets but lost its protocol type, and an emptied consumer-protocol group was gone
+  from `ConsumerGroupDescribe` and listed as classic. The store's record of a group now
+  carries its protocol type, or its epoch and assignor (records of earlier versions are
+  still read).
+
+- Groups: requests Kafka refuses are refused, with Kafka's codes (recorded:
+  `group-requests-refused`). An empty group id is `INVALID_GROUP_ID` on every classic
+  group API and `OffsetDelete` (a v0 `JoinGroup` used to join a group named ""). A
+  classic `JoinGroup` with no protocol type is `INCONSISTENT_GROUP_PROTOCOL`. A
+  `ConsumerGroupHeartbeat` join that says it owns partitions, or does not say, is
+  `INVALID_REQUEST`, as is a static leave with no instance id and an empty instance id;
+  a rebalance timeout of 0 is accepted; a later epoch in a group that does not exist is
+  `GROUP_ID_NOT_FOUND`; the messages are Kafka's. `OffsetCommit` below v9 from a
+  consumer-protocol member is `UNSUPPORTED_VERSION`. In a consumer group, a classic
+  `SyncGroup` with the wrong protocol type or name is `INCONSISTENT_GROUP_PROTOCOL`, a
+  classic `JoinGroup` must share a protocol with the other classic members, an unknown
+  member id is seated as Kafka seats it, a classic member's `ConsumerGroupHeartbeat` is
+  answered, and a classic `LeaveGroup` can remove a consumer-protocol member. A
+  `LeaveGroup` from v3 answers 0 at the top level and each member's code beside it.
+- Groups: static membership fencing. A request naming a static instance nobody holds is
+  `UNKNOWN_MEMBER_ID`, and one naming an instance another member holds is
+  `FENCED_INSTANCE_ID`, on `Heartbeat`, `SyncGroup`, `OffsetCommit` and
+  `ConsumerGroupHeartbeat` (a member heartbeating with the wrong instance id used to be
+  answered 0; the member a restarted consumer-protocol instance replaced was
+  `UNKNOWN_MEMBER_ID`). An empty `group.instance.id` is an instance id on a classic
+  `JoinGroup`, as on Kafka. The docs no longer say static membership is not acted on.
+
+- server API: `Options.OffsetsRetention` sets how long committed offsets are kept once
+  nothing reads them, as the CLI's `--offsets-retention`. An embedder had expiry at the
+  7-day default with no way to change or turn it off; zero is still that default and a
+  negative value keeps offsets for ever.
+
+- Groups: a classic member of a consumer group that rejoins keeps the partitions its
+  `JoinGroup` says it still owns, as Apache Kafka 4.3.1 does (recorded:
+  `mixed-protocol-cooperative`). Every rejoin used to give up everything, which is
+  true of an eager consumer only: a cooperative-sticky one goes on reading until its
+  `SyncGroup` returns, and its partitions could be handed to another member meanwhile.
+  Its assignment is written at the version of its subscription. A static classic
+  member (`group.instance.id`) that restarts takes the place of the member holding its
+  instance instead of being seated twice, and the old member id is
+  `FENCED_INSTANCE_ID` (recorded: `mixed-protocol-static`).
+
+- Groups: a classic group upgraded in the middle of a rebalance answers what it had
+  parked as Apache Kafka 4.3.1 does (recorded: `mixed-protocol-parked`). A `JoinGroup`
+  waiting for the others to rejoin was answered `UNKNOWN_MEMBER_ID`, which makes a
+  client throw its member id away, while that id was kept as a member of the new
+  consumer group and held a share of the partitions until its session ran out (45 s
+  for a Java client). It is now `REBALANCE_IN_PROGRESS`, the member keeps its id and
+  its next `JoinGroup` finds its seat. A group upgraded between its `JoinGroup`s and
+  the leader's `SyncGroup` keeps each member's partitions of the generation before
+  (they were dropped, which freed them for the new member while a cooperative consumer
+  was still reading them), and the `SyncGroup`s that follow are
+  `REBALANCE_IN_PROGRESS`. A refused `SyncGroup` carries no protocol type and no
+  protocol name.
+
+- Offsets retention: a group that is gone leaves nothing behind. `DeleteGroups` removed
+  the group's offsets and left "empty since" in memory, so the same id used afterwards
+  by a standalone committer had its new offsets judged by when the deleted group had
+  emptied, and lost them early. The record now goes with the group, before its offsets
+  do. As on Apache Kafka 4.3.1 (recorded: `offsets-retention-recreate`), a group with no
+  members and no offsets is dropped by the next sweep, classic or consumer-protocol:
+  until then it is listed `Empty` and a commit made into it is a commit into an empty
+  group; after it, the id is a new group. Before this a classic group with no offsets
+  was unlisted the moment its last member left (Kafka lists it until its next check),
+  an emptied consumer-protocol group with no offsets stayed listed until the broker
+  restarted, and the emptiness of a group that then lost its last offset was counted
+  against later commits for a whole retention. A classic group that empties moves on a
+  generation, as Kafka's does: the next member to join is told two more than the last
+  one had.
+
+- Offsets retention: a restart no longer expires the offsets of a group that was live
+  when the broker stopped. Members are not kept across a restart, and a group with none
+  in memory and no record of having emptied was taken for one nobody had ever joined:
+  each offset expired from its own commit, so the first sweep after a restart could
+  delete an old, valid offset on a quiet partition before its consumer was back. The
+  metadata database now records that a group has members (and their longest session)
+  before the first member's join is answered, so it is there after a crash too. After a
+  restart such a group is treated as Apache Kafka 4.3.1 treats the members it loads
+  back (recorded: `offsets-retention-restart`): they are there until their session has
+  passed with nobody joining; from then a classic group has its retention to go, and a
+  consumer-protocol group's offsets are as old as their commits. That last is Kafka's
+  rule for any consumer-protocol group with no members, and is new here: such a group
+  used to keep its offsets for the retention from when it emptied. A data directory
+  from an earlier version is adopted on first start (every group with offsets is taken
+  to have had members). The record is kept with `--offsets-retention 0` as well. A join
+  that cannot be recorded is `COORDINATOR_NOT_AVAILABLE`. The sweep judges a group from
+  one view of it, taken with both coordinators held still, where it read three things
+  under three locks; a failed write of the record is tried again; and a group being
+  deleted is skipped. ConsumerGroupDescribe of a group that does not exist carries
+  Kafka's message, `Group <id> not found.`
+
 - Console: every button reads weight 400 whether it is a button or a link drawn as one (the
   boards draw them all as buttons). A request that took under a millisecond shows its
   measured time (`42 µs`, `0.4 ms`) rather than the design boards' `0 ms`: a broker

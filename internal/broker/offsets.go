@@ -275,7 +275,7 @@ func (b *Broker) commitFence(oc *kmsg.OffsetCommitRequest) int16 {
 		return kerr.InvalidGroupID.Code
 	}
 	if b.claims.ownerOf(oc.Group) == protoConsumer {
-		return b.cg848.validateCommit(oc.Group, oc.MemberID, oc.Generation)
+		return b.cg848.validateCommitAt(oc.Group, oc.MemberID, oc.Generation, oc.GetVersion())
 	}
 	return b.groups.validateCommit(oc.Group, oc.MemberID, oc.InstanceID, oc.Generation)
 }

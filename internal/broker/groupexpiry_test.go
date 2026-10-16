@@ -109,6 +109,7 @@ func TestGroupSessionExpiry_KIP848(t *testing.T) {
 	req.MemberEpoch = 0
 	req.RebalanceTimeoutMillis = 3000
 	req.SubscribedTopicNames = []string{"expiry-topic"}
+	req.Topics = []kmsg.ConsumerGroupHeartbeatRequestTopic{} // a join owns nothing.
 	assignor := "uniform"
 	req.ServerAssignor = &assignor
 	resp, err := req.RequestWith(ctx, cl)

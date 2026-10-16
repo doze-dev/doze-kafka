@@ -53,8 +53,15 @@ func (b *Broker) deleteGroup(id string) int16 {
 	if b.cg848.forget(id) {
 		existed = true
 	}
+	// When the group became empty goes with it, and before its offsets do: the id used
+	// again is a group nobody has joined (recorded: offsets-retention-recreate, g-del),
+	// and nothing still waiting to be written may put the old group back in the store.
+	was, known := b.expiry.forget(id)
 	n, err := b.meta.DeleteGroupOffsets(id)
 	if err != nil {
+		if known {
+			b.expiry.restore(id, was)
+		}
 		return b.storageFault("delete group: remove committed offsets", err, "group", id)
 	}
 	if !existed && n == 0 {
@@ -71,6 +78,10 @@ func (b *Broker) deleteGroup(id string) int16 {
 func (b *Broker) handleOffsetDelete(ctx context.Context, req *protocol.Request, odr *kmsg.OffsetDeleteRequest, resp *kmsg.OffsetDeleteResponse) error {
 	if !b.canGroup(req.Conn, odr.Group, opDelete) {
 		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
+		return nil
+	}
+	if odr.Group == "" {
+		resp.ErrorCode = kerr.InvalidGroupID.Code // recorded: group-requests-refused, ej-offset-delete.
 		return nil
 	}
 	known := b.groupIsActive(odr.Group) || b.groupHasOffsets(odr.Group)

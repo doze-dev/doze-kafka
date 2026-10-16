@@ -1,0 +1,2880 @@
+{
+  "scenario": "offsets-retention-recreate",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "ret-a"
+          },
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "ret-b"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "ret-a",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          },
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "ret-b",
+            "TopicID": "\u003ctopic-id:2\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "find-coordinators",
+      "api": "FindCoordinator",
+      "version": 4,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": [
+          "g-none",
+          "g-c-none",
+          "g-del",
+          "g-c-del",
+          "g-offdel",
+          "g-offdel-late",
+          "g-rejoin",
+          "g-c-late",
+          "g-two"
+        ],
+        "CoordinatorType": 0
+      },
+      "response": {
+        "Coordinators": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "g-none",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "g-c-none",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "g-del",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "g-c-del",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "g-offdel",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "g-offdel-late",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "g-rejoin",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "g-c-late",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "g-two",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          }
+        ],
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "consumer-join-g-c-del",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "g-c-del",
+        "InstanceID": null,
+        "MemberEpoch": 0,
+        "MemberID": "",
+        "RackID": null,
+        "RebalanceTimeoutMillis": 30000,
+        "ServerAssignor": "uniform",
+        "SubscribedTopicNames": [
+          "ret-a"
+        ],
+        "SubscribedTopicRegex": null,
+        "Topics": []
+      },
+      "response": {
+        "Assignment": {
+          "Topics": [
+            {
+              "Partitions": [
+                0
+              ],
+              "TopicID": "\u003ctopic-id:1\u003e"
+            }
+          ]
+        },
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:1\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "commit-g-c-del",
+      "api": "OffsetCommit",
+      "version": 9,
+      "request": {
+        "Generation": 2,
+        "Group": "g-c-del",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 50,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "leave-g-c-del",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "g-c-del",
+        "InstanceID": null,
+        "MemberEpoch": -1,
+        "MemberID": "\u003cmember:1\u003e",
+        "RackID": null,
+        "RebalanceTimeoutMillis": -1,
+        "ServerAssignor": null,
+        "SubscribedTopicNames": null,
+        "SubscribedTopicRegex": null,
+        "Topics": null
+      },
+      "response": {
+        "Assignment": null,
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 0,
+        "MemberEpoch": -1,
+        "MemberID": "\u003cmember:1\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "consumer-join-g-c-late",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "g-c-late",
+        "InstanceID": null,
+        "MemberEpoch": 0,
+        "MemberID": "",
+        "RackID": null,
+        "RebalanceTimeoutMillis": 30000,
+        "ServerAssignor": "uniform",
+        "SubscribedTopicNames": [
+          "ret-a"
+        ],
+        "SubscribedTopicRegex": null,
+        "Topics": []
+      },
+      "response": {
+        "Assignment": {
+          "Topics": [
+            {
+              "Partitions": [
+                0
+              ],
+              "TopicID": "\u003ctopic-id:1\u003e"
+            }
+          ]
+        },
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:2\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "commit-g-c-late",
+      "api": "OffsetCommit",
+      "version": 9,
+      "request": {
+        "Generation": 2,
+        "Group": "g-c-late",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 60,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "commit-g-two-a",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": -1,
+        "Group": "g-two",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 70,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "consumer-join-g-c-none",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "g-c-none",
+        "InstanceID": null,
+        "MemberEpoch": 0,
+        "MemberID": "",
+        "RackID": null,
+        "RebalanceTimeoutMillis": 30000,
+        "ServerAssignor": "uniform",
+        "SubscribedTopicNames": [
+          "ret-a"
+        ],
+        "SubscribedTopicRegex": null,
+        "Topics": []
+      },
+      "response": {
+        "Assignment": {
+          "Topics": [
+            {
+              "Partitions": [
+                0
+              ],
+              "TopicID": "\u003ctopic-id:1\u003e"
+            }
+          ]
+        },
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:3\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "leave-g-c-none",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "g-c-none",
+        "InstanceID": null,
+        "MemberEpoch": -1,
+        "MemberID": "\u003cmember:3\u003e",
+        "RackID": null,
+        "RebalanceTimeoutMillis": -1,
+        "ServerAssignor": null,
+        "SubscribedTopicNames": null,
+        "SubscribedTopicRegex": null,
+        "Topics": null
+      },
+      "response": {
+        "Assignment": null,
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 0,
+        "MemberEpoch": -1,
+        "MemberID": "\u003cmember:3\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-needs-id-g-del",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-del",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:4\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-g-del",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-del",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:4\u003e",
+        "MemberID": "\u003cmember:4\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:4\u003e",
+            "ProtocolMetadata": "AAAAAAABAAVyZXQtYf////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sync-g-del",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "g-del",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:4\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "commit-g-del",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": 1,
+        "Group": "g-del",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 10,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "leave-g-del",
+      "api": "LeaveGroup",
+      "version": 4,
+      "request": {
+        "Group": "g-del",
+        "MemberID": "",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:4\u003e",
+            "Reason": null
+          }
+        ]
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Members": [
+          {
+            "ErrorCode": 0,
+            "InstanceID": null,
+            "MemberID": "\u003cmember:4\u003e"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-needs-id-g-offdel",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-offdel",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:5\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-g-offdel",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-offdel",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:5\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:5\u003e",
+        "MemberID": "\u003cmember:5\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:5\u003e",
+            "ProtocolMetadata": "AAAAAAABAAVyZXQtYf////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sync-g-offdel",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "g-offdel",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:5\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:5\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "commit-g-offdel",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": 1,
+        "Group": "g-offdel",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:5\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 20,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "leave-g-offdel",
+      "api": "LeaveGroup",
+      "version": 4,
+      "request": {
+        "Group": "g-offdel",
+        "MemberID": "",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:5\u003e",
+            "Reason": null
+          }
+        ]
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Members": [
+          {
+            "ErrorCode": 0,
+            "InstanceID": null,
+            "MemberID": "\u003cmember:5\u003e"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-needs-id-g-offdel-late",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-offdel-late",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:6\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-g-offdel-late",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-offdel-late",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:6\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:6\u003e",
+        "MemberID": "\u003cmember:6\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:6\u003e",
+            "ProtocolMetadata": "AAAAAAABAAVyZXQtYf////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sync-g-offdel-late",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "g-offdel-late",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:6\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:6\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "commit-g-offdel-late",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": 1,
+        "Group": "g-offdel-late",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:6\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 30,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "leave-g-offdel-late",
+      "api": "LeaveGroup",
+      "version": 4,
+      "request": {
+        "Group": "g-offdel-late",
+        "MemberID": "",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:6\u003e",
+            "Reason": null
+          }
+        ]
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Members": [
+          {
+            "ErrorCode": 0,
+            "InstanceID": null,
+            "MemberID": "\u003cmember:6\u003e"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-needs-id-g-rejoin",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-rejoin",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:7\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-g-rejoin",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-rejoin",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:7\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:7\u003e",
+        "MemberID": "\u003cmember:7\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:7\u003e",
+            "ProtocolMetadata": "AAAAAAABAAVyZXQtYf////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sync-g-rejoin",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "g-rejoin",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:7\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:7\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "commit-g-rejoin",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": 1,
+        "Group": "g-rejoin",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:7\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 40,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "leave-g-rejoin",
+      "api": "LeaveGroup",
+      "version": 4,
+      "request": {
+        "Group": "g-rejoin",
+        "MemberID": "",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:7\u003e",
+            "Reason": null
+          }
+        ]
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Members": [
+          {
+            "ErrorCode": 0,
+            "InstanceID": null,
+            "MemberID": "\u003cmember:7\u003e"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-needs-id-g-none",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-none",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:8\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-g-none",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-none",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:8\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:8\u003e",
+        "MemberID": "\u003cmember:8\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:8\u003e",
+            "ProtocolMetadata": "AAAAAAABAAVyZXQtYf////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sync-g-none",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "g-none",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:8\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:8\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "leave-g-none",
+      "api": "LeaveGroup",
+      "version": 4,
+      "request": {
+        "Group": "g-none",
+        "MemberID": "",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:8\u003e",
+            "Reason": null
+          }
+        ]
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Members": [
+          {
+            "ErrorCode": 0,
+            "InstanceID": null,
+            "MemberID": "\u003cmember:8\u003e"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "leave-g-c-late-at-40",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "g-c-late",
+        "InstanceID": null,
+        "MemberEpoch": -1,
+        "MemberID": "\u003cmember:2\u003e",
+        "RackID": null,
+        "RebalanceTimeoutMillis": -1,
+        "ServerAssignor": null,
+        "SubscribedTopicNames": null,
+        "SubscribedTopicRegex": null,
+        "Topics": null
+      },
+      "response": {
+        "Assignment": null,
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 0,
+        "MemberEpoch": -1,
+        "MemberID": "\u003cmember:2\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "commit-g-two-b-at-40",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": -1,
+        "Group": "g-two",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 71,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-b",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-b",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "delete-g-del",
+      "api": "DeleteGroups",
+      "version": 2,
+      "request": {
+        "Groups": [
+          "g-del"
+        ]
+      },
+      "response": {
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "g-del"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "commit-g-del-at-40",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": -1,
+        "Group": "g-del",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 11,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "delete-g-c-del",
+      "api": "DeleteGroups",
+      "version": 2,
+      "request": {
+        "Groups": [
+          "g-c-del"
+        ]
+      },
+      "response": {
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "g-c-del"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "commit-g-c-del-at-40",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": -1,
+        "Group": "g-c-del",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 51,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "offset-delete-g-offdel",
+      "api": "OffsetDelete",
+      "version": 0,
+      "request": {
+        "Group": "g-offdel",
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a"
+          }
+        ]
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a"
+          }
+        ]
+      }
+    },
+    {
+      "label": "commit-g-offdel-at-40",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": -1,
+        "Group": "g-offdel",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 21,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "offset-delete-g-offdel-late",
+      "api": "OffsetDelete",
+      "version": 0,
+      "request": {
+        "Group": "g-offdel-late",
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a"
+          }
+        ]
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a"
+          }
+        ]
+      }
+    },
+    {
+      "label": "again-join-needs-id-g-rejoin",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-rejoin",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:9\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "again-join-g-rejoin",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-rejoin",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:9\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 3,
+        "LeaderID": "\u003cmember:9\u003e",
+        "MemberID": "\u003cmember:9\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:9\u003e",
+            "ProtocolMetadata": "AAAAAAABAAVyZXQtYf////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "again-sync-g-rejoin",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 3,
+        "Group": "g-rejoin",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:9\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:9\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "again-leave-g-rejoin",
+      "api": "LeaveGroup",
+      "version": 4,
+      "request": {
+        "Group": "g-rejoin",
+        "MemberID": "",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:9\u003e",
+            "Reason": null
+          }
+        ]
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Members": [
+          {
+            "ErrorCode": 0,
+            "InstanceID": null,
+            "MemberID": "\u003cmember:9\u003e"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "t45-list",
+      "api": "ListGroups",
+      "version": 5,
+      "request": {
+        "StatesFilter": null,
+        "TypesFilter": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "Group": "g-c-del",
+            "GroupState": "Empty",
+            "GroupType": "classic",
+            "ProtocolType": ""
+          },
+          {
+            "Group": "g-c-late",
+            "GroupState": "Empty",
+            "GroupType": "consumer",
+            "ProtocolType": "consumer"
+          },
+          {
+            "Group": "g-del",
+            "GroupState": "Empty",
+            "GroupType": "classic",
+            "ProtocolType": ""
+          },
+          {
+            "Group": "g-offdel",
+            "GroupState": "Empty",
+            "GroupType": "classic",
+            "ProtocolType": "consumer"
+          },
+          {
+            "Group": "g-rejoin",
+            "GroupState": "Empty",
+            "GroupType": "classic",
+            "ProtocolType": "consumer"
+          },
+          {
+            "Group": "g-two",
+            "GroupState": "Empty",
+            "GroupType": "classic",
+            "ProtocolType": ""
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "t45-describe-g-offdel-late",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "g-offdel-late"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "g-offdel-late",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "t45-describe-g-none",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "g-none"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "g-none",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "t45-describe-g-c-none",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "g-c-none"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group g-c-none not found.",
+            "Group": "g-c-none",
+            "Members": null,
+            "State": ""
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "commit-g-offdel-late-at-45",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": -1,
+        "Group": "g-offdel-late",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 31,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "t75-fetch-g-del",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-del",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-del",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 11,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t75-fetch-g-c-del",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-c-del",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-c-del",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 51,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t75-fetch-g-offdel",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-offdel",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-offdel",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t75-fetch-g-offdel-late",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-offdel-late",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-offdel-late",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 31,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t75-fetch-g-rejoin",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-rejoin",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-rejoin",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 40,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t75-fetch-g-c-late",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-c-late",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-c-late",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t75-fetch-g-two",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-two",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-two",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 71,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t75-list",
+      "api": "ListGroups",
+      "version": 5,
+      "request": {
+        "StatesFilter": null,
+        "TypesFilter": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "Group": "g-c-del",
+            "GroupState": "Empty",
+            "GroupType": "classic",
+            "ProtocolType": ""
+          },
+          {
+            "Group": "g-del",
+            "GroupState": "Empty",
+            "GroupType": "classic",
+            "ProtocolType": ""
+          },
+          {
+            "Group": "g-offdel-late",
+            "GroupState": "Empty",
+            "GroupType": "classic",
+            "ProtocolType": ""
+          },
+          {
+            "Group": "g-rejoin",
+            "GroupState": "Empty",
+            "GroupType": "classic",
+            "ProtocolType": "consumer"
+          },
+          {
+            "Group": "g-two",
+            "GroupState": "Empty",
+            "GroupType": "classic",
+            "ProtocolType": ""
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "t115-fetch-g-del",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-del",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-del",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t115-fetch-g-c-del",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-c-del",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-c-del",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t115-fetch-g-offdel",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-offdel",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-offdel",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t115-fetch-g-offdel-late",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-offdel-late",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-offdel-late",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t115-fetch-g-rejoin",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-rejoin",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-rejoin",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t115-fetch-g-c-late",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-c-late",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-c-late",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t115-fetch-g-two",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-two",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-two",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t115-list",
+      "api": "ListGroups",
+      "version": 5,
+      "request": {
+        "StatesFilter": null,
+        "TypesFilter": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}

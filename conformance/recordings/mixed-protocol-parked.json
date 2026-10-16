@@ -1,0 +1,1129 @@
+{
+  "scenario": "mixed-protocol-parked",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 4,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "mk"
+          },
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "mk-b"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 4,
+            "ReplicationFactor": 1,
+            "Topic": "mk",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          },
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "mk-b",
+            "TopicID": "\u003ctopic-id:2\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "find-coordinators",
+      "api": "FindCoordinator",
+      "version": 4,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": [
+          "mk-join",
+          "mk-sync"
+        ],
+        "CoordinatorType": 0
+      },
+      "response": {
+        "Coordinators": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "mk-join",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "mk-sync",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          }
+        ],
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "pj-a-join-needs-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "mk-join",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJta/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "pj-a-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "mk-join",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJta/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:1\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJta/////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "pj-a-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "mk-join",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAJtawAAAAQAAAAAAAAAAQAAAAIAAAAD/////w==",
+            "MemberID": "\u003cmember:1\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJtawAAAAQAAAAAAAAAAQAAAAIAAAAD/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "pj-b-join-needs-id",
+      "conn": "b",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "mk-join",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAARtay1i/////w==",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "pj-n-join",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "mk-join",
+        "InstanceID": null,
+        "MemberEpoch": 0,
+        "MemberID": "",
+        "RackID": null,
+        "RebalanceTimeoutMillis": 30000,
+        "ServerAssignor": "uniform",
+        "SubscribedTopicNames": [
+          "mk"
+        ],
+        "SubscribedTopicRegex": null,
+        "Topics": []
+      },
+      "response": {
+        "Assignment": {
+          "Topics": null
+        },
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:3\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "pj-b-join-parked",
+      "conn": "b",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "mk-join",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAARtay1i/////w==",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 27,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "pj-describe",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "mk-join"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "mk-join",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1,
+                        2,
+                        3
+                      ],
+                      "Topic": "mk",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 1,
+                "MemberID": "\u003cmember:1\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "mk"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1
+                      ],
+                      "Topic": "mk",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              },
+              {
+                "Assignment": {
+                  "TopicPartitions": null
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 1,
+                "MemberID": "\u003cmember:2\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "mk-b"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "mk-b",
+                      "TopicID": "\u003ctopic-id:2\u003e"
+                    }
+                  ]
+                }
+              },
+              {
+                "Assignment": {
+                  "TopicPartitions": null
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:3\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "mk"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        2,
+                        3
+                      ],
+                      "Topic": "mk",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Reconciling"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "pj-describe-classic",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "mk-join"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "mk-join",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "pj-b-rejoin",
+      "conn": "b",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "mk-join",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAARtay1i/////w==",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": null,
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "pj-b-sync",
+      "conn": "b",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 2,
+        "Group": "mk-join",
+        "GroupAssignment": null,
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAARtay1iAAAAAQAAAAD/////",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "pj-b-heartbeat",
+      "conn": "b",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 2,
+        "Group": "mk-join",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "pj-a-heartbeat",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 1,
+        "Group": "mk-join",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e"
+      },
+      "response": {
+        "ErrorCode": 27,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "pj-n-heartbeat",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "mk-join",
+        "InstanceID": null,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:3\u003e",
+        "RackID": null,
+        "RebalanceTimeoutMillis": -1,
+        "ServerAssignor": null,
+        "SubscribedTopicNames": null,
+        "SubscribedTopicRegex": null,
+        "Topics": null
+      },
+      "response": {
+        "Assignment": null,
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:3\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "pj-describe-after",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "mk-join"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "mk-join",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1,
+                        2,
+                        3
+                      ],
+                      "Topic": "mk",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 1,
+                "MemberID": "\u003cmember:1\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "mk"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1
+                      ],
+                      "Topic": "mk",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              },
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "mk-b",
+                      "TopicID": "\u003ctopic-id:2\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:2\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "mk-b"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "mk-b",
+                      "TopicID": "\u003ctopic-id:2\u003e"
+                    }
+                  ]
+                }
+              },
+              {
+                "Assignment": {
+                  "TopicPartitions": null
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:3\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "mk"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        2,
+                        3
+                      ],
+                      "Topic": "mk",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Reconciling"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ps-a-join-needs-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "mk-sync",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJta/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:4\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ps-a-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "mk-sync",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJta/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:4\u003e",
+        "MemberID": "\u003cmember:4\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:4\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJta/////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ps-a-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "mk-sync",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAJtawAAAAQAAAAAAAAAAQAAAAIAAAAD/////w==",
+            "MemberID": "\u003cmember:4\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJtawAAAAQAAAAAAAAAAQAAAAIAAAAD/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ps-b-join-needs-id",
+      "conn": "b",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "mk-sync",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAARtay1i/////w==",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:5\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ps-a-rejoin",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "mk-sync",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJta/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "\u003cmember:4\u003e",
+        "MemberID": "\u003cmember:4\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:4\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJta/////8="
+          },
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:5\u003e",
+            "ProtocolMetadata": "AAAAAAABAARtay1i/////w=="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ps-b-join",
+      "conn": "b",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "mk-sync",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:5\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAARtay1i/////w==",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "\u003cmember:4\u003e",
+        "MemberID": "\u003cmember:5\u003e",
+        "Members": null,
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ps-n-join",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "mk-sync",
+        "InstanceID": null,
+        "MemberEpoch": 0,
+        "MemberID": "",
+        "RackID": null,
+        "RebalanceTimeoutMillis": 30000,
+        "ServerAssignor": "uniform",
+        "SubscribedTopicNames": [
+          "mk"
+        ],
+        "SubscribedTopicRegex": null,
+        "Topics": []
+      },
+      "response": {
+        "Assignment": {
+          "Topics": null
+        },
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 3,
+        "MemberID": "\u003cmember:6\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ps-b-sync-parked",
+      "conn": "b",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 2,
+        "Group": "mk-sync",
+        "GroupAssignment": null,
+        "InstanceID": null,
+        "MemberID": "\u003cmember:5\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 27,
+        "MemberAssignment": "",
+        "Protocol": null,
+        "ProtocolType": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ps-a-leader-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 2,
+        "Group": "mk-sync",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAJtawAAAAIAAAAAAAAAAf////8=",
+            "MemberID": "\u003cmember:4\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 27,
+        "MemberAssignment": "",
+        "Protocol": null,
+        "ProtocolType": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ps-describe",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "mk-sync"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 3,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 3,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "mk-sync",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1,
+                        2,
+                        3
+                      ],
+                      "Topic": "mk",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:4\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "mk"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1
+                      ],
+                      "Topic": "mk",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              },
+              {
+                "Assignment": {
+                  "TopicPartitions": null
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:5\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "mk-b"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "mk-b",
+                      "TopicID": "\u003ctopic-id:2\u003e"
+                    }
+                  ]
+                }
+              },
+              {
+                "Assignment": {
+                  "TopicPartitions": null
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 3,
+                "MemberID": "\u003cmember:6\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "mk"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        2,
+                        3
+                      ],
+                      "Topic": "mk",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Reconciling"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ps-describe-classic",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "mk-sync"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "mk-sync",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ps-a-heartbeat",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 2,
+        "Group": "mk-sync",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e"
+      },
+      "response": {
+        "ErrorCode": 27,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ps-b-heartbeat",
+      "conn": "b",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 2,
+        "Group": "mk-sync",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:5\u003e"
+      },
+      "response": {
+        "ErrorCode": 27,
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}

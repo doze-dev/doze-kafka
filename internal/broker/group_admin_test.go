@@ -342,7 +342,8 @@ func TestGroupAdmin_OffsetDeleteRemovesAnOffsetWhoseTopicIsGone(t *testing.T) {
 }
 
 // ConsumerGroupDescribe of a group that is a classic group is GROUP_ID_NOT_FOUND, and
-// the message says why (Kafka's own words), so a tool tells "no such group" from "ask
+// the message says why (Kafka's own words, recorded: mixed-protocol-rolling and
+// offsets-retention-restart), so a tool tells "no such group" from "ask
 // DescribeGroups".
 func TestGroupAdmin_ConsumerGroupDescribeOfAClassicGroup(t *testing.T) {
 	addr := startBroker(t, 4)
@@ -362,7 +363,7 @@ func TestGroupAdmin_ConsumerGroupDescribeOfAClassicGroup(t *testing.T) {
 	if classic.ErrorCode != kerr.GroupIDNotFound.Code || classic.ErrorMessage == nil || *classic.ErrorMessage != "Group classic-g is not a consumer group." {
 		t.Errorf("a classic group: code %d message %v", classic.ErrorCode, classic.ErrorMessage)
 	}
-	if none.ErrorCode != kerr.GroupIDNotFound.Code || none.ErrorMessage != nil {
+	if none.ErrorCode != kerr.GroupIDNotFound.Code || none.ErrorMessage == nil || *none.ErrorMessage != "Group nobody-at-all not found." {
 		t.Errorf("a group that does not exist: code %d message %v", none.ErrorCode, none.ErrorMessage)
 	}
 }
