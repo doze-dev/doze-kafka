@@ -2,6 +2,12 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { test, expect } from '../fixtures/console';
 import type { Locator, Page } from '@playwright/test';
 import { kafkaAddr } from '../addr';
+import { BASE_URL } from '../playwright.config';
+
+// The held consumers read a topic of their own: the seed's topics are other specs' (a topic's
+// dock lists the requests that touched it, and the first of them is the seed's).
+const HOLD_TOPIC = 'trf-hold-topic';
+
 
 // What the Traffic boards do, as against what they draw. What they draw (every element's
 // geometry, type, colour and copy, and the data against a ledger of real clients) is
@@ -20,7 +26,7 @@ test.describe.configure({ mode: 'serial' });
 
 /** A consumer that stays in its group; `env` says how (HOLD_TELEMETRY, HOLD_KIP848, ...). */
 async function holdOne(client: string, group: string, env: Record<string, string>) {
-  const p = spawn(`e2e/.tmp/bin/hold-trf-${process.pid}`, [kafkaAddr(), client, group, 'seed-orders'],
+  const p = spawn(`e2e/.tmp/bin/hold-trf-${process.pid}`, [kafkaAddr(), client, group, HOLD_TOPIC],
     { cwd: '..', stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, ...env } });
   holds.push(p);
   await new Promise<void>((resolve, reject) => {
@@ -31,6 +37,7 @@ async function holdOne(client: string, group: string, env: Record<string, string
 }
 
 test.beforeAll(async () => {
+  await fetch(new URL('new/topic', BASE_URL), { method: 'POST', body: new URLSearchParams({ name: HOLD_TOPIC, partitions: '2' }) });
   execFileSync('go', ['build', '-o', `e2e/.tmp/bin/hold-trf-${process.pid}`, './e2e/hold'], { cwd: '..', env: { ...process.env, GOWORK: 'off' } });
   await holdOne(CLIENT, GROUP, { HOLD_TELEMETRY: '1' });
   await holdOne(QUIET, 'trf-quiet-group', { HOLD_NO_METRICS: '1' });

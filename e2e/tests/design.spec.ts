@@ -292,7 +292,7 @@ test('on Traffic the inspector lists the open connections until a row replaces t
   const panel = page.locator('#inspector-panel');
   await expect(panel).toBeVisible();
   await expect(panel.locator('.cap').first()).toHaveText('Connected clients');
-  await expect(panel.locator('.h2')).toHaveText(/\d+ open connections?/);
+  await expect(panel.locator('.h2')).toHaveText(/^(\d+ open connections?|\d+ clients? · \d+ connections)$/);
   await expect(panel.locator('.r.h').first()).toContainText('Client');
   const row = page.locator('#traffic-table .tf-rows > .r[data-row]').first();
   await row.click();

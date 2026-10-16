@@ -3,6 +3,12 @@ import { createRequire } from 'node:module';
 import { test, expect } from '../fixtures/console';
 import type { Page } from '@playwright/test';
 import { kafkaAddr } from '../addr';
+import { BASE_URL } from '../playwright.config';
+
+// The held consumers read a topic of their own: the seed's topics are other specs' (a topic's
+// dock lists the requests that touched it, and the first of them is the seed's).
+const HOLD_TOPIC = 'a11y-hold-topic';
+
 
 // Every state of the Traffic pages under axe-core, at 1440, 960 and 390, in the light,
 // dark and high-contrast themes: no violation of any impact but "minor" (serious,
@@ -20,7 +26,7 @@ const KGROUP = 'a11y-848-group';
 test.describe.configure({ mode: 'serial' });
 
 async function holdOne(client: string, group: string, env: Record<string, string>) {
-  const p = spawn(`e2e/.tmp/bin/hold-a11y-${process.pid}`, [kafkaAddr(), client, group, 'seed-orders'],
+  const p = spawn(`e2e/.tmp/bin/hold-a11y-${process.pid}`, [kafkaAddr(), client, group, HOLD_TOPIC],
     { cwd: '..', stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, ...env } });
   holds.push(p);
   await new Promise<void>((resolve, reject) => {
@@ -31,6 +37,7 @@ async function holdOne(client: string, group: string, env: Record<string, string
 }
 
 test.beforeAll(async () => {
+  await fetch(new URL('new/topic', BASE_URL), { method: 'POST', body: new URLSearchParams({ name: HOLD_TOPIC, partitions: '2' }) });
   execFileSync('go', ['build', '-o', `e2e/.tmp/bin/hold-a11y-${process.pid}`, './e2e/hold'], { cwd: '..', env: { ...process.env, GOWORK: 'off' } });
   await holdOne('a11y-hold', GROUP, { HOLD_TELEMETRY: '1' });
   await holdOne('a11y-quiet', 'a11y-quiet-group', { HOLD_NO_METRICS: '1' });
