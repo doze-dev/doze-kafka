@@ -1,6 +1,80 @@
 {
-  "binaryBytes": 27448258,
-  "idleHeapBytes": 1711216,
-  "modules": 435,
-  "slackPercent": 5
+  "build": "CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w' ./cmd/doze-kafka",
+  "run": "GOMAXPROCS=2 doze-kafka --listen 127.0.0.1:0 --console-addr 127.0.0.1:0 --schema-registry-addr 127.0.0.1:0 --data-dir <empty> --pprof-addr 127.0.0.1:<free>; heap = HeapAlloc of the third /debug/pprof/heap?gc=1, one second after pprof answers",
+  "modules": 421,
+  "platforms": {
+    "darwin/arm64": {
+      "binaryBytes": 27417106,
+      "idleHeapBytes": 1340088,
+      "idleHeapNoiseBytes": 5352,
+      "go": "go1.27.2",
+      "recorded": "2026-10-16",
+      "where": "macOS 27, Apple M-series, native"
+    },
+    "linux/arm64": {
+      "binaryBytes": 26607776,
+      "idleHeapBytes": 1334064,
+      "idleHeapNoiseBytes": 6376,
+      "go": "go1.27.2",
+      "recorded": "2026-10-16",
+      "where": "golang:1.27 container, linux/arm64, native on Apple M-series (Docker VM)"
+    }
+  },
+  "carries": [
+    {
+      "what": "github.com/bufbuild/protocompile (and the google.golang.org/protobuf descriptor and reflection packages it uses)",
+      "commit": "f84a7e1",
+      "cost": "protocompile 561,555 bytes of symbols, google.golang.org/protobuf other than protowire 986,804 (go tool nm -size on the unstripped darwin/arm64 build, 2026-10-16)",
+      "why": "the built-in schema registry (WP 12.1, 12.2) compiles Protobuf schemas to check references and compatibility as Confluent's registry does; without a compiler a Protobuf subject cannot be registered"
+    },
+    {
+      "what": "github.com/hamba/avro/v2",
+      "commit": "f84a7e1",
+      "cost": "176,673 bytes of symbols (same measurement)",
+      "why": "the schema registry parses Avro schemas, canonicalises them and judges compatibility; Avro is the format most Confluent-serializer users register"
+    },
+    {
+      "what": "google.golang.org/protobuf/encoding/protowire",
+      "commit": "b78b15b",
+      "cost": "4,128 bytes of symbols (same measurement); the module was already a dependency (go.mod since 1a8a914)",
+      "why": "client telemetry (KIP-714, WP 14.3): pushed metrics are OTLP protobuf, decoded field by field (internal/telemetry/otlp.go, encode.go) rather than through generated OTLP types"
+    }
+  ],
+  "raises": [
+    {
+      "date": "2026-10-11",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 26551170,
+      "to": 26990850,
+      "reason": "d74c851 re-recorded after stage 0 (997d7bd..d74c851): the settings table (internal/settings), the console route table, Refusal partials, the inspector, the palette and key map with its help overlay, a third theme, the wire dock and neighbours graph, the phone layout (console templates and static +2,559/-1,143 lines, Go outside tests +7,610/-549)"
+    },
+    {
+      "date": "2026-10-11",
+      "key": "darwin/arm64 idleHeapBytes",
+      "from": 2335312,
+      "to": 2698472,
+      "reason": "d74c851: the same stage 0 console work; the console's template set was parsed at start and held by every broker, and it grew with the new templates. dc9c8a6 then parsed it on the first console request and the budget came down to 1,711,216"
+    },
+    {
+      "date": "2026-10-11",
+      "key": "modules",
+      "from": 421,
+      "to": 435,
+      "reason": "10b11a7 (in d74c851's recording): gremlins v0.6.0 became a go tool dependency for the mutation gate, 14 modules. 1d339ac replaced gremlins with scripts/mutate and the count went back to 421"
+    },
+    {
+      "date": "2026-10-11",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 26990850,
+      "to": 27313762,
+      "reason": "ed6b701 re-recorded after the Traffic stage (d74c851..ed6b701): the traffic recorder (internal/traffic), the bounded telemetry store, the error-class table and facts in internal/protocol, the Traffic boards Main and Traf-02 to Traf-12 in the console, stage 1 BAD-1/3/4/29"
+    },
+    {
+      "date": "2026-10-12",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 27313762,
+      "to": 27448258,
+      "reason": "f896df5 re-recorded after D6 and D7 (ed6b701..f896df5): offsets expiry and mixed classic/consumer groups (b1cadf5), redacted config printing (a06eabc), streamed decompression bounds in produce (e908c93), the traffic story and protocol Detail additions"
+    }
+  ]
 }

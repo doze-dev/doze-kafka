@@ -2,9 +2,10 @@
 # The embedding API is the exported surface of server/. This writes it and fails
 # when it changed without a CHANGELOG line.
 #
-#   scripts/api.sh          check: the committed surface equals the code, and the
-#                           commit that last changed the surface also added a
+#   scripts/api.sh          check: the committed surface equals the code, and
+#                           every commit that changed the surface also added a
 #                           CHANGELOG.md line containing "server API"
+#                           (scripts/api-rule.sh; it needs the whole history)
 #   scripts/api.sh record   write testdata/api/server.txt from the code
 #
 # Changing the surface is therefore two edits in one commit: `task api:record`,
@@ -30,14 +31,7 @@ if ! diff -u "$surface" "$now"; then
   exit 1
 fi
 
-# The surface file may only change together with a CHANGELOG line.
-has_line() { grep -qi '^+.*server API' ; }
-if [ -n "$(git status --porcelain -- "$surface")" ]; then
-  # Uncommitted (new or modified): the same working tree must add the line.
-  git diff HEAD -- CHANGELOG.md | has_line || {
-    echo "$surface is modified but CHANGELOG.md has no added line containing \"server API\"." >&2; exit 1; }
-elif last=$(git log -1 --format=%H -- "$surface" 2>/dev/null) && [ -n "$last" ]; then
-  git show --format= "$last" -- CHANGELOG.md | has_line || {
-    echo "commit ${last:0:9} changed $surface without adding a CHANGELOG.md line containing \"server API\"." >&2; exit 1; }
-fi
+# The surface file may only change together with a CHANGELOG line: every commit
+# that changed it, and the working tree. A shallow clone fails (api-rule.sh).
+scripts/api-rule.sh "$surface"
 echo "ok       server API surface ($(wc -l < "$surface" | tr -d ' ') declarations)"

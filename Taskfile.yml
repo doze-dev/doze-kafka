@@ -163,14 +163,14 @@ tasks:
       - scripts/coverage.sh record
 
   lightness:
-    desc: 'Binary size, idle heap and module count against testdata/lightness.json (5% slack)'
+    desc: 'Binary size (exact), idle heap (within the start-to-start variation measured when recorded) and module count (exact) against this platform''s budget in testdata/lightness.json; every raise in the file''s history needs its reason in the file'
     cmds:
       - scripts/lightness.sh
 
   lightness:record:
-    desc: 'Record today''s weight as the budget (the commit message says why it grew)'
+    desc: 'Record this platform''s weight as its budget (20 starts). A number that went up needs -reason, which is written into the file: task lightness:record -- -reason "why"'
     cmds:
-      - scripts/lightness.sh record
+      - scripts/lightness.sh record {{.CLI_ARGS}}
 
   mutate:record:
     desc: 'Mutation-test packages (gremlins, a go tool) and store counts and surviving mutants as file:line:type in testdata/mutation.json. Name packages: task mutate:record -- ./internal/protocol'

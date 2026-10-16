@@ -12,10 +12,13 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2 # the public-surface check reads the last commit's CHANGELOG diff
-      - uses: actions/setup-go@v7
+          # The whole history: the public-surface rule reads every commit that changed
+          # testdata/api/server.txt, and fails in a shallow clone rather than pass on
+          # the boundary commit (scripts/api-rule.sh).
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
       - name: gofmt
@@ -33,6 +36,12 @@ jobs:
         run: GOOS=windows GOARCH=amd64 go vet ./...
       - name: build the binary
         run: go build ./cmd/doze-kafka
+      # Every module in the repository, the fixtures of the gates' self-tests included.
+      - name: go mod tidy -diff (every module)
+        run: |
+          for mod in $(git ls-files '*go.mod'); do
+            echo "== $mod"; (cd "$(dirname "$mod")" && GOWORK=off go mod tidy -diff) || exit 1
+          done
       - name: Public surface (server/)
         run: scripts/api.sh
       # The second identity: listener on :0, a console prefix, a data directory with a
@@ -48,10 +57,23 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the coverage gate reads the floor file's history
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      # The documents' kcat commands are run as written (docs/), so kcat is installed.
+      - name: Install kcat (Linux; librdkafka 2.15.1 from pinned sources)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config zlib1g-dev libzstd-dev liblz4-dev \
+            libssl-dev libsasl2-dev libcurl4-openssl-dev libyajl-dev
+          scripts/install-kcat.sh /usr/local
+      - name: Install kcat (macOS)
+        if: runner.os == 'macOS'
+        run: brew install kcat
       - name: Unit tests
         run: go test -short ./...
       - name: Integration tests (race, with coverage)
@@ -75,13 +97,29 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage
           path: cover.out
+      # On both: the floors are per platform (testdata/coverage.txt), and macOS runs
+      # code Linux does not (F_FULLFSYNC, the doze-names daemon path).
       - name: Coverage floor
-        if: matrix.os == 'ubuntu-latest'
         run: scripts/coverage.sh
-      - name: Lightness budget
-        if: matrix.os == 'ubuntu-latest'
-        run: scripts/lightness.sh
+
+  # The budget is per platform and recorded natively on linux/arm64 (a golang:1.27
+  # container on an arm64 Mac) and darwin/arm64; linux/amd64 could not be recorded
+  # natively (Go under amd64 emulation on that machine crashes), so the gate runs
+  # on GitHub's arm64 Linux runner, where its budget was recorded.
+  lightness:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # every raise in testdata/lightness.json's history needs its reason
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      # The exact toolchain go.mod names: a binary's size is a fact about one
+      # toolchain, and setup-go may install a newer patch release.
+      - name: Lightness budget (linux/arm64)
+        run: GOTOOLCHAIN="$(awk '/^toolchain/ {print $2}' go.mod)" scripts/lightness.sh

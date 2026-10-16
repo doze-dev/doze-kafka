@@ -47,5 +47,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # shellcheck disable=SC2016 # the backticks are Markdown, printed as they are
           gh issue create --title "Compat matrix failed ($(date -u +%F))" \
             --body "$(printf 'The scheduled client-compatibility run failed.\n\n```\n%s\n```\n\nRun: %s/%s/actions/runs/%s' "$(sed -n '/---- matrix/,$p' matrix.txt)" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
