@@ -145,7 +145,7 @@
   <span class="m" role="gridcell">{{when .Time "clockms"}}</span>
   <span class="m" role="gridcell" title="{{.Who}}{{if .Software}} · {{.Software}}{{end}} · {{.Remote}}">{{if .ConnKey}}<a href="{{$.P}}/traffic?client={{.WhoQ}}" class="tf-who" tabindex="-1" data-inspector-open hx-get="{{$.P}}/inspect/client?key={{.ConnKey}}" hx-trigger="click consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false">{{.Who}}</a>{{else}}{{.Who}}{{end}}</span>
   <span class="m b" role="gridcell" title="{{.API}} v{{.Version}}{{if .Folded}} ×{{.Count}}{{end}} · correlation {{.Correlation}}">{{.API}} <span class="mut">v{{.Version}}</span>{{if .Folded}} <span class="tag">×{{.Count}}</span>{{end}}</span>
-  <span class="m el" role="gridcell"{{if .Target}} title="{{.Target}}"{{end}}>{{if .Target}}{{.Target}}{{else}}—{{end}}</span>
+  <span class="m el" role="gridcell"{{if .Target}} title="{{if .TargetTitle}}{{.TargetTitle}}{{else}}{{.Target}}{{end}}"{{end}}>{{if .Target}}{{.Target}}{{else}}—{{end}}</span>
   <span class="mut el tf-c-detail" role="gridcell" title="{{if .Rhythm}}{{.Interval}}{{else}}{{.DetailText}}{{end}}">{{if .Rhythm}}{{.Interval}}, since {{when .First "clock"}}{{else if .DetailText}}{{.DetailText}}{{else}}—{{end}}</span>
   <span class="m {{.Tone}} tf-result" role="gridcell" title="{{.ResultTitle}}">{{wrapName .Result}}</span>
   <span class="m ra" role="gridcell" title="{{.DurExact}}">{{.Dur}}</span>

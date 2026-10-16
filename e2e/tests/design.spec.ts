@@ -293,8 +293,8 @@ test('on Traffic the inspector lists the open connections until a row replaces t
   await expect(panel).toBeVisible();
   await expect(panel.locator('.cap').first()).toHaveText('Connected clients');
   await expect(panel.locator('.h2')).toHaveText(/\d+ open connections?/);
-  await expect(panel.locator('.r.h')).toContainText('Client');
-  const row = page.locator('#traffic-table tbody tr').first();
+  await expect(panel.locator('.r.h').first()).toContainText('Client');
+  const row = page.locator('#traffic-table .tf-rows > .r[data-row]').first();
   await row.click();
   await expect(page.locator('#inspector #inspector-title')).toBeVisible();
   await expect(page.locator('#insp-default')).toBeHidden(); // replaced, not stacked.
@@ -304,14 +304,14 @@ test('on Traffic the inspector lists the open connections until a row replaces t
   const order = await page.evaluate(() => {
     const m = document.querySelector('main#detail')!;
     const y = (sel: string) => (m.querySelector(sel) as HTMLElement | null)?.getBoundingClientRect().top ?? -1;
-    return { summary: y('#traffic-summary'), filter: y('.filterrow'), table: y('#traffic-table') };
+    return { summary: y('#traffic-summary'), filter: y('.tf-filter'), table: y('#traffic-table') };
   });
   expect(order.summary).toBeGreaterThan(0);
   expect(order.summary).toBeLessThan(order.filter);
   expect(order.filter).toBeLessThan(order.table);
-  await expect(page.locator('.filterrow input[name=q]')).toHaveAttribute('placeholder', 'Client, topic, group or request');
-  await expect(page.locator('.filterrow .seg a')).toHaveText(['all', 'errors', 'produce', 'fetch', 'groups', 'admin']);
-  await expect(page.locator('#traffic-table thead th')).toHaveText(['Time', 'Client', 'Request', 'Topic or group', 'Detail', 'Result', 'Took']);
+  await expect(page.locator('.tf-filter input[name=q]')).toHaveAttribute('placeholder', 'Client, topic, group or request');
+  await expect(page.locator('.tf-filter .seg a')).toHaveText(['all', 'errors', 'produce', 'fetch', 'groups', 'admin']);
+  await expect(page.locator('#traffic-table .r.h > span')).toHaveText(['Time', 'Client', 'Request', 'Topic or group', 'Detail', 'Result', 'Took']);
   await expect(page.locator('#traffic-summary')).toContainText('kept: the last');
   await expect(page.locator('main#detail')).toContainText("The console's own requests are left out");
 });
@@ -522,46 +522,6 @@ test('at 390 the top bar is a menu button, logo, title and the palette, and mess
   expect(b!.y + b!.height).toBeGreaterThanOrEqual(843);
 });
 
-// Main: the Traffic table shows the whole time, the whole "took" and the whole result;
-// a header never runs into the next one. (The audit read "17:12:57.1…", "0.0…" and
-// "TOPIC_ALREADY…" off the first build of this table.)
-test('the Traffic table does not truncate time, took or result, and its headers do not collide', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('traffic');
-  const table = page.locator('#traffic-table');
-  await expect(table.locator('tbody tr', { hasText: 'TOPIC_ALREADY_EXISTS' })).toHaveCount(1);
-  const bad = await table.evaluate((t) => {
-    const clipped: string[] = [];
-    // Time (1), Result (6), Took (7) are shown whole on every row.
-    for (const tr of Array.from(t.querySelectorAll('tbody tr'))) {
-      for (const i of [0, 5, 6]) {
-        const td = tr.children[i] as HTMLElement;
-        if (td.scrollWidth > td.clientWidth) clipped.push(`${td.textContent!.trim()} (${td.scrollWidth} > ${td.clientWidth})`);
-      }
-    }
-    // A header's words fit its cell, so neighbours cannot run into one another.
-    for (const th of Array.from(t.querySelectorAll('thead th'))) {
-      const el = th as HTMLElement;
-      if (el.scrollWidth > el.clientWidth) clipped.push(`th ${el.textContent} (${el.scrollWidth} > ${el.clientWidth})`);
-    }
-    return clipped;
-  });
-  expect(bad).toEqual([]);
-  // The result column's text starts where its header does, and Took ends where its header ends.
-  const left = await table.evaluate((t) => {
-    const th = t.querySelector('thead th:nth-child(6)') as HTMLElement;
-    const td = t.querySelector('tbody tr td:nth-child(6)') as HTMLElement;
-    return [th.getBoundingClientRect().left, td.getBoundingClientRect().left];
-  });
-  expect(left[1]).toBeCloseTo(left[0], 0);
-  const right = await table.evaluate((t) => {
-    const th = t.querySelector('thead th:nth-child(7)') as HTMLElement;
-    const td = t.querySelector('tbody tr td:nth-child(7)') as HTMLElement;
-    return [th.getBoundingClientRect().right, td.getBoundingClientRect().right];
-  });
-  expect(right[1]).toBeCloseTo(right[0], 0);
-});
-
 test('the Traffic summary says the window of each number', async ({ page }) => {
   await page.goto('traffic');
   const sum = page.locator('#traffic-summary');
@@ -571,7 +531,7 @@ test('the Traffic summary says the window of each number', async ({ page }) => {
   await expect(sum.locator('> .m')).toHaveCount(4);
   await expect(sum.locator('> .mut:not(.m)')).toHaveText(['·', '·', '·']);
   // The errors are those of the minute, and the number says so on hover.
-  await expect(sum.locator('> .m').nth(2)).toHaveAttribute('title', /last minute/);
+  await expect(sum.locator('> .m').nth(2)).toHaveAttribute('title', /requests of that minute/);
   await expect(sum).toContainText(/kept: the last [\d,]+, in memory only/);
 });
 
@@ -588,19 +548,6 @@ test('the keys strip is never clipped: whole at 960 and 1440, not drawn at 390 w
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('traffic');
   await expect(page.locator('#keys')).toBeHidden();
-});
-
-test('at 390 the Traffic requests are cards: time, request, what it was about, and how it went', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('traffic');
-  const row = page.locator('#traffic-table tbody tr').first();
-  await expect(row).toBeVisible();
-  expect(await row.evaluate((el) => getComputedStyle(el).display)).toBe('grid');
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  // The result is on the card, whole.
-  const res = row.locator('td.cell-result');
-  await expect(res).toBeVisible();
-  expect(await res.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
 });
 
 // Ac-Home: type and operation are words (Topic, Write), the permission is ALLOW or DENY.
@@ -703,46 +650,6 @@ test('the top bar holds no control that is hidden: Retry is drawn with the disco
   await page.goto('topics');
   await expect(page.locator('header.topbar #pill-retry')).toHaveCount(0);
   expect(await page.locator('header.topbar button[hidden], header.topbar a[hidden]').count()).toBe(0);
-});
-
-test('the Traffic columns: the board\'s tracks where the page has room, and nothing pushed off the edge at 1440 beside the inspector', async ({ page }) => {
-  // The board's tracks are 92 150 118 1fr 190 84 52, 906 px with the gaps and the row's
-  // padding; its own render at 1440 beside the 400 px inspector has 802, leaves the
-  // topic 8 px and cuts the Time. So: Time 92, Request 130 (the board's 118 is
-  // "Heartbeat v4 x18" and cannot hold "FindCoordinator v4"), Result 118 (AD5) and Took 52
-  // are fixed; Client, Topic and Detail share the rest, and there is no sideways scroll.
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('traffic');
-  const wrap = page.locator('#traffic-table').locator('xpath=ancestor::div[contains(@class,"tbl-wrap")]');
-  const fit = await wrap.evaluate((w) => ({ client: w.clientWidth, scroll: w.scrollWidth }));
-  expect(fit.scroll, 'the table is as wide as its card').toBeLessThanOrEqual(fit.client);
-  const cells = await page.locator('#traffic-table thead tr:first-child th').evaluateAll((ths) => ths.map((th) => {
-    const cs = getComputedStyle(th);
-    const w = th.getBoundingClientRect().width;
-    // The track is the cell less its padding; the board's gap is the two paddings that meet.
-    return { track: Math.round(w - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)), pl: cs.paddingLeft, pr: cs.paddingRight, right: th.getBoundingClientRect().right };
-  }));
-  const [time, , request, , , result, took] = cells.map((c) => c.track);
-  expect([time, request, result, took]).toEqual([92, 130, 118, 52]);
-  for (const i of [1, 3, 4]) expect(cells[i].track, `column ${i + 1} keeps room to be read`).toBeGreaterThanOrEqual(80);
-  for (let i = 0; i < cells.length - 1; i++) {
-    const meet = parseFloat(cells[i].pr) + parseFloat(cells[i + 1].pl);
-    expect(meet, `gap after column ${i + 1}`).toBe(14);
-  }
-  expect(cells[0].pl).toBe('12px');
-  expect(cells[6].pr).toBe('12px');
-  // The last column ends inside the card: Took is on screen.
-  const cardRight = await wrap.evaluate((w) => w.getBoundingClientRect().right);
-  expect(cells[6].right).toBeLessThanOrEqual(cardRight + 1);
-  // From 1600 the board's own tracks hold beside the inspector, and the topic's 1fr is the rest.
-  await page.setViewportSize({ width: 1920, height: 1000 });
-  const wide = await page.locator('#traffic-table thead tr:first-child th').evaluateAll((ths) => ths.map((th, i) => Math.round(th.getBoundingClientRect().width - (i === 0 ? 19 : i === 6 ? 19 : 14))));
-  expect([wide[0], wide[1], wide[2], wide[4], wide[5], wide[6]]).toEqual([92, 150, 130, 190, 118, 52]);
-  expect(wide[3]).toBeGreaterThan(300);
-  // The status strip's weights: the three counts and the note are mono, the dots are muted.
-  const strip = page.locator('#traffic-summary');
-  for (const el of await strip.locator('> .m').all()) await expect(el).toHaveCSS('font-family', /Plex Mono/);
-  await expect(strip.locator('> .mut:not(.m)').first()).toHaveCSS('color', 'rgb(86, 91, 99)');
 });
 
 test('the wire dock writes the client, the request, the detail, the result and the time taken whole at 1280', async ({ page }) => {

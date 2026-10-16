@@ -32,7 +32,7 @@ const title = (page: Page) => page.locator('#inspector #inspector-title');
 async function cycle(page: Page, row: Locator, kind: string, opts: { focusBack?: boolean } = {}) {
   await row.click();
   await expect(overlay(page)).toBeVisible();
-  await expect(page.locator('#inspector .inspector-h')).toHaveAttribute('data-inspector-kind', kind);
+  await expect(page.locator('#inspector [data-inspector-kind]')).toHaveAttribute('data-inspector-kind', kind);
   const open = await title(page).getAttribute('data-open');
   expect(open, 'the selection names its address').toBeTruthy();
   await expect.poll(() => new URL(page.url()).searchParams.get('open')).toBe(open);
@@ -49,7 +49,7 @@ async function cycle(page: Page, row: Locator, kind: string, opts: { focusBack?:
   await page.reload();
   await expect(overlay(page)).toBeVisible();
   await expect(title(page)).toHaveAttribute('data-open', open!);
-  await expect(page.locator('#inspector .inspector-h')).toHaveAttribute('data-inspector-kind', kind);
+  await expect(page.locator('#inspector [data-inspector-kind]')).toHaveAttribute('data-inspector-kind', kind);
 
   // Back leaves it (the page it was opened from has no selection).
   await page.goBack();
@@ -64,12 +64,13 @@ test('a message is selected, closed, refreshed and left with Back', async ({ pag
 
 test('a request is selected, closed, refreshed and left with Back', async ({ page }) => {
   await page.goto('traffic');
-  await cycle(page, page.locator('#traffic-table tbody tr', { hasText: 'Produce' }).filter({ hasText: 'seed-orders' }).first(), 'request');
+  await cycle(page, page.locator('#traffic-table .tf-rows > .r[data-row]', { hasText: 'Produce' }).filter({ hasText: 'seed-orders' }).first(), 'request');
 });
 
 test('a client is selected, closed, refreshed and left with Back', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 }); // the connections beside the table are drawn from 1400.
   await page.goto('traffic');
-  const row = page.locator('#clients-list .insp-client', { hasText: 'inspect-hold' }).first().locator('a.insp-client-open');
+  const row = page.locator('#clients-list .tf-conn', { hasText: 'inspect-hold' }).first().locator('a.tf-conn-open');
   await expect(row).toBeVisible();
   await row.click();
   await expect(title(page)).toContainText('inspect-hold');
@@ -82,15 +83,15 @@ test('a client is selected, closed, refreshed and left with Back', async ({ page
 // the shell's key handling for rows must not cancel it.
 test('Enter on the client link inside a request inspector opens the client', async ({ page }) => {
   await page.goto('traffic');
-  await page.locator('#traffic-table tbody tr', { hasText: 'inspect-hold' }).first().click();
-  await expect(page.locator('#inspector .inspector-h')).toHaveAttribute('data-inspector-kind', 'request');
+  await page.locator('#traffic-table .tf-rows > .r[data-row]', { hasText: 'inspect-hold' }).first().click();
+  await expect(page.locator('#inspector [data-inspector-kind]')).toHaveAttribute('data-inspector-kind', 'request');
   const link = page.locator('#inspector a[data-inspector-open]', { hasText: 'inspect-hold' }).first();
   await expect(link).toBeVisible();
   // htmx has swapped the record in and settled it: the link is live.
   await expect(page.locator('#inspector .htmx-added, #inspector .htmx-settling')).toHaveCount(0);
   await link.focus();
   await page.keyboard.press('Enter');
-  await expect(page.locator('#inspector .inspector-h')).toHaveAttribute('data-inspector-kind', 'client');
+  await expect(page.locator('#inspector [data-inspector-kind]')).toHaveAttribute('data-inspector-kind', 'client');
   await expect(title(page)).toContainText('inspect-hold');
 });
 

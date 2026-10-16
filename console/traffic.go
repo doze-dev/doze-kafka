@@ -370,10 +370,11 @@ type trafficRow struct {
 	OpenKey string
 	// ConnKey is the open connection it came over, to open that client; "" once it has
 	// closed.
-	ConnKey string
-	Target  string // the topics, or the group, or the transactional id.
-	Who     string // the client id, else the address.
-	WhoQ    string // Who as a query value.
+	ConnKey     string
+	Target      string // the topics, or the group, or the transactional id.
+	TargetTitle string // what Target counts, by name ("5 topics" is these five).
+	Who         string // the client id, else the address.
+	WhoQ        string // Who as a query value.
 	// Dur is the board's duration ("2 ms", "0 ms", "3.0 s"); DurExact the measured one,
 	// for the tooltip ("42 µs").
 	Dur, DurExact string
@@ -473,6 +474,7 @@ func (c *Console) trafficRow(e TrafficEvent, v trafficView) trafficRow {
 			row.Target = e.Topics[0]
 		case n > 1:
 			row.Target = strconv.Itoa(n) + " topics"
+			row.TargetTitle = topics
 		default:
 			row.Target = "all topics"
 		}

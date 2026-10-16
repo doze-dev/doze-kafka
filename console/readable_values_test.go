@@ -84,3 +84,13 @@ func TestARowsTargetIsWhatTheRequestNames(t *testing.T) {
 		}
 	}
 }
+
+// "5 topics" on a Metadata row is five names, and the title says which: a filter by
+// a topic that lists a Metadata row has to show why it matched.
+func TestAMetadataRowsCountIsTitledByItsNames(t *testing.T) {
+	c := &Console{}
+	r := c.trafficRow(TrafficEvent{API: "Metadata", Topics: []string{"a", "b", "c"}, TopicsMore: 2}, trafficView{})
+	if r.Target != "5 topics" || r.TargetTitle != "a, b, c and 2 more" {
+		t.Errorf("Target %q, title %q", r.Target, r.TargetTitle)
+	}
+}

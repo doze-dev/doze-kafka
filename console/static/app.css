@@ -1233,6 +1233,9 @@ html[data-traffic-open^="client"] #detail[data-traffic-view="clients"] #traffic-
    it renders 13 px Plex Sans, and so does this one. */
 .tf-filter .inp { font: inherit; }
 .tf-filter .seg > * { white-space: normal; }
+/* Where no board is drawn (under 1440) the kinds keep their words: the board's own flex
+   shrink at 1440 beside the panel cuts "admin", and the page draws that as the board does. */
+@media (max-width: 1439px) { .tf-filter .seg { flex: none; } .tf-filter .seg > * { white-space: nowrap; } .tf-filter .inp { min-width: 64px; } }
 .tf-pill { min-width: 0; max-width: 100%; }
 .tf-pill > .m { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tf-pill > .mut, .tf-pill > .btn { flex: none; }
@@ -1251,11 +1254,15 @@ html[data-traffic-open^="client"] #detail[data-traffic-view="clients"] #traffic-
 .tf-conn-open { display: grid; grid-template-columns: minmax(0, 1fr) 70px 56px; column-gap: 14px; align-items: center; color: inherit; text-decoration: none; }
 .tf-conn-open:hover .b { text-decoration: underline; }
 .tf-conn-open > .ra { text-align: right; }
+.tf-conn > .m, .tf-conn > .note { overflow-wrap: anywhere; }
 
 /* The inspector's head (the boards' .hd) with its close control out of flow in the
    corner, so the head is the board's size. */
 .insp .hd.tf-ihd { position: relative; }
 .tf-ihd > .row .h2 { min-width: 0; overflow-wrap: anywhere; }
+.tf-ihd > .m { overflow-wrap: anywhere; }
+.tf-foot { overflow-wrap: anywhere; }
+.tf-foot:empty { display: none; }
 .tf-ihd > .tf-close { position: absolute; top: 6px; right: 6px; height: 20px; width: 20px; padding: 0; font-size: var(--fs-base); line-height: 1; }
 .insp .bd > .btn { align-self: stretch; }
 .tf-ticks > .tick { flex: none; display: inline-block; width: 3px; border-radius: 1px; background: var(--ink); }
