@@ -6,9 +6,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
 // normalizer turns a request or response into plain JSON with everything that
@@ -41,8 +44,47 @@ var (
 	nodeKeys     = map[string]bool{"NodeID": true, "Leader": true, "ControllerID": true, "BrokerID": true, "PreferredReadReplica": true, "CurrentLeader": false}
 	nodeListKeys = map[string]bool{"Replicas": true, "ISR": true, "OfflineReplicas": true, "ReplicaNodes": true}
 	memberKeys   = map[string]bool{"MemberID": true, "LeaderID": true, "MemberId": true, "ConsumerID": true}
-	dropKeys     = map[string]bool{"Version": true, "UnknownTags": true}
+	// UnknownTags marshals as {} whatever it holds (its fields are unexported):
+	// normalize counts the tags instead (unknownTagsKey).
+	dropKeys = map[string]bool{"UnknownTags": true}
 )
+
+// unknownTagsKey, at the top of a normalised message, is how many tagged fields
+// the decoder did not know, anywhere in it; absent when there are none. One broker
+// sending a tagged field the other does not is a difference.
+const unknownTagsKey = "(unknown tagged fields)"
+
+// countUnknownTags counts the unknown tagged fields in a kmsg value.
+func countUnknownTags(v reflect.Value) int {
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		if v.IsNil() {
+			return 0
+		}
+		return countUnknownTags(v.Elem())
+	case reflect.Struct:
+		if t, ok := v.Interface().(kmsg.Tags); ok {
+			return t.Len()
+		}
+		n := 0
+		for i := 0; i < v.NumField(); i++ {
+			if v.Type().Field(i).IsExported() {
+				n += countUnknownTags(v.Field(i))
+			}
+		}
+		return n
+	case reflect.Slice, reflect.Array:
+		if v.Type().Elem().Kind() == reflect.Uint8 {
+			return 0
+		}
+		n := 0
+		for i := 0; i < v.Len(); i++ {
+			n += countUnknownTags(v.Index(i))
+		}
+		return n
+	}
+	return 0
+}
 
 // normalize takes a kmsg request or response (any JSON-marshalable value).
 func (n *normalizer) normalize(v any) (any, error) {
@@ -56,7 +98,16 @@ func (n *normalizer) normalize(v any) (any, error) {
 	if err := dec.Decode(&tree); err != nil {
 		return nil, err
 	}
-	return n.walk(tree, ""), nil
+	out := n.walk(tree, "")
+	if m, ok := out.(map[string]any); ok {
+		// The message's own Version is the version it was sent at, which the step
+		// already names; a field called Version inside it is data and stays.
+		delete(m, "Version")
+		if c := countUnknownTags(reflect.ValueOf(v)); c > 0 {
+			m[unknownTagsKey] = c
+		}
+	}
+	return out, nil
 }
 
 func (n *normalizer) walk(v any, key string) any {

@@ -49,3 +49,32 @@ func TestZeroSubscriptionIDIsKeptByTheNormalizer(t *testing.T) {
 		t.Fatalf("SubscriptionID 7 normalised to %v, want the first made-up id", id)
 	}
 }
+
+// A tagged field one broker sends and the decoder does not know is counted, so
+// it is a difference; a field named Version inside a message is data and kept
+// (only the message's own version, which the step names, is dropped).
+func TestUnknownTagsAndNestedVersionsReachTheRecording(t *testing.T) {
+	n := newNormalizer()
+	r := kmsg.NewPtrDescribeClusterResponse()
+	r.Version = 1
+	b := kmsg.NewDescribeClusterResponseBroker()
+	b.UnknownTags.Set(99, []byte{1})
+	r.Brokers = append(r.Brokers, b)
+	got, err := n.normalize(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := got.(map[string]any)
+	if fmt.Sprint(m[unknownTagsKey]) != "1" {
+		t.Errorf("an unknown tagged field is not in the normalised message: %v", m)
+	}
+	if _, ok := m["Version"]; ok {
+		t.Errorf("the message's own version was kept: %v", m)
+	}
+	nested := struct{ Inner struct{ Version int } }{}
+	nested.Inner.Version = 3
+	got, _ = n.normalize(nested)
+	if fmt.Sprint(got.(map[string]any)["Inner"]) != "map[Version:3]" {
+		t.Errorf("a nested Version was dropped: %v", got)
+	}
+}
