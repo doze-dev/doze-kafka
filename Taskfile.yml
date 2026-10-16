@@ -168,6 +168,11 @@ tasks:
       - go build -o bin/doze-kafka ./cmd/doze-kafka
       - scripts/kcat-check.sh bin/doze-kafka
 
+  gate-report:
+    desc: 'Run every gate and write the results to plan/evidence/gates-<date>.md for the stage close commit (task gate-report -- --slow adds the mutation check and the compat matrix)'
+    cmds:
+      - scripts/gate-report.sh {{.CLI_ARGS}}
+
   docs:check:
     desc: 'Every check of the documents: links and anchors in every markdown file outside plan/, getting-started run as written with its output blocks compared, kafka-*.sh lines run in apache/kafka (Docker), and error names and messages the documents quote held to the source'
     cmds:

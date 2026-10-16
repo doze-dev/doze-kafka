@@ -530,8 +530,10 @@ table** to [trace](stages/trace.md), and the **Tp-02 extras** (cleanup policy an
 - [ ] Every ask in E is either built or has a sentence saying where it landed instead.
 - [ ] C1 and C2 meet theirs, in all three repositories.
 - [ ] `go tool task check`, `coverage`, `mutate:check`, `lightness`, `api`,
-      `test:e2e` (route gate on), `test:compat` (all 20 cells) are green on
-      `main`, with the results recorded in the last commit of the stage.
+      `test:e2e` (route gate on), `test:compat` (all 24 cells) are green on
+      `main`, with the results recorded in the last commit of the stage by
+      `task gate-report -- --slow` (`scripts/gate-report.sh` writes
+      `plan/evidence/gates-<date>.md`; the commit carries that file).
 - [ ] The existing console still works for every section not yet rebuilt: the
       73 browser tests pass, with only the edits that A1, A2 and A6 change on
       purpose (a drawer becomes the inspector; an error becomes a refusal).
