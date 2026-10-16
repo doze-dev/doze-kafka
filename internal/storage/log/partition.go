@@ -192,7 +192,14 @@ func (p *Partition) appendLocked(records []byte) (int64, error) {
 	if err := p.offline(); err != nil {
 		return 0, err
 	}
-	firstOffset := p.logEndOffset
+	// A payload is appended whole or not at all, as Kafka appends it: every
+	// batch is checked before any is written, the payload goes into one segment
+	// (the roll, if one is due, comes first), and a write that fails part-way
+	// takes back the batches before it. Leaving them used to answer the
+	// partition as failed with records of it in the log: a consumer read what
+	// its producer was told had failed, and a plain producer's retry wrote them
+	// twice.
+	transactional := false
 	for pos := 0; pos < len(records); {
 		info, ok := parseHeader(records[pos:])
 		if !ok || pos+int(info.totalBytes) > len(records) {
@@ -204,35 +211,59 @@ func (p *Partition) appendLocked(records []byte) (int64, error) {
 			return 0, fmt.Errorf("%w: record count %d at byte %d", ErrCorruptBatch, info.recordCount, pos)
 		}
 		batch := records[pos : pos+int(info.totalBytes)]
-		offset := p.logEndOffset
-		stampBaseOffset(batch, offset)
-		// The first transactional batch a partition takes starts it keeping
-		// transaction state: the marker file says so for a later open, and the log so
-		// far is scanned now, before this batch is in it.
-		transactional := len(batch) >= batchFullHeaderBytes && attrsOf(batch)&(batchTransactionalBit|batchControlBit) != 0
-		if transactional {
-			if err := p.markTransactional(); err != nil {
-				return 0, err
-			}
-			if err := p.ensureTxn(); err != nil {
-				return 0, err
-			}
-		}
-
-		if p.active().sizeBytes > 0 && p.active().sizeBytes+int64(len(batch)) > p.segmentBytes {
-			if err := p.rollLocked(offset); err != nil {
-				return 0, err
-			}
-		}
-		if err := p.active().append(offset, batch); err != nil {
-			return 0, err
-		}
-		p.appendSeq.Add(1)
-		p.logEndOffset = offset + int64(info.recordCount)
-		if transactional {
-			p.txn.observe(batch, offset)
+		if len(batch) >= batchFullHeaderBytes && attrsOf(batch)&(batchTransactionalBit|batchControlBit) != 0 {
+			transactional = true
 		}
 		pos += int(info.totalBytes)
+	}
+	// The first transactional batch a partition takes starts it keeping
+	// transaction state: the marker file says so for a later open, and the log so
+	// far is scanned now, before this payload is in it.
+	if transactional {
+		if err := p.markTransactional(); err != nil {
+			return 0, err
+		}
+		if err := p.ensureTxn(); err != nil {
+			return 0, err
+		}
+	}
+	if p.active().sizeBytes > 0 && p.active().sizeBytes+int64(len(records)) > p.segmentBytes {
+		if err := p.rollLocked(p.logEndOffset); err != nil {
+			return 0, err
+		}
+	}
+	seg := p.active()
+	mark := seg.mark()
+	firstOffset := p.logEndOffset
+	type placed struct {
+		batch  []byte
+		offset int64
+	}
+	var done []placed
+	for pos := 0; pos < len(records); {
+		info, _ := parseHeader(records[pos:])
+		batch := records[pos : pos+int(info.totalBytes)]
+		offset := p.logEndOffset
+		stampBaseOffset(batch, offset)
+		if err := seg.append(offset, batch); err != nil {
+			if len(done) > 0 {
+				seg.rewind(mark)
+				p.logEndOffset = firstOffset
+				p.appendSeq.Add(1) // the cut has to reach the disk like a write.
+			}
+			return 0, err
+		}
+		p.logEndOffset = offset + int64(info.recordCount)
+		done = append(done, placed{batch, offset})
+		pos += int(info.totalBytes)
+	}
+	p.appendSeq.Add(1)
+	if transactional {
+		for _, d := range done {
+			if len(d.batch) >= batchFullHeaderBytes && attrsOf(d.batch)&(batchTransactionalBit|batchControlBit) != 0 {
+				p.txn.observe(d.batch, d.offset)
+			}
+		}
 	}
 	return firstOffset, nil
 }

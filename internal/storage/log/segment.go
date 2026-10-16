@@ -144,6 +144,30 @@ func (s *Segment) append(offset int64, batch []byte) error {
 	return nil
 }
 
+// segmentMark is where a segment's appends stood, for rewind.
+type segmentMark struct {
+	size, sinceIndex int64
+	entries          int
+	lastModified     time.Time
+}
+
+func (s *Segment) mark() segmentMark {
+	return segmentMark{s.sizeBytes, s.sinceIndex, len(s.index.entries), s.lastModified}
+}
+
+// rewind takes back every append since m: the bytes and index entries are cut
+// off and the segment counts as it did. A cut that fails leaves bytes past the
+// size the segment counts; the next append writes over them, and recovery after
+// a crash before then finds them as it would a torn tail.
+func (s *Segment) rewind(m segmentMark) {
+	s.sizeBytes, s.sinceIndex, s.lastModified = m.size, m.sinceIndex, m.lastModified
+	_ = fsTruncate(s.log, m.size)
+	if len(s.index.entries) > m.entries {
+		s.index.entries = s.index.entries[:m.entries]
+		_ = fsTruncate(s.index.file, int64(m.entries)*indexEntryBytes)
+	}
+}
+
 // sync flushes this segment's log and index to stable storage. It is the unit of
 // durability: the coarse fsync timer syncs the active segment, a roll syncs the
 // segment being sealed, and graceful shutdown syncs everything before close.

@@ -563,7 +563,12 @@ func (m *Manager) periodicSync() {
 			p.syncWarned.Store(nil)
 			continue
 		}
+		// An offline partition fails every tick, first with the fsync's own error
+		// and then with "offline" wrapped round it: one line for all of them.
 		msg := err.Error()
+		if p.Offline() {
+			msg = "offline"
+		}
 		if last := p.syncWarned.Load(); last != nil && *last == msg {
 			continue
 		}
