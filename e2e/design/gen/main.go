@@ -46,6 +46,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -64,9 +65,11 @@ import (
 type ledger struct {
 	mu sync.Mutex
 	f  *os.File
-	// The requests written to the broker and not yet answered, by broker and API key, in
-	// the order they were written (a connection answers in order): what a sync line lists.
-	flying map[[2]int32][]float64
+	// The requests written to the broker and not yet answered, by API key, in the order
+	// they were written (a connection answers in order): what a sync line lists. Each is
+	// the time taken just before the write call, which is before the broker can have read
+	// a byte of it (see stampConn).
+	flying map[int16][]float64
 }
 
 // ledgers are the clients of this process, which SIGUSR1 asks to sync.
@@ -85,7 +88,7 @@ func newLedger(id string) *ledger {
 		fmt.Fprintln(os.Stderr, "gen:", err)
 		os.Exit(1)
 	}
-	l := &ledger{f: f, flying: map[[2]int32][]float64{}}
+	l := &ledger{f: f, flying: map[int16][]float64{}}
 	ledgersMu.Lock()
 	ledgers = append(ledgers, l)
 	ledgersMu.Unlock()
@@ -102,7 +105,7 @@ func (l *ledger) sync() {
 	var open []map[string]any
 	for k, starts := range l.flying {
 		for _, s := range starts {
-			open = append(open, map[string]any{"key": k[1], "api": kmsg.NameForKey(int16(k[1])), "start": s})
+			open = append(open, map[string]any{"key": k, "api": kmsg.NameForKey(k), "start": s})
 		}
 	}
 	b, _ := json.Marshal(map[string]any{"ev": "sync", "t": ms(time.Now()), "open": open})
@@ -130,28 +133,46 @@ func (l *ledger) line(m map[string]any) {
 // when its first byte was written (kgo's end-to-end duration starts there, after the
 // time the request waited in the client's queue); the broker's time for it is when it
 // read it, which is in between.
-func (l *ledger) OnBrokerE2E(b kgo.BrokerMetadata, key int16, e kgo.BrokerE2E) {
+func (l *ledger) OnBrokerE2E(_ kgo.BrokerMetadata, key int16, e kgo.BrokerE2E) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	end := time.Now()
-	start := end.Add(-e.DurationE2E())
-	k := [2]int32{b.NodeID, int32(key)}
-	if q := l.flying[k]; len(q) > 0 {
-		l.flying[k] = q[1:]
+	// start is the time taken before the write, never later than the broker's reading of
+	// the request. end is read here, after the answer and whatever the process was doing
+	// before this hook ran, so it is never earlier than the broker's answering: both
+	// errors widen the span the request may have been read in, and neither narrows it.
+	// (kgo's own duration taken back from here put start late by as long as the hook
+	// waited to run: on a loaded machine, tens of milliseconds after the broker had the
+	// request.)
+	start := ms(end.Add(-e.DurationE2E()))
+	if q := l.flying[key]; len(q) > 0 {
+		start = min(start, q[0])
+		l.flying[key] = q[1:]
 	}
-	m := map[string]any{"ev": "req", "key": key, "api": kmsg.NameForKey(key), "start": ms(start), "end": ms(end), "t": ms(end), "wr": e.BytesWritten, "rd": e.BytesRead}
+	m := map[string]any{"ev": "req", "key": key, "api": kmsg.NameForKey(key), "start": start, "end": ms(end), "t": ms(end), "wr": e.BytesWritten, "rd": e.BytesRead}
 	if err := e.Err(); err != nil {
 		m["err"] = err.Error()
 	}
 	l.line(m)
 }
 
-// OnBrokerWrite notes a request as flying from the moment its first byte was written.
-func (l *ledger) OnBrokerWrite(b kgo.BrokerMetadata, key int16, _ int, _, timeToWrite time.Duration, _ error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	k := [2]int32{b.NodeID, int32(key)}
-	l.flying[k] = append(l.flying[k], ms(time.Now().Add(-timeToWrite)))
+// stampConn takes the time just before each write to the broker. A request is one write
+// (size, API key, version, correlation id, ...): the time before it is a lower bound of
+// when the broker read it.
+type stampConn struct {
+	net.Conn
+	l *ledger
+}
+
+func (c *stampConn) Write(p []byte) (int, error) {
+	t := time.Now()
+	if len(p) >= 6 {
+		key := int16(binary.BigEndian.Uint16(p[4:6]))
+		c.l.mu.Lock()
+		c.l.flying[key] = append(c.l.flying[key], ms(t))
+		c.l.mu.Unlock()
+	}
+	return c.Conn.Write(p)
 }
 
 func (l *ledger) OnBrokerConnect(_ kgo.BrokerMetadata, _ time.Duration, c net.Conn, err error) {
@@ -180,7 +201,14 @@ func client(addr, id string, opts ...kgo.Opt) (*kgo.Client, *ledger) {
 	l := newLedger(id)
 	name, version := software()
 	l.write(map[string]any{"ev": "software", "name": name, "version": version})
-	base := []kgo.Opt{kgo.SeedBrokers(addr), kgo.ClientID(id), kgo.WithHooks(l)}
+	dial := func(ctx context.Context, network, host string) (net.Conn, error) {
+		c, err := (&net.Dialer{Timeout: 10 * time.Second}).DialContext(ctx, network, host)
+		if err != nil {
+			return nil, err
+		}
+		return &stampConn{Conn: c, l: l}, nil
+	}
+	base := []kgo.Opt{kgo.SeedBrokers(addr), kgo.ClientID(id), kgo.WithHooks(l), kgo.Dialer(dial)}
 	if os.Getenv("NOMETRICS") != "" {
 		base = append(base, kgo.DisableClientMetrics())
 	}
