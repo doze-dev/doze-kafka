@@ -64,7 +64,7 @@ var Units = []Unit{
 	{Name: "cmd/doze-kafka", Dir: "cmd/doze-kafka", Shards: 2},               // 15 min
 	// The broker by what the file does: each group is one unit.
 	{Name: "internal/broker:groups", Dir: "internal/broker", Shards: 8, Only: []string{
-		"group", "group848", "group848_assign", "groups", "groups848", "groupadmin", "groupdelete", "groupevents", "grouptimer", "groupmigrate", "offsetexpiry", "offsets"}},
+		"group", "group848", "group848_assign", "groups", "groups848", "groupadmin", "groupdelete", "groupevents", "grouptimer", "groupmigrate", "grouporder", "offsetexpiry", "offsets"}},
 	{Name: "internal/broker:data", Dir: "internal/broker", Shards: 8, Only: []string{
 		"produce", "fetch", "idempotency", "listoffsets", "deleterecords", "producerid", "txn", "txnapis"}},
 	{Name: "internal/broker:admin", Dir: "internal/broker", Shards: 8, Only: []string{

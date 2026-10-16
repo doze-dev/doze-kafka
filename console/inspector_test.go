@@ -53,6 +53,12 @@ func TestEverySelectionRendersThroughTheInspectorContract(t *testing.T) {
 	txnWrite(t, context.Background(), p, "tx", "open")
 
 	reqKey := src.events[1].ID
+	// An ACL, made through the console's own form.
+	if rec := req(t, c, "POST", "/_console/new/acl", url.Values{"principal": {"User:audit"}, "host": {"*"}, "resource": {"topic"}, "name": {"secrets"},
+		"pattern": {"literal"}, "operation": {"read"}, "permission": {"deny"}}); rec.Code != 303 {
+		t.Fatalf("create an ACL: %d %s", rec.Code, rec.Body)
+	}
+	aclKey := joinKey("User:audit", "topic", "secrets", "literal", "read", "deny", "*")
 	cases := []struct {
 		kind, path string
 		title      string // the title the selection must have.
@@ -61,11 +67,12 @@ func TestEverySelectionRendersThroughTheInspectorContract(t *testing.T) {
 	}{
 		{KindMessage, "/_console/topics/orders/message?partition=0&offset=1", "P0 · offset 1", "1", []string{"Timestamp", "Send again"}},
 		{KindRequest, "/_console/inspect/request?key=" + reqKey, "Produce v9", "request:" + reqKey, []string{"billing", "1 partition, 2.0 KiB"}},
-		{KindClient, "/_console/inspect/client?key=1", "billing", "client:1", []string{"apache-kafka-java 3.7.0", "billing-workers", "41"}},
+		{KindClient, "/_console/inspect/client?key=1", "billing", "client:1", []string{"apache-kafka-java 3.7.0", "billing-workers", "Its requests"}},
 		{KindMember, "/_console/inspect/member?key=" + url.QueryEscape(joinKey("billing", memberID)), "billing-service", "member:" + joinKey("billing", memberID), []string{"Assigned partitions", "orders", "0–1"}},
 		{KindSubject, "/_console/inspect/subject?key=orders-value", "orders-value", "subject:orders-value", []string{"Compatibility", "Avro"}},
 		{KindTransaction, "/_console/inspect/transaction?key=inspect-txn", "inspect-txn", "transaction:inspect-txn", []string{"tx-0", "Ongoing"}},
 		{KindEvent, "/_console/inspect/event?key=" + url.QueryEscape(joinKey("billing-workers", "3")), "session expired", "event:" + joinKey("billing-workers", "3"), []string{"no heartbeat within its session timeout"}},
+		{KindACL, "/_console/inspect/acl?key=" + url.QueryEscape(aclKey), "DENY User:audit Read", "acl:" + aclKey, []string{"Refuses every request that needs Read on this topic by User:audit", "It is the only ACL about it", "Check a request"}},
 	}
 	seen := map[string]bool{}
 	for _, tc := range cases {

@@ -33,29 +33,10 @@ func readLogStart(dir string) int64 {
 }
 
 // writeLogStart records the log-start offset durably: a crash leaves either the old
-// value or the new one, never a torn file.
+// value or the new one, never a torn file, and a power cut after it returns does
+// not bring the old one back.
 func writeLogStart(dir string, offset int64) error {
-	tmp := filepath.Join(dir, logStartFile+".tmp")
-	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
-	if err != nil {
-		return err
-	}
-	if _, err := f.WriteString(strconv.FormatInt(offset, 10) + "\n"); err != nil {
-		f.Close()
-		return err
-	}
-	if err := f.Sync(); err != nil {
-		f.Close()
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(tmp, filepath.Join(dir, logStartFile)); err != nil {
-		return err
-	}
-	syncDir(dir)
-	return nil
+	return writeFileDurably(filepath.Join(dir, logStartFile), []byte(strconv.FormatInt(offset, 10)+"\n"))
 }
 
 // DeleteBefore makes offset the partition's log-start offset: records below it are
@@ -80,27 +61,43 @@ func (p *Partition) DeleteBefore(offset int64) (int64, error) {
 	if offset <= p.logStartOffset {
 		return p.logStartOffset, nil
 	}
+	// A partition whose flush failed takes no writes until a restart, and moving
+	// its start is one. Refused before anything is recorded: the new start used
+	// to be written and then the request answered as failed.
+	if err := p.offline(); err != nil {
+		return p.logStartOffset, err
+	}
+	// Emptying a partition that has records in its active segment: a fresh
+	// segment is started at the log end so the old one can go too, rather than
+	// holding what was deleted until the segment happens to roll. The old one is
+	// sealed first, while failing still leaves nothing changed.
+	empties := offset == p.logEndOffset && p.active().sizeBytes > 0
+	if empties {
+		if err := p.flushSegment(p.active()); err != nil {
+			return p.logStartOffset, err
+		}
+	}
 	if err := writeLogStart(p.dir, offset); err != nil {
 		return p.logStartOffset, err
 	}
 	p.logStartOffset = offset
+	if p.txn.ready {
+		p.txn.dropBelow(offset)
+	}
 
-	// Emptying a partition that has records in its active segment: start a fresh
-	// segment at the log end so the old one can go too, rather than holding what was
-	// deleted until the segment happens to roll.
-	if offset == p.logEndOffset && p.active().sizeBytes > 0 {
-		if err := p.active().sync(); err != nil {
-			return p.logStartOffset, err
+	// From here the start has moved, durably, and that is the answer whatever
+	// happens to the files below it: one that cannot be removed now is invisible,
+	// and is removed by a later call or the next open.
+	if empties {
+		if err := p.addSegment(offset); err != nil {
+			p.log.Warn("delete records: the log start moved, but a new segment could not be started; the old one stays on disk until the partition rolls", "partition", filepath.Base(p.dir), "err", err)
+			return p.logStartOffset, nil
 		}
-		seg, err := openSegment(p.dir, offset, p.indexInterval, p.beforeSync)
-		if err != nil {
-			return p.logStartOffset, err
-		}
-		p.segments = append(p.segments, seg)
 	}
 	for len(p.segments) > 1 && p.segments[1].baseOffset <= offset {
 		if err := p.dropOldestLocked(); err != nil {
-			return p.logStartOffset, err
+			p.log.Warn("delete records: the log start moved, but a segment below it could not be removed yet", "partition", filepath.Base(p.dir), "err", err)
+			break
 		}
 	}
 	return p.logStartOffset, nil

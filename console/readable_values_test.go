@@ -45,7 +45,7 @@ func TestRetentionIsWrittenInItsBiggestWholeUnit(t *testing.T) {
 	for in, want := range map[string]string{
 		"604800000": "7 d", "86400000": "1 d", "43200000": "12 h", "3600000": "1 h",
 		"5400000": "90 m", "60000": "1 m", "30000": "30 s", "1000": "1 s", "1500": "1500 ms", "250": "250 ms",
-		"-1": "no limit", " 60000 ": "1 m", "soon": "",
+		"-1": "no time limit", " 60000 ": "1 m", "soon": "",
 	} {
 		if got := retentionText(in); got != want {
 			t.Errorf("retentionText(%q) = %q, want %q", in, got, want)
@@ -79,8 +79,28 @@ func TestARowsTargetIsWhatTheRequestNames(t *testing.T) {
 		{"transaction", TrafficEvent{TxnID: "t-1"}, "tx t-1"},
 		{"via a group", TrafficEvent{ViaGroup: "g"}, ""},
 	} {
-		if got := c.trafficRow(tc.e).Target; got != tc.want {
+		if got := c.trafficRow(tc.e, trafficView{}).Target; got != tc.want {
 			t.Errorf("%s: Target = %q, want %q", tc.name, got, tc.want)
 		}
+	}
+}
+
+// "5 topics" on a Metadata row is five names, and the title says which: a filter by
+// a topic that lists a Metadata row has to show why it matched.
+func TestAMetadataRowsCountIsTitledByItsNames(t *testing.T) {
+	c := &Console{}
+	r := c.trafficRow(TrafficEvent{API: "Metadata", Topics: []string{"a", "b", "c"}, TopicsMore: 2}, trafficView{})
+	if r.Target != "5 topics" || r.TargetTitle != "a, b, c and 2 more" {
+		t.Errorf("Target %q, title %q", r.Target, r.TargetTitle)
+	}
+}
+
+// A group request that names topics (a heartbeat of the consumer protocol subscribes to
+// them) is listed by a topic filter: its title says so, as its text says only the group.
+func TestAGroupRowsTitleNamesTheTopicsItIsListedFor(t *testing.T) {
+	c := &Console{}
+	r := c.trafficRow(TrafficEvent{API: "ConsumerGroupHeartbeat", Group: "g", Topics: []string{"orders"}}, trafficView{})
+	if r.Target != "g" || r.TargetTitle != "g · orders" {
+		t.Errorf("Target %q, title %q", r.Target, r.TargetTitle)
 	}
 }

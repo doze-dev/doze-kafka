@@ -32,9 +32,9 @@ test('Access: six ACLs', async ({ page }) => {
 });
 
 test('Traffic: five harbour clients are in the requests', async ({ page }) => {
-  await page.goto('traffic');
+  await page.goto('traffic?q=harbour-');
   const clients = new Set<string>();
-  for (const cell of await page.locator('#traffic-table tbody tr').allInnerTexts()) {
+  for (const cell of await page.locator('#traffic-table .tf-rows > .r[data-row]').allInnerTexts()) {
     for (const m of cell.matchAll(/harbour-[a-z-]+/g)) {
       if (/^harbour-(gate|crane|pilot-boat|customs-scanner|billing-sync)$/.test(m[0])) clients.add(m[0]);
     }

@@ -1,13 +1,15 @@
 package console
 
-// The inspector's bodies for Traffic: one request (Traf-04), a folded row (Traf-05),
-// a client that reports metrics (Traf-07) and one that does not (Traf-11).
+// The inspector's bodies for Traffic: one request (Traf-04; an OffsetCommit as Traf-08
+// draws it), a folded row (Traf-05), a client that reports metrics (Traf-07) and one
+// that does not (Traf-11). Their template is traffic_inspector.html.
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -33,21 +35,21 @@ type foldView struct {
 	Last     time.Time
 	Interval string
 	Each     string // "ok, 0 ms each"
-	Result   string
 	Ticks    []tickView
 	Kept     int
 	Note     string // "Each tick is one heartbeat" / "the last 64 of 310"
-	Unit     string // "heartbeat", "fetch", "push"
+	Unit     string // "heartbeat", "fetch", "report"
 	Unfold   bool
+	// Same is what every repeat had in common beyond the request (Traf-05's
+	// "Generation: epoch 12 throughout"): the recorder's fold breaks when it changes, so
+	// it holds for all of them. SameLabel is its row's label.
+	Same, SameLabel string
 }
 
 type tickView struct {
-	Height int
-	Tone   string
-	Title  string
-	At     time.Time
-	Took   string
-	Result string
+	Title string
+	At    time.Time
+	Took  string
 }
 
 // explainView is what a refusal means, for the inspector of the request that got it.
@@ -56,7 +58,7 @@ type explainView struct {
 	Closed                                         string
 }
 
-func (c *Console) requestExplain(e TrafficEvent) *explainView {
+func (c *Console) requestExplain(e TrafficEvent, autoCreate bool) *explainView {
 	if e.Error == "" {
 		return nil
 	}
@@ -68,7 +70,7 @@ func (c *Console) requestExplain(e TrafficEvent) *explainView {
 		v.Closed = e.Closed
 		return v
 	}
-	info := protocol.Explain(e.ErrorCode)
+	info := protocol.ExplainFor(e.ErrorCode, protocol.BrokerFacts{AutoCreateTopics: autoCreate})
 	v.Meaning, v.Cause, v.Fix = info.Meaning, info.Cause, info.Fix
 	switch e.Class {
 	case "expected":
@@ -85,7 +87,7 @@ func (c *Console) requestExplain(e TrafficEvent) *explainView {
 	return v
 }
 
-// periodic repeats are named by what they are.
+// repeatUnit names a folded row's repeats by what they are.
 func repeatUnit(api string) string {
 	switch api {
 	case "Heartbeat", "ConsumerGroupHeartbeat":
@@ -102,22 +104,19 @@ func repeatUnit(api string) string {
 
 func (c *Console) foldView(e TrafficEvent, unfold bool) *foldView {
 	f := &foldView{Count: e.Count, First: e.First, Last: e.Time, Interval: intervalText(e), Unit: repeatUnit(e.API), Unfold: unfold}
-	each := shortDuration(e.Duration)
-	f.Each = "ok, " + each + " each"
-	f.Result = "ok"
-	var maxDur time.Duration
+	f.Each = "ok, " + shortDuration(e.Duration) + " each"
 	for _, t := range e.Ticks {
-		maxDur = max(maxDur, t.Duration)
-	}
-	for _, t := range e.Ticks {
-		h := 14
-		if maxDur > 0 {
-			h = 6 + int(16*float64(t.Duration)/float64(maxDur))
-		}
-		f.Ticks = append(f.Ticks, tickView{Height: h, Tone: resultTone(t.Class), At: t.At, Took: shortDuration(t.Duration),
-			Title: whenText(t.At, StyleClockMs) + " · " + shortDuration(t.Duration)})
+		f.Ticks = append(f.Ticks, tickView{At: t.At, Took: shortDuration(t.Duration), Title: whenText(t.At, StyleClockMs) + " · " + shortDuration(t.Duration)})
 	}
 	f.Kept = len(f.Ticks)
+	// The row's detail is part of what folds (the recorder's fold key): a heartbeat's
+	// generation, a fetch's wait. It was the same for every repeat.
+	switch {
+	case strings.HasPrefix(e.Detail, "generation "):
+		f.SameLabel, f.Same = "Generation", e.Detail+" throughout"
+	case strings.HasPrefix(e.Detail, "epoch "):
+		f.SameLabel, f.Same = "Epoch", e.Detail+" throughout"
+	}
 	f.Note = "Each tick is one " + f.Unit
 	if e.Count > f.Kept && f.Kept > 0 {
 		f.Note += ": the last " + strconv.Itoa(f.Kept) + " of " + groupDigits(int64(e.Count))
@@ -168,6 +167,38 @@ func plural2(n int, one string) string {
 // groupInt writes 4812 as "4,812".
 func groupInt(n int64) string { return groupDigits(n) }
 
+// inspectTraffic renders a Traffic selection: the boards' head (.hd) and the kind's
+// body. title is the head's title as the boards write it (the request, its version
+// muted); tone is what the body is ("request", "folded", "client-metrics",
+// "client-none"), for the page to draw its state by (shell.js sets data-traffic-open).
+func (c *Console) inspectTraffic(w http.ResponseWriter, v inspectorView, title template.HTML, tone string) {
+	data := map[string]any{}
+	for k, val := range v.Body {
+		data[k] = val
+	}
+	data["InspKind"], data["InspKey"], data["InspTitle"], data["InspSub"] = v.Kind, v.Key, v.Title, v.Sub
+	data["InspTitleHTML"] = title
+	if title == "" {
+		data["InspTitleHTML"] = template.HTML(template.HTMLEscapeString(v.Title)) //nolint:gosec // escaped here.
+	}
+	data["InspKindLabel"] = inspectorKindLabels[v.Kind]
+	if v.Cap != "" {
+		data["InspKindLabel"] = v.Cap
+	}
+	data["InspStatus"], data["InspStatusTone"], data["InspStatusKind"], data["InspSubTime"] = v.Status, v.StatusTone, v.StatusKind, v.SubTime
+	data["InspGone"], data["InspGoneMsg"], data["InspOpen"], data["InspTone"] = v.Gone, v.GoneMsg, openParam(v.Kind, v.Key), tone
+	c.partial(w, "traffic_inspector", data)
+}
+
+// requestTitle is the boards' head: the request, its version muted, and the fold count.
+func requestTitle(e TrafficEvent) template.HTML {
+	t := template.HTMLEscapeString(e.API) + ` <span class="mut">v` + strconv.Itoa(int(e.Version)) + `</span>`
+	if e.Count > 1 {
+		t += ` <span class="tag">×` + strconv.Itoa(e.Count) + `</span>`
+	}
+	return template.HTML(t) //nolint:gosec // the API name is escaped; the rest is ours.
+}
+
 func (c *Console) inspectRequest(w http.ResponseWriter, r *http.Request, key string) {
 	if c.trafficOff(w, r) {
 		return
@@ -196,32 +227,37 @@ func (c *Console) inspectRequest(w http.ResponseWriter, r *http.Request, key str
 	if !ok {
 		v.Gone = true
 		v.GoneMsg = "This request has aged out of what the broker remembers. The last couple of thousand are kept, in memory only."
-		c.inspect(w, v)
+		c.inspectTraffic(w, v, "", "request")
 		return
 	}
-	row := c.trafficRow(e)
+	row := c.trafficRow(e, trafficView{})
 	v.Title = fmt.Sprintf("%s v%d", e.API, e.Version)
+	tone := "request"
+	body := v.Body
+	commit := e.API == "OffsetCommit" && e.Error == "" && !row.Folded
 	if row.Folded {
+		tone = "folded"
 		v.Cap = "Folded row"
 		v.Title += " ×" + strconv.Itoa(e.Count)
 		v.Sub = row.Who
 		if g := firstNonEmpty(e.Group, e.ViaGroup); g != "" {
 			v.Sub += " · " + g
 		}
-		if e.Error == "" {
-			v.Status, v.StatusTone = "all ok", "ok"
-		}
+		v.Status, v.StatusTone = "all ok", "ok"
 	} else {
 		v.Status, v.StatusTone = "ok · "+row.Dur, "ok"
 		if e.Error != "" {
 			v.Status, v.StatusTone = e.Error+" · "+row.Dur, row.Tone
 		}
 		v.SubTime = e.Time
-		v.Sub = "correlation " + groupInt(int64(e.Correlation))
+		// Traf-04 draws a request's head with its time and correlation id; Traf-08 draws a
+		// commit's with its time alone.
+		if !commit {
+			v.Sub = "correlation " + groupInt(int64(e.Correlation))
+		}
 	}
-	body := v.Body
 	body["R"] = row
-	body["Explain"] = c.requestExplain(e)
+	body["Explain"] = c.requestExplain(e, c.autoCreateTopics(r.Context()))
 	body["Parts"] = c.partViews(e.Facts)
 	body["PartsMore"] = e.Facts.PartitionsMore
 	body["HasAcks"], body["Acks"] = e.Facts.HasAcks, acksText(e.Facts.Acks)
@@ -229,6 +265,10 @@ func (c *Console) inspectRequest(w http.ResponseWriter, r *http.Request, key str
 	body["Decoded"], body["DecodedRaw"] = html, raw
 	if row.Folded {
 		body["Fold"] = c.foldView(e, q.Get("unfold") != "")
+	}
+	if commit {
+		body["Commit"] = true
+		body["Commits"] = row.TopicParts
 	}
 	if e.ClientID != "" || e.Remote != "" {
 		body["WhoFilter"] = c.prefix + "/traffic?" + TrafficFilter{Client: row.Who}.query()
@@ -240,7 +280,12 @@ func (c *Console) inspectRequest(w http.ResponseWriter, r *http.Request, key str
 		body["GroupName"], body["GroupLink"] = g, c.groupURL(g)
 		body["GroupVia"] = e.Group == "" && e.ViaGroup != ""
 	}
-	c.inspect(w, v)
+	// "Follow in Topics" goes to the topic the request wrote or read, when there is one
+	// to go to: a refused Produce names a topic that does not exist (A8).
+	if len(e.Topics) > 0 && (e.Kind == "produce" || e.Kind == "fetch") && c.topicExists(r.Context(), e.Topics[0]) {
+		body["FollowURL"] = c.topicURL(e.Topics[0])
+	}
+	c.inspectTraffic(w, v, requestTitle(e), tone)
 }
 
 func acksText(a int) string {
@@ -275,25 +320,53 @@ func firstNonEmpty(ss ...string) string {
 
 // ---- clients ----
 
-// metricLabel names a metric as a person would, for the ones everyone looks at. Any
-// other is shown as its short name: a label is only written where it is known to say
-// what the metric is.
-var metricLabels = []struct{ Match, Label string }{
-	{"error.rate", "Request error rate"},
-	{"retry.rate", "Request retries"},
-	{"request.latency.avg", "Request latency, average"},
-	{"request.latency.max", "Request latency, maximum"},
-	{"poll.idle.ratio", "Poll idle ratio"},
-	{"connection.count", "Connection count"},
+// metricLabels name a metric in words, for the ones the boards name: each is the
+// metric's own name written out (the client said what it measures; the label says it
+// in words and claims nothing more), matched on the whole name below the client's
+// prefix, so a record rate is not called a request rate (A3). Any other metric is
+// shown by its short name.
+var metricLabels = map[string]string{
+	"request.latency.avg":               "Request latency, average",
+	"request.latency.max":               "Request latency, maximum",
+	"node.request.latency.avg":          "Request latency to a node, average",
+	"node.request.latency.max":          "Request latency to a node, maximum",
+	"poll.idle.ratio.avg":               "Poll idle ratio",
+	"connection.count":                  "Connection count",
+	"request.error.rate":                "Request error rate",
+	"request.retry.rate":                "Request retries",
+	"record.error.rate":                 "Record error rate",
+	"record.retry.rate":                 "Record retries",
+	"fetch.manager.bytes.consumed.rate": "Bytes fetched",
 }
 
-func metricLabel(name string) string {
-	for _, l := range metricLabels {
-		if strings.Contains(name, l.Match) {
-			return l.Label
+// metricShort is a metric's name below the client's own prefix
+// ("org.apache.kafka.producer.").
+func metricShort(name string) string {
+	for _, p := range []string{"org.apache.kafka.producer.", "org.apache.kafka.consumer.", "org.apache.kafka.client.", "org.apache.kafka."} {
+		if strings.HasPrefix(name, p) {
+			return strings.TrimPrefix(name, p)
 		}
 	}
-	return ""
+	return name
+}
+
+func metricLabel(name string) string { return metricLabels[metricShort(name)] }
+
+// metricOrder is the order Traf-07 lists the metrics it names in.
+var metricOrder = map[string]int{
+	"request.error.rate": 0, "request.retry.rate": 1, "record.error.rate": 2, "record.retry.rate": 3,
+	"request.latency.avg": 4, "node.request.latency.avg": 5, "poll.idle.ratio.avg": 6, "connection.count": 7,
+	"fetch.manager.bytes.consumed.rate": 8, "request.latency.max": 9, "node.request.latency.max": 10,
+}
+
+// worthALook are the metrics the boards put first ("Worth a look first"): the error
+// and retry rates, by their whole name.
+func worthALook(name string) bool {
+	switch metricShort(name) {
+	case "request.error.rate", "request.retry.rate", "record.error.rate", "record.retry.rate":
+		return true
+	}
+	return false
 }
 
 // clientMetrics is a client's metrics, ready to show (Traf-07).
@@ -304,13 +377,12 @@ type clientMetrics struct {
 	Dropped     int
 	Skipped     int
 	Last        time.Time
+	Every       string // "5 s": how often it has reported, from its reports.
 	Worth, Rest []metricRow
 	More        int
 	All         bool
 	Span        string
 	Terminated  bool
-	Resource    string
-	IDShort     string
 }
 
 const restShown = 4
@@ -375,40 +447,111 @@ func (c *Console) hasMetrics(cl TrafficClient) bool {
 	return ok
 }
 
+// sparkBars is how many of a series' latest reports its sparkline draws, one bar each
+// (Traf-07: twelve bars).
+const sparkBars = 12
+
+// sparkBarsHTML draws a series' latest reports as the board's bars: the board's .spark,
+// a 16 px box, each bar 2 px at the least and as tall as its value is of the largest
+// drawn.
+func sparkBarsHTML(samples []MetricSample) template.HTML {
+	if len(samples) == 0 {
+		return ""
+	}
+	if len(samples) > sparkBars {
+		samples = samples[len(samples)-sparkBars:]
+	}
+	hi := 0.0
+	for _, s := range samples {
+		if !math.IsNaN(s.V) && !math.IsInf(s.V, 0) {
+			hi = math.Max(hi, math.Abs(s.V))
+		}
+	}
+	var b strings.Builder
+	b.WriteString(`<span class="spark">`)
+	for _, s := range samples {
+		h := 2
+		if hi > 0 && !math.IsNaN(s.V) && !math.IsInf(s.V, 0) {
+			h = 2 + int(math.Round(14*math.Abs(s.V)/hi))
+		}
+		fmt.Fprintf(&b, `<i style="height: %dpx"></i>`, h)
+	}
+	b.WriteString(`</span>`)
+	return template.HTML(b.String()) //nolint:gosec // numbers only.
+}
+
+// kibText is a number of bytes as the boards write it: "526 B", "1.2 KiB", "3.4 MiB".
+func kibText(n int) string {
+	switch {
+	case n < 1024:
+		return strconv.Itoa(n) + " B"
+	case n < 1<<20:
+		return strconv.FormatFloat(float64(n)/1024, 'f', 1, 64) + " KiB"
+	}
+	return strconv.FormatFloat(float64(n)/(1<<20), 'f', 1, 64) + " MiB"
+}
+
+// metricValue writes a metric's latest value with the unit the client gave it, in the
+// boards' way: "1.4 ms", "0 /s", "1.2 KiB/s", "0.94", "1". With no unit it is the number
+// alone: a unit is never guessed from a name.
+func metricValue(v float64, unit string) string {
+	switch unit {
+	case "By/s", "By":
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return "—"
+		}
+		s := kibText(int(math.Round(v)))
+		if unit == "By/s" {
+			s += "/s"
+		}
+		return s
+	case "1/s":
+		return formatMetric(v, "") + " /s"
+	}
+	return formatMetric(v, unit)
+}
+
 func (c *Console) clientMetricsView(in ClientInstance, all bool) clientMetrics {
 	m := clientMetrics{Reports: in.Pushes, Metrics: in.Metrics, Dropped: in.Dropped, Skipped: in.Skipped, Last: in.Last, All: all, Terminated: in.Terminated}
 	if m.Metrics == 0 {
 		m.Metrics = len(in.Series)
 	}
-	m.IDShort = in.ID
-	if len(m.IDShort) > 8 {
-		m.IDShort = m.IDShort[:8]
+	if in.Pushes > 1 && in.Last.After(in.First) {
+		m.Every = everyText(in.Last.Sub(in.First) / time.Duration(in.Pushes-1))
 	}
-	var keys []string
-	for k, v := range in.Resource {
-		keys = append(keys, k+"="+v)
-	}
-	sort.Strings(keys)
-	m.Resource = strings.Join(keys, " · ")
 	var span time.Duration
 	rows := make([]metricRow, 0, len(in.Series))
 	lastOf := map[string]float64{}
 	for _, s := range in.Series {
-		if len(s.Samples) > 1 {
-			span = max(span, s.Samples[len(s.Samples)-1].T.Sub(s.Samples[0].T))
+		drawn := s.Samples
+		if len(drawn) > sparkBars {
+			drawn = drawn[len(drawn)-sparkBars:]
 		}
-		short := strings.TrimPrefix(s.Name, "org.apache.kafka.")
-		row := metricRow{Name: s.Name, Short: short, Attrs: s.Attrs, Unit: s.Unit, Last: formatMetric(lastSample(s), s.Unit), N: len(s.Samples), Spark: sparkline(s.Samples)}
-		if l := metricLabel(s.Name); l != "" {
-			row.Label = l
+		if len(drawn) > 1 {
+			span = max(span, drawn[len(drawn)-1].T.Sub(drawn[0].T))
+		}
+		row := metricRow{Name: s.Name, Short: metricShort(s.Name), Label: metricLabel(s.Name), Attrs: s.Attrs, Unit: s.Unit, Last: metricValue(lastSample(s), s.Unit), N: len(s.Samples), Spark: sparkBarsHTML(s.Samples)}
+		if worthALook(s.Name) {
+			row.Tone = "ok"
+			if lastSample(s) > 0 {
+				row.Tone = "warn"
+			}
 		}
 		rows = append(rows, row)
 		lastOf[s.Name+"\x00"+s.Attrs] = lastSample(s)
 	}
-	rank := func(r metricRow) int { return metricRank(r.Name, lastOf[r.Name+"\x00"+r.Attrs]) }
+	// The metrics the boards name come first, in the boards' order (Traf-07: request
+	// latency, poll idle ratio, connection count, bytes fetched); then the rest by what
+	// answers "is this client healthy" first (metricRank).
+	rank := func(r metricRow) int {
+		if i, ok := metricOrder[metricShort(r.Name)]; ok {
+			return i - len(metricOrder)
+		}
+		return metricRank(r.Name, lastOf[r.Name+"\x00"+r.Attrs])
+	}
 	sort.SliceStable(rows, func(a, b int) bool { return rank(rows[a]) < rank(rows[b]) })
 	for _, r := range rows {
-		if strings.Contains(r.Name, "error.rate") || strings.Contains(r.Name, "retry.rate") {
+		if worthALook(r.Name) {
 			m.Worth = append(m.Worth, r)
 		} else {
 			m.Rest = append(m.Rest, r)
@@ -422,16 +565,33 @@ func (c *Console) clientMetricsView(in ClientInstance, all bool) clientMetrics {
 		m.More += len(m.Rest) - restShown
 		m.Rest = m.Rest[:restShown]
 	}
-	// The chart covers what the samples cover: the span from the first sample to the
-	// last of the longest series, written in whole minutes ("the last 5 minutes").
-	mins := int(span.Round(time.Minute) / time.Minute)
-	switch {
-	case mins >= 2:
-		m.Span = "the last " + strconv.Itoa(mins) + " minutes"
-	case span > 0:
-		m.Span = "the last " + strconv.Itoa(int(span.Round(time.Second)/time.Second)) + " seconds"
+	// The bars cover what the drawn samples cover: from the first bar's report to the
+	// last ("the last minute", "the last 25 seconds").
+	switch secs := int(span.Round(time.Second) / time.Second); {
+	case secs >= 55 && secs <= 65:
+		m.Span = "the last minute"
+	case secs >= 120:
+		m.Span = "the last " + strconv.Itoa(int(span.Round(time.Minute)/time.Minute)) + " minutes"
+	case secs > 0:
+		m.Span = "the last " + strconv.Itoa(secs) + " seconds"
 	}
 	return m
+}
+
+// everyText is how often something happens, as the boards write it: "5 s", "1.5 s",
+// "2 min".
+func everyText(d time.Duration) string {
+	switch {
+	case d < time.Second:
+		return strconv.Itoa(int(d.Milliseconds())) + " ms"
+	case d < time.Minute:
+		s := d.Seconds()
+		if math.Abs(s-math.Round(s)) < 0.05 || s >= 10 {
+			return strconv.Itoa(int(math.Round(s))) + " s"
+		}
+		return strconv.FormatFloat(s, 'f', 1, 64) + " s"
+	}
+	return strconv.Itoa(int(math.Round(d.Minutes()))) + " min"
 }
 
 func (c *Console) inspectClient(w http.ResponseWriter, r *http.Request, key string) {
@@ -468,8 +628,8 @@ func (c *Console) inspectClient(w http.ResponseWriter, r *http.Request, key stri
 			}
 		}
 		v.Title = who
-		v.Sub = joinNonEmpty(" · ", firstNonEmpty(cl.Software, "software not reported"), cl.Principal, cl.Remote)
-		v.Status, v.StatusKind = "connected "+spanText(now.Sub(cr.Opened)), "pill"
+		v.Sub = joinNonEmpty(" · ", firstNonEmpty(cr.Software, "software not reported"), cr.Principal, cl.Remote)
+		v.Status, v.StatusKind = "connected "+spanBoard(now.Sub(cr.Opened)), "pill"
 		body := v.Body
 		body["C"] = cr
 		if cr.Conns > 1 {
@@ -483,41 +643,48 @@ func (c *Console) inspectClient(w http.ResponseWriter, r *http.Request, key stri
 				in, ok = mi, true
 			}
 		}
+		tone := "client-none"
 		allMetrics := r.URL.Query().Get("all") != ""
 		if ok {
+			tone = "client-metrics"
+			// Traf-07's client that reports wears the ok tint; Traf-11's does not.
+			v.StatusTone = "ok"
 			m := c.clientMetricsView(in, allMetrics)
 			m.Who = who
 			body["M"] = m
 			body["HasMetrics"] = true
 		} else if c.metrics != nil {
 			body["NoMetrics"] = true
-			body["Asked"] = cl.AskedTelemetry
+			body["Asked"] = cr.AskedTelemetry
 			// A client that does report, to point at.
-			var other *clientRow
-			for _, ocl := range all {
-				if ocl.Conn != cl.Conn && (ocl.ClientID == "" || ocl.ClientID != cl.ClientID) && c.hasMetrics(ocl) {
-					x := c.clientRow(ocl, now)
-					other = &x
+			for _, g := range c.groupClients(all, now) {
+				if g.Who == cr.Who {
+					continue
+				}
+				for _, mem := range g.Members {
+					if c.hasMetrics(mem.TrafficClient) {
+						body["OtherURL"] = c.inspectURL(KindClient, strconv.FormatUint(mem.Conn, 10))
+						body["OtherHref"] = c.prefix + "/traffic?view=clients&open=client:" + strconv.FormatUint(mem.Conn, 10)
+						break
+					}
+				}
+				if body["OtherURL"] != nil {
 					break
 				}
-			}
-			if other != nil {
-				body["Other"] = other
-				body["OtherURL"] = c.inspectURL(KindClient, strconv.FormatUint(other.Conn, 10))
 			}
 		}
 		body["MetricsOn"] = c.metrics != nil
 		var gl []struct{ Name, URL string }
-		for _, g := range cl.Groups {
+		for _, g := range cr.TrafficClient.Groups {
 			gl = append(gl, struct{ Name, URL string }{g, c.groupURL(g)})
 		}
 		body["GroupLinks"] = gl
-		c.inspect(w, v)
+		c.inspectTraffic(w, v, "", tone)
 		return
 	}
 	v.Gone = true
 	v.GoneMsg = "This connection has closed."
-	c.inspect(w, v)
+	c.inspectTraffic(w, v, "", "client-none")
 }
 
 func joinNonEmpty(sep string, ss ...string) string {

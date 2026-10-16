@@ -39,17 +39,14 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
     <button type="button" class="menu-btn" id="menu-btn" aria-label="Menu" aria-controls="rail" aria-expanded="false">☰</button>
     <a class="brand" href="{{.Prefix}}/"><span class="logo" aria-hidden="true">z</span><span class="brand-name">doze-kafka</span>{{if .Workspace}}<span class="sub" id="workspace-label">{{.Workspace}}</span>{{end}}</a>
     <span class="pg-title" id="pg-title" aria-hidden="true"></span>
-    <button type="button" class="tb-palette" id="palette-open" aria-haspopup="dialog"><span class="grow">Jump to a topic, group or subject, or do something…</span><span class="kbd">⌘K</span></button>
+    {{/* The jump field's words are Sy-01's at full width and Sy-03's ("Jump or act…")
+         where the field is 300 px; the one shown is the button's name. */}}
+    <button type="button" class="tb-palette" id="palette-open" aria-haspopup="dialog"><span class="grow tb-long">Jump to a topic, group or subject, or do something…</span><span class="grow tb-short">Jump or act…</span><span class="kbd">⌘K</span></button>
     <div class="tb-spacer"></div>
     <div class="tb-right">
-      <span class="pill mono live" id="live-pill" title="The broker this console is connected to"><span class="dot" aria-hidden="true"></span><span class="pill-addr">{{if .Endpoint}}{{.Endpoint}}{{else}}broker{{end}}</span><span class="pill-state" hidden></span></span>
+      <span class="pill live" id="live-pill" title="The broker this console is connected to"><span class="dot" aria-hidden="true"></span><span class="m pill-addr">{{if .Endpoint}}{{.Endpoint}}{{else}}broker{{end}}</span><span class="pill-state" hidden></span></span>
       {{if .KafkaCompat}}<span class="pill" id="compat-pill">{{.KafkaCompat}}</span>{{end}}
-      <div class="theme-seg" id="theme-seg" role="group" aria-label="Theme">
-        <button type="button" data-mode="system" title="Follow the system setting">system</button>
-        <button type="button" data-mode="light" title="Light">light</button>
-        <button type="button" data-mode="dark" title="Dark">dark</button>
-        <button type="button" data-mode="contrast" title="High contrast">high contrast</button>
-      </div>
+      {{template "theme_seg" ""}}
     </div>
   </header>
 
@@ -69,6 +66,7 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
       {{template "ri" dict "P" .Prefix "URL" "/cluster" "On" (eq .Page "cluster") "Name" "Cluster" "Chip" "CL" "C" "cl"}}
       <div class="grow"></div>
       {{template "ri" dict "P" .Prefix "URL" "/connect" "On" (eq .Page "connect") "Name" "Connect an app" "Chip" "⇢" "C" "mut"}}
+      {{template "theme_seg" "rail-theme"}}
     </nav>
 
     {{/* NOTE: hx-target/hx-select here are INHERITED by every htmx actuator
@@ -110,13 +108,18 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
     </div>
   </div>
 
-  <!-- styled confirm (replaces native hx-confirm dialogs) -->
+  <!-- styled confirm (replaces native hx-confirm dialogs): Tp-24's title, paragraph,
+       table of what goes and what stays, then Cancel (focused) and the verb -->
   <div class="overlay" id="confirm" hidden>
-    <div class="dialog anim" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-msg">
-      <div class="dialog-h"><h3 id="confirm-title">Are you sure?</h3><p id="confirm-msg"></p></div>
-      <div class="dialog-f">
-        <button type="button" class="btn" id="confirm-no">Cancel</button>
-        <button type="button" class="btn btn-destructive" id="confirm-yes">Confirm</button>
+    <div class="modal anim" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-msg confirm-rows">
+      <div class="pad col g12">
+        <h2 class="h2" id="confirm-title">Are you sure?</h2>
+        <p id="confirm-msg"></p>
+        <div class="kv" id="confirm-rows" style="--c: 118px 1fr" hidden></div>
+        <div class="row g8 confirm-f">
+          <button type="button" class="btn" id="confirm-no">Cancel</button>
+          <button type="button" class="btn danger" id="confirm-yes">Confirm</button>
+        </div>
       </div>
     </div>
   </div>
@@ -146,6 +149,15 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
 </body>
 </html>
 {{end}}
+
+{{/* The theme switch (Sy-07): in the top bar, and at the foot of the ☰ menu at phone
+     width (the "rail-theme" copy), where the top bar has no room for it. */}}
+{{define "theme_seg"}}<div class="theme-seg{{if .}} {{.}}{{end}}"{{if not .}} id="theme-seg"{{end}} role="group" aria-label="Theme">
+  <button type="button" data-mode="system" title="Follow the system setting">system</button>
+  <button type="button" data-mode="light" title="Light">light</button>
+  <button type="button" data-mode="dark" title="Dark">dark</button>
+  <button type="button" data-mode="contrast" title="High contrast">high contrast</button>
+</div>{{end}}
 
 {{/* ri = one rail item: the section's chip, its name and, where it has one, the
      number the boards put beside it. A count with a Ct is kept live by shell.js. */}}
@@ -179,5 +191,5 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
 {{/* The keys strip: what the keys do on this page, one line at the foot (Sy-01).
      The hints come from keys.go, per page; a hint is a key the page really has. */}}
 {{define "keys_strip"}}
-<div class="keys" id="keys" hx-swap-oob="true" role="note" aria-label="Keys on this page">{{range .Hints}}<span{{if .Only}} class="keys-{{.Only}}"{{end}}>{{range .Keys}}<span class="kbd">{{.}}</span>{{end}}{{.Label}}</span>{{end}}</div>
+<footer class="keys" id="keys" hx-swap-oob="true" aria-label="Keys on this page">{{range .Hints}}<span{{if or .Only .Width}} class="{{if .Only}}keys-{{.Only}}{{end}}{{if .Width}} keys-w-{{.Width}}{{end}}"{{end}}>{{range .Keys}}<span class="kbd">{{.}}</span>{{end}}{{.Label}}</span>{{end}}{{range dialogHints}}{{$k := .Kind}}{{range .Hints}}<span class="keys-dialog keys-dialog-{{$k}}">{{range .Keys}}<span class="kbd">{{.}}</span>{{end}}{{.Label}}</span>{{end}}{{end}}</footer>
 {{end}}

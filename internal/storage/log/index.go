@@ -30,17 +30,17 @@ type indexEntry struct {
 }
 
 // openIndex opens (creating if needed) the index file and loads its entries.
-func openIndex(path string) (*Index, error) {
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o644)
+func openIndex(path string) (ix *Index, created bool, err error) {
+	f, created, err := fsOpenFile(path, os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	ix := &Index{file: f}
+	ix = &Index{file: f}
 	if err := ix.load(); err != nil {
 		f.Close()
-		return nil, err
+		return nil, false, err
 	}
-	return ix, nil
+	return ix, created, nil
 }
 
 func (ix *Index) load() error {
@@ -71,11 +71,14 @@ func (ix *Index) append(offset, position int64) error {
 	var buf [indexEntryBytes]byte
 	binary.BigEndian.PutUint64(buf[0:], uint64(offset))
 	binary.BigEndian.PutUint64(buf[8:], uint64(position))
-	if _, err := ix.file.WriteAt(buf[:], int64(len(ix.entries))*indexEntryBytes); err != nil {
+	if err := faultAt("log.file.write"); err != nil {
+		return err
+	}
+	ix.dirty.Store(true) // before the write: a failed write may still have changed the file.
+	if err := fsWriteAt(ix.file, buf[:], int64(len(ix.entries))*indexEntryBytes); err != nil {
 		return err
 	}
 	ix.entries = append(ix.entries, indexEntry{offset, position})
-	ix.dirty.Store(true)
 	return nil
 }
 
@@ -93,20 +96,23 @@ func (ix *Index) lookup(target int64) int64 {
 // right an index that disagrees with the log it describes: the index is derived
 // data, so the log wins.
 func (ix *Index) rewrite(entries []indexEntry) error {
-	if err := ix.file.Truncate(0); err != nil {
-		return err
-	}
-	var buf [indexEntryBytes]byte
-	for i, e := range entries {
-		binary.BigEndian.PutUint64(buf[0:], uint64(e.offset))
-		binary.BigEndian.PutUint64(buf[8:], uint64(e.position))
-		if _, err := ix.file.WriteAt(buf[:], int64(i)*indexEntryBytes); err != nil {
-			return err
-		}
-	}
+	// The entries in memory are right from here on, whatever happens to the file:
+	// they came from the log, and a file left half written is put right by the
+	// next open, which compares it with the log again.
 	ix.entries = append(ix.entries[:0], entries...)
 	ix.dirty.Store(true)
-	return nil
+	if err := fsTruncate(ix.file, 0); err != nil {
+		return err
+	}
+	raw := make([]byte, 0, len(entries)*indexEntryBytes)
+	for _, e := range entries {
+		raw = binary.BigEndian.AppendUint64(raw, uint64(e.offset))
+		raw = binary.BigEndian.AppendUint64(raw, uint64(e.position))
+	}
+	if len(raw) == 0 {
+		return nil
+	}
+	return fsWriteAt(ix.file, raw, 0)
 }
 
 // sync flushes appended index entries to stable storage, if there are any new
@@ -116,7 +122,7 @@ func (ix *Index) sync() error {
 	if !ix.dirty.Swap(false) {
 		return nil
 	}
-	if err := flushFile(ix.file); err != nil {
+	if err := fsSync(ix.file); err != nil {
 		ix.dirty.Store(true) // not flushed: the next sync must try again.
 		return err
 	}

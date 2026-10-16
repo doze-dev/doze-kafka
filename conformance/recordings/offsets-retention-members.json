@@ -1,0 +1,1684 @@
+{
+  "scenario": "offsets-retention-members",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "ret-a"
+          },
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "ret-b"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "ret-a",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          },
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "ret-b",
+            "TopicID": "\u003ctopic-id:2\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "find-coordinators",
+      "api": "FindCoordinator",
+      "version": 4,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": [
+          "g-stable",
+          "g-rebal",
+          "g-connect",
+          "g-unreadable"
+        ],
+        "CoordinatorType": 0
+      },
+      "response": {
+        "Coordinators": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "g-stable",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "g-rebal",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "g-connect",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "g-unreadable",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          }
+        ],
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "stable-join-needs-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-stable",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "stable-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-stable",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:1\u003e",
+            "ProtocolMetadata": "AAAAAAABAAVyZXQtYf////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "stable-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "g-stable",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:1\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "stable-commit-a",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": 1,
+        "Group": "g-stable",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 10,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "stable-commit-b",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": 1,
+        "Group": "g-stable",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 11,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-b",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-b",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "rebal-join-needs-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-rebal",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 300000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rebal-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-rebal",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 300000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:2\u003e",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:2\u003e",
+            "ProtocolMetadata": "AAAAAAABAAVyZXQtYf////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rebal-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "g-rebal",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:2\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rebal-commit-a",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": 1,
+        "Group": "g-rebal",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 10,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "rebal-commit-b",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": 1,
+        "Group": "g-rebal",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 11,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-b",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-b",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "connect-join-needs-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-connect",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "connect",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:3\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "connect-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-connect",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:3\u003e",
+        "ProtocolType": "connect",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:3\u003e",
+        "MemberID": "\u003cmember:3\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:3\u003e",
+            "ProtocolMetadata": "AAAAAAABAAVyZXQtYf////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "connect",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "connect-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "g-connect",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:3\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:3\u003e",
+        "Protocol": "range",
+        "ProtocolType": "connect"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "connect",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "connect-commit-a",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": 1,
+        "Group": "g-connect",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:3\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 10,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "connect-commit-b",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": 1,
+        "Group": "g-connect",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:3\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 11,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-b",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-b",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "unreadable-join-needs-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-unreadable",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:4\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "unreadable-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-unreadable",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:4\u003e",
+        "MemberID": "\u003cmember:4\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:4\u003e",
+            "ProtocolMetadata": "////"
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "unreadable-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "g-unreadable",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:4\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "unreadable-commit-a",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": 1,
+        "Group": "g-unreadable",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 10,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-a",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "unreadable-commit-b",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": 1,
+        "Group": "g-unreadable",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 11,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ret-b",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ret-b",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "rebal-b-join-needs-id",
+      "conn": "b",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-rebal",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:5\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rebal-describe-at-once",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "g-rebal"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "g-rebal",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+                "MemberID": "\u003cmember:2\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:5\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "PreparingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "t75-fetch-g-stable",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-stable",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-stable",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 10,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t75-fetch-g-rebal",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-rebal",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-rebal",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 10,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 11,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t75-fetch-g-connect",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-connect",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-connect",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 10,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 11,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t75-fetch-g-unreadable",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-unreadable",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-unreadable",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 10,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 11,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t75-describe-g-rebal",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "g-rebal"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "g-rebal",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+                "MemberID": "\u003cmember:2\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:5\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "PreparingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rebal-a-rejoin-at-80",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-rebal",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "\u003cmember:2\u003e",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:2\u003e",
+            "ProtocolMetadata": "AAAAAAABAAVyZXQtYf////8="
+          },
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:5\u003e",
+            "ProtocolMetadata": "AAAAAAABAAVyZXQtYf////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rebal-b-join",
+      "conn": "b",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "g-rebal",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:5\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAVyZXQtYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 300000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "\u003cmember:2\u003e",
+        "MemberID": "\u003cmember:5\u003e",
+        "Members": null,
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rebal-a-sync-at-80",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 2,
+        "Group": "g-rebal",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:2\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rebal-b-sync-at-80",
+      "conn": "b",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 2,
+        "Group": "g-rebal",
+        "GroupAssignment": null,
+        "InstanceID": null,
+        "MemberID": "\u003cmember:5\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "t115-fetch-g-stable",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-stable",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-stable",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 10,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t115-fetch-g-rebal",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-rebal",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-rebal",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 10,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t115-fetch-g-connect",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-connect",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-connect",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 10,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 11,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t115-fetch-g-unreadable",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "g-unreadable",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "g-unreadable",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 10,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-a",
+                "TopicID": "\u003czero-id\u003e"
+              },
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 11,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ret-b",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "t115-describe-g-rebal",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "g-rebal"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "g-rebal",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAAVyZXQtYQAAAAEAAAAA/////w==",
+                "MemberID": "\u003cmember:2\u003e",
+                "ProtocolMetadata": "AAAAAAABAAVyZXQtYf////8="
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:5\u003e",
+                "ProtocolMetadata": "AAAAAAABAAVyZXQtYf////8="
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}

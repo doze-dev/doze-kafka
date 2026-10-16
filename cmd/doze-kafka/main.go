@@ -20,7 +20,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	_ "net/http/pprof" // registers /debug/pprof on the default mux; only served if --pprof-addr is set.
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -119,12 +119,12 @@ func realMain(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if st.cfg.PprofAddr != "" {
-		go func() {
-			logger.Info("pprof listening", "addr", st.cfg.PprofAddr)
-			if err := http.ListenAndServe(st.cfg.PprofAddr, nil); err != nil { //nolint:gosec // debug-only, local
-				logger.Warn("pprof server stopped", "err", err)
-			}
-		}()
+		ln, err := servePprof(st.cfg.PprofAddr, logger)
+		if err != nil {
+			logger.Warn("pprof server stopped", "err", err)
+		} else {
+			defer ln.Close()
+		}
 	}
 
 	// Stop accepting, then let in-flight work drain, on SIGINT/SIGTERM — and on
@@ -137,6 +137,32 @@ func realMain(args []string, stdout, stderr io.Writer) int {
 		return exitRuntime
 	}
 	return 0
+}
+
+// servePprof serves the profiles of net/http/pprof on addr and returns the listener
+// (closing it stops the server). It has a mux of its own: the package's default
+// registration also serves /debug/pprof/cmdline, the command line this process was
+// started with, and that is where --sasl-user user:password is. Nothing here serves
+// the default mux, so that page does not exist.
+func servePprof(addr string, logger *slog.Logger) (net.Listener, error) {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index) // the index and every named profile (heap, goroutine, ...).
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	mux.HandleFunc("/debug/pprof/cmdline", http.NotFound)
+	logger.Info("pprof listening", "addr", ln.Addr().String())
+	go func() {
+		srv := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+		if err := srv.Serve(ln); err != nil && !errors.Is(err, net.ErrClosed) && err != http.ErrServerClosed {
+			logger.Warn("pprof server stopped", "err", err)
+		}
+	}()
+	return ln, nil
 }
 
 // printVersion prints doze-kafka's own version, deliberately prefixed with the
@@ -337,6 +363,9 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 	}
 
 	ready.envCommand = envHint(st, bound)
+	if readyHook != nil {
+		readyHook(ready)
+	}
 	announce(out, logger, cfg, ready)
 	serving = true
 	if err := srv.ServeListener(ctx, bind.ln); err != nil {
@@ -347,6 +376,11 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 	logger.Info("shutting down: flushing logs to disk")
 	return nil
 }
+
+// readyHook, when a test sets it, is handed what the summary is about to report. The
+// summary is not printed at --log-level warn or error, and a test that reads those
+// logs still has to find the instance.
+var readyHook func(readyInfo)
 
 // readyInfo is what the start-up summary reports.
 type readyInfo struct {
@@ -540,7 +574,7 @@ func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger
 		Traffic: traffic, TraceHeader: cfg.TraceHeader, ClientMetrics: clientMetrics,
 		Facts: console.BrokerFacts{
 			Workspace: workspaceLabel(cfg.InstanceName()), KafkaMajor: cfg.Version,
-			DataDir: cfg.DataDir, SASLMechanisms: cfg.SASLMechanisms, RegistryURL: registryPublic,
+			DataDir: cfg.DataDir, SASLMechanisms: cfg.SASLMechanisms, RegistryURL: registryPublic, RegistryBuiltIn: registryURL != "",
 			AutoCreateTopics: cfg.AutoCreateTopics, DefaultPartitions: cfg.DefaultPartitions, MaxPartitions: cfg.MaxPartitions,
 			Version: version, Started: time.Now(),
 		},

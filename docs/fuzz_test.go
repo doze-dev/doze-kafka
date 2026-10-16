@@ -62,6 +62,8 @@ var ownedElsewhere = []fuzzOwned{
 		Reason: "Decompress and CheckProduce read a gzip records section member by member through it"},
 	{File: "internal/storage/log/records.go", Func: "boundedReader.Read",
 		NotParser: "an io.Reader that counts what a decompressor produced against a limit; its []byte is the buffer it fills, and it parses nothing"},
+	{File: "internal/storage/log/cleanstop.go", Func: "readNameList",
+		NotParser: "reads the clean-shutdown and unvalidated-partitions files this broker wrote itself in its own data directory; its strings are that path and the header it wrote"},
 	{File: "internal/storage/log/logstart.go", Func: "readLogStart",
 		NotParser: "reads the log-start file this broker wrote itself (writeLogStart) in its own data directory; its string is that directory's path"},
 	// console/traffic*.go.

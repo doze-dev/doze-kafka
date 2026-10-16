@@ -13,6 +13,9 @@ import (
 
 	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/internal/embed"
+	"github.com/doze-dev/doze-kafka/internal/serverhook"
+	"github.com/doze-dev/doze-kafka/server"
+	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
 // --- Apache Kafka in Docker (the recorder) ---
@@ -57,8 +60,93 @@ func StartKafkaFor(s Scenario) (Target, error) {
 			"KAFKA_LISTENER_NAME_PLAINTEXT_PLAIN_SASL_JAAS_CONFIG="+jaas+";",
 		)
 		probeUser, probePass = s.Admin, s.Users[s.Admin]
+		if scram := scramMechanisms(s.Mechanisms); len(scram) > 0 {
+			// The listener's SCRAM users are not in a JAAS file: they are records in
+			// the cluster's metadata, written below through the admin API once the
+			// broker answers. (A triple underscore is the image's way to spell a
+			// hyphen in a property name.)
+			env = append(env, "KAFKA_SASL_ENABLED_MECHANISMS="+strings.Join(s.Mechanisms, ","))
+			for _, m := range scram {
+				env = append(env, "KAFKA_LISTENER_NAME_PLAINTEXT_"+strings.ReplaceAll(m, "-", "___")+
+					"_SASL_JAAS_CONFIG=org.apache.kafka.common.security.scram.ScramLoginModule required;")
+			}
+		}
 	}
-	return startKafka(KafkaImage, s.DiskMiB, env, probeUser, probePass)
+	t, err := startKafka(KafkaImage, s.DiskMiB, env, probeUser, probePass)
+	if err != nil {
+		return nil, err
+	}
+	if scram := scramMechanisms(s.Mechanisms); len(scram) > 0 {
+		if err := createScramUsers(t.Addr(), s, scram); err != nil {
+			t.Close()
+			return nil, err
+		}
+	}
+	return t, nil
+}
+
+func scramMechanisms(all []string) []string {
+	var out []string
+	for _, m := range all {
+		if strings.HasPrefix(m, "SCRAM-") {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// createScramUsers gives every user of the scenario a SCRAM credential for each
+// SCRAM mechanism, with the user's PLAIN password, ScramIterations and
+// ScramSalt(user): AlterUserScramCredentials, sent by the admin over SASL/PLAIN.
+// It is the scenario's fixture, not a step of it, and it waits until Kafka
+// describes every credential, since the broker learns of them from the metadata
+// log a moment after the request is answered.
+func createScramUsers(addr string, s Scenario, mechanisms []string) error {
+	w, err := dial(addr)
+	if err != nil {
+		return err
+	}
+	defer w.close()
+	if err := w.saslPlain(s.Admin, s.Users[s.Admin]); err != nil {
+		return fmt.Errorf("scram users: admin login: %v", err)
+	}
+	// One request per mechanism: Kafka refuses a user named twice in one
+	// (DUPLICATE_RESOURCE).
+	for _, m := range mechanisms {
+		req := kmsg.NewPtrAlterUserSCRAMCredentialsRequest()
+		for _, u := range sortedKeys(s.Users) {
+			up := kmsg.NewAlterUserSCRAMCredentialsRequestUpsertion()
+			up.Name, up.Mechanism, up.Iterations = u, scramMechanismCode(m), ScramIterations
+			up.Salt = ScramSalt(u)
+			up.SaltedPassword = scramSalted(m, s.Users[u], up.Salt, ScramIterations)
+			req.Upsertions = append(req.Upsertions, up)
+		}
+		resp, err := w.roundTrip(req, 0)
+		if err != nil {
+			return fmt.Errorf("scram users: %v", err)
+		}
+		for _, r := range resp.(*kmsg.AlterUserSCRAMCredentialsResponse).Results {
+			if r.ErrorCode != 0 {
+				return fmt.Errorf("scram users: %s: error %d", r.User, r.ErrorCode)
+			}
+		}
+	}
+	for deadline := time.Now().Add(30 * time.Second); ; time.Sleep(100 * time.Millisecond) {
+		resp, err := w.roundTrip(kmsg.NewPtrDescribeUserSCRAMCredentialsRequest(), 0)
+		if err != nil {
+			return fmt.Errorf("scram users: describe: %v", err)
+		}
+		n := 0
+		for _, r := range resp.(*kmsg.DescribeUserSCRAMCredentialsResponse).Results {
+			n += len(r.CredentialInfos)
+		}
+		if n == len(s.Users)*len(mechanisms) {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("scram users: Kafka describes %d credentials, want %d", n, len(s.Users)*len(mechanisms))
+		}
+	}
 }
 
 func startKafka(image string, diskMiB int, extra []string, probeUser, probePass string, mounts ...string) (Target, error) {
@@ -82,6 +170,11 @@ func startKafka(image string, diskMiB int, extra []string, probeUser, probePass 
 	}
 	// A later -e of the same name wins, so a scenario's settings replace the defaults.
 	for _, kv := range extra {
+		// A scenario that adds a listener of its own has to have it advertised too,
+		// and the advertised list carries the port chosen above.
+		if strings.HasPrefix(kv, "KAFKA_LISTENERS=") && strings.Contains(kv, "INTERNAL://") {
+			args = append(args, "-e", fmt.Sprintf("KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:%d,INTERNAL://localhost:9094", port))
+		}
 		args = append(args, "-e", kv)
 	}
 	for _, m := range mounts {
@@ -126,6 +219,13 @@ func (t *dockerTarget) Restart() error {
 	return t.wait()
 }
 
+// Exec runs a command in the broker's container (Execer): a script fills the
+// volume the log directory is on from beside the broker.
+func (t *dockerTarget) Exec(args ...string) (string, error) {
+	out, err := exec.Command("docker", append([]string{"exec", "-u", "root", t.name}, args...)...).CombinedOutput()
+	return string(out), err
+}
+
 func (t *dockerTarget) Close() { exec.Command("docker", "rm", "-f", t.name).Run() }
 
 // ready sends one Metadata request for no topics and wants a broker back.
@@ -150,6 +250,7 @@ type dozeTarget struct {
 	cancel context.CancelFunc
 	done   chan struct{}
 	mod    func(*config.Config)
+	srv    *server.Server
 }
 
 // StartDoze runs doze-kafka in this process over dir, on a free loopback port,
@@ -160,8 +261,14 @@ func StartDoze(dir string) (Target, error) { return startDoze(dir, nil) }
 // what Doze and Replay change, and the speed its waits run at.
 func StartDozeFor(dir string, s Scenario) (Target, error) {
 	t, err := startDozeWith(dir, func(c *config.Config) {
+		// What the recorded broker has (KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0 in
+		// startKafka); a scenario that sets another sets both.
+		c.GroupInitialRebalanceDelay = 0
 		if len(s.Users) > 0 {
 			c.SASLMechanisms = []string{config.SASLPlain}
+			if len(s.Mechanisms) > 0 {
+				c.SASLMechanisms = s.Mechanisms
+			}
 			c.Credentials = s.Users
 		}
 		if s.Doze != nil {
@@ -219,11 +326,15 @@ func (t *dozeTarget) start() error {
 		return err
 	}
 	t.cancel, t.done = cancel, make(chan struct{})
+	t.srv = srv
 	go func() { srv.Serve(ctx); close(t.done) }()
 	return nil
 }
 
 func (t *dozeTarget) Addr() string { return t.addr }
+
+// CheckOffsets applies the offsets retention now (Env.CheckOffsets).
+func (t *dozeTarget) CheckOffsets() { serverhook.CheckOffsets(t.srv) }
 
 func (t *dozeTarget) Restart() error {
 	t.Close()

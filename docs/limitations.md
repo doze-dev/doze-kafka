@@ -19,15 +19,34 @@ implement it.
   caveat on volatile-cache hardware); with `acks=1` a power loss can lose the last
   sub-second (see [storage & durability](storage-and-durability.md)). But a lost
   *disk* is a lost broker either way — there is no replica.
-- **A failed disk refuses writes; it does not take the broker down.** When the data
-  directory's disk is full or failing, every request that writes answers
-  `KAFKA_STORAGE_ERROR` (retriable), as Apache Kafka does (recorded against
-  `apache/kafka:4.3.1`: `conformance/recordings/full-disk.json`), at `acks=1` and at
-  `acks=all`; at `acks=0`, which has no response to carry it, the connection is closed.
-  Reads, Metadata and group traffic keep working, and freeing space lets writes resume
-  without a restart. Kafka goes further: with its only log directory failed the broker
-  shuts down (the recording's last two steps are a closed connection); this one stays
-  up, which is kinder to a development machine and not what a production broker does.
+- **A failed disk refuses writes; it does not take the broker down.** What each write
+  API answers when the data volume has no room is recorded against `apache/kafka:4.3.1`
+  (`conformance/recordings/full-disk*.json`, one broker per API) and replayed against
+  doze-kafka with the fault seam standing in for the volume
+  (`go test -tags faultinject ./conformance -run TestReplayFullDisk`). Produce answers
+  `KAFKA_STORAGE_ERROR` at `acks=1` and at `acks=all`, with no offsets and no message,
+  as Kafka does; at `acks=0`, which has no response to carry it, the connection is
+  closed. OffsetCommit, InitProducerId with a transactional id, AddPartitionsToTxn,
+  AddOffsetsToTxn, TxnOffsetCommit and EndTxn answer `NOT_COORDINATOR`, as Kafka does
+  when the append to its offsets or transaction log fails: the client looks the
+  coordinator up again and retries. Reads, Metadata and group traffic keep working, and
+  freeing space lets writes resume without a restart. Where this differs from the
+  recordings:
+  - Kafka goes further: with its only log directory failed the broker shuts down (each
+    recording's last step finds it gone); this one stays up, which is kinder to a
+    development machine and not what a production broker does.
+  - CreateTopics, DeleteTopics, CreatePartitions, IncrementalAlterConfigs and
+    DeleteRecords answer `KAFKA_STORAGE_ERROR`. Kafka answered them with success in the
+    recordings because its controller keeps the cluster metadata in a log of its own,
+    which the recordings had to put on another volume (on the full one the broker shut
+    down before it answered anything); this broker keeps its topic registry, and the log
+    start a DeleteRecords moves, on the data volume, so a full one refuses them.
+  - DeleteGroups and OffsetDelete answer `KAFKA_STORAGE_ERROR` where Kafka answers
+    `NOT_COORDINATOR`, and a consumer-protocol join (ConsumerGroupHeartbeat), which this
+    broker keeps in memory and does not write, succeeds where Kafka answers
+    `NOT_COORDINATOR`.
+  - Metadata that would create a topic answers `UNKNOWN_TOPIC_OR_PARTITION`, as Kafka
+    does.
 - **After a failed `fsync` the partition refuses writes until the broker restarts.**
   On Linux a failed `fsync` can drop the unflushed pages and clear the error, so a
   retry that "succeeds" proves nothing about the bytes that were lost. Kafka does not
@@ -58,20 +77,23 @@ implement it.
   UNKNOWN_SERVER_ERROR as this does). A batch stored by an earlier version that cannot
   be read is kept, and skipped by the readers that look inside (timestamp lookups and
   the cleaner use its header), so such a log still opens and serves.
+- **The first rebalance of an empty classic group waits 200 ms for more members**,
+  where Kafka's `group.initial.rebalance.delay.ms` is 3 seconds. Every application
+  that starts with the classic protocol waits it before its first partitions; 200 ms is
+  long enough for the consumers of one process to arrive together. How it waits is
+  Kafka's: a member that joins during the wait starts another, cut to what the
+  rebalance timeout leaves, and the first member to join leads
+  (recorded at Kafka's 3 s: `classic-initial-rebalance-delay.json`, replayed with
+  `--group-initial-rebalance-delay=3s`, which gives Kafka's wait).
 - **A consumer-protocol member is asked to heartbeat every second**, where Kafka's
   `group.consumer.heartbeat.interval.ms` is 5 seconds: rebalances settle in a couple of
   seconds on a development machine instead of ten.
-- **A consumer group's target assignment is computed before the request that causes it
-  is answered.** Kafka answers a join first and runs the assignor after, so a describe
-  taken in between shows the group `Assigning`, the old targets, and a classic member
-  that has just joined is told the epoch before its own join as its generation. Here the
-  new targets are there when the join is answered, the group is never `Assigning`, and
-  that generation is one higher. Which request is answered with which code is the same
-  (recorded: `mixed-protocol-groups.json`, `mixed-protocol-rolling.json`).
-- **An empty group with no committed offsets is forgotten at once.** Kafka keeps it
-  listed, `Empty`, until its offsets retention has passed; here a group that holds
-  nothing is not worth listing, and a console that showed every consumer that ever
-  came and went would be a long page.
+- **How often committed offsets are checked is not a setting.** Kafka has
+  `offsets.retention.check.interval.ms` (10 minutes); here the check runs every
+  hundredth of `--offsets-retention`, between 50 ms and 10 minutes, so it is Kafka's
+  default at the default retention and sooner with a short one. It is the same check
+  that drops a group with no members and no offsets, on both
+  (recorded: `offsets-retention-recreate.json`).
 - **A batch whose `acks=all` fsync failed stays in the log.** The producer is told
   `KAFKA_STORAGE_ERROR` with no offset, but the batch was already appended: a consumer
   can read it, and a non-idempotent retry stores it again (an idempotent retry is
@@ -135,6 +157,13 @@ implement it.
 - **Memory only.** The Traffic page keeps the last 2,000 requests and 200 events per
   group, and a restart empties it: it is the last few minutes of a laptop's traffic, not
   an audit log.
+- **A login is shown without what it carried.** For `SaslHandshake`, `SaslAuthenticate`
+  and the SCRAM-credential and delegation-token requests, the inspector's decoded fields
+  are a list of what may be shown (the mechanism, a user's or a principal's name, an
+  iteration count, a lifetime); every other field is `"(hidden)"`, set or not, and a run
+  of bytes never shows its length. A `SaslAuthenticate` row reads `0 B in`: the size of
+  the request is not recorded, because with PLAIN it is the length of the password plus
+  what the row already shows.
 
 ## Listeners and security
 
@@ -218,21 +247,67 @@ implement it.
   `error_message` text is this broker's (it names what to do about it). A Produce batch
   that is too large or corrupt is refused with Kafka's code and, here, a text where Kafka
   sends none. Match on the code.
+- **Group error messages are Kafka's where a recording has them.** A
+  `ConsumerGroupHeartbeat` refusal carries Kafka's text (recorded:
+  `group-requests-refused.json`, `ch-*`, `cs-*`); a few refusals no recording has seen
+  (a group id that is not storable here, a join that could not be written down) carry
+  this broker's own. Classic group APIs carry no message on either.
 - **A partition named twice in one ListOffsets request is answered twice.** Kafka answers
   such an entry once, with `INVALID_REQUEST`. The console asks for a partition's earliest
   and latest offset as two entries of one request, so this stays until it asks differently.
 - **Group membership is not kept across a restart.** Committed offsets are; the members,
   their generation and their assignments are not. After a restart every member must
-  rejoin, and a commit that carries the old generation is `ILLEGAL_GENERATION`, where
-  Kafka (which reloads its groups) accepts it until the session times out.
+  rejoin: its heartbeat is `UNKNOWN_MEMBER_ID` and a commit that carries the old
+  generation is `ILLEGAL_GENERATION`, where Kafka (which reloads its groups) accepts
+  both until the session times out. Until somebody rejoins, the group is listed and
+  described `Empty`, as a classic group with no protocol type whatever it was, where
+  Kafka shows it `Stable` with the members it loaded. What is kept is that the group
+  had members, so its committed offsets expire when Kafka's would
+  ([consumer groups](consumer-groups.md#when-committed-offsets-expire); recorded:
+  `offsets-retention-restart.json`), with one difference on the side of keeping:
+  while the members a real broker would have loaded could still be there, nothing of
+  the group expires, where Kafka goes on expiring the offsets of topics those members
+  were not subscribed to.
 - **On-disk format is doze-kafka's own.** Record batches are stored verbatim (so
   compression round-trips), but the segment/index file layout is not byte-compatible
   with Apache Kafka's. Only doze-kafka reads its own files.
 - **Consumer-group assignor** is a plain, even round-robin (`uniform`) or `range`; it
-  isn't the sticky, cross-topic-balanced reference assignor. Static membership
-  (`group.instance.id`) is accepted on the wire but not acted on.
+  isn't the sticky, cross-topic-balanced reference assignor.
 - **SASL details.** No Kerberos/GSSAPI, no OAUTHBEARER, no delegation tokens, and no
-  `SASLprep` normalization (use ASCII credentials).
+  `SASLprep` normalization (use ASCII credentials). `SaslHandshake` is served at v1
+  only: v0, after which a client sends its tokens without Kafka's framing, closes
+  the connection. Every answer to a login, right or wrong, in order or out of it,
+  is otherwise the one `apache/kafka:4.3.1` gives (`conformance/claims/auth.md`),
+  with two exceptions, both the stricter choice:
+  - A request sent in the middle of a login closes the connection without an answer.
+    Kafka first answers it `ILLEGAL_SASL_STATE` in that request's own error shape and
+    then closes. `ApiVersions` and `SaslHandshake`, the two a client could plausibly
+    send there, are answered as Kafka answers them.
+  - A SCRAM client-final message whose channel binding is not the header the exchange opened with is refused.
+    Kafka does not compare the two; RFC 5802 has a server do it.
+- **DescribeConfigs does not say a config's type** (`ConfigType` is UNKNOWN, 0); Kafka
+  names it (`LIST` for `cleanup.policy`, `conformance/recordings/list-config-append.json`).
+  Names, values and sources are Kafka's.
+- **An empty cleanup.policy is refused** with `INVALID_CONFIG`. Kafka 4.3.1 takes it
+  (SUBTRACT `delete` from an unset `cleanup.policy` leaves `""`, recorded in
+  `list-config-append`), for a log that is neither deleted nor compacted; this broker's
+  log has no such mode, so it refuses what it would not do.
+- **A group request with an empty group id is answered for the group** (open). Apache
+  Kafka 4.3.1 answers a default JoinGroup, SyncGroup, Heartbeat, LeaveGroup and
+  OffsetDelete, whose group id is empty, with `INVALID_GROUP_ID`, and OffsetFetch v2 to
+  v7 with `NOT_COORDINATOR`; this broker answers as for a group that is not there
+  (`conformance/recordings/version-matrix.json`).
+- **ApiVersions v3 with no client software name is answered** (open): Kafka answers
+  `INVALID_REQUEST` (`version-matrix`, step `ApiVersions v3`).
+- **TxnOffsetCommit sent from outside the consumer group** (generation -1, no member id,
+  as a producer that commits a consumer's offsets without being one sends it) is
+  answered for the transaction's state: `INVALID_PRODUCER_ID_MAPPING`, `INVALID_TXN_STATE`,
+  `INVALID_PRODUCER_EPOCH`, or 0. `apache/kafka:4.3.1` answers
+  `COORDINATOR_LOAD_IN_PROGRESS` to every try for thirty seconds, whatever the state
+  (`conformance/recordings/txn-empty-id.json`, steps `txn-offset-commit-*`). Why is not
+  yet understood, so this broker keeps the answer a client can act on.
+- **ApiVersions lists the APIs and versions this broker serves, not Kafka's.** See
+  `docs/api-support.md` for the table and how it is held to a real broker's.
 
 ## If you hit a wall
 

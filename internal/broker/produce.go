@@ -114,7 +114,7 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 				rp.BaseOffset = -1
 			case !ok || part.Partition < 0 || part.Partition >= topic.Partitions:
 				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
-				rp.BaseOffset = -1 // as Apache Kafka answers it (conformance/recordings/produce-mixed-partition-errors.json).
+				rp.BaseOffset = -1 // as Apache Kafka answers it (claim: traffic R7).
 			default:
 				wrote, answered := b.appendRecords(req.Conn, req.Header.APIVersion, pr.TransactionID, name, topic.Config, part, &rp)
 				if wrote {
@@ -163,12 +163,8 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 			// that may vanish: it will retry (idempotently), and the failure is
 			// visible instead of silent.
 			b.log.Error("durable ack: fsync failed; reporting the produce as failed", "topic", tp.topic, "partition", tp.partition, "err", err)
-			msg := "fsync failed: " + err.Error()
 			for _, s := range slots {
-				rp := &resp.Topics[s.topic].Partitions[s.part]
-				rp.ErrorCode = kerr.KafkaStorageError.Code
-				rp.ErrorMessage = &msg
-				rp.BaseOffset = -1
+				refuseForStorage(&resp.Topics[s.topic].Partitions[s.part], kerr.KafkaStorageError.Code)
 			}
 		}
 	}
@@ -331,6 +327,15 @@ func (b *Broker) appendRecords(conn *protocol.Conn, version int16, txnID *string
 	return wrote, answered
 }
 
+// refuseForStorage answers a partition whose write or flush failed the way Apache
+// Kafka does (recorded: full-disk, full-disk-produce): the code, no offsets
+// (-1 for the base offset, the append time and the log start) and no message.
+// The cause is in the broker's log, not in a client's.
+func refuseForStorage(rp *kmsg.ProduceResponseTopicPartition, code int16) {
+	rp.ErrorCode, rp.ErrorMessage = code, nil
+	rp.BaseOffset, rp.LogAppendTime, rp.LogStartOffset = -1, -1, -1
+}
+
 // topicInt reads a numeric topic config, if the topic has set it.
 func topicInt(topicConfig map[string]string, key string) (int64, bool) {
 	v, ok := topicConfig[key]
@@ -346,9 +351,7 @@ func topicInt(topicConfig map[string]string, key string) (int64, bool) {
 func (b *Broker) appendPlain(plog *log.Partition, records []byte, rp *kmsg.ProduceResponseTopicPartition) bool {
 	baseOffset, err := plog.Append(records)
 	if err != nil {
-		rp.ErrorCode = b.storageFault("produce: append", err)
-		msg := err.Error()
-		rp.ErrorMessage = &msg
+		refuseForStorage(rp, b.storageFault("produce: append", err))
 		return false
 	}
 	rp.BaseOffset = baseOffset
@@ -393,9 +396,7 @@ func (b *Broker) appendIdempotent(topic string, partition int32, plog *log.Parti
 		case seqAccept:
 			off, err := plog.Append(batch)
 			if err != nil {
-				rp.ErrorCode = b.storageFault("produce: append (idempotent)", err, "topic", topic, "partition", partition)
-				msg := err.Error()
-				rp.ErrorMessage = &msg
+				refuseForStorage(rp, b.storageFault("produce: append (idempotent)", err, "topic", topic, "partition", partition))
 				return wrote, answered
 			}
 			pp.record(hdr.ProducerID, hdr.ProducerEpoch, firstSeq, lastSeq, off, log.MaxTimestampOf(batch))

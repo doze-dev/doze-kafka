@@ -16,6 +16,8 @@ export const PROBES: Probe[] = [
   { name: 'h1', ref: 'main h1', live: 'main h1' },
   { name: 'table header row', ref: '.card .r.h, .r.h', live: 'table thead tr:first-child, .r.h' },
   { name: 'first table row', ref: '.card .r:not(.h)', live: 'table tbody tr, .r:not(.h)' },
+  // The open row (the record or request in the inspector): its fill is the board's --sel.
+  { name: 'open row', ref: '.card .r.on, .r.on', live: 'table tbody tr.on, .r.on, tr[aria-current="true"], .r[aria-current="true"]' },
   { name: 'tab', ref: '.tab.on', live: '.tabs .tab.on' },
   { name: 'primary button', ref: '.btn.pri', live: '.btn.pri' },
   { name: 'pill', ref: 'main .pill, .pill', live: 'main .pill, .pill' },

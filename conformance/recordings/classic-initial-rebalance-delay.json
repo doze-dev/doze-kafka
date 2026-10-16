@@ -1,0 +1,1376 @@
+{
+  "scenario": "classic-initial-rebalance-delay",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 2,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "ird"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 2,
+            "ReplicationFactor": 1,
+            "Topic": "ird",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "find-coordinators",
+      "api": "FindCoordinator",
+      "version": 4,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": [
+          "ird-warm",
+          "ird-g",
+          "ird-three",
+          "ird-short",
+          "ird-alone"
+        ],
+        "CoordinatorType": 0
+      },
+      "response": {
+        "Coordinators": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "ird-warm",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "ird-g",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "ird-three",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "ird-short",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "ird-alone",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          }
+        ],
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-warm-join-0-needs-id",
+      "conn": "ird-warm-0",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-warm",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-warm-describe-6000ms",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ird-warm"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ird-warm",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:1\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "CompletingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-warm-join-0",
+      "conn": "ird-warm-0",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-warm",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:1\u003e",
+            "ProtocolMetadata": "AAAAAAABAANpcmT/////"
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-g-join-0-needs-id",
+      "conn": "ird-g-0",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-g",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-g-describe-1000ms",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ird-g"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ird-g",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:2\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "PreparingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-g-join-1-needs-id",
+      "conn": "ird-g-1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-g",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:3\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-g-describe-2500ms",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ird-g"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ird-g",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:2\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:3\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "PreparingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-g-describe-4000ms",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ird-g"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ird-g",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:2\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:3\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "PreparingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-g-describe-5500ms",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ird-g"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ird-g",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:2\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:3\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "PreparingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-g-describe-6750ms",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ird-g"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ird-g",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:2\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:3\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "CompletingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-g-join-0",
+      "conn": "ird-g-0",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-g",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:2\u003e",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:2\u003e",
+            "ProtocolMetadata": "AAAAAAABAANpcmT/////"
+          },
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:3\u003e",
+            "ProtocolMetadata": "AAAAAAABAANpcmT/////"
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-g-join-1",
+      "conn": "ird-g-1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-g",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:3\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:2\u003e",
+        "MemberID": "\u003cmember:3\u003e",
+        "Members": null,
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-three-join-0-needs-id",
+      "conn": "ird-three-0",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-three",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:4\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-three-join-1-needs-id",
+      "conn": "ird-three-1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-three",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:5\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-three-join-2-needs-id",
+      "conn": "ird-three-2",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-three",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:6\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-three-describe-5500ms",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ird-three"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ird-three",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:4\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:5\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:6\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "PreparingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-three-describe-6500ms",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ird-three"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ird-three",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:4\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:5\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:6\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "PreparingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-three-describe-8500ms",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ird-three"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ird-three",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:4\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:5\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:6\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "PreparingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-three-describe-9750ms",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ird-three"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ird-three",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:4\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:5\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:6\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "CompletingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-three-join-0",
+      "conn": "ird-three-0",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-three",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:4\u003e",
+        "MemberID": "\u003cmember:4\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:4\u003e",
+            "ProtocolMetadata": "AAAAAAABAANpcmT/////"
+          },
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:5\u003e",
+            "ProtocolMetadata": "AAAAAAABAANpcmT/////"
+          },
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:6\u003e",
+            "ProtocolMetadata": "AAAAAAABAANpcmT/////"
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-three-join-1",
+      "conn": "ird-three-1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-three",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:5\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:4\u003e",
+        "MemberID": "\u003cmember:5\u003e",
+        "Members": null,
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-three-join-2",
+      "conn": "ird-three-2",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-three",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:6\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:4\u003e",
+        "MemberID": "\u003cmember:6\u003e",
+        "Members": null,
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-short-join-0-needs-id",
+      "conn": "ird-short-0",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-short",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:7\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-short-join-1-needs-id",
+      "conn": "ird-short-1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-short",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:8\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-short-describe-2500ms",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ird-short"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ird-short",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:7\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:8\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "PreparingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-short-describe-3500ms",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ird-short"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ird-short",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:7\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:8\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "PreparingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-short-describe-4750ms",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ird-short"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ird-short",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:7\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:8\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "CompletingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-short-join-0",
+      "conn": "ird-short-0",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-short",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:7\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 4000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:7\u003e",
+        "MemberID": "\u003cmember:7\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:7\u003e",
+            "ProtocolMetadata": "AAAAAAABAANpcmT/////"
+          },
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:8\u003e",
+            "ProtocolMetadata": "AAAAAAABAANpcmT/////"
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-short-join-1",
+      "conn": "ird-short-1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-short",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:8\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 4000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:7\u003e",
+        "MemberID": "\u003cmember:8\u003e",
+        "Members": null,
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-alone-join-0-needs-id",
+      "conn": "ird-alone-0",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-alone",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:9\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-alone-describe-2500ms",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ird-alone"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ird-alone",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:9\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "PreparingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-alone-describe-3750ms",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ird-alone"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ird-alone",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:9\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "CompletingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ird-alone-join-0",
+      "conn": "ird-alone-0",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ird-alone",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:9\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANpcmT/////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:9\u003e",
+        "MemberID": "\u003cmember:9\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:9\u003e",
+            "ProtocolMetadata": "AAAAAAABAANpcmT/////"
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}

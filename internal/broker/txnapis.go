@@ -2,6 +2,7 @@ package broker
 
 import (
 	"context"
+	"slices"
 	"sort"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
@@ -50,6 +51,10 @@ func (b *Broker) handleAddPartitionsToTxn(ctx context.Context, req *protocol.Req
 	}
 	if !b.canTxnID(req.Conn, ar.TransactionalID, opWrite) {
 		fail(kerr.TransactionalIDAuthorizationFailed.Code)
+		return nil
+	}
+	if ar.TransactionalID == "" { // claim: api V4
+		fail(kerr.InvalidRequest.Code)
 		return nil
 	}
 	e := b.txns.get(ar.TransactionalID)
@@ -107,14 +112,15 @@ func (b *Broker) handleAddPartitionsToTxn(ctx context.Context, req *protocol.Req
 		return nil
 	}
 
-	e.begin()
-	for _, a := range add {
-		tp := meta.TxnPartition{Topic: a.topic, Partition: a.part}
-		if !containsPartition(e.rec.Partitions, tp) {
-			e.rec.Partitions = append(e.rec.Partitions, tp)
+	if c := b.updateTxn(e, func(rec *meta.TxnRecord) {
+		beginTxn(rec)
+		for _, a := range add {
+			tp := meta.TxnPartition{Topic: a.topic, Partition: a.part}
+			if !containsPartition(rec.Partitions, tp) {
+				rec.Partitions = append(rec.Partitions, tp)
+			}
 		}
-	}
-	if c := b.persistTxn(e); c != 0 {
+	}); c != 0 {
 		for i := range resp.Topics {
 			for j := range resp.Topics[i].Partitions {
 				resp.Topics[i].Partitions[j].ErrorCode = c
@@ -141,10 +147,12 @@ func (b *Broker) handleAddOffsetsToTxn(ctx context.Context, req *protocol.Reques
 	case !b.canGroup(req.Conn, ar.Group, opRead):
 		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
 		return nil
-	case ar.Group == "" || meta.ValidateGroupID(ar.Group) != nil:
-		resp.ErrorCode = kerr.InvalidGroupID.Code
+	case ar.TransactionalID == "": // claim: api V4
+		resp.ErrorCode = kerr.InvalidRequest.Code
 		return nil
 	}
+	// The group id is not checked: Kafka adds an empty one to the transaction and
+	// answers 0 (claim: api V4, step add-offsets-real-no-group).
 	e := b.txns.get(ar.TransactionalID)
 	if e == nil {
 		resp.ErrorCode = kerr.InvalidProducerIDMapping.Code
@@ -160,14 +168,15 @@ func (b *Broker) handleAddOffsetsToTxn(ctx context.Context, req *protocol.Reques
 		resp.ErrorCode = c
 		return nil
 	}
-	e.begin()
-	for _, g := range e.rec.Groups {
-		if g == ar.Group {
-			return nil
-		}
+	if e.rec.State == txnOngoing && slices.Contains(e.rec.Groups, ar.Group) {
+		return nil
 	}
-	e.rec.Groups = append(e.rec.Groups, ar.Group)
-	resp.ErrorCode = b.persistTxn(e)
+	resp.ErrorCode = b.updateTxn(e, func(rec *meta.TxnRecord) {
+		beginTxn(rec)
+		if !slices.Contains(rec.Groups, ar.Group) {
+			rec.Groups = append(rec.Groups, ar.Group)
+		}
+	})
 	return nil
 }
 
@@ -218,7 +227,7 @@ func (b *Broker) handleTxnOffsetCommit(ctx context.Context, req *protocol.Reques
 		fence = b.groupFence(tr.Group, tr.MemberID, tr.InstanceID, tr.Generation)
 	}
 
-	changed := false
+	var staged []meta.TxnOffset
 	for _, t := range tr.Topics {
 		rt := kmsg.NewTxnOffsetCommitResponseTopic()
 		rt.Topic = t.Topic
@@ -239,25 +248,26 @@ func (b *Broker) handleTxnOffsetCommit(ctx context.Context, req *protocol.Reques
 				if p.Metadata != nil {
 					md = *p.Metadata
 				}
-				o := meta.TxnOffset{Group: tr.Group, Topic: t.Topic, Partition: p.Partition, Offset: p.Offset, Metadata: md}
-				replaced := false
-				for i := range e.rec.Offsets {
-					x := e.rec.Offsets[i]
-					if x.Group == o.Group && x.Topic == o.Topic && x.Partition == o.Partition {
-						e.rec.Offsets[i], replaced = o, true
-					}
-				}
-				if !replaced {
-					e.rec.Offsets = append(e.rec.Offsets, o)
-				}
-				changed = true
+				staged = append(staged, meta.TxnOffset{Group: tr.Group, Topic: t.Topic, Partition: p.Partition, Offset: p.Offset, Metadata: md})
 			}
 			rt.Partitions = append(rt.Partitions, rp)
 		}
 		resp.Topics = append(resp.Topics, rt)
 	}
-	if changed {
-		if c := b.persistTxn(e); c != 0 {
+	if len(staged) > 0 {
+		if c := b.updateTxn(e, func(rec *meta.TxnRecord) {
+			for _, o := range staged {
+				replaced := false
+				for i, x := range rec.Offsets {
+					if x.Group == o.Group && x.Topic == o.Topic && x.Partition == o.Partition {
+						rec.Offsets[i], replaced = o, true
+					}
+				}
+				if !replaced {
+					rec.Offsets = append(rec.Offsets, o)
+				}
+			}
+		}); c != 0 {
 			for i := range resp.Topics {
 				for j := range resp.Topics[i].Partitions {
 					if resp.Topics[i].Partitions[j].ErrorCode == 0 {
@@ -273,6 +283,10 @@ func (b *Broker) handleTxnOffsetCommit(ctx context.Context, req *protocol.Reques
 func (b *Broker) handleEndTxn(ctx context.Context, req *protocol.Request, er *kmsg.EndTxnRequest, resp *kmsg.EndTxnResponse) error {
 	if !b.canTxnID(req.Conn, er.TransactionalID, opWrite) {
 		resp.ErrorCode = kerr.TransactionalIDAuthorizationFailed.Code
+		return nil
+	}
+	if er.TransactionalID == "" { // claim: api V4
+		resp.ErrorCode = kerr.InvalidRequest.Code
 		return nil
 	}
 	resp.ErrorCode = b.endTxn(er.TransactionalID, er.ProducerID, er.ProducerEpoch, er.Commit)

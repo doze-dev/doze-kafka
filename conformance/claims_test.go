@@ -10,9 +10,11 @@
 //
 //	spec      the wire protocol's own message definitions (the kmsg structs).
 //	          Evidence names the type and field.
-//	recorded  a scenario run against a real apache/kafka:4.0.0 and stored under
+//	recorded  a scenario run against a real apache/kafka:4.3.1 and stored under
 //	          conformance/recordings/. Evidence is the recording's path, which
-//	          must exist.
+//	          must exist, followed by the steps that show the claim and what they
+//	          hold: #<step>=<path>:<value> … (claimsteps.go). Each step must be in
+//	          the recording with that value.
 //	doc       the Kafka documentation or a KIP. Evidence cites the page or number,
 //	          and Scenario names the recording that would settle it.
 //	memory    somebody recalls it. It is not acted on until it is doc or recorded:
@@ -101,8 +103,10 @@ func Problems(claims []Claim, root string) []string {
 		case "recorded":
 			if !strings.HasPrefix(c.Evidence, "conformance/recordings/") {
 				bad = append(bad, where+": a recorded claim points at a file under conformance/recordings/")
-			} else if _, err := os.Stat(filepath.Join(root, "..", c.Evidence)); err != nil {
-				bad = append(bad, where+": the recording "+c.Evidence+" does not exist")
+			} else if file, _, _ := EvidenceChecks(c.Evidence); !fileExists(filepath.Join(root, "..", file)) {
+				bad = append(bad, where+": the recording "+file+" does not exist")
+			} else {
+				bad = append(bad, checkSteps(c, root)...)
 			}
 		case "doc":
 			if c.Evidence == "" || c.Scenario == "" {
@@ -117,6 +121,11 @@ func Problems(claims []Claim, root string) []string {
 		}
 	}
 	return bad
+}
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
 }
 
 // Count is the number of claims per source, in the order of Sources.
@@ -165,6 +174,11 @@ func TestProblemsCatchesEachKindOfBadRow(t *testing.T) {
 		"spec with no field":      {File: "x.md", ID: "E", Text: "t", Source: "spec"},
 		"recorded, no file":       {File: "x.md", ID: "F", Text: "t", Source: "recorded", Evidence: "conformance/recordings/none.json"},
 		"empty claim":             {File: "x.md", ID: "G", Source: "memory", Scenario: "s"},
+		"recorded, no step named": {File: "x.md", ID: "H", Text: "t", Source: "recorded", Evidence: "conformance/recordings/txn-empty-id.json"},
+		"recorded, no such step":  {File: "x.md", ID: "I", Text: "t", Source: "recorded", Evidence: "conformance/recordings/txn-empty-id.json #no-such-step=ErrorCode:42"},
+		"recorded, wrong value":   {File: "x.md", ID: "J", Text: "t", Source: "recorded", Evidence: "conformance/recordings/txn-empty-id.json #end-txn-commit-empty-id=ErrorCode:49"},
+		"recorded, no such field": {File: "x.md", ID: "K", Text: "t", Source: "recorded", Evidence: "conformance/recordings/txn-empty-id.json #end-txn-commit-empty-id=Nothing:42"},
+		"recorded, not a check":   {File: "x.md", ID: "L", Text: "t", Source: "recorded", Evidence: "conformance/recordings/txn-empty-id.json #end-txn-commit-empty-id=ErrorCode:42 step 3"},
 	} {
 		if p := Problems([]Claim{good, c}, "."); len(p) != 1 {
 			t.Errorf("%s: want one problem, got %v", name, p)
@@ -175,6 +189,11 @@ func TestProblemsCatchesEachKindOfBadRow(t *testing.T) {
 	}
 	if p := Problems([]Claim{good}, "."); len(p) != 0 {
 		t.Errorf("a good claim: %v", p)
+	}
+	rec := Claim{File: "x.md", ID: "M", Text: "t", Source: "recorded"}
+	rec.Evidence = `conformance/recordings/acl-unknown-codes.json #describe-resource-0=(connection):"closed by the broker" #delete-resource-99=Results[0].ErrorMessage:"Unknown patternFilter." #create-resource-any=Results[0].ErrorMessage:null`
+	if p := Problems([]Claim{rec}, "."); len(p) != 0 {
+		t.Errorf("a recorded claim whose checks hold: %v", p)
 	}
 }
 

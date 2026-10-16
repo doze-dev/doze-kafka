@@ -32,7 +32,7 @@ func (b *Broker) handleListOffsets(ctx context.Context, req *protocol.Request, l
 		// (Apache Kafka answers a partition named twice in one topic once, with
 		// INVALID_REQUEST. This broker answers each entry, because the console asks
 		// for a partition's earliest and latest offset as two entries of one request;
-		// docs/limitations.md lists it, and conformance/scenarios.go records it.)
+		// docs/limitations.md lists it; claim: api V11.)
 		for _, part := range t.Partitions {
 			rp := kmsg.NewListOffsetsResponseTopicPartition()
 			rp.Partition = part.Partition

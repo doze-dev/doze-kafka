@@ -60,9 +60,26 @@ type Config struct {
 
 	// Groups.
 	ConsumerSessionTimeout time.Duration // KIP-848 session timeout: evict a member after this long without a heartbeat.
+	// ConsumerAssignmentInterval is the least time between two computations of a
+	// consumer group's target assignment (group.consumer.assignment.interval.ms, 1 s,
+	// as Kafka's default; 0 computes at every heartbeat, which Kafka allows too). It
+	// has no flag or file key: the broker tests of reconciliation set it to 0.
+	ConsumerAssignmentInterval time.Duration
+	// GroupInitialRebalanceDelay is how long the first rebalance of an empty classic
+	// group waits for more members, started again while members keep joining, up to
+	// the rebalance timeout (group.initial.rebalance.delay.ms). Kafka's default is 3 s;
+	// this broker's is 200 ms (docs/limitations.md). Zero completes it at once.
+	GroupInitialRebalanceDelay time.Duration
 	// OffsetsRetention is how long a group's committed offsets are kept once nothing is
 	// reading them (offsets.retention.minutes: 7 days). Zero keeps them for ever.
 	OffsetsRetention time.Duration
+	// OffsetsRetentionCheckInterval is how often the retention is applied
+	// (offsets.retention.check.interval.ms). Zero is a hundredth of the retention,
+	// between 50 ms and ten minutes. It has no flag or file key: the conformance
+	// replays set it long, and apply the retention at the points of a script where
+	// Kafka's check has run (serverhook.CheckOffsets), so that what they compare
+	// does not depend on when a ticker fires.
+	OffsetsRetentionCheckInterval time.Duration
 
 	// Topics.
 	AutoCreateTopics  bool
@@ -175,29 +192,31 @@ func Default() Config {
 		listen = "127.0.0.1:9092"
 	}
 	return Config{
-		Version:                MaxKafkaMajor,
-		ListenAddr:             listen,
-		AdvertisedHost:         "", // derived from the listen address: see ResolveAdvertisedHost.
-		DataDir:                DefaultDataDir,
-		MetaDB:                 "", // empty = <data-dir>/meta.db; see ResolveMetaDB.
-		SegmentBytes:           defaultSegmentBytes,
-		IndexIntervalBytes:     defaultIndexStride,
-		FsyncInterval:          500 * time.Millisecond,
-		ConsumerSessionTimeout: 45 * time.Second,
-		OffsetsRetention:       7 * 24 * time.Hour,
-		AutoCreateTopics:       true,
-		DefaultPartitions:      1,
-		MaxPartitions:          defaultMaxPartitions,
-		MessageMaxBytes:        DefaultMessageMaxBytes,
-		Console:                true,
-		ClientTelemetry:        true,
-		Zone:                   true,
-		SchemaRegistry:         true,
-		SchemaRegistryTLS:      true,
-		ACLDefault:             ACLAllow,
-		ConsoleAddr:            defaultConsoleAddr,
-		LogLevel:               "info",
-		LogFormat:              "text",
+		Version:                    MaxKafkaMajor,
+		ListenAddr:                 listen,
+		AdvertisedHost:             "", // derived from the listen address: see ResolveAdvertisedHost.
+		DataDir:                    DefaultDataDir,
+		MetaDB:                     "", // empty = <data-dir>/meta.db; see ResolveMetaDB.
+		SegmentBytes:               defaultSegmentBytes,
+		IndexIntervalBytes:         defaultIndexStride,
+		FsyncInterval:              500 * time.Millisecond,
+		ConsumerSessionTimeout:     45 * time.Second,
+		ConsumerAssignmentInterval: time.Second,
+		GroupInitialRebalanceDelay: 200 * time.Millisecond,
+		OffsetsRetention:           7 * 24 * time.Hour,
+		AutoCreateTopics:           true,
+		DefaultPartitions:          1,
+		MaxPartitions:              defaultMaxPartitions,
+		MessageMaxBytes:            DefaultMessageMaxBytes,
+		Console:                    true,
+		ClientTelemetry:            true,
+		Zone:                       true,
+		SchemaRegistry:             true,
+		SchemaRegistryTLS:          true,
+		ACLDefault:                 ACLAllow,
+		ConsoleAddr:                defaultConsoleAddr,
+		LogLevel:                   "info",
+		LogFormat:                  "text",
 	}
 }
 
@@ -422,6 +441,12 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: advertised-host %q is not a host name or an IP address (no scheme, port or spaces; the port is --advertised-port)", c.AdvertisedHost)
 	case c.OffsetsRetention < 0:
 		return fmt.Errorf("config: offsets-retention must not be negative, got %s (0 keeps offsets for ever)", c.OffsetsRetention)
+	case c.OffsetsRetentionCheckInterval < 0:
+		return fmt.Errorf("config: the offsets retention check interval must not be negative, got %s", c.OffsetsRetentionCheckInterval)
+	case c.GroupInitialRebalanceDelay < 0:
+		return fmt.Errorf("config: group-initial-rebalance-delay must not be negative, got %s (0 does not wait)", c.GroupInitialRebalanceDelay)
+	case c.ConsumerAssignmentInterval < 0:
+		return fmt.Errorf("config: the consumer group assignment interval must not be negative, got %s", c.ConsumerAssignmentInterval)
 	case c.ConsumerSessionTimeout <= 0:
 		return fmt.Errorf("config: consumer-session-timeout must be positive, got %s (a member would be evicted the moment it joined)", c.ConsumerSessionTimeout)
 	case c.PprofAddr != "" && !validHostPort(c.PprofAddr):

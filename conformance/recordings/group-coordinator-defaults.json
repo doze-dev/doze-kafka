@@ -1,0 +1,167 @@
+{
+  "scenario": "group-coordinator-defaults",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "group-configs",
+      "api": "DescribeConfigs",
+      "version": 4,
+      "request": {
+        "IncludeDocumentation": false,
+        "IncludeSynonyms": true,
+        "Resources": [
+          {
+            "ConfigNames": [
+              "group.initial.rebalance.delay.ms",
+              "group.consumer.assignment.interval.ms",
+              "group.consumer.min.assignment.interval.ms",
+              "group.consumer.heartbeat.interval.ms",
+              "group.consumer.session.timeout.ms",
+              "offsets.retention.minutes",
+              "offsets.retention.check.interval.ms"
+            ],
+            "ResourceName": "1",
+            "ResourceType": "BROKER"
+          }
+        ]
+      },
+      "response": {
+        "Resources": [
+          {
+            "Configs": [
+              {
+                "ConfigSynonyms": [
+                  {
+                    "Name": "group.consumer.assignment.interval.ms",
+                    "Source": "DEFAULT_CONFIG",
+                    "Value": "1000"
+                  }
+                ],
+                "ConfigType": "INT",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "group.consumer.assignment.interval.ms",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "1000"
+              },
+              {
+                "ConfigSynonyms": [
+                  {
+                    "Name": "group.consumer.heartbeat.interval.ms",
+                    "Source": "DEFAULT_CONFIG",
+                    "Value": "5000"
+                  }
+                ],
+                "ConfigType": "INT",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "group.consumer.heartbeat.interval.ms",
+                "ReadOnly": true,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "5000"
+              },
+              {
+                "ConfigSynonyms": [
+                  {
+                    "Name": "group.consumer.min.assignment.interval.ms",
+                    "Source": "DEFAULT_CONFIG",
+                    "Value": "0"
+                  }
+                ],
+                "ConfigType": "INT",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "group.consumer.min.assignment.interval.ms",
+                "ReadOnly": true,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "0"
+              },
+              {
+                "ConfigSynonyms": [
+                  {
+                    "Name": "offsets.retention.check.interval.ms",
+                    "Source": "DEFAULT_CONFIG",
+                    "Value": "600000"
+                  }
+                ],
+                "ConfigType": "LONG",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "offsets.retention.check.interval.ms",
+                "ReadOnly": true,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "600000"
+              },
+              {
+                "ConfigSynonyms": [
+                  {
+                    "Name": "group.consumer.session.timeout.ms",
+                    "Source": "DEFAULT_CONFIG",
+                    "Value": "45000"
+                  }
+                ],
+                "ConfigType": "INT",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "group.consumer.session.timeout.ms",
+                "ReadOnly": true,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "45000"
+              },
+              {
+                "ConfigSynonyms": [
+                  {
+                    "Name": "offsets.retention.minutes",
+                    "Source": "DEFAULT_CONFIG",
+                    "Value": "10080"
+                  }
+                ],
+                "ConfigType": "INT",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "offsets.retention.minutes",
+                "ReadOnly": true,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "10080"
+              },
+              {
+                "ConfigSynonyms": [
+                  {
+                    "Name": "group.initial.rebalance.delay.ms",
+                    "Source": "STATIC_BROKER_CONFIG",
+                    "Value": "0"
+                  },
+                  {
+                    "Name": "group.initial.rebalance.delay.ms",
+                    "Source": "DEFAULT_CONFIG",
+                    "Value": "3000"
+                  }
+                ],
+                "ConfigType": "INT",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "group.initial.rebalance.delay.ms",
+                "ReadOnly": true,
+                "Source": "STATIC_BROKER_CONFIG",
+                "Value": "0"
+              }
+            ],
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "ResourceName": "1",
+            "ResourceType": "BROKER"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}

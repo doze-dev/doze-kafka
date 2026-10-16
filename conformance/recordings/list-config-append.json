@@ -1,0 +1,204 @@
+{
+  "scenario": "list-config-append",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "la"
+          },
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "ls"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "la",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          },
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "ls",
+            "TopicID": "\u003ctopic-id:2\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "append-compact-to-unset",
+      "api": "IncrementalAlterConfigs",
+      "version": 1,
+      "request": {
+        "Resources": [
+          {
+            "Configs": [
+              {
+                "Name": "cleanup.policy",
+                "Op": "APPEND",
+                "Value": "compact"
+              }
+            ],
+            "ResourceName": "la",
+            "ResourceType": "TOPIC"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "Resources": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "ResourceName": "la",
+            "ResourceType": "TOPIC"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "append-compact-to-unset then",
+      "api": "DescribeConfigs",
+      "version": 4,
+      "request": {
+        "IncludeDocumentation": false,
+        "IncludeSynonyms": false,
+        "Resources": [
+          {
+            "ConfigNames": [
+              "cleanup.policy"
+            ],
+            "ResourceName": "la",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Resources": [
+          {
+            "Configs": [
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LIST",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "cleanup.policy",
+                "ReadOnly": false,
+                "Source": "DYNAMIC_TOPIC_CONFIG",
+                "Value": "delete,compact"
+              }
+            ],
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "ResourceName": "la",
+            "ResourceType": "TOPIC"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "subtract-delete-from-unset",
+      "api": "IncrementalAlterConfigs",
+      "version": 1,
+      "request": {
+        "Resources": [
+          {
+            "Configs": [
+              {
+                "Name": "cleanup.policy",
+                "Op": "SUBTRACT",
+                "Value": "delete"
+              }
+            ],
+            "ResourceName": "ls",
+            "ResourceType": "TOPIC"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "Resources": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "ResourceName": "ls",
+            "ResourceType": "TOPIC"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "subtract-delete-from-unset then",
+      "api": "DescribeConfigs",
+      "version": 4,
+      "request": {
+        "IncludeDocumentation": false,
+        "IncludeSynonyms": false,
+        "Resources": [
+          {
+            "ConfigNames": [
+              "cleanup.policy"
+            ],
+            "ResourceName": "ls",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Resources": [
+          {
+            "Configs": [
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LIST",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "cleanup.policy",
+                "ReadOnly": false,
+                "Source": "DYNAMIC_TOPIC_CONFIG",
+                "Value": ""
+              }
+            ],
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "ResourceName": "ls",
+            "ResourceType": "TOPIC"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}

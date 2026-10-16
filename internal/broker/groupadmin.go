@@ -166,7 +166,7 @@ func (b *Broker) handleListGroups(ctx context.Context, req *protocol.Request, lr
 // protocol groups are described via ConsumerGroupDescribe). An unknown group is
 // reported as Dead with no members — Kafka's behaviour, not an error.
 func (b *Broker) handleDescribeGroups(ctx context.Context, req *protocol.Request, dr *kmsg.DescribeGroupsRequest, resp *kmsg.DescribeGroupsResponse) error {
-	for _, id := range dr.Groups {
+	for _, id := range inKafkaGroupOrder(dr.Groups) {
 		rg := kmsg.NewDescribeGroupsResponseGroup()
 		rg.Group = id
 		if !b.canGroup(req.Conn, id, opDescribe) {
@@ -195,8 +195,11 @@ func (b *Broker) handleDescribeGroups(ctx context.Context, req *protocol.Request
 		}
 		rg.State = d.state
 		rg.ProtocolType = d.protocolType
-		// An Empty group has agreed on nothing: Kafka clears the protocol with the members.
-		if d.state != stateEmpty.String() {
+		// Only a Stable group shows its protocol and its members' metadata: in a
+		// rebalance, CompletingRebalance included, Kafka leaves both out and shows the
+		// assignments as they are (claim: groups R23c).
+		stable := d.state == stateStable.String()
+		if stable {
 			rg.Protocol = d.protocol
 		}
 		for _, m := range d.members {
@@ -205,7 +208,9 @@ func (b *Broker) handleDescribeGroups(ctx context.Context, req *protocol.Request
 			rm.ClientID = m.client.clientID
 			rm.ClientHost = m.client.host
 			rm.InstanceID = m.instanceID
-			rm.ProtocolMetadata = m.metadata
+			if stable {
+				rm.ProtocolMetadata = m.metadata
+			}
 			rm.MemberAssignment = m.assignment
 			rg.Members = append(rg.Members, rm)
 		}

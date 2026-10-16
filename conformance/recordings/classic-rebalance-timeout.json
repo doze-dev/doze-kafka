@@ -1,0 +1,530 @@
+{
+  "scenario": "classic-rebalance-timeout",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "rt"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "rt",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "find-coordinators",
+      "api": "FindCoordinator",
+      "version": 4,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": [
+          "rt-longest",
+          "rt-v0"
+        ],
+        "CoordinatorType": 0
+      },
+      "response": {
+        "Coordinators": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "rt-longest",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "rt-v0",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          }
+        ],
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rt-longest-a-join-needs-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "rt-longest",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJydP////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rt-longest-a-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "rt-longest",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJydP////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 15000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:1\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJydP////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rt-longest-a-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "rt-longest",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAJydAAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:1\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJydAAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rt-v0-a-join-needs-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "rt-v0",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJydP////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rt-v0-a-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "rt-v0",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJydP////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 6000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:2\u003e",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:2\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJydP////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rt-v0-a-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "rt-v0",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAJydAAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:2\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJydAAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rt-longest-b-join-needs-id",
+      "conn": "b1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "rt-longest",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJydP////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:3\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rt-longest-describe-10s",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "rt-longest"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "rt-longest",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAAJydAAAAAEAAAAA/////w==",
+                "MemberID": "\u003cmember:1\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:3\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "PreparingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rt-v0-describe-10s",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "rt-v0"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "rt-v0",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAAJydAAAAAEAAAAA/////w==",
+                "MemberID": "\u003cmember:2\u003e",
+                "ProtocolMetadata": ""
+              },
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:4\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "PreparingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rt-longest-describe-18s",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "rt-longest"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "rt-longest",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:3\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "CompletingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rt-v0-describe-18s",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "rt-v0"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "rt-v0",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:4\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "CompletingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rt-longest-b-join",
+      "conn": "b1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "rt-longest",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:3\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJydP////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 6000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "\u003cmember:3\u003e",
+        "MemberID": "\u003cmember:3\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:3\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJydP////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "rt-v0-b-join",
+      "conn": "b2",
+      "api": "JoinGroup",
+      "version": 0,
+      "request": {
+        "Group": "rt-v0",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJydP////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": -1,
+        "SessionTimeoutMillis": 15000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "\u003cmember:4\u003e",
+        "MemberID": "\u003cmember:4\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:4\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJydP////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}

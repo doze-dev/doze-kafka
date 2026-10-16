@@ -35,8 +35,8 @@ func TestFactsOfAProduceNameEachPartitionsResult(t *testing.T) {
 	if len(f.Partitions) != 1 || f.Partitions[0] != (PartResult{Topic: "orders", Partition: 1, Offset: 4812, HasOffset: true, Records: 1, Bytes: 81}) {
 		t.Errorf("partitions = %+v", f.Partitions)
 	}
-	if !json.Valid([]byte(f.Decoded)) || !strings.Contains(f.Decoded, `"TransactionalId": "checkout-1"`) ||
-		!strings.Contains(f.Decoded, `"Records": "1 batch, 1 record, 81 B"`) || !strings.Contains(f.Decoded, `"Acks": -1`) {
+	if !json.Valid([]byte(f.Decoded)) || !strings.Contains(f.Decoded, `"transactional_id": "checkout-1"`) ||
+		!strings.Contains(f.Decoded, `"records": "1 batch, 1 record, 81 B"`) || !strings.Contains(f.Decoded, `"acks": -1`) {
 		t.Errorf("decoded = %s", f.Decoded)
 	}
 }
@@ -136,7 +136,9 @@ func TestFactsUseTheSpecificationsNames(t *testing.T) {
 	tp.Partitions = append(tp.Partitions, pp)
 	q.Topics = append(q.Topics, tp)
 	d := DescribeFacts(q, nil).Decoded
-	for _, want := range []string{`"TransactionalId": "checkout-1"`, `"TimeoutMs": 1500`, `"Acks": -1`, `"TopicData": [{"Name": "orders", "PartitionData": [{"Index": 3`} {
+	// Traf-04 writes the specification's names in snake case: "transactional_id", "timeout_ms",
+	// "topic_data", "partition_data", "index" (C: the page wrote "TransactionalId").
+	for _, want := range []string{`"transactional_id": "checkout-1"`, `"timeout_ms": 1500`, `"acks": -1`, `"topic_data": [{"name": "orders", "partition_data": [{"index": 3`} {
 		if !strings.Contains(d, want) {
 			t.Errorf("decoded = %s, want it to contain %s", d, want)
 		}

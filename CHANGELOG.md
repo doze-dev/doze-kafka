@@ -42,6 +42,107 @@ here that contains "server API"; `task api` fails without it.
   and is now refused. Both were found by fuzz targets added for the trace-header parser
   and the Host check.
 
+- Console: the design gate (`go tool task design`, run once by `test:e2e`) renders
+  each board of the shell, the section homes and Traffic from its own source and
+  compares it with the live console element by element, in light and dark at 1440 and
+  at the shell boards' 960 and 390; every difference is on an allow-list with its
+  reason, and the numbers on the homes are held to what the broker and the registry
+  hold. The shell and homes gates are shown to bite on every run (a planted pixel and a
+  planted count are both reported). One library serves the three gates.
+
+- Console: the topic page is the boards'. Closed, the composer is a key, a value and
+  Send (it was a title bar); the neighbours are wells in ink; the wire is its head and
+  three rows, and beside an open record it drops the time each request took (it ran
+  off the edge); the open record's card at 960 closes with `esc` and the phone's sheet
+  with Close (the board's words), one column the sheet's width (it was squeezed into
+  two), over the board's lighter scrim; a phone's cards are the board's 88 px, the
+  open one ringed in ink rather than filled cell by cell.
+
+- Console: the palette's field, its count and its chosen row are the board's, `⌘K`
+  closes it, and a subject says its versions and compatibility level; the list of
+  keys is in the board's order; while a dialog is open the strip shows that dialog's
+  keys, not the page's.
+
+- Console: high contrast outlines every selection, a table's open row too, and draws
+  its edges 1 px as the design's set does (controls were 2 px); a card's last row keeps
+  its rule; the first run's connection facts are two columns as drawn (they stacked
+  at desktop width); a field's placeholder is full strength (it was 3.92:1).
+
+- Console: accessibility, swept over every page and state at three widths in three
+  themes with moderate findings failing too: the keys strip is the page's footer
+  landmark; the brand keeps its name at phone width; the close button's and the
+  base64 toggles' names hold what they show; the value editor is named; the More menu
+  is a disclosure, not a menu of plain buttons; a box that scrolls can take focus; an
+  aborted transaction's records are muted and struck through, not faded below 4.5:1.
+
+- Console: nothing a page does logs an error. A refusal is said beside the form and is
+  no longer also an htmx console error; the command previews inside the create forms
+  no longer error on every keystroke; the ACL form's preview trigger was invalid; and
+  a preview refreshing after a refusal no longer wipes it.
+
+- Console: a schema the registry cannot read, when checked, is the registry's refusal
+  (42201) like every other "no"; every route's refusals, and the teaching line under
+  every field (the acknowledgements, the topic name rule), are held from data.
+
+- Console: the Traffic pages are drawn as their boards and say only what the broker knows.
+  A design gate (`go tool task design`) renders each board's own files and compares the
+  live page to them element by element, with real clients (classic and KIP-848 groups,
+  telemetry), against a ledger of what they sent; a difference that is not on its
+  allow-list, each entry quoting the plan's record, fails. Wrong before: a client's
+  refusal streak crossed its connections' requests; a fold claimed 169 identical
+  heartbeats across six rebalances; `client=checkout` listed `checkout-api`; "last
+  minute" was 55 to 60 s; the ApiVersions downgrade claimed the client asks again;
+  Metadata said "auto-create on" from the request's flag on a broker with it off; a
+  client's requests a minute fell when one of its connections closed; a client that hung
+  up before its answer, or an API key no Kafka has, counted as the broker failing; times
+  under a millisecond read `0.4 ms`, where the boards print `0 ms` (the exact value is in
+  the title). Esc clears the filter; the keys strip follows each state; the rows are one
+  tab stop of a grid; the inspector announces what it holds; a request's decoded fields
+  are written in the specification's snake case. The keys strip is the page's footer
+  landmark, and the phone's brand link keeps its name.
+
+- Console: `/` on Traffic focuses its filter (the strip said so, and the key found no
+  field); stale rows while the broker is lost are muted (the page's muted ink at full
+  opacity), not faded to the board's .55, which put their text under 4.5:1, so the
+  accessibility sweep now checks them too; a page whose regions poll together (a group's
+  page and its wire dock) no longer queues one poll behind another, and a poll that
+  failed while queued was an uncaught error in the browser's console.
+
+- Groups: a classic JoinGroup into a consumer group whose subscription cannot be read is
+  answered UNKNOWN_SERVER_ERROR with no member id, as Kafka answers it (it fails to read
+  it with an exception it does not catch), where doze answered INCONSISTENT_GROUP_PROTOCOL;
+  a static join and a JoinGroup v3 too (recorded: unreadable-subscription).
+
+- Groups: DescribeGroups, ConsumerGroupDescribe and DeleteGroups that name several
+  groups answer them in Kafka's order, which is not the request's (it follows the
+  groups' __consumer_offsets partitions); doze answered in the request's order. A client
+  that pairs the answers with what it asked by position now pairs them as on Kafka
+  (recorded: describe-groups-order).
+
+- Groups: ConsumerGroupDescribe shows a static member that has left for a restart
+  (epoch -2) at epoch -2, and its group Reconciling, as Kafka does; it showed the epoch
+  it had left at and the group Stable (recorded: consumer-static-leave).
+
+- Groups: the first rebalance of an empty classic group waits as Kafka's does: a member
+  that joins during the delay starts another (cut to what the rebalance timeout
+  leaves), and the first member to join is the leader; it used to wait one delay from
+  the first join and pick a leader by member id. The delay is a setting,
+  `--group-initial-rebalance-delay` (TOML `group-initial-rebalance-delay`; Kafka's
+  `group.initial.rebalance.delay.ms`), 200 ms by default where Kafka's is 3 s. server API:
+  `Options.GroupInitialRebalanceDelay` (0 is the default, negative does not wait).
+  DescribeGroups shows a group's protocol and its members' metadata only once it is
+  Stable, as Kafka does (recorded: classic-initial-rebalance-delay).
+
+- Groups: a consumer group's new targets are computed at most once a second, by a
+  member's heartbeat (or a classic member's JoinGroup), as on Kafka
+  (`group.consumer.assignment.interval.ms`). A member that joins or leaves within a
+  second of the last targets leaves the group `Assigning`, the joiner at the targets'
+  epoch, until such a heartbeat; a leave or an expired session no longer moves anyone's
+  partitions by itself. Before, the targets were computed when the change was made, so
+  epochs and generations read one higher than Kafka's and the group was never
+  `Assigning`. A describe now shows a member's partitions with those it has been told to
+  give up and has not yet (recorded: consumer-assignment-interval, consumer-assignment-expiry).
+
 - Console: Traffic holds a client's long names (client id, software, group, transactional
   id, a 249-character topic) in its columns, cut with an ellipsis and whole in the title
   and the inspector. A client with 90-character names made the clients table 3,675 px
@@ -179,8 +280,191 @@ here that contains "server API"; `task api` fails without it.
   [What SASL and TLS cover](docs/auth-and-tls.md#what-sasl-and-tls-cover) says what
   each setting reaches.
 
-- Console: every button reads weight 400 whether it is a button or a link drawn as one (the
-  boards draw them all as buttons). A request that took under a millisecond shows its
+- Groups: an empty group with committed offsets is listed and described after a restart
+  as before it (recorded: `groups-listed-after-restart`): a classic group kept its
+  offsets but lost its protocol type, and an emptied consumer-protocol group was gone
+  from `ConsumerGroupDescribe` and listed as classic. The store's record of a group now
+  carries its protocol type, or its epoch and assignor (records of earlier versions are
+  still read).
+
+- Groups: requests Kafka refuses are refused, with Kafka's codes (recorded:
+  `group-requests-refused`). An empty group id is `INVALID_GROUP_ID` on every classic
+  group API and `OffsetDelete` (a v0 `JoinGroup` used to join a group named ""). A
+  classic `JoinGroup` with no protocol type is `INCONSISTENT_GROUP_PROTOCOL`. A
+  `ConsumerGroupHeartbeat` join that says it owns partitions, or does not say, is
+  `INVALID_REQUEST`, as is a static leave with no instance id and an empty instance id;
+  a rebalance timeout of 0 is accepted; a later epoch in a group that does not exist is
+  `GROUP_ID_NOT_FOUND`; the messages are Kafka's. `OffsetCommit` below v9 from a
+  consumer-protocol member is `UNSUPPORTED_VERSION`. In a consumer group, a classic
+  `SyncGroup` with the wrong protocol type or name is `INCONSISTENT_GROUP_PROTOCOL`, a
+  classic `JoinGroup` must share a protocol with the other classic members, an unknown
+  member id is seated as Kafka seats it, a classic member's `ConsumerGroupHeartbeat` is
+  answered, and a classic `LeaveGroup` can remove a consumer-protocol member. A
+  `LeaveGroup` from v3 answers 0 at the top level and each member's code beside it.
+- Groups: static membership fencing. A request naming a static instance nobody holds is
+  `UNKNOWN_MEMBER_ID`, and one naming an instance another member holds is
+  `FENCED_INSTANCE_ID`, on `Heartbeat`, `SyncGroup`, `OffsetCommit` and
+  `ConsumerGroupHeartbeat` (a member heartbeating with the wrong instance id used to be
+  answered 0; the member a restarted consumer-protocol instance replaced was
+  `UNKNOWN_MEMBER_ID`). An empty `group.instance.id` is an instance id on a classic
+  `JoinGroup`, as on Kafka. The docs no longer say static membership is not acted on.
+
+- server API: `Options.OffsetsRetention` sets how long committed offsets are kept once
+  nothing reads them, as the CLI's `--offsets-retention`. An embedder had expiry at the
+  7-day default with no way to change or turn it off; zero is still that default and a
+  negative value keeps offsets for ever.
+
+- Groups: a classic member of a consumer group that rejoins keeps the partitions its
+  `JoinGroup` says it still owns, as Apache Kafka 4.3.1 does (recorded:
+  `mixed-protocol-cooperative`). Every rejoin used to give up everything, which is
+  true of an eager consumer only: a cooperative-sticky one goes on reading until its
+  `SyncGroup` returns, and its partitions could be handed to another member meanwhile.
+  Its assignment is written at the version of its subscription. A static classic
+  member (`group.instance.id`) that restarts takes the place of the member holding its
+  instance instead of being seated twice, and the old member id is
+  `FENCED_INSTANCE_ID` (recorded: `mixed-protocol-static`).
+
+- Groups: a classic group upgraded in the middle of a rebalance answers what it had
+  parked as Apache Kafka 4.3.1 does (recorded: `mixed-protocol-parked`). A `JoinGroup`
+  waiting for the others to rejoin was answered `UNKNOWN_MEMBER_ID`, which makes a
+  client throw its member id away, while that id was kept as a member of the new
+  consumer group and held a share of the partitions until its session ran out (45 s
+  for a Java client). It is now `REBALANCE_IN_PROGRESS`, the member keeps its id and
+  its next `JoinGroup` finds its seat. A group upgraded between its `JoinGroup`s and
+  the leader's `SyncGroup` keeps each member's partitions of the generation before
+  (they were dropped, which freed them for the new member while a cooperative consumer
+  was still reading them), and the `SyncGroup`s that follow are
+  `REBALANCE_IN_PROGRESS`. A refused `SyncGroup` carries no protocol type and no
+  protocol name.
+
+- Offsets retention: a group that is gone leaves nothing behind. `DeleteGroups` removed
+  the group's offsets and left "empty since" in memory, so the same id used afterwards
+  by a standalone committer had its new offsets judged by when the deleted group had
+  emptied, and lost them early. The record now goes with the group, before its offsets
+  do. As on Apache Kafka 4.3.1 (recorded: `offsets-retention-recreate`), a group with no
+  members and no offsets is dropped by the next sweep, classic or consumer-protocol:
+  until then it is listed `Empty` and a commit made into it is a commit into an empty
+  group; after it, the id is a new group. Before this a classic group with no offsets
+  was unlisted the moment its last member left (Kafka lists it until its next check),
+  an emptied consumer-protocol group with no offsets stayed listed until the broker
+  restarted, and the emptiness of a group that then lost its last offset was counted
+  against later commits for a whole retention. A classic group that empties moves on a
+  generation, as Kafka's does: the next member to join is told two more than the last
+  one had.
+
+- Offsets retention: a restart no longer expires the offsets of a group that was live
+  when the broker stopped. Members are not kept across a restart, and a group with none
+  in memory and no record of having emptied was taken for one nobody had ever joined:
+  each offset expired from its own commit, so the first sweep after a restart could
+  delete an old, valid offset on a quiet partition before its consumer was back. The
+  metadata database now records that a group has members (and their longest session)
+  before the first member's join is answered, so it is there after a crash too. After a
+  restart such a group is treated as Apache Kafka 4.3.1 treats the members it loads
+  back (recorded: `offsets-retention-restart`): they are there until their session has
+  passed with nobody joining; from then a classic group has its retention to go, and a
+  consumer-protocol group's offsets are as old as their commits. That last is Kafka's
+  rule for any consumer-protocol group with no members, and is new here: such a group
+  used to keep its offsets for the retention from when it emptied. A data directory
+  from an earlier version is adopted on first start (every group with offsets is taken
+  to have had members). The record is kept with `--offsets-retention 0` as well. A join
+  that cannot be recorded is `COORDINATOR_NOT_AVAILABLE`. The sweep judges a group from
+  one view of it, taken with both coordinators held still, where it read three things
+  under three locks; a failed write of the record is tried again; and a group being
+  deleted is skipped. ConsumerGroupDescribe of a group that does not exist carries
+  Kafka's message, `Group <id> not found.`
+
+- A Fetch at an offset out of range (above the log end or below its start) answers
+  `OFFSET_OUT_OF_RANGE` with high watermark, last stable offset and log start offset
+  -1, as `apache/kafka:4.3.1` does (it used to carry the partition's real offsets), and
+  DescribeConfigs answers a resource with an empty error message rather than null
+  (recorded: `fetch-above-the-end`, `list-config-append`; `conformance/claims/api.md`
+  V6, V7). Every code comment that says what Kafka does now names the claims row
+  that shows it, and a test holds new ones to that.
+
+- Transactions and ACLs refuse malformed requests as `apache/kafka:4.3.1` does
+  (recorded: `txn-empty-id`, `acl-unknown-codes`; `conformance/claims/api.md` V4, V5).
+  An empty transactional id is `INVALID_REQUEST` in EndTxn, AddOffsetsToTxn,
+  AddPartitionsToTxn and InitProducerId (InitProducerId used to hand out a producer id
+  for it, as for a null id); AddOffsetsToTxn no longer refuses an empty group id.
+  An ACL request naming the UNKNOWN (0) code for resource type, pattern type, operation
+  or permission closes the connection; a code that is no value matches nothing in
+  DescribeAcls and is `INVALID_REQUEST` in Kafka's words in DeleteAcls and CreateAcls;
+  CreateAcls with ANY or MATCH answers `UNKNOWN_SERVER_ERROR`.
+
+- API versions: no `--kafka-version` profile offers a version the real broker of that
+  major does not serve. At the default, `--kafka-version 4`, nine old versions that
+  Kafka 4 removed (KIP-896) are no longer served: ListOffsets v0, OffsetCommit v0–1,
+  OffsetFetch v0, CreateTopics v0–1, DeleteTopics v0, DescribeAcls, CreateAcls and
+  DeleteAcls v0, DescribeConfigs v0. A request at one closes the connection, as on
+  `apache/kafka:4.3.1` (recorded: `versions-not-served`). A client that old works at
+  `--kafka-version 3`, as it does against a Kafka 3 broker. At `--kafka-version 1`,
+  six maxima come down to what Kafka 1.1.1 has (Metadata v5, FindCoordinator v1,
+  ListGroups v1, InitProducerId v0, SaslAuthenticate v0, DeleteGroups v0). Every
+  column of the version table is now held by a test to the recorded `ApiVersions`
+  answer of a real broker of that major (`conformance/recordings/api-versions.json`;
+  `docs/api-support.md` says which image stands for which).
+
+- **Security: SASL.** A connection logs in once, as the user whose password it proved,
+  and stays that user. Before this (a) a PLAIN token naming another user as its
+  authorization id (`bob NUL alice NUL alice's password`) was accepted, where Kafka
+  refuses it; SCRAM ignored `a=` the same way; (b) a connection that had logged in could
+  send a second `SaslAuthenticate` and become that token's user (alice became bob with
+  bob's password), and a wrong password on it logged the connection out; (c) a refused
+  `SaslHandshake` left the connection open for another try. Every answer to a login now
+  is the one `apache/kafka:4.3.1` gives, from two recordings of it (`sasl-plain`, 143
+  steps; `sasl-scram`, 293 steps; `conformance/claims/auth.md`): the authorization id
+  must be empty or the user's own name; after a login `SaslHandshake` and
+  `SaslAuthenticate` are `ILLEGAL_SASL_STATE` and change nothing; a `SaslAuthenticate`
+  with no handshake, a second `ApiVersions` before the handshake and a request in the
+  middle of a login close the connection; a second handshake mid-login is
+  `ILLEGAL_SASL_STATE` and closed; the refusal texts are Kafka's ("Authentication
+  failed: Invalid username or password", the same for an unknown user); an accepted
+  token answers an empty error message, not a null one; SCRAM takes only the `n`
+  channel-binding flag (it accepted `y`), does not sign a reserved `m=` attribute,
+  refuses a bad `=XX` escape in a user name and anything around the three attributes of
+  a client-final message, and closes without an answer on a proof of the wrong length.
+  Two answers stay stricter than Kafka's and are written in `docs/limitations.md`.
+  `CreateAcls` answers an empty error message for an ACL it created, as Kafka does.
+- Traffic inspector: for the requests that carry a credential (`SaslHandshake`,
+  `SaslAuthenticate`, the SCRAM-credential and delegation-token requests) the decoded
+  fields are held to a list of what may be shown; every other field reads `"(hidden)"`.
+  The length of a SASL token is no longer shown (`"AuthBytes": "29 bytes"` gave the
+  length of a PLAIN password), and neither is the size of a `SaslAuthenticate` request,
+  which gave it too: its row reads `0 B in`.
+
+- Config file errors name the line and the key and never repeat what the file says. An
+  unquoted value outside `[credentials]` used to be quoted back (`expected value but
+  found "hunter2"`), as did a bad duration, and a password typed where the user's name
+  goes was printed whole; under `[credentials]` the key is no longer named, only the
+  line. `credentials` written as anything but a table (`credentials = "..."`) is refused:
+  it used to load as a broker with no users.
+
+- Credentials: `--pprof-addr` no longer serves `/debug/pprof/cmdline` (the command line,
+  which is where `--sasl-user user:password` is); the other profiles are unchanged. The log
+  line for a handler that panicked during a SASL exchange names the type of the panic's
+  value and the stack, not its text. The test that reads every output for a planted
+  password now reads text and JSON logs at every level, logins with PLAIN and both SCRAM
+  mechanisms (right and wrong password), malformed SASL input, the panic line, the pprof
+  pages, the schema registry's answers to HTTP Basic credentials, `/healthz`, the console
+  and its Traffic inspector, every file of the data directory (and its mode), `env`,
+  `doctor`, `--help`, `config print`, and a restart over the same data; a surface it did
+  not reach fails it.
+
+- Durability: an idempotent `acks=all` retry after the broker was killed and restarted
+  is fsynced before it is acknowledged, and a roll after a restart flushes the segment
+  it seals; after an unclean stop nothing read back is taken to be on disk until it has
+  been flushed (a clean stop writes `data/clean-shutdown`). EndTxn is answered only
+  with every marker on disk, and the opposite decision of a decided transaction is
+  answered as Kafka answers it (`CONCURRENT_TRANSACTIONS`, then `INVALID_TXN_STATE`)
+  instead of being acknowledged. On a full or failing disk OffsetCommit and the
+  transaction APIs answer `NOT_COORDINATOR`, as Kafka does, and a refused Produce
+  answers -1 offsets and no message. A cleaning pass that fails part-way leaves the log
+  readable without a restart. A multi-batch produce whose write fails part-way leaves
+  nothing in the log.
+
+- Console: a button reads weight 400, and a link the boards draw as a link (Create topic,
+  Connect an app, Create ACL, Register schema, the first run's three) reads 500, as the
+  boards render them. A request that took under a millisecond shows its
   measured time (`42 µs`, `0.4 ms`) rather than the design boards' `0 ms`: a broker
   answering from memory does that constantly, and `0 ms` says nothing was measured (AD6).
 

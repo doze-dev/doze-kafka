@@ -97,7 +97,7 @@ const DRIVERS: Record<string, (page: Page, size: Size) => Promise<void>> = {
     await open(p, 'topics/seed-orders');
     await p.locator('#palette-open').click();
     await expect(p.locator('#pal-q')).toBeFocused();
-    await p.keyboard.type('e');
+    await p.keyboard.type('ord');
     await expect(p.locator('.pal-item').first()).toBeVisible();
   },
   'Sy-06': async (p) => {
@@ -119,30 +119,30 @@ const DRIVERS: Record<string, (page: Page, size: Size) => Promise<void>> = {
     await p.getByRole('button', { name: 'Purge' }).first().click();
     await expect(p.locator('#confirm')).toBeVisible();
   },
-  Main: async (p) => { await open(p, 'traffic'); await expect(p.locator('#traffic-table tbody tr').first()).toBeVisible(); },
+  Main: async (p) => { await open(p, 'traffic'); await expect(p.locator('#traffic-table .tf-rows > .r[data-row]').first()).toBeVisible(); },
   'Traf-02': async (p) => { await open(p, 'traffic?topic=seed-orders'); await expect(p.locator('#touched')).toBeVisible(); },
   'Traf-03': async (p) => { await open(p, 'traffic?kind=errors'); await expect(p.locator('#error-summary')).toBeVisible(); },
   'Traf-04': async (p) => {
     await open(p, 'traffic?kind=produce&topic=seed-orders');
-    await p.locator('#traffic-table tbody tr').first().click();
+    await p.locator('#traffic-table .tf-rows > .r[data-row]').first().click();
     await expect(p.locator('#request-inspector')).toBeVisible();
   },
   'Traf-05': async (p) => {
     await open(p, `traffic?q=${GROUP}&kind=groups`);
-    const folded = p.locator('#traffic-table tbody tr', { hasText: 'Heartbeat' }).filter({ hasText: /×\d+/ }).first();
+    const folded = p.locator('#traffic-table .tf-rows > .r[data-row]', { hasText: 'Heartbeat' }).filter({ hasText: /×\d+/ }).first();
     await expect(folded).toBeVisible({ timeout: 30_000 });
     await folded.click();
     await expect(p.locator('#fold-ticks')).toBeVisible();
   },
-  'Traf-06': async (p) => { await open(p, 'traffic?view=clients'); await expect(p.locator('#clients-table tbody tr').first()).toBeVisible(); },
+  'Traf-06': async (p) => { await open(p, 'traffic?view=clients'); await expect(p.locator('#clients-table .tf-rows > .r[data-row]').first()).toBeVisible(); },
   'Traf-07': async (p) => {
     await open(p, 'traffic?view=clients');
-    const row = p.locator('#clients-table tbody tr', { hasText: CLIENT }).first();
+    const row = p.locator('#clients-table .tf-rows > .r[data-row]', { hasText: CLIENT }).first();
     await expect(row).toBeVisible();
     await expect(async () => {
       await p.keyboard.press('Escape');
       await row.click();
-      await expect(p.locator('#client-inspector .metric-list.worth')).toBeVisible({ timeout: 2_000 });
+      await expect(p.locator('#client-inspector .well.tf-metrics')).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 40_000, intervals: [1_000] });
   },
   'Traf-08': async (p) => {
@@ -155,14 +155,14 @@ const DRIVERS: Record<string, (page: Page, size: Size) => Promise<void>> = {
   },
   'Traf-11': async (p) => {
     await open(p, 'traffic?view=clients');
-    const row = p.locator('#clients-table tbody tr', { hasText: QUIET }).first();
+    const row = p.locator('#clients-table .tf-rows > .r[data-row]', { hasText: QUIET }).first();
     await expect(row).toBeVisible();
     await row.click();
     await expect(p.locator('#no-metrics')).toBeVisible();
   },
   'Traf-12': async (p) => {
     await open(p, `traffic?group=${GROUP}&kind=groups`);
-    await expect(p.locator('#traffic-story .r.rebalance').first()).toBeVisible();
+    await expect(p.locator('#traffic-story .tf-rebalance').first()).toBeVisible();
   },
 };
 
@@ -277,7 +277,7 @@ test('Traf-10: the broker killed under open pages: rows frozen', async ({ browse
       await ctx.addInitScript((t) => { try { localStorage.setItem('theme', t); } catch { /* none */ } }, theme);
       const page = await ctx.newPage();
       await open(page, 'traffic');
-      await expect(page.locator('#traffic-table tbody tr').first()).toBeVisible({ timeout: 20_000 });
+      await expect(page.locator('#traffic-table .tf-rows > .r[data-row]').first()).toBeVisible({ timeout: 20_000 });
       pages.push({ page, size, theme, close: () => ctx.close() });
     }
   }
@@ -341,7 +341,7 @@ test('reference: the boards rendered as the design draws them', async ({ browser
 
 const FIELDS = ['w', 'h', 'padding', 'gap', 'font', 'family', 'radius', 'color', 'background'] as const; // family: h1 only, gap: main only
 // Widths that follow the window are not facts of the board.
-const FLUID_W = new Set(['top bar', 'main', 'h1', 'table header row', 'first table row', 'keys strip', 'callout', 'segment', 'dialog', 'tab', 'primary button', 'pill']);
+const FLUID_W = new Set(['top bar', 'main', 'h1', 'table header row', 'first table row', 'open row', 'keys strip', 'callout', 'segment', 'dialog', 'tab', 'primary button', 'pill']);
 
 function diffs(id: string, m: MeasFile[string]): string[] {
   const b = board(id);
@@ -393,6 +393,7 @@ test('index: plan/evidence/README.md', async () => {
       if (g('first table row', 'h')) key.push(`row ${g('first table row', 'h')}`);
       const cols = (live.probes['first table row'] as { columns?: number[] } | null)?.columns;
       if (cols) key.push(`cols ${cols.join(' ')}`);
+      if (g('open row', 'background')) key.push(`open row ${g('open row', 'background')}`);
     }
     rows.push(`| ${b.id} | ${b.state} | ${files.join(', ')} | ${key.join('; ') || 'n/a'} | ${b.verdict} |`);
     const d = diffs(b.id, m);
@@ -416,8 +417,12 @@ Screenshots of the live console beside the design's boards, for the review that
   Plex), when the run had DESIGN_DIR; \`measurements.json\` holds the numbers read
   off the board and off the live page by the same function (e2e/evidence/measure.ts).
 - The verdict is the one in \`plan/00-foundation.md\`, "Deviations from the boards";
-  this run does not change it. A difference measured below that the table does not
-  explain is added there.
+  this run does not change it. For Stage 0 (Sy-01 to Sy-08, the section homes and
+  Tp-24) the verdict is the design gate's (\`e2e/design\`, \`go tool task design\`):
+  it compares every probed element of the board and the console, in light and dark,
+  and holds each difference to its reason in an allow-list. The differences listed
+  below are this run's coarser measure (a few fixed sizes and colours per page),
+  kept as a record beside the pictures; the gate is what holds the console.
 
 To reproduce: \`go tool task evidence\` from the repository root (it boots its own
 seeded broker on E2E_PORT and a second one on E2E_PORT+20 for the first-run, empty

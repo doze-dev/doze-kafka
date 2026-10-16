@@ -217,7 +217,11 @@ func (b *Broker) readPartition(topic string, part kmsg.FetchRequestTopicPartitio
 
 	switch {
 	case errors.Is(err, log.ErrOffsetOutOfRange):
+		// Kafka answers it with no offsets and no aborted transactions, and empty
+		// (not null) records (claim: api V7).
 		rp.ErrorCode = kerr.OffsetOutOfRange.Code
+		rp.HighWatermark, rp.LastStableOffset, rp.LogStartOffset = -1, -1, -1
+		rp.AbortedTransactions, rp.RecordBatches = nil, []byte{}
 		return 0
 	case err != nil:
 		rp.ErrorCode = b.storageFault("fetch: read", err, "topic", topic, "partition", part.Partition, "offset", part.FetchOffset)

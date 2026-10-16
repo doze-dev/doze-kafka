@@ -112,6 +112,17 @@ tasks:
       - bun install --frozen-lockfile
       - bunx playwright install chromium
       - bunx playwright test
+      - task: design
+
+  design:
+    desc: 'The design gate (e2e/design): each board of the design (the shell, the section homes, the Traffic pages) rendered from its own files and compared with the live console element by element, in light and dark at 1440 and at the widths the boards draw; every difference is on an allow-list with its reason, or the gate fails. Its own brokers on E2E_PORT=14192 (the Traffic gate starts a third, with real clients, at +40). Run by test:e2e, once.'
+    dir: e2e
+    env:
+      E2E_PORT: '{{.E2E_PORT | default "14192"}}'
+    cmds:
+      - bun install --frozen-lockfile
+      - bunx playwright install chromium
+      - bunx playwright test -c design/playwright.config.ts
 
   evidence:
     desc: 'Design evidence: screenshots of the live console at each board state (light, dark; 1440, and 960/390 where a board has one) into plan/evidence/, with the index. DESIGN_DIR=<the design artifact''s project/ files> also renders the boards. Not part of test:e2e.'
@@ -149,6 +160,8 @@ tasks:
     desc: 'Replay the recorded Apache Kafka scenarios (conformance/recordings) against doze-kafka; no Docker'
     cmds:
       - go test ./conformance -count=1 -v -run 'TestReplay|TestKnown'
+      # The full-volume scenarios, with the fault seam standing in for the volume.
+      - go test -tags faultinject ./conformance -count=1 -v -run TestReplayFullDisk
 
   conformance:record:
     desc: 'Record the scenarios against apache/kafka:4.3.1 in Docker and rewrite conformance/recordings. One scenario: task conformance:record -- -only=listoffsets. The client runs are conformance:record:clients'
@@ -161,6 +174,11 @@ tasks:
     desc: 'Record what real clients send for client telemetry (conformance/recordings/client-telemetry.json): Docker, and kcat 2.5 or newer for the librdkafka run'
     cmds:
       - go test ./conformance -count=1 -v -run '^TestRecordClientTelemetry$' -record
+
+  conformance:stable:
+    desc: 'Record every scripted scenario against apache/kafka:4.3.1 three times and fail unless each run is byte-identical to the committed recordings (a timing-dependent step shows as a changed file). Needs Docker and a clean conformance/recordings'
+    cmds:
+      - scripts/conformance-stable.sh
 
   test:kcat:
     desc: 'kcat (librdkafka) against the real binary; needs kcat installed'

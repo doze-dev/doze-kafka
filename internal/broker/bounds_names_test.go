@@ -260,8 +260,11 @@ func TestALongSCRAMFirstMessageIsRefusedAndNotKept(t *testing.T) {
 	}
 	au := kmsg.NewPtrSASLAuthenticateRequest()
 	au.SASLAuthBytes = []byte("\x00bob\x00hunter2")
-	if code := ask(t, c, au, 2, kmsg.NewPtrSASLAuthenticateResponse()).ErrorCode; code != 34 {
-		t.Errorf("authenticating after a refused handshake: error %d, want ILLEGAL_SASL_STATE (34): the long mechanism was kept", code)
+	// Kafka closes the connection on a SaslAuthenticate that follows a refused handshake
+	// (recorded: sasl-plain, claim auth A9); if the long name had been kept as the
+	// connection's mechanism it would be served.
+	if c.do(au, kmsg.NewPtrSASLAuthenticateResponse()) {
+		t.Errorf("authenticating after a refused handshake was answered: the long mechanism was kept")
 	}
 	p := openRaw(t, addr)
 	hs.Mechanism = config.SASLPlain

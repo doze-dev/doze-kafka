@@ -183,7 +183,15 @@ func doubleOwned(ms ...*member848) string {
 	return ""
 }
 
+// broker848 is a broker whose consumer groups compute new targets at every heartbeat
+// (the assignment interval at 0, which Kafka allows): the tests that use it are of how
+// members reconcile, one heartbeat at a time. broker848Interval keeps the interval.
 func broker848(t *testing.T, session time.Duration) string {
+	t.Helper()
+	return broker848Interval(t, session, 0)
+}
+
+func broker848Interval(t *testing.T, session, interval time.Duration) string {
 	t.Helper()
 	dir := t.TempDir()
 	cfg := config.Default()
@@ -194,6 +202,7 @@ func broker848(t *testing.T, session time.Duration) string {
 	if session > 0 {
 		cfg.ConsumerSessionTimeout = session
 	}
+	cfg.ConsumerAssignmentInterval = interval
 	addr, stop := boot(t, cfg)
 	t.Cleanup(stop)
 	return addr
@@ -233,7 +242,13 @@ func deleteTopic848(t *testing.T, ctx context.Context, cl *kgo.Client, name stri
 // they were told some time later, and report only after applying. The second is
 // what real clients do, and is where double ownership was found.
 func run848Model(t *testing.T, seed int64, steps int, lag bool, topicChurn bool) (violations int, first string) {
-	addr := broker848(t, 0)
+	return run848ModelEvery(t, seed, steps, lag, topicChurn, 0)
+}
+
+// run848ModelEvery is run848Model with the groups' assignment interval at interval: the
+// targets then trail the epoch, and the members settle once it has passed.
+func run848ModelEvery(t *testing.T, seed int64, steps int, lag bool, topicChurn bool, interval time.Duration) (violations int, first string) {
+	addr := broker848Interval(t, 0, interval)
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 	admin := newClient(t, addr)
@@ -343,6 +358,7 @@ func run848Model(t *testing.T, seed int64, steps int, lag bool, topicChurn bool)
 	for _, n := range names {
 		ids[n] = topicIDOf(t, ctx, admin, n)
 	}
+	time.Sleep(interval + 100*time.Millisecond) // the targets are computed at the next heartbeat.
 	for round := 0; round < 12; round++ {
 		for _, m := range ms {
 			if !m.joined {
@@ -412,6 +428,17 @@ func TestGroupKIP848_Model_LaggingClient(t *testing.T) {
 	for _, seed := range []int64{1, 2, 3, 4} {
 		v, first := run848Model(t, seed, 3000, true, false)
 		t.Logf("seed %d lagging client: %d double-ownership violations; first: %s", seed, v, first)
+		if v > 0 {
+			t.Errorf("seed %d: %d violations; first: %s", seed, v, first)
+		}
+	}
+}
+
+// The same with Kafka's assignment interval (1 s): the targets of most steps are
+// computed late, by a heartbeat, after members have come and gone in between.
+func TestGroupKIP848_Model_KafkasAssignmentInterval(t *testing.T) {
+	for _, seed := range []int64{1, 2} {
+		v, first := run848ModelEvery(t, seed, 3000, true, false, time.Second)
 		if v > 0 {
 			t.Errorf("seed %d: %d violations; first: %s", seed, v, first)
 		}

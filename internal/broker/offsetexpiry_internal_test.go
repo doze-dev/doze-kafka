@@ -30,6 +30,12 @@ const testRetention = 10 * time.Minute
 
 func newExpiryRig(t *testing.T, dir string, now time.Time, topics ...string) *expiryRig {
 	t.Helper()
+	return newExpiryRigRetaining(t, dir, now, testRetention, topics...)
+}
+
+// newExpiryRigRetaining is newExpiryRig with a retention other than the test's usual one.
+func newExpiryRigRetaining(t *testing.T, dir string, now time.Time, retention time.Duration, topics ...string) *expiryRig {
+	t.Helper()
 	r := &expiryRig{now: now}
 	m, err := meta.OpenWithClock(filepath.Join(dir, "meta.db"), func() time.Time { return r.now })
 	if err != nil {
@@ -40,7 +46,7 @@ func newExpiryRig(t *testing.T, dir string, now time.Time, topics ...string) *ex
 		t.Fatal(err)
 	}
 	cfg := config.Default()
-	cfg.OffsetsRetention = testRetention
+	cfg.OffsetsRetention = retention
 	b, err := New(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), logs, m)
 	if err != nil {
 		t.Fatal(err)
@@ -49,7 +55,7 @@ func newExpiryRig(t *testing.T, dir string, now time.Time, topics ...string) *ex
 	exp := b.expiry
 	exp.stopAndFlush() // the sweep is run by hand, on this clock.
 	r.b, r.m, r.exp = b, m, exp
-	exp.now = func() time.Time { return r.now }
+	exp.now, exp.started = func() time.Time { return r.now }, now
 	for _, name := range topics {
 		if _, ok, _ := m.Topic(name); !ok {
 			if _, err := m.CreateTopic(name, 1, nil); err != nil {
@@ -212,28 +218,39 @@ func TestOffsetRetentionRemembersWhenAGroupEmptiedAcrossARestart(t *testing.T) {
 	}
 }
 
-// Off by default for an embedder that says zero: nothing runs, nothing expires.
+// A retention of zero keeps offsets for ever, whatever the group is.
 func TestOffsetRetentionOffKeepsOffsetsForEver(t *testing.T) {
+	r := newExpiryRigRetaining(t, t.TempDir(), time.Now(), 0, "a", "b")
+	r.commit(t, "solo", "a", 1)
+	member, _ := r.join(t, "emptied", "a")
+	r.commit(t, "emptied", "a", 2)
+	r.leave(t, "emptied", member)
+	r.join(t, "live", "a")
+	r.commit(t, "live", "b", 3) // a topic it does not read.
+
+	r.advance(1000 * 24 * time.Hour)
+	r.exp.sweep()
+	for group, topic := range map[string]string{"solo": "a", "emptied": "a", "live": "b"} {
+		if !r.has(group, topic) {
+			t.Errorf("with no retention the offset of %s on %s expired", group, topic)
+		}
+	}
+}
+
+// Which groups have members is recorded with the retention off too: turned on later, it
+// must not take a group that was live all along for one nobody joined.
+func TestOffsetRetentionTurnedOnLaterKnowsTheGroupsThatWereLive(t *testing.T) {
 	dir := t.TempDir()
-	m, err := meta.Open(filepath.Join(dir, "meta.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer m.Close()
-	logs, err := log.OpenManager(filepath.Join(dir, "data"), log.ManagerOptions{SegmentBytes: 1 << 20, IndexIntervalBytes: 4096})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer logs.Close()
-	cfg := config.Default()
-	cfg.OffsetsRetention = 0
-	b, err := New(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), logs, m)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer b.Stop()
-	if b.expiry != nil {
-		t.Fatal("a retention of zero started a sweep")
+	r := newExpiryRigRetaining(t, dir, time.Now(), 0, "a")
+	r.join(t, "g", "a")
+	r.commit(t, "g", "a", 5)
+	r.advance(testRetention + time.Minute)
+	r.m.Close() // the broker dies.
+
+	r2 := newExpiryRig(t, dir, r.now.Add(time.Second), "a")
+	r2.exp.sweep()
+	if !r2.has("g", "a") {
+		t.Fatal("turning the retention on expired the offset of a group that was live with it off")
 	}
 }
 
@@ -313,11 +330,14 @@ func TestOffsetRetentionSweepsOnItsOwn(t *testing.T) {
 		t.Error("the sweep did not remove an offset past its retention")
 	}
 	b.Stop() // writes what is only in memory.
-	empty, err := m.GroupsEmptySince()
+	known, err := m.GroupLiveness()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := empty["solo"]; ok {
-		t.Errorf("an entry for a group that never had members: %v", empty)
+	if _, ok := known["solo"]; ok {
+		t.Errorf("an entry for a group that never had members: %v", known)
+	}
+	if st, ok := known["g"]; ok {
+		t.Errorf("an entry for a group with no members and no offsets, which a sweep drops: %+v", st)
 	}
 }

@@ -246,7 +246,7 @@ func TestTopicPageListsItsConsumers(t *testing.T) {
 func TestClusterPageShowsRealAPIsAndConfig(t *testing.T) {
 	c := newTestConsole(t)
 	body := req(t, c, "GET", "/_console/cluster?view=apis", nil).Body.String() + req(t, c, "GET", "/_console/cluster?view=config", nil).Body.String() + req(t, c, "GET", "/_console/cluster", nil).Body.String()
-	for _, want := range []string{"DeleteGroups", "OffsetDelete", "ConsumerGroupHeartbeat", "Produce <span class=\"apiv\">v3–", "Broker configuration", "log.retention.bytes", "auto.create.topics.enable", "limitations</a>"} {
+	for _, want := range []string{"DeleteGroups", "OffsetDelete", "ConsumerGroupHeartbeat", "Produce <span class=\"apiv\">v3–", "Broker configuration", "log.retention.bytes", "auto.create.topics.enable", "All limits</a>"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the cluster page is missing %q", want)
 		}

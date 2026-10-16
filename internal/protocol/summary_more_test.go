@@ -144,7 +144,7 @@ func TestSummarisersNameWhatAdminAndTransactionRequestsAreAbout(t *testing.T) {
 		{"DeleteTopics by name", kmsg.DeleteTopics, deleteByName, nil, Summary{Topics: []string{"old-orders", "old-payments"}}},
 		{"DeleteTopics v6", kmsg.DeleteTopics, deleteV6, nil, Summary{Topics: []string{"old-orders"}, TopicIDs: [][16]byte{{7, 7}}}},
 		{"OffsetCommit of two topics", kmsg.OffsetCommit, commitTwo, nil,
-			Summary{Group: "g-depot", Topics: []string{"orders", "payments"}, Detail: "2 partitions"}},
+			Summary{Group: "g-depot", Topics: []string{"orders", "payments"}, Detail: "2 partitions", Parts: "2 partitions"}},
 		{"Fetch of two topics", kmsg.Fetch, fetchTwo, fetchedTwo,
 			Summary{Topics: []string{"orders", "payments"}, Detail: "2 partitions · 4 records · 162 B"}},
 		{"FindCoordinator of several keys", kmsg.FindCoordinator, findMany, nil, Summary{Group: "g-depot", Detail: "group coordinator"}},

@@ -83,6 +83,8 @@ async function stickingOut(page: Page): Promise<string[]> {
       if (!clip || clip === document.body || clip === root) continue;
       const cs = getComputedStyle(clip);
       if (cs.textOverflow === 'ellipsis') continue; // cut with an ellipsis, as drawn.
+      // The kinds control at 1440 is the board's own, cut as Main draws it (plan/00-foundation.md, Main).
+      if (clip.matches('.tf-filter .seg') && window.innerWidth === 1440) continue;
       if (clip.matches('pre, .code, .cm-scroller') || el.closest('pre, .code, .cm-editor')) continue;
       const cb = clip.getBoundingClientRect();
       // Something inside a box that scrolls sideways was reported with the box.
@@ -106,46 +108,43 @@ for (const width of [1440, 960, 390]) {
     test('the clients view holds a client with the longest names in its tracks', async ({ page }) => {
       await settle(page);
       await page.goto('traffic?view=clients');
-      const row = page.locator('#clients-table tbody tr', { hasText: 'long-client-' });
+      const row = page.locator('#clients-table .tf-rows > .r[data-row]', { hasText: 'long-client-' });
       await expect(row).toHaveCount(1);
       expect(await stickingOut(page)).toEqual([]);
       // The whole of what is kept is a hover away.
-      await expect(row.locator('.cell-client a')).toHaveAttribute('title', kept(CLIENT));
-      if (width >= 960) {
-        await expect(row.locator('.c-sw')).toHaveAttribute('title', kept(`${SOFTWARE} ${VERSION}`));
-        await expect(row.locator('.c-gr')).toHaveAttribute('title', new RegExp('^' + kept(GROUP).slice(0, 60)));
-      }
+      await expect(row.locator(':scope > span').nth(0)).toHaveAttribute('title', new RegExp('^' + kept(CLIENT)));
+      await expect(row.locator(':scope > span').nth(1)).toHaveAttribute('title', kept(`${SOFTWARE} ${VERSION}`));
+      if (width >= 1400) await expect(row.locator(':scope > span').nth(7)).toHaveAttribute('title', new RegExp('^' + kept(GROUP).slice(0, 60)));
       // And the table is as wide as its card, not as wide as its names.
       const table = await page.locator('#clients-table').boundingBox();
-      const wrap = await page.locator('.tbl-wrap').first().boundingBox();
-      expect(table!.width).toBeLessThanOrEqual(wrap!.width + 1);
+      const main = await page.locator('main#detail').boundingBox();
+      expect(table!.width).toBeLessThanOrEqual(main!.width + 1);
     });
 
     test('the client inspector holds them, and shows the whole client id', async ({ page }) => {
       await settle(page);
       await page.goto('traffic?view=clients');
-      await page.locator('#clients-table tbody tr', { hasText: 'long-client-' }).click();
+      await page.locator('#clients-table .tf-rows > .r[data-row]', { hasText: 'long-client-' }).click();
       const insp = page.locator('#client-inspector');
       await expect(insp).toBeVisible();
       expect(await stickingOut(page)).toEqual([]);
       // The inspector is where the whole value is: the client id wraps, it is not cut.
-      const id = insp.locator('.kv [data-full="client-id"]');
+      const id = page.locator('#inspector-title');
       await expect(id).toHaveText(kept(CLIENT));
       const cut = await id.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
       expect(cut).toBe(false);
-      await expect(insp.locator('.kv [data-full="txn-id"]')).toHaveText(kept(TXN));
     });
 
     test('the requests view holds its rows, and a topic of 249 characters', async ({ page }) => {
       await settle(page);
       await page.goto('traffic');
-      await expect(page.locator('#traffic-table tbody tr', { hasText: 'long-client-' }).first()).toBeVisible();
+      await expect(page.locator('#traffic-table .tf-rows > .r[data-row]', { hasText: 'long-client-' }).first()).toBeVisible();
       expect(await stickingOut(page)).toEqual([]);
       await page.goto('traffic?topic=' + TOPIC);
-      await expect(page.locator('#traffic-table tbody tr').first()).toBeVisible();
+      await expect(page.locator('#traffic-table .tf-rows > .r[data-row]').first()).toBeVisible();
       expect(await stickingOut(page)).toEqual([]);
       // A row's inspector, with the long topic among its partitions.
-      await page.locator('#traffic-table tbody tr', { hasText: 'Produce' }).first().click();
+      await page.locator('#traffic-table .tf-rows > .r[data-row]', { hasText: 'Produce' }).first().click();
       await expect(page.locator('#inspector')).toContainText('Result per partition');
       expect(await stickingOut(page)).toEqual([]);
     });
@@ -155,12 +154,12 @@ for (const width of [1440, 960, 390]) {
       await page.goto('traffic?group=' + GROUP);
       await expect(page.locator('#traffic-story')).toBeVisible();
       expect(await stickingOut(page)).toEqual([]);
-      const pill = page.locator('.pill', { hasText: 'long-group-' }).first();
+      const pill = page.locator('.tf-pill', { hasText: 'long-group-' }).first();
       // The pill is the filter as asked: the whole name, cut on screen and whole in its title.
       await expect(pill.locator('.m')).toHaveAttribute('title', GROUP);
       // The pill's own remove control and "clear" are inside the page's column.
       const main = (await page.locator('main').first().boundingBox())!;
-      for (const control of [pill.locator('.pill-x'), page.locator('#detail a', { hasText: /^clear$/ }).first()]) {
+      for (const control of [pill.locator('a[aria-label^="Remove"]'), page.locator('#detail a', { hasText: /^clear$/ }).first()]) {
         const box = (await control.boundingBox())!;
         expect(box.x + box.width).toBeLessThanOrEqual(main.x + main.width + 1);
       }

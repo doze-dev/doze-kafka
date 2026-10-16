@@ -3,6 +3,8 @@ package log
 import (
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -22,8 +24,10 @@ var ErrOffsetOutOfRange = errors.New("log: offset out of range")
 type Partition struct {
 	dir           string
 	topic         string // set by the Manager; which topic's limits apply.
+	number        int32  // set by the Manager; the partition's number, for its log lines.
 	indexInterval int64
 	beforeSync    func() error
+	log           *slog.Logger
 
 	mu             sync.Mutex
 	segmentBytes   int64      // roll the active segment past this size; guarded by mu.
@@ -32,6 +36,28 @@ type Partition struct {
 	logStartOffset int64
 	txn            txnState // open and aborted transactions; see txn.go.
 
+	// What this process does not know to be on disk (durability.go). unsynced are
+	// the sealed segments it has not flushed itself; dirSeq counts changes to the
+	// directory's entries and dirSynced is how many of them a directory flush has
+	// covered; unvalidated is set while the partition is one whose sealed segments
+	// had to be checked on open and have not all been flushed since. Guarded by mu.
+	unsynced    []*Segment
+	dirSeq      uint64
+	dirSynced   uint64
+	unvalidated bool
+
+	// syncWarned is the last failure the periodic flush reported for this
+	// partition, so the same one is not reported every tick.
+	syncWarned atomic.Pointer[string]
+
+	// txnMarked is set once this process knows the "transactions" file is on disk.
+	txnMarked bool
+
+	// failed is set when a flush of this partition failed, and never cleared: see
+	// Segment.failed. It covers what a segment's own flag cannot, a sealed segment
+	// and the directory.
+	failed atomic.Pointer[error]
+
 	// The cleaner (compact.go): one pass at a time, the offset below which the log has
 	// been cleaned, and what the last pass did.
 	cleaning      sync.Mutex
@@ -39,27 +65,45 @@ type Partition struct {
 	cleanedLoaded bool
 	lastClean     CleanResult
 
-	// Group commit. Every Append bumps appendSeq; syncedSeq is how far a completed
-	// fsync is known to cover. A caller that needs its write durable waits its turn
-	// at syncMu and, if a concurrent caller's fsync already covered its write, is
-	// done without issuing one — N concurrent acks=all producers on a partition
-	// share fsyncs instead of paying N in series.
+	// Group commit. Every change that an acknowledgement can rest on (an append,
+	// and at open whatever was read back without being known durable) bumps
+	// appendSeq; syncedSeq is how far a completed flush is known to cover. A caller
+	// that needs its write durable waits its turn at syncMu and, if a concurrent
+	// caller's flush already covered its write, is done without issuing one: N
+	// concurrent acks=all producers on a partition share fsyncs instead of paying
+	// N in series.
 	appendSeq atomic.Uint64
 	syncMu    sync.Mutex
 	syncedSeq atomic.Uint64
 }
 
 // openPartition opens (creating if needed) a partition directory, loading its
-// segments and recovering the active segment's tail.
+// segments and recovering what a crash may have left (recovery.go).
+//
+// Nothing read back here is taken to be on disk unless the caller vouches for
+// it (opts.vouched: the last stop was clean and flushed this partition): the
+// previous process may have been killed with these bytes still in the page
+// cache, and they would be acknowledged again, by a duplicate retry or a
+// transaction's end, with no fsync ever having covered them. What is not vouched
+// for starts dirty, so the first flush of the partition covers it.
 func openPartition(dir string, opts ManagerOptions) (*Partition, error) {
-	_, statErr := os.Stat(dir)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, err
+	if _, statErr := os.Stat(dir); os.IsNotExist(statErr) {
+		if err := fsBefore(FSMkdir, dir, ""); err != nil {
+			return nil, err
+		}
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, err
+		}
+		fsDone(FSMkdir, dir, "")
+		if err := fsSyncDir(filepath.Dir(dir)); err != nil { // persist the new directory's entry.
+			return nil, err
+		}
 	}
-	if os.IsNotExist(statErr) {
-		syncDir(filepath.Dir(dir)) // persist the new directory's entry.
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
-	p := &Partition{dir: dir, segmentBytes: opts.SegmentBytes, indexInterval: opts.IndexIntervalBytes, beforeSync: opts.BeforeSync}
+	p := &Partition{dir: dir, segmentBytes: opts.SegmentBytes, indexInterval: opts.IndexIntervalBytes, beforeSync: opts.BeforeSync, log: logger}
 	// Finish or undo a cleaner swap a crash interrupted, before any index is read.
 	if err := recoverSwaps(dir); err != nil {
 		return nil, err
@@ -70,33 +114,63 @@ func openPartition(dir string, opts ManagerOptions) (*Partition, error) {
 		return nil, err
 	}
 	if len(bases) == 0 {
-		seg, err := openSegment(dir, 0, p.indexInterval, p.beforeSync)
-		if err != nil {
+		// Nothing here yet: there is nothing to recover and nothing to doubt.
+		if err := p.addSegment(0); err != nil {
 			return nil, err
 		}
-		p.segments = []*Segment{seg}
 		return p, nil
 	}
 
+	closeAll := func() {
+		for _, s := range p.segments {
+			s.close()
+		}
+	}
 	for _, base := range bases {
-		seg, err := openSegment(dir, base, p.indexInterval, p.beforeSync)
+		seg, _, err := openSegment(dir, base, p.indexInterval, p.beforeSync)
 		if err != nil {
+			closeAll()
 			return nil, err
 		}
 		p.segments = append(p.segments, seg)
 	}
-	p.logStartOffset = p.segments[0].baseOffset
-	leo, err := recoverSegment(p.active())
-	if err != nil {
+	if err := p.recover(opts); err != nil {
+		closeAll()
 		return nil, err
 	}
-	p.logEndOffset = leo
-	// DeleteRecords may have put the start inside a segment (see logstart.go); never
-	// past the end, which only a log truncated below it could produce.
-	if recorded := min(readLogStart(dir), leo); recorded > p.logStartOffset {
-		p.logStartOffset = recorded
-	}
 	return p, nil
+}
+
+// addSegment creates the segment that begins at base and makes it the active
+// one. Its name is not flushed here: a new name makes the directory dirty, and
+// the flush that an acknowledgement of anything in the segment waits for (Sync)
+// flushes the directory with it. Until then the segment holds nothing anyone was
+// promised, and a power cut that takes it takes nothing. The caller holds mu (or
+// is opening the partition).
+func (p *Partition) addSegment(base int64) error {
+	seg, created, err := openSegment(p.dir, base, p.indexInterval, p.beforeSync)
+	if err != nil {
+		return err
+	}
+	if created {
+		p.dirSeq++
+	}
+	p.segments = append(p.segments, seg)
+	return nil
+}
+
+// syncDirLocked flushes the directory if any of its entries changed since the
+// last flush. The caller holds mu.
+func (p *Partition) syncDirLocked() error {
+	if p.dirSynced >= p.dirSeq {
+		return nil
+	}
+	upto := p.dirSeq
+	if err := fsSyncDir(p.dir); err != nil {
+		return err
+	}
+	p.dirSynced = upto
+	return nil
 }
 
 func (p *Partition) active() *Segment { return p.segments[len(p.segments)-1] }
@@ -115,7 +189,17 @@ func (p *Partition) Append(records []byte) (int64, error) {
 
 // appendLocked is Append for a caller holding p.mu.
 func (p *Partition) appendLocked(records []byte) (int64, error) {
-	firstOffset := p.logEndOffset
+	if err := p.offline(); err != nil {
+		return 0, err
+	}
+	// A payload is appended whole or not at all, as Kafka appends it: every
+	// batch is checked before any is written, the payload goes into one segment
+	// (the roll, if one is due, comes first), and a write that fails part-way
+	// takes back the batches before it. Leaving them used to answer the
+	// partition as failed with records of it in the log: a consumer read what
+	// its producer was told had failed, and a plain producer's retry wrote them
+	// twice.
+	transactional := false
 	for pos := 0; pos < len(records); {
 		info, ok := parseHeader(records[pos:])
 		if !ok || pos+int(info.totalBytes) > len(records) {
@@ -127,43 +211,59 @@ func (p *Partition) appendLocked(records []byte) (int64, error) {
 			return 0, fmt.Errorf("%w: record count %d at byte %d", ErrCorruptBatch, info.recordCount, pos)
 		}
 		batch := records[pos : pos+int(info.totalBytes)]
-		offset := p.logEndOffset
-		stampBaseOffset(batch, offset)
-		// The first transactional batch a partition takes starts it keeping
-		// transaction state: the marker file says so for a later open, and the log so
-		// far is scanned now, before this batch is in it.
-		transactional := len(batch) >= batchFullHeaderBytes && attrsOf(batch)&(batchTransactionalBit|batchControlBit) != 0
-		if transactional {
-			if err := p.markTransactional(); err != nil {
-				return 0, err
-			}
-			if err := p.ensureTxn(); err != nil {
-				return 0, err
-			}
-		}
-
-		if p.active().sizeBytes > 0 && p.active().sizeBytes+int64(len(batch)) > p.segmentBytes {
-			// Durably seal the segment being rolled off before opening the next, so
-			// the periodic timer (which only syncs the active segment) never leaves
-			// a completed segment unsynced.
-			if err := p.active().sync(); err != nil {
-				return 0, err
-			}
-			seg, err := openSegment(p.dir, offset, p.indexInterval, p.beforeSync)
-			if err != nil {
-				return 0, err
-			}
-			p.segments = append(p.segments, seg)
-		}
-		if err := p.active().append(offset, batch); err != nil {
-			return 0, err
-		}
-		p.appendSeq.Add(1)
-		p.logEndOffset = offset + int64(info.recordCount)
-		if transactional {
-			p.txn.observe(batch, offset)
+		if len(batch) >= batchFullHeaderBytes && attrsOf(batch)&(batchTransactionalBit|batchControlBit) != 0 {
+			transactional = true
 		}
 		pos += int(info.totalBytes)
+	}
+	// The first transactional batch a partition takes starts it keeping
+	// transaction state: the marker file says so for a later open, and the log so
+	// far is scanned now, before this payload is in it.
+	if transactional {
+		if err := p.markTransactional(); err != nil {
+			return 0, err
+		}
+		if err := p.ensureTxn(); err != nil {
+			return 0, err
+		}
+	}
+	if p.active().sizeBytes > 0 && p.active().sizeBytes+int64(len(records)) > p.segmentBytes {
+		if err := p.rollLocked(p.logEndOffset); err != nil {
+			return 0, err
+		}
+	}
+	seg := p.active()
+	mark := seg.mark()
+	firstOffset := p.logEndOffset
+	type placed struct {
+		batch  []byte
+		offset int64
+	}
+	var done []placed
+	for pos := 0; pos < len(records); {
+		info, _ := parseHeader(records[pos:])
+		batch := records[pos : pos+int(info.totalBytes)]
+		offset := p.logEndOffset
+		stampBaseOffset(batch, offset)
+		if err := seg.append(offset, batch); err != nil {
+			if len(done) > 0 {
+				seg.rewind(mark)
+				p.logEndOffset = firstOffset
+				p.appendSeq.Add(1) // the cut has to reach the disk like a write.
+			}
+			return 0, err
+		}
+		p.logEndOffset = offset + int64(info.recordCount)
+		done = append(done, placed{batch, offset})
+		pos += int(info.totalBytes)
+	}
+	p.appendSeq.Add(1)
+	if transactional {
+		for _, d := range done {
+			if len(d.batch) >= batchFullHeaderBytes && attrsOf(d.batch)&(batchTransactionalBit|batchControlBit) != 0 {
+				p.txn.observe(d.batch, d.offset)
+			}
+		}
 	}
 	return firstOffset, nil
 }
@@ -175,7 +275,7 @@ func (p *Partition) appendLocked(records []byte) (int64, error) {
 //
 // Above the LEO matters: a consumer holding an offset the log never reached (a
 // committed offset from a topic that was deleted and recreated, say) must be
-// told so it can reset, as it would on real Kafka. Answering "no data" instead
+// told so it can reset, as on Kafka (claim: api V7). Answering "no data" instead
 // makes it wait, then silently skip every record up to that offset.
 func (p *Partition) Read(fetchOffset, maxBytes int64) ([]byte, error) {
 	p.mu.Lock()
@@ -308,75 +408,33 @@ func (p *Partition) LogStartOffset() int64 {
 	return p.logStartOffset
 }
 
-// Sync flushes the active segment to stable storage. Sealed (non-active) segments
-// were synced when they rolled, so the active one is all that can hold unsynced
-// writes.
-func (p *Partition) Sync() error {
-	want := p.appendSeq.Load()
-	if p.syncedSeq.Load() >= want {
-		return nil // nothing written since the last fsync: no lock, no syscall.
-	}
-	p.syncMu.Lock()
-	defer p.syncMu.Unlock()
-	if p.syncedSeq.Load() >= want {
-		return nil // a concurrent caller's fsync covered this write while we waited.
-	}
-
-	// Note how far the log has got BEFORE flushing: the fsync below covers at
-	// least that much (it may cover more), so it is safe to record as durable.
-	p.mu.Lock()
-	upto := p.appendSeq.Load()
-	seg := p.active()
-	p.mu.Unlock()
-
-	// The fsync itself runs without p.mu: holding it blocked every produce and
-	// fetch on the partition for the duration of a disk flush. File operations are
-	// safe to run concurrently with appends. If the segment rolled in the
-	// meantime it was sealed with its own fsync (which waits for this one), and a
-	// sealed, flushed segment makes this a no-op. Any error, including a closed
-	// file, means the flush did not happen and must be reported: "closed" was once
-	// treated as "already safe", which acknowledged writes that a failed shutdown
-	// flush had left in the page cache.
-	if err := seg.sync(); err != nil {
-		return err
-	}
-	p.syncedSeq.Store(upto)
-	return nil
-}
-
 // dropOldestLocked deletes the oldest segment's files and advances the log-start
 // offset. The caller must hold p.mu and ensure at least two segments exist (the
 // active segment is never dropped).
 func (p *Partition) dropOldestLocked() error {
 	oldest := p.segments[0]
-	if err := oldest.close(); err != nil {
+	if err := oldest.retire(); err != nil {
 		return err
 	}
-	if err := removeSegmentFiles(p.dir, oldest.baseOffset); err != nil {
-		return err
-	}
+	p.forgetUnsynced(oldest)
 	p.segments = p.segments[1:]
 	p.logStartOffset = max(p.logStartOffset, p.segments[0].baseOffset)
 	if p.txn.ready {
 		p.txn.dropBelow(p.logStartOffset)
 	}
-	return nil
+	// The segment is gone from the partition whether or not its files could be
+	// removed: a file left behind is below the log start, and the next open
+	// removes it.
+	p.dirSeq++
+	return removeSegmentFiles(p.dir, oldest.baseOffset)
 }
 
-// close syncs the active segment (making a graceful shutdown durable) and then
-// closes every segment, returning the first error.
+// close flushes everything (making a graceful shutdown durable) and then closes
+// every segment, returning the first error.
 func (p *Partition) close() error {
+	firstErr := p.Sync()
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	// Every segment, not only the active one: a sealed segment is normally clean
-	// (a no-op here), but one whose seal failed is still dirty, and this is the
-	// last chance to flush it.
-	var firstErr error
-	for _, seg := range p.segments {
-		if err := seg.sync(); err != nil && firstErr == nil {
-			firstErr = err
-		}
-	}
 	for _, seg := range p.segments {
 		if err := seg.close(); err != nil && firstErr == nil {
 			firstErr = err
@@ -410,13 +468,10 @@ func listSegmentBases(dir string) ([]int64, error) {
 // removeSegmentFiles deletes a segment's .log and .index from disk.
 func removeSegmentFiles(dir string, baseOffset int64) error {
 	base := filepath.Join(dir, segmentName(baseOffset))
-	if err := os.Remove(base + ".log"); err != nil && !os.IsNotExist(err) {
+	if err := fsRemove(base + ".log"); err != nil {
 		return err
 	}
-	if err := os.Remove(base + ".index"); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	return nil
+	return fsRemove(base + ".index")
 }
 
 // setSegmentBytes changes the size at which the active segment rolls, from the

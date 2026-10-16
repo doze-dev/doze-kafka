@@ -1,8 +1,14 @@
 package console
 
 import (
+	"fmt"
+	"html/template"
+
 	"github.com/doze-dev/doze-kafka/internal/config"
+	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/settings"
+	"github.com/doze-dev/doze-kafka/internal/storage/meta"
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // Teaching lines come from data. The line under a field (its unit, range, default
@@ -72,7 +78,7 @@ var formFields = map[string]formField{
 	"offset":      {Kind: settings.Group, Name: "new-offset"},
 
 	// Not settings: what is being written, or which thing is being looked at.
-	"name":           {Not: "the name of the topic being created"},
+	"name":           {Not: "the name of the topic being created, or the resource an ACL or a check is about"},
 	"topic":          {Not: "which topic of a group an action is about"},
 	"partition":      {Not: "which partition of a topic a request is for"},
 	"partition_ctx":  {Not: "the partition the page is showing, carried through a form"},
@@ -97,4 +103,68 @@ var formFields = map[string]formField{
 	"group":          {Not: "the consumer group the Traffic page is narrowed to, carried through its filter form"},
 	"client":         {Not: "the client the Traffic page is narrowed to, carried through its filter form"},
 	"tab":            {Not: "which tab of a page a form belongs to, so its answer is the same tab"},
+	// The ACL being created, or the request being checked: a stored entry's fields,
+	// each with its line from aclFieldNotes (how the broker reads it).
+	"principal":  {Not: "an ACL's principal, or the principal a check asks about"},
+	"host":       {Not: "an ACL's host, or the address a check asks about"},
+	"resource":   {Not: "an ACL's resource type, or the one a check asks about"},
+	"pattern":    {Not: "how an ACL's name matches: literal or prefixed"},
+	"operation":  {Not: "an ACL's operation, or the one a check asks about"},
+	"permission": {Not: "whether an ACL allows or denies"},
+}
+
+// unnamedFields are the controls that send nothing under a name of their own, each with
+// what it is: a filter that narrows what is on the page, the palette's search, a
+// header's key and value (sent together as the form's "headers"), the partition picker
+// that is a link. TestEveryFormFieldHasASettingsRecordOrSaysWhyNot holds every control
+// with no name to this list, keyed by its aria-label or its class.
+var unnamedFields = map[string]string{
+	"Filter principals": "narrows the page's list of principals; sends nothing",
+	"Filter Topics":     "narrows the list pane; sends nothing",
+	"Filter Groups":     "narrows the list pane; sends nothing",
+	"Filter Schemas":    "narrows the list pane; sends nothing",
+	"Filter groups":     "narrows the groups table; sends nothing",
+	"Jump to a topic, group, subject or action": "the palette's search; sends nothing",
+	"Header key":   "a record header's key, sent with its value in the form's headers",
+	"Header value": "a record header's value, sent with its key in the form's headers",
+	"psel":         "picks the partition the page shows: a link, not a field",
+}
+
+// acksChoice is one acknowledgement the produce form can ask for, and what it does on
+// this broker (internal/broker/produce.go, handleProduce): acks=1 is answered once the
+// batch is in the log, in the OS page cache; acks=all once the partitions it wrote are
+// fsynced; acks=0 is answered not at all. The values are the ones parseProduceForm
+// takes (TestAcksChoicesAreWhatTheFormTakes).
+type acksChoice struct{ Value, Aria, Say string }
+
+func acksChoices() []acksChoice {
+	return []acksChoice{
+		{"1", "acks 1: the broker confirms the write", "Written to the page cache before acknowledging."},
+		{"0", "acks 0: no confirmation", "Fire-and-forget — the broker sends no response at all."},
+		{"all", "acks all: confirmed after it is on disk", "Fsynced to disk before acknowledging. Slower, durable."},
+	}
+}
+
+// topicNameRule is what a topic may be named, from the rule the broker applies when it
+// creates one (meta.ValidateTopicName, held to it by TestTopicNameRuleIsTheBrokers).
+func topicNameRule() template.HTML {
+	return template.HTML(fmt.Sprintf(`letters, digits, <span class="mono">.</span> <span class="mono">_</span> <span class="mono">-</span> and at most %d characters`, meta.MaxTopicNameLen))
+}
+
+// subjectNameRule is how a topic's value schema is named, as the console looks for it
+// (the topic's name and valueSubjectSuffix: the Topic name strategy serializers use).
+func subjectNameRule() template.HTML {
+	return template.HTML(`a topic's value schema is <span class="mono">&lt;topic&gt;` + valueSubjectSuffix + `</span>`)
+}
+
+// valueSubjectSuffix is what follows a topic's name in its value schema's subject.
+const valueSubjectSuffix = "-value"
+
+// topicNameMax is the longest a topic's name may be (the create form's maxlength).
+func topicNameMax() int { return meta.MaxTopicNameLen }
+
+// takenRule is what the create form says while the name typed is one the broker has:
+// CreateTopics answers it with this code and creates nothing (internal/broker/topics.go).
+func takenRule() string {
+	return fmt.Sprintf("already exists on this broker. The broker would answer %s and change nothing.", protocol.ErrorName(kerr.TopicAlreadyExists.Code))
 }

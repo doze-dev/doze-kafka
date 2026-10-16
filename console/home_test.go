@@ -59,6 +59,35 @@ func TestConnectPageIsFilledInFromTheBroker(t *testing.T) {
 	}
 }
 
+// Under SASL the Connect page says everything a client needs (verification of
+// 82b8752, A9): the login line, which mechanism it chose when there are two, that the
+// registry asks for the same user, and that `doze-kafka env` does not carry the
+// password (it said a client "can skip all of it").
+func TestConnectPageUnderSASLSaysTheLoginAndTheRegistrysAuth(t *testing.T) {
+	c, _ := newTestConsoleAddr(t, func(o *Options) {
+		o.Facts = BrokerFacts{SASLMechanisms: []string{"PLAIN", "SCRAM-SHA-512"}, RegistryURL: "http://127.0.0.1:8081"}
+	})
+	page := readable(req(t, c, "GET", "/_console/connect", nil).Body.String())
+	for _, want := range []string{
+		`sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="<user>" password="<password>";`,
+		"# the listener also takes SCRAM-SHA-512: set sasl.mechanism to it",
+		"basic.auth.credentials.source=USER_INFO", "basic.auth.user.info=<user>:<password>",
+		"it asks for the same user and password, as HTTP basic authentication",
+		"its user and password are not printed there",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the connect page under SASL does not say %q", want)
+		}
+	}
+	if strings.Contains(page, "can skip all of it") {
+		t.Error("under SASL the page says a client can skip all of it with doze-kafka env, which prints no password")
+	}
+	open := readable(req(t, newTestConsole(t), "GET", "/_console/connect", nil).Body.String())
+	if !strings.Contains(open, "can skip all of it: eval \"$(doze-kafka env)\" sets KAFKA_BOOTSTRAP_SERVERS and KAFKA_BROKERS.") {
+		t.Errorf("the open broker's sentence: %s", between(open, "This broker is at", "\n"))
+	}
+}
+
 // The Trace page without an id asks for one (Tc-Home) instead of refusing; a pasted
 // header value is read as the trace id it carries.
 func TestTraceWithoutAnIDAsksForOne(t *testing.T) {

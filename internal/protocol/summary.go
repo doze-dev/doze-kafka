@@ -280,11 +280,11 @@ func sumMetadata(q kmsg.Request, r kmsg.Response) Summary {
 			s.TopicIDs = append(s.TopicIDs, t.TopicID)
 		}
 	}
-	switch {
-	case req.Topics == nil || len(req.Topics) == 0:
+	// Whether the request allowed the broker to create what it named. Whether the broker
+	// does is its own setting, which the page writes (A8).
+	s.AutoCreate = req.AllowAutoTopicCreation && len(req.Topics) > 0
+	if len(req.Topics) == 0 {
 		s.Detail = "all topics"
-	case req.AllowAutoTopicCreation:
-		s.Detail = "auto-create on"
 	}
 	// With the answer, say what came back: how many topics, or why a named one did not.
 	if resp, ok := r.(*kmsg.MetadataResponse); ok {
@@ -294,23 +294,13 @@ func sumMetadata(q kmsg.Request, r kmsg.Response) Summary {
 				bad = t.ErrorCode
 			}
 		}
-		switch {
-		case bad != 0 && len(req.Topics) > 0:
-			s.Detail = withDetails(ErrorPhrase(bad), autoCreate(req))
-		case req.Topics == nil || len(req.Topics) == 0:
-			s.Detail = withDetails(plural(len(resp.Topics), "topic"), autoCreate(req))
-		default:
-			s.Detail = withDetails(plural(len(resp.Topics), "topic"), autoCreate(req))
+		if bad != 0 && len(req.Topics) > 0 {
+			s.Detail = ErrorPhrase(bad)
+		} else {
+			s.Detail = plural(len(resp.Topics), "topic")
 		}
 	}
 	return s
-}
-
-func autoCreate(req *kmsg.MetadataRequest) string {
-	if req.AllowAutoTopicCreation && len(req.Topics) > 0 {
-		return "auto-create on"
-	}
-	return ""
 }
 
 func sumOffsetCommit(q kmsg.Request, _ kmsg.Response) Summary {
@@ -325,11 +315,14 @@ func sumOffsetCommit(q kmsg.Request, _ kmsg.Response) Summary {
 		if len(req.Topics) > 1 {
 			detail = plural(len(parts), "partition")
 		}
+		s := Summary{Group: req.Group, Parts: detail,
+			Topics: topicNames(req.Topics, func(t kmsg.OffsetCommitRequestTopic) string { return t.Topic })}
 		if req.Generation > 0 {
+			s.Gen, s.HasGen = req.Generation, true
 			detail = withDetails(detail, "generation "+strconv.Itoa(int(req.Generation)))
 		}
-		return Summary{Group: req.Group, Detail: detail,
-			Topics: topicNames(req.Topics, func(t kmsg.OffsetCommitRequestTopic) string { return t.Topic })}
+		s.Detail = detail
+		return s
 	}
 	return Summary{}
 }

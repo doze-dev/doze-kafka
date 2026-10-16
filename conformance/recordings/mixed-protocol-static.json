@@ -1,0 +1,1405 @@
+{
+  "scenario": "mixed-protocol-static",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 2,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "ms"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 2,
+            "ReplicationFactor": 1,
+            "Topic": "ms",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "find-coordinators",
+      "api": "FindCoordinator",
+      "version": 4,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": [
+          "ms-down",
+          "ms-up",
+          "ms-held"
+        ],
+        "CoordinatorType": 0
+      },
+      "response": {
+        "Coordinators": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "ms-down",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "ms-up",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "ms-held",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          }
+        ],
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sd-n-join",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "ms-down",
+        "InstanceID": null,
+        "MemberEpoch": 0,
+        "MemberID": "",
+        "RackID": null,
+        "RebalanceTimeoutMillis": 30000,
+        "ServerAssignor": "uniform",
+        "SubscribedTopicNames": [
+          "ms"
+        ],
+        "SubscribedTopicRegex": null,
+        "Topics": []
+      },
+      "response": {
+        "Assignment": {
+          "Topics": [
+            {
+              "Partitions": [
+                0,
+                1
+              ],
+              "TopicID": "\u003ctopic-id:1\u003e"
+            }
+          ]
+        },
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:1\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sd-n-heartbeat",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "ms-down",
+        "InstanceID": null,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:1\u003e",
+        "RackID": null,
+        "RebalanceTimeoutMillis": -1,
+        "ServerAssignor": null,
+        "SubscribedTopicNames": null,
+        "SubscribedTopicRegex": null,
+        "Topics": null
+      },
+      "response": {
+        "Assignment": null,
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:1\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sd-s1-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ms-down",
+        "InstanceID": "i1",
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJtc/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": null,
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sd-s1-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 2,
+        "Group": "ms-down",
+        "GroupAssignment": null,
+        "InstanceID": "i1",
+        "MemberID": "\u003cmember:2\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sd-describe",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "ms-down"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 3,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ms-down",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1
+                      ],
+                      "Topic": "ms",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:1\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "ms"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1
+                      ],
+                      "Topic": "ms",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              },
+              {
+                "Assignment": {
+                  "TopicPartitions": null
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": "i1",
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:2\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "ms"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": null
+                }
+              }
+            ],
+            "State": "Assigning"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sd-s2-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ms-down",
+        "InstanceID": "i1",
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJtc/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:3\u003e",
+        "Members": null,
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sd-s2-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 2,
+        "Group": "ms-down",
+        "GroupAssignment": null,
+        "InstanceID": "i1",
+        "MemberID": "\u003cmember:3\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sd-s2-heartbeat",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 2,
+        "Group": "ms-down",
+        "InstanceID": "i1",
+        "MemberID": "\u003cmember:3\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sd-s1-heartbeat-old-id",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 2,
+        "Group": "ms-down",
+        "InstanceID": "i1",
+        "MemberID": "\u003cmember:2\u003e"
+      },
+      "response": {
+        "ErrorCode": 82,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sd-s1-heartbeat-old-id-no-instance",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 2,
+        "Group": "ms-down",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e"
+      },
+      "response": {
+        "ErrorCode": 25,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sd-describe-after-restart",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "ms-down"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 3,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ms-down",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1
+                      ],
+                      "Topic": "ms",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:1\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "ms"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1
+                      ],
+                      "Topic": "ms",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              },
+              {
+                "Assignment": {
+                  "TopicPartitions": null
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": "i1",
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:3\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "ms"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": null
+                }
+              }
+            ],
+            "State": "Assigning"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sd-s1-commit-old-id",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": 2,
+        "Group": "ms-down",
+        "InstanceID": "i1",
+        "MemberID": "\u003cmember:2\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ms",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 25,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ms",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "sd-s1-sync-old-id",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 2,
+        "Group": "ms-down",
+        "GroupAssignment": null,
+        "InstanceID": "i1",
+        "MemberID": "\u003cmember:2\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 82,
+        "MemberAssignment": "",
+        "Protocol": null,
+        "ProtocolType": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sd-s1-join-old-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ms-down",
+        "InstanceID": "i1",
+        "MemberID": "\u003cmember:2\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJtc/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 82,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sd-describe-after-old-id",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "ms-down"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 3,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ms-down",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1
+                      ],
+                      "Topic": "ms",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:1\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "ms"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1
+                      ],
+                      "Topic": "ms",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              },
+              {
+                "Assignment": {
+                  "TopicPartitions": null
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": "i1",
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:3\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "ms"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": null
+                }
+              }
+            ],
+            "State": "Assigning"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "su-s1-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ms-up",
+        "InstanceID": "i1",
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJtc/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:4\u003e",
+        "MemberID": "\u003cmember:4\u003e",
+        "Members": [
+          {
+            "InstanceID": "i1",
+            "MemberID": "\u003cmember:4\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJtc/////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "su-s1-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "ms-up",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAJtcwAAAAIAAAAAAAAAAf////8=",
+            "MemberID": "\u003cmember:4\u003e"
+          }
+        ],
+        "InstanceID": "i1",
+        "MemberID": "\u003cmember:4\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJtcwAAAAIAAAAAAAAAAf////8=",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "su-n-join",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "ms-up",
+        "InstanceID": null,
+        "MemberEpoch": 0,
+        "MemberID": "",
+        "RackID": null,
+        "RebalanceTimeoutMillis": 30000,
+        "ServerAssignor": "uniform",
+        "SubscribedTopicNames": [
+          "ms"
+        ],
+        "SubscribedTopicRegex": null,
+        "Topics": []
+      },
+      "response": {
+        "Assignment": {
+          "Topics": null
+        },
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:5\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "su-n-heartbeat",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "ms-up",
+        "InstanceID": null,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:5\u003e",
+        "RackID": null,
+        "RebalanceTimeoutMillis": -1,
+        "ServerAssignor": null,
+        "SubscribedTopicNames": null,
+        "SubscribedTopicRegex": null,
+        "Topics": null
+      },
+      "response": {
+        "Assignment": null,
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:5\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "su-describe",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "ms-up"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ms-up",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1
+                      ],
+                      "Topic": "ms",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": "i1",
+                "MemberEpoch": 1,
+                "MemberID": "\u003cmember:4\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "ms"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "ms",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              },
+              {
+                "Assignment": {
+                  "TopicPartitions": null
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:5\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "ms"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        1
+                      ],
+                      "Topic": "ms",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Reconciling"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "su-s2-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ms-up",
+        "InstanceID": "i1",
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJtc/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:6\u003e",
+        "Members": null,
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "su-s2-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 2,
+        "Group": "ms-up",
+        "GroupAssignment": null,
+        "InstanceID": "i1",
+        "MemberID": "\u003cmember:6\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJtcwAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "su-s2-heartbeat",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 2,
+        "Group": "ms-up",
+        "InstanceID": "i1",
+        "MemberID": "\u003cmember:6\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "su-s1-heartbeat-old-id",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 1,
+        "Group": "ms-up",
+        "InstanceID": "i1",
+        "MemberID": "\u003cmember:4\u003e"
+      },
+      "response": {
+        "ErrorCode": 82,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "su-s1-heartbeat-old-id-no-instance",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 1,
+        "Group": "ms-up",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e"
+      },
+      "response": {
+        "ErrorCode": 25,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "su-describe-after-restart",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "ms-up"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ms-up",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": null
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:5\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "ms"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        1
+                      ],
+                      "Topic": "ms",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              },
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "ms",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": "i1",
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:6\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "ms"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "ms",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Reconciling"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "su-s1-commit-old-id",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": 1,
+        "Group": "ms-up",
+        "InstanceID": "i1",
+        "MemberID": "\u003cmember:4\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ms",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 25,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ms",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "su-s1-sync-old-id",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "ms-up",
+        "GroupAssignment": null,
+        "InstanceID": "i1",
+        "MemberID": "\u003cmember:4\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 82,
+        "MemberAssignment": "",
+        "Protocol": null,
+        "ProtocolType": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "su-s1-join-old-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ms-up",
+        "InstanceID": "i1",
+        "MemberID": "\u003cmember:4\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJtc/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 82,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "su-describe-after-old-id",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "ms-up"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ms-up",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": null
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:5\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "ms"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        1
+                      ],
+                      "Topic": "ms",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              },
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "ms",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": "i1",
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:6\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "ms"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "ms",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Reconciling"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "su-leave-by-instance",
+      "api": "LeaveGroup",
+      "version": 4,
+      "request": {
+        "Group": "ms-up",
+        "MemberID": "",
+        "Members": [
+          {
+            "InstanceID": "i1",
+            "MemberID": "",
+            "Reason": null
+          }
+        ]
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Members": [
+          {
+            "ErrorCode": 0,
+            "InstanceID": "i1",
+            "MemberID": ""
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "su-describe-after-leave",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "ms-up"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 3,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ms-up",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": null
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:5\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "ms"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        1
+                      ],
+                      "Topic": "ms",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Assigning"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sh-n-join-static",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "ms-held",
+        "InstanceID": "j1",
+        "MemberEpoch": 0,
+        "MemberID": "",
+        "RackID": null,
+        "RebalanceTimeoutMillis": 30000,
+        "ServerAssignor": "uniform",
+        "SubscribedTopicNames": [
+          "ms"
+        ],
+        "SubscribedTopicRegex": null,
+        "Topics": []
+      },
+      "response": {
+        "Assignment": {
+          "Topics": [
+            {
+              "Partitions": [
+                0,
+                1
+              ],
+              "TopicID": "\u003ctopic-id:1\u003e"
+            }
+          ]
+        },
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:7\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sh-classic-join-same-instance",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ms-held",
+        "InstanceID": "j1",
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJtc/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:8\u003e",
+        "Members": null,
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "sh-describe",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "ms-held"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group ms-held is not a consumer group.",
+            "Group": "ms-held",
+            "Members": null,
+            "State": ""
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}

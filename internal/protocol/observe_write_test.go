@@ -11,7 +11,9 @@ import (
 )
 
 // A client that goes away before its answer is written leaves a row that says so: the
-// request was served, the answer could not be sent, and the connection is over. It
+// request was served, the client closed the connection before the answer, and the
+// connection is over. The broker did not fail (the row was "failed", red, and counted
+// among the minute's errors): it is the normal flow of a client that leaves. It
 // holds for an answer small enough to sit in the write buffer until it is flushed, and
 // for one large enough to go straight to the socket.
 func TestAnAnswerThatCannotBeWrittenIsObserved(t *testing.T) {
@@ -31,8 +33,8 @@ func TestAnAnswerThatCannotBeWrittenIsObserved(t *testing.T) {
 			close(gone)
 
 			got := waitObservations(t, obs, 1)[0]
-			if got.Class != ClassFailed || !strings.Contains(got.Closed, "could not be written") {
-				t.Fatalf("observed %+v, want a failed row that says the answer could not be written", got)
+			if got.Class != ClassExpected || got.Closed != "the client closed the connection before the answer" {
+				t.Fatalf("observed %+v, want an expected row that says the client closed the connection before the answer", got)
 			}
 			if got.ClientID != "impatient" || got.Correlation != 77 || got.API != kmsg.Heartbeat || got.RespBytes != 0 {
 				t.Errorf("who, which and how much: %q %d %v, %d bytes answered", got.ClientID, got.Correlation, got.API, got.RespBytes)

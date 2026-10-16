@@ -73,6 +73,11 @@ func TestEverySurfaceRenders(t *testing.T) {
 		switch {
 		case strings.Contains(path, "/inspect/"):
 			continue // one request per kind, with the key of a real selection: inspector_test.go
+		case strings.HasSuffix(rt.path, "/api/list/{section}"):
+			path = strings.Replace(path, "{section}", "topics", 1)
+			if r := req(t, c, "GET", strings.Replace(path, "/topics", "/groups", 1), nil); r.Code != http.StatusOK || !strings.Contains(r.Body.String(), `"billing"`) {
+				t.Errorf("GET the groups list = %d %s", r.Code, r.Body)
+			}
 		case strings.HasSuffix(path, "/dock"):
 			path += "?topic=orders"
 		case strings.Contains(path, "/confirm/"):

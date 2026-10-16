@@ -145,7 +145,7 @@ func (a *authorizer) allowed(principal, host string, rt int8, name string, op in
 
 // writesSomewhere reports whether the principal has been allowed to write to any
 // topic, which Kafka accepts as the right to produce idempotently when no one has
-// granted IdempotentWrite on the cluster.
+// granted IdempotentWrite on the cluster (claim: api V8).
 func (a *authorizer) writesSomewhere(principal, host string) bool {
 	for _, acl := range *a.acls.Load() {
 		if acl.ResourceType == resTopic && acl.Permission == permAllow && implied(acl.Operation, opWrite) &&

@@ -247,7 +247,7 @@ func (s *Store) touch(id [16]byte, who Who) *instance {
 				}
 			}
 			if owned >= maxPerConn {
-				// Never refused (Apache Kafka refuses nothing): the connection's own
+				// Never refused (Apache Kafka refuses nothing; claim: traffic R13): the connection's own
 				// oldest goes, so a flood of fresh ids from one socket costs the flood's
 				// maker and nobody else.
 				s.evictOf(who.Conn)
@@ -300,13 +300,14 @@ const (
 // Subscribe is the gate for a client asking for its subscription. Apache Kafka answers
 // a second request within the push interval of the last request it took from the
 // instance, a subscription or a push, THROTTLING_QUOTA_EXCEEDED; a refused request does
-// not postpone the next (recorded: conformance/recordings/telemetry-interval.json).
+// not postpone the next (recorded: conformance/recordings/telemetry-interval.json;
+// claims: traffic R1b).
 //
 // One request is answered although it is early: the one that follows a push refused
 // for its subscription id or its compression type (AskAgain), which is the client
 // doing what the refusal told it to. It is answered once and sets no clock, so the push
 // straight after it is still early (recorded:
-// conformance/recordings/telemetry-ask-again.json).
+// conformance/recordings/telemetry-ask-again.json; claim: traffic R11).
 func (s *Store) Subscribe(id [16]byte, who Who) Verdict {
 	s.mu.Lock()
 	defer s.mu.Unlock()

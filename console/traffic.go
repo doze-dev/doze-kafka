@@ -12,9 +12,11 @@ package console
 // folded row (Traf-05) in the inspector, the clients (Traf-06, Traf-07, Traf-11),
 // paused (Traf-08), empty (Traf-09), disconnected (Traf-10) and the story of a group's
 // rebalance (Traf-12). The page is this file; the inspector's bodies are in
-// traffic_inspect.go and the explainers and the story in traffic_story.go.
+// traffic_inspect.go and the explainers and the story in traffic_story.go. The design
+// gate (e2e/design) measures each board against the page.
 
 import (
+	"context"
 	"fmt"
 	"hash/fnv"
 	"html/template"
@@ -47,7 +49,8 @@ type TrafficSource interface {
 	GroupEvents(group string, limit int) []TrafficGroupEvent
 	// Story is a group's requests nested under the rebalances they belong to.
 	Story(group string) TrafficStory
-	// Window counts the requests and the errors of the last d (at most five minutes).
+	// Window counts the requests and the errors of the last d of whole five-second
+	// buckets (at most five minutes), and says which stretch that is.
 	Window(d time.Duration) TrafficWindow
 	// Refusals groups the error rows held by what they said, most often first.
 	Refusals() []TrafficRefusal
@@ -59,6 +62,7 @@ type TrafficSource interface {
 
 // TrafficFilter narrows the requests. Zero fields match everything.
 type TrafficFilter struct {
+	// Client is one client: its id exactly, or the address of a connection with none.
 	Client string
 	API    string
 	Topic  string
@@ -99,8 +103,15 @@ type TrafficEvent struct {
 	Topics                                []string
 	TopicsMore                            int // topics the request named that the recorder did not keep.
 	Group, ViaGroup, TxnID, Detail        string
-	Error                                 string // the Kafka error's name; empty when it went well.
-	ErrorCode                             int16
+	// Parts are the partitions the request named ("p0–p2") where the row writes them
+	// beside a topic or a group; Gen its generation, when HasGen; AutoCreate that a
+	// Metadata request allowed the broker to create the topics it named.
+	Parts      string
+	Gen        int32
+	HasGen     bool
+	AutoCreate bool
+	Error      string // the Kafka error's name; empty when it went well.
+	ErrorCode  int16
 	// Class is what the error means: "expected", "refused", "denied", "not-implemented"
 	// or "failed"; "" when there was none.
 	Class string
@@ -152,6 +163,14 @@ type TrafficClient struct {
 	Req1m, Req5m, Err5m                   int
 	Streak                                int
 	LastError                             string
+	// ClientStreak, ClientLastError and ClientLastClass are the client's (its client id's)
+	// run of errors, across its connections in the order its requests came.
+	ClientStreak    int
+	ClientLastError string
+	ClientLastClass string
+	// ClientReq1m, ClientReq5m and ClientErr5m are the client's counts, across every
+	// connection it has had while one of them stayed open.
+	ClientReq1m, ClientReq5m, ClientErr5m int
 }
 
 // TrafficGroupEvent is something a group's coordinator did.
@@ -166,8 +185,12 @@ type TrafficGroupEvent struct {
 	Cause      string
 }
 
-// TrafficWindow is what the counters say about a stretch of time.
-type TrafficWindow struct{ Requests, Errors int }
+// TrafficWindow is what the counters say about a stretch of time: the requests that
+// began in [From, To) and the errors among them.
+type TrafficWindow struct {
+	Requests, Errors int
+	From, To         time.Time
+}
 
 // TrafficRefusal is one error as the recorder has seen it.
 type TrafficRefusal struct {
@@ -229,7 +252,7 @@ func trafficFilterFrom(r *http.Request) TrafficFilter {
 }
 
 // trafficView is what the Traffic page was asked for: the source's own filter, the one
-// field of the board ("client, topic, group or request", matched by the console over
+// field of the board ("client, topic, group or request", matched by the recorder over
 // every field at once), the kind of request, and which of the two views it is.
 type trafficView struct {
 	TrafficFilter
@@ -251,6 +274,11 @@ func trafficViewFrom(r *http.Request) trafficView {
 	}
 	if q.Get("view") == "clients" {
 		v.View = "clients"
+	}
+	// The field shows the topic or group a pill names (Traf-02, Traf-12); sent back
+	// unchanged it is that pill, not a second filter of the same words.
+	if v.Q != "" && (v.Q == v.Topic || v.Q == v.Group) {
+		v.Q = ""
 	}
 	return v
 }
@@ -342,17 +370,20 @@ type trafficRow struct {
 	OpenKey string
 	// ConnKey is the open connection it came over, to open that client; "" once it has
 	// closed.
-	ConnKey  string
-	Target   string // the topics, or the group, or the transactional id.
-	Who      string // the client id, else the address.
-	Dur      string
-	Sizes    string
-	Folded   bool
-	SameSpan string // "over 2m10s" on a folded row.
+	ConnKey     string
+	Target      string // the topics, or the group, or the transactional id.
+	TargetTitle string // what Target counts, by name ("5 topics" is these five).
+	Who         string // the client id, else the address.
+	WhoQ        string // Who as a query value.
+	// Dur is the board's duration ("2 ms", "0 ms", "3.0 s"); DurExact the measured one,
+	// for the tooltip ("42 µs").
+	Dur, DurExact string
+	Sizes         string // "526 B / 71 B": in, out.
+	Folded        bool
 	// Tone is the colour word of the result: "ok", "deny" (refused, denied, expected),
 	// "warn" (not implemented) or "bad" (failed).
 	Tone string
-	// RowClass is the table row's class: the tint of a refusal.
+	// RowClass is the row's class: the tint of a refusal.
 	RowClass string
 	// Result is what the Result column reads: "ok" or the error's name.
 	Result string
@@ -362,9 +393,11 @@ type trafficRow struct {
 	// repeat its rhythm ("every 3 s, since 14:34:15").
 	DetailText string
 	Interval   string
-	// Rhythm says the detail is the row's rhythm ("every 3 s, since 14:34:15"), the time
-	// being drawn by the template so that it is in the browser's zone.
+	// Rhythm says the detail is the row's rhythm, the time being drawn by the template
+	// so that it is in the browser's zone.
 	Rhythm bool
+	// TopicParts is a commit's topic and partitions: "harbour.depot.dispatch p0–p2".
+	TopicParts string
 }
 
 // resultTone maps an error class to the board's four colours: purple for what real
@@ -402,30 +435,74 @@ func classWord(class string) string {
 // periodic are the APIs whose repeats are a rhythm, and are written as one.
 var periodic = map[string]bool{"Heartbeat": true, "ConsumerGroupHeartbeat": true, "PushTelemetry": true}
 
-func (c *Console) trafficRow(e TrafficEvent) trafficRow {
+// groupAPIs are the requests a group's row names the group for (Main: an OffsetCommit
+// is "g-depot-router" with its partitions in the detail).
+var groupAPIs = map[string]bool{
+	"OffsetCommit": true, "OffsetFetch": true, "Heartbeat": true, "JoinGroup": true, "SyncGroup": true, "LeaveGroup": true,
+	"ConsumerGroupHeartbeat": true, "FindCoordinator": true, "TxnOffsetCommit": true, "OffsetDelete": true,
+}
+
+// trafficRow writes a request the way the boards do. What the Target and Detail say
+// follows what the page is filtered by: beside a topic filter (Traf-02) a commit names
+// its topic and the group goes to the detail; otherwise (Main) a commit names its group
+// and its topic and partitions are the detail.
+func (c *Console) trafficRow(e TrafficEvent, v trafficView) trafficRow {
 	row := trafficRow{TrafficEvent: e, Folded: e.Count > 1, OpenKey: e.ID}
+	topics := strings.Join(e.Topics, ", ")
+	if e.TopicsMore > 0 {
+		topics += " and " + strconv.Itoa(e.TopicsMore) + " more"
+	}
+	if len(e.Topics) == 1 && e.Parts != "" {
+		row.TopicParts = e.Topics[0] + " " + e.Parts
+	} else {
+		row.TopicParts = strings.TrimSpace(topics + " " + e.Parts)
+	}
+	row.DetailText = e.Detail
 	switch {
-	case len(e.Topics) > 0:
-		row.Target = strings.Join(e.Topics, ", ")
-		if e.TopicsMore > 0 {
-			row.Target += " and " + strconv.Itoa(e.TopicsMore) + " more"
+	case v.Topic != "" && len(e.Topics) > 0:
+		// Beside a topic filter every row names the topic it is about (Traf-02).
+		row.Target = topics
+		if e.API == "OffsetCommit" && e.Group != "" {
+			row.DetailText = joinNonEmpty(" · ", e.Parts, e.Group)
 		}
+		if e.API == "Metadata" {
+			row.DetailText = c.metadataDetail(e)
+		}
+	case e.API == "Metadata":
+		switch n := len(e.Topics) + e.TopicsMore; {
+		case n == 1:
+			row.Target = e.Topics[0]
+		case n > 1:
+			row.Target = strconv.Itoa(n) + " topics"
+			row.TargetTitle = topics
+		default:
+			row.Target = "all topics"
+		}
+		row.DetailText = c.metadataDetail(e)
+	case groupAPIs[e.API] && e.Group != "":
+		row.Target = e.Group
+		if len(e.Topics) > 0 && v.Topic == "" {
+			// A filter by topic lists this row because of the topics it names.
+			row.TargetTitle = e.Group + " · " + topics
+		}
+		if e.API == "OffsetCommit" {
+			row.DetailText = row.TopicParts
+		}
+	case len(e.Topics) > 0:
+		row.Target = topics
 	case e.Group != "":
 		row.Target = e.Group
 	case e.TxnID != "":
 		row.Target = "tx " + e.TxnID
-	case e.ViaGroup != "":
-		row.Target = ""
 	}
 	row.Who = e.ClientID
 	if row.Who == "" {
 		row.Who = e.Remote
 	}
-	row.Dur = shortDuration(e.Duration)
-	row.Sizes = humanBytes(e.ReqBytes) + " in · " + humanBytes(e.RespBytes) + " out"
-	row.DetailText = e.Detail
+	row.WhoQ = queryEscape(row.Who)
+	row.Dur, row.DurExact = shortDuration(e.Duration), exactDuration(e.Duration)
+	row.Sizes = kibText(e.ReqBytes) + " / " + kibText(e.RespBytes)
 	if row.Folded {
-		row.SameSpan = "over " + shortDuration(e.Time.Sub(e.First))
 		row.Interval = intervalText(e)
 		if periodic[e.API] && row.Interval != "" {
 			row.DetailText = row.Interval + ", since " + whenText(e.First, StyleClock)
@@ -456,44 +533,64 @@ func (c *Console) trafficRow(e TrafficEvent) trafficRow {
 	return row
 }
 
+// metadataDetail is what a Metadata row's detail says: the answer, and what the broker
+// does with a request that allows it to create the topics it named. "auto-create on"
+// was the request's flag, written on a broker started with auto-create off (A8).
+func (c *Console) metadataDetail(e TrafficEvent) string {
+	detail := e.Detail
+	if strings.HasSuffix(detail, " topic") || strings.HasSuffix(detail, " topics") {
+		detail = "" // the Target column says how many.
+	}
+	if e.AutoCreate && c.facts.KafkaMajor > 0 {
+		if c.facts.AutoCreateTopics {
+			detail = joinNonEmpty(" · ", detail, "auto-create on")
+		} else {
+			detail = joinNonEmpty(" · ", detail, "asks to auto-create; off here")
+		}
+	}
+	if detail == "" {
+		detail = e.Detail
+	}
+	return detail
+}
+
 // intervalText is how often a folded row repeated: "every 3 s".
 func intervalText(e TrafficEvent) string {
 	if e.Count < 2 {
 		return ""
 	}
-	each := e.Time.Sub(e.First) / time.Duration(e.Count-1)
-	switch {
-	case each < 100*time.Millisecond:
-		return "every " + shortDuration(each)
-	case each < time.Second:
-		return "every " + strconv.Itoa(int(each.Milliseconds())) + " ms"
-	case each < time.Minute:
-		s := each.Seconds()
-		if math.Abs(s-math.Round(s)) < 0.05 || s >= 10 {
-			return "every " + strconv.Itoa(int(math.Round(s))) + " s"
-		}
-		return "every " + strconv.FormatFloat(s, 'f', 1, 64) + " s"
-	}
-	return "every " + strconv.Itoa(int(each.Minutes()+0.5)) + " min"
+	return "every " + everyText(e.Time.Sub(e.First)/time.Duration(e.Count-1))
 }
 
-// shortDuration is a duration a person reads at a glance: 42 µs, 0.4 ms, 12 ms, 2.5 s,
-// 3m10s. Under a tenth of a millisecond it is microseconds, so a request answered in
-// 40 µs does not read "0.0 ms", which says nothing was measured.
+// shortDuration is a duration as the boards write it: whole milliseconds, rounded
+// ("0 ms", "2 ms", "41 ms", "500 ms"), seconds to a tenth from one second ("3.0 s"), and
+// minutes and seconds from a minute ("2 m 10 s"). The boards print "0 ms" for what took
+// under half a millisecond (Main, Traf-05, Traf-12); the measured time is the
+// tooltip (exactDuration).
 func shortDuration(d time.Duration) string {
 	switch {
-	case d < 100*time.Microsecond:
-		return fmt.Sprintf("%d µs", max(d.Microseconds(), 0))
-	case d < time.Millisecond:
-		return fmt.Sprintf("%.1f ms", float64(d)/float64(time.Millisecond))
-	case d < time.Second:
-		return fmt.Sprintf("%d ms", d.Milliseconds())
-	case d < time.Minute:
-		return fmt.Sprintf("%.1f s", d.Seconds())
+	case d < 0:
+		d = 0
+		fallthrough
+	case d < 999500*time.Microsecond:
+		return strconv.FormatInt(int64(math.Round(float64(d)/float64(time.Millisecond))), 10) + " ms"
+	case d < 59950*time.Millisecond:
+		return strconv.FormatFloat(d.Seconds(), 'f', 1, 64) + " s"
 	default:
 		d = d.Round(time.Second)
-		return fmt.Sprintf("%dm%02ds", int(d.Minutes()), int(d.Seconds())%60)
+		return fmt.Sprintf("%d m %d s", int(d.Minutes()), int(d.Seconds())%60)
 	}
+}
+
+// exactDuration is the measured duration, for the tooltip: "42 µs", "0.4 ms", "22.8 ms".
+func exactDuration(d time.Duration) string {
+	switch {
+	case d < 100*time.Microsecond:
+		return fmt.Sprintf("took %d µs", max(d.Microseconds(), 0))
+	case d < time.Second:
+		return fmt.Sprintf("took %.1f ms", float64(d)/float64(time.Millisecond))
+	}
+	return fmt.Sprintf("took %.3f s", d.Seconds())
 }
 
 // spanText is how long ago something was, for a column of ages: "just now", 12s, 3m 10s, 2h 05m, 3d 05h.
@@ -512,10 +609,26 @@ func spanText(d time.Duration) string {
 	}
 }
 
+// spanBoard is how long something has been, as the Traffic boards write it: "9 s",
+// "38 s", "4 m 10 s", "1 h 02 m", "2 h 14 m", "3 d 05 h".
+func spanBoard(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%d s", max(int(d.Seconds()), 0))
+	case d < time.Hour:
+		return fmt.Sprintf("%d m %02d s", int(d.Minutes()), int(d.Seconds())%60)
+	case d < 48*time.Hour:
+		return fmt.Sprintf("%d h %02d m", int(d.Hours()), int(d.Minutes())%60)
+	}
+	return fmt.Sprintf("%d d %02d h", int(d.Hours())/24, int(d.Hours())%24)
+}
+
 // clientRow is an open connection, ready to show.
 type clientRow struct {
 	TrafficClient
-	Who  string
+	Who string
+	// Age is how long it has been open, and Idle since its last request, as the boards
+	// write them ("2 h 14 m", "38 s").
 	Age  string
 	Idle string
 	// Filter is the query that shows only this client's requests, and Href the address
@@ -525,11 +638,11 @@ type clientRow struct {
 	// Doing is what its requests say it is: "producer · tx checkout-1", the groups it
 	// is in, "none (producer)".
 	Doing string
-	// Note is the line under it in the connected-clients list.
-	Note string
-	// Rate is the error rate over its last five minutes, as the Clients view writes it.
-	Rate    string
-	RateTon string
+	// Rate is the error rate over its last five minutes, as the Clients view writes it;
+	// RateTitle what it is of.
+	Rate      string
+	RateTon   string
+	RateTitle string
 	// NeedsALook marks a client the page raises: refused several times in a row, or
 	// most of what it asked was refused.
 	NeedsALook bool
@@ -567,6 +680,12 @@ func (c *Console) groupClients(cls []TrafficClient, now time.Time) []clientRow {
 	out := make([]clientRow, 0, len(order))
 	for _, who := range order {
 		conns := by[who]
+		// A client's counts are its own, whichever connection carried them: the sum over
+		// the connections open now lost those of one that closed (a fetch connection
+		// closed at a rebalance), so a client said 116 a minute and had sent 178.
+		for i := range conns {
+			conns[i].Req1m, conns[i].Req5m, conns[i].Err5m = conns[i].ClientReq1m, conns[i].ClientReq5m, conns[i].ClientErr5m
+		}
 		if len(conns) == 1 {
 			cr := c.clientRow(conns[0], now)
 			cr.Conns, cr.Members, cr.Keys = 1, []clientRow{cr}, "client:"+strconv.FormatUint(conns[0].Conn, 10)
@@ -574,14 +693,14 @@ func (c *Console) groupClients(cls []TrafficClient, now time.Time) []clientRow {
 			continue
 		}
 		// The connection that spoke last stands for the client; the rest of the row is the
-		// sum of all of them.
+		// sum of all of them. The streak is the client's own, the same on each (A2).
 		m := conns[0]
 		for _, cl := range conns[1:] {
 			if cl.Last.After(m.Last) {
 				m = cl
 			}
 		}
-		m.Opened, m.Requests, m.Req1m, m.Req5m, m.Err5m, m.Streak = conns[0].Opened, 0, 0, 0, 0, 0
+		m.Opened, m.Requests = conns[0].Opened, 0
 		m.Groups, m.Produces, m.Fetches, m.AskedTelemetry = nil, false, false, false
 		var members []clientRow
 		var keys []string
@@ -591,12 +710,6 @@ func (c *Console) groupClients(cls []TrafficClient, now time.Time) []clientRow {
 				m.Opened = cl.Opened
 			}
 			m.Requests += cl.Requests
-			m.Req1m += cl.Req1m
-			m.Req5m += cl.Req5m
-			m.Err5m += cl.Err5m
-			if cl.Streak > m.Streak {
-				m.Streak, m.LastError = cl.Streak, cl.LastError
-			}
 			for _, g := range cl.Groups {
 				if !slices.Contains(m.Groups, g) {
 					m.Groups = append(m.Groups, g)
@@ -619,11 +732,6 @@ func (c *Console) groupClients(cls []TrafficClient, now time.Time) []clientRow {
 		}
 		m.Principal = strings.Join(principals, ", ")
 		cr := c.clientRow(m, now)
-		cr.NeedsALook = false
-		for _, mem := range members {
-			cr.NeedsALook = cr.NeedsALook || mem.NeedsALook
-		}
-		cr.LookHead, cr.LookNote = lookWords(m, len(conns))
 		cr.Conns, cr.More, cr.Members, cr.Keys = len(conns), len(conns)-1, members, strings.Join(keys, " ")
 		out = append(out, cr)
 	}
@@ -644,40 +752,51 @@ func clientCount(cls []TrafficClient) int {
 	return len(seen)
 }
 
-// needsALook is the rule behind "1 client needs a look": three refusals in a row, or
-// three or more in five minutes making up at least half of what it asked.
+// needsALook is the rule behind "1 client needs a look": three errors in a row, the
+// client's latest requests, or three or more in five minutes making up at least half of
+// what it asked.
 func needsALook(c TrafficClient) bool {
-	return c.Streak >= 3 || (c.Err5m >= 3 && c.Req5m > 0 && c.Err5m*2 >= c.Req5m)
+	return c.ClientStreak >= 3 || (c.Err5m >= 3 && c.Req5m > 0 && c.Err5m*2 >= c.Req5m)
 }
 
-// lookWords says why a client needs a look, as the callout's sentence (after the
+// noWord is the word for a kind of no, in a sentence: "refused", "denied", "failed".
+func noWord(class string) string {
+	switch class {
+	case "denied":
+		return "denied"
+	case "failed":
+		return "failed"
+	case "not-implemented":
+		return "not served"
+	}
+	return "refused"
+}
+
+// lookWords say why a client needs a look, as the callout's sentence (after the
 // client's name) and as the line under it in the connected-clients list. The board
 // (Traf-06) draws the streak: "has been refused 4 times in a row", "last 4 requests
-// refused". A client raised by the five-minute rule alone has no such streak (its
-// latest request may have gone well, and the streak is then 0), so it is told by the
-// count the rule read. conns is how many connections the client is: a streak is one
-// connection's, the count is all of them.
-func lookWords(c TrafficClient, conns int) (head, note string) {
-	if c.Streak >= 3 {
-		head = fmt.Sprintf("has been refused %d times in a row", c.Streak)
-		note = fmt.Sprintf("last %d requests refused", c.Streak)
-		if conns > 1 {
-			head += fmt.Sprintf(" on one of its %d connections", conns)
-			note += " on one connection"
+// refused"; the word is the class of the no (an ACL's is "denied": A2 of the
+// foundation). A client raised by the five-minute rule alone has no such streak, so it
+// is told by the count the rule read.
+func lookWords(c TrafficClient) (head, note string) {
+	if c.ClientStreak >= 3 {
+		w := noWord(c.ClientLastClass)
+		if w == "failed" {
+			return fmt.Sprintf("has failed %d times in a row", c.ClientStreak), fmt.Sprintf("last %d requests failed", c.ClientStreak)
 		}
-		return head, note
+		return fmt.Sprintf("has been %s %d times in a row", w, c.ClientStreak), fmt.Sprintf("last %d requests %s", c.ClientStreak, w)
 	}
-	return fmt.Sprintf("was refused %d of its %d requests in the last five minutes", c.Err5m, c.Req5m),
-		fmt.Sprintf("%d of %d requests refused in the last 5 minutes", c.Err5m, c.Req5m)
+	return fmt.Sprintf("had %d errors among its %d requests in the last five minutes", c.Err5m, c.Req5m),
+		fmt.Sprintf("%d of %d requests were errors in the last 5 minutes", c.Err5m, c.Req5m)
 }
 
 func (c *Console) clientRow(cl TrafficClient, now time.Time) clientRow {
-	cr := clientRow{TrafficClient: cl, Who: cl.ClientID, Age: spanText(now.Sub(cl.Opened)), Idle: spanText(now.Sub(cl.Last))}
+	cr := clientRow{TrafficClient: cl, Who: cl.ClientID, Age: spanBoard(now.Sub(cl.Opened)), Idle: spanBoard(now.Sub(cl.Last))}
 	if cr.Who == "" {
 		cr.Who = cl.Remote
 	}
 	cr.Filter = TrafficFilter{Client: cr.Who}.query()
-	cr.Href = template.URL(c.prefix + "/traffic?" + cr.Filter)
+	cr.Href = template.URL(c.prefix + "/traffic?" + cr.Filter) //nolint:gosec // built from an escaped query.
 	var does []string
 	switch {
 	case cl.Produces && cl.TxnID != "":
@@ -691,12 +810,14 @@ func (c *Console) clientRow(cl TrafficClient, now time.Time) clientRow {
 	does = append(does, cl.Groups...)
 	cr.Doing = strings.Join(does, " · ")
 	cr.NeedsALook = needsALook(cl)
-	cr.LookHead, cr.LookNote = lookWords(cl, 1)
+	cr.LookHead, cr.LookNote = lookWords(cl)
 	switch {
 	case cl.Req5m == 0:
 		cr.Rate, cr.RateTon = "—", "mut"
+		cr.RateTitle = "No request in the last 5 minutes"
 	default:
 		pct := float64(cl.Err5m) * 100 / float64(cl.Req5m)
+		cr.RateTitle = fmt.Sprintf("%d of %d requests in the last 5 minutes were errors", cl.Err5m, cl.Req5m)
 		switch {
 		case cl.Err5m == 0:
 			cr.Rate, cr.RateTon = "0 %", "ok"
@@ -709,8 +830,8 @@ func (c *Console) clientRow(cl TrafficClient, now time.Time) clientRow {
 	switch {
 	case len(cl.Groups) > 0:
 		cr.Groups = strings.Join(cl.Groups, ", ")
-		if cl.Streak > 0 && cl.Streak >= 3 {
-			cr.Groups += ", refused"
+		if cl.ClientStreak >= 3 {
+			cr.Groups += ", " + noWord(cl.ClientLastClass)
 		}
 	case cl.Produces:
 		cr.Groups = "none (producer)"
@@ -733,9 +854,30 @@ func (c *Console) ringText(now time.Time) (short, long string) {
 		return "from recent requests; none are kept yet",
 			"Written by is counted from " + kept + ", and none are kept yet. It does not survive a restart."
 	}
+	// spanText says "just now" below two seconds; every row held is then that young.
 	age := spanText(now.Sub(held.Oldest))
-	return "from recent requests, the oldest " + age + " old",
-		"Written by is counted from " + kept + ". It reaches back " + age + ": a client that wrote earlier, or whose requests have been pushed out, is not listed. It does not survive a restart."
+	if age == "just now" {
+		age = "2s"
+	}
+	return "from the last " + age + " of requests",
+		"Written by is counted from " + kept + ". They reach back " + age + ": a client that wrote earlier, or whose requests have been pushed out, is not listed. It does not survive a restart."
+}
+
+// autoCreateTopics is the broker's setting, when the console knows it.
+func (c *Console) autoCreateTopics(context.Context) bool { return c.facts.AutoCreateTopics }
+
+// topicExists says the topic is one the broker has now.
+func (c *Console) topicExists(ctx context.Context, name string) bool {
+	topics, err := c.be.ListTopics(ctx)
+	if err != nil {
+		return false
+	}
+	for _, t := range topics {
+		if t.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // trafficData is everything the Traffic page, and its poll, draw.
@@ -752,9 +894,19 @@ func (c *Console) trafficData(r *http.Request) map[string]any {
 	h := fnv.New64a()
 	data := map[string]any{
 		"Filter": v, "FilterQ": v.query(), "Filtered": !v.empty(), "InspDefault": "traffic",
-		"HasClientMetrics": c.metrics != nil, "OOB": false,
-		"TView": v.View,
+		"HasClientMetrics": c.metrics != nil, "MetricsOn": c.metrics != nil, "OOB": false,
+		"TView": v.View, "ClearURL": c.prefix + "/traffic",
 	}
+	// Clearing the filter (Esc, "clear") keeps the kind of request asked for, as the
+	// field and the pills are the filter and the kinds are not.
+	if v.Kind != "" && (v.Group == "" || v.Flat) {
+		data["ClearURL"] = c.prefix + "/traffic?kind=" + v.Kind
+	}
+	field := v.Q
+	if field == "" {
+		field = firstNonEmpty(v.Topic, v.Group)
+	}
+	data["FieldValue"] = field
 
 	// The clients, in the order they connected.
 	crows := c.groupClients(clients, now)
@@ -772,7 +924,7 @@ func (c *Console) trafficData(r *http.Request) map[string]any {
 		}
 	}
 	for _, cl := range clients {
-		fmt.Fprint(h, cl.Conn, cl.Requests, cl.ClientID, cl.Software, cl.Streak, cl.Req5m, ";")
+		fmt.Fprint(h, cl.Conn, cl.Requests, cl.ClientID, cl.Software, cl.ClientStreak, cl.Req5m, ";")
 	}
 	data["Clients"], data["NeedLook"] = crows, needLook
 	data["ClientCount"], data["ConnCount"] = len(crows), len(clients)
@@ -783,34 +935,36 @@ func (c *Console) trafficData(r *http.Request) map[string]any {
 	}
 	data["KeptText"] = kept
 	data["LastMinute"], data["ErrorCount"] = win.Requests, win.Errors
+	data["WindowFrom"], data["WindowTo"] = win.From.UnixMilli(), win.To.UnixMilli()
+	data["WindowFromT"], data["WindowToT"] = win.From, win.To
 	data["Since"] = c.traffic.Since()
-	fmt.Fprint(h, "|", len(clients), win.Requests, win.Errors, v.View)
+	fmt.Fprint(h, "|", len(clients), win.Requests, win.Errors, win.From.UnixMilli(), v.View)
 
-	// The tabs' Clients badge is the number of connected clients.
 	if v.View == "clients" {
 		data["Attention"] = c.attention(crows)
+		data["ClientNote"] = clientsNote(crows)
 		// Traf-06 draws no panel: the table has the clients, so the inspector's own
 		// list of them would show them twice and take 400 px the table's nine
 		// columns need. A selected client opens it.
 		data["InspDefault"] = ""
+		// A paused clients view counts the requests since it paused (Traf-08), from now.
+		data["NewestMs"] = msText(now)
 		data["Hash"] = fmt.Sprintf("%x", h.Sum64())
 		data["Rows"] = []trafficRow(nil)
+		data["Hints"] = trafficHints("clients", false)
 		c.trafficKindsData(data, v)
 		return data
 	}
 
 	// The rows: everything the recorder holds that the page's filter lets through,
 	// newest first; the table shows the first trafficRows of them, and the heading says
-	// how many matched.
-	//
-	// One question to the recorder, which hands over the rows shown and counts the rest
-	// where they lie. (This asked for every row it held, twice, to count them here: two
-	// copies of the whole ring under the lock every client's request waits on, each poll.)
+	// how many matched. One question to the recorder, which hands over the rows shown and
+	// counts the rest where they lie.
 	res := c.traffic.Query(v.source(), trafficRows)
 	totalReq, matchedRows, matchedReq := res.Held, res.Total, res.Requests
 	var rows []trafficRow
 	for _, e := range res.Rows {
-		row := c.trafficRow(e)
+		row := c.trafficRow(e, v)
 		if open[e.Conn] {
 			row.ConnKey = strconv.FormatUint(e.Conn, 10)
 		}
@@ -818,23 +972,32 @@ func (c *Console) trafficData(r *http.Request) map[string]any {
 		fmt.Fprint(h, e.ID, e.Seq, e.Count, ",")
 	}
 	data["Rows"] = rows
+	data["RowCount"] = len(rows) + 1
 	data["Matched"], data["MatchedRows"], data["TotalRequests"] = matchedReq, matchedRows, totalReq
 	data["Cut"] = matchedRows > len(rows)
 	data["Shown"] = len(rows)
-	// The cursor a paused page counts from: the start of the newest row shown.
+	// The cursor a paused page counts from: the start of the newest row shown, to the
+	// millisecond it is written in (a row that began later in the same millisecond is
+	// counted by the recorder, which has the nanoseconds).
 	var newest time.Time
 	for _, row := range rows {
 		if row.Time.After(newest) {
 			newest = row.Time
 		}
 	}
+	if newest.IsZero() {
+		newest = now
+	}
 	data["Newest"] = newest
-	data["NewestMs"] = newest.UnixMilli()
+	data["NewestMs"] = msText(newest)
 
 	// The refusals of what the page lists: the errors view's explainers, and the line
-	// under the table.
+	// under the table (A9: they were of everything held, so the panel named a refusal
+	// the filtered list did not have).
 	refusals := c.traffic.Refusals()
-	data["Refused"] = 0
+	if v.Kind == "errors" || v.ErrorsOnly {
+		refusals = refusalsOf(c.traffic.Events(v.source(), 0))
+	}
 	failed := 0
 	refusedRows := 0
 	for _, rf := range refusals {
@@ -850,15 +1013,22 @@ func (c *Console) trafficData(r *http.Request) map[string]any {
 	}
 
 	// Which summary the inspector shows until a row or a client replaces it.
+	state := "requests"
 	switch {
 	case v.Kind == "errors" || v.ErrorsOnly:
 		data["InspDefault"] = "errors"
+		state = "errors"
+		// The most frequent refusal of what the page lists, not of everything held (A9).
 		data["ErrorSummary"] = c.errorSummary(r.Context(), refusals)
 	case v.Topic != "":
 		data["InspDefault"] = "touched"
-		data["Touched"] = c.touched(v.Topic)
+		state = "filtered"
+		data["Touched"] = c.touched(r.Context(), v.Topic)
 	case v.Group != "" && !v.Flat:
 		data["InspDefault"] = "story"
+		state = "story"
+	case !v.empty():
+		state = "filtered"
 	}
 	if v.Group != "" && !v.Flat {
 		fv := v
@@ -875,9 +1045,88 @@ func (c *Console) trafficData(r *http.Request) map[string]any {
 			data["GroupSummary"] = c.groupSummary(r.Context(), v.Group, st)
 		}
 	}
+	// The line under the table has the board's 8 px under it on Main, Traf-02, Traf-04,
+	// Traf-05, Traf-08 and Traf-10; the errors view and the story put a spacer there.
+	data["FootPad"] = state != "errors" && state != "story"
+	data["Hints"] = trafficHints(state, false)
 	data["Hash"] = fmt.Sprintf("%x", h.Sum64())
 	c.trafficKindsData(data, v)
 	return data
+}
+
+// msText is a time as milliseconds to the microsecond ("1792148375593.043"): the
+// paused page's cursor, which the browser reads as a number and sends back.
+func msText(t time.Time) string {
+	us := t.UnixMicro()
+	return strconv.FormatInt(us/1000, 10) + "." + fmt.Sprintf("%03d", us%1000)
+}
+
+// refusalsOf groups error rows by what they said, most often first (ties: newest
+// first), as the recorder's Refusals does for all it holds.
+func refusalsOf(rows []TrafficEvent) []TrafficRefusal {
+	by := map[string]*TrafficRefusal{}
+	per := map[string]map[string]int{}
+	var order []string
+	for _, e := range rows {
+		if e.Error == "" || e.Class == "expected" || e.Class == "" {
+			continue
+		}
+		g := by[e.Error]
+		if g == nil {
+			g = &TrafficRefusal{Code: e.ErrorCode, Name: e.Error, Class: e.Class, First: e.Time, Last: e.Time, Latest: e.ID, API: e.API, Topics: e.Topics}
+			by[e.Error], per[e.Error] = g, map[string]int{}
+			order = append(order, e.Error)
+		}
+		n := max(e.Count, 1)
+		g.Count += n
+		if e.Time.Before(g.First) {
+			g.First = e.Time
+		}
+		if e.Time.After(g.Last) {
+			g.Last, g.Latest, g.API, g.Topics = e.Time, e.ID, e.API, e.Topics
+		}
+		who := firstNonEmpty(e.ClientID, e.Remote)
+		per[e.Error][who] += n
+	}
+	out := make([]TrafficRefusal, 0, len(order))
+	for _, k := range order {
+		g := by[k]
+		for who, n := range per[k] {
+			g.Clients = append(g.Clients, TrafficClientCount{who, n})
+		}
+		slices.SortFunc(g.Clients, func(a, b TrafficClientCount) int {
+			if a.Count != b.Count {
+				return b.Count - a.Count
+			}
+			return strings.Compare(a.Client, b.Client)
+		})
+		out = append(out, *g)
+	}
+	slices.SortStableFunc(out, func(a, b TrafficRefusal) int {
+		if a.Count != b.Count {
+			return b.Count - a.Count
+		}
+		return b.Last.Compare(a.Last)
+	})
+	return out
+}
+
+// clientsNote is the line under the clients table (Traf-06): what the error rate is of,
+// and, as the board does, the one client with errors that does not need a look.
+func clientsNote(rows []clientRow) string {
+	s := "Error rate is the requests refused, denied, not served or failed over all requests in the last 5 minutes."
+	for _, r := range rows {
+		if r.NeedsALook || r.Err5m == 0 {
+			continue
+		}
+		s += fmt.Sprintf(" %s shows %s among %s", r.Who, pluralOf(r.Err5m, "error"), groupDigits(int64(r.Req5m)))
+		if r.LastError != "" {
+			s += " (the latest " + r.LastError + ")"
+		}
+		s += "."
+		break
+	}
+	return s
 }
 
 // countErrors counts the error rows in what is shown.
@@ -904,7 +1153,12 @@ func (c *Console) trafficKindsData(data map[string]any, v trafficView) {
 		if qs != "" {
 			u += "?" + qs
 		}
-		kinds = append(kinds, map[string]any{"Key": k.Key, "Label": k.Label, "URL": u, "On": v.Kind == k.Key || (k.Key == "errors" && v.Kind == "" && v.ErrorsOnly)})
+		on := v.Kind == k.Key || (k.Key == "errors" && v.Kind == "" && v.ErrorsOnly)
+		// A group's story is its group requests (Traf-12 draws "groups" on).
+		if v.Group != "" && !v.Flat && v.Kind == "" {
+			on = k.Key == "groups"
+		}
+		kinds = append(kinds, map[string]any{"Key": k.Key, "Label": k.Label, "URL": u, "On": on})
 	}
 	data["Kinds"] = kinds
 
@@ -954,11 +1208,41 @@ func (c *Console) attention(rows []clientRow) map[string]any {
 		if !r.NeedsALook {
 			continue
 		}
-		a := map[string]any{"Who": r.Who, "Head": r.LookHead, "Err": r.LastError, "URL": c.prefix + "/traffic?kind=errors&" + TrafficFilter{Client: r.Who}.query()}
-		a["Why"] = refusalWhy(r.LastError)
+		a := map[string]any{"Who": r.Who, "Head": r.LookHead, "URL": c.prefix + "/traffic?kind=errors&" + TrafficFilter{Client: r.Who}.query()}
+		a["Why"] = refusalWhy(firstNonEmpty(r.ClientLastError, r.LastError))
 		return a
 	}
 	return nil
+}
+
+// trafficHints are the keys strip of a Traffic page in the state the server draws it
+// (the boards' strips: Main, Traf-02, Traf-03, Traf-06, Traf-09, Traf-12). What the
+// browser changes (a row opened, paused, the broker lost) the shell redraws from the
+// same words (shell.js, trafficKeys).
+func trafficHints(state string, empty bool) []keyHint {
+	k := func(label string, keys ...string) keyHint { return keyHint{Keys: keys, Label: label} }
+	move, open, filter, pause, jump := k("move", "j", "k"), k("open", "↵"), k("filter", "/"), k("pause", "p"), k("jump or act", "⌘K")
+	lostKeys := []keyHint{lost(k("retry now", "r")), lost(move), lost(jump)}
+	var hs []keyHint
+	switch {
+	case empty:
+		hs = []keyHint{k("connect an app", "c"), pause, jump}
+		lostKeys = []keyHint{lost(k("retry now", "r")), lost(jump)}
+	case state == "clients":
+		hs = []keyHint{move, k("open client", "↵"), k("requests", "g", "r"), jump}
+	case state == "errors":
+		hs = []keyHint{move, open, filter, k("errors only", "e"), pause, jump}
+	case state == "filtered":
+		hs = []keyHint{move, open, filter, k("clear filter", "esc"), pause, jump}
+	case state == "story":
+		hs = []keyHint{move, open, k("clear filter", "esc"), jump}
+	default:
+		hs = []keyHint{move, open, filter, pause, jump}
+	}
+	for i := range hs {
+		hs[i] = live(hs[i])
+	}
+	return append(hs, lostKeys...)
 }
 
 // trafficPage is the home page of the Traffic section.
@@ -972,14 +1256,20 @@ func (c *Console) trafficPage(w http.ResponseWriter, r *http.Request) {
 	if v, _ := data["TView"].(string); v == "clients" {
 		data["Title"] = "Traffic, clients"
 	}
-	// An empty broker with no filter is the board's "nothing yet": the line to point an
-	// app at, from the running configuration.
+	c.markEmpty(r, data)
+	c.render(w, r, "traffic_detail", data)
+}
+
+// markEmpty makes an empty broker with no filter the board's "nothing yet" (Traf-09):
+// the line to point an app at, from the running configuration.
+func (c *Console) markEmpty(r *http.Request, data map[string]any) {
 	if data["ClientCount"].(int) == 0 && data["TView"] == "requests" && !data["Filtered"].(bool) && data["TotalRequests"].(int) == 0 {
 		data["Empty"] = true
+		data["SoFar"] = 0
 		data["Facts"] = c.connectFacts(r)
-		data["Hints"] = pageHints("traffic_empty")
+		data["Hints"] = trafficHints("", true)
+		data["InspDefault"] = ""
 	}
-	c.render(w, r, "traffic_detail", data)
 }
 
 // trafficLive is the polled region: the request tail (or the clients table) with the
@@ -996,29 +1286,26 @@ func (c *Console) trafficLive(w http.ResponseWriter, r *http.Request) {
 	// The summary line and the inspector's default are outside this region: they come
 	// back with it, out of band.
 	data["OOB"] = true
-	if data["ClientCount"].(int) == 0 && data["TView"] == "requests" && !data["Filtered"].(bool) && data["TotalRequests"].(int) == 0 {
-		data["Empty"] = true
-		data["Facts"] = c.connectFacts(r)
-		data["Hints"] = pageHints("traffic_empty")
-	} else {
-		data["Hints"] = pageHints("traffic")
-	}
+	c.markEmpty(r, data)
 	c.partial(w, "traffic_live", data)
 }
 
 // trafficNew answers the paused page's one question, cheaply: how many requests came
-// after the one it stopped at. It is polled only while the page is paused.
+// after the one it stopped at. It is polled only while the page is paused; it also
+// tells a paused page that the broker is still there.
 func (c *Console) trafficNew(w http.ResponseWriter, r *http.Request) {
 	if c.trafficOff(w, r) {
 		return
 	}
 	v := trafficViewFrom(r)
-	ms, err := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64)
-	if err != nil {
+	ms, err := strconv.ParseFloat(r.URL.Query().Get("since"), 64)
+	if err != nil || math.IsNaN(ms) || math.IsInf(ms, 0) {
 		c.fail(w, r, badInput("since is the time the page stopped at, in milliseconds"))
 		return
 	}
-	n, atLeast := c.traffic.NewSince(v.source(), time.UnixMilli(ms))
+	// "since" is the start of the newest row the page shows, to the microsecond
+	// (msText): what began after that microsecond is new.
+	n, atLeast := c.traffic.NewSince(v.source(), time.UnixMicro(int64(math.Round(ms*1000))).Add(time.Microsecond-1))
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	fmt.Fprintf(w, `{"n":%d,"atLeast":%t}`, n, atLeast)

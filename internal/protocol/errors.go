@@ -68,7 +68,7 @@ type errorRow struct {
 var errorTable = []errorRow{
 	// The request is not valid.
 	{kerr.InvalidRequest, ClassRefused, "A field is missing or out of range for the version the client spoke.", "Compare the client library's version with the broker's, and the request it was building."},
-	{kerr.UnknownTopicOrPartition, ClassRefused, "The app names a topic this broker does not have, or a partition past the topic's last.", "Check the name for a typo, create the topic, or let the producer's first Metadata create it."},
+	{kerr.UnknownTopicOrPartition, ClassRefused, "The app names a topic that is not on this broker, or a partition past the topic's last. Usually the name has a typo, or the topic is created by a setup step that has not run yet.", "Check the name for a typo, create the topic, or let the producer's first Metadata create it."},
 	{kerr.UnknownTopicID, ClassRefused, "A request named a topic by an id that no topic has now: it was deleted and made again.", "Nothing: the client refreshes its metadata and asks again."},
 	{kerr.TopicAlreadyExists, ClassRefused, "CreateTopics for a name that is already a topic.", "Treat it as done, or choose another name."},
 	{kerr.InvalidTopicException, ClassRefused, "The topic name is empty, is '.' or '..', is longer than 249 bytes, or has a character a name may not.", "Use letters, digits, '.', '_' and '-'."},
@@ -78,8 +78,8 @@ var errorTable = []errorRow{
 	{kerr.InvalidConfig, ClassRefused, "A topic setting that is not one, or a value out of its range.", "See the topic's Config tab for the settings and their ranges."},
 	{kerr.InvalidRequiredAcks, ClassRefused, "A producer's acks that is not -1, 0 or 1.", "Set acks to all, 1 or 0."},
 	{kerr.MessageTooLarge, ClassRefused, "A batch larger than the topic's max.message.bytes.", "Send smaller batches, or raise max.message.bytes on the topic."},
-	{kerr.InvalidTimestamp, ClassRefused, "A record whose timestamp the topic will not take: a CreateTime further behind or ahead of the broker's clock than message.timestamp.before.max.ms / after.max.ms allow, or a LogAppendTime bit set by the client.", "Stamp records with the current time, or widen the topic's message.timestamp.before.max.ms / after.max.ms."},
-	{kerr.InvalidRecord, ClassRefused, "A record the topic will not take: on a compacted topic, one without a key. For a telemetry push, a body that does not decompress or inflates past the size the broker said it would take.", "Give every record on a compacted topic a key. A client that pushes metrics must compress them as the codec it names."},
+	{kerr.InvalidRecord, ClassRefused, "A batch or record the broker will not take: its header claims a different number of records than it holds, two batches for one partition, an empty record set, a base offset other than 0, or, on a compacted topic, a record without a key. For a telemetry push, a body that does not decompress or inflates past the size the broker said it would take.", "Give every record on a compacted topic a key. A client that pushes metrics must compress them as the codec it names."},
+	{kerr.InvalidTimestamp, ClassRefused, "A batch whose record timestamps are further from the broker's clock than the topic's message.timestamp.before.max.ms or after.max.ms allow, or that set the LogAppendTime bit itself.", "Check the producer's clock, or widen message.timestamp.before.max.ms and message.timestamp.after.max.ms on the topic."},
 	{kerr.CorruptMessage, ClassRefused, "A record batch whose checksum or framing does not match.", "A client or proxy altered the bytes: look at what sits between the app and the broker."},
 	{kerr.OffsetOutOfRange, ClassRefused, "A consumer asked for an offset the log no longer has, or has not reached.", "The consumer resets by its auto.offset.reset; check retention if it keeps happening."},
 	{kerr.OffsetMetadataTooLarge, ClassRefused, "The metadata string on an offset commit is too long.", "Commit shorter metadata or none."},
@@ -128,6 +128,7 @@ var errorTable = []errorRow{
 	// The broker.
 	{kerr.UnknownServerError, ClassFailed, "The broker failed in a way it has no name for.", "Look at the broker's log at this time."},
 	{kerr.KafkaStorageError, ClassFailed, "The broker could not write or read its data directory. A write refused with this may already be in the log: when the sync after the append failed, a consumer can read the batch although the producer was told no offset.", "A retry of a non-idempotent producer can store it twice. Check the disk: space, permissions, a lock. The Cluster page shows the data directory."},
+	{kerr.NotCoordinator, ClassFailed, "The coordinator could not write its state (a full or failing disk), and answers as Kafka does when the append to its offsets or transaction log fails: look the coordinator up again and retry.", "Retry; free space on the data directory's disk if it persists."},
 	{kerr.CoordinatorNotAvailable, ClassFailed, "The group or transaction coordinator is not ready.", "Retry; if it persists, check the broker's log."},
 	{kerr.UnsupportedVersion, ClassNotImplemented, "The client asked for a version of an API this broker does not offer.", "Use a client that negotiates versions with ApiVersions, or a newer broker profile."},
 	{kerr.UnsupportedCompressionType, ClassNotImplemented, "A compression type this broker does not take for this purpose.", "Use gzip, snappy, lz4, zstd or none."},
@@ -224,3 +225,30 @@ var errorPhrases = map[int16]string{
 
 // ErrorPhrase is the short phrase for a code, or "" when there is none.
 func ErrorPhrase(code int16) string { return errorPhrases[code] }
+
+// BrokerFacts are the broker's settings an explanation depends on. Known is false when
+// the console runs apart from the broker and does not know them.
+type BrokerFacts struct {
+	Known            bool
+	AutoCreateTopics bool
+}
+
+// ExplainFor is Explain, with the advice that depends on the broker's settings written
+// for this broker.
+//
+// A topic that does not exist is the one: the table's advice was to "let the
+// producer's first Metadata create it", which a broker started with
+// --auto-create-topics=false never does (A8). This broker creates a topic a Metadata
+// request names when the request allows it and auto-create is on (maybeAutoCreate in
+// internal/broker); a Produce never creates one, as in Kafka.
+func ExplainFor(code int16, f BrokerFacts) ErrorInfo {
+	info := Explain(code)
+	if code == kerr.UnknownTopicOrPartition.Code && f.Known {
+		if f.AutoCreateTopics {
+			info.Fix = "Check the name for a typo, or create the topic. auto-create is on here: a Metadata request that allows it creates the topic it names; a Produce does not."
+		} else {
+			info.Fix = "Check the name for a typo, or create the topic: auto-create is off on this broker, so nothing creates it on its own."
+		}
+	}
+	return info
+}

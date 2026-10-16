@@ -48,7 +48,10 @@ func (m *cgMember) heartbeat(t *testing.T, ctx context.Context, subscribe []stri
 	if subscribe != nil {
 		r.SubscribedTopicNames = subscribe
 	}
-	if reportOwned {
+	switch {
+	case m.epoch == 0:
+		r.Topics = []kmsg.ConsumerGroupHeartbeatRequestTopic{} // a join owns nothing, and says so.
+	case reportOwned:
 		r.Topics = []kmsg.ConsumerGroupHeartbeatRequestTopic{}
 		for id, ps := range m.held {
 			if len(ps) == 0 {
@@ -109,6 +112,7 @@ func TestGroupKIP848_BrokerMintsAMemberIDWhenNoneIsGiven(t *testing.T) {
 		r.SetVersion(version)
 		r.Group, r.RebalanceTimeoutMillis = "mint", 60_000
 		r.SubscribedTopicNames = []string{"t"}
+		r.Topics = []kmsg.ConsumerGroupHeartbeatRequestTopic{} // a join owns nothing.
 		var resp kmsg.ConsumerGroupHeartbeatResponse
 		if !c.do(r, &resp) {
 			t.Fatal("connection closed")
@@ -134,7 +138,7 @@ func TestGroupKIP848_BrokerMintsAMemberIDWhenNoneIsGiven(t *testing.T) {
 // (still empty) handed B partitions A believed it owned. Playing both members by
 // hand, no partition may ever be in both hands.
 func TestGroupKIP848_NoPartitionIsHeldByTwoMembers(t *testing.T) {
-	addr := startBroker(t, 4)
+	addr := startBrokerAssigningAtOnce(t, 4) // of reconciliation, not of when targets are computed.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	admin := newClient(t, addr)
@@ -246,8 +250,10 @@ func TestGroupCoordinators_ShareNoGroupID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.ErrorCode != kerr.InconsistentGroupProtocol.Code {
-		t.Errorf("classic join into a live KIP-848 group: code %d, want INCONSISTENT_GROUP_PROTOCOL (%d)", resp.ErrorCode, kerr.InconsistentGroupProtocol.Code)
+	// Its subscription is not one (joinRequest's metadata): Kafka answers that
+	// UNKNOWN_SERVER_ERROR and seats nobody (recorded: unreadable-subscription).
+	if resp.ErrorCode != kerr.UnknownServerError.Code {
+		t.Errorf("classic join into a live KIP-848 group: code %d, want UNKNOWN_SERVER_ERROR (%d)", resp.ErrorCode, kerr.UnknownServerError.Code)
 	}
 
 	// Neither id is listed twice.

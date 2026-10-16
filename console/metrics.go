@@ -10,7 +10,6 @@ package console
 // broker is.
 
 import (
-	"fmt"
 	"html/template"
 	"math"
 	"strconv"
@@ -64,6 +63,8 @@ type metricRow struct {
 	Last  string
 	N     int
 	Spark template.HTML
+	// Tone is the value's colour, for an error or retry rate: ok at zero, warn above.
+	Tone string
 }
 
 // metricPriority is what to put first, most useful first: errors and retries, how long
@@ -128,38 +129,4 @@ func formatMetric(v float64, unit string) string {
 		s += " " + unit
 	}
 	return s
-}
-
-const (
-	sparkW, sparkH = 120, 24
-	sparkPoints    = 60
-)
-
-// sparkline draws a series as a small inline SVG: its last sparkPoints samples scaled to
-// fit, so the shape is what shows. Nothing to draw (fewer than two samples) is a dot's
-// worth of nothing, not an empty chart.
-func sparkline(samples []MetricSample) template.HTML {
-	if len(samples) < 2 {
-		return ""
-	}
-	if len(samples) > sparkPoints {
-		samples = samples[len(samples)-sparkPoints:]
-	}
-	lo, hi := math.Inf(1), math.Inf(-1)
-	for _, s := range samples {
-		lo, hi = math.Min(lo, s.V), math.Max(hi, s.V)
-	}
-	var pts strings.Builder
-	for i, s := range samples {
-		x := float64(i) * float64(sparkW-2) / float64(len(samples)-1)
-		y := float64(sparkH) / 2
-		if hi > lo {
-			y = 2 + (hi-s.V)/(hi-lo)*float64(sparkH-4)
-		}
-		fmt.Fprintf(&pts, "%.1f,%.1f ", x+1, y)
-	}
-	return template.HTML(fmt.Sprintf(
-		`<svg class="spark" viewBox="0 0 %d %d" width="%d" height="%d" role="img" aria-label="the last %d samples, from %s to %s"><polyline points="%s"/></svg>`,
-		sparkW, sparkH, sparkW, sparkH, len(samples), template.HTMLEscapeString(formatMetric(samples[0].V, "")), template.HTMLEscapeString(formatMetric(samples[len(samples)-1].V, "")),
-		strings.TrimSpace(pts.String())))
 }

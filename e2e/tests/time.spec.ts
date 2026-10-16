@@ -52,7 +52,7 @@ test.describe('a browser behind UTC', () => {
 
 test('the request table and the group timeline use the same zone', async ({ page }) => {
   await page.goto('traffic');
-  const traffic = page.locator('#traffic-table tbody tr').first().locator('time.when');
+  const traffic = page.locator('#traffic-table .tf-rows > .r[data-row]').first().locator('time.when').first();
   await expect(traffic).toHaveAttribute('title', /\(UTC[+-]\d\d:\d\d\) · \d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3} UTC$/);
   const zone = (await traffic.getAttribute('title'))!.match(/\(UTC[+-]\d\d:\d\d\)/)![0];
   await page.goto('groups/g-timeline?tab=timeline');

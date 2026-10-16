@@ -168,6 +168,34 @@ what moved from the text below:
 - Q1 stays a design choice, not a Kafka claim; Q2, Q5 and the new Q9 are recorded
   (`conformance/claims/bad-days.md`).
 
+**A durability review after stage 1 reopened BAD-1, 3, 4, 13 and 27, and they are
+closed again** (F1 to F9 of that review). What is true now:
+
+- **BAD-1 across a restart.** Nothing read back at open counts as on disk until this
+  process has flushed it: an unclean stop (no `data/clean-shutdown`) leaves every
+  partition's active segment and directory dirty, so a duplicate retry after a kill -9
+  is fsynced before it is acknowledged; a roll seals with an fsync whatever wrote the
+  segment; a data directory from before has every segment of every partition checked
+  and flushed once. The BAD-1 tests count fsyncs at the file seam
+  (`internal/storage/log/fs.go`), not `SyncPartition` calls.
+- **Transactions.** EndTxn is answered and recorded Complete only with every marker
+  fsynced, on the first try, a retry and recovery; the opposite decision is answered as
+  Kafka answers it (recorded) and never carried out; every coordinator write stores a
+  copy before memory takes it (BAD-27's shape, on every path).
+- **BAD-4 per API, recorded.** Each write API on a full volume is recorded against
+  Kafka 4.3.1 (`full-disk-*`) and replayed against doze with the fault seam
+  (`TestReplayFullDisk`, `-tags faultinject`): OffsetCommit and the transaction APIs
+  are `NOT_COORDINATOR`, Produce `KAFKA_STORAGE_ERROR` with -1 offsets and no message;
+  each fault site has a test. DeleteGroups and OffsetDelete still answer
+  `KAFKA_STORAGE_ERROR` where Kafka answers `NOT_COORDINATOR` (their file belongs to
+  the groups work; written down in limitations).
+- **BAD-13.** The power-cut model cuts every file and every name, and
+  `TestPowerCutKeepsEveryAcksAllRecord` checks every acknowledged record, transaction,
+  offset, topic and log start over several topics with a restart in the middle; a
+  sweep fails and cuts after each file operation of a workload.
+- The cleaner's swap leaves a readable log at every failure point; a payload is
+  appended whole or not at all; directory fsync errors are errors.
+
 | ID | Sev | Finding | Where | Ev. | Src | Test to write first |
 |---|---|---|---|---|---|---|
 | BAD-1 | P0 | A retry of an idempotent `acks=all` batch that the log already holds (`seqDuplicate`) is acknowledged **without an fsync**. `appendIdempotent` returns `wrote=false` for a duplicate, so the partition is never put in `written`, and only `written` partitions are synced (`produce.go:75-79`, `:110-113`, `:282`). Sequence: the first send is appended, the fsync fails or the connection drops before the sync, the producer retries, the duplicate is answered with the original offset and `ErrorCode 0` while the bytes are still in the page cache. Acknowledged and not durable. | `internal/broker/produce.go:75-79,110,262-290` | read | code | Broker internal test `TestDuplicateRetryAtAcksAllIsSyncedBeforeTheAck`: idempotent batch at `acks=all` with `BeforeSync` failing (gets `KAFKA_STORAGE_ERROR`); `BeforeSync` healed; resend the same sequence; assert `SyncOps` rose by 1 and the reply is `0`. Then revert the fix and watch it fail. |

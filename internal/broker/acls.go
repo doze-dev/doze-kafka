@@ -43,19 +43,33 @@ const (
 // unknown), given how many values it has.
 func known(v int8, max int8) bool { return v >= 1 && v <= max }
 
-// validateFilter says why a filter cannot be used, or "" if it can.
+// unknownCode reports whether any of the codes is 0, UNKNOWN in each of the four
+// enumerations. Kafka refuses such a request while reading it and closes the
+// connection, for every ACL API (claim: api V5).
+func unknownCode(codes ...int8) bool {
+	for _, c := range codes {
+		if c == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// errUnknownACLCode is what a handler returns for a request unknownCode refuses.
+var errUnknownACLCode = &protocol.CloseError{Reason: "an ACL request names the UNKNOWN (0) resource type, pattern type, operation or permission"}
+
+// validate says why a filter matches nothing Kafka can name, in Kafka's words, or
+// "" if it can be used: a resource type or pattern type that is no code makes
+// the pattern filter unknown, an operation or permission the entry filter
+// (claim: api V5).
 //
 //fuzz:parser class=acl-filters FuzzACLFilterMatches
 func (f aclFilter) validate() string {
 	switch {
-	case !known(f.resourceType, 7):
-		return "the resource type is not one this broker knows"
-	case !known(f.patternType, 4):
-		return "the resource pattern type is not one this broker knows"
-	case !known(f.operation, 14):
-		return "the operation is not one this broker knows"
-	case !known(f.permission, 3):
-		return "the permission type is not one this broker knows"
+	case !known(f.resourceType, 7) || !known(f.patternType, 4):
+		return "Unknown patternFilter."
+	case !known(f.operation, 14) || !known(f.permission, 3):
+		return "Unknown entryFilter."
 	}
 	return ""
 }
@@ -97,33 +111,48 @@ func (f aclFilter) matches(a meta.ACL) bool {
 		(f.permission == aclAny || f.permission == a.Permission)
 }
 
-// validateCreation says why an entry cannot be stored, or "" if it can: a stored
-// entry is concrete (no "any", no "match"), and its principal says what kind it is.
+// validateCreation says why an entry cannot be stored, or "" if it can, and the
+// code to answer with. A code that is no value of its enumeration is
+// INVALID_REQUEST in Kafka's words; ANY, or the MATCH pattern, is a value but
+// not one an entry can have, and Kafka answers UNKNOWN_SERVER_ERROR with no
+// message (claim: api V5). The rest are this broker's own checks.
 //
 //fuzz:parser FuzzACLFilterMatches
-func validateCreation(a meta.ACL) string {
+func validateCreation(a meta.ACL) (int16, string) {
+	invalid := func(what string) (int16, string) {
+		return kerr.InvalidRequest.Code, "Invalid " + what + " UNKNOWN"
+	}
 	switch {
-	case !known(a.ResourceType, 7) || a.ResourceType == aclAny:
-		return "Invalid resource type"
-	case a.PatternType != aclLiteral && a.PatternType != aclPrefix:
-		return "Invalid resource pattern type: an entry is literal or prefixed"
-	case !known(a.Operation, 14) || a.Operation == aclAny:
-		return "Invalid operation"
-	case a.Permission != 2 && a.Permission != 3:
-		return "Invalid permission type: an entry allows or denies"
+	case !known(a.ResourceType, 7):
+		return invalid("resourceType")
+	case !known(a.PatternType, 4):
+		return invalid("patternType")
+	case !known(a.Operation, 14):
+		return invalid("operation")
+	case !known(a.Permission, 3):
+		return invalid("permissionType")
+	case a.ResourceType == aclAny || a.PatternType == aclAny || a.PatternType == aclMatch ||
+		a.Operation == aclAny || a.Permission == aclAny:
+		return kerr.UnknownServerError.Code, ""
+	}
+	msg := ""
+	switch {
 	case strings.ContainsRune(a.Name+a.Principal+a.Host, 0):
 		// The store identifies an entry by its fields joined with NUL.
-		return "Invalid entry: a NUL byte in the name, principal or host"
+		msg = "Invalid entry: a NUL byte in the name, principal or host"
 	case a.Name == "":
-		return "Invalid resource name: it is empty"
+		msg = "Invalid resource name: it is empty"
 	case !strings.Contains(a.Principal, ":") || strings.HasPrefix(a.Principal, ":"):
-		return "Invalid principal: it is written Type:name, such as User:alice"
+		msg = "Invalid principal: it is written Type:name, such as User:alice"
 	case a.Host == "":
-		return "Invalid host: it is empty (use * for any)"
+		msg = "Invalid host: it is empty (use * for any)"
 	case a.ResourceType == 4 && a.Name != clusterResourceName:
-		return "The only valid name for the CLUSTER resource is " + clusterResourceName
+		msg = "The only valid name for the CLUSTER resource is " + clusterResourceName
 	}
-	return ""
+	if msg == "" {
+		return 0, ""
+	}
+	return kerr.InvalidRequest.Code, msg
 }
 
 // aclState serialises changes to the stored entries, so a delete's matches and its
@@ -156,6 +185,11 @@ func (b *Broker) handleCreateACLs(ctx context.Context, req *protocol.Request, cr
 	b.acls.mu.Lock()
 	defer b.acls.mu.Unlock()
 
+	for _, c := range cr.Creations {
+		if unknownCode(int8(c.ResourceType), int8(c.ResourcePatternType), int8(c.Operation), int8(c.PermissionType)) {
+			return errUnknownACLCode
+		}
+	}
 	if !b.canCluster(req.Conn, opAlter) {
 		for range cr.Creations {
 			rr := kmsg.NewCreateACLsResponseResult()
@@ -172,12 +206,17 @@ func (b *Broker) handleCreateACLs(ctx context.Context, req *protocol.Request, cr
 			Principal: c.Principal, Host: c.Host, Operation: int8(c.Operation), Permission: int8(c.PermissionType),
 		}
 		rr := kmsg.NewCreateACLsResponseResult()
-		if msg := validateCreation(a); msg != "" {
-			rr.ErrorCode = kerr.InvalidRequest.Code
-			rr.ErrorMessage = &msg
+		if code, msg := validateCreation(a); code != 0 {
+			rr.ErrorCode = code
+			if msg != "" {
+				rr.ErrorMessage = &msg
+			}
 		} else {
 			accepted = append(accepted, a)
 			valid[i] = true
+			// An empty message, not a null one, as Kafka sends with an ACL it
+			// created (claim: auth A1).
+			rr.ErrorMessage = new(string)
 		}
 		resp.Results = append(resp.Results, rr)
 	}
@@ -198,14 +237,19 @@ func filterFrom(rt kmsg.ACLResourceType, name *string, pt kmsg.ACLResourcePatter
 }
 
 func (b *Broker) handleDescribeACLs(ctx context.Context, req *protocol.Request, dr *kmsg.DescribeACLsRequest, resp *kmsg.DescribeACLsResponse) error {
+	if unknownCode(int8(dr.ResourceType), int8(dr.ResourcePatternType), int8(dr.Operation), int8(dr.PermissionType)) {
+		return errUnknownACLCode
+	}
+	// An empty message, not a null one, as Kafka sends (claim: api V5).
+	resp.ErrorMessage = new(string)
 	if !b.canCluster(req.Conn, opDescribe) {
 		resp.ErrorCode = kerr.ClusterAuthorizationFailed.Code
 		return nil
 	}
 	f := filterFrom(dr.ResourceType, dr.ResourceName, dr.ResourcePatternType, dr.Principal, dr.Host, dr.Operation, dr.PermissionType)
-	if msg := f.validate(); msg != "" {
-		resp.ErrorCode = kerr.InvalidRequest.Code
-		resp.ErrorMessage = &msg
+	if f.validate() != "" {
+		// A filter with a code Kafka cannot name matches nothing: Kafka answers
+		// 0 with no entries (claim: api V5).
 		return nil
 	}
 	all, err := b.meta.ListACLs()
@@ -254,6 +298,11 @@ func (b *Broker) handleDescribeACLs(ctx context.Context, req *protocol.Request, 
 }
 
 func (b *Broker) handleDeleteACLs(ctx context.Context, req *protocol.Request, dr *kmsg.DeleteACLsRequest, resp *kmsg.DeleteACLsResponse) error {
+	for _, f := range dr.Filters {
+		if unknownCode(int8(f.ResourceType), int8(f.ResourcePatternType), int8(f.Operation), int8(f.PermissionType)) {
+			return errUnknownACLCode
+		}
+	}
 	b.acls.mu.Lock()
 	defer b.acls.mu.Unlock()
 

@@ -20,16 +20,18 @@ import (
 func TestTemplateClassesAreStyled(t *testing.T) {
 	// Classes that intentionally carry no styles: pure JS/layout hooks.
 	hookClasses := map[string]string{
-		"ago":         "relative-time hook — shell.js rewrites its text as time passes",
-		"done":        "marks a finished rebalance in the story, for the browser spec",
-		"going":       "marks a rebalance still in progress in the story, for the browser spec",
-		"worth":       "names the first list of a client's metrics, for the browser spec",
-		"rest":        "names the second list of a client's metrics, for the browser spec",
-		"rebalance":   "marks a rebalance row in the story, for the browser spec",
-		"c-er":        "the Error rate column of the clients table, which the table sizes",
-		"paused-text": "the banner's sentence, for the browser spec",
-		"tf-empty":    "the empty-state card, for the browser spec",
-		"kid":         "marks a request that came before the oldest rebalance, drawn muted by .r.kid",
+		"ago":           "relative-time hook — shell.js rewrites its text as time passes",
+		"done":          "marks a finished rebalance in the story, for the browser spec",
+		"going":         "marks a rebalance still in progress in the story, for the browser spec",
+		"worth":         "names the first list of a client's metrics, for the browser spec",
+		"rest":          "names the second list of a client's metrics, for the browser spec",
+		"rebalance":     "marks a rebalance row in the story, for the browser spec",
+		"c-er":          "the Error rate column of the clients table, which the table sizes",
+		"paused-text":   "the banner's sentence, for the browser spec",
+		"tf-empty":      "the empty-state card, for the browser spec",
+		"kid":           "marks a request that came before the oldest rebalance, drawn muted by .r.kid",
+		"tf-head":       "the Traffic page's head, for the design gate (e2e/design)",
+		"tf-hidden-act": "the button the m key presses (all of a client's metrics); the board draws none",
 	}
 
 	css := readAll(t, "static/app.css")
@@ -194,7 +196,10 @@ func TestTypeScaleIsClosed(t *testing.T) {
 // that table stated in the most local place available, and converting eighty of
 // those to classes would make the markup worse and the stylesheet longer.
 var inlineBudget = map[string]int{
-	"groups.html": 1, "inspector.html": 3, "panes.html": 1, "topics.html": 4, "traffic.html": 2,
+	"groups.html": 1, "inspector.html": 0, "panes.html": 1, "topics.html": 4,
+	// Traffic writes the boards' own inline styles where the board does (a column's tracks,
+	// a body's gap, the empty card's size), so a template reads like the board it implements.
+	"traffic.html": 3, "traffic_inspector.html": 7,
 }
 
 func TestInlineStyleBudget(t *testing.T) {

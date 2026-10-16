@@ -1,0 +1,4356 @@
+{
+  "scenario": "sasl-plain",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "fixture-topics",
+      "conn": "admin",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "for-alice"
+          },
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "for-bob"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "for-alice",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          },
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "for-bob",
+            "TopicID": "\u003ctopic-id:2\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "fixture-acls",
+      "conn": "admin",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": [
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "DESCRIBE",
+            "PermissionType": "ALLOW",
+            "Principal": "User:alice",
+            "ResourceName": "for-alice",
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "TOPIC"
+          },
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "DESCRIBE",
+            "PermissionType": "ALLOW",
+            "Principal": "User:bob",
+            "ResourceName": "for-bob",
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": ""
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": ""
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "good-handshake",
+      "conn": "good",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "good-authenticate",
+      "conn": "good",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "good-who",
+      "conn": "good",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "good-bob-handshake",
+      "conn": "good-bob",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "good-bob-authenticate",
+      "conn": "good-bob",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000bob\u0000bob-secret"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "good-bob-who",
+      "conn": "good-bob",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "authzid-same-handshake",
+      "conn": "authzid-same",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "authzid-same-authenticate",
+      "conn": "authzid-same",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "alice\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authzid-same-who",
+      "conn": "authzid-same",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "authzid-other-user-handshake",
+      "conn": "authzid-other-user",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "authzid-other-user-authenticate",
+      "conn": "authzid-other-user",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "bob\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Client requested an authorization id that is different from username",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authzid-other-user-who",
+      "conn": "authzid-other-user",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "authzid-admin-handshake",
+      "conn": "authzid-admin",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "authzid-admin-authenticate",
+      "conn": "authzid-admin",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "admin\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Client requested an authorization id that is different from username",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authzid-admin-who",
+      "conn": "authzid-admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "authzid-not-a-user-handshake",
+      "conn": "authzid-not-a-user",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "authzid-not-a-user-authenticate",
+      "conn": "authzid-not-a-user",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "mallory\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Client requested an authorization id that is different from username",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authzid-not-a-user-who",
+      "conn": "authzid-not-a-user",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "authzid-other-user-wrong-password-handshake",
+      "conn": "authzid-other-user-wrong-password",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "authzid-other-user-wrong-password-authenticate",
+      "conn": "authzid-other-user-wrong-password",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "bob\u0000alice\u0000nope"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Invalid username or password",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authzid-other-user-wrong-password-who",
+      "conn": "authzid-other-user-wrong-password",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "authzid-other-user-empty-password-handshake",
+      "conn": "authzid-other-user-empty-password",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "authzid-other-user-empty-password-authenticate",
+      "conn": "authzid-other-user-empty-password",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "bob\u0000alice\u0000"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: password not specified",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authzid-other-user-empty-password-who",
+      "conn": "authzid-other-user-empty-password",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "wrong-password-handshake",
+      "conn": "wrong-password",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "wrong-password-authenticate",
+      "conn": "wrong-password",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000nope"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Invalid username or password",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "wrong-password-who",
+      "conn": "wrong-password",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "other-users-password-handshake",
+      "conn": "other-users-password",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "other-users-password-authenticate",
+      "conn": "other-users-password",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000bob-secret"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Invalid username or password",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "other-users-password-who",
+      "conn": "other-users-password",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "password-prefix-handshake",
+      "conn": "password-prefix",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "password-prefix-authenticate",
+      "conn": "password-prefix",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secre"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Invalid username or password",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "password-prefix-who",
+      "conn": "password-prefix",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "password-longer-handshake",
+      "conn": "password-longer",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "password-longer-authenticate",
+      "conn": "password-longer",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret1"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Invalid username or password",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "password-longer-who",
+      "conn": "password-longer",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "unknown-user-handshake",
+      "conn": "unknown-user",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "unknown-user-authenticate",
+      "conn": "unknown-user",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000mallory\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Invalid username or password",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "unknown-user-who",
+      "conn": "unknown-user",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "user-in-capitals-handshake",
+      "conn": "user-in-capitals",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "user-in-capitals-authenticate",
+      "conn": "user-in-capitals",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000ALICE\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Invalid username or password",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "user-in-capitals-who",
+      "conn": "user-in-capitals",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "empty-password-handshake",
+      "conn": "empty-password",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "empty-password-authenticate",
+      "conn": "empty-password",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: password not specified",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "empty-password-who",
+      "conn": "empty-password",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "empty-user-handshake",
+      "conn": "empty-user",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "empty-user-authenticate",
+      "conn": "empty-user",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: username not specified",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "empty-user-who",
+      "conn": "empty-user",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "empty-user-and-password-handshake",
+      "conn": "empty-user-and-password",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "empty-user-and-password-authenticate",
+      "conn": "empty-user-and-password",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000\u0000"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: username not specified",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "empty-user-and-password-who",
+      "conn": "empty-user-and-password",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "no-nuls-handshake",
+      "conn": "no-nuls",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "no-nuls-authenticate",
+      "conn": "no-nuls",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "alice alice-secret"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Invalid SASL/PLAIN response: expected 3 tokens, got 1",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "no-nuls-who",
+      "conn": "no-nuls",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "two-parts-handshake",
+      "conn": "two-parts",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "two-parts-authenticate",
+      "conn": "two-parts",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "alice\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Invalid SASL/PLAIN response: expected 3 tokens, got 2",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "two-parts-who",
+      "conn": "two-parts",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "four-parts-handshake",
+      "conn": "four-parts",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "four-parts-authenticate",
+      "conn": "four-parts",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret\u0000extra"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Invalid SASL/PLAIN response: expected 3 tokens, got 4",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "four-parts-who",
+      "conn": "four-parts",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "trailing-nul-handshake",
+      "conn": "trailing-nul",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "trailing-nul-authenticate",
+      "conn": "trailing-nul",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret\u0000"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Invalid SASL/PLAIN response: expected 3 tokens, got 4",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "trailing-nul-who",
+      "conn": "trailing-nul",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "empty-token-handshake",
+      "conn": "empty-token",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "empty-token-authenticate",
+      "conn": "empty-token",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": ""
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Invalid SASL/PLAIN response: expected 3 tokens, got 1",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "empty-token-who",
+      "conn": "empty-token",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "not-utf8-handshake",
+      "conn": "not-utf8",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "not-utf8-authenticate",
+      "conn": "not-utf8",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "base64:AGFsaWNlAP/+/Q=="
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Invalid username or password",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "not-utf8-who",
+      "conn": "not-utf8",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "token-of-64k-handshake",
+      "conn": "token-of-64k",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "token-of-64k-authenticate",
+      "conn": "token-of-64k",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Invalid username or password",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "token-of-64k-who",
+      "conn": "token-of-64k",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "unknown-mechanism-handshake",
+      "conn": "unknown-mechanism",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "BOGUS"
+      },
+      "response": {
+        "ErrorCode": 33,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "unknown-mechanism-authenticate",
+      "conn": "unknown-mechanism",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "unknown-mechanism-who",
+      "conn": "unknown-mechanism",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "lowercase-mechanism-handshake",
+      "conn": "lowercase-mechanism",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "plain"
+      },
+      "response": {
+        "ErrorCode": 33,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "lowercase-mechanism-authenticate",
+      "conn": "lowercase-mechanism",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "lowercase-mechanism-who",
+      "conn": "lowercase-mechanism",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "empty-mechanism-handshake",
+      "conn": "empty-mechanism",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": ""
+      },
+      "response": {
+        "ErrorCode": 33,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "empty-mechanism-authenticate",
+      "conn": "empty-mechanism",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "empty-mechanism-who",
+      "conn": "empty-mechanism",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "scram-not-enabled-handshake",
+      "conn": "scram-not-enabled",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "SCRAM-SHA-256"
+      },
+      "response": {
+        "ErrorCode": 33,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "scram-not-enabled-authenticate",
+      "conn": "scram-not-enabled",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "scram-not-enabled-who",
+      "conn": "scram-not-enabled",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "refused-then-right-handshake",
+      "conn": "refused-then-right",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "BOGUS"
+      },
+      "response": {
+        "ErrorCode": 33,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "refused-then-right-handshake-plain",
+      "conn": "refused-then-right",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "refused-then-right-authenticate",
+      "conn": "refused-then-right",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "refused-then-right-who",
+      "conn": "refused-then-right",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "no-handshake-authenticate",
+      "conn": "no-handshake",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "no-handshake-who",
+      "conn": "no-handshake",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "no-login-who",
+      "conn": "no-login",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "request-before-token-handshake",
+      "conn": "request-before-token",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "request-before-token-who",
+      "conn": "request-before-token",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": null,
+        "ClusterID": null,
+        "ControllerID": -1,
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 34,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 34,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "request-before-token-who-again",
+      "conn": "request-before-token",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "request-before-token-authenticate",
+      "conn": "request-before-token",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "request-before-token-who-at-the-end",
+      "conn": "request-before-token",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "versions-first-versions",
+      "conn": "versions-first",
+      "api": "ApiVersions",
+      "version": 0,
+      "request": {
+        "ClientSoftwareName": "",
+        "ClientSoftwareVersion": "",
+        "ClusterID": null,
+        "NodeID": -1
+      },
+      "response": {
+        "ApiKeys": [
+          {
+            "ApiKey": 0,
+            "MaxVersion": 13,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 1,
+            "MaxVersion": 18,
+            "MinVersion": 4
+          },
+          {
+            "ApiKey": 2,
+            "MaxVersion": 11,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 3,
+            "MaxVersion": 13,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 8,
+            "MaxVersion": 10,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 9,
+            "MaxVersion": 10,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 10,
+            "MaxVersion": 6,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 11,
+            "MaxVersion": 9,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 12,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 13,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 14,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 15,
+            "MaxVersion": 6,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 16,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 17,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 18,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 19,
+            "MaxVersion": 7,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 20,
+            "MaxVersion": 6,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 21,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 22,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 23,
+            "MaxVersion": 4,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 24,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 25,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 26,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 27,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 28,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 29,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 30,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 31,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 32,
+            "MaxVersion": 4,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 33,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 34,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 35,
+            "MaxVersion": 5,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 36,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 37,
+            "MaxVersion": 3,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 38,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 39,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 40,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 41,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 42,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 43,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 44,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 45,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 46,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 47,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 48,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 49,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 50,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 51,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 55,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 57,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 60,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 61,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 64,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 65,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 66,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 68,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 69,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 74,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 75,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 76,
+            "MaxVersion": 1,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 77,
+            "MaxVersion": 1,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 78,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 79,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 80,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 81,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 83,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 84,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 85,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 86,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 87,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 88,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 89,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 90,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 91,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 92,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          }
+        ],
+        "ErrorCode": 0,
+        "FinalizedFeatures": null,
+        "FinalizedFeaturesEpoch": -1,
+        "SupportedFeatures": null,
+        "ThrottleMillis": 0,
+        "ZkMigrationReady": false
+      }
+    },
+    {
+      "label": "versions-first-handshake",
+      "conn": "versions-first",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "versions-first-authenticate",
+      "conn": "versions-first",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "versions-first-who",
+      "conn": "versions-first",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "versions-first-versions-after-login",
+      "conn": "versions-first",
+      "api": "ApiVersions",
+      "version": 0,
+      "request": {
+        "ClientSoftwareName": "",
+        "ClientSoftwareVersion": "",
+        "ClusterID": null,
+        "NodeID": -1
+      },
+      "response": {
+        "ApiKeys": [
+          {
+            "ApiKey": 0,
+            "MaxVersion": 13,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 1,
+            "MaxVersion": 18,
+            "MinVersion": 4
+          },
+          {
+            "ApiKey": 2,
+            "MaxVersion": 11,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 3,
+            "MaxVersion": 13,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 8,
+            "MaxVersion": 10,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 9,
+            "MaxVersion": 10,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 10,
+            "MaxVersion": 6,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 11,
+            "MaxVersion": 9,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 12,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 13,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 14,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 15,
+            "MaxVersion": 6,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 16,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 17,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 18,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 19,
+            "MaxVersion": 7,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 20,
+            "MaxVersion": 6,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 21,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 22,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 23,
+            "MaxVersion": 4,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 24,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 25,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 26,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 27,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 28,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 29,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 30,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 31,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 32,
+            "MaxVersion": 4,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 33,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 34,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 35,
+            "MaxVersion": 5,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 36,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 37,
+            "MaxVersion": 3,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 38,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 39,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 40,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 41,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 42,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 43,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 44,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 45,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 46,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 47,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 48,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 49,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 50,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 51,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 55,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 57,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 60,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 61,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 64,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 65,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 66,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 68,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 69,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 74,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 75,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 76,
+            "MaxVersion": 1,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 77,
+            "MaxVersion": 1,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 78,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 79,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 80,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 81,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 83,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 84,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 85,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 86,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 87,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 88,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 89,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 90,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 91,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 92,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          }
+        ],
+        "ErrorCode": 0,
+        "FinalizedFeatures": null,
+        "FinalizedFeaturesEpoch": -1,
+        "SupportedFeatures": null,
+        "ThrottleMillis": 0,
+        "ZkMigrationReady": false
+      }
+    },
+    {
+      "label": "versions-first-who-at-the-end",
+      "conn": "versions-first",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "versions-before-token-handshake",
+      "conn": "versions-before-token",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "versions-before-token-versions",
+      "conn": "versions-before-token",
+      "api": "ApiVersions",
+      "version": 0,
+      "request": {
+        "ClientSoftwareName": "",
+        "ClientSoftwareVersion": "",
+        "ClusterID": null,
+        "NodeID": -1
+      },
+      "response": {
+        "ApiKeys": null,
+        "ErrorCode": 34,
+        "FinalizedFeatures": null,
+        "FinalizedFeaturesEpoch": -1,
+        "SupportedFeatures": null,
+        "ThrottleMillis": 0,
+        "ZkMigrationReady": false
+      }
+    },
+    {
+      "label": "versions-before-token-authenticate",
+      "conn": "versions-before-token",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "versions-before-token-who",
+      "conn": "versions-before-token",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "versions-twice-first",
+      "conn": "versions-twice",
+      "api": "ApiVersions",
+      "version": 0,
+      "request": {
+        "ClientSoftwareName": "",
+        "ClientSoftwareVersion": "",
+        "ClusterID": null,
+        "NodeID": -1
+      },
+      "response": {
+        "ApiKeys": [
+          {
+            "ApiKey": 0,
+            "MaxVersion": 13,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 1,
+            "MaxVersion": 18,
+            "MinVersion": 4
+          },
+          {
+            "ApiKey": 2,
+            "MaxVersion": 11,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 3,
+            "MaxVersion": 13,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 8,
+            "MaxVersion": 10,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 9,
+            "MaxVersion": 10,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 10,
+            "MaxVersion": 6,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 11,
+            "MaxVersion": 9,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 12,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 13,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 14,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 15,
+            "MaxVersion": 6,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 16,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 17,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 18,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 19,
+            "MaxVersion": 7,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 20,
+            "MaxVersion": 6,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 21,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 22,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 23,
+            "MaxVersion": 4,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 24,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 25,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 26,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 27,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 28,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 29,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 30,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 31,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 32,
+            "MaxVersion": 4,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 33,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 34,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 35,
+            "MaxVersion": 5,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 36,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 37,
+            "MaxVersion": 3,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 38,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 39,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 40,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 41,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 42,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 43,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 44,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 45,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 46,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 47,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 48,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 49,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 50,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 51,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 55,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 57,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 60,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 61,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 64,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 65,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 66,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 68,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 69,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 74,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 75,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 76,
+            "MaxVersion": 1,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 77,
+            "MaxVersion": 1,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 78,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 79,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 80,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 81,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 83,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 84,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 85,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 86,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 87,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 88,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 89,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 90,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 91,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 92,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          }
+        ],
+        "ErrorCode": 0,
+        "FinalizedFeatures": null,
+        "FinalizedFeaturesEpoch": -1,
+        "SupportedFeatures": null,
+        "ThrottleMillis": 0,
+        "ZkMigrationReady": false
+      }
+    },
+    {
+      "label": "versions-twice-second",
+      "conn": "versions-twice",
+      "api": "ApiVersions",
+      "version": 0,
+      "request": {
+        "ClientSoftwareName": "",
+        "ClientSoftwareVersion": "",
+        "ClusterID": null,
+        "NodeID": -1
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "versions-twice-handshake",
+      "conn": "versions-twice",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "versions-twice-authenticate",
+      "conn": "versions-twice",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "versions-twice-who",
+      "conn": "versions-twice",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "handshake-twice-first",
+      "conn": "handshake-twice",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "handshake-twice-second",
+      "conn": "handshake-twice",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 34,
+        "SupportedMechanisms": null
+      }
+    },
+    {
+      "label": "handshake-twice-authenticate",
+      "conn": "handshake-twice",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "handshake-twice-who",
+      "conn": "handshake-twice",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "twice-handshake",
+      "conn": "twice",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "twice-authenticate",
+      "conn": "twice",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "twice-who",
+      "conn": "twice",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "twice-authenticate-again",
+      "conn": "twice",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 34,
+        "ErrorMessage": "SaslAuthenticate request received after successful authentication",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "twice-who-after-second-token",
+      "conn": "twice",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "twice-handshake-again",
+      "conn": "twice",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 34,
+        "SupportedMechanisms": null
+      }
+    },
+    {
+      "label": "twice-authenticate-as-bob",
+      "conn": "twice",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000bob\u0000bob-secret"
+      },
+      "response": {
+        "ErrorCode": 34,
+        "ErrorMessage": "SaslAuthenticate request received after successful authentication",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "twice-who-after-bob",
+      "conn": "twice",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "twice-authenticate-wrong-password",
+      "conn": "twice",
+      "api": "SASLAuthenticate",
+      "version": 2,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000nope"
+      },
+      "response": {
+        "ErrorCode": 34,
+        "ErrorMessage": "SaslAuthenticate request received after successful authentication",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "twice-who-after-wrong-password",
+      "conn": "twice",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "twice-handshake-unknown-mechanism",
+      "conn": "twice",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "BOGUS"
+      },
+      "response": {
+        "ErrorCode": 34,
+        "SupportedMechanisms": null
+      }
+    },
+    {
+      "label": "twice-who-at-the-end",
+      "conn": "twice",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "authenticate-v0-handshake",
+      "conn": "authenticate-v0",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "authenticate-v0-good",
+      "conn": "authenticate-v0",
+      "api": "SASLAuthenticate",
+      "version": 0,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authenticate-v0-who",
+      "conn": "authenticate-v0",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "authenticate-v0-again",
+      "conn": "authenticate-v0",
+      "api": "SASLAuthenticate",
+      "version": 0,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 34,
+        "ErrorMessage": "SaslAuthenticate request received after successful authentication",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authenticate-v0-wrong-handshake",
+      "conn": "authenticate-v0-wrong",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "authenticate-v0-wrong-authenticate",
+      "conn": "authenticate-v0-wrong",
+      "api": "SASLAuthenticate",
+      "version": 0,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000nope"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Invalid username or password",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authenticate-v0-wrong-who",
+      "conn": "authenticate-v0-wrong",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "authenticate-v1-handshake",
+      "conn": "authenticate-v1",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "authenticate-v1-good",
+      "conn": "authenticate-v1",
+      "api": "SASLAuthenticate",
+      "version": 1,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authenticate-v1-who",
+      "conn": "authenticate-v1",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 29,
+            "IsInternal": false,
+            "Partitions": null,
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "authenticate-v1-again",
+      "conn": "authenticate-v1",
+      "api": "SASLAuthenticate",
+      "version": 1,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000alice-secret"
+      },
+      "response": {
+        "ErrorCode": 34,
+        "ErrorMessage": "SaslAuthenticate request received after successful authentication",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authenticate-v1-wrong-handshake",
+      "conn": "authenticate-v1-wrong",
+      "api": "SASLHandshake",
+      "version": 1,
+      "request": {
+        "Mechanism": "PLAIN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "SupportedMechanisms": [
+          "PLAIN"
+        ]
+      }
+    },
+    {
+      "label": "authenticate-v1-wrong-authenticate",
+      "conn": "authenticate-v1-wrong",
+      "api": "SASLAuthenticate",
+      "version": 1,
+      "request": {
+        "SASLAuthBytes": "\u0000alice\u0000nope"
+      },
+      "response": {
+        "ErrorCode": 58,
+        "ErrorMessage": "Authentication failed: Invalid username or password",
+        "SASLAuthBytes": "",
+        "SessionLifetimeMillis": 0
+      }
+    },
+    {
+      "label": "authenticate-v1-wrong-who",
+      "conn": "authenticate-v1-wrong",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": [
+          {
+            "Topic": "for-alice",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "Topic": "for-bob",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    }
+  ]
+}

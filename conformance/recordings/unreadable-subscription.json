@@ -1,0 +1,293 @@
+{
+  "scenario": "unreadable-subscription",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "us"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "us",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "find-coordinators",
+      "api": "FindCoordinator",
+      "version": 4,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": [
+          "us-g"
+        ],
+        "CoordinatorType": 0
+      },
+      "response": {
+        "Coordinators": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "us-g",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          }
+        ],
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "us-n-join",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "us-g",
+        "InstanceID": null,
+        "MemberEpoch": 0,
+        "MemberID": "",
+        "RackID": null,
+        "RebalanceTimeoutMillis": 30000,
+        "ServerAssignor": "uniform",
+        "SubscribedTopicNames": [
+          "us"
+        ],
+        "SubscribedTopicRegex": null,
+        "Topics": []
+      },
+      "response": {
+        "Assignment": {
+          "Topics": [
+            {
+              "Partitions": [
+                0
+              ],
+              "TopicID": "\u003ctopic-id:1\u003e"
+            }
+          ]
+        },
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:1\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "us-join-needs-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "us-g",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAEC",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "us-join-with-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "us-g",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAEC",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": -1,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "us-join-static",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "us-g",
+        "InstanceID": "us-i",
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAEC",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": -1,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "us-join-v3",
+      "api": "JoinGroup",
+      "version": 3,
+      "request": {
+        "Group": "us-g",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAEC",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": -1,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "",
+        "Members": null,
+        "Protocol": "",
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "us-describe",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "us-g"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "us-g",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "us",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:1\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "us"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "us",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}

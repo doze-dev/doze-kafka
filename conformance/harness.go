@@ -60,6 +60,12 @@ type Scenario struct {
 	// connection then logs in with Env.Open.
 	Users map[string]string
 	Admin string
+	// Mechanisms are the SASL mechanisms both brokers offer when Users is set, in
+	// the order Apache Kafka lists them in a SaslHandshake answer; nil is PLAIN
+	// alone. PLAIN must be among them (the recorder and the readiness probe log in
+	// with it), and with a SCRAM mechanism the recorder gives every user a SCRAM
+	// credential of the same password before the script starts (targets.go).
+	Mechanisms []string
 	// NoReplay, when it says why, makes the scenario evidence only: it is
 	// recorded against Apache Kafka and not replayed against doze-kafka.
 	NoReplay string
@@ -106,10 +112,13 @@ type Recording struct {
 type Env struct {
 	target Target
 	speed  float64 // 1 against Kafka; Scenario.Speed against doze-kafka.
-	w      *wire
-	norm   *normalizer
-	steps  []Step
-	fail   func(format string, args ...any)
+	// settles is true against the real broker only: see DoUntil.
+	settles bool
+	asked   int // how many times a step was asked again (only ever against the real broker).
+	w       *wire
+	norm    *normalizer
+	steps   []Step
+	fail    func(format string, args ...any)
 	// Named connections (Open, Use): the current one is w, cur is its name.
 	cur   string
 	conns map[string]*connSlot
@@ -128,6 +137,7 @@ func NewEnv(target Target, fail func(string, ...any)) (*Env, error) {
 		return nil, err
 	}
 	e := &Env{target: target, w: w, norm: newNormalizer(), fail: fail, speed: 1, conns: map[string]*connSlot{"": {w: w}}}
+	_, e.settles = target.(*dockerTarget)
 	return e, nil
 }
 
@@ -195,25 +205,115 @@ func (e *Env) Wait(d time.Duration) {
 	time.Sleep(time.Duration(float64(d) / e.speed))
 }
 
+// CheckOffsets is a point of the script by which the real broker's offsets check has
+// run (KafkaEnv sets its interval well below the script's waits): against doze-kafka,
+// whose replay sets the interval long (Scenario.Replay), it runs the check now and
+// returns once it has. A scenario whose answers depend on whether a check ran between
+// two requests is then decided by the script, not by when a ticker fires. It is not a
+// step, and against Kafka it does nothing.
+func (e *Env) CheckOffsets() {
+	if c, ok := e.target.(interface{ CheckOffsets() }); ok {
+		c.CheckOffsets()
+	}
+}
+
 // Quiet sends req and discards the answer, without recording a step: the keep-alive
 // traffic of a script (a member that must not be expired while the script waits).
 func (e *Env) Quiet(req kmsg.Request, version int16) {
 	e.w.roundTrip(req, version)
 }
 
+// Scrub makes literal read as placeholder in every SASL token recorded from here
+// on: for the part of a token a script computed from something the broker made up
+// (a SCRAM proof), named for what it is.
+func (e *Env) Scrub(literal, placeholder string) {
+	e.norm.scrub = append(e.norm.scrub, [2]string{literal, placeholder})
+}
+
+// ClientNonce tells the normaliser a nonce the script will open a SCRAM exchange
+// with, so that what a broker appends to it is known to be the server's half.
+func (e *Env) ClientNonce(nonce string) {
+	e.norm.clientNonces = append(e.norm.clientNonces, nonce)
+}
+
+// lastWasClosed reports whether the broker answered the last step by closing the
+// connection (Do then returns an empty response, which is not an answer of 0).
+func (e *Env) lastWasClosed() bool {
+	if len(e.steps) == 0 {
+		return false
+	}
+	m, _ := e.steps[len(e.steps)-1].Response.(map[string]any)
+	_, closed := m["(connection)"]
+	return closed
+}
+
+// Await sends req over the current connection, again and again for up to thirty
+// seconds, until done is true of the answer. It is a wait and not a step: nothing
+// is recorded, so nothing it sees can be evidence, and what is the same on every
+// run is the state the next step finds. It is how a script waits for something a
+// broker finishes after it has answered (an ACL applied, a leader elected) before
+// the step that depends on it, instead of letting that step race it.
+func (e *Env) Await(what string, req kmsg.Request, version int16, done func(kmsg.Response) bool) {
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		resp, err := e.w.roundTrip(req, version)
+		if err != nil {
+			e.fail("waiting until %s: %v", what, err)
+			return
+		}
+		if done(resp) {
+			return
+		}
+		if time.Now().After(deadline) {
+			e.fail("waited 30s until %s", what)
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
 // Steps are the recorded steps so far.
 func (e *Env) Steps() []Step { return e.steps }
 
 // Do sends req at version and records the answer under label.
+//
+// Against the real broker, an answer that carries COORDINATOR_LOAD_IN_PROGRESS,
+// COORDINATOR_NOT_AVAILABLE or NOT_COORDINATOR is asked again (see DoUntil): a
+// script that has just made the first group of a fresh cluster is not about the
+// seconds Kafka takes to create its offsets topic. Against doze-kafka nothing is
+// ever asked twice.
 func (e *Env) Do(label string, req kmsg.Request, version int16) kmsg.Response {
-	return e.DoUntil(label, req, version, nil)
+	return e.do(label, req, version, nil, false)
+}
+
+// DoFirst is Do without the asking again, against either broker: the first answer
+// is the one recorded, whatever it is. It is for a step whose answer may itself be
+// one of the three coordinator codes (a request for a group that has no
+// coordinator, a transactional commit the coordinator will not take), which Do
+// would ask a hundred times and then record anyway. The script waits for what it
+// needs first, with Await.
+func (e *Env) DoFirst(label string, req kmsg.Request, version int16) kmsg.Response {
+	return e.do(label, req, version, nil, true)
 }
 
 // DoUntil is Do for something Kafka finishes after it has answered (an
 // auto-created topic exists a moment after the Metadata request that asked for
-// it): the request is sent again, up to ten seconds, until done is true of the
-// response, and only that last answer is recorded.
+// it): against the real broker the request is sent again, for up to thirty
+// seconds, until done is true of the response, and only that last answer is
+// recorded.
+//
+// Against doze-kafka the request is sent once. A replay is the comparison of
+// doze-kafka's answer with the recorded one, and an answer that was asked for
+// again until it came out right would compare equal whatever came before it: a
+// broker that answered NOT_COORDINATOR where Kafka's first answer was 0 would
+// pass. So the retries are the recorder's alone, they stand for "Kafka had not
+// finished", and doze-kafka, which has nothing to finish, is held to its first
+// answer (TestAReplayNeverAsksTwice).
 func (e *Env) DoUntil(label string, req kmsg.Request, version int16, done func(kmsg.Response) bool) kmsg.Response {
+	return e.do(label, req, version, done, false)
+}
+
+func (e *Env) do(label string, req kmsg.Request, version int16, done func(kmsg.Response) bool, once bool) kmsg.Response {
 	e.fail2(label)
 	nreq, err := e.norm.normalize(req)
 	if err != nil {
@@ -247,9 +347,10 @@ func (e *Env) DoUntil(label string, req kmsg.Request, version int16, done func(k
 			onlyRequestedConfigs(nreq, nresp)
 		}
 		step.Response = nresp
-		if attempt >= 100 || !coordinatorSettling(nresp) && (done == nil || done(resp)) {
+		if once || !e.settles || attempt >= 100 || !coordinatorSettling(nresp) && (done == nil || done(resp)) {
 			break
 		}
+		e.asked++
 		time.Sleep(300 * time.Millisecond)
 	}
 	e.steps = append(e.steps, step)
@@ -257,9 +358,13 @@ func (e *Env) DoUntil(label string, req kmsg.Request, version int16, done func(k
 }
 
 // sortProduceResponse puts a Produce response's topics and partitions in name
-// and number order. Apache Kafka answers them in the order of a hash map, not
-// the order of the request (recorded: produce-mixed-partition-errors), which is
-// nothing a client can rely on, so the order is not what is compared.
+// and number order before it is recorded. Apache Kafka lists them in the order of
+// a hash map, which is not the request's and is not the same from one run of the
+// broker to the next: recorded as given, produce-mixed-partition-errors came out
+// in a different order on a second recording of the same script (found by task
+// conformance:stable). An order that changes between runs cannot be evidence of
+// any order, and no client can rely on one, so the order is not recorded and not
+// compared; what is compared is each partition's answer.
 func sortProduceResponse(r kmsg.Response) {
 	p, ok := r.(*kmsg.ProduceResponse)
 	if !ok {
@@ -603,6 +708,13 @@ type Pending struct {
 
 // Start sends req over the current connection and returns at once.
 func (e *Env) Start(label string, req kmsg.Request, version int16) *Pending {
+	return e.StartHeld(label, req, version, 0)
+}
+
+// StartHeld is Start for a request the broker is meant to hold for about hold (a
+// JoinGroup parked for a rebalance longer than the minute any answer is otherwise
+// given): its answer is waited for that long and a minute more.
+func (e *Env) StartHeld(label string, req kmsg.Request, version int16, hold time.Duration) *Pending {
 	e.fail2(label)
 	nreq, err := e.norm.normalize(req)
 	if err != nil {
@@ -611,7 +723,7 @@ func (e *Env) Start(label string, req kmsg.Request, version int16) *Pending {
 	p := &Pending{label: label, conn: e.cur, req: req, version: version, nreq: nreq, done: make(chan struct{})}
 	w := e.w
 	go func() {
-		p.resp, p.err = w.roundTrip(req, version)
+		p.resp, p.err = w.roundTripWithin(req, version, hold+60*time.Second)
 		close(p.done)
 	}()
 	return p

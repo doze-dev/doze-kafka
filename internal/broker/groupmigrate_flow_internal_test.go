@@ -101,7 +101,7 @@ func (r *expiryRig) holding(t *testing.T, group, topic string, session, rebalanc
 	sync := kmsg.NewPtrSyncGroupRequest()
 	sync.Group, sync.MemberID, sync.Generation = group, res.memberID, res.generation
 	a := kmsg.NewSyncGroupRequestGroupAssignment()
-	a.MemberID, a.MemberAssignment = res.memberID, encodeClassicAssignment(map[string][]int32{topic: partitions})
+	a.MemberID, a.MemberAssignment = res.memberID, encodeClassicAssignment(0, map[string][]int32{topic: partitions})
 	sync.GroupAssignment = append(sync.GroupAssignment, a)
 	if sr, err := r.b.groups.sync(ctx, sync); err != nil || sr.errorCode != 0 {
 		t.Fatalf("sync: %v %+v", err, sr)
@@ -146,14 +146,20 @@ func TestMixedGroupRefusals(t *testing.T) {
 	if res := req(time.Second, "connect", "", subscriptionBytes("t")); res.errorCode != kerr.InconsistentGroupProtocol.Code {
 		t.Errorf("another protocol type: %d", res.errorCode)
 	}
-	if res := req(time.Second, "consumer", "", []byte{9}); res.errorCode != kerr.InconsistentGroupProtocol.Code {
-		t.Errorf("a subscription that is not the consumer protocol's: %d", res.errorCode)
+	// A subscription that cannot be read is found out once the member has an id, and
+	// answered as Kafka answers it, UNKNOWN_SERVER_ERROR with no member id (recorded:
+	// unreadable-subscription).
+	if res := req(time.Second, "consumer", "", []byte{9}); res.errorCode != kerr.MemberIDRequired.Code {
+		t.Errorf("a subscription that is not the consumer protocol's, first join: %d", res.errorCode)
+	} else if res := req(time.Second, "consumer", res.memberID, []byte{9}); res.errorCode != kerr.UnknownServerError.Code || res.memberID != "" {
+		t.Errorf("a subscription that is not the consumer protocol's: %d, member id %q", res.errorCode, res.memberID)
 	}
 	if res := req(time.Second, "consumer", "n", subscriptionBytes("t")); res.errorCode != kerr.UnknownMemberID.Code {
 		t.Errorf("a consumer-protocol member's id: %d", res.errorCode)
 	}
-	if res := req(time.Second, "consumer", "never-issued", subscriptionBytes("t")); res.errorCode != kerr.UnknownMemberID.Code {
-		t.Errorf("an id nobody was given: %d", res.errorCode)
+	// An id nobody was given is seated as it comes (recorded: cm-classic-join-unknown-member-id).
+	if res := req(time.Second, "consumer", "never-issued", subscriptionBytes("t")); res.errorCode != errNone || res.memberID != "never-issued" {
+		t.Errorf("an id nobody was given: %+v", res)
 	}
 	first := req(time.Second, "consumer", "", subscriptionBytes("t"))
 	if first.errorCode != kerr.MemberIDRequired.Code || first.memberID == "" {

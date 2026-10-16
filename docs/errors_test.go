@@ -37,6 +37,7 @@ import (
 // library packages that answer for it (net/http, crypto/tls).
 
 var (
+	tomlLine   = regexp.MustCompile(`^[a-z][a-z0-9-]* = `)
 	upperSnake = regexp.MustCompile(`^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$`)
 	// Only the forms that say what the program does: "print with --x" is an
 	// instruction to the reader, not a claim about output.
@@ -277,6 +278,9 @@ func claims(name, md string) []claim {
 // isCommand reports whether a span is a command for the reader to type (`config
 // print --show-secrets`), not something the program says.
 func isCommand(s string) bool {
+	if tomlLine.MatchString(s) {
+		return true // a line of the config file the reader writes
+	}
 	switch strings.Fields(s)[0] {
 	case "doze-kafka", "./doze-kafka", "config", "env", "doctor", "dns-setup", "kcat", "go", "curl", "docker":
 		return true

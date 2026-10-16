@@ -17,7 +17,9 @@ export const REGISTRY_PORT = PORT + 2;
 // itself, with SASL and TLS as well, and says where it is in the environment.
 const EXTERNAL = process.env.E2E_EXTERNAL === '1';
 export const IDENTITY = !!process.env.E2E_IDENTITY;
-export const PREFIX = IDENTITY ? '/ops/kafka-ui' : '/_console';
+// The console's prefix: where the second identity mounted the console it started
+// (read from its address), else the identity's, else the default.
+export const PREFIX = EXTERNAL && process.env.E2E_CONSOLE_URL ? new URL(process.env.E2E_CONSOLE_URL).pathname.replace(/\/$/, '') : IDENTITY ? '/ops/kafka-ui' : '/_console';
 export const KAFKA_ADDR = EXTERNAL ? process.env.E2E_KAFKA_ADDR! : `127.0.0.1:${PORT}`;
 export const REGISTRY_URL = EXTERNAL ? process.env.E2E_REGISTRY_URL! : `http://127.0.0.1:${REGISTRY_PORT}`;
 export const BASE_URL = EXTERNAL ? process.env.E2E_CONSOLE_URL! : `http://127.0.0.1:${CONSOLE_PORT}${PREFIX}/`;

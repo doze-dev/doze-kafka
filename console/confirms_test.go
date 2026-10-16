@@ -69,15 +69,19 @@ func TestEveryConfirmIsTrueOfWhatTheActionDoes(t *testing.T) {
 		commitFor(t, addr, "doomed-a", "doomed", map[int32]int64{0: 1})
 		commitFor(t, addr, "doomed-b", "doomed", map[int32]int64{1: 2})
 		say := confirmOn(t, req(t, c, "GET", "/_console/topics/doomed", nil).Body.String(), "/_console/topics/doomed/delete")
-		if n := numberBefore(t, say, "partitions"); n != 3 {
+		if n := numberBefore(t, say, "partition logs"); n != 3 {
 			t.Errorf("says %d partitions: %s", n, say)
 		}
 		if n := numberBefore(t, say, "records"); n != 12 {
 			t.Errorf("says %d records: %s", n, say)
 		}
-		groups := numberBefore(t, say, "groups")
-		if groups != 2 || !strings.Contains(say, "doomed-a") || !strings.Contains(say, "doomed-b") {
-			t.Errorf("says %d groups: %s", groups, say)
+		groups := 0
+		for _, g := range []string{"doomed-a", "doomed-b"} {
+			if strings.Contains(say, "offsets of doomed-a and doomed-b for this topic are deleted") {
+				groups++
+			} else {
+				t.Errorf("does not say %s loses its offsets: %s", g, say)
+			}
 		}
 		// What it says happens: the topic is gone, and the two groups lose their offsets on it.
 		held := 0
@@ -126,8 +130,12 @@ func TestEveryConfirmIsTrueOfWhatTheActionDoes(t *testing.T) {
 		if !strings.Contains(say, "purge-behind") || strings.Contains(say, "purge-caught-up") {
 			t.Errorf("names the wrong groups as behind: %s", say)
 		}
-		unread := numberBefore(t, say[strings.Index(say, "will be behind"):], "records")
-		behind := numberBefore(t, say, "group is")
+		lagM := regexp.MustCompile(`purge-behind \(lag (\d+)\)`).FindStringSubmatch(say)
+		if lagM == nil {
+			t.Fatalf("does not say purge-behind's lag: %s", say)
+		}
+		unread, _ := strconv.Atoi(lagM[1])
+		behind := strings.Count(say, "(lag ")
 		// Measured before: what the behind group has not read; after: where the log now starts.
 		before := offsetsOf(t, c, "purge-behind")["purgeme/0"]
 		if rec := req(t, c, "POST", "/_console/topics/purgeme/purge", nil); rec.Code != 303 {
@@ -304,13 +312,14 @@ func TestEveryDestructiveRouteHasAConfirm(t *testing.T) {
 	inTable := map[string]bool{}
 	for _, s := range confirmTable {
 		inTable[s.Path] = true
-		if s.Title == "" || s.Verb == "" || s.Sentence == nil {
-			t.Errorf("confirm %s is incomplete", s.ID)
+		if s.Say == nil {
+			t.Fatalf("confirm %s is incomplete", s.ID)
 		}
-		// Rendered with nothing measured, a sentence still names its verb and
-		// is a question (the person answers it).
-		if got := s.Sentence(confirmFacts{Name: "x", Topic: "t"}); !strings.HasSuffix(strings.TrimSpace(got), "?") && !strings.Contains(got, "? ") {
-			t.Errorf("confirm %s is not a question: %q", s.ID, got)
+		// Rendered with nothing measured, a confirm still has a title, a verb on its
+		// button, and names the thing it acts on.
+		say := s.Say(confirmFacts{Name: "the-thing", Topic: "t"})
+		if say.Title == "" || say.Verb == "" || !strings.Contains(say.Text(), "the-thing") {
+			t.Errorf("confirm %s does not say what it does to what: %+v", s.ID, say)
 		}
 	}
 	destructive := regexp.MustCompile(`/(?:topics|groups|schemas)/\{\w+\}/[a-z/]*(?:delete|purge|reset|partitions)[a-z/]*`)
@@ -372,10 +381,10 @@ func TestTheConfirmIsMeasuredWhenTheButtonIsPressed(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if numberBefore(t, got.Text, "records") != 5 || !strings.Contains(got.Text, "fresh-reader") || numberBefore(t, got.Text[strings.Index(got.Text, "will be behind"):], "records") != 3 {
+	if numberBefore(t, got.Text, "records") != 5 || !strings.Contains(got.Text, "fresh-reader (lag 3)") {
 		t.Errorf("the sentence is not of the topic as it is now: %s", got.Text)
 	}
-	if got.Title != "Purge topic" || got.Verb != "Purge" {
+	if got.Title != "Purge topic fresh" || got.Verb != "Purge 5 records" {
 		t.Errorf("title/verb = %q/%q", got.Title, got.Verb)
 	}
 	// Every confirm of the table can be asked for, and a thing that is not there is refused.

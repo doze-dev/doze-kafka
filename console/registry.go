@@ -173,6 +173,18 @@ type SubjectRow struct {
 	Name, Type, TypeLabel string
 	Latest                int
 	ID                    int // the latest version's schema id.
+	Versions              int // how many versions it has.
+}
+
+// TypeName is the language as the home table writes it (Sc-Home): AVRO, PROTOBUF, JSON.
+func (r SubjectRow) TypeName() string {
+	switch r.Type {
+	case schemaregistry.TypeJSON:
+		return "JSON"
+	case schemaregistry.TypeProtobuf:
+		return "PROTOBUF"
+	}
+	return "AVRO"
 }
 
 // TypeShort is the language as the list's pill writes it: AVRO, PROTO, JSON.
@@ -187,16 +199,47 @@ func (r SubjectRow) TypeShort() string {
 }
 
 func (rc *registryClient) Subjects(ctx context.Context) ([]SubjectRow, error) {
-	var latest []schemaVersion
-	if err := rc.call(ctx, "GET", "/schemas?latestOnly=true", nil, &latest); err != nil {
-		return nil, err
+	rows, _, err := rc.Catalogue(ctx)
+	return rows, err
+}
+
+// Catalogue is every subject with its latest version and how many versions it has,
+// and the schema id of every version: one request (GET /schemas).
+func (rc *registryClient) Catalogue(ctx context.Context) ([]SubjectRow, []int, error) {
+	var all []schemaVersion
+	if err := rc.call(ctx, "GET", "/schemas", nil, &all); err != nil {
+		return nil, nil, err
 	}
-	out := make([]SubjectRow, 0, len(latest))
-	for _, v := range latest {
-		out = append(out, SubjectRow{Name: v.Subject, Type: v.Type(), TypeLabel: v.TypeLabel(), Latest: v.Version, ID: v.ID})
+	at := map[string]int{}
+	var out []SubjectRow
+	var ids []int
+	for _, v := range all {
+		ids = append(ids, v.ID)
+		i, ok := at[v.Subject]
+		if !ok {
+			at[v.Subject] = len(out)
+			out = append(out, SubjectRow{Name: v.Subject})
+			i = len(out) - 1
+		}
+		out[i].Versions++
+		if v.Version > out[i].Latest {
+			out[i].Latest, out[i].ID, out[i].Type, out[i].TypeLabel = v.Version, v.ID, v.Type(), v.TypeLabel()
+		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
-	return out, nil
+	sort.Ints(ids)
+	return out, ids, nil
+}
+
+// Mode is the registry's global mode (READWRITE, READONLY, IMPORT).
+func (rc *registryClient) Mode(ctx context.Context) (string, error) {
+	var m struct {
+		Mode string `json:"mode"`
+	}
+	if err := rc.call(ctx, "GET", "/mode", nil, &m); err != nil {
+		return "", err
+	}
+	return m.Mode, nil
 }
 
 func (rc *registryClient) Version(ctx context.Context, subject string, version int) (schemaVersion, error) {

@@ -2,6 +2,7 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { test, expect } from '../fixtures/console';
 import type { Locator, Page } from '@playwright/test';
 import { kafkaAddr } from '../addr';
+import { BASE_URL } from '../playwright.config';
 
 // One inspector, six selections (plus a group's events): a message, a request, a
 // client, a member, a subject and a transaction. Each is selected, closed with Esc
@@ -10,12 +11,17 @@ import { kafkaAddr } from '../addr';
 
 let hold: ChildProcess | undefined;
 
+// The held consumer reads a topic of its own: it fetches all the time, and on a seed topic
+// its requests would be the newest the topic's dock lists (dock.spec.ts expects the seed's).
+const HOLD_TOPIC = 'inspect-hold-topic';
+
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
   // A consumer that stays in its group, so there is a client and a member to look at.
+  await fetch(new URL('new/topic', BASE_URL), { method: 'POST', body: new URLSearchParams({ name: HOLD_TOPIC, partitions: '1' }) });
   execFileSync('go', ['build', '-o', `e2e/.tmp/bin/hold-${process.pid}`, './e2e/hold'], { cwd: '..', env: { ...process.env, GOWORK: 'off' } });
-  hold = spawn(`e2e/.tmp/bin/hold-${process.pid}`, [kafkaAddr(), 'inspect-hold', 'inspect-hold-group', 'seed-orders'], { cwd: '..', stdio: ['ignore', 'pipe', 'inherit'] });
+  hold = spawn(`e2e/.tmp/bin/hold-${process.pid}`, [kafkaAddr(), 'inspect-hold', 'inspect-hold-group', HOLD_TOPIC], { cwd: '..', stdio: ['ignore', 'pipe', 'inherit'] });
   await new Promise<void>((resolve, reject) => {
     const t = setTimeout(() => reject(new Error('the held consumer never joined its group')), 20_000);
     hold!.stdout!.on('data', (b) => { if (String(b).includes('ready')) { clearTimeout(t); resolve(); } });
@@ -32,7 +38,7 @@ const title = (page: Page) => page.locator('#inspector #inspector-title');
 async function cycle(page: Page, row: Locator, kind: string, opts: { focusBack?: boolean } = {}) {
   await row.click();
   await expect(overlay(page)).toBeVisible();
-  await expect(page.locator('#inspector .inspector-h')).toHaveAttribute('data-inspector-kind', kind);
+  await expect(page.locator('#inspector [data-inspector-kind]')).toHaveAttribute('data-inspector-kind', kind);
   const open = await title(page).getAttribute('data-open');
   expect(open, 'the selection names its address').toBeTruthy();
   await expect.poll(() => new URL(page.url()).searchParams.get('open')).toBe(open);
@@ -49,7 +55,7 @@ async function cycle(page: Page, row: Locator, kind: string, opts: { focusBack?:
   await page.reload();
   await expect(overlay(page)).toBeVisible();
   await expect(title(page)).toHaveAttribute('data-open', open!);
-  await expect(page.locator('#inspector .inspector-h')).toHaveAttribute('data-inspector-kind', kind);
+  await expect(page.locator('#inspector [data-inspector-kind]')).toHaveAttribute('data-inspector-kind', kind);
 
   // Back leaves it (the page it was opened from has no selection).
   await page.goBack();
@@ -63,13 +69,15 @@ test('a message is selected, closed, refreshed and left with Back', async ({ pag
 });
 
 test('a request is selected, closed, refreshed and left with Back', async ({ page }) => {
-  await page.goto('traffic');
-  await cycle(page, page.locator('#traffic-table tbody tr', { hasText: 'Produce' }).filter({ hasText: 'seed-orders' }).first(), 'request');
+  // The seed's own requests (the page lists the newest 200, and a suite asking at the same time pushes them out).
+  await page.goto('traffic?client=doze-seed');
+  await cycle(page, page.locator('#traffic-table .tf-rows > .r[data-row]', { hasText: 'Produce' }).filter({ hasText: 'seed-orders' }).first(), 'request');
 });
 
 test('a client is selected, closed, refreshed and left with Back', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 }); // the connections beside the table are drawn from 1400.
   await page.goto('traffic');
-  const row = page.locator('#clients-list .insp-client', { hasText: 'inspect-hold' }).first().locator('a.insp-client-open');
+  const row = page.locator('#clients-list .tf-conn', { hasText: 'inspect-hold' }).first().locator('a.tf-conn-open');
   await expect(row).toBeVisible();
   await row.click();
   await expect(title(page)).toContainText('inspect-hold');
@@ -81,16 +89,17 @@ test('a client is selected, closed, refreshed and left with Back', async ({ page
 // Enter on a link inside the inspector that opens another selection is the link's own:
 // the shell's key handling for rows must not cancel it.
 test('Enter on the client link inside a request inspector opens the client', async ({ page }) => {
-  await page.goto('traffic');
-  await page.locator('#traffic-table tbody tr', { hasText: 'inspect-hold' }).first().click();
-  await expect(page.locator('#inspector .inspector-h')).toHaveAttribute('data-inspector-kind', 'request');
+  // The client's own requests (the page lists the newest 200 of everyone's).
+  await page.goto('traffic?client=inspect-hold');
+  await page.locator('#traffic-table .tf-rows > .r[data-row]').first().click();
+  await expect(page.locator('#inspector [data-inspector-kind]')).toHaveAttribute('data-inspector-kind', 'request');
   const link = page.locator('#inspector a[data-inspector-open]', { hasText: 'inspect-hold' }).first();
   await expect(link).toBeVisible();
   // htmx has swapped the record in and settled it: the link is live.
   await expect(page.locator('#inspector .htmx-added, #inspector .htmx-settling')).toHaveCount(0);
   await link.focus();
   await page.keyboard.press('Enter');
-  await expect(page.locator('#inspector .inspector-h')).toHaveAttribute('data-inspector-kind', 'client');
+  await expect(page.locator('#inspector [data-inspector-kind]')).toHaveAttribute('data-inspector-kind', 'client');
   await expect(title(page)).toContainText('inspect-hold');
 });
 
@@ -100,7 +109,7 @@ test('a member is selected, closed, refreshed and left with Back', async ({ page
   await expect(row).toContainText('inspect-hold');
   await cycle(page, row, 'member');
   await row.click();
-  await expect(overlay(page)).toContainText('seed-orders');
+  await expect(overlay(page)).toContainText(HOLD_TOPIC);
 });
 
 test('a transaction is selected, closed, refreshed and left with Back', async ({ page }) => {

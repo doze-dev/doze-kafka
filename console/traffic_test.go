@@ -275,7 +275,7 @@ func TestTrafficInspectorShowsOneRequestAndSaysWhenItMovedOn(t *testing.T) {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"Produce v9", "billing", "apache-kafka-java 3.7.0", "127.0.0.1:50001", "User:ANONYMOUS", "orders", "1 partition, 2.0 KiB", "12 ms", "2.1 KB in"} {
+	for _, want := range []string{`Produce <span class="mut">v9</span>`, "billing", "apache-kafka-java 3.7.0", "127.0.0.1:50001", "User:ANONYMOUS", "orders", "12 ms", "2.1 KiB / "} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the inspector is missing %q:\n%s", want, body)
 		}
@@ -333,17 +333,24 @@ func TestWithoutATrafficSourceThereIsNoTrafficSection(t *testing.T) {
 	}
 }
 
+// A duration is the boards': whole milliseconds, rounded (22.8 ms was "22 ms": A9), "0 ms"
+// under half a millisecond as the boards print it, seconds to a tenth from one second;
+// the measured time is the tooltip (AD6).
 func TestShortDuration(t *testing.T) {
 	for in, want := range map[time.Duration]string{
-		400 * time.Microsecond: "0.4 ms", 12 * time.Millisecond: "12 ms", 2500 * time.Millisecond: "2.5 s",
-		190 * time.Second: "3m10s", 0: "0 µs",
-		// Under a tenth of a millisecond is microseconds, never "0.0 ms".
-		42 * time.Microsecond: "42 µs", 49 * time.Microsecond: "49 µs", 99*time.Microsecond + 900*time.Nanosecond: "99 µs",
-		100 * time.Microsecond: "0.1 ms", 960 * time.Microsecond: "1.0 ms", -3 * time.Microsecond: "0 µs",
-		time.Millisecond: "1 ms", 999 * time.Millisecond: "999 ms",
+		400 * time.Microsecond: "0 ms", 12 * time.Millisecond: "12 ms", 2500 * time.Millisecond: "2.5 s",
+		190 * time.Second: "3 m 10 s", 0: "0 ms", 42 * time.Microsecond: "0 ms", 499 * time.Microsecond: "0 ms",
+		500 * time.Microsecond: "1 ms", 960 * time.Microsecond: "1 ms", -3 * time.Microsecond: "0 ms",
+		22800 * time.Microsecond: "23 ms", time.Millisecond: "1 ms", 999 * time.Millisecond: "999 ms", 999600 * time.Microsecond: "1.0 s",
+		3 * time.Second: "3.0 s",
 	} {
 		if got := shortDuration(in); got != want {
 			t.Errorf("shortDuration(%v) = %q, want %q", in, got, want)
+		}
+	}
+	for in, want := range map[time.Duration]string{42 * time.Microsecond: "took 42 µs", 400 * time.Microsecond: "took 0.4 ms", 22800 * time.Microsecond: "took 22.8 ms", 3 * time.Second: "took 3.000 s"} {
+		if got := exactDuration(in); got != want {
+			t.Errorf("exactDuration(%v) = %q, want %q", in, got, want)
 		}
 	}
 }
@@ -387,7 +394,7 @@ func sampleMetrics() fakeMetrics {
 	)
 	return fakeMetrics{[]ClientInstance{
 		{ID: "0d7a8e3c-1b1e-4c2f-9a77-3b7c2f6a9d10", Conn: 1, ClientID: "billing", Software: "apache-kafka-java 3.7.1", Principal: "User:ANONYMOUS", Host: "/127.0.0.1",
-			First: tt0, Last: time.Now(), Pushes: 20, Resource: map[string]string{"client_rack": "r1"}, Series: series},
+			First: tt0, Last: tt0.Add(95 * time.Second), Pushes: 20, Resource: map[string]string{"client_rack": "r1"}, Series: series},
 		{ID: "11111111-2222-4333-8444-555555555555", ClientID: "audit", Last: time.Now(), Pushes: 1, Terminated: true},
 	}}
 }
@@ -398,23 +405,20 @@ func TestClientInspectorShowsWhatItReportsAboutItself(t *testing.T) {
 	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic(); o.ClientMetrics = sampleMetrics() })
 	body := req(t, c, "GET", "/_console/inspect/client?key=1", nil).Body.String()
 	for _, want := range []string{
-		"Metrics reported by the client itself", "metrics, not traces", "20 reports", "last report",
-		"Request latency, average", "node_id=1", // the label a person writes, and the attributes it is for.
+		"Metrics reported by the client itself", "metrics, not traces", "Reported every 5 s", "last report",
+		"Request latency to a node, average", "node_id=1", // the metric's own name in words, and the attributes it is for.
 		"13.5 ms", // 4 + 19*0.5, with its unit and without float noise.
-		"Sparklines cover", "one point per report",
+		"Sparklines cover the last minute, one bar per report",
 		"more metrics are in the full list",
-		"client_rack=r1", // what the client said about itself.
 		"connected",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the client's inspector does not show %q:\n%s", want, body)
 		}
 	}
-	if strings.Contains(body, "one bar per report") {
-		t.Error("the copy says bars; the chart is a line of points")
-	}
-	if n := strings.Count(body, `<polyline points=`); n < 1 {
-		t.Errorf("%d sparklines drawn", n)
+	// One bar a report, the last twelve (Traf-07).
+	if n := strings.Count(body, `<span class="spark">`); n < 1 || strings.Count(between(body, `<span class="spark">`, "</span>"), "<i ") != 12 {
+		t.Errorf("%d sparklines drawn: %s", n, between(body, `<span class="spark">`, "</span>"))
 	}
 	// The interesting ones come first, and the rest fold away until asked for.
 	if strings.Contains(body, "producer.filler.09") {
@@ -484,25 +488,22 @@ func TestFormatMetric(t *testing.T) {
 	}
 }
 
-func TestSparklineScalesTheLastSamplesAndDrawsNothingForOne(t *testing.T) {
-	if got := sparkline(ramp(1, 1, 1)); got != "" {
-		t.Errorf("one sample drew %q", got)
+// Traf-07's sparkline is a bar a report, the last twelve, each 2 px at the least and as
+// tall as its value is of the largest drawn (16 px), as the board draws it.
+func TestSparkBarsAreTheLastTwelveReports(t *testing.T) {
+	if got := sparkBarsHTML(nil); got != "" {
+		t.Errorf("nothing drew %q", got)
 	}
-	flat := string(sparkline(ramp(5, 7, 0)))
-	if !strings.Contains(flat, `points="1.0,12.0 `) {
-		t.Errorf("a flat series is not drawn along the middle: %s", flat)
+	bars := string(sparkBarsHTML(ramp(20, 0, 1)))
+	if n := strings.Count(bars, "<i "); n != sparkBars {
+		t.Errorf("%d bars for 20 reports, want the last %d", n, sparkBars)
 	}
-	rising := string(sparkline(ramp(5, 0, 1)))
-	// Oldest at the left and the bottom, newest at the right and the top.
-	if !strings.HasPrefix(between(rising, `points="`, `"/>`), `points="1.0,22.0 `) || !strings.HasSuffix(between(rising, `points="`, `"/>`), `119.0,2.0`) {
-		t.Errorf("a rising series does not run bottom-left to top-right: %s", rising)
+	// The last twelve of 0..19 are 8..19: the first is 2 + 14*8/19, the last 16.
+	if !strings.Contains(bars, `<span class="spark"><i style="height: 8px"></i>`) || !strings.Contains(bars, `<i style="height: 16px"></i></span>`) {
+		t.Errorf("the bars do not scale to the largest drawn: %s", bars)
 	}
-	long := string(sparkline(ramp(200, 0, 1)))
-	if n := strings.Count(between(long, `points="`, `"/>`), ","); n != sparkPoints {
-		t.Errorf("%d points drawn for 200 samples, want the last %d", n, sparkPoints)
-	}
-	if !strings.Contains(long, "the last 60 samples, from 140 to 199") {
-		t.Errorf("the chart's description is wrong: %s", long)
+	if zero := string(sparkBarsHTML(ramp(3, 0, 0))); strings.Count(zero, "height: 2px") != 3 {
+		t.Errorf("a series of zeros is not three 2 px bars: %s", zero)
 	}
 }
 

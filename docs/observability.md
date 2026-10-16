@@ -59,6 +59,8 @@ before it when all of these hold, and into nothing else:
 - it is the same connection, the same API, the same topics and the same group or
   transactional id (the version, the partition and the client id are not part of this:
   a client id is per connection);
+- it says the same: any change breaks the fold, the group's generation or epoch and the
+  detail included, and a row that was broken does not resume across a different answer;
 - the row's last request was less than ten minutes ago.
 
 A folded row keeps its count (`×40`) and moves to the front as it repeats, keeps the
@@ -71,10 +73,15 @@ heartbeat keeps its count however busy the broker is.
 ### Counts and windows
 
 Every number on the page says what it is counted over. The **summary** (clients
-connected, requests and errors in the last minute) and each client's **Req/min** and
-**Error rate** (the last five minutes) come from counters kept in five-second buckets:
-they count a folded row's every repeat, not its rows, and are exact to the nearest five
-seconds. *N of M requests match* counts requests among those the recorder keeps.
+connected, requests and errors in the last minute) and each client's **Req/min** (the
+last minute) and **Error rate** (the last five minutes) come from counters kept in
+five-second buckets: they count a folded row's every repeat, not its rows. The last
+minute is the twelve whole buckets before the one being filled, so it is exactly 60
+seconds long, and the page gives its bounds (the hover on the count); a bucket is
+filled when it has ended, so the minute trails the clock by up to five seconds. A
+client's counts are its own across its connections, kept after a connection closes
+(a member whose fetch connection closed at a rebalance still counts what it sent
+there). *N of M requests match* counts requests among those the recorder keeps.
 
 ### Filters, the clients view, pausing
 
@@ -85,9 +92,11 @@ seconds. *N of M requests match* counts requests among those the recorder keeps.
   connection that joined one is known). Filters are in the address, so a link shares
   them and the live refresh keeps them.
 - **Clients** (`?view=clients`): who is connected, their software, principal and address,
-  requests a minute, groups and error rate. A client is flagged when it was refused three
-  times in a row, or when three or more of its requests in five minutes make up at least
-  half of what it asked. The page says which: "refused 4 times in a row", or "refused 3
+  requests a minute, groups and error rate. A client is one client id: its connections
+  are listed in its inspector. It is flagged when it was refused three times in a row
+  (its own requests in order, across its connections: an answered request of another
+  kind in between ends the run), or when three or more of its requests in five minutes
+  make up at least half of what it asked. The page says which: "refused 4 times in a row", or "refused 3
   of its 5 requests in the last five minutes" for a client whose latest request went
   well.
 - **Pause** stops the table (`p`). The broker is not paused: the page counts the requests
@@ -104,7 +113,14 @@ seconds. *N of M requests match* counts requests among those the recorder keeps.
   those are only names: a client of yours that uses one of them is listed like any
   other (it used to be invisible).
 - **Version negotiation is not an error.** A client newer than the broker is told
-  `UNSUPPORTED_VERSION` by `ApiVersions` and asks again at a version it can use.
+  `UNSUPPORTED_VERSION` by `ApiVersions`, with the versions the broker serves, which is
+  how it chooses one (the row says so, and nothing about what the client will do next).
+- **Times.** A row's time is when the broker began
+  the request and its duration how long the broker held it; a request that took under a
+  millisecond says `0 ms`, and the exact figure is in its title and its inspector.
+- **A connection a request ended** is classed by whose doing it was: a client that hung
+  up before its answer is not the broker failing; an API key no Kafka has, or bytes that
+  are no request, are refused.
 
 ### What is kept, and what it holds about people
 

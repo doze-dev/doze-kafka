@@ -41,6 +41,7 @@ func (b *Broker) handleAPIVersions(ctx context.Context, req *protocol.Request) (
 		return req.Reply(resp), nil
 	}
 	resp.SetVersion(req.Header.APIVersion)
+	req.Conn.AnsweredVersions() // the one ApiVersions a connection that has not logged in may send.
 
 	// A body that is not an ApiVersions request, at a version that is served, is
 	// answered the list all the same, as it always was here: what Kafka does with one

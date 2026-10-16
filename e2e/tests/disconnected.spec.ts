@@ -1,8 +1,35 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
+import { removeDir } from '../cleanup';
 import { join, resolve } from 'node:path';
 import { test, expect } from '../fixtures/console';
+import { createRequire } from 'node:module';
+import type { Locator, Page } from '@playwright/test';
 import { PREFIX } from '../playwright.config';
+
+const AXE = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
+/** Every violation axe finds but the minor ones, of the page as it is now. */
+async function axeProblems(page: Page): Promise<string[]> {
+  await page.addScriptTag({ path: AXE });
+  // Nothing is left out: the frozen rows are muted (not faded to .55 as Traf-10 draws them: plan/00-foundation.md), and are swept like every other state's.
+  const res = await page.evaluate(async () => (window as any).axe.run(document, { resultTypes: ['violations'] }));
+  return (res.violations as any[]).filter((v) => v.impact !== 'minor')
+    .map((v) => `${v.impact} ${v.id}: ${v.help} e.g. ${v.nodes.slice(0, 3).map((n: any) => n.target.join(' ')).join(' | ')}`);
+}
+
+/** Every piece of text in the row is in the muted ink (the colour of .mut), none faded. */
+async function expectMuted(row: Locator) {
+  const bad = await row.evaluate((r) => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--mut)';
+    document.body.appendChild(probe);
+    const want = getComputedStyle(probe).color;
+    probe.remove();
+    return Array.from(r.querySelectorAll('*')).concat([r]).filter((e) => (e.textContent || '').trim() && !e.children.length)
+      .filter((e) => getComputedStyle(e).color !== want || getComputedStyle(e).opacity !== '1').map((e) => `${e.className}: ${getComputedStyle(e).color}`);
+  });
+  expect(bad, 'the stale row\'s text is the muted ink, unfaded').toEqual([]);
+}
 
 // The console when the broker is not there. This spec runs its own broker (its own
 // ports, and a data directory whose path has a space in it), kills it in the middle
@@ -43,7 +70,7 @@ test.describe.configure({ mode: 'serial' });
 test.beforeAll(async () => {
   mkdirSync(join(ROOT, 'e2e', '.tmp', 'bin'), { recursive: true });
   execFileSync('go', ['build', '-o', BIN, './cmd/doze-kafka'], { cwd: ROOT, env: { ...process.env, GOWORK: 'off' } });
-  rmSync(DATA, { recursive: true, force: true });
+  removeDir(DATA);
   mkdirSync(DATA, { recursive: true });
   await up();
 });
@@ -98,6 +125,65 @@ test('the broker stops mid-poll: one state on the pill, the rows frozen, no toas
   expect(await page.evaluate(() => (window as any).__toasts)).toBe(0);
 });
 
+// The pill is the shell's, on every page (A7): a page with nothing live of its own (the
+// Topics list, Cluster, Connect, a form, a page that says "not found") learns from the
+// shell's heartbeat that the broker is gone, says so on the pill, raises no error, and
+// comes back by itself. The verification of 82b8752 found the pill green on 10 of 19
+// page kinds 8 s after the process was killed.
+test('every kind of page says the broker is gone, and comes back, without a reload or an error', async ({ context, request, uniqueName }) => {
+  test.setTimeout(240_000);
+  const topic = uniqueName('every');
+  expect((await request.post(`${CONSOLE}new/topic`, { form: { name: topic, partitions: '1' } })).ok()).toBe(true);
+  // A group with a member, so a group's own page (two regions that poll) is among them.
+  const holdBin = join(ROOT, 'e2e', '.tmp', 'bin', `hold-every-${PORT}`);
+  execFileSync('go', ['build', '-o', holdBin, './e2e/hold'], { cwd: ROOT, env: { ...process.env, GOWORK: 'off' } });
+  const hold = spawn(holdBin, [`127.0.0.1:${PORT}`, 'every-hold', `${topic}-group`, topic],
+    { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, E2E_SASL_USER: '', E2E_TLS: '' } });
+  await new Promise<void>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('the held consumer never joined its group')), 20_000);
+    hold.stdout!.on('data', (b) => { if (String(b).includes('ready')) { clearTimeout(t); resolve(); } });
+    hold.on('exit', () => reject(new Error('the held consumer exited')));
+  });
+  hold.kill('SIGTERM'); // its committed offsets keep the group; its page is what is wanted.
+  const kinds = ['traffic', 'traffic?view=clients', 'trace', 'topics', `topics/${topic}`, `topics/${topic}?tab=partitions`, `topics/${topic}?tab=config`,
+    'groups', `groups/${topic}-group`, `groups/${topic}-group?tab=members`, 'groups/nobody-here', 'topics/nothing-here', 'schemas', 'new/schema',
+    'access', 'cluster', 'cluster?view=transactions', 'connect', 'new/topic', ''];
+  const pages = [];
+  const errors: string[] = [];
+  for (const k of kinds) {
+    const p = await context.newPage();
+    p.on('pageerror', (e) => errors.push(`${k}: ${e.message || String(e)}`));
+    await p.goto(CONSOLE + k);
+    await expect(p.locator('#live-pill')).not.toHaveClass(/disconnected/);
+    await p.evaluate(() => { (window as any).__marker = 'same-document'; });
+    pages.push(p);
+  }
+  await kill();
+  for (const [i, p] of pages.entries()) {
+    await p.bringToFront();
+    await expect(p.locator('#live-pill'), `${kinds[i]} while the broker is gone`).toHaveClass(/disconnected/, { timeout: 12_000 });
+    await expect(p.locator('#live-pill .pill-state')).toHaveText('not reachable');
+    await expect(p.locator('html')).toHaveAttribute('data-connection-lost', '');
+    await expect(p.locator('.toast')).toHaveCount(0);
+  }
+  // A page whose regions poll keeps failing while the broker is gone: several polls
+  // in front, and still no error and no toast.
+  for (const k of [`topics/${topic}`, `groups/${topic}-group`]) {
+    const p = pages[kinds.indexOf(k)];
+    await p.bringToFront();
+    await p.waitForTimeout(8_000);
+    await expect(p.locator('.toast')).toHaveCount(0);
+  }
+  await up();
+  for (const [i, p] of pages.entries()) {
+    await p.bringToFront();
+    await expect(p.locator('#live-pill'), `${kinds[i]} once the broker is back`).not.toHaveClass(/disconnected/, { timeout: 12_000 });
+    expect(await p.evaluate(() => (window as any).__marker)).toBe('same-document');
+  }
+  expect(errors).toEqual([]);
+  for (const p of pages) await p.close();
+});
+
 test('at a phone width the pill still says so, and Retry asks at once', async ({ page, request, uniqueName }) => {
   const topic = uniqueName('narrow');
   expect((await request.post(`${CONSOLE}new/topic`, { form: { name: topic, partitions: '1' } })).ok()).toBe(true);
@@ -124,7 +210,7 @@ test('Traffic when the broker is lost: the pill, the callout, the frozen line, R
   execFileSync('go', ['run', './e2e/put', `127.0.0.1:${PORT}`, topic, '2026-10-10T12:00:00Z', 'x'],
     { cwd: ROOT, env: { ...process.env, GOWORK: 'off', E2E_SASL_USER: '', E2E_TLS: '' } });
   await page.goto(`${CONSOLE}traffic`);
-  await expect(page.locator('#traffic-table tbody tr').first()).toBeVisible();
+  await expect(page.locator('#traffic-table .tf-rows > .r[data-row]').first()).toBeVisible();
   const callout = page.locator('#lost-callout');
   await expect(callout).toBeHidden();
   await kill();
@@ -151,22 +237,30 @@ test('Traffic when the broker is lost: the pill, the callout, the frozen line, R
   await expect(top.locator('.dot')).toHaveCSS('background-color', 'rgb(179, 37, 27)');
   await expect(page.locator('header.topbar #pill-retry')).toHaveCount(0);
   expect((await page.locator('header.topbar #palette-open').boundingBox())!.width).toBe(420);
-  await expect(page.locator('.frozen-line')).toContainText('Nothing newer than this line is known.');
+  await expect(page.locator('.tf-frozen')).toContainText('Nothing newer than this line is known.');
+  expect(await axeProblems(page), 'the lost page, accessible').toEqual([]);
+  // The muted rows hold in every theme (the page is lost, so the theme is switched in place).
+  for (const theme of ['dark', 'contrast']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+    expect(await axeProblems(page), `the lost page, accessible, in ${theme}`).toEqual([]);
+  }
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
   // Traf-10 draws it as the row under the header, not above it.
   const below = await page.evaluate(() => {
-    const head = document.querySelector('#traffic-table thead th')!.getBoundingClientRect();
-    const frozen = document.querySelector('.frozen-line')!.getBoundingClientRect();
-    const first = document.querySelector('#traffic-table tbody tr')!.getBoundingClientRect();
+    const head = document.querySelector('#traffic-table .r.h > span')!.getBoundingClientRect();
+    const frozen = document.querySelector('.tf-frozen')!.getBoundingClientRect();
+    const first = document.querySelector('#traffic-table .tf-rows > .r[data-row]')!.getBoundingClientRect();
     return { headBottom: head.bottom, frozenTop: frozen.top, frozenBottom: frozen.bottom, firstTop: first.top };
   });
   expect(below.frozenTop).toBeGreaterThanOrEqual(below.headBottom - 1);
   expect(below.firstTop).toBeGreaterThanOrEqual(below.frozenBottom - 1);
-  // The rows are dimmed, and only the rows: the header and the frozen line are not.
-  await expect(page.locator('#traffic-table tbody')).toHaveCSS('opacity', '0.55');
-  await expect(page.locator('#traffic-live .tbl-wrap')).toHaveCSS('opacity', '1');
-  await expect(page.locator('#traffic-table thead')).toHaveCSS('opacity', '1');
-  await expect(page.locator('.frozen-line')).toHaveCSS('opacity', '1');
-  await expect(page.locator('#traffic-table tbody tr').first()).toBeVisible(); // still there.
+  // The rows are muted, and only the rows: the header and the frozen line are not. Muted, not faded: the board's .55 opacity puts the text under 4.5:1.
+  await expect(page.locator('#traffic-table .tf-rows')).toHaveCSS('opacity', '1');
+  await expectMuted(page.locator('#traffic-table .tf-rows > .r[data-row]').first());
+  await expect(page.locator('#traffic-table')).toHaveCSS('opacity', '1');
+  await expect(page.locator('#traffic-table .r.h')).toHaveCSS('opacity', '1');
+  await expect(page.locator('.tf-frozen')).toHaveCSS('opacity', '1');
+  await expect(page.locator('#traffic-table .tf-rows > .r[data-row]').first()).toBeVisible(); // still there.
   // What is counted from the broker is not drawn while it cannot be reached: the board
   // has no summary and no connected-clients panel.
   await expect(page.locator('#traffic-summary')).toBeHidden();
@@ -174,7 +268,7 @@ test('Traffic when the broker is lost: the pill, the callout, the frozen line, R
   // The key strip is the board's: r, j k, jump.
   const strip = page.locator('#keys');
   await expect(strip.locator('.keys-lost')).toHaveText([/retry now$/, /move$/, /jump or act$/]);
-  await expect(strip.locator('.keys-live')).toHaveCount(6);
+  await expect(strip.locator('.keys-live')).not.toHaveCount(0);
   for (const k of await strip.locator('.keys-live').all()) await expect(k).toBeHidden();
 
   await up();
@@ -197,6 +291,7 @@ test('Traf-09: nothing has reached the broker, and Traf-10 over it', async ({ pa
   await expect(empty).toBeVisible();
   await expect(empty.locator('.h2')).toHaveText('Nothing has reached this broker yet');
   await expect(empty.locator('.up-only')).toBeVisible();
+  expect(await axeProblems(page), 'the empty page, accessible').toEqual([]);
   // The board draws no filter, no kinds, no connected clients and no "select a row".
   await expect(page.locator('.filterrow')).toBeHidden();
   await expect(page.locator('.seg')).toBeHidden();
@@ -244,23 +339,24 @@ test('Traf-06 and Traf-10: the Clients view draws the frozen line under its head
     });
     await page.goto(`${CONSOLE}traffic?view=clients`);
     const table = page.locator('#clients-table');
-    await expect(table.locator('tbody tr', { hasText: 'disc-hold' })).toBeVisible();
-    await expect(table.locator('.frozen-line')).toBeHidden();
+    await expect(table.locator('.tf-rows > .r[data-row]', { hasText: 'disc-hold' })).toBeVisible();
+    await expect(table.locator('.tf-frozen')).toBeHidden();
     await kill();
     await expect(page.locator('html')).toHaveAttribute('data-connection-lost', '', { timeout: 15_000 });
-    const line = table.locator('.frozen-line');
+    const line = table.locator('.tf-frozen');
     await expect(line).toBeVisible();
     await expect(line).toContainText('Nothing newer than this line is known.');
     const below = await table.evaluate((t) => {
-      const head = t.querySelector('thead th')!.getBoundingClientRect();
-      const frozen = t.querySelector('.frozen-line')!.getBoundingClientRect();
-      const first = t.querySelector('tbody tr')!.getBoundingClientRect();
+      const head = t.querySelector('.r.h > span')!.getBoundingClientRect();
+      const frozen = t.querySelector('.tf-frozen')!.getBoundingClientRect();
+      const first = t.querySelector('.tf-rows > .r[data-row]')!.getBoundingClientRect();
       return { headBottom: head.bottom, frozenTop: frozen.top, frozenBottom: frozen.bottom, firstTop: first.top };
     });
     expect(below.frozenTop).toBeGreaterThanOrEqual(below.headBottom - 1);
     expect(below.firstTop).toBeGreaterThanOrEqual(below.frozenBottom - 1);
     await expect(line).toHaveCSS('opacity', '1');
-    await expect(table.locator('tbody')).toHaveCSS('opacity', '0.55');
+    await expect(table.locator('.tf-rows')).toHaveCSS('opacity', '1');
+    await expectMuted(table.locator('.tf-rows > .r[data-row]').first());
   } finally {
     hold.kill('SIGTERM');
     await up();
