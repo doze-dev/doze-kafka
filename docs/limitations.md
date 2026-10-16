@@ -195,6 +195,13 @@ implement it.
     send there, are answered as Kafka answers them.
   - A SCRAM client-final message whose channel binding is not the header the exchange opened with is refused.
     Kafka does not compare the two; RFC 5802 has a server do it.
+- **TxnOffsetCommit sent from outside the consumer group** (generation -1, no member id,
+  as a producer that commits a consumer's offsets without being one sends it) is
+  answered for the transaction's state: `INVALID_PRODUCER_ID_MAPPING`, `INVALID_TXN_STATE`,
+  `INVALID_PRODUCER_EPOCH`, or 0. `apache/kafka:4.3.1` answers
+  `COORDINATOR_LOAD_IN_PROGRESS` to every try for thirty seconds, whatever the state
+  (`conformance/recordings/txn-empty-id.json`, steps `txn-offset-commit-*`). Why is not
+  yet understood, so this broker keeps the answer a client can act on.
 - **ApiVersions lists the APIs and versions this broker serves, not Kafka's.** See
   `docs/api-support.md` for the table and how it is held to a real broker's.
 

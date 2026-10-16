@@ -6,6 +6,16 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Transactions and ACLs refuse malformed requests as `apache/kafka:4.3.1` does
+  (recorded: `txn-empty-id`, `acl-unknown-codes`; `conformance/claims/api.md` V4, V5).
+  An empty transactional id is `INVALID_REQUEST` in EndTxn, AddOffsetsToTxn,
+  AddPartitionsToTxn and InitProducerId (InitProducerId used to hand out a producer id
+  for it, as for a null id); AddOffsetsToTxn no longer refuses an empty group id.
+  An ACL request naming the UNKNOWN (0) code for resource type, pattern type, operation
+  or permission closes the connection; a code that is no value matches nothing in
+  DescribeAcls and is `INVALID_REQUEST` in Kafka's words in DeleteAcls and CreateAcls;
+  CreateAcls with ANY or MATCH answers `UNKNOWN_SERVER_ERROR`.
+
 - API versions: no `--kafka-version` profile offers a version the real broker of that
   major does not serve. At the default, `--kafka-version 4`, nine old versions that
   Kafka 4 removed (KIP-896) are no longer served: ListOffsets v0, OffsetCommit v0–1,
