@@ -131,67 +131,77 @@ func produced(t *testing.T, ctx context.Context, addr string) {
 	}
 }
 
-// The kcat lines in clients.md, run as written against a broker of this test's
-// own with $KAFKA_BOOTSTRAP_SERVERS set: the produce line is given "hi" on stdin,
-// the consume line must print it back, and the metadata line must list a broker.
-// The Kafka command-line tools are interactive Java; they are only held to the
-// same variable. (The kafkajs snippet is run as written by compat/kafkajs.
-// frameworks.md's properties are the settings the Spring and Connect compat cells
-// use, written there by hand rather than read from the page.)
-func TestClientsShellSnippetsRunAsWritten(t *testing.T) {
+// The kcat lines in clients.md and the README, run as written against a broker of
+// this test's own with $KAFKA_BOOTSTRAP_SERVERS set: a produce line reads "hi" from
+// stdin unless it pipes its own input, the consume line must print what was
+// produced, and the metadata line must list a broker. The Kafka command-line tools
+// are interactive Java and are only held to the same variable; the README's
+// install lines fetch from the network and are not run. (The kafkajs snippet is
+// run as written by compat/kafkajs. frameworks.md's properties are the settings
+// the Spring and Connect compat cells use, written there by hand rather than read
+// from the page.)
+func TestShellSnippetsRunAsWritten(t *testing.T) {
 	if testing.Short() {
 		t.Skip("runs kcat")
-	}
-	raw, err := os.ReadFile("clients.md")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var lines []string
-	for _, m := range regexp.MustCompile("(?s)```sh\n(.*?)```").FindAllStringSubmatch(string(raw), -1) {
-		for _, l := range strings.Split(strings.TrimSpace(m[1]), "\n") {
-			lines = append(lines, strings.TrimSpace(strings.SplitN(l, "  #", 2)[0]))
-		}
-	}
-	if len(lines) == 0 {
-		t.Fatal("clients.md has no shell snippets")
 	}
 	if _, err := exec.LookPath("kcat"); err != nil {
 		t.Skip("kcat is not installed: the shell snippets are not run here")
 	}
-
-	addr := inProcessBroker(t)
-	env := append(os.Environ(), "KAFKA_BOOTSTRAP_SERVERS="+addr)
-	ran := 0
-	for _, l := range lines {
-		if !strings.Contains(l, `"$KAFKA_BOOTSTRAP_SERVERS"`) {
-			t.Errorf("clients.md: %q does not use \"$KAFKA_BOOTSTRAP_SERVERS\"", l)
-		}
-		if !strings.HasPrefix(l, "kcat ") {
-			continue
-		}
-		cmd := exec.Command("sh", "-c", l)
-		cmd.Env = env
-		if strings.Contains(l, " -P") {
-			cmd.Stdin = strings.NewReader("hi\n")
-		}
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("%s: %v\n%s", l, err, out)
-		}
-		switch {
-		case strings.Contains(l, " -C"):
-			if !regexp.MustCompile(`(?m)^hi$`).Match(out) {
-				t.Errorf("%s printed %q, not the record the produce line wrote", l, out)
+	for file, wantLines := range map[string]int{"clients.md": 3, "../README.md": 2} {
+		t.Run(filepath.Base(file), func(t *testing.T) {
+			raw, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
 			}
-		case strings.Contains(l, " -L"):
-			if !strings.Contains(string(out), "1 brokers:") {
-				t.Errorf("%s lists no broker:\n%s", l, out)
+			var lines []string
+			for _, m := range regexp.MustCompile("(?s)```sh\n(.*?)```").FindAllStringSubmatch(string(raw), -1) {
+				for _, l := range strings.Split(strings.TrimSpace(m[1]), "\n") {
+					l = strings.TrimSpace(strings.SplitN(l, "  #", 2)[0])
+					if !strings.HasPrefix(l, "#") && (strings.Contains(l, "kcat ") || strings.Contains(l, "kafka-console-")) {
+						lines = append(lines, l)
+					}
+				}
 			}
-		}
-		ran++
-	}
-	if ran != 3 {
-		t.Errorf("ran %d kcat lines, want the 3 clients.md shows", ran)
+			addr := inProcessBroker(t)
+			env := append(os.Environ(), "KAFKA_BOOTSTRAP_SERVERS="+addr)
+			ran, produced := 0, ""
+			for _, l := range lines {
+				if !strings.Contains(l, `"$KAFKA_BOOTSTRAP_SERVERS"`) {
+					t.Errorf("%s: %q does not use \"$KAFKA_BOOTSTRAP_SERVERS\"", file, l)
+				}
+				if !strings.Contains(l, "kcat ") {
+					continue
+				}
+				cmd := exec.Command("sh", "-c", l)
+				cmd.Env = env
+				if strings.Contains(l, " -P") {
+					produced = "hi"
+					if m := regexp.MustCompile(`^echo "([^"]*)" \|`).FindStringSubmatch(l); m != nil {
+						produced = m[1]
+					} else {
+						cmd.Stdin = strings.NewReader("hi\n")
+					}
+				}
+				out, err := cmd.CombinedOutput()
+				if err != nil {
+					t.Fatalf("%s: %v\n%s", l, err, out)
+				}
+				switch {
+				case strings.Contains(l, " -C"):
+					if produced == "" || !regexp.MustCompile(`(?m)^`+regexp.QuoteMeta(produced)+`$`).Match(out) {
+						t.Errorf("%s printed %q, not the record the produce line wrote (%q)", l, out, produced)
+					}
+				case strings.Contains(l, " -L"):
+					if !strings.Contains(string(out), "1 brokers:") {
+						t.Errorf("%s lists no broker:\n%s", l, out)
+					}
+				}
+				ran++
+			}
+			if ran != wantLines {
+				t.Errorf("ran %d kcat lines from %s, want %d", ran, file, wantLines)
+			}
+		})
 	}
 }
 
