@@ -177,7 +177,7 @@ func applyIncremental(config map[string]string, c kmsg.IncrementalAlterConfigsRe
 		if !settings.IsListTopicConfig(c.Name) {
 			return &alterError{kerr.InvalidRequest.Code, fmt.Sprintf("config %q is not a list, so there is nothing to append to or subtract from", c.Name)}
 		}
-		// A list not set on the topic starts from its default, as Kafka does:
+		// A list not set on the topic starts from its default, as Kafka does (claim: api V6):
 		// appending "compact" to an unset cleanup.policy gives "delete,compact".
 		current, set := config[c.Name]
 		if !set && c.Name == "cleanup.policy" {

@@ -1,0 +1,104 @@
+{
+  "scenario": "idempotent-write-from-topic-write",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "conn": "admin",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "iw"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "iw",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "allow-alice-write-iw",
+      "conn": "admin",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": [
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "WRITE",
+            "PermissionType": "ALLOW",
+            "Principal": "User:alice",
+            "ResourceName": "iw",
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": ""
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "alice-init-producer-id",
+      "conn": "alice",
+      "api": "InitProducerID",
+      "version": 4,
+      "request": {
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "TransactionTimeoutMillis": 60000,
+        "TransactionalID": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "bob-init-producer-id",
+      "conn": "bob",
+      "api": "InitProducerID",
+      "version": 4,
+      "request": {
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "TransactionTimeoutMillis": 60000,
+        "TransactionalID": null
+      },
+      "response": {
+        "ErrorCode": 31,
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}

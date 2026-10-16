@@ -83,11 +83,11 @@
       }
     },
     {
-      "label": "first-refused-acks-all",
+      "label": "first-refused",
       "api": "Produce",
       "version": 9,
       "request": {
-        "(a batch of 700 KiB, repeated until the volume was full)": 0
+        "(a batch of 700 KiB, repeated until the volume was full)": -1
       },
       "response": {
         "Brokers": null,
@@ -116,171 +116,14 @@
       }
     },
     {
-      "label": "refused-again-acks-all",
-      "api": "Produce",
-      "version": 9,
+      "label": "broker-after-the-refusal",
+      "api": "(broker)",
+      "version": 0,
       "request": {
-        "(a batch of 700 KiB)": -1
+        "(Metadata on a new connection, until it is not answered)": 0
       },
       "response": {
-        "Brokers": null,
-        "ThrottleMillis": 0,
-        "Topics": [
-          {
-            "Partitions": [
-              {
-                "BaseOffset": -1,
-                "CurrentLeader": {
-                  "LeaderEpoch": -1,
-                  "LeaderID": -1
-                },
-                "ErrorCode": 56,
-                "ErrorMessage": null,
-                "ErrorRecords": null,
-                "LogAppendTime": -1,
-                "LogStartOffset": -1,
-                "Partition": 0
-              }
-            ],
-            "Topic": "disk",
-            "TopicID": "\u003czero-id\u003e"
-          }
-        ]
-      }
-    },
-    {
-      "label": "refused-acks-1",
-      "api": "Produce",
-      "version": 9,
-      "request": {
-        "(a batch of 700 KiB)": 1
-      },
-      "response": {
-        "Brokers": null,
-        "ThrottleMillis": 0,
-        "Topics": [
-          {
-            "Partitions": [
-              {
-                "BaseOffset": -1,
-                "CurrentLeader": {
-                  "LeaderEpoch": -1,
-                  "LeaderID": -1
-                },
-                "ErrorCode": 56,
-                "ErrorMessage": null,
-                "ErrorRecords": null,
-                "LogAppendTime": -1,
-                "LogStartOffset": -1,
-                "Partition": 0
-              }
-            ],
-            "Topic": "disk",
-            "TopicID": "\u003czero-id\u003e"
-          }
-        ]
-      }
-    },
-    {
-      "label": "metadata-after",
-      "api": "Metadata",
-      "version": 9,
-      "request": {
-        "AllowAutoTopicCreation": false,
-        "IncludeClusterAuthorizedOperations": false,
-        "IncludeTopicAuthorizedOperations": false,
-        "Topics": [
-          {
-            "Topic": "disk",
-            "TopicID": "\u003czero-id\u003e"
-          }
-        ]
-      },
-      "response": {
-        "AuthorizedOperations": -2147483648,
-        "Brokers": [
-          {
-            "Host": "\u003chost\u003e",
-            "NodeID": "\u003cnode\u003e",
-            "Port": "\u003cport\u003e",
-            "Rack": null
-          }
-        ],
-        "ClusterID": "\u003ccluster\u003e",
-        "ControllerID": "\u003cnode\u003e",
-        "ErrorCode": 0,
-        "ThrottleMillis": 0,
-        "Topics": [
-          {
-            "AuthorizedOperations": -2147483648,
-            "ErrorCode": 0,
-            "IsInternal": false,
-            "Partitions": [
-              {
-                "ErrorCode": 0,
-                "ISR": [
-                  "\u003cnode\u003e"
-                ],
-                "Leader": "\u003cnode\u003e",
-                "LeaderEpoch": 0,
-                "OfflineReplicas": null,
-                "Partition": 0,
-                "Replicas": [
-                  "\u003cnode\u003e"
-                ]
-              }
-            ],
-            "Topic": "disk",
-            "TopicID": "\u003czero-id\u003e"
-          }
-        ]
-      }
-    },
-    {
-      "label": "list-earliest-after",
-      "api": "ListOffsets",
-      "version": 7,
-      "request": {
-        "IsolationLevel": 0,
-        "ReplicaID": -1,
-        "TimeoutMillis": 30000,
-        "Topics": [
-          {
-            "Partitions": [
-              {
-                "CurrentLeaderEpoch": -1,
-                "MaxNumOffsets": 1,
-                "Partition": 0,
-                "Timestamp": -2
-              }
-            ],
-            "Topic": "disk"
-          }
-        ]
-      },
-      "response": {
-        "(connection)": "closed by the broker"
-      }
-    },
-    {
-      "label": "create-after",
-      "api": "CreateTopics",
-      "version": 7,
-      "request": {
-        "TimeoutMillis": 15000,
-        "Topics": [
-          {
-            "Configs": null,
-            "NumPartitions": 1,
-            "ReplicaAssignment": null,
-            "ReplicationFactor": 1,
-            "Topic": "disk-2"
-          }
-        ],
-        "ValidateOnly": false
-      },
-      "response": {
-        "(connection)": "closed by the broker"
+        "(broker)": "stopped"
       }
     }
   ]

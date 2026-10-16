@@ -1,0 +1,2022 @@
+{
+  "scenario": "acl-unknown-codes",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create-topic",
+      "conn": "admin",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "acl"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "acl",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "describe-any",
+      "conn": "admin",
+      "api": "DescribeACLs",
+      "version": 3,
+      "request": {
+        "Host": null,
+        "Operation": "ANY",
+        "PermissionType": "ANY",
+        "Principal": null,
+        "ResourceName": null,
+        "ResourcePatternType": "ANY",
+        "ResourceType": "ANY"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "Resources": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-any-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "delete-any",
+      "conn": "admin",
+      "api": "DeleteACLs",
+      "version": 3,
+      "request": {
+        "Filters": [
+          {
+            "Host": null,
+            "Operation": "ANY",
+            "PermissionType": "ANY",
+            "Principal": null,
+            "ResourceName": null,
+            "ResourcePatternType": "ANY",
+            "ResourceType": "ANY"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "MatchingACLs": null
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "delete-any-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "describe-topic-literal",
+      "conn": "admin",
+      "api": "DescribeACLs",
+      "version": 3,
+      "request": {
+        "Host": null,
+        "Operation": "ANY",
+        "PermissionType": "ANY",
+        "Principal": null,
+        "ResourceName": null,
+        "ResourcePatternType": "LITERAL",
+        "ResourceType": "TOPIC"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "Resources": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-topic-literal-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "delete-topic-literal",
+      "conn": "admin",
+      "api": "DeleteACLs",
+      "version": 3,
+      "request": {
+        "Filters": [
+          {
+            "Host": null,
+            "Operation": "ANY",
+            "PermissionType": "ANY",
+            "Principal": null,
+            "ResourceName": null,
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "MatchingACLs": null
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "delete-topic-literal-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "describe-resource-0",
+      "conn": "admin",
+      "api": "DescribeACLs",
+      "version": 3,
+      "request": {
+        "Host": null,
+        "Operation": "ANY",
+        "PermissionType": "ANY",
+        "Principal": null,
+        "ResourceName": null,
+        "ResourcePatternType": "LITERAL",
+        "ResourceType": "UNKNOWN"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "describe-resource-0-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "delete-resource-0",
+      "conn": "admin",
+      "api": "DeleteACLs",
+      "version": 3,
+      "request": {
+        "Filters": [
+          {
+            "Host": null,
+            "Operation": "ANY",
+            "PermissionType": "ANY",
+            "Principal": null,
+            "ResourceName": null,
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "UNKNOWN"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "delete-resource-0-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "describe-pattern-0",
+      "conn": "admin",
+      "api": "DescribeACLs",
+      "version": 3,
+      "request": {
+        "Host": null,
+        "Operation": "ANY",
+        "PermissionType": "ANY",
+        "Principal": null,
+        "ResourceName": null,
+        "ResourcePatternType": "UNKNOWN",
+        "ResourceType": "TOPIC"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "describe-pattern-0-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "delete-pattern-0",
+      "conn": "admin",
+      "api": "DeleteACLs",
+      "version": 3,
+      "request": {
+        "Filters": [
+          {
+            "Host": null,
+            "Operation": "ANY",
+            "PermissionType": "ANY",
+            "Principal": null,
+            "ResourceName": null,
+            "ResourcePatternType": "UNKNOWN",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "delete-pattern-0-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "describe-operation-0",
+      "conn": "admin",
+      "api": "DescribeACLs",
+      "version": 3,
+      "request": {
+        "Host": null,
+        "Operation": "UNKNOWN",
+        "PermissionType": "ANY",
+        "Principal": null,
+        "ResourceName": null,
+        "ResourcePatternType": "LITERAL",
+        "ResourceType": "TOPIC"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "describe-operation-0-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "delete-operation-0",
+      "conn": "admin",
+      "api": "DeleteACLs",
+      "version": 3,
+      "request": {
+        "Filters": [
+          {
+            "Host": null,
+            "Operation": "UNKNOWN",
+            "PermissionType": "ANY",
+            "Principal": null,
+            "ResourceName": null,
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "delete-operation-0-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "describe-permission-0",
+      "conn": "admin",
+      "api": "DescribeACLs",
+      "version": 3,
+      "request": {
+        "Host": null,
+        "Operation": "ANY",
+        "PermissionType": "UNKNOWN",
+        "Principal": null,
+        "ResourceName": null,
+        "ResourcePatternType": "LITERAL",
+        "ResourceType": "TOPIC"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "describe-permission-0-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "delete-permission-0",
+      "conn": "admin",
+      "api": "DeleteACLs",
+      "version": 3,
+      "request": {
+        "Filters": [
+          {
+            "Host": null,
+            "Operation": "ANY",
+            "PermissionType": "UNKNOWN",
+            "Principal": null,
+            "ResourceName": null,
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "delete-permission-0-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "describe-resource-99",
+      "conn": "admin",
+      "api": "DescribeACLs",
+      "version": 3,
+      "request": {
+        "Host": null,
+        "Operation": "ANY",
+        "PermissionType": "ANY",
+        "Principal": null,
+        "ResourceName": null,
+        "ResourcePatternType": "LITERAL",
+        "ResourceType": "UNKNOWN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "Resources": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-resource-99-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "delete-resource-99",
+      "conn": "admin",
+      "api": "DeleteACLs",
+      "version": 3,
+      "request": {
+        "Filters": [
+          {
+            "Host": null,
+            "Operation": "ANY",
+            "PermissionType": "ANY",
+            "Principal": null,
+            "ResourceName": null,
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "UNKNOWN"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": 42,
+            "ErrorMessage": "Unknown patternFilter.",
+            "MatchingACLs": null
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "delete-resource-99-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "describe-pattern-99",
+      "conn": "admin",
+      "api": "DescribeACLs",
+      "version": 3,
+      "request": {
+        "Host": null,
+        "Operation": "ANY",
+        "PermissionType": "ANY",
+        "Principal": null,
+        "ResourceName": null,
+        "ResourcePatternType": "UNKNOWN",
+        "ResourceType": "TOPIC"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "Resources": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-pattern-99-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "delete-pattern-99",
+      "conn": "admin",
+      "api": "DeleteACLs",
+      "version": 3,
+      "request": {
+        "Filters": [
+          {
+            "Host": null,
+            "Operation": "ANY",
+            "PermissionType": "ANY",
+            "Principal": null,
+            "ResourceName": null,
+            "ResourcePatternType": "UNKNOWN",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": 42,
+            "ErrorMessage": "Unknown patternFilter.",
+            "MatchingACLs": null
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "delete-pattern-99-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "describe-operation-99",
+      "conn": "admin",
+      "api": "DescribeACLs",
+      "version": 3,
+      "request": {
+        "Host": null,
+        "Operation": "UNKNOWN",
+        "PermissionType": "ANY",
+        "Principal": null,
+        "ResourceName": null,
+        "ResourcePatternType": "LITERAL",
+        "ResourceType": "TOPIC"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "Resources": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-operation-99-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "delete-operation-99",
+      "conn": "admin",
+      "api": "DeleteACLs",
+      "version": 3,
+      "request": {
+        "Filters": [
+          {
+            "Host": null,
+            "Operation": "UNKNOWN",
+            "PermissionType": "ANY",
+            "Principal": null,
+            "ResourceName": null,
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": 42,
+            "ErrorMessage": "Unknown entryFilter.",
+            "MatchingACLs": null
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "delete-operation-99-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "describe-permission-99",
+      "conn": "admin",
+      "api": "DescribeACLs",
+      "version": 3,
+      "request": {
+        "Host": null,
+        "Operation": "ANY",
+        "PermissionType": "UNKNOWN",
+        "Principal": null,
+        "ResourceName": null,
+        "ResourcePatternType": "LITERAL",
+        "ResourceType": "TOPIC"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "Resources": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-permission-99-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "delete-permission-99",
+      "conn": "admin",
+      "api": "DeleteACLs",
+      "version": 3,
+      "request": {
+        "Filters": [
+          {
+            "Host": null,
+            "Operation": "ANY",
+            "PermissionType": "UNKNOWN",
+            "Principal": null,
+            "ResourceName": null,
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": 42,
+            "ErrorMessage": "Unknown entryFilter.",
+            "MatchingACLs": null
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "delete-permission-99-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "describe-resource-negative",
+      "conn": "admin",
+      "api": "DescribeACLs",
+      "version": 3,
+      "request": {
+        "Host": null,
+        "Operation": "ANY",
+        "PermissionType": "ANY",
+        "Principal": null,
+        "ResourceName": null,
+        "ResourcePatternType": "LITERAL",
+        "ResourceType": "UNKNOWN"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ErrorMessage": "",
+        "Resources": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-resource-negative-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "delete-resource-negative",
+      "conn": "admin",
+      "api": "DeleteACLs",
+      "version": 3,
+      "request": {
+        "Filters": [
+          {
+            "Host": null,
+            "Operation": "ANY",
+            "PermissionType": "ANY",
+            "Principal": null,
+            "ResourceName": null,
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "UNKNOWN"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": 42,
+            "ErrorMessage": "Unknown patternFilter.",
+            "MatchingACLs": null
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "delete-resource-negative-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "describe-all-0",
+      "conn": "admin",
+      "api": "DescribeACLs",
+      "version": 3,
+      "request": {
+        "Host": null,
+        "Operation": "UNKNOWN",
+        "PermissionType": "UNKNOWN",
+        "Principal": null,
+        "ResourceName": null,
+        "ResourcePatternType": "UNKNOWN",
+        "ResourceType": "UNKNOWN"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "describe-all-0-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "delete-all-0",
+      "conn": "admin",
+      "api": "DeleteACLs",
+      "version": 3,
+      "request": {
+        "Filters": [
+          {
+            "Host": null,
+            "Operation": "UNKNOWN",
+            "PermissionType": "UNKNOWN",
+            "Principal": null,
+            "ResourceName": null,
+            "ResourcePatternType": "UNKNOWN",
+            "ResourceType": "UNKNOWN"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "delete-all-0-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "create-good",
+      "conn": "admin",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": [
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "READ",
+            "PermissionType": "ALLOW",
+            "Principal": "User:alice",
+            "ResourceName": "acl",
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": ""
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "create-good-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "create-resource-0",
+      "conn": "admin",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": [
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "READ",
+            "PermissionType": "ALLOW",
+            "Principal": "User:alice",
+            "ResourceName": "acl",
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "UNKNOWN"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "create-resource-0-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "create-resource-any",
+      "conn": "admin",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": [
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "READ",
+            "PermissionType": "ALLOW",
+            "Principal": "User:alice",
+            "ResourceName": "acl",
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "ANY"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": -1,
+            "ErrorMessage": null
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "create-resource-any-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "create-pattern-0",
+      "conn": "admin",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": [
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "READ",
+            "PermissionType": "ALLOW",
+            "Principal": "User:alice",
+            "ResourceName": "acl",
+            "ResourcePatternType": "UNKNOWN",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "create-pattern-0-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "create-pattern-any",
+      "conn": "admin",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": [
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "READ",
+            "PermissionType": "ALLOW",
+            "Principal": "User:alice",
+            "ResourceName": "acl",
+            "ResourcePatternType": "ANY",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": -1,
+            "ErrorMessage": null
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "create-pattern-any-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "create-pattern-match",
+      "conn": "admin",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": [
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "READ",
+            "PermissionType": "ALLOW",
+            "Principal": "User:alice",
+            "ResourceName": "acl",
+            "ResourcePatternType": "MATCH",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": -1,
+            "ErrorMessage": null
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "create-pattern-match-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "create-operation-0",
+      "conn": "admin",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": [
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "UNKNOWN",
+            "PermissionType": "ALLOW",
+            "Principal": "User:alice",
+            "ResourceName": "acl",
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "create-operation-0-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "create-operation-any",
+      "conn": "admin",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": [
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "ANY",
+            "PermissionType": "ALLOW",
+            "Principal": "User:alice",
+            "ResourceName": "acl",
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": -1,
+            "ErrorMessage": null
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "create-operation-any-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "create-permission-0",
+      "conn": "admin",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": [
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "READ",
+            "PermissionType": "UNKNOWN",
+            "Principal": "User:alice",
+            "ResourceName": "acl",
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "create-permission-0-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "create-permission-any",
+      "conn": "admin",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": [
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "READ",
+            "PermissionType": "ANY",
+            "Principal": "User:alice",
+            "ResourceName": "acl",
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": -1,
+            "ErrorMessage": null
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "create-permission-any-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "create-resource-99",
+      "conn": "admin",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": [
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "READ",
+            "PermissionType": "ALLOW",
+            "Principal": "User:alice",
+            "ResourceName": "acl",
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "UNKNOWN"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": 42,
+            "ErrorMessage": "Invalid resourceType UNKNOWN"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "create-resource-99-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "create-pattern-99",
+      "conn": "admin",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": [
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "READ",
+            "PermissionType": "ALLOW",
+            "Principal": "User:alice",
+            "ResourceName": "acl",
+            "ResourcePatternType": "UNKNOWN",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": 42,
+            "ErrorMessage": "Invalid patternType UNKNOWN"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "create-pattern-99-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "create-operation-99",
+      "conn": "admin",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": [
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "UNKNOWN",
+            "PermissionType": "ALLOW",
+            "Principal": "User:alice",
+            "ResourceName": "acl",
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": 42,
+            "ErrorMessage": "Invalid operation UNKNOWN"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "create-operation-99-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "create-permission-99",
+      "conn": "admin",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": [
+          {
+            "Host": "\u003chost\u003e",
+            "Operation": "READ",
+            "PermissionType": "UNKNOWN",
+            "Principal": "User:alice",
+            "ResourceName": "acl",
+            "ResourcePatternType": "LITERAL",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Results": [
+          {
+            "ErrorCode": 42,
+            "ErrorMessage": "Invalid permissionType UNKNOWN"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "create-permission-99-then",
+      "conn": "admin",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    }
+  ]
+}

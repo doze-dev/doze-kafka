@@ -232,7 +232,7 @@ func typed[Q kmsg.Request, R kmsg.Response](fn func(ctx context.Context, req *pr
 // An I/O failure (a full disk, a read-only remount, a failing device) is
 // KAFKA_STORAGE_ERROR, as Apache Kafka answers when a log directory fails: a
 // retriable code that says the broker's storage is the problem. Anything else is
-// UNKNOWN_SERVER_ERROR.
+// UNKNOWN_SERVER_ERROR (claim: bad-days Q2a).
 func (b *Broker) storageFault(op string, err error, attrs ...any) int16 {
 	b.log.Error("request failed: "+op, append(attrs, "err", err)...)
 	if isIOError(err) {

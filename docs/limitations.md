@@ -26,7 +26,7 @@ implement it.
   `acks=all`; at `acks=0`, which has no response to carry it, the connection is closed.
   Reads, Metadata and group traffic keep working, and freeing space lets writes resume
   without a restart. Kafka goes further: with its only log directory failed the broker
-  shuts down (the recording's last two steps are a closed connection); this one stays
+  shuts down within a minute (the recordings' last step, `broker-after-the-refusal`); this one stays
   up, which is kinder to a development machine and not what a production broker does.
 - **After a failed `fsync` the partition refuses writes until the broker restarts.**
   On Linux a failed `fsync` can drop the unflushed pages and clear the error, so a
@@ -142,6 +142,13 @@ implement it.
 - **Memory only.** The Traffic page keeps the last 2,000 requests and 200 events per
   group, and a restart empties it: it is the last few minutes of a laptop's traffic, not
   an audit log.
+- **A login is shown without what it carried.** For `SaslHandshake`, `SaslAuthenticate`
+  and the SCRAM-credential and delegation-token requests, the inspector's decoded fields
+  are a list of what may be shown (the mechanism, a user's or a principal's name, an
+  iteration count, a lifetime); every other field is `"(hidden)"`, set or not, and a run
+  of bytes never shows its length. A `SaslAuthenticate` row reads `0 B in`: the size of
+  the request is not recorded, because with PLAIN it is the length of the password plus
+  what the row already shows.
 
 ## Listeners and security
 
@@ -252,7 +259,40 @@ implement it.
 - **Consumer-group assignor** is a plain, even round-robin (`uniform`) or `range`; it
   isn't the sticky, cross-topic-balanced reference assignor.
 - **SASL details.** No Kerberos/GSSAPI, no OAUTHBEARER, no delegation tokens, and no
-  `SASLprep` normalization (use ASCII credentials).
+  `SASLprep` normalization (use ASCII credentials). `SaslHandshake` is served at v1
+  only: v0, after which a client sends its tokens without Kafka's framing, closes
+  the connection. Every answer to a login, right or wrong, in order or out of it,
+  is otherwise the one `apache/kafka:4.3.1` gives (`conformance/claims/auth.md`),
+  with two exceptions, both the stricter choice:
+  - A request sent in the middle of a login closes the connection without an answer.
+    Kafka first answers it `ILLEGAL_SASL_STATE` in that request's own error shape and
+    then closes. `ApiVersions` and `SaslHandshake`, the two a client could plausibly
+    send there, are answered as Kafka answers them.
+  - A SCRAM client-final message whose channel binding is not the header the exchange opened with is refused.
+    Kafka does not compare the two; RFC 5802 has a server do it.
+- **DescribeConfigs does not say a config's type** (`ConfigType` is UNKNOWN, 0); Kafka
+  names it (`LIST` for `cleanup.policy`, `conformance/recordings/list-config-append.json`).
+  Names, values and sources are Kafka's.
+- **An empty cleanup.policy is refused** with `INVALID_CONFIG`. Kafka 4.3.1 takes it
+  (SUBTRACT `delete` from an unset `cleanup.policy` leaves `""`, recorded in
+  `list-config-append`), for a log that is neither deleted nor compacted; this broker's
+  log has no such mode, so it refuses what it would not do.
+- **A group request with an empty group id is answered for the group** (open). Apache
+  Kafka 4.3.1 answers a default JoinGroup, SyncGroup, Heartbeat, LeaveGroup and
+  OffsetDelete, whose group id is empty, with `INVALID_GROUP_ID`, and OffsetFetch v2 to
+  v7 with `NOT_COORDINATOR`; this broker answers as for a group that is not there
+  (`conformance/recordings/version-matrix.json`).
+- **ApiVersions v3 with no client software name is answered** (open): Kafka answers
+  `INVALID_REQUEST` (`version-matrix`, step `ApiVersions v3`).
+- **TxnOffsetCommit sent from outside the consumer group** (generation -1, no member id,
+  as a producer that commits a consumer's offsets without being one sends it) is
+  answered for the transaction's state: `INVALID_PRODUCER_ID_MAPPING`, `INVALID_TXN_STATE`,
+  `INVALID_PRODUCER_EPOCH`, or 0. `apache/kafka:4.3.1` answers
+  `COORDINATOR_LOAD_IN_PROGRESS` to every try for thirty seconds, whatever the state
+  (`conformance/recordings/txn-empty-id.json`, steps `txn-offset-commit-*`). Why is not
+  yet understood, so this broker keeps the answer a client can act on.
+- **ApiVersions lists the APIs and versions this broker serves, not Kafka's.** See
+  `docs/api-support.md` for the table and how it is held to a real broker's.
 
 ## If you hit a wall
 

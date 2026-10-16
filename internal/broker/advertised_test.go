@@ -139,6 +139,13 @@ func openRaw(t *testing.T, addr string) *rawConn {
 // was closed instead.
 func (r *rawConn) do(req kmsg.Request, resp kmsg.Response) (ok bool) {
 	r.t.Helper()
+	return r.doAs(req, resp, req.GetVersion())
+}
+
+// doAs is do, reading the answer as the version respVersion: the answer to an
+// ApiVersions the broker does not serve is in the v0 form, whatever was asked.
+func (r *rawConn) doAs(req kmsg.Request, resp kmsg.Response, respVersion int16) (ok bool) {
+	r.t.Helper()
 	body := req.AppendTo(nil)
 	hdr := []byte{byte(req.Key() >> 8), byte(req.Key()), byte(req.GetVersion() >> 8), byte(req.GetVersion()), 0, 0, 0, 9, 0xff, 0xff}
 	if req.IsFlexible() {
@@ -157,8 +164,8 @@ func (r *rawConn) do(req kmsg.Request, resp kmsg.Response) (ok bool) {
 	if _, err := io.ReadFull(r.c, buf); err != nil {
 		return false
 	}
-	resp.SetVersion(req.GetVersion()) // flexibility depends on the version.
-	skip := 4                         // correlation id.
+	resp.SetVersion(respVersion) // flexibility depends on the version.
+	skip := 4                    // correlation id.
 	if resp.IsFlexible() && resp.Key() != 18 {
 		skip++ // response header tagged fields.
 	}
@@ -195,8 +202,11 @@ func (r *rawConn) metadataWorks() bool {
 }
 
 // A failed authentication ends the connection, so each guess costs a new one. It
-// used to stay open: 5,000 wrong passwords were tried on one connection in 144 ms,
-// and a failed re-authentication left an authenticated connection authenticated.
+// used to stay open: 5,000 wrong passwords were tried on one connection in 144 ms.
+// A connection that has logged in cannot log in again, as itself or as anybody
+// else: the second attempt is ILLEGAL_SASL_STATE (34) whatever its password, and
+// the connection stays the user it was (claim: auth A7; who it is afterwards is
+// held by the replay of conformance/recordings/sasl-plain.json, steps twice-*).
 func TestFailedAuthenticationClosesTheConnection(t *testing.T) {
 	addr := startAuthBroker(t, []string{"PLAIN"}, map[string]string{"alice": "secret"}, "", "")
 
@@ -208,17 +218,69 @@ func TestFailedAuthenticationClosesTheConnection(t *testing.T) {
 		t.Fatal("the connection was still usable after a failed authentication")
 	}
 
-	// A good login, then a failed re-authentication: the connection must not stay
-	// authenticated.
-	c = openRaw(t, addr)
+	// A good login, then another attempt: refused whatever the password, and the
+	// connection is still served.
+	for _, pass := range []string{"wrong", "secret"} {
+		c = openRaw(t, addr)
+		if code, open := c.plain("alice", "secret"); !open || code != 0 {
+			t.Fatalf("a correct login: code %d, answered %v", code, open)
+		}
+		if !c.metadataWorks() {
+			t.Fatal("an authenticated connection should be served")
+		}
+		au := kmsg.NewPtrSASLAuthenticateRequest()
+		au.SetVersion(1)
+		au.SASLAuthBytes = []byte("\x00alice\x00" + pass)
+		var ar kmsg.SASLAuthenticateResponse
+		if !c.do(au, &ar) || ar.ErrorCode != 34 {
+			t.Fatalf("a second SaslAuthenticate (password %q) on a logged-in connection: code %d, want ILLEGAL_SASL_STATE (34), answered", pass, ar.ErrorCode)
+		}
+		hs := kmsg.NewPtrSASLHandshakeRequest()
+		hs.SetVersion(1)
+		hs.Mechanism = "PLAIN"
+		var hr kmsg.SASLHandshakeResponse
+		if !c.do(hs, &hr) || hr.ErrorCode != 34 || len(hr.SupportedMechanisms) != 0 {
+			t.Fatalf("a second SaslHandshake on a logged-in connection: code %d, mechanisms %v; want 34 and none", hr.ErrorCode, hr.SupportedMechanisms)
+		}
+		if !c.metadataWorks() {
+			t.Fatal("a logged-in connection was closed or logged out by a second login attempt")
+		}
+	}
+}
+
+// A client that opens at a version of ApiVersions this broker does not serve is told
+// which ones it does (UNSUPPORTED_VERSION and the one row) and asks again. That is not
+// the one ApiVersions a connection that has still to log in may send: franz-go opens at
+// v5, so counting it closed every franz-go connection to a broker with SASL on before
+// it could log in. A second ApiVersions that was served still closes the connection.
+func TestAnUnsupportedApiVersionsDoesNotUseUpTheOneBeforeLogin(t *testing.T) {
+	addr := startAuthBroker(t, []string{"PLAIN"}, map[string]string{"alice": "secret"}, "", "")
+	c := openRaw(t, addr)
+
+	var served kmsg.ApiVersionsResponse
+	tooNew := kmsg.NewPtrApiVersionsRequest()
+	tooNew.SetVersion(99)
+	tooNew.ClientSoftwareName, tooNew.ClientSoftwareVersion = "t", "1"
+	if !c.doAs(tooNew, &served, 0) || served.ErrorCode != 35 {
+		t.Fatalf("ApiVersions v99: answered, code %d; want UNSUPPORTED_VERSION (35)", served.ErrorCode)
+	}
+
+	ok := kmsg.NewPtrApiVersionsRequest()
+	ok.SetVersion(3)
+	ok.ClientSoftwareName, ok.ClientSoftwareVersion = "t", "1"
+	if !c.do(ok, &served) || served.ErrorCode != 0 {
+		t.Fatalf("ApiVersions v3 after the refused v99: answered, code %d; want the list (0)", served.ErrorCode)
+	}
 	if code, open := c.plain("alice", "secret"); !open || code != 0 {
-		t.Fatalf("a correct login: code %d, answered %v", code, open)
+		t.Fatalf("the login after it: code %d, open %v; want 0, open", code, open)
 	}
-	if !c.metadataWorks() {
-		t.Fatal("an authenticated connection should be served")
+
+	// And a second one that was served is still one too many.
+	d := openRaw(t, addr)
+	if !d.do(ok, &served) {
+		t.Fatal("the first ApiVersions was not answered")
 	}
-	c.plain("alice", "wrong")
-	if c.metadataWorks() {
-		t.Fatal("after a failed re-authentication the connection was still authenticated")
+	if d.do(ok, &served) {
+		t.Fatal("a second served ApiVersions before login was answered; Kafka closes the connection")
 	}
 }

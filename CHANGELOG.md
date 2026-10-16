@@ -236,6 +236,83 @@ here that contains "server API"; `task api` fails without it.
   deleted is skipped. ConsumerGroupDescribe of a group that does not exist carries
   Kafka's message, `Group <id> not found.`
 
+- A Fetch at an offset out of range (above the log end or below its start) answers
+  `OFFSET_OUT_OF_RANGE` with high watermark, last stable offset and log start offset
+  -1, as `apache/kafka:4.3.1` does (it used to carry the partition's real offsets), and
+  DescribeConfigs answers a resource with an empty error message rather than null
+  (recorded: `fetch-above-the-end`, `list-config-append`; `conformance/claims/api.md`
+  V6, V7). Every code comment that says what Kafka does now names the claims row
+  that shows it, and a test holds new ones to that.
+
+- Transactions and ACLs refuse malformed requests as `apache/kafka:4.3.1` does
+  (recorded: `txn-empty-id`, `acl-unknown-codes`; `conformance/claims/api.md` V4, V5).
+  An empty transactional id is `INVALID_REQUEST` in EndTxn, AddOffsetsToTxn,
+  AddPartitionsToTxn and InitProducerId (InitProducerId used to hand out a producer id
+  for it, as for a null id); AddOffsetsToTxn no longer refuses an empty group id.
+  An ACL request naming the UNKNOWN (0) code for resource type, pattern type, operation
+  or permission closes the connection; a code that is no value matches nothing in
+  DescribeAcls and is `INVALID_REQUEST` in Kafka's words in DeleteAcls and CreateAcls;
+  CreateAcls with ANY or MATCH answers `UNKNOWN_SERVER_ERROR`.
+
+- API versions: no `--kafka-version` profile offers a version the real broker of that
+  major does not serve. At the default, `--kafka-version 4`, nine old versions that
+  Kafka 4 removed (KIP-896) are no longer served: ListOffsets v0, OffsetCommit v0–1,
+  OffsetFetch v0, CreateTopics v0–1, DeleteTopics v0, DescribeAcls, CreateAcls and
+  DeleteAcls v0, DescribeConfigs v0. A request at one closes the connection, as on
+  `apache/kafka:4.3.1` (recorded: `versions-not-served`). A client that old works at
+  `--kafka-version 3`, as it does against a Kafka 3 broker. At `--kafka-version 1`,
+  six maxima come down to what Kafka 1.1.1 has (Metadata v5, FindCoordinator v1,
+  ListGroups v1, InitProducerId v0, SaslAuthenticate v0, DeleteGroups v0). Every
+  column of the version table is now held by a test to the recorded `ApiVersions`
+  answer of a real broker of that major (`conformance/recordings/api-versions.json`;
+  `docs/api-support.md` says which image stands for which).
+
+- **Security: SASL.** A connection logs in once, as the user whose password it proved,
+  and stays that user. Before this (a) a PLAIN token naming another user as its
+  authorization id (`bob NUL alice NUL alice's password`) was accepted, where Kafka
+  refuses it; SCRAM ignored `a=` the same way; (b) a connection that had logged in could
+  send a second `SaslAuthenticate` and become that token's user (alice became bob with
+  bob's password), and a wrong password on it logged the connection out; (c) a refused
+  `SaslHandshake` left the connection open for another try. Every answer to a login now
+  is the one `apache/kafka:4.3.1` gives, from two recordings of it (`sasl-plain`, 143
+  steps; `sasl-scram`, 293 steps; `conformance/claims/auth.md`): the authorization id
+  must be empty or the user's own name; after a login `SaslHandshake` and
+  `SaslAuthenticate` are `ILLEGAL_SASL_STATE` and change nothing; a `SaslAuthenticate`
+  with no handshake, a second `ApiVersions` before the handshake and a request in the
+  middle of a login close the connection; a second handshake mid-login is
+  `ILLEGAL_SASL_STATE` and closed; the refusal texts are Kafka's ("Authentication
+  failed: Invalid username or password", the same for an unknown user); an accepted
+  token answers an empty error message, not a null one; SCRAM takes only the `n`
+  channel-binding flag (it accepted `y`), does not sign a reserved `m=` attribute,
+  refuses a bad `=XX` escape in a user name and anything around the three attributes of
+  a client-final message, and closes without an answer on a proof of the wrong length.
+  Two answers stay stricter than Kafka's and are written in `docs/limitations.md`.
+  `CreateAcls` answers an empty error message for an ACL it created, as Kafka does.
+- Traffic inspector: for the requests that carry a credential (`SaslHandshake`,
+  `SaslAuthenticate`, the SCRAM-credential and delegation-token requests) the decoded
+  fields are held to a list of what may be shown; every other field reads `"(hidden)"`.
+  The length of a SASL token is no longer shown (`"AuthBytes": "29 bytes"` gave the
+  length of a PLAIN password), and neither is the size of a `SaslAuthenticate` request,
+  which gave it too: its row reads `0 B in`.
+
+- Config file errors name the line and the key and never repeat what the file says. An
+  unquoted value outside `[credentials]` used to be quoted back (`expected value but
+  found "hunter2"`), as did a bad duration, and a password typed where the user's name
+  goes was printed whole; under `[credentials]` the key is no longer named, only the
+  line. `credentials` written as anything but a table (`credentials = "..."`) is refused:
+  it used to load as a broker with no users.
+
+- Credentials: `--pprof-addr` no longer serves `/debug/pprof/cmdline` (the command line,
+  which is where `--sasl-user user:password` is); the other profiles are unchanged. The log
+  line for a handler that panicked during a SASL exchange names the type of the panic's
+  value and the stack, not its text. The test that reads every output for a planted
+  password now reads text and JSON logs at every level, logins with PLAIN and both SCRAM
+  mechanisms (right and wrong password), malformed SASL input, the panic line, the pprof
+  pages, the schema registry's answers to HTTP Basic credentials, `/healthz`, the console
+  and its Traffic inspector, every file of the data directory (and its mode), `env`,
+  `doctor`, `--help`, `config print`, and a restart over the same data; a surface it did
+  not reach fails it.
+
 - Console: every button reads weight 400 whether it is a button or a link drawn as one (the
   boards draw them all as buttons). A request that took under a millisecond shows its
   measured time (`42 µs`, `0.4 ms`) rather than the design boards' `0 ms`: a broker

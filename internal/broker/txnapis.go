@@ -52,6 +52,10 @@ func (b *Broker) handleAddPartitionsToTxn(ctx context.Context, req *protocol.Req
 		fail(kerr.TransactionalIDAuthorizationFailed.Code)
 		return nil
 	}
+	if ar.TransactionalID == "" { // claim: api V4
+		fail(kerr.InvalidRequest.Code)
+		return nil
+	}
 	e := b.txns.get(ar.TransactionalID)
 	if e == nil {
 		fail(kerr.InvalidProducerIDMapping.Code)
@@ -141,10 +145,12 @@ func (b *Broker) handleAddOffsetsToTxn(ctx context.Context, req *protocol.Reques
 	case !b.canGroup(req.Conn, ar.Group, opRead):
 		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
 		return nil
-	case ar.Group == "" || meta.ValidateGroupID(ar.Group) != nil:
-		resp.ErrorCode = kerr.InvalidGroupID.Code
+	case ar.TransactionalID == "": // claim: api V4
+		resp.ErrorCode = kerr.InvalidRequest.Code
 		return nil
 	}
+	// The group id is not checked: Kafka adds an empty one to the transaction and
+	// answers 0 (claim: api V4, step add-offsets-real-no-group).
 	e := b.txns.get(ar.TransactionalID)
 	if e == nil {
 		resp.ErrorCode = kerr.InvalidProducerIDMapping.Code
@@ -273,6 +279,10 @@ func (b *Broker) handleTxnOffsetCommit(ctx context.Context, req *protocol.Reques
 func (b *Broker) handleEndTxn(ctx context.Context, req *protocol.Request, er *kmsg.EndTxnRequest, resp *kmsg.EndTxnResponse) error {
 	if !b.canTxnID(req.Conn, er.TransactionalID, opWrite) {
 		resp.ErrorCode = kerr.TransactionalIDAuthorizationFailed.Code
+		return nil
+	}
+	if er.TransactionalID == "" { // claim: api V4
+		resp.ErrorCode = kerr.InvalidRequest.Code
 		return nil
 	}
 	resp.ErrorCode = b.endTxn(er.TransactionalID, er.ProducerID, er.ProducerEpoch, er.Commit)

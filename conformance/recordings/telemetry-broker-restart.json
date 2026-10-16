@@ -125,7 +125,7 @@
         "ErrorCode": 89,
         "PushIntervalMillis": 0,
         "RequestedMetrics": null,
-        "SubscriptionID": "\u003csubscription:3\u003e",
+        "SubscriptionID": 0,
         "TelemetryMaxBytes": 0,
         "ThrottleMillis": 0
       }
@@ -138,7 +138,7 @@
         "ClientInstanceID": "\u003cinstance:1\u003e",
         "CompressionType": 0,
         "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
-        "SubscriptionID": "\u003csubscription:3\u003e",
+        "SubscriptionID": 0,
         "Terminating": false
       },
       "response": {

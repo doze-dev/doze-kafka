@@ -21,6 +21,12 @@ import (
 // encodes to the same bytes. A wrong version range in the table (advertised past
 // what the handler can encode) or a handler that panics on an empty request shows
 // up here, for the API and version it is wrong at.
+//
+// What the answers say is compared with real Kafka elsewhere: the version-matrix
+// scenario (conformance/scenarios_versions.go) sends the same default request of
+// every API at every offered version to apache/kafka:4.3.1 and the replay holds
+// doze-kafka's error codes and shape to each recorded answer, with every accepted
+// difference listed (conformance/claims/api.md V13).
 
 // matrixVersions is the versions of a range to try: the ends and the middle.
 func matrixVersions(r protocol.VersionRange) []int16 {
@@ -50,6 +56,11 @@ func defaultRequest(key int16, version int16) kmsg.Request {
 		// INVALID_REQUEST with no list, as Kafka refuses it: that answer would decode
 		// and round-trip and prove nothing about the list.
 		r.ClientSoftwareName, r.ClientSoftwareVersion = "matrix", "1"
+	case *kmsg.DescribeACLsRequest:
+		// Every code at its default is UNKNOWN (0), on which Kafka, and this
+		// broker, close the connection (conformance/claims/api.md V5, and the
+		// version-matrix recording); ANY is the filter that is answered.
+		r.ResourceType, r.ResourcePatternType, r.Operation, r.PermissionType = 1, 1, 1, 1
 	}
 	req.SetVersion(version)
 	return req
@@ -65,6 +76,13 @@ func matrixRequest(t *testing.T, addr string, key, version int16, req kmsg.Reque
 		t.Fatal(err)
 	}
 	defer c.Close()
+	return matrixRequestOn(t, c, key, version, req)
+}
+
+// matrixRequestOn is matrixRequest over a connection the caller made, for a
+// request that only means something after another (SaslAuthenticate).
+func matrixRequestOn(t *testing.T, c net.Conn, key, version int16, req kmsg.Request) (answered bool, resp []byte) {
+	t.Helper()
 	hdr := []byte{byte(key >> 8), byte(key), byte(version >> 8), byte(version), 0, 0, 0, 9, 0xff, 0xff}
 	if req.IsFlexible() {
 		hdr = append(hdr, 0)
@@ -155,10 +173,24 @@ func TestVersionMatrix_SASLAPIsAnswerWhenConfigured(t *testing.T) {
 		found++
 		for _, v := range matrixVersions(protocol.VersionRange{Min: a.Min, Max: a.Max}) {
 			req := defaultRequest(int16(a.Key), v)
+			c, err := net.DialTimeout("tcp", addr, 2*time.Second)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer c.Close()
 			if a.Key == protocol.APIKey(kmsg.SASLHandshake) {
 				req.(*kmsg.SASLHandshakeRequest).Mechanism = "PLAIN"
+			} else {
+				// A SaslAuthenticate with no handshake before it closes the connection,
+				// as on Kafka (claim: auth A8): it is sent where it belongs.
+				hs := kmsg.NewPtrSASLHandshakeRequest()
+				hs.SetVersion(1)
+				hs.Mechanism = "PLAIN"
+				if answered, _ := matrixRequestOn(t, c, int16(kmsg.SASLHandshake), 1, hs); !answered {
+					t.Fatalf("SaslHandshake before SASLAuthenticate v%d: closed the connection", v)
+				}
 			}
-			answered, raw := matrixRequest(t, addr, int16(a.Key), v, req)
+			answered, raw := matrixRequestOn(t, c, int16(a.Key), v, req)
 			if !answered {
 				t.Errorf("%s v%d: closed the connection", protocol.APIName(a.Key), v)
 			} else if problem := readResponse(int16(a.Key), v, raw); problem != "" {

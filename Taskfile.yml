@@ -153,6 +153,11 @@ tasks:
     cmds:
       - go test ./conformance -count=1 -v -run TestRecord -record {{.CLI_ARGS}}
 
+  conformance:stable:
+    desc: 'Record every scripted scenario against apache/kafka:4.3.1 three times and fail unless each run is byte-identical to the committed recordings (a timing-dependent step shows as a changed file). Needs Docker and a clean conformance/recordings'
+    cmds:
+      - scripts/conformance-stable.sh
+
   test:kcat:
     desc: 'kcat (librdkafka) against the real binary; needs kcat installed'
     cmds:
