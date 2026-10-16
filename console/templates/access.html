@@ -1,42 +1,175 @@
-{{/* Access (Ac-Home): the ACLs the broker holds, and the rule that applies where there
-     is none. Read-only: ACLs are managed through the Kafka API (kafka-acls,
-     Terraform), as the page says. The board's create form and the "could a principal
-     do this" checker are not built here; the console has no write path for ACLs. */}}
-{{define "access_detail"}}{{template "shell_top" .}}
-  <aside class="list" aria-label="Principals">
-    <a class="li {{if not .Principal}}on{{end}}" href="{{prefix}}/access"><span class="grow">All ACLs</span><span class="m mut">{{len .AllACLs}}</span></a>
+{{/* Access. The list on the left is the principals (Ac-Home's "Principals"): all
+     ACLs, each principal an ACL names with its count or its denies, User:ANONYMOUS
+     (every client without a login), and the super users. */}}
+{{define "access_lp"}}
+<nav class="list" aria-label="Principals">
+  <div class="li"><span class="cap">Principals</span></div>
+  <div class="list-filter"><input class="inp m" type="search" placeholder="Filter principals" aria-label="Filter principals" data-filter-target=".list a.li[data-name]" data-filter-none="#list-none" spellcheck="false" autocomplete="off"></div>
+  <div class="list-scroll">
+    <a class="li {{if and .All (not .Principal)}}on{{end}}" href="{{prefix}}/access"{{if and .All (not .Principal)}} aria-current="page"{{end}}><span class="grow">All ACLs</span><span class="m mut">{{len .AllACLs}}</span></a>
     {{range .Principals}}
-    <a class="li {{if eq .Name $.Principal}}on{{end}}" href="{{prefix}}/access?principal={{.Name}}"><span class="m grow el">{{.Name}}</span><span class="m {{if .Denies}}deny{{else}}mut{{end}}">{{if .Denies}}{{.Denies}} deny{{else}}{{.Count}}{{end}}</span></a>
+    <a class="li {{if eq .Name $.Principal}}on{{end}}" href="{{prefix}}/access?principal={{.Name}}" data-name="{{.Name}}"{{if eq .Name $.Principal}} aria-current="page"{{end}}><span class="m grow el">{{.Name}}</span>{{if .Super}}<span class="note">super user</span>{{else if .Denies}}<span class="m deny">{{.Denies}} deny</span>{{else}}<span class="m mut">{{.Count}}</span>{{end}}</a>
     {{end}}
-    {{range .SuperUserList}}<div class="li"><span class="m grow el">{{.}}</span><span class="note">super user</span></div>{{end}}
-  </aside>
+    <div class="note list-note" id="list-none" hidden>No principal matches the filter.</div>
+  </div>
+</nav>
+{{end}}
+
+{{/* Ac-Home: the ACLs the broker holds, the rule where there is none, what was refused,
+     a checker, and the wire of ACL requests and refusals under the page. */}}
+{{define "access_detail"}}{{template "shell_top" .}}
+  {{template "access_lp" (dict "AllACLs" .AllACLs "Principals" .Principals "Principal" .Principal "All" true)}}
   <main class="main" id="detail">
     <div class="row sb ce idband">
       <div class="col"><h1 class="h1">Access</h1><span class="note">The ACLs on this broker. They are enforced on every request.</span></div>
+      <div class="row g8 ce"><a class="btn pri" href="{{prefix}}/new/acl" data-create>Create ACL</a></div>
     </div>
 
-    <div class="callout" role="note"><span><span class="b">These are enforced.</span> {{if .OpenByDefault}}A topic, group or the cluster that no ACL is about is open to everyone (the default is <span class="m">allow</span>); one that has ACLs allows only what they allow, and a DENY always wins.{{else}}Anything an ACL does not allow is refused (<span class="m">--acl-default deny</span>); a DENY always wins.{{end}}{{if .SuperUsers}} Super users, never refused: <span class="m">{{.SuperUsers}}</span>.{{end}} Without authentication every client is <span class="m">User:ANONYMOUS</span>.</span>
-      <span class="note">Manage them with <span class="m">kafka-acls.sh</span> or your provisioning tool. See <a href="https://github.com/doze-dev/doze-kafka/blob/main/docs/authorization.md" target="_blank" rel="noopener">authorization</a>.</span></div>
+    <div class="callout" role="note"><span><span class="b">These are enforced.</span> {{if .OpenByDefault}}A topic, group or the cluster that no ACL is about is open to everyone (the default is <span class="m">allow</span>); one that has ACLs allows only what they allow, and a DENY always wins.{{else}}Anything an ACL does not allow is refused (the default is <span class="m">deny</span>); a DENY always wins.{{end}}{{if .SuperUserList}} Super users, never refused: {{range $i, $s := .SuperUserList}}{{if $i}}, {{end}}<span class="m">{{$s}}</span>{{end}}.{{end}} Without authentication every client is <span class="m">User:ANONYMOUS</span>.</span>
+      <span class="note">Manage them with <span class="m">kafka-acls.sh</span> or your provisioning tool. <a href="https://github.com/doze-dev/doze-kafka/blob/main/docs/authorization.md#the-default" target="_blank" rel="noopener">How the default works</a></span></div>
 
     <div class="row ce g8 wrap" id="access-summary">
       <span class="m">{{len .AllACLs}} ACL{{if ne (len .AllACLs) 1}}s{{end}}</span><span class="mut">·</span>
-      <span class="m">default <span class="b">{{if .OpenByDefault}}allow{{else}}deny{{end}}</span> (<span class="m">--acl-default</span>)</span>
+      <span class="m">default <span class="b">{{if .OpenByDefault}}allow{{else}}deny{{end}}</span> (--acl-default)</span>
       {{if .SuperUserList}}<span class="mut">·</span><span class="m">{{len .SuperUserList}} super user{{if ne (len .SuperUserList) 1}}s{{end}}</span>{{end}}
+      {{if .HasTraffic}}<span class="mut">·</span><span class="m {{if .Refused}}deny{{else}}mut{{end}}" title="Requests an ACL refused, among those the broker keeps in memory">{{num .Refused}} request{{if ne .Refused 1}}s{{end}} refused {{.RefusedOver}}</span>{{end}}
     </div>
 
     {{if .ACLs}}
-    <div class="card" id="acl-table" style="--c: minmax(0, 1.1fr) 80px minmax(0, 1.6fr) 84px 100px 96px 44px">
+    <div class="card" id="acl-table">
       <div class="r h"><span>Principal</span><span>Type</span><span>Name</span><span>Pattern</span><span>Operation</span><span>Permission</span><span>Host</span></div>
       {{range .ACLs}}
-      <div class="r{{if eq .Permission "deny"}} denyrow{{end}}">
-        <span class="m">{{.Principal}}</span><span class="m">{{capital .Resource}}</span><span class="m">{{.Name}}</span><span class="m">{{.Pattern}}</span><span class="m">{{capital .Operation}}</span>
+      <div class="r{{if eq .Permission "deny"}} denyrow{{end}}" tabindex="0" role="button" data-row data-inspector-open data-open-keys="acl:{{.Key}}"
+        hx-get="{{prefix}}/inspect/acl?key={{urlquery .Key}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
+        <span class="m" title="{{.Principal}}">{{.Principal}}</span><span class="m">{{capital .Resource}}</span><span class="m" title="{{.Name}}">{{.Name}}</span><span class="m">{{.Pattern}}</span><span class="m">{{capital .Operation}}</span>
         <span class="m {{if eq .Permission "deny"}}deny b{{else}}ok{{end}}">{{upper .Permission}}</span><span class="m">{{.Host}}</span>
       </div>
       {{end}}
     </div>
-    <div class="note">The list is what <span class="m">DescribeAcls</span> returns.</div>
+    <div class="note">The list is what <span class="m">DescribeAcls</span> returns. Select a row to see what it lets through or refuses.</div>
     {{else}}
-    <div class="callout"><span class="b">None stored</span><span class="note">Create some with <span class="m">kafka-acls.sh --add</span> or your provisioning tool; they take effect at once and appear here.</span></div>
+    <div class="callout"><span class="b">None stored</span><span class="note">Create one here, or with <span class="m">kafka-acls.sh --add</span> or your provisioning tool; it takes effect at once and appears here.</span></div>
+    {{end}}
+
+    <form class="card pad col g6" id="acl-checker" method="get" action="{{prefix}}/access/check">
+      <div class="row sb ce"><h2 class="h2">Could a principal do this?</h2><a class="note" href="{{prefix}}/access/check">Open the checker</a></div>
+      <div class="row ce g8 wrap">
+        <input class="inp m w180" name="principal" aria-label="Principal" value="{{.Check.Principal}}" required spellcheck="false" autocomplete="off">
+        <select class="inp m w90" name="operation" aria-label="Operation">{{range .Operations}}<option value="{{.}}"{{if eq . $.Check.Operation}} selected{{end}}>{{capital .}}</option>{{end}}</select>
+        <select class="inp m w90" name="resource" aria-label="Resource type">{{range .Resources}}<option value="{{.}}"{{if eq . $.Check.Resource}} selected{{end}}>{{capital .}}</option>{{end}}</select>
+        <input class="inp m w180" name="name" aria-label="Resource name" value="{{.Check.Name}}" spellcheck="false" autocomplete="off">
+        <input type="hidden" name="host" value="{{.Check.Host}}">
+        <button class="btn" type="submit">Check</button>
+      </div>
+    </form>
+    <div class="grow"></div>
+  </main>
+  {{template "wire_dock" .}}
+{{template "shell_bottom" .}}{{end}}
+
+{{/* Ac-05: one question, answered by the rules the broker enforces (aclcheck.go), with
+     the ACL that decided, how each rule was read, and what would change the answer. */}}
+{{define "access_check"}}{{template "shell_top" .}}
+  {{template "access_lp" (dict "AllACLs" .AllACLs "Principals" nil "Principal" "")}}
+  <main class="main gap12" id="detail">
+    <div class="row sb ce idband">
+      <div class="col"><h1 class="h1">Check a request</h1><span class="note">Read by the rules the broker enforces, in its order, without sending the request. Nothing is changed or logged as a refusal.</span></div>
+      <div class="row g8 ce"><a class="btn" href="{{prefix}}/access">Back to the list</a></div>
+    </div>
+
+    <form class="card pad col g8" method="get" action="{{prefix}}/access/check">
+      <h2 class="h2">Could this principal do this?</h2>
+      <div class="row ce g8 wrap">
+        <div class="col g4 w170"><label class="note" for="cp">Principal</label><input id="cp" class="inp m" name="principal" value="{{.Check.Principal}}" required spellcheck="false" autocomplete="off"></div>
+        <div class="col g4 w100"><label class="note" for="co">Operation</label><select id="co" class="inp m" name="operation">{{range .Operations}}<option value="{{.}}"{{if eq . $.Check.Operation}} selected{{end}}>{{capital .}}</option>{{end}}</select></div>
+        <div class="col g4 w110"><label class="note" for="ct">Resource</label><select id="ct" class="inp m" name="resource">{{range .Resources}}<option value="{{.}}"{{if eq . $.Check.Resource}} selected{{end}}>{{capital .}}</option>{{end}}</select></div>
+        <div class="col g4 w200"><label class="note" for="cn">Name</label><input id="cn" class="inp m" name="name" value="{{.Check.Name}}" spellcheck="false" autocomplete="off"></div>
+        <div class="col g4 w130"><label class="note" for="ch">From host</label><input id="ch" class="inp m" name="host" value="{{.Check.Host}}" spellcheck="false" autocomplete="off"></div>
+        <div class="col g4"><span class="note" aria-hidden="true">&nbsp;</span><button class="btn pri" type="submit">Check</button></div>
+      </div>
+    </form>
+
+    {{with .Answer}}
+    <div class="callout {{if .Allowed}}ok{{else}}deny{{end}}" role="status" id="check-answer"><div class="row g8 ce"><span class="h1 {{if .Allowed}}ok{{else}}deny{{end}}">{{if .Allowed}}ALLOWED{{else}}DENIED{{end}}</span><span class="m">{{$.Check.Principal}} {{if .Allowed}}can{{else}}cannot{{end}} {{capital $.Check.Operation}} {{$.Check.Resource}} {{$.Check.Name}} from {{$.Check.Host}}</span></div>
+      {{if not .Allowed}}<span class="note">A real request like this is refused with <span class="m">{{$.Error}}</span>{{with $.LastRefused}}, the way <span class="m">{{if .ClientID}}{{.ClientID}}{{else}}{{.Remote}}{{end}}</span> was at {{when .Time "clock"}}{{end}}.</span>{{end}}</div>
+
+    {{with .By}}
+    <div class="card" id="check-decided">
+      <div class="r h"><span>The ACL that decided</span><span>Resource</span><span>Pattern</span><span>Operation</span><span>Permission</span><span>Host</span></div>
+      <div class="r{{if eq .Permission "deny"}} denyrow{{end}}"><span class="m">{{.Principal}}</span><span class="m">{{capital .Resource}} {{.Name}}</span><span class="m">{{.Pattern}}</span><span class="m">{{capital .Operation}}</span><span class="m {{if eq .Permission "deny"}}deny b{{else}}ok{{end}}">{{upper .Permission}}</span><span class="m">{{.Host}}</span></div>
+    </div>
+    {{end}}
+
+    <div class="card pad col g6" id="check-steps"><h2 class="h2">How the rules were read</h2>
+      {{range $i, $s := .Steps}}<div class="row g8{{if not $s.Reached}} mut{{end}}"><span class="num{{if not $s.Reached}} num-off{{end}}">{{add $i 1}}</span><span>{{$s.Ask}} {{if $s.Decided}}<span class="b {{if $.Answer.Allowed}}ok{{else}}deny{{end}}">{{$s.Answer}}</span>{{else}}{{$s.Answer}}{{end}}</span></div>{{end}}
+    </div>
+
+    <div class="row g12">
+      <div class="well pad col g4 grow"><span class="b">{{if .Allowed}}To refuse it{{else}}To let it through{{end}}</span><span class="note">{{segs $.Advice}}</span></div>
+      {{with $.Compare}}<div class="well pad col g4 grow"><span class="b">Compare an allowed request</span><span class="note"><span class="m">{{.Q.Principal}}</span> {{capital .Q.Operation}} {{.Q.Resource}} <span class="m">{{.Q.Name}}</span> is <span class="ok b">ALLOWED</span>, by <span class="m">ALLOW {{.By.Principal}} {{capital .By.Operation}}</span> on that {{.Q.Resource}}.</span></div>{{end}}
+    </div>
     {{end}}
   </main>
 {{template "shell_bottom" .}}{{end}}
+
+{{/* Ac-03: the fields CreateAcls has, the same ACL from a terminal (built on the
+     server as the form changes), and what it will do. */}}
+{{define "access_create"}}{{template "shell_top" .}}
+  {{template "access_lp" (dict "AllACLs" .AllACLs "Principals" nil "Principal" "")}}
+  <main class="main gap12" id="detail">
+    <div class="row sb ce idband">
+      <div class="col"><h1 class="h1">Create an ACL</h1><span class="note">The same fields <span class="m">CreateAcls</span> has. The console sends it as <span class="m">{{.Console}}</span>{{if .ConsoleSuper}}, a super user{{end}}.</span></div>
+      <div class="row g8 ce"><a class="btn" href="{{prefix}}/access">Back to the list</a></div>
+    </div>
+    <form class="col g12" id="create-acl" hx-post="{{prefix}}/new/acl" hx-disabled-elt="find button[type=submit]" x-data="{perm: '{{.A.Permission}}'}">
+      <div class="card pad col g12">
+        <div class="row g12">
+          <div class="col g4 grow"><label class="b" for="ap">Principal</label><input id="ap" class="inp m" name="principal" value="{{.A.Principal}}" placeholder="User:alice" required spellcheck="false" autocomplete="off" aria-describedby="ap-teach"><span class="note" id="ap-teach">{{aclNote "principal"}}</span></div>
+          <div class="col g4 w150"><label class="b" for="ah">Host</label><input id="ah" class="inp m" name="host" value="{{.A.Host}}" required spellcheck="false" autocomplete="off" aria-describedby="ah-teach"><span class="note" id="ah-teach">{{aclNote "host"}}</span></div>
+        </div>
+        <div class="row g12">
+          <div class="col g4 w170"><label class="b" for="art">Resource type</label><select id="art" class="inp m" name="resource" aria-describedby="art-teach">{{range .Resources}}<option value="{{.}}"{{if eq . $.A.Resource}} selected{{end}}>{{capital .}}</option>{{end}}</select><span class="note" id="art-teach">{{aclNote "resource"}}</span></div>
+          <div class="col g4 grow"><label class="b" for="arn">Resource name</label><input id="arn" class="inp m" name="name" value="{{.A.Name}}" spellcheck="false" autocomplete="off" aria-describedby="arn-teach"><span class="note" id="arn-teach">{{aclNote "name"}}</span></div>
+          <div class="col g4 w170"><label class="b" for="apt">Pattern</label><select id="apt" class="inp m" name="pattern" aria-describedby="apt-teach"><option value="literal"{{if eq .A.Pattern "literal"}} selected{{end}}>literal</option><option value="prefixed"{{if eq .A.Pattern "prefixed"}} selected{{end}}>prefixed</option></select><span class="note" id="apt-teach">{{aclNote "pattern"}}</span></div>
+        </div>
+        <div class="row g12">
+          <div class="col g4 w170"><label class="b" for="aop">Operation</label><select id="aop" class="inp m" name="operation" aria-describedby="aop-teach">{{range .Operations}}<option value="{{.}}"{{if eq . $.A.Operation}} selected{{end}}>{{capital .}}</option>{{end}}</select><span class="note" id="aop-teach">{{aclNote "operation"}}</span></div>
+          <div class="col g4 w170"><span class="b" id="aperm-l">Permission</span><div class="seg" role="group" aria-labelledby="aperm-l"><button type="button" :class="perm==='allow'&&'on'" :aria-pressed="perm==='allow'" @click="perm='allow'" class="{{if eq .A.Permission "allow"}}on{{end}}" aria-pressed="{{eq .A.Permission "allow"}}">ALLOW</button><button type="button" :class="perm==='deny'&&'on'" :aria-pressed="perm==='deny'" @click="perm='deny'" class="{{if eq .A.Permission "deny"}}on{{end}}" aria-pressed="{{eq .A.Permission "deny"}}">DENY</button></div><input type="hidden" name="permission" :value="perm" value="{{.A.Permission}}"><span class="note">{{aclNote "permission"}}</span></div>
+          <div class="grow"></div>
+        </div>
+      </div>
+      <div id="acl-preview" hx-get="{{prefix}}/new/acl/preview" hx-trigger="input from:#create-acl delay:200ms, change from:#create-acl, click from:#create-acl .seg button" hx-include="#create-acl" hx-target="this" hx-select="unset" hx-swap="innerHTML" class="col g12">{{template "access_create_preview" .}}</div>
+      <div class="err form-err" data-err-slot hidden role="alert"></div>
+      <div class="row g8"><button class="btn pri" type="submit">Create ACL</button><a class="btn" href="{{prefix}}/access/check?principal={{urlquery .A.Principal}}&amp;operation={{urlquery .A.Operation}}&amp;resource={{urlquery .A.Resource}}&amp;name={{urlquery .A.Name}}">Check first</a><a class="btn ghost" href="{{prefix}}/access">Cancel</a></div>
+    </form>
+  </main>
+{{template "shell_bottom" .}}{{end}}
+
+{{define "access_create_preview"}}
+<div class="card pad col g8"><h2 class="h2">The same ACL from a terminal</h2><pre class="code" id="acl-command">{{.Command}}</pre></div>
+<div class="well pad col g4" id="acl-effect"><span class="b">What this will do</span><span class="note">{{segs .Effect}}</span></div>
+{{end}}
+
+{{/* What one ACL is and what it decided (Ac-02's panel), in the inspector. */}}
+{{define "inspector_acl"}}
+<div class="inspector-b" id="acl-inspector">
+  <div class="kv">
+    <span>Principal</span><span class="m">{{.A.Principal}}</span>
+    <span>Resource</span><span class="m">{{capital .A.Resource}} {{.A.Name}}</span>
+    <span>Pattern</span><span class="m">{{.A.Pattern}}</span>
+    <span>Operation</span><span class="m">{{capital .A.Operation}}</span>
+    <span>Permission</span><span class="m {{if eq .A.Permission "deny"}}deny b{{else}}ok{{end}}">{{upper .A.Permission}}</span>
+    <span>Host</span><span class="m">{{.A.Host}}</span>
+  </div>
+  <p class="note">{{if eq .A.Permission "deny"}}Refuses every request that needs {{capital .A.Operation}} on {{if eq .A.Pattern "prefixed"}}a {{.A.Resource}} whose name starts with <span class="m">{{.A.Name}}</span>{{else}}this {{.A.Resource}}{{end}} by <span class="m">{{.A.Principal}}</span>{{if ne .A.Host "*"}} from <span class="m">{{.A.Host}}</span>{{end}}. A DENY wins over any ALLOW.{{else}}Lets <span class="m">{{.A.Principal}}</span>{{if ne .A.Host "*"}} from <span class="m">{{.A.Host}}</span>{{end}} {{.A.Operation}} {{if eq .A.Pattern "prefixed"}}every {{.A.Resource}} whose name starts with <span class="m">{{.A.Name}}</span>{{else}}this {{.A.Resource}}{{end}}, unless a DENY that matches refuses it.{{end}}
+    {{if .Others}}{{.Others}} other ACL{{if ne .Others 1}}s are{{else}} is{{end}} about it too.{{else}}It is the only ACL about it: anything it does not allow is refused to everyone but a super user.{{end}}</p>
+  {{if and .HasTraffic (eq .A.Permission "deny")}}
+  <span class="cap">Because of it, right now</span>
+  <div class="kv">
+    <span>Refused</span><span class="m">{{num .Refused}} request{{if ne .Refused 1}}s{{end}} {{.Over}}</span>
+    {{with .Last}}<span>Last</span><span class="m">{{when .Time "clock"}} {{.API}}</span><span>Client</span><span class="m">{{if .ClientID}}{{.ClientID}} · {{end}}{{.Remote}}</span><span>Error</span><span class="m deny">{{.Error}}</span>{{end}}
+  </div>
+  {{end}}
+  <div class="inspector-acts"><a class="btn" href="{{.CheckURL}}">Check a request</a></div>
+</div>
+{{end}}

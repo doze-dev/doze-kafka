@@ -61,7 +61,7 @@ var keyMap = []keyBinding{
 
 	{"p", "p", "pause", "Pause or resume the live view", ScopePage, ""},
 	{"p", "p", "produce", "Produce (on a topic)", ScopePage, ""},
-	{"c", "c", "create", "Create (on Topics, Subjects); connect an app (on an empty Traffic)", ScopePage, ""},
+	{"c", "c", "create", "Create (on Topics, Subjects, Access); connect an app (on an empty Traffic)", ScopePage, ""},
 	{"r", "r", "retry", "Retry now, when the broker is lost (on Traffic)", ScopePage, ""},
 	{"e", "e", "errors", "Errors only, and back (on Traffic)", ScopePage, ""},
 	{"u", "u", "unfold", "Unfold the open folded row (on Traffic)", ScopePage, ""},
@@ -148,7 +148,7 @@ func pageHints(view string) []keyHint {
 	case "cluster":
 		return []keyHint{{Keys: []string{"g", "c"}, Label: "cluster"}, hintOpen, hintJump, hintHelp}
 	case "access":
-		return []keyHint{hintMove, hintOpen, hintFilter, hintJump}
+		return []keyHint{hintMove, hintOpen, {Keys: []string{"c"}, Label: "create ACL"}, hintFilter, hintJump}
 	case "trace":
 		return []keyHint{{Keys: []string{"/"}, Label: "trace id"}, hintMove, {Keys: []string{"↵"}, Label: "follow"}, hintJump}
 	case "first_run":

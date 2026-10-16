@@ -12,6 +12,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 	"net/url"
 	"sort"
@@ -104,6 +105,24 @@ func segsText(s []confirmSeg) string {
 		b.WriteString(x.T)
 	}
 	return b.String()
+}
+
+// segsHTML draws runs of text for a template: mono and bold runs in their spans,
+// every run escaped.
+func segsHTML(s []confirmSeg) template.HTML {
+	var b strings.Builder
+	for _, x := range s {
+		t := template.HTMLEscapeString(x.T)
+		switch {
+		case x.M:
+			b.WriteString(`<span class="m">` + t + `</span>`)
+		case x.B:
+			b.WriteString(`<span class="b">` + t + `</span>`)
+		default:
+			b.WriteString(t)
+		}
+	}
+	return template.HTML(b.String())
 }
 
 func txt(s string) confirmSeg  { return confirmSeg{T: s} }

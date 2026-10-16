@@ -153,7 +153,11 @@ func (c *Console) routeTable() []routeRow {
 
 		// Cluster and access.
 		get("/cluster", specShell, "the cluster page", c.cluster),
-		get("/access", specAccess, "stored ACLs, read-only", c.access),
+		get("/access", specAccess, "stored ACLs, the checker card and the wire of ACL requests", c.access),
+		get("/access/check", specAccess, "could a principal do this, by the broker's rules (Ac-05)", c.accessCheck),
+		get("/new/acl", specAccess, "the create form (Ac-03)", c.aclCreatePage),
+		get("/new/acl/preview", specAccess, "the create form's command and what it will do, as typed", c.aclCreatePreview),
+		post("/new/acl", specAccess, "create an ACL (CreateAcls)", c.aclCreate),
 
 		// The shell: the inspector, the wire dock and a confirm's sentence.
 		get("/inspect/{kind}", "inspector.spec.ts", "the inspector's body for one selection", c.inspectRoute),

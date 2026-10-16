@@ -72,7 +72,7 @@ var formFields = map[string]formField{
 	"offset":      {Kind: settings.Group, Name: "new-offset"},
 
 	// Not settings: what is being written, or which thing is being looked at.
-	"name":           {Not: "the name of the topic being created"},
+	"name":           {Not: "the name of the topic being created, or the resource an ACL or a check is about"},
 	"topic":          {Not: "which topic of a group an action is about"},
 	"partition":      {Not: "which partition of a topic a request is for"},
 	"partition_ctx":  {Not: "the partition the page is showing, carried through a form"},
@@ -97,4 +97,12 @@ var formFields = map[string]formField{
 	"group":          {Not: "the consumer group the Traffic page is narrowed to, carried through its filter form"},
 	"client":         {Not: "the client the Traffic page is narrowed to, carried through its filter form"},
 	"tab":            {Not: "which tab of a page a form belongs to, so its answer is the same tab"},
+	// The ACL being created, or the request being checked: a stored entry's fields,
+	// each with its line from aclFieldNotes (how the broker reads it).
+	"principal":  {Not: "an ACL's principal, or the principal a check asks about"},
+	"host":       {Not: "an ACL's host, or the address a check asks about"},
+	"resource":   {Not: "an ACL's resource type, or the one a check asks about"},
+	"pattern":    {Not: "how an ACL's name matches: literal or prefixed"},
+	"operation":  {Not: "an ACL's operation, or the one a check asks about"},
+	"permission": {Not: "whether an ACL allows or denies"},
 }

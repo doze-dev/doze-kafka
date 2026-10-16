@@ -25,6 +25,7 @@
 {{else if eq .InspKind "subject"}}{{template "inspector_subject" .}}
 {{else if eq .InspKind "transaction"}}{{template "inspector_transaction" .}}
 {{else if eq .InspKind "event"}}{{template "inspector_event" .}}
+{{else if eq .InspKind "acl"}}{{template "inspector_acl" .}}
 {{end}}
 {{end}}
 
