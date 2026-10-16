@@ -217,6 +217,7 @@
           <option value="">all topics</option>
           {{range .Topics}}<option value="{{.}}">{{.}}</option>{{end}}
         </select></label>
+      {{else}}{{/* One topic: no choice to offer, and the buttons still send the scope they include (all of them). */}}<input type="hidden" id="reset-scope" name="topic" value="">
       {{end}}
       <button type="button" class="btn" {{if not (and .CanAct .Offsets)}}disabled title="{{if .Members}}Stop the group's {{len .Members}} consumer{{if ne (len .Members) 1}}s{{end}} first{{else}}No committed offsets to reset{{end}}"{{end}}
         hx-post="{{groupURL .Group.ID}}/reset" hx-include="#reset-scope" hx-vals='{"to":"earliest","tab":"offsets"}' data-confirm-url="{{confirmURL "group.reset.earliest" "group" .Group.ID}}" data-confirm-title="{{(index .Confirm "group.reset.earliest").Title}}" data-confirm-verb="{{(index .Confirm "group.reset.earliest").Verb}}" hx-confirm="{{(index .Confirm "group.reset.earliest").Text}}" hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this">{{icon "skip-back"}} Reset to earliest</button>
