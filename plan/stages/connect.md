@@ -559,3 +559,9 @@ that owns the package; log them in this table).
 - Apache Kafka's own `docker-compose` examples document `KAFKA_ADVERTISED_LISTENERS`
   per audience (host vs container); the page's single "advertised host" is the
   doze equivalent, and the reason `host.docker.internal` is the common answer.
+
+## Foundation asks this stage builds
+
+From [00-foundation.md section E](../00-foundation.md#e-asks-from-the-stages): asks stage 0 did not build because this stage is their only consumer.
+
+- E18: a cluster `Facts` type (listeners, SASL, TLS, registry) that the Cluster and Connect pages and `doze-kafka env` import.

@@ -29,6 +29,12 @@ here that contains "server API"; `task api` fails without it.
   and group pages have a wire dock at their foot: the requests about that topic or
   group, live.
 
+- Schema registry: it answers only requests whose `Host` is an IP address, `localhost`,
+  a `.doze` name, the `--advertised-host` or a `--console-allow-host` name (the same
+  list as the console), and refuses any other with 403 in the registry's error shape,
+  before asking for credentials. An unauthenticated registry on loopback could
+  otherwise be read and written by a web page through DNS rebinding.
+
 - Console: a B3 span or parent id in a record's headers is shown only when it is one (16
   hex digits). A producer can write anything there, of any length, and the Trace page
   printed it as "span …"; such a value is now left out, and the trace id still finds

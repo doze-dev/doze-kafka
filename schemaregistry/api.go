@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/doze-dev/doze-kafka/internal/hostguard"
 )
 
 // contentType is what Confluent's registry answers with, and what its clients send.
@@ -16,8 +18,14 @@ const contentType = "application/vnd.schemaregistry.v1+json"
 type Options struct {
 	// Auth, when set, is asked to approve the HTTP basic credentials of every request
 	// (the same users as the broker's SASL). Nil means no authentication.
-	Auth   func(user, pass string) bool
-	Logger *slog.Logger
+	Auth func(user, pass string) bool
+	// AllowedHosts are the host names, beyond the always-allowed set (IP literals,
+	// localhost, *.doze), that a request's Host header may name: the host clients
+	// are told to dial, and whatever the operator listed. "*" allows every name.
+	// A request for any other host is refused before anything else is looked at
+	// (see ServeHTTP): that is the defence against DNS rebinding.
+	AllowedHosts []string
+	Logger       *slog.Logger
 }
 
 // API is the registry's REST interface.
@@ -37,8 +45,20 @@ func NewAPI(reg *Registry, opts Options) *API {
 // Registry is the store behind the API.
 func (a *API) Registry() *Registry { return a.reg }
 
+// ServeHTTP answers one request. The Host header is judged first, before the
+// credentials and before the route: a request that names a host this registry is
+// not served under came through a name somebody else controls (DNS rebinding from a
+// web page: internal/hostguard), and it learns nothing, not even whether the
+// registry wants a password. The 403 carries the registry's error shape with the
+// HTTP status as its error_code, as the 401, 404 and 405 do.
+//
 //fuzz:parser class=registry-rest FuzzAPIBody
 func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if !hostguard.Allowed(r.Host, a.opts.AllowedHosts) {
+		writeErr(w, newErr(403, codeForbidden, "This schema registry does not answer to the host name %s. If that is a name you chose, start doze-kafka with --console-allow-host=%s (the registry answers to the same names as the console, and to --advertised-host).",
+			hostguard.Quote(r.Host), hostguard.Name(r.Host)))
+		return
+	}
 	if a.opts.Auth != nil {
 		u, p, ok := r.BasicAuth()
 		if !ok || !a.opts.Auth(u, p) {

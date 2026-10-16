@@ -609,3 +609,9 @@ here".
   KIP-467 (per-record errors on produce, relevant to TOP-10).
 - Confluent Control Center and Conduktor show the same compaction ratio and
   "dirty" state per topic from JMX; doze-kafka has no JMX, hence the `LogSource`.
+
+## Foundation asks this stage builds
+
+From [00-foundation.md section E](../00-foundation.md#e-asks-from-the-stages): asks stage 0 did not build because this stage is their only consumer.
+
+- E18: a `LogSource` hook in the console `Options` beside `Traffic` and `ClientMetrics`.

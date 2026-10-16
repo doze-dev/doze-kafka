@@ -377,3 +377,11 @@ Order: 1, 2, 3, 4 first (the boards cannot lie once these exist); 5, 6, 7 in par
 - Apache Kafka: `kafka-transactions.sh` (`list`, `describe`, `abort`, `find-hanging`), added by KIP-664 (`doc`/`memory`, R2); `kafka-log-dirs.sh` over DescribeLogDirs for sizes; `kafka-configs.sh --describe --entity-type brokers`; `transactional.id.expiration.ms` for id expiry (`doc`).
 - Redpanda Console and Kafbat UI both have compat cells here; whether each calls DescribeLogDirs is `memory` and is checked from the compat logs before deciding on key 35.
 - Within this repo: `Traffic` and `ClientMetrics` are already in-process hooks on `console.Options`, which is the shape `ClusterSource` follows; `doze-names` owns the zone, and its claims on Cl-08 stay doze-names' to verify.
+
+## Foundation asks this stage builds
+
+From [00-foundation.md section E](../00-foundation.md#e-asks-from-the-stages): asks stage 0 did not build because this stage is their only consumer.
+
+- E10: the storage-stats cache the Cluster page reads, inside the idle-heap budget.
+- E18: a `ClusterSource` hook in the console `Options` beside `Traffic` and `ClientMetrics`.
+- E14: the error strings quoted in `console/templates` held to the code, as `docs/errors_test.go` holds the documents'.

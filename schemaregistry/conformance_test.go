@@ -217,7 +217,7 @@ func TestConformance(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got := run(recorderDoer(NewAPI(reg, Options{})), sc, 1000+i)
+			got := run(recorderDoer(NewAPI(reg, Options{AllowedHosts: testHosts})), sc, 1000+i)
 			if len(got) != len(want) {
 				t.Fatalf("%d steps played, %d recorded", len(got), len(want))
 			}

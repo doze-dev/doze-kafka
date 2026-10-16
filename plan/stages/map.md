@@ -512,3 +512,10 @@ are needed for items 7 and 8.
 - Layered graph drawing (Sugiyama): columns by kind replace the layering step,
   and barycentre sweeps with a crossing-reduction acceptance test are the
   ordering step; no cycle removal, no dummy-node routing.
+
+## Foundation asks this stage builds
+
+From [00-foundation.md section E](../00-foundation.md#e-asks-from-the-stages): asks stage 0 did not build because this stage is their only consumer.
+
+- E5: a rail item **Map** under Observe that opens this stage's page (`Neighbours(kind, name)` is already built in `console/graph.go`).
+- E10: the map aggregator allocates nothing before the map is first opened, held by the lightness gate (`testdata/lightness.json`'s idle heap).

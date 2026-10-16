@@ -1,4 +1,4 @@
-package console
+package hostguard
 
 import (
 	"net/netip"
@@ -7,7 +7,7 @@ import (
 )
 
 // The Host header is the one thing between a DNS-rebinding page and a console
-// that acts with the broker's credentials (hostguard.go). hostAllowed reads it,
+// that acts with the broker's credentials, or a schema registry (hostguard.go). Allowed reads it,
 // so it reads bytes a hostile page's browser, or anything else that can reach the
 // port, chose. Beyond "no panic":
 //
@@ -151,7 +151,7 @@ func FuzzHostGuard(f *testing.F) {
 				star = true
 			}
 		}
-		got := hostAllowed(host, extra)
+		got := Allowed(host, extra)
 
 		// 1. Only the expected shapes get in ("*" is the operator turning the guard off).
 		if !star && got && !fuzzHostShape(host, extra) {
@@ -161,7 +161,7 @@ func FuzzHostGuard(f *testing.F) {
 			t.Fatalf("Host %q is refused though the allow list %q holds *", host, extra)
 		}
 		// The operator's list adds names; it never takes a built-in one away.
-		if hostAllowed(host, nil) && !got {
+		if Allowed(host, nil) && !got {
 			t.Fatalf("Host %q is allowed with no list and refused with %q", host, extra)
 		}
 
@@ -169,12 +169,12 @@ func FuzzHostGuard(f *testing.F) {
 		// upper case change nothing; nor do brackets with a port after them.
 		if !strings.ContainsAny(host, ":[]") {
 			for _, same := range []string{host + ":9093", host + ":", "[" + host + "]", "[" + host + "]:443", fuzzASCIIUpper(host)} {
-				if hostAllowed(same, extra) != got {
+				if Allowed(same, extra) != got {
 					t.Fatalf("Host %q allowed=%v, and %q allowed=%v", host, got, same, !got)
 				}
 			}
 			if host != "" && !strings.HasSuffix(host, ".") {
-				if hostAllowed(host+".", extra) != got {
+				if Allowed(host+".", extra) != got {
 					t.Fatalf("Host %q allowed=%v, and with the root dot allowed=%v", host, got, !got)
 				}
 			}
@@ -211,7 +211,7 @@ func FuzzHostGuard(f *testing.F) {
 			dressed += ":0"
 		}
 		dressed = spaces[int(deco>>3)%len(spaces)] + dressed + spaces[int(deco>>7)%len(spaces)]
-		if hostAllowed(dressed, extra) {
+		if Allowed(dressed, extra) {
 			t.Fatalf("Host %q is allowed (allow list %q): it names the foreign %s", dressed, extra, foreign)
 		}
 	})

@@ -240,3 +240,9 @@ Half-day units. Order matters: truth of the scan first, then cost, then boards.
 Total 14 half-days: **M, 7 days.** Items 5 and 7 are the two that are real new backend; if item 5 is deferred the stage still closes but TRC-17 stays open as a P2 moved to the cluster stage with a reason.
 
 Prior art. Apache Kafka answers time lookups with a `.timeindex` file per segment (KIP-33; ListOffsets by time is KIP-79; the max-timestamp query is KIP-734), which is the persistent form of what `timestamps.go` rebuilds in memory; a persisted sidecar is the straightforward fix for TRC-17. Redpanda Console and Kafbat/AKHQ browse messages by offset and timestamp and filter by header, but none builds a cross-topic trail. Trace headers on Kafka records are written by OpenTelemetry's Kafka client instrumentation as W3C `traceparent` (and by Brave's Kafka tracing as B3 headers); the consoles that exist for tracing (Jaeger, Zipkin) get spans from the application, not from the broker, which is why this page is explicit that it can only see what apps propagate. KIP-714 (client metrics) is metrics, not traces, and the existing `observability.md` already says so. Read-only scans with a budget and an honest "partial" banner have no direct Kafka precedent; the closest is the Confluent Control Center message viewer's bounded search.
+
+## Foundation asks this stage builds
+
+From [00-foundation.md section E](../00-foundation.md#e-asks-from-the-stages): asks stage 0 did not build because this stage is their only consumer.
+
+- E18: one bounded-scan helper (a cap on records and bytes read per request) that Trace and Schemas both use.

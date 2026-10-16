@@ -556,3 +556,9 @@ that drops unsynced writes) are the model for the power-cut test of BAD-13.
 **doze-aws** `plan/00-foundation.md` has the same "failure injection" idea as a
 shared helper; the registry's recorded corpus in this repository is the oracle's
 shape.
+
+## Foundation asks this stage builds
+
+From [00-foundation.md section E](../00-foundation.md#e-asks-from-the-stages): asks stage 0 did not build because this stage is their only consumer.
+
+- E7: the health pill's states (Healthy, Writes failing, Not reachable, Recovered) as data the page reads, not strings in `console/static/shell.js`, each driven by a test that makes the broker report it.

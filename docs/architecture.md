@@ -154,7 +154,7 @@ something else, is still its author's to mark.
 | The version in a registry path | `schemaregistry` | `FuzzVersionPath` |
 | The console's form inputs and query strings | `console` (driven through its handler) | `FuzzConsoleForms` |
 | Trace headers in a record (W3C `traceparent`, B3, the configured header) | `console` | `FuzzTraceHeaders` |
-| The Host header (the DNS-rebinding guard) | `console` | `FuzzHostGuard` |
+| The Host header (the DNS-rebinding guard of the console and of the schema registry) | `internal/hostguard` | `FuzzHostGuard` |
 
 Not yet covered, with the reason: the console reads a classic group member's
 assignment bytes inline in `describeGroupClassic` (`console/backend_groups.go`),

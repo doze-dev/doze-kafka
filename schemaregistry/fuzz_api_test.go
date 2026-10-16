@@ -27,7 +27,7 @@ func newFuzzAPI(t testing.TB) *API {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return NewAPI(r, Options{})
+	return NewAPI(r, Options{AllowedHosts: testHosts})
 }
 
 // serve runs one request and checks what must hold of every answer.

@@ -122,7 +122,7 @@ func TestCorpus(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			do := recorderDoer(NewAPI(reg, Options{}))
+			do := recorderDoer(NewAPI(reg, Options{AllowedHosts: testHosts}))
 			var bad []string
 			skipped := 0
 			for _, c := range f.Cases {

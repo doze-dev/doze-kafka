@@ -397,6 +397,34 @@ brackets.
 These do not change any "done when" above; they enlarge what A1, A2, A4 to A7
 and B2 to B14 must hold.
 
+Where the asks that stage 0 did not build landed (each is also in the owning stage
+document's own list, "Foundation asks this stage builds", so it cannot be lost):
+
+- **E5**: `Neighbours(kind, name)` on the graph type is built (`console/graph.go`)
+  and A5's sentence renders from it. The rail item **Map** is not: the only page it
+  would open is the map stage's, and a rail item to nothing is a dead end. It lands
+  in [map](stages/map.md).
+- **E7**: the health pill's states as data are not built: the pill has one state
+  string ("Not reachable", `console/static/shell.js`), and Healthy, Writes failing
+  and Recovered are only meaningful once the bad-days stage makes the broker report
+  writes failing. It lands in [bad-days](stages/bad-days.md).
+- **E10**: the recorder's budget of 2,000 maximal rows is held (the Traffic stage's
+  bounds). The storage-stats cache lands in [cluster](stages/cluster.md) (its only
+  reader is the Cluster page) and the map aggregator that allocates nothing before
+  first use in [map](stages/map.md).
+- **E14**: built: `docs/errors_test.go` holds the error names, messages and log lines
+  the documents quote to the source, and `task docs:check` runs every document check.
+  The templates' quoted strings are not checked yet: they are owned by the console
+  stages and land with the next one that edits `console/templates`
+  ([cluster](stages/cluster.md)).
+- **E18**: the Host guard is built as `internal/hostguard`, used by the console and
+  the schema registry listener (DNS rebinding against an unauthenticated registry was
+  a safety gap today, so it was not deferred). The cluster `Facts` type that Cluster,
+  Connect and `env` import lands in [connect](stages/connect.md), the bounded-scan
+  helper in [trace](stages/trace.md) (Schemas reuses it), and the `ClusterSource` and
+  `LogSource` hooks in the console `Options` in [cluster](stages/cluster.md) and
+  [topics](stages/topics.md).
+
 ## Additions to the design
 
 What the console has that the boards do not draw. Each is built, tested in
