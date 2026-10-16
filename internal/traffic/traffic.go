@@ -69,10 +69,11 @@ const (
 	MaxGroupEvents = 200
 	MaxGroups      = 100
 
-	// bucketWidth and bucketCount make a connection's counters: five minutes in five
-	// second steps. The whole broker's is the same shape.
+	// bucketWidth and bucketCount make a connection's counters: five minutes of whole
+	// five-second buckets, and the one that is filling. The whole broker's is the same
+	// shape.
 	bucketWidth = 5 * time.Second
-	bucketCount = 60
+	bucketCount = 61
 )
 
 // clip returns s cut to at most n bytes, on a character boundary, ending in an
@@ -145,6 +146,13 @@ type Event struct {
 	// TxnID is the transactional id the request named, if it did. It is not a group.
 	TxnID  string
 	Detail string
+	// Parts are the partitions the request named, as ranges ("p0–p2"), where its row
+	// writes them beside a topic or a group (an offset commit); Gen its generation, when
+	// HasGen; AutoCreate that a Metadata request allowed the broker to create a topic.
+	Parts      string
+	Gen        int32
+	HasGen     bool
+	AutoCreate bool
 	// Error is the Kafka name of the first error in the response ("" when it went
 	// well), ErrorCode its number, and Class what it means (expected, refused,
 	// denied, not implemented, failed).
@@ -174,7 +182,6 @@ func (e Event) IsError() bool { return e.Class.IsError() }
 type row struct {
 	Event
 	prev, next *row
-	foldKey    string
 }
 
 // Client is a live connection that has sent a request.
@@ -199,6 +206,11 @@ type Client struct {
 	// is the name of the latest.
 	Streak    int
 	LastError string
+	// ClientStreak and ClientLastError are the same for the client this connection
+	// belongs to (its client id, or its address when it has none): its requests in the
+	// order they came, whichever of its connections carried them (A2).
+	ClientStreak    int
+	ClientLastError string
 }
 
 // GroupEvent is something a coordinator did: a member joined, a generation began.
@@ -216,10 +228,10 @@ type GroupEvent struct {
 	Cause   string
 }
 
-// Filter narrows the rows. Zero fields match everything. Text fields match a
-// substring, case-insensitively, except Group, Topic and Kind, which match exactly.
+// Filter narrows the rows. Zero fields match everything. API and Any match a
+// substring, case-insensitively; Client, Group, Topic and Kind match exactly.
 type Filter struct {
-	Client string // matches the client id, the software or the peer address.
+	Client string // one client: its id exactly, or the address of a connection with none.
 	API    string
 	Topic  string
 	// Group matches the rows that name the group and the fetches of its members.
@@ -281,16 +293,26 @@ func (c *counters) add(t time.Time, isErr bool) {
 	}
 }
 
-// sum is the requests and errors in the window ending at now, at most five minutes.
-func (c *counters) sum(now time.Time, window time.Duration) (total, errs int) {
-	hi := int32(now.UnixNano() / int64(bucketWidth))
+// span is the window of whole buckets that ends where the bucket now filling begins:
+// [from, to), window long (rounded up to whole buckets, at most five minutes). A count
+// of it is of a whole minute (A7: the twelve buckets that ended with the filling one
+// were 55 to 60 seconds).
+func span(now time.Time, window time.Duration) (lo, hi int32, from, to time.Time) {
+	hi = int32(now.UnixNano() / int64(bucketWidth))
 	n := int32(window / bucketWidth)
 	if window%bucketWidth != 0 {
 		n++
 	}
-	lo := hi - n
+	n = min(n, bucketCount-1)
+	lo = hi - n
+	return lo, hi, time.Unix(0, int64(lo)*int64(bucketWidth)), time.Unix(0, int64(hi)*int64(bucketWidth))
+}
+
+// sum is the requests and errors in the window of whole buckets before now.
+func (c *counters) sum(now time.Time, window time.Duration) (total, errs int) {
+	lo, hi, _, _ := span(now, window)
 	for i := range c.b {
-		if b := c.b[i]; b.idx > lo && b.idx <= hi && b.total > 0 {
+		if b := c.b[i]; b.idx >= lo && b.idx < hi && b.total > 0 {
 			total += int(b.total)
 			errs += int(b.errs)
 		}
@@ -307,6 +329,17 @@ type conn struct {
 	seen bool
 	// recent is the foldable row each kind of request is currently folding into.
 	recent map[string]*row
+	// skey is the client this connection is counted under in the recorder's streaks:
+	// its client id, or its address when it has none.
+	skey string
+}
+
+// streak is a client's run of errors, its latest requests: the client's, across its
+// connections, in the order they came (A2).
+type streak struct {
+	n     int
+	last  string
+	conns int
 }
 
 // groupLog is one group's events.
@@ -335,7 +368,8 @@ type Recorder struct {
 	head, tail *row // most recently active first.
 	limit      int
 	conns      map[uint64]*conn
-	all        counters // the whole broker, console clients left out.
+	streaks    map[string]*streak // by client: one entry per client with an open connection.
+	all        counters           // the whole broker, console clients left out.
 
 	groups map[string]*groupLog
 }
@@ -352,8 +386,38 @@ func New(capacity int, resolve func([16]byte) string) *Recorder {
 	return &Recorder{
 		resolve: resolve, describe: protocol.DescribeFactsNamed, limit: capacity, now: time.Now,
 		epoch: strconv.FormatInt(time.Now().Unix(), 36),
-		byID:  map[string]*row{}, conns: map[uint64]*conn{}, groups: map[string]*groupLog{},
+		byID:  map[string]*row{}, conns: map[uint64]*conn{}, groups: map[string]*groupLog{}, streaks: map[string]*streak{},
 	}
+}
+
+// countUnder moves a connection's place in the streaks to the client it now says it is.
+// The lock is held.
+func (r *Recorder) countUnder(c *conn, key string) {
+	if c.skey == key {
+		return
+	}
+	r.release(c)
+	c.skey = key
+	s := r.streaks[key]
+	if s == nil {
+		s = &streak{}
+		r.streaks[key] = s
+	}
+	s.conns++
+}
+
+// release takes a connection out of the streaks; a client's goes with its last
+// connection. The lock is held.
+func (r *Recorder) release(c *conn) {
+	if c.skey == "" {
+		return
+	}
+	if s := r.streaks[c.skey]; s != nil {
+		if s.conns--; s.conns <= 0 {
+			delete(r.streaks, c.skey)
+		}
+	}
+	c.skey = ""
 }
 
 // ConnOpened implements protocol.Observer.
@@ -368,6 +432,9 @@ func (r *Recorder) ConnOpened(id uint64, remote string) {
 func (r *Recorder) ConnClosed(id uint64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if c := r.conns[id]; c != nil {
+		r.release(c)
+	}
 	delete(r.conns, id)
 }
 
@@ -483,13 +550,14 @@ func (r *Recorder) Request(o protocol.Observation) {
 		Topics: p.topics, TopicsMore: p.more, Group: p.group, TxnID: p.txnID, Detail: p.detail,
 		Error: p.errName, ErrorCode: o.ErrorCode, Class: p.class, Closed: p.closed,
 		Idle: o.Idle, Duration: o.Duration, ReqBytes: o.ReqBytes, RespBytes: o.RespBytes,
+		Parts: clip(o.Parts, MaxText), Gen: o.Gen, HasGen: o.HasGen, AutoCreate: o.AutoCreate,
 	}
 	// A fetch does not say which group it belongs to; the connection knows.
 	if ev.Group == "" && ev.TxnID == "" && o.Kind == "fetch" && len(c.Groups) > 0 {
 		ev.ViaGroup = c.Groups[len(c.Groups)-1]
 	}
-	key := foldKey(&ev)
-	if mayFold && r.fold(c, key, &ev) {
+
+	if mayFold && r.fold(c, &ev) {
 		r.mu.Unlock()
 		return
 	}
@@ -500,13 +568,13 @@ func (r *Recorder) Request(o protocol.Observation) {
 		// A connection's requests come one at a time, so nothing of this connection
 		// changed meanwhile; if something did (a caller that is not a connection), the
 		// row it made is the one to fold into.
-		if r.fold(c, key, &ev) {
+		if r.fold(c, &ev) {
 			r.mu.Unlock()
 			return
 		}
 	}
 	ev.Facts = facts
-	r.insert(c, key, ev)
+	r.insert(c, ev)
 	r.mu.Unlock()
 }
 
@@ -549,13 +617,29 @@ func (r *Recorder) count(c *conn, o *protocol.Observation, p *prepared) {
 	} else {
 		c.Streak, c.LastError = 0, ""
 	}
+	key := c.ClientID
+	if key == "" {
+		key = c.Remote
+	}
+	r.countUnder(c, key)
+	s := r.streaks[key]
+	if p.isErr {
+		s.n++
+		s.last = p.errName
+	} else {
+		s.n, s.last = 0, ""
+	}
 }
 
 // fold adds the request to the row its connection is folding requests like it into,
 // and reports whether there was one. The lock is held.
-func (r *Recorder) fold(c *conn, key string, ev *Event) bool {
-	prev := c.recent[key]
-	if prev == nil || ev.Time.Sub(prev.Time) >= collapseWindow {
+//
+// A connection folds one row per request kind, the latest of that kind: any other
+// request of the kind (another generation, a different answer) ends the fold, and a
+// repeat after it is a row of its own, not the old row going on (A4).
+func (r *Recorder) fold(c *conn, ev *Event) bool {
+	prev := c.recent[ev.API]
+	if prev == nil || !sameRequest(&prev.Event, ev) || ev.Time.Sub(prev.Time) >= collapseWindow {
 		return false
 	}
 	if len(prev.Ticks) == 0 {
@@ -567,7 +651,7 @@ func (r *Recorder) fold(c *conn, key string, ev *Event) bool {
 	prev.Count++
 	prev.Time, prev.Seq = ev.Time, r.seq
 	prev.Duration, prev.ReqBytes, prev.RespBytes = ev.Duration, ev.ReqBytes, ev.RespBytes
-	prev.Detail = ev.Detail
+
 	prev.Correlation = ev.Correlation
 	if len(prev.Ticks) >= MaxTicks {
 		copy(prev.Ticks, prev.Ticks[1:])
@@ -581,30 +665,38 @@ func (r *Recorder) fold(c *conn, key string, ev *Event) bool {
 
 // insert puts a new row at the front, dropping the least recently active one when the
 // recorder is full. The lock is held.
-func (r *Recorder) insert(c *conn, key string, ev Event) {
+func (r *Recorder) insert(c *conn, ev Event) {
 	r.seq++
 	ev.Seq = r.seq
 	ev.ID = r.epoch + "." + strconv.FormatUint(r.seq, 36)
-	stored := &row{Event: ev, foldKey: key}
+	stored := &row{Event: ev}
 	if len(r.byID) >= r.limit && r.tail != nil {
 		old := r.tail
 		r.unlink(old)
 		delete(r.byID, old.ID)
 		r.held -= uint64(max(old.Count, 1))
-		if oc := r.conns[old.Conn]; oc != nil && oc.recent[old.foldKey] == old {
-			delete(oc.recent, old.foldKey)
+		if oc := r.conns[old.Conn]; oc != nil && oc.recent[old.API] == old {
+			delete(oc.recent, old.API)
 		}
 	}
 	r.byID[ev.ID] = stored
 	r.held++
 	r.pushFront(stored)
 	if ev.Idle && ev.Error == "" {
-		c.recent[key] = stored
+		c.recent[ev.API] = stored
+	} else {
+		delete(c.recent, ev.API) // a different request of the kind breaks the fold.
 	}
 }
 
-func foldKey(e *Event) string {
-	return e.API + "\x00" + strings.Join(e.Topics, ",") + "\x00" + strconv.Itoa(e.TopicsMore) + "\x00" + e.Group + "\x00" + e.TxnID
+// sameRequest is what two requests must share to be one row: the request, what it
+// names and its detail (a heartbeat's generation, a fetch's wait). The page says each
+// repeat "asked the same thing and got the same answer": without the detail a new
+// generation folded into the old one's row, across six rebalances (A4). It compares the
+// fields where they lie (a key built of them was a copy of the topics in every row).
+func sameRequest(a, b *Event) bool {
+	return a.API == b.API && a.TopicsMore == b.TopicsMore && a.Group == b.Group && a.TxnID == b.TxnID &&
+		a.Detail == b.Detail && slices.Equal(a.Topics, b.Topics)
 }
 
 func (r *Recorder) copyRow(x *row) Event {
@@ -752,7 +844,7 @@ func (r *Recorder) NewSince(f Filter, t time.Time) (n int, atLeast bool) {
 // lowered is the filter with its substring fields in lower case, done once for a walk
 // of the list rather than once a row.
 func (f Filter) lowered() Filter {
-	f.Client, f.API, f.Any = strings.ToLower(f.Client), strings.ToLower(f.API), strings.ToLower(f.Any)
+	f.API, f.Any = strings.ToLower(f.API), strings.ToLower(f.Any)
 	return f
 }
 
@@ -807,7 +899,10 @@ func (f *Filter) matches(e *Event) bool {
 	if f.Group != "" && e.Group != f.Group && e.ViaGroup != f.Group {
 		return false
 	}
-	if f.Client != "" && !containsFold(e.ClientID, f.Client) && !containsFold(e.Software, f.Client) && !containsFold(e.Remote, f.Client) {
+	// The client is one client: its id, or for a connection with none, its address. It
+	// was a substring of the id, the software or the address, so "checkout" listed
+	// checkout-api's requests too (A6). The page's one field (Any) is the search.
+	if f.Client != "" && e.ClientID != f.Client && (e.ClientID != "" || e.Remote != f.Client) {
 		return false
 	}
 	if f.Any != "" && !f.any(e) {
@@ -848,25 +943,38 @@ func (r *Recorder) Clients() []Client {
 		cc.Groups = slices.Clone(c.Groups)
 		cc.Req1m, _ = c.counts.sum(now, time.Minute)
 		cc.Req5m, cc.Err5m = c.counts.sum(now, 5*time.Minute)
+		if s := r.streaks[c.skey]; s != nil {
+			cc.ClientStreak, cc.ClientLastError = s.n, s.last
+		}
 		out = append(out, cc)
 	}
 	slices.SortFunc(out, func(a, b Client) int { return cmp.Compare(a.Conn, b.Conn) })
 	return out
 }
 
-// Window is what the whole broker's counters say about a stretch of time.
+// Window is what the whole broker's counters say about a stretch of time: the requests
+// that began in [From, To), and the errors among them.
 type Window struct {
 	Requests, Errors int
+	From, To         time.Time
 }
 
-// Last returns the requests and errors of the last d (at most five minutes, to the
-// nearest five seconds), folded repeats counted one by one. Errors are the answers that
-// are refused, denied, not implemented or failed: expected flow is not one.
+// LastMinute is the requests and errors of the last whole minute counted.
+func (r *Recorder) LastMinute() Window {
+	return r.Last(time.Minute)
+}
+
+// Last returns the requests and errors of the last d of whole five-second buckets (at
+// most five minutes), folded repeats counted one by one, and the stretch they are of.
+// Errors are the answers that are refused, denied, not implemented or failed: expected
+// flow is not one.
 func (r *Recorder) Last(d time.Duration) Window {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	t, e := r.all.sum(r.now(), d)
-	return Window{Requests: t, Errors: e}
+	now := r.now()
+	t, e := r.all.sum(now, d)
+	_, _, from, to := span(now, d)
+	return Window{Requests: t, Errors: e, From: from.In(now.Location()), To: to.In(now.Location())}
 }
 
 // Requests is how many requests the recorder has seen since it started.

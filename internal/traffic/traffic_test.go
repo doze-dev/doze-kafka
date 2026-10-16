@@ -140,17 +140,18 @@ func TestFilters(t *testing.T) {
 		f    Filter
 		want int
 	}{
-		"all":         {Filter{}, 4},
-		"topic":       {Filter{Topic: "orders"}, 2},
-		"topic exact": {Filter{Topic: "order"}, 0},
-		"group":       {Filter{Group: "billing"}, 1},
-		"api":         {Filter{API: "FETCH"}, 1},
-		"errors":      {Filter{ErrorsOnly: true}, 1},
-		"client":      {Filter{Client: "BILLING"}, 4},
-		"software":    {Filter{Client: "java 3.7"}, 1},
-		"remote":      {Filter{Client: "127.0.0.1"}, 4},
-		"nobody":      {Filter{Client: "inventory"}, 0},
-		"combined":    {Filter{Topic: "orders", API: "produce"}, 1},
+		"all":                  {Filter{}, 4},
+		"topic":                {Filter{Topic: "orders"}, 2},
+		"topic exact":          {Filter{Topic: "order"}, 0},
+		"group":                {Filter{Group: "billing"}, 1},
+		"api":                  {Filter{API: "FETCH"}, 1},
+		"errors":               {Filter{ErrorsOnly: true}, 1},
+		"client":               {Filter{Client: "billing-app"}, 4},
+		"client is one client": {Filter{Client: "BILLING"}, 0},
+		"software":             {Filter{Any: "java 3.7"}, 1},
+		"remote":               {Filter{Any: "127.0.0.1"}, 4},
+		"nobody":               {Filter{Client: "inventory"}, 0},
+		"combined":             {Filter{Topic: "orders", API: "produce"}, 1},
 	} {
 		if got := n(c.f); got != c.want {
 			t.Errorf("%s: %d rows, want %d", name, got, c.want)
