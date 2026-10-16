@@ -1068,7 +1068,8 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
 @media (max-width: 640px) {
   :root { --pad: 12px; }
   .topbar { gap: 10px; padding: 0 10px; }
-  .brand .sub, .brand-name { display: none; }
+  /* The brand is the logo alone; its words stay its name for a screen reader. */
+  .brand .sub, .brand-name { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
   /* Sy-04's status: the dot alone (the address is its name, for a screen reader, and
      its tooltip); when the broker is lost the pill says so in full. */
   .tb-right .pill.live:not(.disconnected) { border: 0; background: none; padding: 0; height: auto; }
@@ -1211,7 +1212,8 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
 
 /* Transactions on the tape: records of a transaction that is open or aborted are dimmed
    and badged, and a commit or abort marker is a thin divider, not a record. */
-.tbl tr.txn-aborted td { opacity: .55; }
+/* An aborted record: muted and struck through, never faded (.55 opacity was 2.5 to 3.9:1). */
+.tbl tr.txn-aborted td, .tbl tr.txn-aborted td * { color: var(--mut); }
 .tbl tr.txn-aborted .cell-val { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--bad) 60%, transparent); }
 .tbl tr.txn-open td { background: color-mix(in srgb, var(--warn) 6%, transparent); }
 .txnbadge { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: var(--fs-xs); line-height: 16px; font-family: var(--font-sans); border: 1px solid var(--border); color: var(--dim); }
@@ -1219,7 +1221,7 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
 .txnbadge-aborted { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--border)); }
 .tbl tr.txnmark td { padding-top: 1px; padding-bottom: 1px; font-size: var(--fs-xs); color: var(--dim); border-top: 1px dashed var(--border); border-bottom: 1px dashed var(--border); background: transparent; }
 .tbl tr.txnmark .txnmark-l { letter-spacing: .04em; text-transform: lowercase; }
-.txntoggle[aria-pressed="true"] { background: var(--sel); }
+.txntoggle[data-on="true"] { background: var(--sel); }
 
 /* ---- schemas ---- */
 .badge.schema-type { background: var(--denybg); color: var(--deny); }

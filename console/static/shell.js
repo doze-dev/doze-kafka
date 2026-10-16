@@ -1264,6 +1264,25 @@
     if (e.target.closest("[data-dock-toggle]")) setDock(!dockOpen());
   });
   document.addEventListener("DOMContentLoaded", syncDock);
+
+  // ---------- scroll regions ----------
+  // A box whose content is wider or taller than it scrolls; someone without a mouse
+  // can only scroll it if it can take focus. Every such box gets tabindex=0 while it
+  // overflows (a command, a value, a request's fields, the inspector), after every
+  // swap and when the window changes size.
+  function focusableScrollers() {
+    document.querySelectorAll("pre, .code, #inspector-panel, .insp-sel, .inspector-b, [data-scroller]").forEach(function (el) {
+      if (!el.getClientRects().length) return;
+      var cs = getComputedStyle(el);
+      var scrolls = (/(auto|scroll)/.test(cs.overflowX) && el.scrollWidth > el.clientWidth + 1) || (/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 1);
+      if (scrolls && !el.hasAttribute("tabindex")) { el.setAttribute("tabindex", "0"); el.setAttribute("data-scroll-focus", ""); }
+      else if (!scrolls && el.hasAttribute("data-scroll-focus")) { el.removeAttribute("tabindex"); el.removeAttribute("data-scroll-focus"); }
+    });
+  }
+  document.addEventListener("DOMContentLoaded", focusableScrollers);
+  document.addEventListener("htmx:afterSettle", function () { requestAnimationFrame(focusableScrollers); });
+  var scrollerTimer = 0;
+  window.addEventListener("resize", function () { clearTimeout(scrollerTimer); scrollerTimer = setTimeout(focusableScrollers, 150); });
   document.addEventListener("htmx:afterSettle", syncDock);
 
   // ---------- filters ----------

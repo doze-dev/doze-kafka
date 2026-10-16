@@ -191,5 +191,5 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
 {{/* The keys strip: what the keys do on this page, one line at the foot (Sy-01).
      The hints come from keys.go, per page; a hint is a key the page really has. */}}
 {{define "keys_strip"}}
-<div class="keys" id="keys" hx-swap-oob="true" role="note" aria-label="Keys on this page">{{range .Hints}}<span{{if or .Only .Width}} class="{{if .Only}}keys-{{.Only}}{{end}}{{if .Width}} keys-w-{{.Width}}{{end}}"{{end}}>{{range .Keys}}<span class="kbd">{{.}}</span>{{end}}{{.Label}}</span>{{end}}{{range dialogHints}}{{$k := .Kind}}{{range .Hints}}<span class="keys-dialog keys-dialog-{{$k}}">{{range .Keys}}<span class="kbd">{{.}}</span>{{end}}{{.Label}}</span>{{end}}{{end}}</div>
+<footer class="keys" id="keys" hx-swap-oob="true" aria-label="Keys on this page">{{range .Hints}}<span{{if or .Only .Width}} class="{{if .Only}}keys-{{.Only}}{{end}}{{if .Width}} keys-w-{{.Width}}{{end}}"{{end}}>{{range .Keys}}<span class="kbd">{{.}}</span>{{end}}{{.Label}}</span>{{end}}{{range dialogHints}}{{$k := .Kind}}{{range .Hints}}<span class="keys-dialog keys-dialog-{{$k}}">{{range .Keys}}<span class="kbd">{{.}}</span>{{end}}{{.Label}}</span>{{end}}{{end}}</footer>
 {{end}}

@@ -106,8 +106,8 @@
       </div>
       <div class="row ce g8 idband-acts">
         <a class="btn pri" href="{{groupURL .Group.ID}}?tab=offsets#reset">Reset offsets…</a>
-        <div class="more"><button type="button" class="btn" aria-label="More actions for {{.Group.ID}}" title="More actions" aria-haspopup="true" aria-expanded="false" data-more>···</button>
-          <div class="menu" role="menu" hidden>
+        <div class="more"><button type="button" class="btn" aria-label="More actions for {{.Group.ID}}" title="More actions" aria-expanded="false" data-more>···</button>
+          <div class="menu" role="group" aria-label="More actions" hidden>
             <button type="button" class="btn danger" {{if not .CanAct}}disabled title="Stop the group's consumers first"{{end}}
               hx-post="{{groupURL .Group.ID}}/delete" hx-disabled-elt="this" data-confirm-url="{{confirmURL "group.delete" "group" .Group.ID}}" data-confirm-title="{{(index .Confirm "group.delete").Title}}" data-confirm-verb="{{(index .Confirm "group.delete").Verb}}" hx-confirm="{{(index .Confirm "group.delete").Text}}">{{icon "trash"}} Delete</button>
             {{if not .CanAct}}<div class="menu-note">Delete is possible once no member is connected.</div>{{end}}

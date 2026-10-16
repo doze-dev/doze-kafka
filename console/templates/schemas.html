@@ -96,8 +96,8 @@
       <div class="row ce g8 wrap"><h1 class="h1 m">{{.Subject}}</h1><span class="pill">{{.Cur.TypeLabel}}</span></div>
       <div class="row g8 ce idband-acts">
         <a class="btn pri" href="{{schemaURL .Subject}}?tab=register" data-create>Register new version</a>
-        <div class="more"><button type="button" class="btn" aria-label="More actions" title="More actions" aria-haspopup="true" aria-expanded="false" data-more>···</button>
-          <div class="menu" role="menu" hidden>
+        <div class="more"><button type="button" class="btn" aria-label="More actions" title="More actions" aria-expanded="false" data-more>···</button>
+          <div class="menu" role="group" aria-label="More actions" hidden>
             <button class="btn danger" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" data-confirm-url="{{confirmURL "schema.delete" "subject" .Subject}}" data-confirm-title="{{(index .Confirm "schema.delete").Title}}" data-confirm-verb="{{(index .Confirm "schema.delete").Verb}}" hx-confirm="{{(index .Confirm "schema.delete").Text}}">{{icon "trash"}} Delete subject</button>
             {{if gt (len .Versions) 1}}<button class="btn danger" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" hx-vals='{"version":"{{.Cur.Version}}"}' data-confirm-url="{{confirmURL "schema.version.delete" "subject" .Subject "version" .Cur.Version}}" data-confirm-title="{{(index .Confirm "schema.version.delete").Title}}" data-confirm-verb="{{(index .Confirm "schema.version.delete").Verb}}" hx-confirm="{{(index .Confirm "schema.version.delete").Text}}">{{icon "trash"}} Delete v{{.Cur.Version}}</button>{{end}}
           </div>

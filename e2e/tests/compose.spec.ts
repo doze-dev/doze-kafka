@@ -56,7 +56,7 @@ test('a bad header is reported next to the composer and nothing is sent', async 
   await page.getByRole('button', { name: '+ Add header' }).click();
   await page.getByLabel('Header key').fill('trace');
   await page.getByLabel('Header value', { exact: true }).fill('!!not base64!!');
-  await page.getByRole('button', { name: 'Header value is base64' }).click();
+  await page.getByRole('button', { name: 'b64 header value' }).click();
   await setEditor('x');
   await page.getByRole('button', { name: 'Send message' }).click();
   await expect(page.locator('#compose-body [data-err-slot]')).toBeVisible();
