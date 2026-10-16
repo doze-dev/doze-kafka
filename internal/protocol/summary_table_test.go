@@ -137,7 +137,7 @@ func TestSummarisersReportWhatTheRequestNames(t *testing.T) {
 		{"a fetch with nothing is idle and says how long it waited", eq, kmsg.NewPtrFetchResponse(),
 			Summary{Topics: []string{"orders"}, Idle: true, Detail: "empty, waiting up to 500 ms"}},
 		{"an offset commit names the group, the topic and the partitions", oc, nil,
-			Summary{Group: "g-depot", Topics: []string{"dispatch"}, Detail: "p0–p2, p5 · generation 7"}},
+			Summary{Group: "g-depot", Topics: []string{"dispatch"}, Detail: "p0–p2, p5 · generation 7", Parts: "p0–p2, p5", Gen: 7, HasGen: true}},
 		{"a first join is given an id to join with", jq, jmr,
 			Summary{Group: "g-depot", Detail: "a new member asks in; it is given an id to join with"}},
 		{"a join answered to the leader counts the members", jq, jr,
@@ -160,7 +160,7 @@ func TestSummarisersReportWhatTheRequestNames(t *testing.T) {
 		{"committing offsets in a transaction", txnCommit, nil,
 			Summary{Group: "g-depot", TxnID: "checkout-1", Detail: "offsets inside the transaction"}},
 		{"describing a transaction", descTxn, nil, Summary{TxnID: "checkout-1"}},
-		{"metadata that may create", meta, nil, Summary{Topics: []string{"a", "b"}, Detail: "auto-create on"}},
+		{"metadata that may create", meta, nil, Summary{Topics: []string{"a", "b"}, AutoCreate: true}},
 		{"metadata for everything", metaAll, nil, Summary{Detail: "all topics"}},
 		{"version negotiation says the software", av, nil, Summary{Software: "librdkafka 2.5.3", Detail: "librdkafka 2.5.3"}},
 	} {

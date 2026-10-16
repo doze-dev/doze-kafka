@@ -223,3 +223,30 @@ var errorPhrases = map[int16]string{
 
 // ErrorPhrase is the short phrase for a code, or "" when there is none.
 func ErrorPhrase(code int16) string { return errorPhrases[code] }
+
+// BrokerFacts are the broker's settings an explanation depends on. Known is false when
+// the console runs apart from the broker and does not know them.
+type BrokerFacts struct {
+	Known            bool
+	AutoCreateTopics bool
+}
+
+// ExplainFor is Explain, with the advice that depends on the broker's settings written
+// for this broker.
+//
+// A topic that does not exist is the one: the table's advice was to "let the
+// producer's first Metadata create it", which a broker started with
+// --auto-create-topics=false never does (A8). This broker creates a topic a Metadata
+// request names when the request allows it and auto-create is on (maybeAutoCreate in
+// internal/broker); a Produce never creates one, as in Kafka.
+func ExplainFor(code int16, f BrokerFacts) ErrorInfo {
+	info := Explain(code)
+	if code == kerr.UnknownTopicOrPartition.Code && f.Known {
+		if f.AutoCreateTopics {
+			info.Fix = "Check the name for a typo, or create the topic. auto-create is on here: a Metadata request that allows it creates the topic it names; a Produce does not."
+		} else {
+			info.Fix = "Check the name for a typo, or create the topic: auto-create is off on this broker, so nothing creates it on its own."
+		}
+	}
+	return info
+}

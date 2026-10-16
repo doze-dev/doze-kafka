@@ -373,6 +373,12 @@ func (c *Conn) serve(ctx context.Context) {
 
 // observe tells the observer about an answered request.
 func (c *Conn) observe(req *Request, began time.Time, reqBytes, respBytes int) {
+	// The sizes are what crossed the wire: the frame and its four-byte length (a
+	// client's own count has them; the page said four bytes less on each side).
+	reqBytes += 4
+	if respBytes > 0 {
+		respBytes += 4
+	}
 	o := Observation{
 		Conn: c.id, Remote: c.raw.RemoteAddr().String(), Principal: c.Principal(),
 		ClientID: req.Header.ClientID, API: req.Header.APIKey, Version: req.Header.APIVersion,
@@ -402,7 +408,7 @@ func (c *Conn) observeClosed(h *RequestHeader, began time.Time, reqBytes int, re
 	c.observer.Request(Observation{
 		Conn: c.id, Remote: c.raw.RemoteAddr().String(), Principal: c.Principal(),
 		ClientID: h.ClientID, API: h.APIKey, Version: h.APIVersion,
-		Start: began, Duration: time.Since(began), ReqBytes: reqBytes,
+		Start: began, Duration: time.Since(began), ReqBytes: reqBytes + 4,
 		Correlation: h.CorrelationID, Closed: reason, Own: c.own.Load(),
 		Summary: Summary{Class: class, Kind: Kind(h.APIKey), Detail: "closed the connection: " + reason},
 	})

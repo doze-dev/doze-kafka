@@ -106,8 +106,8 @@ func TestSummarisersSayWhatEachRequestAsks(t *testing.T) {
 	if got := sumMetadata(named(false), nil).Detail; got != "all topics" {
 		t.Errorf("Metadata for nothing: %q", got)
 	}
-	if got := sumMetadata(named(true, "orders"), nil).Detail; got != "auto-create on" {
-		t.Errorf("Metadata that may create: %q", got)
+	if got := sumMetadata(named(true, "orders"), nil); got.Detail != "" || !got.AutoCreate { // the broker says whether it creates (A8)
+		t.Errorf("Metadata that may create: %+v", got)
 	}
 	if got := sumMetadata(named(false), resp(0, 0, 0)).Detail; got != "3 topics" {
 		t.Errorf("Metadata for everything, answered: %q", got)

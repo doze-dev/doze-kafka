@@ -43,6 +43,15 @@ type Summary struct {
 	Idle bool
 	// Detail is a short phrase: "2 partitions, 14 records".
 	Detail string
+	// Parts are the partitions the request named, as ranges ("p0–p2"), for the requests
+	// whose row writes them beside a topic or a group (an offset commit).
+	Parts string
+	// Gen is the generation (or epoch) the request carried, when HasGen.
+	Gen    int32
+	HasGen bool
+	// AutoCreate says a Metadata request allowed the broker to create the topics it
+	// named. Whether it does is the broker's setting, not the request's.
+	AutoCreate bool
 	// Software is "name version" from ApiVersions, when the client says.
 	Software string
 	// ErrorCode is the first non-zero error in the response, 0 if none.
@@ -147,9 +156,21 @@ func (r *Request) Describe() Summary {
 	// Answering a newer ApiVersions than we know with UNSUPPORTED_VERSION is how every
 	// client learns what to speak, not a failure: listing it as an error put one on
 	// every new connection of every client newer than the broker.
+	//
+	// The row says what the broker did, not what the client will do next: that is the
+	// client's (A1).
 	if r.Header.APIKey == kmsg.ApiVersions && s.ErrorCode == kerr.UnsupportedVersion.Code {
 		s.ErrorCode = 0
-		s.Detail = "version negotiation: the client asks again at a version offered here"
+		v := "v" + strconv.Itoa(int(r.Header.APIVersion))
+		s.Detail = v + " is newer than this broker serves: answered UNSUPPORTED_VERSION with the versions to ask at"
+		if resp, ok := r.answered.(*kmsg.ApiVersionsResponse); ok {
+			for _, k := range resp.ApiKeys {
+				if k.ApiKey == int16(kmsg.ApiVersions) {
+					s.Detail = v + " is newer than this broker's v" + strconv.Itoa(int(k.MinVersion)) + " to v" + strconv.Itoa(int(k.MaxVersion)) +
+						": answered UNSUPPORTED_VERSION with the versions to ask at"
+				}
+			}
+		}
 	}
 	s.Class = Classify(r.Header.APIKey, s.ErrorCode)
 	// A refused request with nothing else to say says why, in a phrase.

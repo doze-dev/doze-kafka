@@ -34,8 +34,8 @@ func TestDetailOfTheRequestsThatLeftItEmpty(t *testing.T) {
 	}
 	mq.Topics = []kmsg.MetadataRequestTopic{{Topic: str("a")}}
 	mq.AllowAutoTopicCreation = true
-	if got := summaryOf(mq, mr).Detail; got != "3 topics · auto-create on" {
-		t.Errorf("metadata that may create: %q", got)
+	if got := summaryOf(mq, mr); got.Detail != "3 topics" || !got.AutoCreate { // the broker says whether it creates (A8)
+		t.Errorf("metadata that may create: %+v", got)
 	}
 	missing := kmsg.NewPtrMetadataResponse()
 	mt := kmsg.NewMetadataResponseTopic()
