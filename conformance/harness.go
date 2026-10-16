@@ -112,10 +112,13 @@ type Recording struct {
 type Env struct {
 	target Target
 	speed  float64 // 1 against Kafka; Scenario.Speed against doze-kafka.
-	w      *wire
-	norm   *normalizer
-	steps  []Step
-	fail   func(format string, args ...any)
+	// settles is true against the real broker only: see DoUntil.
+	settles bool
+	asked   int // how many times a step was asked again (only ever against the real broker).
+	w       *wire
+	norm    *normalizer
+	steps   []Step
+	fail    func(format string, args ...any)
 	// Named connections (Open, Use): the current one is w, cur is its name.
 	cur   string
 	conns map[string]*connSlot
@@ -134,6 +137,7 @@ func NewEnv(target Target, fail func(string, ...any)) (*Env, error) {
 		return nil, err
 	}
 	e := &Env{target: target, w: w, norm: newNormalizer(), fail: fail, speed: 1, conns: map[string]*connSlot{"": {w: w}}}
+	_, e.settles = target.(*dockerTarget)
 	return e, nil
 }
 
@@ -260,15 +264,44 @@ func (e *Env) Await(what string, req kmsg.Request, version int16, done func(kmsg
 func (e *Env) Steps() []Step { return e.steps }
 
 // Do sends req at version and records the answer under label.
+//
+// Against the real broker, an answer that carries COORDINATOR_LOAD_IN_PROGRESS,
+// COORDINATOR_NOT_AVAILABLE or NOT_COORDINATOR is asked again (see DoUntil): a
+// script that has just made the first group of a fresh cluster is not about the
+// seconds Kafka takes to create its offsets topic. Against doze-kafka nothing is
+// ever asked twice.
 func (e *Env) Do(label string, req kmsg.Request, version int16) kmsg.Response {
-	return e.DoUntil(label, req, version, nil)
+	return e.do(label, req, version, nil, false)
+}
+
+// DoFirst is Do without the asking again, against either broker: the first answer
+// is the one recorded, whatever it is. It is for a step whose answer may itself be
+// one of the three coordinator codes (a request for a group that has no
+// coordinator, a transactional commit the coordinator will not take), which Do
+// would ask a hundred times and then record anyway. The script waits for what it
+// needs first, with Await.
+func (e *Env) DoFirst(label string, req kmsg.Request, version int16) kmsg.Response {
+	return e.do(label, req, version, nil, true)
 }
 
 // DoUntil is Do for something Kafka finishes after it has answered (an
 // auto-created topic exists a moment after the Metadata request that asked for
-// it): the request is sent again, up to ten seconds, until done is true of the
-// response, and only that last answer is recorded.
+// it): against the real broker the request is sent again, for up to thirty
+// seconds, until done is true of the response, and only that last answer is
+// recorded.
+//
+// Against doze-kafka the request is sent once. A replay is the comparison of
+// doze-kafka's answer with the recorded one, and an answer that was asked for
+// again until it came out right would compare equal whatever came before it: a
+// broker that answered NOT_COORDINATOR where Kafka's first answer was 0 would
+// pass. So the retries are the recorder's alone, they stand for "Kafka had not
+// finished", and doze-kafka, which has nothing to finish, is held to its first
+// answer (TestAReplayNeverAsksTwice).
 func (e *Env) DoUntil(label string, req kmsg.Request, version int16, done func(kmsg.Response) bool) kmsg.Response {
+	return e.do(label, req, version, done, false)
+}
+
+func (e *Env) do(label string, req kmsg.Request, version int16, done func(kmsg.Response) bool, once bool) kmsg.Response {
 	e.fail2(label)
 	nreq, err := e.norm.normalize(req)
 	if err != nil {
@@ -302,9 +335,10 @@ func (e *Env) DoUntil(label string, req kmsg.Request, version int16, done func(k
 			onlyRequestedConfigs(nreq, nresp)
 		}
 		step.Response = nresp
-		if attempt >= 100 || !coordinatorSettling(nresp) && (done == nil || done(resp)) {
+		if once || !e.settles || attempt >= 100 || !coordinatorSettling(nresp) && (done == nil || done(resp)) {
 			break
 		}
+		e.asked++
 		time.Sleep(300 * time.Millisecond)
 	}
 	e.steps = append(e.steps, step)
