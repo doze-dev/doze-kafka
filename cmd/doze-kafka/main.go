@@ -287,6 +287,7 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 	if !cfg.ByName() {
 		bootstrap = dialable(bind.ln.Addr(), cfg.AdvertisedHost)
 	}
+	bound := envBound{listen: bind.ln.Addr().String()}
 	ready := readyInfo{version: version, kafka: cfg.Version, bootstrap: bootstrap, dataDir: absPath(cfg.DataDir),
 		auth: authSummary(cfg), configFile: st.configFile}
 
@@ -302,6 +303,7 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 			return err
 		}
 		defer closeRegistry()
+		bound.registry = registryAddr
 		if cfg.RegistryTLS() {
 			ready.registryURL = registryTLSURL(besideTheName && cfg.ByName(), bind.host, registryAddr)
 		} else {
@@ -323,6 +325,7 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 			return err
 		}
 		defer closeConsole()
+		bound.console = consoleAddr
 		// A name's URL is port-less when the shared front door is up; where it is not
 		// (or this instance has no name) the address it actually bound is the URL.
 		ready.consoleURL = z.routeConsole(logger, consoleAddr)
@@ -331,6 +334,7 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 		}
 	}
 
+	ready.envCommand = envHint(st, bound)
 	announce(out, logger, cfg, ready)
 	serving = true
 	if err := srv.ServeListener(ctx, bind.ln); err != nil {
@@ -347,6 +351,7 @@ type readyInfo struct {
 	version, bootstrap, consoleURL, registryURL string
 	kafka                                       int
 	dataDir, auth, configFile                   string
+	envCommand                                  string // the `doze-kafka env` that prints this broker (envHint).
 }
 
 // authSummary is one phrase for how the listener is protected.
@@ -394,7 +399,16 @@ func announce(out io.Writer, logger *slog.Logger, cfg config.Config, r readyInfo
 		fmt.Fprintf(&b, "    config    %s\n", r.configFile)
 	}
 	b.WriteString("\n")
-	fmt.Fprintf(&b, "    %-24s point this shell at it\n", `eval "$(doze-kafka env)"`)
+	envCommand := r.envCommand
+	if envCommand == "" {
+		envCommand = "doze-kafka env"
+	}
+	if eval := `eval "$(` + envCommand + `)"`; len(eval) <= 24 {
+		fmt.Fprintf(&b, "    %-24s point this shell at it\n", eval)
+	} else {
+		// Too long to align: the command on a line of its own, to copy whole.
+		fmt.Fprintf(&b, "    point this shell at it:\n      %s\n", eval)
+	}
 	fmt.Fprintf(&b, "    %-24s when something looks wrong\n\n", "doze-kafka doctor")
 	io.WriteString(out, b.String()) //nolint:errcheck // a banner on stdout
 }

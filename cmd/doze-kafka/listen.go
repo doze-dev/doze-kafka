@@ -241,7 +241,7 @@ func instanceAddress(cfg config.Config) (bootstrap, console string) {
 		}
 		cc := ""
 		if cfg.Console && cfg.ConsoleAddr != "" {
-			cc = "http://" + cfg.ConsoleAddr
+			cc = httpURL(cfg.ConsoleAddr)
 		}
 		return net.JoinHostPort(advertised, port), cc
 	}

@@ -155,7 +155,15 @@ Examples:
 //
 // The result is validated here, before anything starts, so every configuration
 // mistake is reported the same way at the same moment.
-func loadConfig(args []string) (startup, error) {
+func loadConfig(args []string) (startup, error) { return loadConfigFor(args, false) }
+
+// loadEnvConfig is loadConfig for `doze-kafka env`, which prints where a client
+// connects and never a password: there SASL mechanisms without users are
+// accepted, so `env --sasl-mechanisms SCRAM-SHA-512` (what the start-up summary
+// prints under SASL) works without the passwords on a command line.
+func loadEnvConfig(args []string) (startup, error) { return loadConfigFor(args, true) }
+
+func loadConfigFor(args []string, forEnv bool) (startup, error) {
 	args, showVersion, notices := normalizeArgs(args)
 	if showVersion {
 		return startup{}, errShowVersion
@@ -198,7 +206,11 @@ func loadConfig(args []string) (startup, error) {
 	}
 	c.ResolveAdvertisedHost()
 	c.ResolveConsoleAddr()
-	if err := c.Validate(); err != nil {
+	check := c
+	if forEnv && check.AuthEnabled() && len(check.Credentials) == 0 {
+		check.Credentials = map[string]string{"env": "not printed"}
+	}
+	if err := check.Validate(); err != nil {
 		return startup{}, err
 	}
 	notices = append(notices, c.Warnings()...)

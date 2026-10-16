@@ -55,8 +55,12 @@ only when both its input and its error output are a terminal, and only Enter, `y
 on a password; it never runs `sudo` there. `doze-kafka --listen 127.0.0.1:9092` skips names entirely.
 
 That's it — there's a Kafka broker at that name, and a web console at the URL on the
-next line ([Console](console.md)). Run `eval "$(doze-kafka env)"` in the client
-terminal so the commands below find it. Leave it running in this terminal;
+next line ([Console](console.md)). Run the `eval "$(doze-kafka env ...)"` line the
+summary ends with, in the client terminal, so the commands below find it. By name it is
+`eval "$(doze-kafka env)"`, run in the project directory; under `--listen` the summary
+spells out the flags that give this broker's addresses (`env` reads only its own flags
+and `doze-kafka.toml`, not a running broker), for example
+`eval "$(doze-kafka env --listen 127.0.0.1:9092 --console-addr 127.0.0.1:9093 --schema-registry-addr 127.0.0.1:8081 --config '')"`. Leave it running in this terminal;
 open another for the client.
 
 ## Produce and consume
