@@ -705,10 +705,18 @@ func (m *cg848Manager) describe(group string) (state string, epoch int32, assign
 	slices.Sort(ids)
 	for _, id := range ids {
 		mem := g.members[id]
+		assigned := mem.assigned.clone()
+		if mem.classic != nil {
+			// A classic member holds what it has been told to give up until its next
+			// JoinGroup says it has (recorded: co-describe-after-1).
+			for p := range mem.revoking {
+				assigned[p] = struct{}{}
+			}
+		}
 		members = append(members, cg848MemberDesc{
 			client: mem.client, id: mem.id, instanceID: mem.instanceID, rack: mem.rack, epoch: mem.epoch,
 			subscribed: append([]string(nil), mem.subscribed...), regex: mem.regexText,
-			assigned: mem.assigned.clone(), target: mem.target.clone(),
+			assigned: assigned, target: mem.target.clone(),
 		})
 	}
 	return g.stateName(), g.epoch, g.assignor, members, true

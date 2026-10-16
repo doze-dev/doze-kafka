@@ -6,6 +6,16 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Groups: a classic member of a consumer group that rejoins keeps the partitions its
+  `JoinGroup` says it still owns, as Apache Kafka 4.3.1 does (recorded:
+  `mixed-protocol-cooperative`). Every rejoin used to give up everything, which is
+  true of an eager consumer only: a cooperative-sticky one goes on reading until its
+  `SyncGroup` returns, and its partitions could be handed to another member meanwhile.
+  Its assignment is written at the version of its subscription. A static classic
+  member (`group.instance.id`) that restarts takes the place of the member holding its
+  instance instead of being seated twice, and the old member id is
+  `FENCED_INSTANCE_ID` (recorded: `mixed-protocol-static`).
+
 - Groups: a classic group upgraded in the middle of a rebalance answers what it had
   parked as Apache Kafka 4.3.1 does (recorded: `mixed-protocol-parked`). A `JoinGroup`
   waiting for the others to rejoin was answered `UNKNOWN_MEMBER_ID`, which makes a

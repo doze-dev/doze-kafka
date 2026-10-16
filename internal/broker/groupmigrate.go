@@ -29,8 +29,14 @@ import (
 //     answered with no leader and no member list (nobody relays assignments, the broker
 //     computes them) and its SyncGroup carries the partitions it may have now.
 //   - A classic member is told to rejoin the way the protocol has always done it, with
-//     REBALANCE_IN_PROGRESS on a heartbeat, when its partitions are to change; its
-//     rejoin gives up everything it held, which is what lets another member take them.
+//     REBALANCE_IN_PROGRESS on a heartbeat, when its partitions are to change. Its
+//     JoinGroup says which partitions it still owns: an eager consumer owns none by
+//     then, which is what lets another member take them; a cooperative one owns what it
+//     had, is given the part of it that it keeps, and has given up the rest when a later
+//     JoinGroup of its own no longer lists it (mixed-protocol-cooperative.json).
+//   - A static classic member that restarts (its instance id, no member id) takes the
+//     place of the member holding that instance, classic or not; the id it replaces is
+//     fenced (mixed-protocol-static.json).
 //   - When the last consumer-protocol member leaves, the group is a classic group again:
 //     its members are told their generation is gone (ILLEGAL_GENERATION) and rejoin.
 //
@@ -41,6 +47,7 @@ import (
 type classicSeat struct {
 	protocols []groupProtocolEntry // as offered, in the client's order.
 	protocol  string               // the one whose subscription it was read from.
+	version   int16                // the version that subscription is written at, and its assignments are.
 	session   time.Duration        // the session timeout it asked for.
 }
 
@@ -205,15 +212,16 @@ func decodeClassicAssignment(b []byte) map[string][]int32 {
 	return out
 }
 
-// encodeClassicAssignment is the bytes a classic member gets in its SyncGroup: version 0,
-// the topics it owns with their partitions, no user data.
-func encodeClassicAssignment(topics map[string][]int32) []byte {
+// encodeClassicAssignment is the bytes a classic member gets in its SyncGroup: the topics
+// it owns with their partitions and no user data, at the version its subscription was
+// written at (recorded: 0, 1 and 3; the layout is the same at every one of them).
+func encodeClassicAssignment(version int16, topics map[string][]int32) []byte {
 	names := make([]string, 0, len(topics))
 	for n := range topics {
 		names = append(names, n)
 	}
 	slices.Sort(names)
-	b := binary.BigEndian.AppendUint16(nil, 0)
+	b := binary.BigEndian.AppendUint16(nil, uint16(version))
 	b = binary.BigEndian.AppendUint32(b, uint32(len(names)))
 	for _, n := range names {
 		ps := slices.Clone(topics[n])
@@ -230,15 +238,54 @@ func encodeClassicAssignment(topics map[string][]int32) []byte {
 
 // --- the consumer-group coordinator's side ---
 
-// seatSubscription is the topics a classic member's protocols subscribe to, and the
-// name of the protocol they were read from: the first it offered that can be read.
-func seatSubscription(protocols []groupProtocolEntry) (topics []string, protocol string, ok bool) {
+// classicSubscription is what a classic consumer's protocol metadata says: the topics it
+// subscribes to and, from version 1, the partitions it still owns.
+type classicSubscription struct {
+	version int16
+	topics  []string
+	owned   map[string][]int32
+}
+
+// decodeClassicSubscription reads a classic consumer's protocol metadata (version, topic
+// names, user data; then from version 1 the owned partitions, and fields this broker
+// does not use). A version 1 subscription whose owned partitions cannot be read is not
+// read at all: taking it to own nothing would free partitions it may be reading.
+func decodeClassicSubscription(b []byte) (sub classicSubscription, ok bool) {
+	if sub.topics, ok = decodeConsumerSubscription(b); !ok {
+		return sub, false
+	}
+	sub.version = int16(binary.BigEndian.Uint16(b))
+	if sub.version < 1 {
+		return sub, true
+	}
+	b = b[6:]
+	for range sub.topics {
+		b = b[2+int(binary.BigEndian.Uint16(b)):]
+	}
+	if len(b) < 4 {
+		return sub, false
+	}
+	if n := int(int32(binary.BigEndian.Uint32(b))); n > 0 { // user data; -1 is none.
+		if n > len(b)-4 {
+			return sub, false
+		}
+		b = b[n:]
+	}
+	if sub.owned = decodeClassicAssignment(append([]byte{0, 0}, b[4:]...)); sub.owned == nil {
+		return sub, false
+	}
+	return sub, true
+}
+
+// seatSubscription is what a classic member's protocols subscribe to, and the name of
+// the protocol it was read from: the first it offered that can be read.
+func seatSubscription(protocols []groupProtocolEntry) (sub classicSubscription, protocol string, ok bool) {
 	for _, p := range protocols {
-		if t, decoded := decodeConsumerSubscription(p.metadata); decoded {
-			return t, p.name, true
+		if s, decoded := decodeClassicSubscription(p.metadata); decoded {
+			return s, p.name, true
 		}
 	}
-	return nil, "", false
+	return classicSubscription{}, "", false
 }
 
 // adopt makes a consumer group out of a classic one: each member keeps the partitions
@@ -248,22 +295,13 @@ func (m *cg848Manager) adopt(id string, snap classicSnapshot) *cg848Group {
 	g := &cg848Group{id: id, epoch: snap.generation, assignor: assignorUniform, members: make(map[string]*cg848Member)}
 	m.groups[id] = g
 	for _, sm := range snap.members {
-		topics, protocol, _ := seatSubscription(sm.protocols)
-		held := tpSet{}
-		for name, parts := range decodeClassicAssignment(sm.assignment) {
-			t, ok, err := m.meta.Topic(name)
-			if err != nil || !ok {
-				continue
-			}
-			for _, p := range parts {
-				held[tp{t.ID, p}] = struct{}{}
-			}
-		}
+		sub, protocol, _ := seatSubscription(sm.protocols)
+		held := m.partitionsOf(decodeClassicAssignment(sm.assignment))
 		mem := &cg848Member{
-			id: sm.id, instanceID: sm.instanceID, client: sm.client, subscribed: topics,
+			id: sm.id, instanceID: sm.instanceID, client: sm.client, subscribed: sub.topics,
 			epoch: snap.generation, prevEpoch: snap.generation, target: held.clone(), assigned: held,
 			rebalanceTimeout: sm.rebalanceTimeout,
-			classic:          &classicSeat{protocols: sm.protocols, protocol: protocol, session: sm.session},
+			classic:          &classicSeat{protocols: sm.protocols, protocol: protocol, version: sub.version, session: sm.session},
 		}
 		g.members[sm.id] = mem
 		m.resetSession(g, mem)
@@ -287,7 +325,7 @@ func (m *cg848Manager) maybeDowngrade(g *cg848Group) {
 		snap.members = append(snap.members, classicSnapshotMember{
 			id: mem.id, instanceID: mem.instanceID, client: mem.client, protocols: mem.classic.protocols,
 			protocol: mem.classic.protocol, session: mem.classic.session, rebalanceTimeout: mem.rebalanceTimeout,
-			assignment: m.classicAssignmentBytes(mem.assigned),
+			assignment: m.classicAssignmentBytes(mem.classic.version, mem.assigned),
 		})
 	}
 	if !m.bridge.giveClassic(g.id, snap) {
@@ -327,17 +365,24 @@ func (m *cg848Manager) classicJoin(r *kmsg.JoinGroupRequest, who clientRef) (res
 	}
 	protocols := protocolEntries(r.Protocols)
 	// A group of consumers has one protocol type; a Connect worker is not one of them.
-	topics, protocol, ok := seatSubscription(protocols)
+	sub, protocol, ok := seatSubscription(protocols)
 	if r.ProtocolType != "consumer" || len(protocols) == 0 || !ok {
 		return refuse(kerr.InconsistentGroupProtocol.Code)
 	}
+	static := r.InstanceID != nil && *r.InstanceID != ""
 
 	id := r.MemberID
+	var predecessor *cg848Member // the member a restarted static instance takes the place of.
 	if id == "" {
-		// Kafka from JoinGroup v4 hands out the id first and the client comes back with
-		// it (KIP-394); older clients are joined in the one step.
 		id = generateMemberID(r.InstanceID)
-		if r.GetVersion() >= 4 {
+		switch {
+		case static:
+			// A static member joins in one step, and if its instance is held, in the
+			// holder's place (recorded: sd-s1-join, sd-s2-join, sh-classic-join-same-instance).
+			predecessor = g.holderOf(*r.InstanceID)
+		case r.GetVersion() >= 4:
+			// Kafka from JoinGroup v4 hands out the id first and the client comes back
+			// with it (KIP-394); older clients are joined in the one step.
 			m.pendingSeat(r.Group, id)
 			return joinResult{errorCode: kerr.MemberIDRequired.Code, memberID: id, generation: -1}, true
 		}
@@ -346,6 +391,10 @@ func (m *cg848Manager) classicJoin(r *kmsg.JoinGroupRequest, who clientRef) (res
 	switch {
 	case mem != nil && mem.classic == nil:
 		return refuse(kerr.UnknownMemberID.Code) // that is a consumer-protocol member's id.
+	case mem == nil && r.MemberID != "" && g.fenced(id, r.InstanceID):
+		// Its restarted self has the instance now. Answered with no member id
+		// (recorded: sd-s1-join-old-id).
+		return joinResult{errorCode: kerr.FencedInstanceID.Code, generation: -1}, true
 	case mem == nil && r.MemberID != "" && !m.seatIssued(r.Group, id):
 		return refuse(kerr.UnknownMemberID.Code)
 	}
@@ -359,24 +408,42 @@ func (m *cg848Manager) classicJoin(r *kmsg.JoinGroupRequest, who clientRef) (res
 	}
 	m.redeemSeat(r.Group, id)
 	changed := false
-	if mem == nil {
+	wasConsumer := false
+	switch {
+	case predecessor != nil:
+		// The instance has one seat. Its new incarnation has what the old one had and,
+		// like any member asking in, keeps of it what its JoinGroup says it owns.
+		predecessor.stopTimers()
+		delete(g.members, predecessor.id)
+		wasConsumer = predecessor.classic == nil
+		mem = &cg848Member{id: id, target: predecessor.target, assigned: predecessor.assigned, revoking: predecessor.revoking,
+			epoch: predecessor.epoch, prevEpoch: predecessor.prevEpoch, subscribed: predecessor.subscribed}
+		g.members[id] = mem
+		changed = predecessor.regex != nil
+		m.emit(g, "joined", id, "client "+who.clientID+" (classic protocol), the restarted static instance "+*r.InstanceID+" in place of "+predecessor.id, "")
+	case mem == nil:
 		mem = &cg848Member{id: id, target: tpSet{}, assigned: tpSet{}}
 		g.members[id] = mem
 		changed = true
 		m.emit(g, "joined", id, "client "+who.clientID+" (classic protocol)", "")
-	} else {
-		// A member asking in again has dropped everything it held: that is what a
-		// classic rejoin means, and what lets another member take the partitions. It
-		// is not a change to the group by itself (recorded: the epoch stays).
-		mem.assigned, mem.revoking = tpSet{}, nil
-		mem.revoke.stop()
+	}
+	// A member asking in holds what its JoinGroup says it still owns and has given up
+	// the rest. An eager consumer owns nothing by then, which is what lets another
+	// member take its partitions; a cooperative one goes on reading what it lists
+	// (recorded: mixed-protocol-cooperative). It is not a change to the group by
+	// itself (recorded: the epoch stays).
+	owned := m.partitionsOf(sub.owned)
+	for p := range mem.assigned {
+		if !owned.has(p) {
+			delete(mem.assigned, p)
+		}
 	}
 	mem.client, mem.instanceID = who, r.InstanceID
-	if !slices.Equal(mem.subscribed, topics) {
-		mem.subscribed = topics
+	if !slices.Equal(mem.subscribed, sub.topics) {
+		mem.subscribed = sub.topics
 		changed = true
 	}
-	mem.classic = &classicSeat{protocols: protocols, protocol: protocol, session: time.Duration(r.SessionTimeoutMillis) * time.Millisecond}
+	mem.classic = &classicSeat{protocols: protocols, protocol: protocol, version: sub.version, session: time.Duration(r.SessionTimeoutMillis) * time.Millisecond}
 	mem.rebalanceTimeout = time.Duration(r.RebalanceTimeoutMillis) * time.Millisecond
 	if mem.rebalanceTimeout <= 0 {
 		mem.rebalanceTimeout = mem.classic.session
@@ -386,9 +453,50 @@ func (m *cg848Manager) classicJoin(r *kmsg.JoinGroupRequest, who clientRef) (res
 	if changed {
 		m.bumpAndReassign(g, "a classic member joined or changed its subscription")
 	}
-	m.reconcile(g, mem, tpSet{})
+	m.reconcile(g, mem, owned)
 	m.armClassicRevocations(g)
-	return joinResult{generation: mem.epoch, protocol: protocol, memberID: id}, true
+	res = joinResult{generation: mem.epoch, protocol: protocol, memberID: id}
+	if wasConsumer {
+		// The member it replaced may have been the last of the consumer protocol.
+		m.maybeDowngrade(g)
+	}
+	return res, true
+}
+
+// holderOf is the member that holds a static instance id, or nil.
+func (g *cg848Group) holderOf(instance string) *cg848Member {
+	for _, mem := range g.members {
+		if mem.instanceID != nil && *mem.instanceID == instance {
+			return mem
+		}
+	}
+	return nil
+}
+
+// fenced reports whether a request naming a static instance comes from a member id that
+// does not hold it: its restarted successor does.
+func (g *cg848Group) fenced(memberID string, instance *string) bool {
+	if instance == nil || *instance == "" {
+		return false
+	}
+	holder := g.holderOf(*instance)
+	return holder != nil && holder.id != memberID
+}
+
+// partitionsOf is partitions named by topic as a set by topic id; a topic that is not
+// there has none.
+func (m *cg848Manager) partitionsOf(byName map[string][]int32) tpSet {
+	out := tpSet{}
+	for name, parts := range byName {
+		t, ok, err := m.meta.Topic(name)
+		if err != nil || !ok {
+			continue
+		}
+		for _, p := range parts {
+			out[tp{t.ID, p}] = struct{}{}
+		}
+	}
+	return out
 }
 
 // classicSync answers a SyncGroup from a classic member of a consumer group: nobody
@@ -403,6 +511,8 @@ func (m *cg848Manager) classicSync(r *kmsg.SyncGroupRequest) (assignment []byte,
 	}
 	mem := g.members[r.MemberID]
 	switch {
+	case mem == nil && g.fenced(r.MemberID, r.InstanceID):
+		return nil, kerr.FencedInstanceID.Code, true
 	case mem == nil || mem.classic == nil:
 		return nil, kerr.UnknownMemberID.Code, true
 	case r.Generation != mem.epoch:
@@ -415,18 +525,18 @@ func (m *cg848Manager) classicSync(r *kmsg.SyncGroupRequest) (assignment []byte,
 	}
 	m.resetSession(g, mem)
 	mem.sent = mem.assigned.clone()
-	return m.classicAssignmentBytes(mem.assigned), errNone, true
+	return m.classicAssignmentBytes(mem.classic.version, mem.assigned), errNone, true
 }
 
 // classicAssignmentBytes is a set of partitions as a classic consumer is told it.
-func (m *cg848Manager) classicAssignmentBytes(a tpSet) []byte {
+func (m *cg848Manager) classicAssignmentBytes(version int16, a tpSet) []byte {
 	topics := map[string][]int32{}
 	for _, t := range a.byTopic() {
 		if topic, ok, err := m.meta.TopicByID(t.topic); err == nil && ok {
 			topics[topic.Name] = append(topics[topic.Name], t.parts...)
 		}
 	}
-	return encodeClassicAssignment(topics)
+	return encodeClassicAssignment(version, topics)
 }
 
 // classicHeartbeat keeps a classic member's session and says whether it must rejoin: its
@@ -441,6 +551,8 @@ func (m *cg848Manager) classicHeartbeat(r *kmsg.HeartbeatRequest) (code int16, h
 	}
 	mem := g.members[r.MemberID]
 	switch {
+	case mem == nil && g.fenced(r.MemberID, r.InstanceID):
+		return kerr.FencedInstanceID.Code, true // recorded: sd-s1-heartbeat-old-id.
 	case mem == nil || mem.classic == nil:
 		return kerr.UnknownMemberID.Code, true
 	case r.Generation != mem.epoch:
@@ -481,7 +593,13 @@ func (m *cg848Manager) classicLeave(r *kmsg.LeaveGroupRequest) (results []leaveR
 	removed := false
 	for _, who := range membersToLeave(r) {
 		res := leaveResult{memberID: who.memberID, instanceID: who.instanceID, errorCode: kerr.UnknownMemberID.Code}
-		if mem := g.members[who.memberID]; mem != nil && mem.classic != nil {
+		mem := g.members[who.memberID]
+		if who.memberID == "" && who.instanceID != nil && *who.instanceID != "" {
+			// A static member is named by its instance id, as an admin tool names it
+			// (recorded: su-leave-by-instance).
+			mem = g.holderOf(*who.instanceID)
+		}
+		if mem != nil && mem.classic != nil {
 			m.emit(g, "left", mem.id, "client "+mem.client.clientID+" left the group", "")
 			m.removeMember(g, mem.id)
 			res.errorCode = errNone

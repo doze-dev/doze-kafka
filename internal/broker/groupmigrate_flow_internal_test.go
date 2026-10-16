@@ -101,7 +101,7 @@ func (r *expiryRig) holding(t *testing.T, group, topic string, session, rebalanc
 	sync := kmsg.NewPtrSyncGroupRequest()
 	sync.Group, sync.MemberID, sync.Generation = group, res.memberID, res.generation
 	a := kmsg.NewSyncGroupRequestGroupAssignment()
-	a.MemberID, a.MemberAssignment = res.memberID, encodeClassicAssignment(map[string][]int32{topic: partitions})
+	a.MemberID, a.MemberAssignment = res.memberID, encodeClassicAssignment(0, map[string][]int32{topic: partitions})
 	sync.GroupAssignment = append(sync.GroupAssignment, a)
 	if sr, err := r.b.groups.sync(ctx, sync); err != nil || sr.errorCode != 0 {
 		t.Fatalf("sync: %v %+v", err, sr)
