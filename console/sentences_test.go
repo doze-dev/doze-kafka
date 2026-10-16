@@ -84,6 +84,32 @@ func TestWrittenBySaysHowFarBackInWords(t *testing.T) {
 	}
 }
 
+// The facts sentence named a schema for any topic with a subject called <topic>-value
+// ("Avro value with schema harbour-alerts-value v1" over plain JSON records). It says
+// what the newest record is, read from its bytes, or nothing.
+func TestTheFactsSentenceSaysOnlyWhatTheRecordsAre(t *testing.T) {
+	c, _, _ := newRegistryConsole(t)
+	register(t, c, "plain-value", userV1)
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"plain"}, "partitions": {"1"}})
+	produceTo(t, c, "plain", 0, 2) // plain text values, no schema id in them.
+	page := readable(req(t, c, "GET", "/_console/topics/plain", nil).Body.String())
+	facts := between(page, "1 partition,", ".\n")
+	if strings.Contains(facts, "schema") || strings.Contains(facts, "Avro") {
+		t.Errorf("the facts name a schema the records do not carry: %q", facts)
+	}
+
+	register(t, c, "framed-value", userV1)
+	register(t, c, "framed-value", userV2)
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"framed"}, "partitions": {"1"}})
+	if rec := req(t, c, "POST", "/_console/topics/framed/produce", url.Values{"partition": {"0"}, "partition_ctx": {"0"}, "value": {`{"id": 7, "email": null}`}, "schema_subject": {"framed-value"}}); rec.Code != 200 {
+		t.Fatalf("produce: %d %s", rec.Code, rec.Body)
+	}
+	page = readable(req(t, c, "GET", "/_console/topics/framed", nil).Body.String())
+	if !strings.Contains(page, "an Avro value with schema framed-value v2") {
+		t.Errorf("the facts do not say what the newest record is: %q", between(page, "1 partition,", ".\n"))
+	}
+}
+
 // "kept with no  limit": retention.ms -1 is no limit by time (retention.bytes may still
 // limit it), and the sentence says that.
 func TestUnlimitedRetentionIsSaidOnce(t *testing.T) {

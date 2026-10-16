@@ -225,7 +225,7 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		data["Bounds"] = bounds
-		data["Facts"] = c.topicSummary(detail, bounds, schemas)
+		data["Facts"] = c.topicSummary(ctx, detail, bounds)
 		data["PartitionRange"] = partitionRange(detail.Partitions)
 		switch tab {
 		case "partitions":
@@ -249,7 +249,7 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		data["Search"], data["PartitionRange"], data["Rows"] = found, partitionRange(detail.Partitions), found.Rows
 		if bounds, err := c.be.PartitionBounds(ctx, name, detail.Partitions); err == nil {
-			data["Facts"] = c.topicSummary(detail, bounds, schemas)
+			data["Facts"] = c.topicSummary(ctx, detail, bounds)
 		}
 		c.composerSchemas(r, name, data)
 		c.render(w, r, "topic_detail", data)
@@ -271,7 +271,7 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	maps.Copy(data, tape)
 	if bounds, ok := tape["Bounds"].([]PartitionBound); ok {
-		data["Facts"] = c.topicSummary(detail, bounds, schemas)
+		data["Facts"] = c.topicSummary(ctx, detail, bounds)
 	}
 	c.composerSchemas(r, name, data)
 	if atNote != "" && tape["JumpNote"] == "" {
@@ -283,25 +283,25 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 // topicFactsView is the one sentence under a topic's name (Sy-01 part 4): partitions,
 // messages, how long they are kept, the schema, and when the newest was written.
 type topicFactsView struct {
-	Partitions  int32
-	Messages    int64
-	Retention   string
-	Compact     bool
-	SchemaType  string // "Avro", "JSON Schema" or "Protobuf" for the value subject, or "".
-	SchemaVer   int
-	Newest      time.Time
-	HasNewest   bool
-	Subject     string
-	SubjectURL  string
-	SchemaLabel string
+	Partitions int32
+	Messages   int64
+	Retention  string
+	Compact    bool
+	SchemaType string // "Avro", "JSON Schema" or "Protobuf" for the value subject, or "".
+	SchemaVer  int
+	Newest     time.Time
+	HasNewest  bool
+	Subject    string
+	SubjectURL string
 }
 
-func (c *Console) topicSummary(d *TopicDetail, bounds []PartitionBound, schemas []topicSchema) topicFactsView {
+func (c *Console) topicSummary(ctx context.Context, d *TopicDetail, bounds []PartitionBound) topicFactsView {
 	f := topicFactsView{Partitions: d.Partitions}
-	for _, b := range bounds {
+	newestIn := -1
+	for i, b := range bounds {
 		f.Messages += b.Count()
-		if b.Newest.After(f.Newest) {
-			f.Newest, f.HasNewest = b.Newest, true
+		if b.Count() > 0 && b.Newest.After(f.Newest) {
+			f.Newest, f.HasNewest, newestIn = b.Newest, true, i
 		}
 	}
 	policy, retention := "", ""
@@ -320,9 +320,16 @@ func (c *Console) topicSummary(d *TopicDetail, bounds []PartitionBound, schemas 
 	default:
 		f.Retention = retentionText(retention)
 	}
-	for _, s := range schemas {
-		if s.Label == "value" || f.Subject == "" {
-			f.SchemaType, f.SchemaVer, f.Subject, f.SubjectURL, f.SchemaLabel = s.TypeLabel, s.Version, s.Subject, s.URL, s.Label
+	// The schema is the newest record's, read from its bytes: a value a registry-aware
+	// serializer wrote carries the schema's id. A subject named like the topic says
+	// nothing about what was written (a producer need not use it), so it is not asked.
+	if newestIn >= 0 && c.reg != nil {
+		b := bounds[newestIn]
+		if msgs, err := c.be.FetchWindow(ctx, d.Name, b.Partition, b.Latest-1, 1); err == nil && len(msgs) > 0 {
+			if v := c.msgView(ctx, d.Name, msgs[len(msgs)-1]); v.Value.Schema != nil {
+				s := v.Value.Schema
+				f.SchemaType, f.SchemaVer, f.Subject, f.SubjectURL = s.TypeLabel, s.Version, s.Subject, s.URL
+			}
 		}
 	}
 	return f
