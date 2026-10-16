@@ -25,17 +25,21 @@ type promised struct {
 	committed map[topicPartition][]string         // payloads of committed transactions.
 	aborted   map[topicPartition][]string         // payloads of aborted ones.
 	logStart  map[topicPartition]int64
-	offsets   map[string]map[topicPartition]int64 // group to committed offset.
-	topics    map[string]int32                    // topic to partition count.
-	gone      []string                            // deleted topics.
-	configs   map[string]map[string]string
+	// logStartMay is a log start a DeleteRecords that was not acknowledged asked
+	// for: a request that failed may have taken effect, as on any broker.
+	logStartMay map[topicPartition]int64
+	offsets     map[string]map[topicPartition]int64 // group to committed offset.
+	topics      map[string]int32                    // topic to partition count.
+	gone        []string                            // deleted topics.
+	configs     map[string]map[string]string
 }
 
 func newPromised() *promised {
 	return &promised{
 		records: map[topicPartition]map[int64]string{}, committed: map[topicPartition][]string{},
 		aborted: map[topicPartition][]string{}, logStart: map[topicPartition]int64{},
-		offsets: map[string]map[topicPartition]int64{}, topics: map[string]int32{},
+		logStartMay: map[topicPartition]int64{},
+		offsets:     map[string]map[topicPartition]int64{}, topics: map[string]int32{},
 		configs: map[string]map[string]string{},
 	}
 }
@@ -73,7 +77,12 @@ func (w *promised) check(t *testing.T, after *rig, when string) {
 		if err != nil {
 			t.Fatalf("%s: %s-%d: %v", when, tp.topic, tp.partition, err)
 		}
-		if got, want := part.LogStartOffset(), w.logStart[tp]; got != want {
+		start := part.LogStartOffset()
+		if may, ok := w.logStartMay[tp]; ok && start == may {
+			w.logStart[tp] = may // what is below it was deleted by a request that may take effect.
+			defer delete(w.logStart, tp)
+		}
+		if got, want := start, w.logStart[tp]; got != want {
 			t.Fatalf("%s: %s-%d starts at %d after the cut, want %d", when, tp.topic, tp.partition, got, want)
 		}
 		batches := after.read(tp.topic, tp.partition, false)
