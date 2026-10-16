@@ -118,7 +118,7 @@
            "1MB" are written for Kafka), so the page does not carry a second parser. */}}
       <section class="card pad col g8" aria-label="The same thing, from a shell">
         <div class="row sb ce"><h2 class="h2">The same thing, from a shell</h2><span class="note">Updates as you type. Copy it to repeat this elsewhere.</span></div>
-        <div id="shell-preview-wrap" hx-get="{{.Prefix}}/new/topic/shell" hx-trigger="input from:#create-topic delay:200ms" hx-include="#create-topic" hx-target="this" hx-select="unset" hx-swap="innerHTML">{{template "shell_preview" .}}</div>
+        <div id="shell-preview-wrap" hx-disabled-elt="unset" hx-get="{{.Prefix}}/new/topic/shell" hx-trigger="input from:#create-topic delay:200ms" hx-include="#create-topic" hx-target="this" hx-select="unset" hx-swap="innerHTML">{{template "shell_preview" .}}</div>
       </section>
     </form>
     <div class="row g12 wrap callouts">
@@ -180,7 +180,7 @@
       {{/* Sy-01 part 7 (and Tp-05's Try it row): closed, the composer is still a key, a
            value and Send. The partition is chosen by the key and acks is 1, as the open
            form's defaults; p or the bar opens the whole form. */}}
-      <form class="quick" id="compose-quick" hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" {{if eq .Tab "messages"}}hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML"{{else}}hx-swap="none"{{end}} @htmx:after-request="if($event.detail.successful){$el.reset()}" x-data>
+      <form class="quick" id="compose-quick" hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" {{if eq .Tab "messages"}}hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML"{{else}}hx-swap="none"{{end}} @htmx:after-request="if($event.detail.xhr.status < 400){$el.reset()}" x-data>
         <input type="hidden" name="partition_ctx" value="{{.Partition}}">
         <div class="row g8">
           <input class="inp m quick-key" name="key" aria-label="Key (optional)" placeholder="key" autocomplete="off">
@@ -190,7 +190,7 @@
         <div class="err form-err" data-err-slot hidden role="alert"></div>
       </form>
       <div class="dock-form" id="compose-body">
-        <form hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" {{if eq .Tab "messages"}}hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML"{{else}}hx-swap="none"{{end}} x-data="{hdrs:[], acks:'1', keyB64:false, valB64:false, tomb:false}" x-effect="window.dozeEditor && dozeEditor.setValidate($refs.value, !(valB64 || tomb), tomb ? 'null value — nothing is sent' : (valB64 ? 'base64 — sent as raw bytes' : ''))" @htmx:after-request="if($event.detail.successful){window.dozeEditor?dozeEditor.set($refs.value,''):$refs.value.value='';$refs.key.value='';hdrs=[];keyB64=false;valB64=false;tomb=false}">
+        <form hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" {{if eq .Tab "messages"}}hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML"{{else}}hx-swap="none"{{end}} x-data="{hdrs:[], acks:'1', keyB64:false, valB64:false, tomb:false}" x-effect="window.dozeEditor && dozeEditor.setValidate($refs.value, !(valB64 || tomb), tomb ? 'null value — nothing is sent' : (valB64 ? 'base64 — sent as raw bytes' : ''))" @htmx:after-request="if($event.detail.xhr.status < 400){window.dozeEditor?dozeEditor.set($refs.value,''):$refs.value.value='';$refs.key.value='';hdrs=[];keyB64=false;valB64=false;tomb=false}">
           <input type="hidden" name="partition_ctx" value="{{.Partition}}">
           <div class="crow">
             <div class="field w-part">

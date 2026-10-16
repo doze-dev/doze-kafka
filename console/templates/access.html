@@ -138,7 +138,7 @@
           <div class="grow"></div>
         </div>
       </div>
-      <div id="acl-preview" hx-get="{{prefix}}/new/acl/preview" hx-trigger="input from:#create-acl delay:200ms, change from:#create-acl, click from:#create-acl .seg button" hx-include="#create-acl" hx-target="this" hx-select="unset" hx-swap="innerHTML" class="col g12">{{template "access_create_preview" .}}</div>
+      <div id="acl-preview" hx-disabled-elt="unset" hx-get="{{prefix}}/new/acl/preview" hx-trigger="input from:#create-acl delay:200ms, change from:#create-acl, click from:#create-acl delay:50ms" hx-include="#create-acl" hx-target="this" hx-select="unset" hx-swap="innerHTML" class="col g12">{{template "access_create_preview" .}}</div>
       <div class="err form-err" data-err-slot hidden role="alert"></div>
       <div class="row g8"><button class="btn pri" type="submit">Create ACL</button><a class="btn w5" href="{{prefix}}/access/check?principal={{urlquery .A.Principal}}&amp;operation={{urlquery .A.Operation}}&amp;resource={{urlquery .A.Resource}}&amp;name={{urlquery .A.Name}}">Check first</a><a class="btn ghost w5" href="{{prefix}}/access" data-esc>Cancel</a></div>
     </form>

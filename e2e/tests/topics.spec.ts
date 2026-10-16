@@ -182,3 +182,13 @@ test('transactions on the tape: aborted and open records are marked, markers are
   await expect(page.locator('#open-transactions')).toContainText('seed-open');
   await expect(page.locator('#open-transactions')).toContainText('Ongoing');
 });
+
+// The command preview inside the form asks again 200 ms after typing; that request
+// used to clear the form's error slot, so a refusal that came first was wiped.
+test('a refusal stays when the form\'s preview refreshes after it', async ({ page }) => {
+  await page.goto('new/topic');
+  await page.locator('#f-name').fill('bad name!');
+  await page.getByRole('button', { name: 'Create topic' }).click();
+  await page.waitForTimeout(1200); // the preview's request (200 ms after typing) has come and gone.
+  await expect(page.locator('[data-err-slot]')).toContainText('invalid topic name');
+});

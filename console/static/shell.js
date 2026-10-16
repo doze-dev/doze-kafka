@@ -300,12 +300,16 @@
     var msg = errorText(e.detail.xhr);
     if (isLivePoll(e)) { setDisconnected(true, msg, pollPath(e)); return; }
     if (isInspectorRequest(e)) return;
-    var elt = e.detail.elt;
+    sayFailure(e, msg);
+  });
+  function sayFailure(e, msg) {
+    // The element that asked: in htmx:beforeSwap, detail.elt is where it would swap.
+    var elt = (e.detail.requestConfig && e.detail.requestConfig.elt) || e.detail.elt;
     var form = elt && elt.closest ? elt.closest("form") : null;
     var slot = form && form.querySelector("[data-err-slot]");
     if (slot) { slot.textContent = msg; slot.hidden = false; return; }
     toast(msg.length > 140 ? msg.slice(0, 140) + "…" : msg, "err");
-  });
+  }
   // Nothing came back at all (the console server itself is gone).
   function networkFailure(e) {
     if (isLivePoll(e)) { setDisconnected(true, "the console server did not answer", pollPath(e)); return; }
@@ -321,6 +325,14 @@
     var xhr = e.detail.xhr;
     if (xhr && xhr.getResponseHeader("X-Doze-Page") === "error") {
       e.detail.shouldSwap = true;
+      e.detail.isError = false;
+    } else if (xhr && xhr.status >= 400 && !isLivePoll(e) && !isInspectorRequest(e)) {
+      // A refusal (A2: Kafka's 4xx) or a failure, from something the person did: it
+      // is said where they are looking, and is the answer, not an error of the page's.
+      // htmx would also log every one as a console error; told it is not an error, it
+      // does not, and what reads "successful" reads the status instead.
+      sayFailure(e, errorText(xhr));
+      e.detail.shouldSwap = false;
       e.detail.isError = false;
     }
   });
@@ -340,7 +352,10 @@
     var elt = e.detail.elt;
     var form = elt && elt.closest ? elt.closest("form") : null;
     var slot = form && form.querySelector("[data-err-slot]");
-    if (slot) { slot.hidden = true; slot.textContent = ""; }
+    // Only the form's own sending clears its last error: a preview inside the form (a
+    // GET as it is typed into) refreshing after a refusal wiped the refusal.
+    var verb = e.detail.requestConfig && e.detail.requestConfig.verb;
+    if (slot && verb && verb !== "get") { slot.hidden = true; slot.textContent = ""; }
     var bar = document.getElementById("reqbar");
     inflight++;
     if (!slowTimer && bar) slowTimer = setTimeout(function () { bar.hidden = false; }, 500);
@@ -1241,7 +1256,7 @@
   // failure it stays open, and the error is a toast.
   document.addEventListener("htmx:afterRequest", function (e) {
     var el = e.detail.elt;
-    if (el && el.hasAttribute && el.hasAttribute("data-close-inspector-on-success") && e.detail.successful) closeInspector(false);
+    if (el && el.hasAttribute && el.hasAttribute("data-close-inspector-on-success") && e.detail.xhr && e.detail.xhr.status < 400) closeInspector(false);
   });
 
   // ---------- docked composer ----------
