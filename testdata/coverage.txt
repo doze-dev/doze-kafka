@@ -1,31 +1,31 @@
-cmd/doze-kafka 84.8 darwin
-cmd/doze-kafka 85.5 linux
-conformance 91.8 darwin
-conformance 91.8 linux
-console 89.1 darwin
-console 89.2 linux
+cmd/doze-kafka 86.3 darwin
+cmd/doze-kafka 87 linux
+conformance 88.9 darwin
+conformance 88.9 linux
+console 88.9 darwin
+console 88.9 linux
 e2e/seed 78.7 darwin
 e2e/seed 78.7 linux
-internal/broker 90.4 darwin
-internal/broker 90.4 linux
-internal/config 66.3 darwin
-internal/config 66.3 linux
+internal/broker 91.5 darwin
+internal/broker 91.6 linux
+internal/config 89.8 darwin
+internal/config 89.8 linux
 internal/consolefeed 97.5 darwin
 internal/consolefeed 97.5 linux
 internal/embed 100 darwin
 internal/embed 100 linux
 internal/hostguard 100 darwin
 internal/hostguard 100 linux
-internal/protocol 91.2 darwin
-internal/protocol 91.3 linux
+internal/protocol 89 darwin
+internal/protocol 89.1 linux
 internal/protocol/observe.go 100
 internal/protocol/summary.go 92
-internal/settings 78 darwin
-internal/settings 78 linux
-internal/storage/log 84 darwin
-internal/storage/log 84 linux
-internal/storage/meta 83.3 darwin
-internal/storage/meta 83.3 linux
+internal/settings 92 darwin
+internal/settings 92 linux
+internal/storage/log 85.9 darwin
+internal/storage/log 85.9 linux
+internal/storage/meta 82.5 darwin
+internal/storage/meta 82.5 linux
 internal/telemetry 98.8 darwin
 internal/telemetry 98.8 linux
 internal/traffic 99.6 darwin
@@ -44,8 +44,8 @@ scripts/mutate 73.7 darwin
 scripts/mutate 74.5 linux
 scripts/vulncheck 61.8 darwin
 scripts/vulncheck 61.8 linux
-server 94.6 darwin
-server 94.6 linux
+server 93.9 darwin
+server 93.9 linux
 # Floors lowered in this file's history, each with what is known of why (written
 # 2026-10-16 from the commits; the gate fails on a lowered floor with no line here).
 # lowered: 2026-10-11 internal/storage/log 81 -> 80.2: aad280e called 80.2 the stable value with no measurement in the commit; the cause, found later, was the maintenance loop's one-second tick landing inside other tests or not (internal/storage/log/maintain_tick_test.go now reaches those lines on purpose)
@@ -77,3 +77,18 @@ server 94.6 linux
 # lowered: 2026-10-16 internal/consolefeed@linux 100 -> 97.5: measured 97.5 in this package's own run on Linux after the merge; e66da06 wrote 100 with no platform and no run recorded
 # lowered: 2026-10-16 internal/settings@linux 78.9 -> 78: the merge of main brought settings rows (message.max.bytes, timestamp bounds, 9b90f55; compression.type as applied, 94d8def) whose paths no settings test reaches
 # lowered: 2026-10-16 internal/storage/log@linux 86.4 -> 84: the merge of main brought CheckProduce and the streamed codecs (9b90f55, produce.go and records.go) with refusal branches no test reaches; the code is another worker's
+# lowered: 2026-10-17 internal/storage/log@darwin 84.9 -> 84: the merge of main (3068499) sets main's one-platform floor 84.9 beside this branch's re-recorded per-platform floor; 84 is measured on the merged tree and its fall is explained by the 2026-10-16 line for 86.4 -> 84 (main's CheckProduce branches)
+# lowered: 2026-10-17 internal/storage/log@linux 84.9 -> 84: the merge of main (3068499) sets main's one-platform floor 84.9 beside this branch's re-recorded per-platform floor; 84 is measured on the merged tree and its fall is explained by the 2026-10-16 line for 86.4 -> 84 (main's CheckProduce branches)
+# no-tests: e2e/design/gen: the design gate's traffic generator; e2e/design's traffic spec runs it and compares the page with the ledger it writes
+# no-tests: e2e/design/truth: prints what a running broker holds for the design gate, whose specs compare the console's numbers with it
+# no-tests: internal/powercut: a test-only model of a disk after a power cut, exercised by internal/broker's powercut and durability tests that use it
+# lowered: 2026-10-17 conformance@darwin 91.8 -> 88.9: measured on the tree merged with main 3ca2610, which brought 3,702 lines added outside tests in 25 files (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-17 console@darwin 89.1 -> 88.9: measured on the tree merged with main 3ca2610, which brought 2,734 lines added and 475 removed outside tests (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-17 internal/protocol@darwin 91.2 -> 89: measured on the tree merged with main 3ca2610, which brought 478 lines added outside tests (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-17 internal/storage/meta@darwin 83.3 -> 82.5: measured on the tree merged with main 3ca2610, which brought 237 lines added outside tests (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-17 server@darwin 94.6 -> 93.9: measured on the tree merged with main 3ca2610, which brought 17 lines added (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-16 conformance@linux 91.8 -> 88.9: measured on the tree merged with main 3ca2610, which brought 3,702 lines added outside tests in 25 files (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-16 console@linux 89.2 -> 88.9: measured on the tree merged with main 3ca2610, which brought 2,734 lines added and 475 removed outside tests (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-16 internal/protocol@linux 91.3 -> 89.1: measured on the tree merged with main 3ca2610, which brought 478 lines added outside tests (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-16 internal/storage/meta@linux 83.3 -> 82.5: measured on the tree merged with main 3ca2610, which brought 237 lines added outside tests (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-16 server@linux 94.6 -> 93.9: measured on the tree merged with main 3ca2610, which brought 17 lines added (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
