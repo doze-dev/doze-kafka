@@ -73,6 +73,29 @@ as `allow-list entry explains nothing: …`: delete it.
 
 ## It bites
 
-`homes/bite.spec.ts` runs only with `DESIGN_BITE=1`: it plants a one-pixel change in
-the console's stylesheet (through the page, after load) and a wrong count in a home's
-summary, and expects the gate to report both. Run it after changing `lib/`.
+`homes/bite.spec.ts` runs with every `task test:design`: it plants a one-pixel change
+in a home (a style added to the live page after it loads: the list's rows 31 px, not
+30) and a count one more than the broker holds in a home's summary, and passes only if
+the gate reports the first as a difference nothing explains and the data check fails
+on the second; the same home with nothing planted has nothing unexplained. A change to
+`lib/` that blunts the comparison fails it.
+
+The same was done once in the console's own source when the gate was written
+(`.list .li` 31 px in app.css; the topics home's partitions plus one in
+handlers_topics.go): homes.spec reported `list item h "30" -> "31"` in light and dark,
+and data.spec "19 partitions" where the broker holds 18; both were put back by hand
+and the gate was green again.
+
+The comparison and data checks are:
+
+| Spec | Boards and places | Data held to the broker |
+|---|---|---|
+| `homes/homes.spec.ts` | Tp-Home, Gr-Home, Sc-Home, Tc-Home, Ac-Home, Cl-Home at 1440 light and dark | |
+| `homes/narrow.spec.ts` | each home at 960 (Sy-03's shell) and 390 (Sy-04's), light and dark | |
+| `homes/data.spec.ts` | | every count, lag, version, id, ACL and size on the homes |
+| `homes/confirms.spec.ts` | Tp-24's purge and delete | what each confirm says |
+| `shell/anatomy.spec.ts` | Sy-01 (light, dark), Sy-02 (dark) on a topic | the table's cells, the schema callout |
+| `shell/narrow.spec.ts` | Sy-03 at 960, Sy-04 at 390, light and dark | the sheet's scrim and grab handle |
+| `shell/dialogs.spec.ts` | Sy-05's palette, Sy-06's shortcuts, light and dark | |
+| `shell/themes.spec.ts` | Sy-07's switch; its specimens in light, dark and high contrast | every token, every printed ratio, the selection outline |
+| `shell/firstrun.spec.ts` | Sy-08 on an empty broker of its own, light and dark | |

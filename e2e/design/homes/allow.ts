@@ -8,6 +8,8 @@ import { shellAllow } from '../shell/common-allow';
 
 const BOTH = ['1440-light', '1440-dark'];
 
+const DOT = 'the dot is inside the broker pill, whose address is read to a screen reader and not drawn, and the pill\'s type is 12 px; Sy-04\'s dot sits in the top bar\'s 13 px; a dot has no text';
+
 // ---------- data: the seed's world is not the boards' sample ----------
 const TOPIC_COUNT = 'the count is the seed\'s 14 topics; the board\'s sample has 7';
 const DATA_DIR = 'it names this broker\'s data directory (data-14192 in the gate\'s run); the board\'s is ./data';
@@ -51,6 +53,11 @@ export const ALLOW: Allowed[] = [
   ...confirm('Tp-24 purge', '452'),
   ...confirm('Tp-24 delete', '948'),
   ...['Tp-Home', 'Gr-Home', 'Sc-Home', 'Tc-Home', 'Ac-Home', 'Cl-Home'].flatMap((b) => shellAllow(b)),
+  // At 960 and 390 (narrow.spec): Sy-03's shell and Sy-04's on every home.
+  ...['Tp-Home', 'Gr-Home', 'Sc-Home', 'Tc-Home', 'Ac-Home', 'Cl-Home'].flatMap((b) => [
+    ...shellAllow(`${b} at 960`, ['960-dark', '960-light']),
+    { board: `${b} at 390`, el: 'broker dot', prop: 'font', board_value: 'IBM Plex Sans 400 13px/20px', live_value: 'IBM Plex Sans 400 12px/20px', at: ['390-dark', '390-light'], reason: DOT } as Allowed,
+  ]),
   { board: 'Tp-Home', el: 'list cap', prop: 'w', board_value: "129.1", live_value: "136", at: ['1440-dark', '1440-light'], reason: TOPIC_COUNT },
   { board: 'Tp-Home', el: 'list cap', prop: 'text', board_value: "TOPICS · 7 · MESSAGES", live_value: "TOPICS · 14 · MESSAGES", at: ['1440-dark', '1440-light'], reason: TOPIC_COUNT },
   { board: 'Tp-Home', el: 'list item', prop: 'y', board_value: "89", live_value: "134", at: ['1440-dark', '1440-light'], reason: AD1_FILTER },
