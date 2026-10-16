@@ -146,7 +146,11 @@ func (n *node) Start() {
 
 func (n *node) launch() {
 	args := []string{"-listen", n.Addr, "-data-dir", n.DataDir, "-meta-db", n.MetaDB,
-		"-fsync-interval", n.fsync, "-kafka-version", strconv.Itoa(n.version), "-console=false"}
+		"-fsync-interval", n.fsync, "-kafka-version", strconv.Itoa(n.version), "-console=false",
+		// The registry's default address is a fixed port (8081): on a machine running
+		// anything else there the node exited at once ("address already in use") and
+		// the test failed dialling a broker that had never stayed up.
+		"-schema-registry=false"}
 	if n.pprofAddr != "" {
 		args = append(args, "-pprof-addr", n.pprofAddr)
 	}

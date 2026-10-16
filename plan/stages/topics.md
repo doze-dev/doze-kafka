@@ -534,7 +534,7 @@ On top of the common ones in [the protocol](../01-protocol.md).
 - [ ] TOP-1 to TOP-5, TOP-34 closed with the red test first (`git log` shows test commit before fix).
 - [ ] `go test ./internal/broker -run 'TestCreateTopics|TestDescribeConfigs' -count=1` green; no test skipped for R1 to R5 once recorded.
 - [ ] SIGKILL variant: acknowledged `acks=all` write survives `kill -9` and a
-      restart (`go test ./internal/broker -run TestAcksAllSurvivesSIGKILL`, uses B5).
+      restart (`go test ./internal/broker -run TestCrash_AcknowledgedWriteSurvivesAProcessKill`, uses B5; process-kill survival, not a power cut).
 - [ ] A data-dir test with a path containing a space creates, produces, restarts, reads (`go test ./internal/broker -run TestTopicsDataDirWithSpace`).
 - [ ] 1,000-partition topic: create under 1 s, page under 1 s, fd count unchanged (`TestWideTopicBudget`).
 - [ ] Total partitions or topics bounded or documented as unbounded (TOP-5 follow-up decision in the changelog).

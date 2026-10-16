@@ -8,11 +8,17 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
-// An acks=all write that was acknowledged is on disk: the process is killed
-// (SIGKILL, no flush, no shutdown hook) the moment the acknowledgement arrives,
-// and the record is there when the same directory is opened again. The timer
-// fsync is off so nothing but the write's own sync can be what saved it.
-func TestCrash_AcknowledgedAcksAllWriteSurvivesSIGKILL(t *testing.T) {
+// An acks=all write that was acknowledged survives the process being killed: the
+// process gets SIGKILL (no flush, no shutdown hook) the moment the acknowledgement
+// arrives, and the record is there when the same directory is opened again.
+//
+// What this proves is process-kill survival: the write reached the kernel before it
+// was acknowledged, so nothing held only in the process's memory is lost. It does
+// NOT prove the write was synced to stable storage: SIGKILL leaves the page cache
+// alone, so the record is read back from it whether or not fsync ran (with the
+// segment's fsync made a no-op, this test still passes). Surviving a power cut needs
+// a model that drops what was not synced: a test of the storage package, not this.
+func TestCrash_AcknowledgedWriteSurvivesAProcessKill(t *testing.T) {
 	n := startNode(t, nodeSubprocess(), nodeFsync("0"))
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
