@@ -4,17 +4,17 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 27553442,
-      "idleHeapBytes": 1340088,
-      "idleHeapNoiseBytes": 5352,
+      "binaryBytes": 27956338,
+      "idleHeapBytes": 1368256,
+      "idleHeapNoiseBytes": 7304,
       "go": "go1.27.2",
-      "recorded": "2026-10-16",
+      "recorded": "2026-10-17",
       "where": "macOS 27, Apple M-series, native"
     },
     "linux/arm64": {
-      "binaryBytes": 26738848,
-      "idleHeapBytes": 1343248,
-      "idleHeapNoiseBytes": 7144,
+      "binaryBytes": 27132064,
+      "idleHeapBytes": 1365104,
+      "idleHeapNoiseBytes": 5560,
       "go": "go1.27.2",
       "recorded": "2026-10-16",
       "where": "golang:1.27 container, linux/arm64, native on Apple M-series (Docker VM)"
@@ -103,6 +103,41 @@
       "from": 1334064,
       "to": 1343248,
       "reason": "the merge of main 62fc8bc: produce reads every batch whole through its codec (9b90f55), the registry over TLS and the console guard beyond loopback (3840d1a), golang.org/x/term made direct for the isatty check before sudo (f68e29c), config print of every setting (18c7cd5), the module's console feed (e66da06); the one more module is github.com/twmb/franz-go/pkg/sr, a test dependency of 3840d1a (franz-go sr against the registry over https), counted by go list -m all"
+    },
+    {
+      "date": "2026-10-17",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 27448258,
+      "to": 27553442,
+      "reason": "the merge of main (3068499) sets main's file, whose last budget was the one-platform 27448258, beside this branch's: the recorded 27553442 is this branch's measured budget on the merged tree, and its growth from 27417106 is explained in the entry above"
+    },
+    {
+      "date": "2026-10-17",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 27553442,
+      "to": 27956338,
+      "reason": "the merge of main 3ca2610 (62fc8bc..3ca2610: Go outside tests +12,102/-1,713, console templates and static +1,461/-730): the Traffic pages drawn as their boards (b2f6b38) and their states, the palette, keys, themes and first run held to Sy-05..08 (1403730), the homes as their boards (d92207c), group ordering, rebalance delay and targets computed by heartbeat (e1243a8, 626cfd8, 2419271), per-client request rates (91c8330); the larger code and templates weigh in the binary; what in the idle heap grew was not attributed"
+    },
+    {
+      "date": "2026-10-17",
+      "key": "darwin/arm64 idleHeapBytes",
+      "from": 1340088,
+      "to": 1368256,
+      "reason": "the merge of main 3ca2610 (62fc8bc..3ca2610: Go outside tests +12,102/-1,713, console templates and static +1,461/-730): the Traffic pages drawn as their boards (b2f6b38) and their states, the palette, keys, themes and first run held to Sy-05..08 (1403730), the homes as their boards (d92207c), group ordering, rebalance delay and targets computed by heartbeat (e1243a8, 626cfd8, 2419271), per-client request rates (91c8330); the larger code and templates weigh in the binary; what in the idle heap grew was not attributed"
+    },
+    {
+      "date": "2026-10-16",
+      "key": "linux/arm64 binaryBytes",
+      "from": 26738848,
+      "to": 27132064,
+      "reason": "the merge of main 3ca2610 (62fc8bc..3ca2610: Go outside tests +12,102/-1,713, console templates and static +1,461/-730): the Traffic pages drawn as their boards (b2f6b38) and their states, the palette, keys, themes and first run held to Sy-05..08 (1403730), the homes as their boards (d92207c), group ordering, rebalance delay and targets computed by heartbeat (e1243a8, 626cfd8, 2419271), per-client request rates (91c8330); the larger code and templates weigh in the binary; what in the idle heap grew was not attributed"
+    },
+    {
+      "date": "2026-10-16",
+      "key": "linux/arm64 idleHeapBytes",
+      "from": 1343248,
+      "to": 1365104,
+      "reason": "the merge of main 3ca2610 (62fc8bc..3ca2610: Go outside tests +12,102/-1,713, console templates and static +1,461/-730): the Traffic pages drawn as their boards (b2f6b38) and their states, the palette, keys, themes and first run held to Sy-05..08 (1403730), the homes as their boards (d92207c), group ordering, rebalance delay and targets computed by heartbeat (e1243a8, 626cfd8, 2419271), per-client request rates (91c8330); the larger code and templates weigh in the binary; what in the idle heap grew was not attributed"
     }
   ]
 }
