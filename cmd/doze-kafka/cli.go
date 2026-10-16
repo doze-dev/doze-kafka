@@ -142,7 +142,8 @@ file, the file over the defaults.
 	}
 	fmt.Fprint(w, `
 Examples:
-  doze-kafka                                   run on 127.0.0.1:9092, console on :9093
+  doze-kafka                                   serve kafka.<dir>.doze:9092, console at http://kafka.<dir>.doze
+  doze-kafka --listen 127.0.0.1:9092           serve an address instead of the name (console 127.0.0.1:9093)
   doze-kafka --listen :9092 --advertised-host host.docker.internal
                                                reachable from containers on this machine
   doze-kafka --data-dir /tmp/kafka --retention-ms 3600000

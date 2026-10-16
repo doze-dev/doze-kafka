@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -357,5 +358,15 @@ func TestZoneOffWithoutAddressIsRefusedPlainly(t *testing.T) {
 	cfg.Zone = false
 	if _, err := prepareZone(context.Background(), cfg, slog.New(slog.NewTextHandler(io.Discard, nil))); !errors.Is(err, errNothingToListenOn) {
 		t.Errorf("zone off and no --listen: %v", err)
+	}
+}
+
+// The first example in --help is the bare command, and it says what the bare
+// command does: serve the project's .doze name (it said 127.0.0.1:9092).
+func TestHelpExampleForTheBareCommandNamesTheName(t *testing.T) {
+	_, out, _ := run3("--help")
+	m := regexp.MustCompile(`(?m)^  doze-kafka {2,}(.*)$`).FindStringSubmatch(out)
+	if m == nil || !strings.Contains(m[1], "kafka.<dir>.doze:9092") || strings.Contains(m[1], "127.0.0.1") {
+		t.Errorf("--help's example for the bare command: %q", m)
 	}
 }
