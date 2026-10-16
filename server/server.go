@@ -120,6 +120,7 @@ func init() {
 	serverhook.NewWithConsole = func(opts any) (any, error) { return newFromOptions(opts.(Options), true) }
 	serverhook.Traffic = func(srv any) *traffic.Recorder { return srv.(*Server).rec }
 	serverhook.ClientMetrics = func(srv any) *telemetry.Store { return srv.(*Server).b.Telemetry() }
+	serverhook.CheckOffsets = func(srv any) { srv.(*Server).b.CheckOffsets() }
 }
 
 // Server is an embedded broker. Construct with New, then Serve.

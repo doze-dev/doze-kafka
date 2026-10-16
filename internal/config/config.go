@@ -63,6 +63,13 @@ type Config struct {
 	// OffsetsRetention is how long a group's committed offsets are kept once nothing is
 	// reading them (offsets.retention.minutes: 7 days). Zero keeps them for ever.
 	OffsetsRetention time.Duration
+	// OffsetsRetentionCheckInterval is how often the retention is applied
+	// (offsets.retention.check.interval.ms). Zero is a hundredth of the retention,
+	// between 50 ms and ten minutes. It has no flag or file key: the conformance
+	// replays set it long, and apply the retention at the points of a script where
+	// Kafka's check has run (serverhook.CheckOffsets), so that what they compare
+	// does not depend on when a ticker fires.
+	OffsetsRetentionCheckInterval time.Duration
 
 	// Topics.
 	AutoCreateTopics  bool
@@ -422,6 +429,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: advertised-host %q is not a host name or an IP address (no scheme, port or spaces; the port is --advertised-port)", c.AdvertisedHost)
 	case c.OffsetsRetention < 0:
 		return fmt.Errorf("config: offsets-retention must not be negative, got %s (0 keeps offsets for ever)", c.OffsetsRetention)
+	case c.OffsetsRetentionCheckInterval < 0:
+		return fmt.Errorf("config: the offsets retention check interval must not be negative, got %s", c.OffsetsRetentionCheckInterval)
 	case c.ConsumerSessionTimeout <= 0:
 		return fmt.Errorf("config: consumer-session-timeout must be positive, got %s (a member would be evicted the moment it joined)", c.ConsumerSessionTimeout)
 	case c.PprofAddr != "" && !validHostPort(c.PprofAddr):

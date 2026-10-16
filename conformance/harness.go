@@ -195,6 +195,18 @@ func (e *Env) Wait(d time.Duration) {
 	time.Sleep(time.Duration(float64(d) / e.speed))
 }
 
+// CheckOffsets is a point of the script by which the real broker's offsets check has
+// run (KafkaEnv sets its interval well below the script's waits): against doze-kafka,
+// whose replay sets the interval long (Scenario.Replay), it runs the check now and
+// returns once it has. A scenario whose answers depend on whether a check ran between
+// two requests is then decided by the script, not by when a ticker fires. It is not a
+// step, and against Kafka it does nothing.
+func (e *Env) CheckOffsets() {
+	if c, ok := e.target.(interface{ CheckOffsets() }); ok {
+		c.CheckOffsets()
+	}
+}
+
 // Quiet sends req and discards the answer, without recording a step: the keep-alive
 // traffic of a script (a member that must not be expired while the script waits).
 func (e *Env) Quiet(req kmsg.Request, version int16) {

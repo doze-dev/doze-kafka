@@ -53,6 +53,7 @@ type groupLiveness struct {
 type offsetExpiry struct {
 	b         *Broker
 	retention time.Duration // 0: nothing expires; what is known of the groups is kept all the same.
+	every     time.Duration // the check interval; 0 is interval's default.
 	now       func() time.Time
 	started   time.Time // when the presumed groups' sessions began to run.
 
@@ -63,9 +64,10 @@ type offsetExpiry struct {
 	groups map[string]groupLiveness
 	dirty  map[string]bool // the groups whose record is not yet in the store; true once a failure was logged.
 
-	wake chan struct{} // something became dirty: write it now, not at the next tick.
-	stop chan struct{}
-	done chan struct{}
+	wake     chan struct{}      // something became dirty: write it now, not at the next tick.
+	checkReq chan chan struct{} // CheckOffsets: one sweep now, on the sweep's goroutine.
+	stop     chan struct{}
+	done     chan struct{}
 }
 
 // adoptedSession is the session given to the groups of a store written before groups
@@ -74,7 +76,7 @@ const adoptedSession = 45 * time.Second
 
 // newOffsetExpiry loads what the store remembers of the groups. It does not start the
 // sweep: start does.
-func newOffsetExpiry(b *Broker, retention time.Duration) (*offsetExpiry, error) {
+func newOffsetExpiry(b *Broker, retention, every time.Duration) (*offsetExpiry, error) {
 	n, err := b.meta.AdoptGroupsWithOffsets(adoptedSession)
 	if err != nil {
 		return nil, err
@@ -86,7 +88,7 @@ func newOffsetExpiry(b *Broker, retention time.Duration) (*offsetExpiry, error) 
 	if err != nil {
 		return nil, err
 	}
-	e := &offsetExpiry{b: b, retention: retention, now: time.Now, started: time.Now(),
+	e := &offsetExpiry{b: b, retention: retention, every: every, now: time.Now, started: time.Now(), checkReq: make(chan chan struct{}),
 		groups: make(map[string]groupLiveness, len(stored)), dirty: map[string]bool{},
 		wake: make(chan struct{}, 1), stop: make(chan struct{}), done: make(chan struct{})}
 	for id, st := range stored {
@@ -213,6 +215,9 @@ func (e *offsetExpiry) flush() {
 // ten minutes (Kafka's offsets.retention.check.interval.ms default), which is also what
 // it is with no retention.
 func (e *offsetExpiry) interval() time.Duration {
+	if e.every > 0 {
+		return e.every
+	}
 	if e.retention <= 0 {
 		return 10 * time.Minute
 	}
@@ -237,9 +242,23 @@ func (e *offsetExpiry) start() {
 				e.flush()
 			case <-sweep.C:
 				e.sweep()
+			case done := <-e.checkReq:
+				e.sweep()
+				close(done)
 			}
 		}
 	}()
+}
+
+// checkNow runs one sweep and returns once it has: what a scheduled check would do,
+// at a moment the caller chooses. It does nothing once the sweep has stopped.
+func (e *offsetExpiry) checkNow() {
+	done := make(chan struct{})
+	select {
+	case e.checkReq <- done:
+		<-done
+	case <-e.done:
+	}
 }
 
 // stopAndFlush ends the sweep and writes what is still only in memory.

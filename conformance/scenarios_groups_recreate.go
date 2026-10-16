@@ -16,8 +16,15 @@ func init() {
 		Scenario{Name: "offsets-retention-recreate", Run: offsetsRetentionRecreate,
 			KafkaEnv: []string{"KAFKA_OFFSETS_RETENTION_MINUTES=1", "KAFKA_OFFSETS_RETENTION_CHECK_INTERVAL_MS=1000"},
 			Speed:    10,
-			Replay:   func(cfg *config.Config) { cfg.OffsetsRetention = time.Minute / 10 },
-			Known:    offsetsRecreateKnown(),
+			// Kafka checks every second; the replay checks only where the script says
+			// one has run (Env.CheckOffsets). g-offdel's OffsetDelete and the commit
+			// after it are a moment apart, and a check that falls between them makes
+			// the commit a new group's: the recording is of one that did not.
+			Replay: func(cfg *config.Config) {
+				cfg.OffsetsRetention = time.Minute / 10
+				cfg.OffsetsRetentionCheckInterval = time.Hour
+			},
+			Known: offsetsRecreateKnown(),
 		},
 	)
 }
@@ -60,7 +67,8 @@ func offsetDeleteRequest(group, topic string) *kmsg.OffsetDeleteRequest {
 //	g-two           never had a member: a commit of ret-a at 0 and of ret-b at 40.
 //
 // And two that never commit anything, for when a group with no members and no offsets
-// stops being listed (the broker checks every second):
+// stops being listed (the broker checks every second; the replay where Env.CheckOffsets
+// says):
 //
 //	g-none          classic; its member joins and leaves at 0.
 //	g-c-none        consumer protocol; the same.
@@ -133,6 +141,7 @@ func offsetsRetentionRecreate(e *Env) {
 	e.classicLeave("again-leave-g-rejoin", "g-rejoin", m)
 
 	until(45 * time.Second)
+	e.CheckOffsets()
 	e.listGroups("t45-list")
 	e.describeClassic("t45-describe-g-offdel-late", "g-offdel-late")
 	e.describeClassic("t45-describe-g-none", "g-none")
@@ -140,7 +149,9 @@ func offsetsRetentionRecreate(e *Env) {
 	e.commitOne("commit-g-offdel-late-at-45", "g-offdel-late", "", -1, "ret-a", 31)
 
 	until(75 * time.Second)
+	e.CheckOffsets()
 	checkpoint("t75")
 	until(115 * time.Second)
+	e.CheckOffsets()
 	checkpoint("t115")
 }

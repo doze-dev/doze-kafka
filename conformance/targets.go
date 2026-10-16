@@ -13,6 +13,8 @@ import (
 
 	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/internal/embed"
+	"github.com/doze-dev/doze-kafka/internal/serverhook"
+	"github.com/doze-dev/doze-kafka/server"
 )
 
 // --- Apache Kafka in Docker (the recorder) ---
@@ -150,6 +152,7 @@ type dozeTarget struct {
 	cancel context.CancelFunc
 	done   chan struct{}
 	mod    func(*config.Config)
+	srv    *server.Server
 }
 
 // StartDoze runs doze-kafka in this process over dir, on a free loopback port,
@@ -219,11 +222,15 @@ func (t *dozeTarget) start() error {
 		return err
 	}
 	t.cancel, t.done = cancel, make(chan struct{})
+	t.srv = srv
 	go func() { srv.Serve(ctx); close(t.done) }()
 	return nil
 }
 
 func (t *dozeTarget) Addr() string { return t.addr }
+
+// CheckOffsets applies the offsets retention now (Env.CheckOffsets).
+func (t *dozeTarget) CheckOffsets() { serverhook.CheckOffsets(t.srv) }
 
 func (t *dozeTarget) Restart() error {
 	t.Close()
