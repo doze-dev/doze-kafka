@@ -712,6 +712,35 @@ func classicRebalanceGenerations(e *Env) {
 
 func produceMixedPartitionErrors(e *Env) {
 	e.Do("create", createTopics(false, newTopic("pm-a", 2, 1), newTopic("pm-b", 1, 1, "max.message.bytes", "2000")), 7)
+	// Each partition has a leader a moment after the CreateTopics was answered.
+	// Wait for that before producing: a Produce asked again after a
+	// NOT_LEADER_OR_FOLLOWER on one partition writes the others twice (one
+	// recording had pm-a/1 at offset 1 after its first write).
+	led := kmsg.NewPtrListOffsetsRequest()
+	led.ReplicaID = -1
+	for _, tp := range []struct {
+		topic string
+		parts []int32
+	}{{"pm-a", []int32{0, 1}}, {"pm-b", []int32{0}}} {
+		rt := kmsg.NewListOffsetsRequestTopic()
+		rt.Topic = tp.topic
+		for _, p := range tp.parts {
+			rp := kmsg.NewListOffsetsRequestTopicPartition()
+			rp.Partition, rp.Timestamp, rp.CurrentLeaderEpoch = p, -1, -1
+			rt.Partitions = append(rt.Partitions, rp)
+		}
+		led.Topics = append(led.Topics, rt)
+	}
+	e.Await("every partition has a leader", led, 7, func(r kmsg.Response) bool {
+		for _, t := range r.(*kmsg.ListOffsetsResponse).Topics {
+			for _, p := range t.Partitions {
+				if p.ErrorCode != 0 {
+					return false
+				}
+			}
+		}
+		return true
+	})
 	ok := encodeBatch([]ProduceRecord{{TimestampMs: 1000, Key: "k", Value: "v"}})
 	big := encodeBatch([]ProduceRecord{{TimestampMs: 1000, Key: "k", Value: string(make([]byte, 5000))}})
 	corrupt := append([]byte(nil), ok...)
@@ -739,17 +768,7 @@ func produceMixedPartitionErrors(e *Env) {
 			p.Partition, p.Records = pt.p, pt.data
 			r.Topics[i].Partitions = append(r.Topics[i].Partitions, p)
 		}
-		// A partition that has just been created is not led for a moment (6).
-		e.DoUntil(label, r, 9, func(resp kmsg.Response) bool {
-			for _, t := range resp.(*kmsg.ProduceResponse).Topics {
-				for _, p := range t.Partitions {
-					if p.ErrorCode == 6 {
-						return false
-					}
-				}
-			}
-			return true
-		})
+		e.Do(label, r, 9)
 	}
 	produce("all-ok", part{"pm-a", 0, ok}, part{"pm-a", 1, ok})
 	produce("unknown-partition-then-too-large", part{"pm-a", 0, ok}, part{"pm-a", 7, ok}, part{"pm-b", 0, big})
