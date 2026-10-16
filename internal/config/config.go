@@ -60,6 +60,11 @@ type Config struct {
 
 	// Groups.
 	ConsumerSessionTimeout time.Duration // KIP-848 session timeout: evict a member after this long without a heartbeat.
+	// ConsumerAssignmentInterval is the least time between two computations of a
+	// consumer group's target assignment (group.consumer.assignment.interval.ms, 1 s,
+	// as Kafka's default; 0 computes at every heartbeat, which Kafka allows too). It
+	// has no flag or file key: the broker tests of reconciliation set it to 0.
+	ConsumerAssignmentInterval time.Duration
 	// OffsetsRetention is how long a group's committed offsets are kept once nothing is
 	// reading them (offsets.retention.minutes: 7 days). Zero keeps them for ever.
 	OffsetsRetention time.Duration
@@ -182,29 +187,30 @@ func Default() Config {
 		listen = "127.0.0.1:9092"
 	}
 	return Config{
-		Version:                MaxKafkaMajor,
-		ListenAddr:             listen,
-		AdvertisedHost:         "", // derived from the listen address: see ResolveAdvertisedHost.
-		DataDir:                DefaultDataDir,
-		MetaDB:                 "", // empty = <data-dir>/meta.db; see ResolveMetaDB.
-		SegmentBytes:           defaultSegmentBytes,
-		IndexIntervalBytes:     defaultIndexStride,
-		FsyncInterval:          500 * time.Millisecond,
-		ConsumerSessionTimeout: 45 * time.Second,
-		OffsetsRetention:       7 * 24 * time.Hour,
-		AutoCreateTopics:       true,
-		DefaultPartitions:      1,
-		MaxPartitions:          defaultMaxPartitions,
-		MessageMaxBytes:        DefaultMessageMaxBytes,
-		Console:                true,
-		ClientTelemetry:        true,
-		Zone:                   true,
-		SchemaRegistry:         true,
-		SchemaRegistryTLS:      true,
-		ACLDefault:             ACLAllow,
-		ConsoleAddr:            defaultConsoleAddr,
-		LogLevel:               "info",
-		LogFormat:              "text",
+		Version:                    MaxKafkaMajor,
+		ListenAddr:                 listen,
+		AdvertisedHost:             "", // derived from the listen address: see ResolveAdvertisedHost.
+		DataDir:                    DefaultDataDir,
+		MetaDB:                     "", // empty = <data-dir>/meta.db; see ResolveMetaDB.
+		SegmentBytes:               defaultSegmentBytes,
+		IndexIntervalBytes:         defaultIndexStride,
+		FsyncInterval:              500 * time.Millisecond,
+		ConsumerSessionTimeout:     45 * time.Second,
+		ConsumerAssignmentInterval: time.Second,
+		OffsetsRetention:           7 * 24 * time.Hour,
+		AutoCreateTopics:           true,
+		DefaultPartitions:          1,
+		MaxPartitions:              defaultMaxPartitions,
+		MessageMaxBytes:            DefaultMessageMaxBytes,
+		Console:                    true,
+		ClientTelemetry:            true,
+		Zone:                       true,
+		SchemaRegistry:             true,
+		SchemaRegistryTLS:          true,
+		ACLDefault:                 ACLAllow,
+		ConsoleAddr:                defaultConsoleAddr,
+		LogLevel:                   "info",
+		LogFormat:                  "text",
 	}
 }
 
@@ -431,6 +437,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: offsets-retention must not be negative, got %s (0 keeps offsets for ever)", c.OffsetsRetention)
 	case c.OffsetsRetentionCheckInterval < 0:
 		return fmt.Errorf("config: the offsets retention check interval must not be negative, got %s", c.OffsetsRetentionCheckInterval)
+	case c.ConsumerAssignmentInterval < 0:
+		return fmt.Errorf("config: the consumer group assignment interval must not be negative, got %s", c.ConsumerAssignmentInterval)
 	case c.ConsumerSessionTimeout <= 0:
 		return fmt.Errorf("config: consumer-session-timeout must be positive, got %s (a member would be evicted the moment it joined)", c.ConsumerSessionTimeout)
 	case c.PprofAddr != "" && !validHostPort(c.PprofAddr):

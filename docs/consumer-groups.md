@@ -71,9 +71,8 @@ Kafka does, recorded in `conformance/recordings/mixed-protocol-groups.json` and
 - A group with no members moves from one protocol to the other whole, and keeps its
   committed offsets.
 
-The differences left are in [limitations](limitations.md): Kafka computes the target
-assignment after it has answered a join, so epochs read one apart for a moment and the
-group is shown `Assigning`; this broker computes it first.
+The one difference left is in [limitations](limitations.md): a consumer-protocol member
+is asked to heartbeat every second, not every five.
 
 ### When committed offsets expire
 
@@ -170,7 +169,19 @@ broker evicts it and rebalances to the rest.
 Under the **KIP-848** protocol the broker computes assignments, and the handoff is
 safe by construction: doze-kafka never hands a partition to a new owner while the
 previous owner still reports holding it — a partition is only reassigned once its old
-owner has released it. Under the **classic** protocol the broker is only a relay, so
+owner has released it.
+
+The new targets are not computed the moment the group changes. As on Kafka
+(`group.consumer.assignment.interval.ms`, 1 s), they are computed at most once a second,
+and only by a member's heartbeat (or a classic member's `JoinGroup`): a member that joins
+or leaves within a second of the last targets leaves the group `Assigning`, with the old
+targets and the joiner at their epoch, until the first heartbeat a second or more after
+them. That lasts until somebody heartbeats, however long that is: a leave or an expired
+session does not compute them (recorded: `consumer-assignment-interval.json`,
+`consumer-assignment-expiry.json`). With members heartbeating every second, a change
+reaches them within about two.
+
+Under the **classic** protocol the broker is only a relay, so
 avoiding overlap is the client's job (its rebalance protocol), exactly as it is with
 Apache Kafka.
 

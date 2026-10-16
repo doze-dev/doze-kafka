@@ -43,7 +43,7 @@ func FuzzGroupSequence(f *testing.F) {
 		if len(ops) > 400 {
 			ops = ops[:400]
 		}
-		m := newCG848Manager(st, slog.New(slog.NewTextHandler(io.Discard, nil)), time.Hour, nil)
+		m := newCG848Manager(st, slog.New(slog.NewTextHandler(io.Discard, nil)), time.Hour, 0, nil)
 		defer m.stop()
 
 		type who struct {

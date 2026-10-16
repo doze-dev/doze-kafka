@@ -108,7 +108,7 @@ func (e *offsetExpiry) restoreEmptyGroups() {
 	for id, st := range e.groups {
 		switch {
 		case st.Consumer:
-			e.b.cg848.restoreEmpty(id, st.Epoch, st.Assignor)
+			e.b.cg848.restoreEmpty(id, st.Epoch, st.AssignmentEpoch, st.Assignor)
 		case !st.Live && st.ProtocolType != "":
 			e.b.groups.restoreEmpty(id, st.ProtocolType)
 		}
@@ -145,6 +145,7 @@ func (e *offsetExpiry) joining(group string, classic bool, session time.Duration
 type groupKind struct {
 	protocolType string
 	epoch        int32
+	targetEpoch  int32 // the epoch of its last target assignment.
 	assignor     string
 }
 
@@ -156,7 +157,7 @@ func (e *offsetExpiry) emptied(group string, classic bool, kind groupKind) {
 	if classic {
 		e.groups[group] = groupLiveness{GroupLiveness: meta.GroupLiveness{EmptySince: e.now().UnixMilli(), ProtocolType: kind.protocolType}}
 	} else {
-		e.groups[group] = groupLiveness{GroupLiveness: meta.GroupLiveness{Consumer: true, Epoch: kind.epoch, Assignor: kind.assignor}}
+		e.groups[group] = groupLiveness{GroupLiveness: meta.GroupLiveness{Consumer: true, Epoch: kind.epoch, AssignmentEpoch: kind.targetEpoch, Assignor: kind.assignor}}
 	}
 	e.markDirty(group)
 	e.mu.Unlock()

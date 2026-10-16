@@ -328,20 +328,8 @@ func offsetsRetentionKnown() []Known {
 
 const limHeartbeatInterval = "A consumer-protocol member is asked to heartbeat every second"
 
-// What a migrating group differs in is the same few things, and each is written down in
-// docs/limitations.md. Every request a client makes is answered with the code Kafka
-// answers with; what differs is the interval a member is asked to heartbeat at, the
-// numbers of epochs and generations (Kafka computes the target assignment after it has
-// answered, so a joiner is told the epoch before its own join), and the states and
-// targets a describe taken between shows.
-const (
-	limAssignAfter  = "A consumer group's target assignment is computed before the request that causes it"
-	pathGroups      = "Groups"
-	pathRequest     = "request"
-	pathGeneration  = "Generation"
-	pathMemberEpoch = "MemberEpoch"
-	pathAssignment  = "Assignment"
-)
+// pathGroups is the groups of a describe or a listing, as a Known path.
+const pathGroups = "Groups"
 
 // knownSteps is one Known entry for each step.
 func knownSteps(limitation, path string, steps ...string) []Known {
@@ -356,8 +344,6 @@ func mixedGroupsKnown() []Known {
 	var k []Known
 	k = append(k, knownSteps(limHeartbeatInterval, "HeartbeatIntervalMillis",
 		"c1-consumer-joins", "c1-consumer-heartbeat", "n1-consumer-joins", "n1-consumer-heartbeat")...)
-	k = append(k, knownSteps(limAssignAfter, pathGeneration, "n1-classic-join-with-id")...)
-	k = append(k, knownSteps(limAssignAfter, pathGroups, "n1-describe-consumer", "n1-list")...)
 	return k
 }
 
@@ -367,13 +353,6 @@ func mixedRollingKnown() []Known {
 		"up-n-join", "up-n-heartbeat-1", "up-n-heartbeat-2", "up-n-heartbeat-3", "up-n-heartbeat-4",
 		"down-n-join", "down-n-heartbeat-1", "down-n-heartbeat-2", "down-n-heartbeat-3",
 		"emptyup-n-join", "emptydown-n-join")...)
-	k = append(k, knownSteps(limAssignAfter, pathGroups, "up-describe-after-leave", "up-list", "down-describe", "down-list",
-		"down-list-after-leave", "emptydown-list")...)
-	k = append(k, knownSteps(limAssignAfter, pathGeneration, "down-c-join", "down-c-rejoin")...)
-	k = append(k, knownSteps(limAssignAfter, pathRequest,
-		"down-c-sync", "down-c-heartbeat-1", "down-c-heartbeat-2", "down-c-resync", "down-c-heartbeat-3")...)
-	k = append(k, knownSteps(limAssignAfter, pathAssignment, "up-n-heartbeat-4", "down-n-heartbeat-2")...)
-	k = append(k, knownSteps(limAssignAfter, pathMemberEpoch, "up-n-heartbeat-4")...)
 	return k
 }
 

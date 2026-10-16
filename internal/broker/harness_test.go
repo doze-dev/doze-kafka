@@ -92,6 +92,29 @@ func bootAt(t *testing.T, addr, dir string, version int) (string, func()) {
 	return boot(t, cfg)
 }
 
+// startBrokerWith is startBroker with the config changed by mod first.
+func startBrokerWith(t *testing.T, version int, mod func(*config.Config)) string {
+	t.Helper()
+	dir := t.TempDir()
+	cfg := config.Default()
+	cfg.Version = version
+	cfg.ListenAddr = "127.0.0.1:0"
+	cfg.DataDir = filepath.Join(dir, "data")
+	cfg.MetaDB = filepath.Join(dir, "meta.db")
+	mod(&cfg)
+	addr, stop := boot(t, cfg)
+	t.Cleanup(stop)
+	return addr
+}
+
+// startBrokerAssigningAtOnce is startBroker with the consumer groups' assignment
+// interval at 0, which Kafka allows: for a test of how members reconcile, which would
+// otherwise wait a second for each new target.
+func startBrokerAssigningAtOnce(t *testing.T, version int) string {
+	t.Helper()
+	return startBrokerWith(t, version, func(c *config.Config) { c.ConsumerAssignmentInterval = 0 })
+}
+
 // runBroker boots a broker from a full config and returns a stop func.
 func runBroker(t *testing.T, cfg config.Config) func() {
 	t.Helper()

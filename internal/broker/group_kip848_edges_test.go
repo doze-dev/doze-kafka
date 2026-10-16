@@ -138,7 +138,7 @@ func TestGroupKIP848_BrokerMintsAMemberIDWhenNoneIsGiven(t *testing.T) {
 // (still empty) handed B partitions A believed it owned. Playing both members by
 // hand, no partition may ever be in both hands.
 func TestGroupKIP848_NoPartitionIsHeldByTwoMembers(t *testing.T) {
-	addr := startBroker(t, 4)
+	addr := startBrokerAssigningAtOnce(t, 4) // of reconciliation, not of when targets are computed.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	admin := newClient(t, addr)

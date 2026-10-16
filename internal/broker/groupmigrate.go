@@ -292,7 +292,7 @@ func seatSubscription(protocols []groupProtocolEntry) (sub classicSubscription, 
 // it held, which no other member may take until it has rejoined and given them up.
 // Caller holds m.mu.
 func (m *cg848Manager) adopt(id string, snap classicSnapshot) *cg848Group {
-	g := &cg848Group{id: id, epoch: snap.generation, assignor: assignorUniform, members: make(map[string]*cg848Member)}
+	g := &cg848Group{id: id, epoch: snap.generation, targetEpoch: snap.generation, assignor: assignorUniform, members: make(map[string]*cg848Member)}
 	m.groups[id] = g
 	for _, sm := range snap.members {
 		sub, protocol, _ := seatSubscription(sm.protocols)
@@ -461,6 +461,8 @@ func (m *cg848Manager) classicJoin(r *kmsg.JoinGroupRequest, who clientRef) (res
 	m.resetSession(g, mem)
 	if changed {
 		m.bumpAndReassign(g, "a classic member joined or changed its subscription")
+	} else {
+		m.assignIfDue(g) // recorded: consumer-assignment-interval, c-rejoin-1500ms.
 	}
 	m.reconcile(g, mem, owned)
 	m.armClassicRevocations(g)
@@ -559,7 +561,7 @@ func (m *cg848Manager) classicSync(r *kmsg.SyncGroupRequest) (assignment []byte,
 		r.Protocol != nil && *r.Protocol != mem.classic.protocol:
 		// recorded: cm-sync-wrong-protocol-type, cm-sync-wrong-protocol-name.
 		return nil, kerr.InconsistentGroupProtocol.Code, true
-	case mem.epoch != g.epoch && len(mem.revoking) == 0:
+	case mem.epoch != g.targetEpoch && len(mem.revoking) == 0:
 		// The group has moved on since this member joined, and it is not in the middle
 		// of giving partitions up: there is nothing for it to collect, it must join
 		// again (recorded: ps-a-leader-sync is 27, co-a-resync-1 is not).
@@ -602,7 +604,7 @@ func (m *cg848Manager) classicHeartbeat(r *kmsg.HeartbeatRequest) (code int16, h
 		return kerr.IllegalGeneration.Code, true
 	}
 	m.resetSession(g, mem)
-	if mem.epoch != g.epoch || m.classicMustRejoin(g, mem) {
+	if mem.epoch != g.targetEpoch || m.classicMustRejoin(g, mem) {
 		return kerr.RebalanceInProgress.Code, true
 	}
 	return errNone, true
@@ -657,8 +659,7 @@ func (m *cg848Manager) classicLeave(r *kmsg.LeaveGroupRequest) (results []leaveR
 			// Not downgraded, even when the member named was the last of the consumer
 			// protocol: Kafka downgrades when such a member leaves by its own protocol
 			// (recorded: cm-describe-after-leave is a consumer group).
-			m.bumpAndReassign(g, "a member left")
-			m.armClassicRevocations(g)
+			m.bumpForRemoval(g, "a member left")
 		}
 	}
 	return results, true
@@ -697,7 +698,7 @@ func (m *cg848Manager) armSeatRevoke(g *cg848Group, mem *cg848Member, timeout ti
 		m.emit(g, "expired", mem.id, "a classic member did not rejoin within its rebalance timeout", "")
 		m.removeMember(g, mem.id)
 		if len(g.members) > 0 {
-			m.bumpAndReassign(g, "a member was removed")
+			m.bumpForRemoval(g, "a member was removed")
 			m.maybeDowngrade(g)
 		}
 	})

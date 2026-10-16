@@ -96,7 +96,7 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 		// An emptied group stays until the offsets retention's sweep finds it holds
 		// nothing (offsetexpiry.go).
 		groups:  newGroupManager(func(string) bool { return true }, claims),
-		cg848:   newCG848Manager(m, logger, cfg.ConsumerSessionTimeout, claims),
+		cg848:   newCG848Manager(m, logger, cfg.ConsumerSessionTimeout, cfg.ConsumerAssignmentInterval, claims),
 		auth:    auth,
 		idem:    newIdempotency(),
 		profile: profile,

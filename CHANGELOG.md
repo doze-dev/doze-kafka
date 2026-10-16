@@ -6,6 +6,16 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Groups: a consumer group's new targets are computed at most once a second, by a
+  member's heartbeat (or a classic member's JoinGroup), as on Kafka
+  (`group.consumer.assignment.interval.ms`). A member that joins or leaves within a
+  second of the last targets leaves the group `Assigning`, the joiner at the targets'
+  epoch, until such a heartbeat; a leave or an expired session no longer moves anyone's
+  partitions by itself. Before, the targets were computed when the change was made, so
+  epochs and generations read one higher than Kafka's and the group was never
+  `Assigning`. A describe now shows a member's partitions with those it has been told to
+  give up and has not yet (recorded: consumer-assignment-interval, consumer-assignment-expiry).
+
 - Console: Traffic holds a client's long names (client id, software, group, transactional
   id, a 249-character topic) in its columns, cut with an ellipsis and whole in the title
   and the inspector. A client with 90-character names made the clients table 3,675 px

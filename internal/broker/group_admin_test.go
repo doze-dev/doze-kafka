@@ -87,9 +87,17 @@ func TestGroupAdmin_ConsumerGroupStateIsReal(t *testing.T) {
 		t.Errorf("a lone member holding its whole target: state %q, want Stable", s)
 	}
 
+	// A second member a moment after the first targets: the group is Assigning until
+	// a heartbeat a second (the assignment interval) after them computes the new ones,
+	// and then Reconciling while partitions move (recorded: consumer-assignment-interval).
 	b.heartbeat(t, ctx, []string{"t"}, false)
+	if s := consumerGroupState(t, ctx, a); s != "Assigning" {
+		t.Errorf("a second member joined a moment after the first targets: state %q, want Assigning", s)
+	}
+	time.Sleep(1100 * time.Millisecond)
+	a.heartbeat(t, ctx, nil, false)
 	if s := consumerGroupState(t, ctx, a); s != "Reconciling" {
-		t.Errorf("a second member joined and partitions must move: state %q, want Reconciling", s)
+		t.Errorf("the new targets are computed and partitions must move: state %q, want Reconciling", s)
 	}
 	for range 8 {
 		a.heartbeat(t, ctx, nil, true)
