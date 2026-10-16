@@ -32,7 +32,7 @@ Where it listens:
 | Mode | Address |
 |---|---|
 | By name (the default) | `http://schema.<name>.doze` through the shared front door, port 8081 on the instance's own address |
-| `--listen` | `127.0.0.1:8081` |
+| `--listen` | `127.0.0.1:8081`; a free loopback port when `--listen` is on port 0 |
 | `--schema-registry-addr host:port` | wherever you say |
 | `--schema-registry=false` | not served |
 | With `--tls-cert` and `--tls-key` | the same address over `https://`; by name, `https://kafka.<name>.doze:8081` |

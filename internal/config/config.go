@@ -142,7 +142,9 @@ const (
 	listenModeConsole  = "127.0.0.1:9093"
 	// The registry is HTTP too, on Confluent's own port, beside the broker on the
 	// name's address in name mode and on loopback under --listen.
-	listenModeRegistry  = "127.0.0.1:8081"
+	listenModeRegistry = "127.0.0.1:8081"
+	// Under a --listen on port 0, both take a port the system chooses.
+	listenModeAnyPort   = "127.0.0.1:0"
 	defaultSegmentBytes = 128 << 20 // 128 MiB
 	defaultIndexStride  = 4 << 10   // 4 KiB
 
@@ -225,14 +227,28 @@ func DeriveName(dir string) string {
 // --listen gave it an address, which replaces the name rather than adding to it.
 func (c Config) ByName() bool { return c.ListenAddr == "" }
 
-// ResolveConsoleAddr fills in the console's address under --listen. In name mode
-// it stays empty until the name's own address is known (see cmd/doze-kafka).
+// ResolveConsoleAddr fills in the console's and the registry's addresses under
+// --listen. In name mode they stay empty until the name's own address is known
+// (see cmd/doze-kafka).
+//
+// A --listen on port 0 asks the system for a port, which is how a script or a
+// test runs a broker that cannot collide with another: the console and the
+// registry then take system-chosen ports too, on loopback, rather than fixed ones
+// that a second copy would find taken. A fixed --listen keeps the fixed ports
+// (9093 and Confluent's 8081), which are what a person types.
 func (c *Config) ResolveConsoleAddr() {
-	if c.ConsoleAddr == "" && !c.ByName() {
-		c.ConsoleAddr = listenModeConsole
+	if c.ByName() {
+		return
 	}
-	if c.SchemaRegistryAddr == "" && !c.ByName() {
-		c.SchemaRegistryAddr = listenModeRegistry
+	console, registry := listenModeConsole, listenModeRegistry
+	if _, port, err := net.SplitHostPort(c.ListenAddr); err == nil && port == "0" {
+		console, registry = listenModeAnyPort, listenModeAnyPort
+	}
+	if c.ConsoleAddr == "" {
+		c.ConsoleAddr = console
+	}
+	if c.SchemaRegistryAddr == "" {
+		c.SchemaRegistryAddr = registry
 	}
 }
 

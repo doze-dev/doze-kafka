@@ -141,7 +141,7 @@ where this one says `kafka-version`; that spelling is still read.
 | Flag | Default | Meaning |
 |---|---|---|
 | `--console` | `true` | Serve the web console. `--console=false` to turn it off. |
-| `--console-addr` | *beside the broker* | `host:port` for the console's HTTP listener. Unset, it is port 9093 on the name's own address (and `http://kafka.<name>.doze`, port-less, through the shared front door); under `--listen`, `127.0.0.1:9093`. A taken port is an error naming this flag. |
+| `--console-addr` | *beside the broker* | `host:port` for the console's HTTP listener. Unset, it is port 9093 on the name's own address (and `http://kafka.<name>.doze`, port-less, through the shared front door); under `--listen`, `127.0.0.1:9093`, or a free loopback port when `--listen` is on port 0. A taken port is an error naming this flag. |
 | `--console-prefix` | `/_console` | The URL path the console is served under, for a reverse proxy that mounts it below a path of its own. `/` serves it at the root of its port. |
 | `--console-allow-host` | *(none)* | Extra Host names the console answers to, besides `localhost`, IP addresses and `*.doze`. Comma-separated or repeated. A guard against DNS rebinding. |
 | `--console-unprotected` | `false` | Serve the console beyond loopback although SASL or TLS is on. The console has no login, is plain HTTP and, with SASL, acts as a super user, so without this flag that combination is refused at start-up. With it, a warning says what is open. See [What SASL and TLS cover](auth-and-tls.md#what-sasl-and-tls-cover). |
@@ -152,7 +152,7 @@ where this one says `kafka-version`; that spelling is still read.
 | Flag | Default | Meaning |
 |---|---|---|
 | `--schema-registry` | `true` | Serve the built-in Confluent-compatible schema registry. `--schema-registry=false` to turn it off. |
-| `--schema-registry-addr` | *beside the broker* | `host:port` for the registry's HTTP listener. Unset, it is port 8081 on the name's own address (and `http://schema.<name>.doze`, port-less, through the shared front door); under `--listen`, `127.0.0.1:8081`. A taken port is an error naming this flag. |
+| `--schema-registry-addr` | *beside the broker* | `host:port` for the registry's HTTP listener. Unset, it is port 8081 on the name's own address (and `http://schema.<name>.doze`, port-less, through the shared front door); under `--listen`, `127.0.0.1:8081`, or a free loopback port when `--listen` is on port 0. A taken port is an error naming this flag. |
 | `--schema-registry-tls` | `true` | Serve the registry over HTTPS, with the broker's certificate, when `--tls-cert` and `--tls-key` are set; without them it changes nothing. `--schema-registry-tls=false` keeps the registry plain HTTP beside a TLS broker, and warns at start-up if it is then on an address other machines can reach. |
 
 ### Process
@@ -206,11 +206,12 @@ consumer groups only):
 ./doze-kafka --kafka-version 3
 ```
 
-**Throwaway broker on a random port** (handy for scripts and CI):
+**Throwaway broker on a random port** (handy for scripts and CI). With `--listen` on
+port 0 the console and the registry take free ports too, so two of these run at once:
 
 ```sh
-./doze-kafka --listen 127.0.0.1:0 --console-addr 127.0.0.1:0 --data-dir "$(mktemp -d)"
-# the summary printed at start-up has the bootstrap address and the console URL
+./doze-kafka --listen 127.0.0.1:0 --data-dir "$(mktemp -d)"
+# the summary printed at start-up has the bootstrap address, the console and the registry URL
 ```
 
 **Reachable from a container on this machine:**

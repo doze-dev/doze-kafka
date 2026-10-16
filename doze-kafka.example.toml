@@ -56,7 +56,7 @@ max-partitions = 1000     # most partitions one topic may have; each is a direct
 # --- console -------------------------------------------------------------------
 
 console = true                   # serve the web console.
-# console-addr = "127.0.0.1:9093" # unset: beside the broker on the name's address (9093), or 127.0.0.1:9093 under listen.
+# console-addr = "127.0.0.1:9093" # unset: beside the broker on the name's address (9093), or 127.0.0.1:9093 under listen (a free port when listen is on port 0).
 # console-prefix = "/_console"          # the URL path the console is served under.
 # console-allow-host = ["devbox.lan"] # extra Host names the console answers to.
 console-unprotected = false             # true: serve the console beyond loopback although SASL or TLS is on (it has no login).
@@ -68,7 +68,7 @@ zone = true                              # join the shared .doze zone (names and
 # --- schema registry ----------------------------------------------------------
 
 schema-registry = true                  # serve the built-in Confluent-compatible schema registry.
-# schema-registry-addr = "127.0.0.1:8081" # unset: beside the broker on the name's address (8081), or 127.0.0.1:8081 under listen.
+# schema-registry-addr = "127.0.0.1:8081" # unset: beside the broker on the name's address (8081), or 127.0.0.1:8081 under listen (a free port when listen is on port 0).
 schema-registry-tls = true              # with [tls] set, serve the registry over https with the same certificate; false keeps it http.
 
 # --- process -------------------------------------------------------------------
