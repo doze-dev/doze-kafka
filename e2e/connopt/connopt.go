@@ -9,14 +9,14 @@ import (
 	"os"
 
 	"github.com/twmb/franz-go/pkg/kgo"
-	"github.com/twmb/franz-go/pkg/sasl/plain"
+	"github.com/twmb/franz-go/pkg/sasl/scram"
 )
 
 // Opts are the connection options every helper client starts with.
 func Opts() []kgo.Opt {
 	var opts []kgo.Opt
 	if user := os.Getenv("E2E_SASL_USER"); user != "" {
-		opts = append(opts, kgo.SASL(plain.Auth{User: user, Pass: os.Getenv("E2E_SASL_PASS")}.AsMechanism()))
+		opts = append(opts, kgo.SASL(scram.Auth{User: user, Pass: os.Getenv("E2E_SASL_PASS")}.AsSha512Mechanism()))
 	}
 	if os.Getenv("E2E_TLS") == "1" {
 		opts = append(opts, kgo.DialTLSConfig(&tls.Config{InsecureSkipVerify: true})) //nolint:gosec // a throwaway certificate on loopback.

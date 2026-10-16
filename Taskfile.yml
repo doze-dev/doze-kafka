@@ -107,12 +107,12 @@ tasks:
       - python3 evidence/optimise.py ../plan/evidence
 
   check:identity:
-    desc: 'The second identity (listener on :0, a console prefix, a data directory with a space, SASL and TLS on) booted as the binary and used by a real client and the console'
+    desc: 'The second identity (listener on :0, a console prefix, a data directory with a space, SASL/SCRAM-SHA-512 and TLS on): the built binary, booted twice over the same directory, used by a real client and the console (TestSecondIdentity; task check runs it with the rest)'
     cmds:
       - go test -race -count=1 -run 'SecondIdentity' ./cmd/doze-kafka
 
   test:e2e:identity:
-    desc: 'The browser suite against a broker started with the second identity (listener on 127.0.0.1:0, console prefix, data dir with a space, SASL and TLS); the route gate is on'
+    desc: 'The browser suite against a broker started with the second identity (listener on 127.0.0.1:0, console prefix, data dir with a space, SASL/SCRAM-SHA-512 and TLS); the route gate is on'
     cmds:
       - go build -o bin/{{.BINARY}} ./cmd/doze-kafka
       - cd e2e && bun install --frozen-lockfile && bunx playwright install chromium

@@ -30,5 +30,5 @@ test('the cluster page lists the broker, its APIs and its settings', async ({ pa
   await expect(page.getByText('log.retention.ms')).toBeVisible();
   await page.goto('cluster');
   // How the console itself is connected: the second identity (E2E_EXTERNAL) is SASL over TLS.
-  await expect(page.getByText(process.env.E2E_EXTERNAL === '1' ? /SASL PLAIN · TLS/ : /no authentication · plaintext/)).toBeVisible();
+  await expect(page.getByText(process.env.E2E_EXTERNAL === '1' ? /SASL SCRAM-SHA-512 · TLS/ : /no authentication · plaintext/)).toBeVisible();
 });

@@ -82,7 +82,7 @@ func run(bin string, cmdline []string) (int, error) {
 	broker := exec.Command(absBin,
 		"--listen", "127.0.0.1:0", "--console-addr", "127.0.0.1:0", "--schema-registry-addr", "127.0.0.1:0",
 		"--console-prefix", consolePrefix, "--data-dir", dataDir,
-		"--sasl-mechanisms", "PLAIN", "--sasl-user", user+":"+pass,
+		"--sasl-mechanisms", "SCRAM-SHA-512", "--sasl-user", user+":"+pass,
 		"--tls-cert", cert, "--tls-key", key, "--zone=false", "--log-format", "json")
 	stdout, err := broker.StderrPipe() // the structured log is on stderr.
 	if err != nil {
