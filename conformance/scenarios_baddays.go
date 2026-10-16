@@ -12,12 +12,7 @@ func init() {
 	Scenarios = append(Scenarios,
 		Scenario{Name: "joingroup-session-timeout", Run: joinGroupSessionTimeout},
 		Scenario{Name: "produce-acks-zero", Run: produceAcksZero},
-		Scenario{Name: "produce-decompressed-size", Run: produceDecompressedSize, Known: []Known{
-			// A refusal's text is doze-kafka's own; Kafka's response carries none.
-			{Step: "keep-uncompressed-over", Path: "Topics[0].Partitions[0].ErrorMessage", Limitation: limMessages},
-			{Step: "keep-gzip-compressed-over", Path: "Topics[0].Partitions[0].ErrorMessage", Limitation: limMessages},
-			{Step: "plain-gzip-small-inflates-50k", Path: "Topics[0].Partitions[0].ErrorMessage", Limitation: limMessages},
-		}},
+		Scenario{Name: "produce-decompressed-size", Run: produceDecompressedSize},
 	)
 }
 
@@ -92,7 +87,10 @@ func produceAcksZero(e *Env) {
 // compressed batch to, the batch as it came (compressed) or what it inflates to? The
 // topics have max.message.bytes=2000; every payload inflates to far more than that and
 // the compressible ones weigh a few hundred bytes. Each answer is then followed by a
-// Fetch, so a "success" is shown to have stored the batch.
+// ListOffsets for the partition's end (the step "<label> then end"), so a success is
+// shown to have stored the batch and a refusal not to have. (Not a Fetch: the
+// batch Kafka stores for the recompress topic is its own gzip output, whose bytes
+// are no claim.)
 func produceDecompressedSize(e *Env) {
 	cfg := func(name, compression string) kmsg.CreateTopicsRequestTopic {
 		return newTopic(name, 1, 1, "max.message.bytes", "2000", "compression.type", compression)
@@ -137,6 +135,15 @@ func produceDecompressedSize(e *Env) {
 			}
 			return true
 		})
+		lo := kmsg.NewPtrListOffsetsRequest()
+		lo.ReplicaID = -1
+		lt := kmsg.NewListOffsetsRequestTopic()
+		lt.Topic = topic
+		lp := kmsg.NewListOffsetsRequestTopicPartition()
+		lp.Timestamp = -1 // the end.
+		lt.Partitions = append(lt.Partitions, lp)
+		lo.Topics = append(lo.Topics, lt)
+		e.Do(label+" then end", lo, 7)
 	}
 	send("keep-uncompressed-over", "keep", encodeBatch(zeros(5000)))
 	send("keep-gzip-small-inflates-50k", "keep", encodeBatchCodec(zeros(50000), 1))

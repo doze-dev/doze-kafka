@@ -13,7 +13,7 @@ import (
 // A NUL is refused at creation instead.
 func TestCreateACLRefusesANulInAnyText(t *testing.T) {
 	good := acl(resTopic, "orders", aclLiteral, "User:alice", "*", 3, 3)
-	if why := validateCreation(good); why != "" {
+	if code, why := validateCreation(good); code != 0 {
 		t.Fatalf("the control entry is refused: %s", why)
 	}
 	for field, mutate := range map[string]func(a meta.ACL) meta.ACL{
@@ -21,7 +21,7 @@ func TestCreateACLRefusesANulInAnyText(t *testing.T) {
 		"principal": func(a meta.ACL) meta.ACL { a.Principal = "User:al\x00ice"; return a },
 		"host":      func(a meta.ACL) meta.ACL { a.Host = "10.0.0.1\x00*"; return a },
 	} {
-		if why := validateCreation(mutate(good)); why == "" {
+		if code, _ := validateCreation(mutate(good)); code == 0 {
 			t.Errorf("an entry with a NUL in its %s was accepted", field)
 		}
 	}
@@ -60,9 +60,11 @@ func FuzzACLFilterMatches(f *testing.F) {
 			}
 		}
 		_ = exact.validate()
-		_ = validateCreation(entry)
-		if strings.Contains(name+principal+host, "\x00") && validateCreation(entry) == "" {
+		_, _ = validateCreation(entry)
+		if strings.Contains(name+principal+host, "\x00") && first(validateCreation(entry)) == 0 {
 			t.Fatalf("an entry with a NUL passed validateCreation: %+v", entry)
 		}
 	})
 }
+
+func first(code int16, _ string) int16 { return code }

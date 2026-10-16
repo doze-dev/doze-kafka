@@ -263,6 +263,12 @@ func TestRollWaitsForAnInFlightFsyncAndLearnsItFailed(t *testing.T) {
 	first := p.segments[0]
 
 	inFsync, release := make(chan struct{}), make(chan struct{})
+	// Whatever this test concludes, the flush it holds must be let go before the
+	// partition is closed: a seal that did not wait used to fail the test and then
+	// hang it for the whole timeout, behind its own blocked fsync.
+	var releaseOnce sync.Once
+	letGo := func() { releaseOnce.Do(func() { close(release) }) }
+	defer letGo()
 	var calls atomic.Int64
 	hookFsync(t, func(f *os.File) error {
 		if f != first.log {
@@ -287,7 +293,7 @@ func TestRollWaitsForAnInFlightFsyncAndLearnsItFailed(t *testing.T) {
 		t.Fatalf("the roll finished (err=%v) while the segment's flush was still in progress", err)
 	case <-time.After(150 * time.Millisecond):
 	}
-	close(release)
+	letGo()
 	if err := <-timerErr; !errors.Is(err, errDisk) {
 		t.Fatalf("the failed flush reported %v", err)
 	}

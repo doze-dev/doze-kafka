@@ -37,9 +37,6 @@ func FuzzValidateBatches(f *testing.F) {
 			}
 			pos += int(info.totalBytes)
 		}
-		if got := LargestBatch(b); got > int64(len(b)) {
-			t.Fatalf("LargestBatch %d is larger than the payload (%d)", got, len(b))
-		}
 	})
 }
 
@@ -59,7 +56,7 @@ func FuzzScanLog(f *testing.F) {
 			}
 			return data[pos : pos+int64(n)], nil
 		}
-		validEnd, leo, want, _, err := scanLog(read, int64(len(data)), base, interval)
+		validEnd, leo, want, _, err := scanLog(read, int64(len(data)), base, interval, false)
 		if err != nil {
 			t.Fatal(err)
 		}

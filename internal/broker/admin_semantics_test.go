@@ -52,9 +52,18 @@ func TestMetadataBelowV4AutoCreates(t *testing.T) {
 	}
 }
 
-// ListOffsets v0 answers with a list, not a single field. It was left empty.
+// ListOffsets v0 answers with a list, not a single field. It was left empty. (v0 is
+// in the Kafka 1 to 3 profiles; Kafka 4 removed it and closes the connection on it,
+// claim: api V2, and so does the Kafka 4 profile.)
 func TestListOffsetsV0ReturnsAnOffset(t *testing.T) {
-	addr := startBroker(t, 4)
+	v4 := openRaw(t, startBroker(t, 4))
+	gone := kmsg.NewPtrListOffsetsRequest()
+	gone.SetVersion(0)
+	var none kmsg.ListOffsetsResponse
+	if v4.do(gone, &none) {
+		t.Fatal("the Kafka 4 profile answered ListOffsets v0, which Kafka 4 does not serve")
+	}
+	addr := startBroker(t, 3)
 	cl := newClient(t, addr)
 	mustCreateTopic(t, context.Background(), cl, "t", 1)
 	produceN(t, context.Background(), cl, "t", 5)

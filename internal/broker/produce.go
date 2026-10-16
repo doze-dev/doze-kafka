@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
@@ -54,6 +55,40 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 		return req.Reply(resp), nil
 	}
 
+	// Before any partition is handled Kafka looks at the first batch of each, to see
+	// whether the request is transactional, and a request it cannot even take apart
+	// there fails whole; so does one with a transactional batch and no transactional
+	// id (recorded: produce-validation, records-20-zero-bytes, magic-3-in-v2-layout,
+	// transactional-bit-no-producer-id).
+	var first [][]byte
+	for _, t := range pr.Topics {
+		for _, part := range t.Partitions {
+			first = append(first, part.Records)
+		}
+	}
+	transactional, refusal := log.RequestRefusal(first)
+	if refusal == nil && transactional && pr.TransactionID == nil {
+		refusal = &log.Refusal{Kind: refuseTransactionalID, BeforeLog: true,
+			Reason: "a transactional record batch in a request that names no transactional id"}
+	}
+	if refusal != nil {
+		for _, t := range pr.Topics {
+			rt := kmsg.NewProduceResponseTopic()
+			rt.Topic, rt.TopicID = t.Topic, t.TopicID
+			for _, part := range t.Partitions {
+				rp := kmsg.NewProduceResponseTopicPartition()
+				rp.Partition = part.Partition
+				refuseProduce(&rp, refusal, nil)
+				rt.Partitions = append(rt.Partitions, rp)
+			}
+			resp.Topics = append(resp.Topics, rt)
+		}
+		if pr.Acks == 0 {
+			return nil, fmt.Errorf("produce with acks=0 was refused (%s)", refusal.Reason)
+		}
+		return req.Reply(resp), nil
+	}
+
 	producedTopics := map[string]struct{}{}
 	// Partitions written by this request, with where their response entries sit,
 	// so an fsync failure can be reported against exactly those entries.
@@ -79,9 +114,9 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 				rp.BaseOffset = -1
 			case !ok || part.Partition < 0 || part.Partition >= topic.Partitions:
 				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
-				rp.BaseOffset = -1 // as Apache Kafka answers it (conformance/recordings/produce-mixed-partition-errors.json).
+				rp.BaseOffset = -1 // as Apache Kafka answers it (claim: traffic R7).
 			default:
-				wrote, answered := b.appendRecords(req.Conn, pr.TransactionID, name, topic.Config, part, &rp)
+				wrote, answered := b.appendRecords(req.Conn, req.Header.APIVersion, pr.TransactionID, name, topic.Config, part, &rp)
 				if wrote {
 					producedTopics[name] = struct{}{}
 				}
@@ -128,16 +163,102 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 			// that may vanish: it will retry (idempotently), and the failure is
 			// visible instead of silent.
 			b.log.Error("durable ack: fsync failed; reporting the produce as failed", "topic", tp.topic, "partition", tp.partition, "err", err)
-			msg := "fsync failed: " + err.Error()
 			for _, s := range slots {
-				rp := &resp.Topics[s.topic].Partitions[s.part]
-				rp.ErrorCode = kerr.KafkaStorageError.Code
-				rp.ErrorMessage = &msg
-				rp.BaseOffset = -1
+				refuseForStorage(&resp.Topics[s.topic].Partitions[s.part], kerr.KafkaStorageError.Code)
 			}
 		}
 	}
 	return req.Reply(resp), nil
+}
+
+// refuseTransactionalID is the one refusal of a Produce request that the log does
+// not make: a transactional batch with no transactional id to authorise.
+const refuseTransactionalID log.RefusalKind = -1
+
+// refusalCode is the Kafka error for each kind of refusal.
+func refusalCode(k log.RefusalKind) int16 {
+	switch k {
+	case log.RefuseInvalidRecord:
+		return kerr.InvalidRecord.Code
+	case log.RefuseCorrupt:
+		return kerr.CorruptMessage.Code
+	case log.RefuseTooLarge:
+		return kerr.MessageTooLarge.Code
+	case log.RefuseTimestamp:
+		return kerr.InvalidTimestamp.Code
+	case log.RefuseCompression:
+		return kerr.UnsupportedCompressionType.Code
+	case refuseTransactionalID:
+		return kerr.TransactionalIDAuthorizationFailed.Code
+	}
+	// A records section that cannot be decompressed: Kafka has no better name for it
+	// than this (recorded: garbage, a truncated stream and a codec number nothing has
+	// are all UNKNOWN_SERVER_ERROR).
+	return kerr.UnknownServerError.Code
+}
+
+// refuseProduce fills a partition's answer for a batch that is not stored. plog is
+// the partition's log, nil when the refusal is of the whole request.
+func refuseProduce(rp *kmsg.ProduceResponseTopicPartition, r *log.Refusal, plog *log.Partition) {
+	rp.ErrorCode = refusalCode(r.Kind)
+	rp.BaseOffset = -1
+	rp.LogAppendTime = -1
+	// Kafka's answer carries the partition's log start offset once the log has been
+	// asked, and -1 for a refusal made before that.
+	rp.LogStartOffset = -1
+	if plog != nil && !r.BeforeLog {
+		rp.LogStartOffset = plog.LogStartOffset()
+	}
+	// Kafka's answer carries its text where it has one and null where it does not
+	// (recorded: every refusal in produce-validation without a text of Kafka's).
+	if r.KafkaMessage != "" {
+		msg := r.KafkaMessage
+		rp.ErrorMessage = &msg
+	}
+	for _, rec := range r.Records {
+		er := kmsg.NewProduceResponseTopicPartitionErrorRecord()
+		er.RelativeOffset = rec.Index
+		m := rec.Message
+		er.ErrorMessage = &m
+		rp.ErrorRecords = append(rp.ErrorRecords, er)
+	}
+}
+
+// produceRules is what a topic's configuration holds a batch to.
+func (b *Broker) produceRules(version int16, topic string, partition int32, topicConfig map[string]string) log.ProduceRules {
+	rules := log.ProduceRules{
+		Version:        version,
+		MaxBatchBytes:  b.cfg.MessageMaxBytes,
+		RequireKeys:    compacts(topicConfig),
+		Target:         log.TargetProducer,
+		LogAppendTime:  topicConfig["message.timestamp.type"] == "LogAppendTime",
+		NowMs:          time.Now().UnixMilli(),
+		BeforeMaxMs:    math.MaxInt64,
+		AfterMaxMs:     log.DefaultTimestampAfterMaxMs,
+		TopicPartition: topic + "-" + strconv.Itoa(int(partition)),
+	}
+	if rules.MaxBatchBytes <= 0 {
+		rules.MaxBatchBytes = log.DefaultMaxMessageBytes
+	}
+	// The topic's own limit on one record batch replaces the broker's
+	// (message.max.bytes, Kafka's default of 1048588 unless set).
+	if limit, ok := topicInt(topicConfig, "max.message.bytes"); ok {
+		rules.MaxBatchBytes = limit
+	}
+	if ms, ok := topicInt(topicConfig, "message.timestamp.before.max.ms"); ok {
+		rules.BeforeMaxMs = ms
+	}
+	if ms, ok := topicInt(topicConfig, "message.timestamp.after.max.ms"); ok {
+		rules.AfterMaxMs = ms
+	}
+	switch c := topicConfig["compression.type"]; c {
+	case "", "producer":
+	case "uncompressed":
+		rules.Target = 0
+	default:
+		rules.Target = log.CodecByName(c)
+	}
+	return rules
 }
 
 // appendRecords appends one partition's records and fills rp. A non-idempotent
@@ -146,7 +267,7 @@ func (b *Broker) handleProduce(ctx context.Context, req *protocol.Request) ([]by
 // answer rests on data already in the log without having written it (a duplicate
 // retry): that data may still be in the page cache, so an acks=all answer must
 // sync it too (BAD-1).
-func (b *Broker) appendRecords(conn *protocol.Conn, txnID *string, topic string, topicConfig map[string]string, part kmsg.ProduceRequestTopicPartition, rp *kmsg.ProduceResponseTopicPartition) (wrote, answered bool) {
+func (b *Broker) appendRecords(conn *protocol.Conn, version int16, txnID *string, topic string, topicConfig map[string]string, part kmsg.ProduceRequestTopicPartition, rp *kmsg.ProduceResponseTopicPartition) (wrote, answered bool) {
 	plog, err := b.logs.ExistingPartition(topic, part.Partition)
 	if errors.Is(err, log.ErrNoSuchPartition) {
 		// The topic was deleted between resolving it and opening its log.
@@ -158,71 +279,31 @@ func (b *Broker) appendRecords(conn *protocol.Conn, txnID *string, topic string,
 		return false, false
 	}
 
-	// Validate every batch before writing any: shape and CRC. A bad batch must not
-	// be stored (every consumer would then fail on it, forever) and must not leave
-	// the batches before it half-appended.
-	if err := log.ValidateBatches(part.Records); err != nil {
-		rp.ErrorCode = kerr.CorruptMessage.Code
-		msg := err.Error()
-		rp.ErrorMessage = &msg
-		rp.BaseOffset = -1
+	// Everything Kafka holds a batch to, before a byte of it is written: one batch,
+	// its header, its checksum, and every record of it, read through whatever it is
+	// compressed with (log.CheckProduce, which is a stream and holds no payload). A
+	// batch that is refused is not stored, on any kind of topic; a batch that was
+	// stored used to be refused here only on a topic that compacts.
+	rules := b.produceRules(version, topic, part.Partition, topicConfig)
+	accepted, refusal := log.CheckProduce(part.Records, rules)
+	if refusal != nil {
+		refuseProduce(rp, refusal, plog)
 		return false, false
 	}
+	batch, hdr := accepted.Batch, accepted.Header
 
-	// The topic's own limit on one record batch, if it has set one. (There is no
-	// broker-wide default: a development broker that refused every batch over
-	// Kafka's 1 MB would surprise more people than it helped.)
-	if limit, ok := topicInt(topicConfig, "max.message.bytes"); ok {
-		if largest := log.LargestBatch(part.Records); largest > limit {
-			rp.ErrorCode = kerr.MessageTooLarge.Code
-			msg := fmt.Sprintf("a record batch of %d bytes is larger than this topic's max.message.bytes (%d)", largest, limit)
-			rp.ErrorMessage = &msg
-			rp.BaseOffset = -1
-			return false, false
-		}
-	}
-	// What the broker has to look inside a compressed batch for: a compacted topic is
-	// keyed (a record with no key has nothing to replace, and is refused as Kafka refuses
-	// it), and a topic that stores uncompressed is held to max.message.bytes as it is
-	// stored, which Kafka does by inflating what a producer compressed (recorded:
-	// produce-decompressed-size; every other topic is held to the size as it arrived,
-	// checked above). The look is a stream: a batch that inflates past what this broker
-	// holds is MESSAGE_TOO_LARGE however little it weighs.
-	check := log.RecordCheck{RequireKeys: compacts(topicConfig)}
-	if topicConfig["compression.type"] == "uncompressed" {
-		if limit, ok := topicInt(topicConfig, "max.message.bytes"); ok {
-			check.MaxStored = limit
-		}
-	}
-	if check.RequireKeys || check.MaxStored > 0 {
-		if err := log.CheckRecords(part.Records, check); err != nil {
-			msg := err.Error()
-			switch {
-			case errors.Is(err, log.ErrStoredTooLarge):
-				rp.ErrorCode = kerr.MessageTooLarge.Code
-				msg = fmt.Sprintf("a record batch that inflates past this topic's max.message.bytes (%d): the topic stores records uncompressed (compression.type)", check.MaxStored)
-			case errors.Is(err, log.ErrInflatedTooLarge):
-				rp.ErrorCode = kerr.MessageTooLarge.Code
-				msg = fmt.Sprintf("a record batch inflates past %d bytes, more than this broker will inflate", log.MaxInflatedBytes)
-			default:
-				rp.ErrorCode = kerr.InvalidRecord.Code
-			}
-			rp.ErrorMessage = &msg
-			rp.BaseOffset = -1
-			return false, false
-		}
-	}
 	// message.timestamp.type=LogAppendTime: the records take the broker's clock.
 	appendTime := int64(-1)
-	if topicConfig["message.timestamp.type"] == "LogAppendTime" {
-		appendTime = time.Now().UnixMilli()
-		log.StampLogAppendTime(part.Records, appendTime)
+	if rules.LogAppendTime {
+		appendTime = rules.NowMs
+		log.StampLogAppendTime(batch, appendTime)
 	}
 
-	if hdr, ok := log.ParseBatch(part.Records); !ok || hdr.ProducerID < 0 {
-		wrote = b.appendPlain(plog, part.Records, rp)
+	switch {
+	case hdr.ProducerID < 0:
+		wrote = b.appendPlain(plog, batch, rp)
 		answered = wrote
-	} else if hdr.Transactional {
+	case hdr.Transactional:
 		// A transactional producer needs Write on its transactional id as well, and
 		// the transaction must be open on this partition for the length of the append.
 		if txnID != nil && !b.canTxnID(conn, *txnID, opWrite) {
@@ -236,14 +317,23 @@ func (b *Broker) appendRecords(conn *protocol.Conn, txnID *string, topic string,
 			return false, false
 		}
 		defer unlock()
-		wrote, answered = b.appendIdempotent(topic, part.Partition, plog, part.Records, rp)
-	} else {
-		wrote, answered = b.appendIdempotent(topic, part.Partition, plog, part.Records, rp)
+		wrote, answered = b.appendIdempotent(topic, part.Partition, plog, batch, rp)
+	default:
+		wrote, answered = b.appendIdempotent(topic, part.Partition, plog, batch, rp)
 	}
-	if rp.ErrorCode == 0 {
+	if rp.ErrorCode == 0 && wrote {
 		rp.LogAppendTime = appendTime // -1 under CreateTime: the record's own timestamp stands.
 	}
 	return wrote, answered
+}
+
+// refuseForStorage answers a partition whose write or flush failed the way Apache
+// Kafka does (recorded: full-disk, full-disk-produce): the code, no offsets
+// (-1 for the base offset, the append time and the log start) and no message.
+// The cause is in the broker's log, not in a client's.
+func refuseForStorage(rp *kmsg.ProduceResponseTopicPartition, code int16) {
+	rp.ErrorCode, rp.ErrorMessage = code, nil
+	rp.BaseOffset, rp.LogAppendTime, rp.LogStartOffset = -1, -1, -1
 }
 
 // topicInt reads a numeric topic config, if the topic has set it.
@@ -261,9 +351,7 @@ func topicInt(topicConfig map[string]string, key string) (int64, bool) {
 func (b *Broker) appendPlain(plog *log.Partition, records []byte, rp *kmsg.ProduceResponseTopicPartition) bool {
 	baseOffset, err := plog.Append(records)
 	if err != nil {
-		rp.ErrorCode = b.storageFault("produce: append", err)
-		msg := err.Error()
-		rp.ErrorMessage = &msg
+		refuseForStorage(rp, b.storageFault("produce: append", err))
 		return false
 	}
 	rp.BaseOffset = baseOffset
@@ -285,7 +373,14 @@ func (b *Broker) appendIdempotent(topic string, partition int32, plog *log.Parti
 		return false, false
 	}
 
-	var firstOffset int64 = -1
+	// A batch refused for its sequence or its epoch has no offset (-1), and the
+	// answer carries the partition's log start offset, as Kafka's does.
+	refused := func(code int16) (bool, bool) {
+		rp.ErrorCode, rp.BaseOffset, rp.LogAppendTime = code, -1, -1
+		rp.LogStartOffset = plog.LogStartOffset()
+		return wrote, answered
+	}
+	var firstOffset, duplicateTime int64 = -1, -1
 	for pos := 0; pos < len(records); {
 		hdr, ok := log.ParseBatch(records[pos:])
 		if !ok || hdr.TotalBytes <= 0 || pos+hdr.TotalBytes > len(records) {
@@ -301,12 +396,10 @@ func (b *Broker) appendIdempotent(topic string, partition int32, plog *log.Parti
 		case seqAccept:
 			off, err := plog.Append(batch)
 			if err != nil {
-				rp.ErrorCode = b.storageFault("produce: append (idempotent)", err, "topic", topic, "partition", partition)
-				msg := err.Error()
-				rp.ErrorMessage = &msg
+				refuseForStorage(rp, b.storageFault("produce: append (idempotent)", err, "topic", topic, "partition", partition))
 				return wrote, answered
 			}
-			pp.record(hdr.ProducerID, hdr.ProducerEpoch, firstSeq, lastSeq, off)
+			pp.record(hdr.ProducerID, hdr.ProducerEpoch, firstSeq, lastSeq, off, log.MaxTimestampOf(batch))
 			if firstOffset < 0 {
 				firstOffset = off
 			}
@@ -315,22 +408,23 @@ func (b *Broker) appendIdempotent(topic string, partition int32, plog *log.Parti
 			answered = true
 			if firstOffset < 0 {
 				firstOffset = v.offset
+				// A duplicate is answered as the batch it repeats was: its offset, and
+				// the timestamp that batch was stored with (recorded: produce-validation,
+				// unknown-pid-seq-5-again).
+				duplicateTime = v.timestamp
 			}
 		case seqDuplicateOld:
-			rp.ErrorCode = kerr.DuplicateSequenceNumber.Code
-			return wrote, answered
+			return refused(kerr.DuplicateSequenceNumber.Code)
 		case seqOutOfOrder:
-			rp.ErrorCode = kerr.OutOfOrderSequenceNumber.Code
-			return wrote, answered
+			return refused(kerr.OutOfOrderSequenceNumber.Code)
 		case seqFenced:
-			rp.ErrorCode = kerr.InvalidProducerEpoch.Code
-			return wrote, answered
+			return refused(kerr.InvalidProducerEpoch.Code)
 		}
 		pos += hdr.TotalBytes
 	}
 
 	rp.BaseOffset = firstOffset
-	rp.LogAppendTime = -1
+	rp.LogAppendTime = duplicateTime
 	rp.LogStartOffset = plog.LogStartOffset()
 	return wrote, answered
 }

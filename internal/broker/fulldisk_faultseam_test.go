@@ -97,8 +97,10 @@ func TestFullDiskProduceIsKafkaStorageError_FaultSeam(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if code := oresp.Topics[0].Partitions[0].ErrorCode; code != kerr.KafkaStorageError.Code {
-		t.Errorf("OffsetCommit on a full disk: code %d, want KAFKA_STORAGE_ERROR", code)
+	// NOT_COORDINATOR, as Kafka answers when the append to its offsets log fails
+	// (recorded: full-disk-offset-commit).
+	if code := oresp.Topics[0].Partitions[0].ErrorCode; code != kerr.NotCoordinator.Code {
+		t.Errorf("OffsetCommit on a full disk: code %d, want NOT_COORDINATOR", code)
 	}
 
 	cp := kmsg.NewPtrCreatePartitionsRequest()

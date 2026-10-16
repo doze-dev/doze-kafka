@@ -21,12 +21,22 @@ file is still used, with a notice, until you move it in.)
 
 ## How messages are stored
 
-When a client produces, doze-kafka assigns offsets and appends the record batch to
-the active segment **exactly as it arrived on the wire** — it never decodes or
-re-encodes your payload. That's why compression (gzip, snappy, lz4, zstd) just works:
-the compressed batch is stored verbatim and handed back byte-for-byte to the consumer,
-which decompresses it. It also means the on-disk format is doze-kafka's own; it is not
-byte-compatible with Apache Kafka's segment files, and doesn't need to be.
+When a client produces, doze-kafka reads the batch before it stores it, as Apache Kafka
+does: its header, its checksum and every record, through whatever codec it is
+compressed with, in one streaming pass that never holds the inflated records. A batch
+that does not check out is refused with Kafka's error and nothing of it is stored (see
+[limitations](limitations.md) for the three cases refused here that Kafka keeps). A
+batch that passes is appended to the active segment **as it arrived**, compressed as the
+producer compressed it, and handed back byte-for-byte to the consumer; only the header's
+maximum timestamp is set to the latest of the records', as Kafka sets it. Where a topic's
+`compression.type` names a codec other than the batch's (or `uncompressed`), the batch is
+written out again in the topic's codec, as Kafka does. The on-disk format is doze-kafka's
+own; it is not byte-compatible with Apache Kafka's segment files, and doesn't need to be.
+
+A log written by an earlier version can hold a batch whose records cannot be read
+(those versions stored what they did not read). Such a partition still opens and
+serves: the cleaner keeps the batch as it is and logs that it did, and timestamp
+lookups go by its header.
 
 A segment rolls to a new file once it passes `--segment-bytes` (default 128 MiB). A
 sparse index records a position every `--index-interval-bytes` (default 4 KiB) so a
@@ -88,8 +98,10 @@ partitions in use, and it follows these rules:
 - `min.cleanable.dirty.ratio` (here 0: clean as soon as a segment has rolled, rather than
   Kafka's 0.5), `min.compaction.lag.ms` and `max.compaction.lag.ms` decide when. Rewritten
   batches are uncompressed unless the topic's `compression.type` names a codec.
-- A rewrite is swapped in without a moment when the log cannot be read, and a stop at any
-  point leaves a log that opens: a half-written file is discarded, and an index that no
+- A rewrite is swapped in without a moment when the log cannot be read; a swap that
+  fails at any step (a full disk, say) puts a readable segment back before it returns,
+  so the log reads on without a restart; and a stop or a power cut at any point leaves a
+  log that opens: a half-written file is discarded, and an index that no
   longer matches its log is rebuilt from it. The segment keeps its original age, so a
   rewrite does not postpone retention.
 
@@ -125,11 +137,23 @@ producer's `acks` setting, which is exactly the Kafka knob for durability:
   didn't ask for.
 - **`acks=0`** — fire and forget; no acknowledgement at all.
 
-Either way, on the next start recovery scans the active segment, truncates any
-half-written tail, and resumes at the last intact record — it comes back without
-corruption. This is exercised directly by a chaos harness (`go tool task chaos`) that
-`SIGKILL`s and restarts the broker under sustained load: acknowledged `acks=all`
-records survive every crash, with no loss and no gaps.
+Either way, the next start knows whether the last stop was clean: a graceful stop
+that flushed everything writes `data/clean-shutdown` (as Kafka writes
+`.kafka_cleanshutdown`), and the next start removes it. Without it nothing read back
+from disk is taken to be on disk: a partition's active segment is checked batch by
+batch (every CRC, not only the tail), a half-written tail is cut, and the segment and
+its directory count as unflushed, so the first flush after the start (an `acks=all`,
+the timer, the roll that seals it, the end of a transaction) flushes them, whatever
+this process wrote or did not. A segment is flushed by the roll that seals it, so a
+sealed one needs no second look; a data directory from before that held is checked
+whole, every segment of every partition, once. Opening a partition costs the same
+after a crash as before; the extra flush is paid by its first sync (measured with 5,000
+partitions on a loaded macOS machine: listening in about 15 ms either way, the first
+touch of all of them in under a second, and the first `acks=all` to each one 11 to 58
+seconds against 11 to 18 before, `F_FULLFSYNC` of each segment and directory being the
+cost; later ones as before). This is exercised by a chaos harness (`go tool task
+chaos`) that `SIGKILL`s and restarts the broker under sustained load, and by the
+power-cut model below, which `SIGKILL` cannot be.
 
 Tighten the `acks=1` window by lowering `--fsync-interval` (at some throughput cost),
 or set it to `0` to rely purely on `acks=all` fsyncs plus the flush-on-shutdown.
@@ -137,26 +161,46 @@ or set it to `0` to rely purely on `acks=all` fsyncs plus the flush-on-shutdown.
 An `acks=all` acknowledgement is also given for a **duplicate** of a batch the log
 already holds (an idempotent producer's retry): the retry is answered with the
 original offset only after the partition has been fsynced, because the first send may
-have reached the page cache and no further. An earlier version acknowledged that retry
-without a sync (BAD-1).
+have reached the page cache and no further — including when the broker was killed and
+restarted between the first send and the retry, when the batch was read back from a
+file this process never flushed. Earlier versions acknowledged that retry without a
+sync (BAD-1), and after a restart still did.
 
 ### When the disk misbehaves
 
-- **A full or failing disk** answers every write `KAFKA_STORAGE_ERROR`, which clients
-  treat as retriable; `acks=0` produces get the connection closed instead. Reads and
-  group traffic carry on and writes resume when space is freed. Nothing acknowledged
-  is lost and a refused write leaves no offset behind.
+- **A full or failing disk** refuses every write with a retriable code: Produce and
+  the admin APIs answer `KAFKA_STORAGE_ERROR`; OffsetCommit and the transaction APIs
+  (InitProducerId with a transactional id, AddPartitionsToTxn, AddOffsetsToTxn,
+  TxnOffsetCommit, EndTxn) answer `NOT_COORDINATOR`, as Apache Kafka does when the
+  append to its offsets or transaction log fails, so the client finds the coordinator
+  again and retries; a Metadata request that would create a topic answers
+  `UNKNOWN_TOPIC_OR_PARTITION`. `acks=0` produces get the connection closed instead.
+  What Kafka answers on each is recorded (`conformance/recordings/full-disk-*.json`)
+  and the differences are in [limitations](limitations.md). Reads and group traffic
+  carry on and writes resume when space is freed. Nothing acknowledged is lost and a
+  refused write leaves no offset behind.
 - **A failed fsync** (as opposed to a failed write) is not retried. The kernel may
   have thrown the unflushed pages away and reported the error once, so a second
   `fsync` returning success would acknowledge data that is gone. The partition's log
   segment goes offline: appends and syncs answer `KAFKA_STORAGE_ERROR` until the
-  broker is restarted, and recovery then keeps exactly what reached the disk. The
-  batch whose fsync failed was already appended, so a consumer may read a record its
-  producer was told failed; retry it idempotently.
-- **Power loss** is modelled by the test `TestPowerCutKeepsEveryAcksAllRecord`: it
-  keeps only what was fsynced (three variants for the unsynced tail: dropped, zeroed,
-  partly kept), reopens, and requires every `acks=all` record to be there. `SIGKILL`
-  keeps the page cache and cannot tell whether `acks=all` fsyncs; this test can.
+  broker is restarted. Recovery then keeps whatever intact batches the files hold
+  (which may include the one whose fsync failed, if the pages survived) and treats
+  none of it as flushed until it has flushed it. The batch whose fsync failed was
+  already appended, so a consumer may read a record its producer was told failed;
+  retry it idempotently. A write that fails part-way through a request leaves nothing
+  of that request in the log.
+- **Power loss** is modelled (`internal/powercut`): every file is cut to what its last
+  fsync covered (the unflushed bytes dropped, zeroed, partly kept, or kept page by
+  page), and every name created, renamed or removed since its directory's last fsync
+  is gone or back — segments, indexes, `meta.db`, `log-start`, the transaction mark,
+  `cleaner-offset`. `TestPowerCutKeepsEveryAcksAllRecord` cuts the power after each
+  step of a workload over several topics (produces, offset commits, a config change,
+  DeleteRecords, a kill and restart, committed and aborted transactions, topics
+  created and deleted) and requires every acknowledged record, transaction outcome,
+  committed offset, topic and log start to be there. A sweep fails, and separately
+  cuts the power after, each one of the 137 file operations of another workload
+  (`TestEveryFileOperationFailingOrCutLosesNothingAcknowledged`). `SIGKILL` keeps the
+  page cache and cannot tell whether anything was fsynced; these can.
 
 ## Committed offsets
 

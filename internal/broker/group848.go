@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"fmt"
 	"log/slog"
 	"regexp"
 	"slices"
@@ -131,9 +132,9 @@ type cg848Manager struct {
 	stopped        bool           // the broker is shutting down: timers do nothing.
 	sink           GroupEventSink // told what happens in groups; nil = nobody is watching.
 
-	// emptied and activated tell the offsets retention when a group lost its last
-	// member and when it got one again; nil = nobody is counting.
-	emptied, activated func(group string)
+	// liveness is the offsets retention, told when a group gets members and when it
+	// has lost the last one; nil = nobody is counting.
+	liveness livenessRecorder
 
 	// bridge is the classic coordinator, for moving a group between the two when a
 	// member of the other protocol joins (groupmigrate.go); nil when there is none.
@@ -225,14 +226,57 @@ func cg848Error(code int16, msg string) cg848Result {
 	return cg848Result{errorCode: int16(code), errorMsg: msg}
 }
 
+// notAMember and staleEpoch are Kafka's words for the two ways a heartbeat is refused
+// most often (recorded: ext probes val-unknown-member-in-live-group, val-epoch-too-high).
+func notAMember(member, group string) string {
+	return "Member " + member + " is not a member of group " + group + "."
+}
+
+func staleEpoch(sent, known int32) string {
+	than := "greater"
+	if sent < known {
+		than = "smaller"
+	}
+	return fmt.Sprintf("The consumer group member has a %s member epoch (%d) than the one known by the group coordinator (%d). The member must abandon all its partitions and rejoin.", than, sent, known)
+}
+
+// staticRefusal is the answer to a heartbeat naming a static instance that is not its
+// own: nobody holds it, or another member does (recorded: cs-heartbeat-wrong-instance,
+// cs-old-member-heartbeat).
+func (g *cg848Group) staticRefusal(member string, instance *string) (cg848Result, bool) {
+	switch g.staticCheck(member, instance) {
+	case kerr.UnknownMemberID.Code:
+		return cg848Error(kerr.UnknownMemberID.Code, "Instance id "+*instance+" is unknown."), true
+	case kerr.FencedInstanceID.Code:
+		return cg848Error(kerr.FencedInstanceID.Code, "Static member "+member+" with instance id "+*instance+
+			" was fenced by member "+g.holderOf(*instance).id+"."), true
+	}
+	return cg848Result{}, false
+}
+
 // heartbeat processes one ConsumerGroupHeartbeat: join (epoch 0), poll (epoch > 0),
 // or leave (epoch -1, or -2 for a static member that will be back).
 func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clientRef) cg848Result {
-	if r.Group == "" || meta.ValidateGroupID(r.Group) != nil {
-		return cg848Error(kerr.InvalidRequest.Code, "the group id is empty or not usable")
-	}
-	if r.MemberEpoch < -2 {
-		return cg848Error(kerr.InvalidRequest.Code, "the member epoch is not a valid value")
+	// Kafka's checks of the request itself, in its order and with its words (recorded:
+	// group-requests-refused, ch-*, ei-c-join-empty-instance).
+	switch {
+	case r.Group == "":
+		return cg848Error(kerr.InvalidRequest.Code, "GroupId can't be empty.")
+	case meta.ValidateGroupID(r.Group) != nil:
+		return cg848Error(kerr.InvalidRequest.Code, "the group id is not usable")
+	case r.InstanceID != nil && *r.InstanceID == "":
+		return cg848Error(kerr.InvalidRequest.Code, "InstanceId can't be empty.")
+	case r.MemberEpoch == 0 && r.RebalanceTimeoutMillis == -1:
+		// Only "not sent": zero is a rebalance timeout (recorded: ch-rebalance-timeout-0).
+		return cg848Error(kerr.InvalidRequest.Code, "RebalanceTimeoutMs must be provided in first request.")
+	case r.MemberEpoch == 0 && (r.Topics == nil || len(r.Topics) != 0):
+		return cg848Error(kerr.InvalidRequest.Code, "TopicPartitions must be empty when (re-)joining.")
+	case r.MemberEpoch == 0 && r.SubscribedTopicNames == nil && r.SubscribedTopicRegex == nil:
+		return cg848Error(kerr.InvalidRequest.Code, "Either SubscribedTopicNames or SubscribedTopicRegex must be non-null when (re-)joining.")
+	case r.MemberEpoch == -2 && r.InstanceID == nil:
+		return cg848Error(kerr.InvalidRequest.Code, "InstanceId can't be null.")
+	case r.MemberEpoch < -2:
+		return cg848Error(kerr.InvalidRequest.Code, "MemberEpoch is invalid.")
 	}
 	// What a member names is kept for as long as it is a member (bounds.go).
 	long := len(r.MemberID) > maxMemberIDBytes || tooLong(deref(r.InstanceID), deref(r.RackID), deref(r.SubscribedTopicRegex))
@@ -242,7 +286,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 	if long {
 		return cg848Error(kerr.InvalidRequest.Code, "a member id, instance id, rack id, topic name or pattern is longer than this broker keeps")
 	}
-	static := r.InstanceID != nil && *r.InstanceID != ""
+	static := r.InstanceID != nil
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -251,11 +295,14 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 	if r.MemberEpoch < 0 {
 		g := m.groups[r.Group]
 		if g == nil {
-			return cg848Error(kerr.GroupIDNotFound.Code, "no such group")
+			return cg848Error(kerr.GroupIDNotFound.Code, "Group "+r.Group+" not found.")
+		}
+		if res, refused := g.staticRefusal(r.MemberID, r.InstanceID); refused {
+			return res
 		}
 		mem := g.members[r.MemberID]
 		if mem == nil {
-			return cg848Error(kerr.UnknownMemberID.Code, "not a member of the group")
+			return cg848Error(kerr.UnknownMemberID.Code, notAMember(r.MemberID, r.Group))
 		}
 		if r.MemberEpoch == -2 && static {
 			// A static member going away for a restart: its place and its
@@ -282,17 +329,11 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 			}
 			r.MemberID = generateMemberID(r.InstanceID)
 		}
-		if r.RebalanceTimeoutMillis <= 0 {
-			return cg848Error(kerr.InvalidRequest.Code, "the rebalance timeout must be set when joining")
-		}
-		if r.SubscribedTopicNames == nil && r.SubscribedTopicRegex == nil {
-			return cg848Error(kerr.InvalidRequest.Code, "a subscription must be set when joining")
-		}
 	}
 	assignor := ""
 	if r.ServerAssignor != nil && *r.ServerAssignor != "" {
 		if assignor = *r.ServerAssignor; assignor != assignorUniform && assignor != assignorRange {
-			return cg848Error(kerr.UnsupportedAssignor.Code, "the assignors offered are uniform and range")
+			return cg848Error(kerr.UnsupportedAssignor.Code, "ServerAssignor "+assignor+" is not supported. Supported assignors: uniform, range.")
 		}
 	}
 	var regex *regexp.Regexp
@@ -305,10 +346,12 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 	}
 
 	g := m.groups[r.Group]
+	created := false
 	if g == nil {
 		if r.MemberEpoch != 0 {
-			// Unknown here (after a broker restart, say): the member must rejoin.
-			return cg848Error(kerr.UnknownMemberID.Code, "no such member; rejoin")
+			// Unknown here (after a broker restart, say): the member must rejoin
+			// (recorded: ch-unknown-member-epoch-5).
+			return cg848Error(kerr.GroupIDNotFound.Code, "Consumer group "+r.Group+" not found.")
 		}
 		// The id is taken for this protocol in one step. A classic group holding it
 		// with members is upgraded: they stay, as members of this one.
@@ -321,6 +364,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 			// is the first epoch Kafka gives a member of a new group (recorded).
 			adopted = &cg848Group{id: r.Group, epoch: 1, assignor: assignorUniform, members: make(map[string]*cg848Member)}
 			m.groups[r.Group] = adopted
+			created = true
 		}
 		g = adopted
 	} else if len(g.members) == 0 && r.MemberEpoch == 0 {
@@ -335,9 +379,19 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 	}
 
 	mem := g.members[r.MemberID]
+	if r.MemberEpoch != 0 {
+		if res, refused := g.staticRefusal(r.MemberID, r.InstanceID); refused {
+			return res
+		}
+	}
 	if mem != nil && mem.classic != nil {
-		// A classic member is not heard from here: it heartbeats by the classic API.
-		return cg848Error(kerr.UnknownMemberID.Code, "no such member; rejoin")
+		// A classic member heartbeating by this API is kept alive and changes nothing
+		// else (recorded: cm-classic-member-sends-consumer-heartbeat).
+		if r.MemberEpoch != mem.epoch {
+			return cg848Error(kerr.FencedMemberEpoch.Code, staleEpoch(r.MemberEpoch, mem.epoch))
+		}
+		m.resetSession(g, mem)
+		return cg848Result{memberID: mem.id, memberEpoch: mem.epoch}
 	}
 	changed := false
 
@@ -349,7 +403,8 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 					continue
 				}
 				if !other.left {
-					return cg848Error(kerr.UnreleasedInstanceID.Code, "another member holds this instance id")
+					return cg848Error(kerr.UnreleasedInstanceID.Code, "Static member "+r.MemberID+" with instance id "+
+						*r.InstanceID+" cannot join the group because the instance id is owned by "+id+" member.")
 				}
 				// Its restarted self: take over the place it left, partitions and all.
 				other.stopTimers()
@@ -362,10 +417,20 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 		}
 		switch {
 		case mem == nil:
-			mem = &cg848Member{id: r.MemberID, target: tpSet{}, assigned: tpSet{}}
-			if len(g.members) == 0 && m.activated != nil {
-				m.activated(g.id)
+			// The group is recorded as having members before it has this one
+			// (offsetexpiry.go).
+			if m.liveness != nil {
+				if err := m.liveness.joining(g.id, false, m.sessionTimeout, "consumer"); err != nil {
+					if len(g.members) == 0 {
+						m.claims.release(g.id, protoConsumer)
+						if created {
+							delete(m.groups, g.id)
+						}
+					}
+					return cg848Error(kerr.CoordinatorNotAvailable.Code, "the group's members could not be recorded; try again")
+				}
 			}
+			mem = &cg848Member{id: r.MemberID, target: tpSet{}, assigned: tpSet{}}
 			g.members[r.MemberID] = mem
 			changed = true
 			m.emit(g, "joined", r.MemberID, "client "+who.clientID, "")
@@ -380,7 +445,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 		mem.rebalanceTimeout = time.Duration(r.RebalanceTimeoutMillis) * time.Millisecond
 	} else {
 		if mem == nil || mem.left {
-			return cg848Error(kerr.UnknownMemberID.Code, "no such member; rejoin")
+			return cg848Error(kerr.UnknownMemberID.Code, notAMember(r.MemberID, r.Group))
 		}
 		switch {
 		case r.MemberEpoch == mem.epoch:
@@ -388,7 +453,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 			// The response that advanced its epoch was lost; tell it again.
 			mem.sent = nil
 		default:
-			return cg848Error(kerr.FencedMemberEpoch.Code, "the member epoch is stale; rejoin")
+			return cg848Error(kerr.FencedMemberEpoch.Code, staleEpoch(r.MemberEpoch, mem.epoch))
 		}
 	}
 	mem.client = who
@@ -548,20 +613,48 @@ func (m *cg848Manager) sessionExpired(g *cg848Group, mem *cg848Member, gen uint6
 }
 
 func (m *cg848Manager) removeMember(g *cg848Group, id string) {
-	if mem := g.members[id]; mem != nil {
+	mem := g.members[id]
+	if mem != nil {
 		mem.stopTimers()
 	}
 	delete(g.members, id)
+	if mem != nil && mem.classic != nil && len(g.members) > 0 && m.liveness != nil && !g.hasClassic() {
+		m.liveness.consumerOnly(g.id, m.sessionTimeout)
+	}
 	if len(g.members) == 0 {
 		// Nobody left: either protocol may use the id now. The emptied group is
 		// kept so it still lists as a consumer group for as long as this broker
 		// runs; forget drops it.
 		g.epoch++
 		m.claims.release(g.id, protoConsumer)
-		if m.emptied != nil {
-			m.emptied(g.id)
+		if m.liveness != nil {
+			m.liveness.emptied(g.id, false, groupKind{protocolType: "consumer", epoch: g.epoch, assignor: g.assignor})
 		}
 	}
+}
+
+// restoreEmpty puts back an emptied consumer group found in the store at start, at the
+// epoch it was at and with its assignor.
+func (m *cg848Manager) restoreEmpty(id string, epoch int32, assignor string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.groups[id] != nil {
+		return
+	}
+	if assignor == "" {
+		assignor = assignorUniform
+	}
+	m.groups[id] = &cg848Group{id: id, epoch: epoch, assignor: assignor, members: make(map[string]*cg848Member)}
+}
+
+// hasClassic reports whether any member arrived by the classic protocol.
+func (g *cg848Group) hasClassic() bool {
+	for _, mem := range g.members {
+		if mem.classic != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // forget drops an emptied group, reporting whether there was one.
@@ -618,10 +711,23 @@ func (m *cg848Manager) hasMembers(group string) bool {
 
 // validateCommit decides whether an OffsetCommit for a KIP-848 group may be
 // stored: the member must be in the group and at its own current epoch. A commit
-// naming no member is allowed only while the group has none.
+// naming no member is allowed only while the group has none. A consumer-protocol
+// member commits with OffsetCommit v9 or later, the first that carries its epoch as
+// such: an older version is UNSUPPORTED_VERSION (recorded: group-requests-refused,
+// cm-commit-v8-consumer-member).
 func (m *cg848Manager) validateCommit(groupID, memberID string, epoch int32) int16 {
+	return m.validateCommitAt(groupID, memberID, epoch, 9)
+}
+
+// validateCommitAt is validateCommit for an OffsetCommit of the version given.
+func (m *cg848Manager) validateCommitAt(groupID, memberID string, epoch int32, version int16) int16 {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if g := m.groups[groupID]; g != nil && version < 9 {
+		if mem := g.members[memberID]; mem != nil && mem.classic == nil {
+			return kerr.UnsupportedVersion.Code
+		}
+	}
 	return int16(m.memberCheck(groupID, memberID, epoch))
 }
 
@@ -687,10 +793,18 @@ func (m *cg848Manager) describe(group string) (state string, epoch int32, assign
 	slices.Sort(ids)
 	for _, id := range ids {
 		mem := g.members[id]
+		assigned := mem.assigned.clone()
+		if mem.classic != nil {
+			// A classic member holds what it has been told to give up until its next
+			// JoinGroup says it has (recorded: co-describe-after-1).
+			for p := range mem.revoking {
+				assigned[p] = struct{}{}
+			}
+		}
 		members = append(members, cg848MemberDesc{
 			client: mem.client, id: mem.id, instanceID: mem.instanceID, rack: mem.rack, epoch: mem.epoch,
 			subscribed: append([]string(nil), mem.subscribed...), regex: mem.regexText,
-			assigned: mem.assigned.clone(), target: mem.target.clone(),
+			assigned: assigned, target: mem.target.clone(),
 		})
 	}
 	return g.stateName(), g.epoch, g.assignor, members, true

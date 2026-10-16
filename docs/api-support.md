@@ -50,12 +50,32 @@ Each emulated major advertises the ranges below (min–max); a client uses the h
 version you both support. This table is the broker's own, generated from the code (a
 test fails if the two differ).
 
-The ranges are **ours**, not a copy of Apache Kafka's. Each profile is close to what a
-real broker of that major offers, but not the same: several maxima are lower, because
-the newer versions carry features doze-kafka does not have (Kafka 4.x brokers go well
-past Produce v9 and Fetch v13, for example), and a few are a version higher than that
-release shipped. The minima are raised: Produce starts at v3 and Fetch at v4, the
-first versions that carry record batch format v2, the only format the log stores.
+The ranges are **ours**, not a copy of Apache Kafka's, and they are never wider than
+Kafka's. Each profile is what a real broker of that major offers, less what
+doze-kafka does not implement: several maxima are lower, because the newer versions
+carry features it does not have (Kafka 4.x brokers go well past Produce v9 and Fetch
+v13, for example). No profile offers an API or a version the real broker of that
+major does not list. A test holds every column to the recorded `ApiVersions` answer
+of one (`conformance/recordings/api-versions.json`):
+
+| Profile | Held to | Which is |
+|---|---|---|
+| Kafka 4 | `apache/kafka:4.3.1` | Apache's image of 4.3.1, the broker every other recording is of. |
+| Kafka 3 | `apache/kafka:3.9.1` | Apache's image of the last 3.x. |
+| Kafka 2 | `confluentinc/cp-kafka:6.2.15` | Confluent Platform 6.2, which Confluent documents as Apache Kafka 2.8, the last 2.x. Apache published no images before 3.7; the mapping of the platform version to the Kafka version is Confluent's documentation, not something the recording shows. |
+| Kafka 1 | `confluentinc/cp-kafka:4.1.4` | Confluent Platform 4.1, whose broker jar is `kafka_2.11-1.1.1-cp4.jar`: Apache Kafka 1.1.1, the last 1.x. |
+
+So the Kafka 4 column starts where Kafka 4 starts. Kafka 4 removed the oldest versions
+of several APIs (KIP-896) and closes the connection on them, and so does this broker
+at `--kafka-version 4` (before this it served nine of them: ListOffsets v0,
+OffsetCommit v0–1, OffsetFetch v0, CreateTopics v0–1, DeleteTopics v0, Describe-,
+Create- and DeleteACLs v0, DescribeConfigs v0; the Kafka 1 column offered six
+versions newer than 1.1.1 has). A client that old still works at
+`--kafka-version 3`, as it does against a Kafka 3 broker.
+
+Two more minima are raised on purpose, in every profile: Produce starts at v3 and
+Fetch at v4, the first versions that carry record batch format v2, the only format
+the log stores. `SaslHandshake` is v1 only (v0 means "unframed tokens follow").
 None of this needs configuring. A client reads the ranges from `ApiVersions` and uses
 the highest version both sides support; a request outside them is not served.
 
@@ -64,35 +84,35 @@ the highest version both sides support; a request outside them is not served.
 |---|---|---|---|---|---|
 | Produce | 0 | 3–5 | 3–7 | 3–9 | 3–9 |
 | Fetch | 1 | 4–6 | 4–10 | 4–13 | 4–13 |
-| ListOffsets | 2 | 0–2 | 0–5 | 0–7 | 0–7 |
-| Metadata | 3 | 0–6 | 0–8 | 0–12 | 0–12 |
-| OffsetCommit | 8 | 0–3 | 0–6 | 0–8 | 0–9 |
-| OffsetFetch | 9 | 0–3 | 0–5 | 0–8 | 0–9 |
-| FindCoordinator | 10 | 0–2 | 0–2 | 0–4 | 0–4 |
+| ListOffsets | 2 | 0–2 | 0–5 | 0–7 | 1–7 |
+| Metadata | 3 | 0–5 | 0–8 | 0–12 | 0–12 |
+| OffsetCommit | 8 | 0–3 | 0–6 | 0–8 | 2–9 |
+| OffsetFetch | 9 | 0–3 | 0–5 | 0–8 | 1–9 |
+| FindCoordinator | 10 | 0–1 | 0–2 | 0–4 | 0–4 |
 | JoinGroup | 11 | 0–2 | 0–4 | 0–7 | 0–9 |
 | Heartbeat | 12 | 0–1 | 0–2 | 0–4 | 0–4 |
 | LeaveGroup | 13 | 0–1 | 0–2 | 0–4 | 0–5 |
 | SyncGroup | 14 | 0–1 | 0–3 | 0–4 | 0–5 |
 | DescribeGroups | 15 | 0–1 | 0–3 | 0–5 | 0–5 |
-| ListGroups | 16 | 0–2 | 0–2 | 0–4 | 0–5 |
+| ListGroups | 16 | 0–1 | 0–2 | 0–4 | 0–5 |
 | SASLHandshake | 17 | 1–1 | 1–1 | 1–1 | 1–1 | only when SASL is configured
 | ApiVersions | 18 | 0–1 | 0–2 | 0–3 | 0–4 |
-| CreateTopics | 19 | 0–2 | 0–3 | 0–7 | 0–7 |
-| DeleteTopics | 20 | 0–1 | 0–3 | 0–5 | 0–6 |
+| CreateTopics | 19 | 0–2 | 0–3 | 0–7 | 2–7 |
+| DeleteTopics | 20 | 0–1 | 0–3 | 0–5 | 1–6 |
 | DeleteRecords | 21 | 0–0 | 0–1 | 0–2 | 0–2 |
-| InitProducerID | 22 | 0–1 | 0–1 | 0–4 | 0–4 |
+| InitProducerID | 22 | 0–0 | 0–1 | 0–4 | 0–4 |
 | AddPartitionsToTxn | 24 | 0–0 | 0–1 | 0–3 | 0–3 |
 | AddOffsetsToTxn | 25 | 0–0 | 0–1 | 0–3 | 0–3 |
 | EndTxn | 26 | 0–0 | 0–1 | 0–3 | 0–3 |
 | TxnOffsetCommit | 28 | 0–0 | 0–2 | 0–3 | 0–3 |
-| DescribeACLs | 29 | 0–0 | 0–1 | 0–3 | 0–3 |
-| CreateACLs | 30 | 0–0 | 0–1 | 0–3 | 0–3 |
-| DeleteACLs | 31 | 0–0 | 0–1 | 0–3 | 0–3 |
-| DescribeConfigs | 32 | 0–1 | 0–2 | 0–4 | 0–4 |
+| DescribeACLs | 29 | 0–0 | 0–1 | 0–3 | 1–3 |
+| CreateACLs | 30 | 0–0 | 0–1 | 0–3 | 1–3 |
+| DeleteACLs | 31 | 0–0 | 0–1 | 0–3 | 1–3 |
+| DescribeConfigs | 32 | 0–1 | 0–2 | 0–4 | 1–4 |
 | AlterConfigs | 33 | 0–0 | 0–2 | 0–2 | 0–2 |
-| SASLAuthenticate | 36 | 0–2 | 0–2 | 0–2 | 0–2 | only when SASL is configured
+| SASLAuthenticate | 36 | 0–0 | 0–2 | 0–2 | 0–2 | only when SASL is configured
 | CreatePartitions | 37 | 0–0 | 0–1 | 0–3 | 0–3 |
-| DeleteGroups | 42 | 0–1 | 0–2 | 0–2 | 0–2 |
+| DeleteGroups | 42 | 0–0 | 0–2 | 0–2 | 0–2 |
 | IncrementalAlterConfigs | 44 | — | 0–1 | 0–1 | 0–1 |
 | OffsetDelete | 47 | — | 0–0 | 0–0 | 0–0 |
 | DescribeCluster | 60 | — | — | 0–1 | 0–2 |
@@ -116,7 +136,10 @@ library's key table, which a test walks). Nothing is absent from this table.
 - **F, functional.** It works locally and its effect is observable.
 - **C, cosmetic.** Accepted and round-tripped with no local effect.
 - **S, stub.** Not served: it is not advertised, and a request for it closes the
-  connection. Every S row says why.
+  connection, as a request for a version outside an advertised range does. That is
+  what Apache Kafka does with an API it does not list and a version it does not serve
+  (recorded against `apache/kafka:4.3.1`: `conformance/claims/api.md`, V2 and V3).
+  Every S row says why.
 
 An API row is F when the broker advertises it (see the version table above) and S
 when it does not; the notes are written by hand and a test fails for an S row

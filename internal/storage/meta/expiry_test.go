@@ -92,39 +92,93 @@ func TestExpireOffsets(t *testing.T) {
 	}
 }
 
-// When a group became empty is kept across a restart, because offsets that outlive
-// their members are expired from that moment and the broker forgets its members when
-// it stops.
-func TestGroupEmptySinceSurvivesAReopen(t *testing.T) {
+// What is kept about a group's members survives a reopen: when it became empty, or that
+// it has members and their session, because the broker forgets the members themselves
+// when it stops and the offsets retention must not take that for a group nobody joined.
+func TestGroupLivenessSurvivesAReopen(t *testing.T) {
 	path := t.TempDir() + "/meta.db"
 	s, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetGroupEmptySince("g1", 1000); err != nil {
-		t.Fatal(err)
+	set := func(group string, st *GroupLiveness) {
+		t.Helper()
+		if err := s.SetGroupLiveness(group, st); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if err := s.SetGroupEmptySince("g2", 2000); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.SetGroupEmptySince("g2", 0); err != nil { // cleared: a member joined.
-		t.Fatal(err)
-	}
+	set("g1", &GroupLiveness{EmptySince: 1000})
+	set("g2", &GroupLiveness{EmptySince: 2000})
+	set("g2", nil) // forgotten.
+	set("g3", &GroupLiveness{Live: true, Classic: true, Session: 45 * time.Second})
+	set("g4", &GroupLiveness{Live: true, Session: 6 * time.Second})
+	set("g5", &GroupLiveness{}) // nothing to keep is nothing kept.
 	s.Close()
 	s, err = Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	got, err := s.GroupsEmptySince()
-	if err != nil || len(got) != 1 || got["g1"] != 1000 {
-		t.Errorf("%v %v", got, err)
+	got, err := s.GroupLiveness()
+	want := map[string]GroupLiveness{
+		"g1": {EmptySince: 1000},
+		"g3": {Live: true, Classic: true, Session: 45 * time.Second},
+		"g4": {Live: true, Session: 6 * time.Second},
 	}
-	// Deleting a group's offsets forgets when it was empty too: nothing is left to expire.
-	if _, err := s.DeleteGroupOffsets("g1"); err != nil {
+	if err != nil || len(got) != len(want) {
+		t.Fatalf("%v %v", got, err)
+	}
+	for g, w := range want {
+		if got[g] != w {
+			t.Errorf("%s: %+v, want %+v", g, got[g], w)
+		}
+	}
+	// Deleting a group's offsets forgets it too: nothing is left to expire.
+	for _, g := range []string{"g1", "g3"} {
+		if _, err := s.DeleteGroupOffsets(g); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got, _ := s.GroupLiveness(); len(got) != 1 || !got["g4"].Live {
+		t.Errorf("after deleting two groups: %v", got)
+	}
+}
+
+// A store written before groups with members were recorded: every group with offsets
+// and no record is taken, once, to have had members, because which of them had is not
+// known. A group that is recorded keeps its record, and a second open adopts nothing.
+func TestAdoptGroupsWithOffsetsRunsOnce(t *testing.T) {
+	s := openStore(t)
+	if _, err := s.CreateTopic("t", 1, nil); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := s.GroupsEmptySince(); len(got) != 0 {
-		t.Errorf("the empty-since of a group with no offsets was kept: %v", got)
+	for _, g := range []string{"old-live", "old-empty"} {
+		if err := s.CommitOffset(g, "t", 0, 1, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.SetGroupLiveness("old-empty", &GroupLiveness{EmptySince: 5}); err != nil {
+		t.Fatal(err)
+	}
+	n, err := s.AdoptGroupsWithOffsets(45 * time.Second)
+	if err != nil || n != 1 {
+		t.Fatalf("adopted %d, %v", n, err)
+	}
+	got, _ := s.GroupLiveness()
+	if st := got["old-live"]; !st.Live || !st.Classic || st.Session != 45*time.Second {
+		t.Errorf("the group with no record: %+v", st)
+	}
+	if st := got["old-empty"]; st.Live || st.EmptySince != 5 {
+		t.Errorf("the group with a record was changed: %+v", st)
+	}
+	// From now on a group with offsets and no record is one nobody joined.
+	if err := s.CommitOffset("standalone", "t", 0, 1, ""); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := s.AdoptGroupsWithOffsets(45 * time.Second); err != nil || n != 0 {
+		t.Fatalf("a second run adopted %d, %v", n, err)
+	}
+	if got, _ := s.GroupLiveness(); len(got) != 2 {
+		t.Errorf("after the second run: %v", got)
 	}
 }

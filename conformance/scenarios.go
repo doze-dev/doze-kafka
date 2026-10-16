@@ -203,6 +203,17 @@ func createTopicsValidation(e *Env) {
 	e.Do("validate-only-invalid", createTopics(true, newTopic("ct-validate2", 0, 1)), v)
 	e.Do("validate-only-exists", createTopics(true, newTopic("ct-valid", 1, 1)), v)
 
+	// Kafka lists a topic it has just created a moment after it answered the
+	// CreateTopics (one recording missed ct-cfg10): wait until the last one created
+	// is listed, so the listing is the same on every run.
+	e.Await("ct-cfg10 is listed", metadataAll(), 12, func(r kmsg.Response) bool {
+		for _, t := range r.(*kmsg.MetadataResponse).Topics {
+			if t.Topic != nil && *t.Topic == "ct-cfg10" {
+				return true
+			}
+		}
+		return false
+	})
 	e.Do("what-exists", metadataAll(), 12)
 }
 
@@ -256,6 +267,33 @@ func noTopicUnknown(r kmsg.Response) bool {
 func listOffsets(e *Env) {
 	const v = 7
 	e.Do("create", createTopics(false, newTopic("lo", 2, 1), newTopic("lo-empty", 1, 1)), 7)
+	// Each partition has a leader a moment after the CreateTopics was answered
+	// (one recording had NOT_LEADER_OR_FOLLOWER for lo/1): wait for all three.
+	every := kmsg.NewPtrListOffsetsRequest()
+	every.ReplicaID = -1
+	for _, tp := range []struct {
+		topic string
+		parts []int32
+	}{{"lo", []int32{0, 1}}, {"lo-empty", []int32{0}}} {
+		rt := kmsg.NewListOffsetsRequestTopic()
+		rt.Topic = tp.topic
+		for _, p := range tp.parts {
+			rp := kmsg.NewListOffsetsRequestTopicPartition()
+			rp.Partition, rp.Timestamp, rp.CurrentLeaderEpoch = p, -1, -1
+			rt.Partitions = append(rt.Partitions, rp)
+		}
+		every.Topics = append(every.Topics, rt)
+	}
+	e.Await("every partition has a leader", every, 7, func(r kmsg.Response) bool {
+		for _, t := range r.(*kmsg.ListOffsetsResponse).Topics {
+			for _, p := range t.Partitions {
+				if p.ErrorCode != 0 {
+					return false
+				}
+			}
+		}
+		return true
+	})
 
 	base := int64(1_600_000_000_000)
 	e.Produce("produce-five", "lo", 0,

@@ -20,14 +20,18 @@ import (
 // partition directories with LEO=0. Single-node: replication factor is always 1.
 func (b *Broker) handleCreateTopics(ctx context.Context, req *protocol.Request, cr *kmsg.CreateTopicsRequest, resp *kmsg.CreateTopicsResponse) error {
 	// A name listed twice is a malformed request: neither entry is acted on, and
-	// Kafka answers once per name ("Duplicate topic name.").
+	// Kafka answers once per name ("Duplicate topic name."; claim: api V10).
 	count := map[string]int{}
 	for _, t := range cr.Topics {
 		count[t.Topic]++
 	}
 	answered := map[string]bool{}
+	// The names this request has created so far. Kafka checks every name of a request
+	// against the topics that were there before it, so two that differ only in '.'
+	// against '_' are both created when they arrive together (createTopic).
+	created := map[string]struct{}{}
 	defer func() {
-		// Kafka answers an error with an empty list of configs, never null.
+		// Kafka answers an error with an empty list of configs, never null (claim: api V10).
 		for i := range resp.Topics {
 			if resp.Topics[i].Configs == nil {
 				resp.Topics[i].Configs = []kmsg.CreateTopicsResponseTopicConfig{}
@@ -57,13 +61,20 @@ func (b *Broker) handleCreateTopics(ctx context.Context, req *protocol.Request, 
 			resp.Topics = append(resp.Topics, rt)
 			continue
 		}
-		resp.Topics = append(resp.Topics, b.createTopic(t, cr.ValidateOnly))
+		rt := b.createTopic(t, cr.ValidateOnly, created)
+		if rt.ErrorCode == 0 && !cr.ValidateOnly {
+			created[t.Topic] = struct{}{}
+		}
+		resp.Topics = append(resp.Topics, rt)
 	}
 	return nil
 }
 
-// createTopic handles a single topic and returns its response entry.
-func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool) kmsg.CreateTopicsResponseTopic {
+// createTopic handles a single topic and returns its response entry. beside is the
+// names the same request has already created: Apache Kafka does not hold a name
+// against those under its '.' against '_' rule, only against the topics that existed
+// when the request arrived (recorded: conformance/recordings/createtopics-collisions.json).
+func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool, beside map[string]struct{}) kmsg.CreateTopicsResponseTopic {
 	rt := kmsg.NewCreateTopicsResponseTopic()
 	rt.Topic = t.Topic
 
@@ -82,18 +93,14 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 	if _, ok, _ := b.meta.Topic(t.Topic); ok {
 		return refuse(kerr.TopicAlreadyExists.Code, "Topic '%s' already exists.", t.Topic)
 	}
-	if all, err := b.meta.ListTopics(); err == nil {
-		names := make([]string, len(all))
-		for i, e := range all {
-			names[i] = e.Name
+	// Asked of the store's index, not of a list of every topic: a request for n
+	// topics used to list and compare all of them n times.
+	if c := b.meta.TopicCollision(t.Topic, beside); c != nil {
+		if c.CaseOnly {
+			return refuse(kerr.InvalidTopicException.Code,
+				"Topic '%s' collides with existing topic: %s (names that differ only in letter case would share a directory on a case-insensitive file system)", c.Name, c.Existing)
 		}
-		if c := meta.FindCollision(t.Topic, names); c != nil {
-			if c.CaseOnly {
-				return refuse(kerr.InvalidTopicException.Code,
-					"Topic '%s' collides with existing topic: %s (names that differ only in letter case would share a directory on a case-insensitive file system)", c.Name, c.Existing)
-			}
-			return refuse(kerr.InvalidTopicException.Code, "Topic '%s' collides with existing topic: %s", c.Name, c.Existing)
-		}
+		return refuse(kerr.InvalidTopicException.Code, "Topic '%s' collides with existing topic: %s", c.Name, c.Existing)
 	}
 
 	// -1 asks for the broker's default. Zero or any other negative count is not a
@@ -156,7 +163,7 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 	}
 	if validateOnly {
 		// Kafka answers a validation with an id it made up for the topic that
-		// was not created.
+		// was not created (claim: api V10).
 		var id meta.TopicID
 		_, _ = rand.Read(id[:])
 		rt.TopicID = id
@@ -166,7 +173,7 @@ func (b *Broker) createTopic(t kmsg.CreateTopicsRequestTopic, validateOnly bool)
 		return rt
 	}
 
-	created, err := b.meta.CreateTopic(t.Topic, partitions, configMap(t.Configs))
+	created, err := b.meta.CreateTopicBeside(t.Topic, partitions, configMap(t.Configs), beside)
 	if err != nil {
 		if errors.Is(err, meta.ErrTopicExists) {
 			rt.ErrorCode = kerr.TopicAlreadyExists.Code

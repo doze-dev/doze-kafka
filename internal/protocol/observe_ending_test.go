@@ -182,3 +182,26 @@ func TestCorrelationIdIsObserved(t *testing.T) {
 		t.Errorf("correlation %d, closed %q", got.Correlation, got.Closed)
 	}
 }
+
+// A handler that ends the connection says whose no it was: a login's (denied), or by
+// default the client's bytes (refused). Neither is the broker failing (red).
+func TestACloseErrorIsClassedByWhoseItWas(t *testing.T) {
+	for name, tc := range map[string]struct {
+		ce   *CloseError
+		want Class
+	}{
+		"a login":      {&CloseError{Reason: "authentication failed", Class: ClassDenied}, ClassDenied},
+		"the client's": {&CloseError{Reason: "an unknown code"}, ClassRefused},
+	} {
+		t.Run(name, func(t *testing.T) {
+			router := NewRouter()
+			router.Register(kmsg.Heartbeat, func(context.Context, *Request) ([]byte, error) { return nil, tc.ce })
+			conn, obs := serveObserved(t, router)
+			sendRaw(t, conn, kmsg.Heartbeat, 1, 5, "app", nil)
+			got := waitObservations(t, obs, 1)[0]
+			if got.Class != tc.want || got.Closed != tc.ce.Reason {
+				t.Errorf("observed class %q closed %q, want %q %q", got.Class, got.Closed, tc.want, tc.ce.Reason)
+			}
+		})
+	}
+}

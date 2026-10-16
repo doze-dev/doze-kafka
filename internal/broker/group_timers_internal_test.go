@@ -198,6 +198,7 @@ func join848(t *testing.T, m *cg848Manager, group, member string) cg848Result {
 	r := kmsg.NewPtrConsumerGroupHeartbeatRequest()
 	r.Group, r.MemberID, r.RebalanceTimeoutMillis = group, member, 60_000
 	r.SubscribedTopicNames = []string{"t"}
+	r.Topics = []kmsg.ConsumerGroupHeartbeatRequestTopic{} // a join owns nothing.
 	res := m.heartbeat(r, clientRef{})
 	if res.errorCode != 0 {
 		t.Fatalf("join: %+v", res)
@@ -292,4 +293,28 @@ func TestExpiryOnlyTheCurrentArmingActs(t *testing.T) {
 		t.Fatal("the timer did not fire")
 	}
 	e.stop()
+}
+
+// A group losing its last member is a generation of its own, as on Kafka: the member
+// that joins the emptied group is in the generation two on from the last one's
+// (recorded: offsets-retention-recreate, again-join-g-rejoin answers 3).
+func TestAnEmptiedClassicGroupHasMovedOnAGeneration(t *testing.T) {
+	noDelay(t)
+	gm := newGroupManager(func(string) bool { return true }, nil) // kept when empty, as in a broker.
+	first, err := gm.join(context.Background(), joinReq("g", ""), clientRef{})
+	if err != nil || first.errorCode != 0 || first.generation != 1 {
+		t.Fatalf("first join: %v %+v", err, first)
+	}
+	leave := kmsg.NewPtrLeaveGroupRequest()
+	leave.Group, leave.MemberID = "g", first.memberID
+	if res := gm.leave(leave); len(res) != 1 || res[0].errorCode != 0 {
+		t.Fatalf("leave: %+v", res)
+	}
+	again, err := gm.join(context.Background(), joinReq("g", ""), clientRef{})
+	if err != nil || again.errorCode != 0 {
+		t.Fatalf("second join: %v %+v", err, again)
+	}
+	if again.generation != 3 {
+		t.Fatalf("the member joining the emptied group is in generation %d, want 3", again.generation)
+	}
 }

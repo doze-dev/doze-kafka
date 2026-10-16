@@ -1,0 +1,362 @@
+{
+  "scenario": "fetch-above-the-end",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "fa"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "fa",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "produce-one",
+      "api": "Produce",
+      "version": 9,
+      "request": {
+        "Acks": -1,
+        "TimeoutMillis": 10000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "Partition": 0,
+                "Records": "AAAAAAAAAAAAAAA6/////wJxamGJAAAAAAAAAAAAAAAAA+gAAAAAAAAD6P//////////////////AAAAARAAAAACawJ2AA=="
+              }
+            ],
+            "Topic": "fa",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ],
+        "TransactionID": null
+      },
+      "response": {
+        "Brokers": null,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "BaseOffset": 0,
+                "CurrentLeader": {
+                  "LeaderEpoch": -1,
+                  "LeaderID": -1
+                },
+                "ErrorCode": 0,
+                "ErrorMessage": null,
+                "ErrorRecords": null,
+                "LogAppendTime": -1,
+                "LogStartOffset": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "fa",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "fetch-at-the-end",
+      "api": "Fetch",
+      "version": 11,
+      "request": {
+        "ClusterID": null,
+        "ForgottenTopics": null,
+        "IsolationLevel": 0,
+        "MaxBytes": 1048576,
+        "MaxWaitMillis": 0,
+        "MinBytes": 1,
+        "Rack": "",
+        "ReplicaID": -1,
+        "ReplicaState": {
+          "Epoch": -1,
+          "ID": -1
+        },
+        "SessionEpoch": -1,
+        "SessionID": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "FetchOffset": 1,
+                "HighWatermark": 9223372036854775807,
+                "LastFetchedEpoch": -1,
+                "LogStartOffset": -1,
+                "Partition": 0,
+                "PartitionMaxBytes": 1048576,
+                "ReplicaDirectoryID": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "Topic": "fa",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "Brokers": null,
+        "ErrorCode": 0,
+        "SessionID": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "AbortedTransactions": null,
+                "CurrentLeader": {
+                  "LeaderEpoch": -1,
+                  "LeaderID": -1
+                },
+                "DivergingEpoch": {
+                  "EndOffset": -1,
+                  "Epoch": -1
+                },
+                "ErrorCode": 0,
+                "HighWatermark": 1,
+                "LastStableOffset": 1,
+                "LogStartOffset": 0,
+                "Partition": 0,
+                "PreferredReadReplica": -1,
+                "RecordBatches": "",
+                "SnapshotID": {
+                  "EndOffset": -1,
+                  "Epoch": -1
+                }
+              }
+            ],
+            "Topic": "fa",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "fetch-above-the-end",
+      "api": "Fetch",
+      "version": 11,
+      "request": {
+        "ClusterID": null,
+        "ForgottenTopics": null,
+        "IsolationLevel": 0,
+        "MaxBytes": 1048576,
+        "MaxWaitMillis": 0,
+        "MinBytes": 1,
+        "Rack": "",
+        "ReplicaID": -1,
+        "ReplicaState": {
+          "Epoch": -1,
+          "ID": -1
+        },
+        "SessionEpoch": -1,
+        "SessionID": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "FetchOffset": 100,
+                "HighWatermark": 9223372036854775807,
+                "LastFetchedEpoch": -1,
+                "LogStartOffset": -1,
+                "Partition": 0,
+                "PartitionMaxBytes": 1048576,
+                "ReplicaDirectoryID": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "Topic": "fa",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "Brokers": null,
+        "ErrorCode": 0,
+        "SessionID": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "AbortedTransactions": null,
+                "CurrentLeader": {
+                  "LeaderEpoch": -1,
+                  "LeaderID": -1
+                },
+                "DivergingEpoch": {
+                  "EndOffset": -1,
+                  "Epoch": -1
+                },
+                "ErrorCode": 1,
+                "HighWatermark": -1,
+                "LastStableOffset": -1,
+                "LogStartOffset": -1,
+                "Partition": 0,
+                "PreferredReadReplica": -1,
+                "RecordBatches": "",
+                "SnapshotID": {
+                  "EndOffset": -1,
+                  "Epoch": -1
+                }
+              }
+            ],
+            "Topic": "fa",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "fetch-below-the-start",
+      "api": "Fetch",
+      "version": 11,
+      "request": {
+        "ClusterID": null,
+        "ForgottenTopics": null,
+        "IsolationLevel": 0,
+        "MaxBytes": 1048576,
+        "MaxWaitMillis": 0,
+        "MinBytes": 1,
+        "Rack": "",
+        "ReplicaID": -1,
+        "ReplicaState": {
+          "Epoch": -1,
+          "ID": -1
+        },
+        "SessionEpoch": -1,
+        "SessionID": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "FetchOffset": -5,
+                "HighWatermark": 9223372036854775807,
+                "LastFetchedEpoch": -1,
+                "LogStartOffset": -1,
+                "Partition": 0,
+                "PartitionMaxBytes": 1048576,
+                "ReplicaDirectoryID": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "Topic": "fa",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "Brokers": null,
+        "ErrorCode": 0,
+        "SessionID": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "AbortedTransactions": null,
+                "CurrentLeader": {
+                  "LeaderEpoch": -1,
+                  "LeaderID": -1
+                },
+                "DivergingEpoch": {
+                  "EndOffset": -1,
+                  "Epoch": -1
+                },
+                "ErrorCode": 1,
+                "HighWatermark": -1,
+                "LastStableOffset": -1,
+                "LogStartOffset": -1,
+                "Partition": 0,
+                "PreferredReadReplica": -1,
+                "RecordBatches": "",
+                "SnapshotID": {
+                  "EndOffset": -1,
+                  "Epoch": -1
+                }
+              }
+            ],
+            "Topic": "fa",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -37,16 +37,19 @@ func FuzzSASLPlain(f *testing.F) {
 	f.Add([]byte("\x00\x00"))
 	f.Add([]byte(""))
 	f.Fuzz(func(t *testing.T, in []byte) {
-		out, done, user, err := a.plainStep(in)
+		user, err := a.plainStep(in)
 		if err != nil {
-			if done || user != "" || out != nil {
-				t.Fatalf("an error with done=%v user=%q out=%q", done, user, out)
+			if user != "" || err.wire == "" || err.silent {
+				t.Fatalf("a refusal with user=%q, wire text %q, silent=%v", user, err.wire, err.silent)
 			}
 			return
 		}
+		// The only tokens that log in: the user and the password, with no
+		// authorization id or the user's own name as one.
 		parts := bytes.Split(in, []byte{0})
-		if !done || user != fuzzUser || len(parts) != 3 || string(parts[1]) != fuzzUser || string(parts[2]) != fuzzPassword {
-			t.Fatalf("PLAIN accepted %q as user %q (done=%v)", in, user, done)
+		if user != fuzzUser || len(parts) != 3 || string(parts[1]) != fuzzUser || string(parts[2]) != fuzzPassword ||
+			(len(parts[0]) != 0 && string(parts[0]) != fuzzUser) {
+			t.Fatalf("PLAIN accepted %q as user %q", in, user)
 		}
 	})
 }
@@ -55,6 +58,9 @@ func FuzzSCRAMClientFirst(f *testing.F) {
 	a := fuzzAuthenticator(f)
 	f.Add([]byte("n,,n=alice,r=rOprNGfwEbeRWgbNEkqO"))
 	f.Add([]byte("y,a=other,n=alice,r=abc"))
+	f.Add([]byte("n,a=other,n=alice,r=abc"))
+	f.Add([]byte("n,a=alice,n=alice,r=abc"))
+	f.Add([]byte("n,,m=x,n=alice,r=abc,e=xt"))
 	f.Add([]byte("p=tls-unique,,n=alice,r=abc"))
 	f.Add([]byte("n,,n=mallory,r=abc"))
 	f.Add([]byte("n,,n=al=3Dice,r=abc"))
@@ -70,8 +76,16 @@ func FuzzSCRAMClientFirst(f *testing.F) {
 		if conv == nil || conv.user != fuzzUser {
 			t.Fatalf("a SCRAM conversation for %q from %q", conv.user, in)
 		}
-		attrs := scramAttrs(string(out))
-		client := scramAttrs(conv.clientFirstBare)
+		// What was accepted is a client-first message with no channel binding, for
+		// the one user, as nobody else: the header is "n,," or "n,a=alice,".
+		if conv.gs2Header != "n,," && conv.gs2Header != "n,a="+fuzzUser+"," {
+			t.Fatalf("a SCRAM conversation opened by the header %q (from %q)", conv.gs2Header, in)
+		}
+		if !bytes.HasPrefix(in, []byte(conv.gs2Header)) || !bytes.HasSuffix(in, []byte(conv.clientFirstBare)) {
+			t.Fatalf("header %q and bare %q are not the ends of %q", conv.gs2Header, conv.clientFirstBare, in)
+		}
+		attrs := fuzzAttrs(string(out))
+		client := fuzzAttrs(conv.clientFirstBare)
 		if !bytes.HasPrefix([]byte(attrs['r']), []byte(client['r'])) || len(attrs['r']) <= len(client['r']) {
 			t.Fatalf("server nonce %q does not extend the client's %q", attrs['r'], client['r'])
 		}
@@ -121,7 +135,7 @@ func FuzzSCRAMClientFinal(f *testing.F) {
 			}
 			return
 		}
-		attrs := scramAttrs(string(in))
+		attrs := fuzzAttrs(string(in))
 		want := base64.StdEncoding.EncodeToString(referenceProof(t, conv, attrs['c'], attrs['r']))
 		if attrs['c'] != channel || attrs['r'] != conv.combinedNonce || attrs['p'] != want {
 			t.Fatalf("SCRAM final accepted %q, which is not the proof for the password", in)
@@ -132,18 +146,41 @@ func FuzzSCRAMClientFinal(f *testing.F) {
 	})
 }
 
-// scramUnescape and scramAttrs take the same bytes; between them a username is
-// recovered. Whatever it is given they must not panic, and escaping then
-// unescaping a name returns it.
+// fuzzAttrs reads a comma-separated SCRAM message into its single-letter
+// attributes, with none of the server's code.
+func fuzzAttrs(s string) map[byte]string {
+	out := make(map[byte]string)
+	for _, part := range bytes.Split([]byte(s), []byte(",")) {
+		if len(part) >= 2 && part[1] == '=' {
+			out[part[0]] = string(part[2:])
+		}
+	}
+	return out
+}
+
+// A username is escaped on the wire ("," as "=2C", "=" as "=3D"). Whatever
+// scramName is given it must not panic; escaping then unescaping a name returns
+// it; and a name it accepts holds no bare comma and no "=" that is not one of the
+// two escapes.
 func FuzzSCRAMUsernameEscaping(f *testing.F) {
 	f.Add("al=2Cice")
 	f.Add("a=3Db,c")
 	f.Add("=")
 	f.Fuzz(func(t *testing.T, name string) {
 		escaped := bytes.ReplaceAll(bytes.ReplaceAll([]byte(name), []byte("="), []byte("=3D")), []byte(","), []byte("=2C"))
-		if got := scramUnescape(string(escaped)); got != name {
-			t.Fatalf("%q escaped to %q came back as %q", name, escaped, got)
+		got, ok := scramName(string(escaped))
+		if name == "" {
+			if ok {
+				t.Fatal("an empty name was accepted")
+			}
+		} else if !ok || got != name {
+			t.Fatalf("%q escaped to %q came back as %q (ok=%v)", name, escaped, got, ok)
 		}
-		scramAttrs(name)
+		if raw, ok := scramName(name); ok {
+			again := bytes.ReplaceAll(bytes.ReplaceAll([]byte(raw), []byte("="), []byte("=3D")), []byte(","), []byte("=2C"))
+			if string(again) != name {
+				t.Fatalf("scramName accepted %q as %q, which escapes to %q", name, raw, again)
+			}
+		}
 	})
 }

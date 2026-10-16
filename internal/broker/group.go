@@ -28,7 +28,8 @@ var initialRebalanceDelay = 200 * time.Millisecond
 
 // The bounds on a classic member's session.timeout.ms: Apache Kafka's defaults of
 // group.min.session.timeout.ms (6 s) and group.max.session.timeout.ms (30 min),
-// recorded against apache/kafka (conformance/recordings/joingroup-session-timeout.json).
+// recorded against apache/kafka (conformance/recordings/joingroup-session-timeout.json;
+// claim: bad-days Q5a).
 // A session outside them is INVALID_SESSION_TIMEOUT, checked before anything
 // else about the request. A client developed here with a 1 s session would
 // otherwise ship a setting every real broker refuses. Variables so a test of
@@ -100,10 +101,11 @@ type groupManager struct {
 	mu     sync.Mutex
 	groups map[string]*group
 
-	// hasOffsets reports whether a group has committed offsets. An empty group
-	// that has none holds nothing worth keeping and is forgotten; one that has
-	// some stays listed (as Empty) because its offsets are durable.
-	hasOffsets func(group string) bool
+	// kept reports whether a group that has just emptied stays, listed as Empty, for
+	// somebody else to drop. In a broker that is the offsets retention's sweep, which
+	// drops a group with no members once it holds no offsets (as Kafka's does:
+	// recorded, offsets-retention-recreate). nil = nobody will, so it is dropped here.
+	kept func(group string) bool
 
 	claims *groupClaims
 
@@ -116,9 +118,25 @@ type groupManager struct {
 
 	sink GroupEventSink // told what happens in groups; nil = nobody is watching.
 
-	// emptied and activated tell the offsets retention when a group lost its last
-	// member and when it got one again; nil = nobody is counting.
-	emptied, activated func(group string)
+	// liveness is the offsets retention, told when a group gets members and when it
+	// has lost the last one; nil = nobody is counting.
+	liveness livenessRecorder
+}
+
+// livenessRecorder is the offsets retention as a coordinator sees it (offsetexpiry.go).
+// Each method is called with the coordinator's lock held.
+type livenessRecorder interface {
+	// joining is called before a member is seated, with the kind of member it is and
+	// its session. An error means the group could not be recorded as having members,
+	// and the member is refused: its commits would be in a store that says nobody is
+	// there to read them.
+	joining(group string, classic bool, session time.Duration, protocolType string) error
+	// emptied is called when the last member has gone; classic is the kind of group
+	// it was, and kind what is shown of it while it is empty.
+	emptied(group string, classic bool, kind groupKind)
+	// consumerOnly is called when the last classic member of a consumer group has
+	// gone and others remain.
+	consumerOnly(group string, session time.Duration)
 }
 
 // stop makes every timer a no-op. After shutdown a session timer would otherwise
@@ -135,11 +153,11 @@ func (gm *groupManager) stop() {
 	}
 }
 
-func newGroupManager(hasOffsets func(string) bool, claims *groupClaims) *groupManager {
+func newGroupManager(kept func(string) bool, claims *groupClaims) *groupManager {
 	if claims == nil {
 		claims = newGroupClaims()
 	}
-	return &groupManager{groups: make(map[string]*group), hasOffsets: hasOffsets, claims: claims,
+	return &groupManager{groups: make(map[string]*group), kept: kept, claims: claims,
 		pending: make(map[string]map[string]time.Time)}
 }
 
@@ -229,6 +247,7 @@ type groupMember struct {
 	instanceID     *string
 	protocols      []groupProtocolEntry // ordered by client preference.
 	assignment     []byte               // from the leader's SyncGroup.
+	previous       []byte               // what it held in the generation before this one; read only until the leader's SyncGroup.
 	rejoined       bool
 	sessionTimeout time.Duration
 	session        expiry // evicts the member if it stops heartbeating.
@@ -301,7 +320,8 @@ func (gm *groupManager) forget(group string) bool {
 // slice of the result. A first-contact member (empty id) gets MEMBER_ID_REQUIRED
 // with a fresh id and must retry (KIP-394) — but only from JoinGroup v4, the
 // first version that knows the code. An older client would not know what to do
-// with it, so it is given an id and joined in one step, as Kafka does.
+// with it, so it is given an id and joined in one step, as Kafka does
+// (claim: groups-requests G3).
 func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who clientRef) (joinResult, error) {
 	refuse := func(code int16) (joinResult, error) {
 		return joinResult{errorCode: int16(code), memberID: r.MemberID, generation: -1}, nil
@@ -315,7 +335,11 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 	if len(r.Protocols) == 0 {
 		return refuse(kerr.InconsistentGroupProtocol.Code)
 	}
-	static := r.InstanceID != nil && *r.InstanceID != ""
+	// The group must say what kind of group it is (recorded: ept-join).
+	if r.ProtocolType == "" {
+		return refuse(kerr.InconsistentGroupProtocol.Code)
+	}
+	static := r.InstanceID != nil // "" too (recorded: ei-join-empty-instance).
 
 	gm.mu.Lock()
 	// A group running under KIP-848 is not a classic group, whatever else is
@@ -369,7 +393,22 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 		gm.mu.Unlock()
 		return refuse(kerr.InconsistentGroupProtocol.Code)
 	}
+	created := g == nil
 	g = gm.getOrCreate(r.Group)
+	// The group is recorded as having members before it has this one (offsetexpiry.go).
+	// A coordinator that cannot write that down is not available, and says so.
+	if gm.liveness != nil {
+		if err := gm.liveness.joining(g.id, true, time.Duration(r.SessionTimeoutMillis)*time.Millisecond, r.ProtocolType); err != nil {
+			if len(g.members) == 0 {
+				gm.claims.release(g.id, protoClassic)
+				if created {
+					delete(gm.groups, g.id)
+				}
+			}
+			gm.mu.Unlock()
+			return refuse(kerr.CoordinatorNotAvailable.Code)
+		}
+	}
 
 	// Everyone in a group must be the same kind of member and share at least one
 	// protocol (assignor). A joiner that cannot agree is refused; it used to be
@@ -404,7 +443,7 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 	}
 	// A retried JoinGroup replaces one still parked: the old request's client is
 	// waiting on an answer that this one supersedes, so release it (Kafka answers
-	// it UNKNOWN_MEMBER_ID) instead of leaving its goroutine blocked.
+	// it UNKNOWN_MEMBER_ID; claim: groups-requests G4) instead of leaving its goroutine blocked.
 	m.failPendingJoin()
 	m.client = who
 	m.instanceID = r.InstanceID
@@ -420,9 +459,6 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 
 	if g.state != statePreparingRebalance {
 		wasEmpty := g.state == stateEmpty
-		if wasEmpty && gm.activated != nil {
-			gm.activated(g.id)
-		}
 		g.beginRebalance()
 		// A member the group did not have is "a member joined"; one it already had, asking in
 		// again, is "a member rejoined".
@@ -503,14 +539,22 @@ func (gm *groupManager) replaceStatic(g *group, oldID string, r *kmsg.JoinGroupR
 	return res, true
 }
 
-// fenced reports whether a request naming a static instance comes from a member
-// id that no longer holds it (its restarted successor does).
-func (g *group) fenced(memberID string, instanceID *string) bool {
-	if instanceID == nil || *instanceID == "" {
-		return false
+// staticCheck is what a request naming a static instance is answered when the
+// instance is not this member's: UNKNOWN_MEMBER_ID when nobody holds it, and
+// FENCED_INSTANCE_ID when another member id does (its restarted successor). An empty
+// instance id is an instance id (recorded: group-requests-refused, st-*-wrong-instance,
+// ei-join-empty-instance).
+func (g *group) staticCheck(memberID string, instanceID *string) int16 {
+	if instanceID == nil {
+		return errNone
 	}
-	cur, held := g.static[*instanceID]
-	return held && cur != memberID
+	switch cur, held := g.static[*instanceID]; {
+	case !held:
+		return kerr.UnknownMemberID.Code
+	case cur != memberID:
+		return kerr.FencedInstanceID.Code
+	}
+	return errNone
 }
 
 // othersThan is the group's members apart from id.
@@ -564,9 +608,9 @@ func (gm *groupManager) sync(ctx context.Context, r *kmsg.SyncGroupRequest) (syn
 		gm.mu.Unlock()
 		return syncResult{errorCode: kerr.UnknownMemberID.Code}, nil
 	}
-	if g.fenced(r.MemberID, r.InstanceID) {
+	if code := g.staticCheck(r.MemberID, r.InstanceID); code != errNone {
 		gm.mu.Unlock()
-		return syncResult{errorCode: kerr.FencedInstanceID.Code}, nil
+		return syncResult{errorCode: code}, nil
 	}
 	m := g.members[r.MemberID]
 	if m == nil {
@@ -634,8 +678,8 @@ func (gm *groupManager) heartbeat(r *kmsg.HeartbeatRequest) int16 {
 	if g == nil {
 		return kerr.UnknownMemberID.Code
 	}
-	if g.fenced(r.MemberID, r.InstanceID) {
-		return kerr.FencedInstanceID.Code
+	if code := g.staticCheck(r.MemberID, r.InstanceID); code != errNone {
+		return code
 	}
 	m := g.members[r.MemberID]
 	if m == nil {
@@ -667,7 +711,7 @@ func (gm *groupManager) leave(r *kmsg.LeaveGroupRequest) []leaveResult {
 		res := leaveResult{memberID: who.memberID, instanceID: who.instanceID, errorCode: kerr.UnknownMemberID.Code}
 		if g != nil {
 			id := who.memberID
-			if who.instanceID != nil && *who.instanceID != "" {
+			if who.instanceID != nil {
 				cur, held := g.static[*who.instanceID]
 				switch {
 				case !held:
@@ -717,8 +761,8 @@ func (gm *groupManager) validateCommit(groupID, memberID string, instanceID *str
 	if generation < 0 && len(g.members) == 0 {
 		return errNone
 	}
-	if g.fenced(memberID, instanceID) {
-		return kerr.FencedInstanceID.Code
+	if code := g.staticCheck(memberID, instanceID); code != errNone {
+		return code
 	}
 	if g.members[memberID] == nil {
 		return kerr.UnknownMemberID.Code
@@ -733,6 +777,16 @@ func (gm *groupManager) validateCommit(groupID, memberID string, instanceID *str
 }
 
 // --- internal state transitions (all called under gm.mu) ---
+
+// restoreEmpty puts back an empty group of this protocol type, found in the store at
+// start.
+func (gm *groupManager) restoreEmpty(id, protocolType string) {
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
+	if gm.groups[id] == nil {
+		gm.getOrCreate(id).protocolType = protocolType
+	}
+}
 
 func (gm *groupManager) getOrCreate(id string) *group {
 	g := gm.groups[id]
@@ -763,10 +817,14 @@ func (g *group) failPendingSyncs(code int16) {
 	}
 }
 
-// failPendingJoin answers a JoinGroup still parked for this member, if any.
-func (m *groupMember) failPendingJoin() {
+// failPendingJoin answers a JoinGroup still parked for this member, if any, with
+// UNKNOWN_MEMBER_ID: the member is gone, or a later JoinGroup of its own took its place.
+func (m *groupMember) failPendingJoin() { m.answerPendingJoin(kerr.UnknownMemberID.Code) }
+
+// answerPendingJoin answers a JoinGroup still parked for this member, if any, with code.
+func (m *groupMember) answerPendingJoin(code int16) {
 	if m.awaitingJoin && m.joinResult != nil {
-		m.joinResult <- joinResult{errorCode: kerr.UnknownMemberID.Code, memberID: m.id, generation: -1}
+		m.joinResult <- joinResult{errorCode: code, memberID: m.id, generation: -1}
 	}
 	m.awaitingJoin = false
 }
@@ -819,8 +877,7 @@ func (g *group) completeJoin() (dropped []string) {
 		}
 	}
 	if len(g.members) == 0 {
-		g.state = stateEmpty
-		g.leader = ""
+		g.becomeEmpty()
 		return dropped
 	}
 	for inst, id := range g.static {
@@ -834,7 +891,7 @@ func (g *group) completeJoin() (dropped []string) {
 	// omits a member, it must get an empty assignment — not the previous
 	// generation's, which would hand it partitions another member now owns.
 	for _, m := range g.members {
-		m.assignment = nil
+		m.previous, m.assignment = m.assignment, nil
 	}
 	g.protocol = g.selectProtocol()
 	g.leader = g.electLeader()
@@ -858,6 +915,15 @@ func (g *group) completeJoin() (dropped []string) {
 	return dropped
 }
 
+// becomeEmpty is the group with its last member gone. That is a generation of its own,
+// as on Kafka: the next member to join finds the generation two on from the one the
+// last member had (recorded: offsets-retention-recreate, again-join-g-rejoin; claim: groups R11p).
+func (g *group) becomeEmpty() {
+	g.state = stateEmpty
+	g.leader = ""
+	g.generation++
+}
+
 // completeJoin closes the rebalance and forgets the group if nobody was left.
 func (gm *groupManager) completeJoin(g *group) {
 	for _, id := range g.completeJoin() {
@@ -878,19 +944,18 @@ func (gm *groupManager) completeJoin(g *group) {
 	}
 }
 
-// dropIfUnused forgets an Empty group that has no committed offsets. A group
-// that still has offsets stays, because those are durable and a consumer
-// resuming under the same id expects to find them.
+// dropIfUnused is a group having lost its last member: the offsets retention is told,
+// the id is free, and the group object goes unless somebody keeps it (kept).
 func (gm *groupManager) dropIfUnused(g *group) {
 	if gm.groups[g.id] != g || len(g.members) != 0 {
 		return
 	}
-	if gm.emptied != nil {
-		gm.emptied(g.id)
+	if gm.liveness != nil {
+		gm.liveness.emptied(g.id, true, groupKind{protocolType: g.protocolType})
 	}
 	// No members: the id is free for either protocol again.
 	gm.claims.release(g.id, protoClassic)
-	if gm.hasOffsets != nil && gm.hasOffsets(g.id) {
+	if gm.kept != nil && gm.kept(g.id) {
 		return
 	}
 	delete(gm.groups, g.id)
@@ -974,8 +1039,7 @@ func (gm *groupManager) removeMember(g *group, id string) {
 func (gm *groupManager) rebalanceAfterChange(g *group, why string) {
 	if len(g.members) == 0 {
 		g.join.stop()
-		g.state = stateEmpty
-		g.leader = ""
+		g.becomeEmpty()
 		gm.dropIfUnused(g)
 		return
 	}

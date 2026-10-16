@@ -12,12 +12,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 
 	"go.etcd.io/bbolt"
 )
@@ -53,8 +57,8 @@ func (e *CollisionError) Error() string {
 func (e *CollisionError) Is(target error) bool { return target == ErrTopicCollides }
 
 // FindCollision reports the first of existing that name may not live beside, or nil.
-// CreateTopic applies the same rule; this is for a caller that must say so without
-// creating anything (CreateTopics with validate_only).
+// It is the rule spelled out over a list; the store answers the same question for the
+// topics it holds from an index (TopicCollision), without looking at each of them.
 func FindCollision(name string, existing []string) *CollisionError {
 	for _, e := range existing {
 		if e == name {
@@ -71,6 +75,69 @@ func FindCollision(name string, existing []string) *CollisionError {
 // metricKey is a name with '.' written as '_': Kafka's metric names cannot tell
 // the two apart, so it refuses a topic whose key is one that exists.
 func metricKey(name string) string { return strings.ReplaceAll(name, ".", "_") }
+
+// foldKey is a name with every letter replaced by the least of the letters it equals
+// without regard to case, so two names have one key exactly when strings.EqualFold
+// says they are equal.
+func foldKey(name string) string {
+	return strings.Map(func(r rune) rune {
+		least := r
+		for f := unicode.SimpleFold(r); f != r; f = unicode.SimpleFold(f) {
+			least = min(least, f)
+		}
+		return least
+	}, name)
+}
+
+// nameIndex answers "which topic may this name not live beside" without looking at
+// every topic: the names under each key the two rules compare. Creating n topics
+// used to compare each with all that existed, n squared comparisons for a batch.
+type nameIndex struct {
+	byFold, byMetric map[string][]string
+}
+
+func newNameIndex() nameIndex {
+	return nameIndex{byFold: map[string][]string{}, byMetric: map[string][]string{}}
+}
+
+func (x nameIndex) add(name string) {
+	x.byFold[foldKey(name)] = append(x.byFold[foldKey(name)], name)
+	x.byMetric[metricKey(name)] = append(x.byMetric[metricKey(name)], name)
+}
+
+func (x nameIndex) remove(name string) {
+	drop := func(m map[string][]string, key string) {
+		names := m[key]
+		if i := slices.Index(names, name); i >= 0 {
+			names = slices.Delete(names, i, i+1)
+		}
+		if len(names) == 0 {
+			delete(m, key)
+			return
+		}
+		m[key] = names
+	}
+	drop(x.byFold, foldKey(name))
+	drop(x.byMetric, metricKey(name))
+}
+
+// collision is the topic name may not live beside, or nil. Names in beside are let
+// off the '.' against '_' rule (and only that one): see Store.CreateTopicBeside.
+func (x nameIndex) collision(name string, beside map[string]struct{}) *CollisionError {
+	for _, e := range x.byFold[foldKey(name)] {
+		if e != name {
+			return &CollisionError{Name: name, Existing: e, CaseOnly: true}
+		}
+	}
+	// The newest first: of several topics a name collides with (they can only have
+	// come from one request), Kafka names the one created last.
+	for _, e := range slices.Backward(x.byMetric[metricKey(name)]) {
+		if _, let := beside[e]; e != name && !let {
+			return &CollisionError{Name: name, Existing: e}
+		}
+	}
+	return nil
+}
 
 // ErrInvalidGroupID is returned for a group id that cannot be a key: NUL is the
 // separator between group, topic and partition in the offsets bucket, so a group
@@ -121,6 +188,18 @@ type Topic struct {
 // Store is the metadata persistence contract: single-writer, small, durable.
 type Store interface {
 	CreateTopic(name string, partitions int32, config map[string]string) (Topic, error)
+	// CreateTopicBeside is CreateTopic for one topic of a CreateTopics request that
+	// names several. Apache Kafka checks each name of a request against the topics
+	// that existed before it, not against the others in it, so "a.b" and "a_b" sent
+	// together are both created (recorded: createtopics-collisions): beside is the
+	// names this request has already created, which the '.' against '_' rule does
+	// not count. Names that differ only in letter case are refused all the same:
+	// that rule is about the directory two topics would share.
+	CreateTopicBeside(name string, partitions int32, config map[string]string, beside map[string]struct{}) (Topic, error)
+	// TopicCollision is the registered topic a new topic called name could not live
+	// beside (CreateTopicBeside's rule and its beside), or nil: what CreateTopics
+	// with validate_only has to say without creating anything.
+	TopicCollision(name string, beside map[string]struct{}) *CollisionError
 	Topic(name string) (Topic, bool, error)
 	TopicByID(id TopicID) (Topic, bool, error)
 	ListTopics() ([]Topic, error)
@@ -150,13 +229,19 @@ type Store interface {
 	// that has no commit time, written before they were kept, is given the time of this
 	// call, so a retention starts counting from the first sweep that saw it.
 	ExpireOffsets(group string, expire func(topic string, partition int32, committedAt int64) bool) (int, error)
-	// SetGroupEmptySince records when a group lost its last member, in unix
-	// milliseconds, or forgets it (0): offsets that outlive their group's members are
-	// kept for a retention from then. It is kept across a restart, which forgets the
-	// members themselves.
-	SetGroupEmptySince(group string, at int64) error
-	// GroupsEmptySince is every recorded group and when it became empty.
-	GroupsEmptySince() (map[string]int64, error)
+	// SetGroupLiveness records what the offsets retention must still know about a
+	// group after a restart, which forgets the members themselves: that it has
+	// members (and the longest session any of them asked for), or when it lost the
+	// last one. A nil state forgets the group.
+	SetGroupLiveness(group string, state *GroupLiveness) error
+	// GroupLiveness is every recorded group.
+	GroupLiveness() (map[string]GroupLiveness, error)
+	// AdoptGroupsWithOffsets is run when the store is opened by a broker: the first
+	// time, on a store written before groups with members were recorded, it records
+	// every group that has offsets and no state as one that has members with this
+	// session, because which of them had is not known and an offset is kept when
+	// that is in doubt. It reports how many it recorded; afterwards it does nothing.
+	AdoptGroupsWithOffsets(session time.Duration) (int, error)
 
 	// CommitOffsets stores several offsets of one group in a single transaction.
 	// Each bolt transaction is an fsync, so committing 20 partitions one at a time
@@ -205,6 +290,8 @@ func OpenWithClock(path string, clock func() time.Time) (Store, error) {
 	// bbolt takes an exclusive file lock. With no timeout a second broker on the
 	// same file (a forgotten terminal, a crashed run still shutting down) blocks
 	// forever in silence; a short timeout turns it into an error that says why.
+	_, statErr := os.Stat(path)
+	isNew := errors.Is(statErr, fs.ErrNotExist)
 	db, err := bbolt.Open(path, 0o600, &bbolt.Options{Timeout: lockTimeout})
 	if err != nil {
 		if errors.Is(err, bbolt.ErrTimeout) {
@@ -212,7 +299,8 @@ func OpenWithClock(path string, clock func() time.Time) (Store, error) {
 		}
 		return nil, fmt.Errorf("meta: open %s: %w", path, err)
 	}
-	err = db.Update(func(tx *bbolt.Tx) error {
+	s := &boltStore{db: db, byName: map[string]Topic{}, byID: map[TopicID]string{}, names: newNameIndex(), clock: clock}
+	err = s.commit(func(tx *bbolt.Tx) error {
 		for _, name := range [][]byte{bucketTopics, bucketTopicsByID, bucketOffsets, bucketMeta, bucketACLs, bucketTxns, bucketRegistry} {
 			if _, err := tx.CreateBucketIfNotExists(name); err != nil {
 				return err
@@ -224,7 +312,18 @@ func OpenWithClock(path string, clock func() time.Time) (Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("meta: init buckets: %w", err)
 	}
-	s := &boltStore{db: db, byName: map[string]Topic{}, byID: map[TopicID]string{}, clock: clock}
+	if isNew {
+		// bbolt flushes the file on every commit and never its directory. A database
+		// created a moment ago is a name in a directory nobody has flushed: every
+		// topic, offset and transaction committed to it since would go with that
+		// name in a power cut.
+		dir := filepath.Dir(path)
+		if err := syncDirectory(dir); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("meta: make %s durable: %w", path, err)
+		}
+		durable("dirsync", dir)
+	}
 	if err := s.loadCache(); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("meta: load topic registry: %w", err)
@@ -242,6 +341,7 @@ func (s *boltStore) loadCache() error {
 			t := Topic{Name: string(k), ID: rec.ID, Partitions: rec.Partitions, Config: rec.Config}
 			s.byName[t.Name] = t
 			s.byID[t.ID] = t.Name
+			s.names.add(t.Name)
 			return nil
 		})
 	})
@@ -280,6 +380,7 @@ type boltStore struct {
 	mu      sync.RWMutex
 	byName  map[string]Topic
 	byID    map[TopicID]string
+	names   nameIndex // the names of byName, by what the collision rules compare.
 }
 
 // update runs one write transaction (one fsync) and counts it, so a test can pin
@@ -289,7 +390,39 @@ func (s *boltStore) update(fn func(tx *bbolt.Tx) error) error {
 	if err := faultAt("meta.write"); err != nil {
 		return err
 	}
-	return s.db.Update(fn)
+	return s.commit(fn)
+}
+
+// commit runs one bbolt write transaction. bbolt fsyncs the file before Update
+// returns unless it was opened with NoSync, and every answer this broker gives
+// about a committed offset, a transaction's state or a topic rests on that; the
+// hook is told so only when it is true, which is how a power-cut test notices a
+// store that was opened not to sync.
+func (s *boltStore) commit(fn func(tx *bbolt.Tx) error) error {
+	if err := s.db.Update(fn); err != nil {
+		return err
+	}
+	if !s.db.NoSync {
+		durable("commit", s.db.Path())
+	}
+	return nil
+}
+
+var durabilityHook atomic.Pointer[func(event, path string)]
+
+// SetDurabilityHookForTest installs a function that is told each time the store
+// has made something durable: "commit" with the database's path after a
+// transaction it fsynced, "dirsync" with a directory after flushing it. It
+// returns a func that removes the hook. Nothing in the broker calls it.
+func SetDurabilityHookForTest(fn func(event, path string)) (restore func()) {
+	old := durabilityHook.Swap(&fn)
+	return func() { durabilityHook.Store(old) }
+}
+
+func durable(event, path string) {
+	if h := durabilityHook.Load(); h != nil && *h != nil {
+		(*h)(event, path)
+	}
 }
 
 type topicRecord struct {
@@ -318,6 +451,16 @@ type OffsetEntry struct {
 }
 
 func (s *boltStore) CreateTopic(name string, partitions int32, config map[string]string) (Topic, error) {
+	return s.CreateTopicBeside(name, partitions, config, nil)
+}
+
+func (s *boltStore) TopicCollision(name string, beside map[string]struct{}) *CollisionError {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.names.collision(name, beside)
+}
+
+func (s *boltStore) CreateTopicBeside(name string, partitions int32, config map[string]string, beside map[string]struct{}) (Topic, error) {
 	if err := ValidateTopicName(name); err != nil {
 		return Topic{}, err
 	}
@@ -335,21 +478,12 @@ func (s *boltStore) CreateTopic(name string, partitions int32, config map[string
 	// topic the store has and the cache does not (invisible, yet uncreatable).
 	s.topicMu.Lock()
 	defer s.topicMu.Unlock()
-	s.mu.RLock()
-	for existing := range s.byName {
-		if existing == name {
-			continue
-		}
-		// Kafka's own rule: "a.b" and "a_b" would share metric names, so they
-		// may not both exist. Ours, beside it: names that differ only in letter
-		// case would share a directory on a case-insensitive file system.
-		caseOnly := strings.EqualFold(existing, name)
-		if caseOnly || metricKey(existing) == metricKey(name) {
-			s.mu.RUnlock()
-			return Topic{}, &CollisionError{Name: name, Existing: existing, CaseOnly: caseOnly}
-		}
+	// Kafka's own rule: "a.b" and "a_b" would share metric names, so they may not
+	// both exist. Ours, beside it: names that differ only in letter case would share
+	// a directory on a case-insensitive file system.
+	if c := s.TopicCollision(name, beside); c != nil {
+		return Topic{}, c
 	}
-	s.mu.RUnlock()
 	err := s.update(func(tx *bbolt.Tx) error {
 		topics := tx.Bucket(bucketTopics)
 		if topics.Get([]byte(name)) != nil {
@@ -374,6 +508,7 @@ func (s *boltStore) CreateTopic(name string, partitions int32, config map[string
 	s.mu.Lock()
 	s.byName[name] = cloneTopic(t)
 	s.byID[id] = name
+	s.names.add(name)
 	s.mu.Unlock()
 	return t, nil
 }
@@ -488,6 +623,7 @@ func (s *boltStore) DeleteTopic(name string) error {
 	if t, ok := s.byName[name]; ok {
 		delete(s.byID, t.ID)
 		delete(s.byName, name)
+		s.names.remove(name)
 	}
 	s.mu.Unlock()
 	return nil
@@ -710,37 +846,159 @@ func (s *boltStore) SetPartitions(name string, count int32) (Topic, error) {
 	return cloneTopic(t), nil
 }
 
-// emptySincePrefix keys, in the meta bucket, when a group lost its last member.
+// GroupLiveness is what is kept about a group's members across a restart.
+type GroupLiveness struct {
+	// EmptySince is when the group lost its last member, in unix milliseconds; 0 for
+	// a group that is Live.
+	EmptySince int64
+	// Live is a group that has members. Classic says one of them joined by the classic
+	// protocol, and Session is the longest session timeout any of them has.
+	Live    bool
+	Classic bool
+	Session time.Duration
+
+	// What kind of group it is, which ListGroups and the describes show of an empty
+	// group after a restart as before it (recorded: groups-listed-after-restart):
+	// ProtocolType is a classic group's protocol type ("consumer", "connect", ...).
+	// Consumer is a consumer-protocol group with no members, which has no EmptySince
+	// (its offsets expire from their commits), and Epoch and Assignor are what it was
+	// at when it emptied.
+	ProtocolType string
+	Consumer     bool
+	Epoch        int32
+	Assignor     string
+}
+
+// emptySincePrefix keys, in the meta bucket, what is kept about a group's members.
+// Written by an earlier version: 8 bytes are when it lost the last one, 9 bytes are a
+// group that has some (the kind of group, then its session in milliseconds). Written
+// now: livenessV2, flags, empty since (8), session in milliseconds (8), epoch (4),
+// then the protocol type and the assignor, each a 2-byte length and its bytes.
 var emptySincePrefix = []byte("empty_since\x00")
+
+// keyGroupsAdopted is set once AdoptGroupsWithOffsets has run.
+var keyGroupsAdopted = []byte("groups_adopted")
+
+const (
+	liveClassic  byte = 'c'
+	liveConsumer byte = 'n'
+	livenessV2   byte = 'V'
+
+	flagLive     byte = 1
+	flagClassic  byte = 2
+	flagConsumer byte = 4
+)
 
 func emptySinceKey(group string) []byte {
 	return append(append([]byte(nil), emptySincePrefix...), group...)
 }
 
-func (s *boltStore) SetGroupEmptySince(group string, at int64) error {
+func encodeGroupLiveness(st GroupLiveness) []byte {
+	var flags byte
+	if st.Live {
+		flags |= flagLive
+	}
+	if st.Classic {
+		flags |= flagClassic
+	}
+	if st.Consumer {
+		flags |= flagConsumer
+	}
+	b := []byte{livenessV2, flags}
+	b = binary.BigEndian.AppendUint64(b, uint64(st.EmptySince))
+	b = binary.BigEndian.AppendUint64(b, uint64(st.Session.Milliseconds()))
+	b = binary.BigEndian.AppendUint32(b, uint32(st.Epoch))
+	b = binary.BigEndian.AppendUint16(b, uint16(len(st.ProtocolType)))
+	b = append(b, st.ProtocolType...)
+	b = binary.BigEndian.AppendUint16(b, uint16(len(st.Assignor)))
+	return append(b, st.Assignor...)
+}
+
+func decodeGroupLiveness(v []byte) (GroupLiveness, bool) {
+	switch {
+	case len(v) == 8:
+		return GroupLiveness{EmptySince: int64(binary.BigEndian.Uint64(v))}, true
+	case len(v) == 9 && (v[0] == liveClassic || v[0] == liveConsumer):
+		return GroupLiveness{Live: true, Classic: v[0] == liveClassic,
+			Session: time.Duration(binary.BigEndian.Uint64(v[1:])) * time.Millisecond}, true
+	case len(v) >= 24 && v[0] == livenessV2:
+		flags := v[1]
+		st := GroupLiveness{Live: flags&flagLive != 0, Classic: flags&flagClassic != 0, Consumer: flags&flagConsumer != 0,
+			EmptySince: int64(binary.BigEndian.Uint64(v[2:])),
+			Session:    time.Duration(binary.BigEndian.Uint64(v[10:])) * time.Millisecond,
+			Epoch:      int32(binary.BigEndian.Uint32(v[18:]))}
+		rest := v[22:]
+		str := func() (string, bool) {
+			if len(rest) < 2 || len(rest) < 2+int(binary.BigEndian.Uint16(rest)) {
+				return "", false
+			}
+			n := int(binary.BigEndian.Uint16(rest))
+			out := string(rest[2 : 2+n])
+			rest = rest[2+n:]
+			return out, true
+		}
+		var ok1, ok2 bool
+		st.ProtocolType, ok1 = str()
+		st.Assignor, ok2 = str()
+		return st, ok1 && ok2 && len(rest) == 0
+	}
+	return GroupLiveness{}, false
+}
+
+func (s *boltStore) SetGroupLiveness(group string, state *GroupLiveness) error {
 	return s.update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucketMeta)
-		if at == 0 {
+		if state == nil || !state.Live && state.EmptySince == 0 && !state.Consumer {
 			return b.Delete(emptySinceKey(group))
 		}
-		var v [8]byte
-		binary.BigEndian.PutUint64(v[:], uint64(at))
-		return b.Put(emptySinceKey(group), v[:])
+		return b.Put(emptySinceKey(group), encodeGroupLiveness(*state))
 	})
 }
 
-func (s *boltStore) GroupsEmptySince() (map[string]int64, error) {
-	out := map[string]int64{}
+func (s *boltStore) GroupLiveness() (map[string]GroupLiveness, error) {
+	out := map[string]GroupLiveness{}
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		c := tx.Bucket(bucketMeta).Cursor()
 		for k, v := c.Seek(emptySincePrefix); k != nil && bytes.HasPrefix(k, emptySincePrefix); k, v = c.Next() {
-			if len(v) == 8 {
-				out[string(k[len(emptySincePrefix):])] = int64(binary.BigEndian.Uint64(v))
+			if st, ok := decodeGroupLiveness(v); ok {
+				out[string(k[len(emptySincePrefix):])] = st
 			}
 		}
 		return nil
 	})
 	return out, err
+}
+
+func (s *boltStore) AdoptGroupsWithOffsets(session time.Duration) (int, error) {
+	done := false
+	if err := s.db.View(func(tx *bbolt.Tx) error {
+		done = tx.Bucket(bucketMeta).Get(keyGroupsAdopted) != nil
+		return nil
+	}); err != nil || done {
+		return 0, err
+	}
+	n := 0
+	err := s.update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(bucketMeta)
+		var last []byte
+		c := tx.Bucket(bucketOffsets).Cursor()
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			i := bytes.IndexByte(k, 0)
+			if i < 0 || bytes.Equal(k[:i], last) {
+				continue
+			}
+			last = append(last[:0], k[:i]...)
+			if b.Get(emptySinceKey(string(last))) != nil {
+				continue
+			}
+			if err := b.Put(emptySinceKey(string(last)), encodeGroupLiveness(GroupLiveness{Live: true, Classic: true, Session: session})); err != nil {
+				return err
+			}
+			n++
+		}
+		return b.Put(keyGroupsAdopted, []byte{1})
+	})
+	return n, err
 }
 
 func (s *boltStore) ExpireOffsets(group string, expire func(topic string, partition int32, committedAt int64) bool) (int, error) {

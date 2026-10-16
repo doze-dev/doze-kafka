@@ -40,6 +40,18 @@ override, so you can commit a `doze-kafka.toml` for your project and still run
 `./doze-kafka --kafka-version 3` for a quick experiment. A mistyped key is rejected
 rather than silently ignored.
 
+An error about the file names the line and the key and never repeats what is written
+there, because the file that fails to load is often one with a password in the wrong
+place:
+
+```
+doze-kafka: read doze-kafka.toml: toml: line 7 (key "tls.key"): this is not valid TOML (a string is written in quotes); what was written is not repeated, because this file can hold passwords
+```
+
+Under `[credentials]` the key is not named either (it is where a user's name goes, and
+a password on a line of its own is read as one): the error gives the line. `credentials`
+written as anything but a table (`credentials = "..."`) is refused.
+
 Two things a file does better than flags: it keeps a **list of SASL users** readable
 (and keeps passwords out of your shell history and `ps` output), and it's
 **committable** — check `doze-kafka.toml` into your repo and the whole team gets the
@@ -47,8 +59,9 @@ same broker.
 
 `doze-kafka config print` writes your *effective* configuration — defaults, then the
 file, then any flags — as TOML, so you can see exactly what the broker will run with,
-or generate a starter file. It validates first, so what it prints is something the
-broker would accept:
+or generate a starter file. Every setting is printed, defaults included; `meta-db`,
+unless you set it, is printed as a comment because it follows `data-dir`. It validates first, so what it prints is something the broker
+would accept, and starting from the printed file gives the same configuration:
 
 ```sh
 doze-kafka config print > doze-kafka.toml
@@ -65,7 +78,8 @@ line names the flag or the line and not the value).
 
 A bad setting is reported once, before anything starts, as a single line, with exit
 code 2 (a broker that fails *while running* exits 1). That covers a mistyped flag, a
-value out of range, and a TLS certificate that is missing or does not match its key:
+value out of range, a TLS certificate that is missing or does not match its key, and
+`--zone=false` with no `--listen`:
 
 ```console
 $ doze-kafka --listen nonsense
@@ -120,10 +134,11 @@ where this one says `kafka-version`; that spelling is still read.
 | `--auto-create-topics` | `true` | Create a topic the first time a client references it. |
 | `--default-partitions` | `1` | Partition count for auto-created topics. |
 | `--max-partitions` | `1000` | Most partitions one topic may have. Each is a directory and open files, so a typo like `--default-partitions 100000` is refused rather than taking the machine down. |
+| `--message-max-bytes` | `1048588` | Largest record batch a topic accepts unless the topic sets `max.message.bytes`: Kafka's `message.max.bytes`. A larger batch is refused `MESSAGE_TOO_LARGE`, as a production broker refuses it. |
 | `--consumer-session-timeout` | `45s` | KIP-848 group session timeout: evict a member after this long without a heartbeat. (Classic groups use the timeout the client requests.) |
 | `--offsets-retention` | `168h` | How long a group's committed offsets are kept once nothing is reading them: Kafka's `offsets.retention.minutes` (7 days). `0` keeps them for ever. The rules are in [consumer groups](consumer-groups.md#when-committed-offsets-expire). |
 | `--client-telemetry` | `true` | Accept the metrics clients push about themselves (KIP-714: Java 3.7+, librdkafka 2.5+) and show the last few minutes in the console. `--client-telemetry=false` stops advertising the two APIs, so clients stop sending. See [Observability](observability.md). |
-| `--zone` | `true` | Join the shared `.doze` zone: claim `kafka.<name>.doze` and route the console through the front door. `--zone=false` is the same as `DOZE_ZONE=off` and needs `--listen`, since there is then no name to listen on. |
+| `--zone` | `true` | Join the shared `.doze` zone: claim `kafka.<name>.doze` and route the console through the front door. `--zone=false` is the same as `DOZE_ZONE=off` and needs `--listen`, since there is then no name to listen on: without it, either is a configuration error (one line, exit 2). |
 
 ### Authentication (all optional; see [Auth & TLS](auth-and-tls.md))
 
@@ -131,7 +146,7 @@ where this one says `kafka-version`; that spelling is still read.
 |---|---|---|
 | `--sasl-mechanisms` | *(none)* | Comma-separated SASL mechanisms to require: `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`. Enabling any turns SASL on. A flag replaces the file's list. |
 | `--sasl-user` | *(none)* | A `user:password` credential. Repeatable. Needs `--sasl-mechanisms`: users without a mechanism are an error, not silently ignored. |
-| `--tls-cert` | *(none)* | PEM certificate file. With `--tls-key`, terminates TLS on the listener. |
+| `--tls-cert` | *(none)* | PEM certificate file. With `--tls-key`, terminates TLS on the Kafka listener and on the schema registry (see `--schema-registry-tls`). The console stays plain HTTP. |
 | `--tls-key` | *(none)* | PEM private key file. |
 | `--acl-default` | `allow` | What a resource with no ACL allows: `allow`, or `deny` (Kafka's own default). ACLs you create are enforced either way. See [Authorization](authorization.md). |
 | `--acl-super-user` | *(none)* | A principal ACLs never refuse, as `User:admin`. Repeatable. |
@@ -141,9 +156,10 @@ where this one says `kafka-version`; that spelling is still read.
 | Flag | Default | Meaning |
 |---|---|---|
 | `--console` | `true` | Serve the web console. `--console=false` to turn it off. |
-| `--console-addr` | *beside the broker* | `host:port` for the console's HTTP listener. Unset, it is port 9093 on the name's own address (and `http://kafka.<name>.doze`, port-less, through the shared front door); under `--listen`, `127.0.0.1:9093`. A taken port is an error naming this flag. |
+| `--console-addr` | *beside the broker* | `host:port` for the console's HTTP listener. Unset, it is port 9093 on the name's own address (and `http://kafka.<name>.doze`, port-less, through the shared front door); under `--listen`, `127.0.0.1:9093`, or a free loopback port when `--listen` is on port 0. A taken port is an error naming this flag. |
 | `--console-prefix` | `/_console` | The URL path the console is served under, for a reverse proxy that mounts it below a path of its own. `/` serves it at the root of its port. |
 | `--console-allow-host` | *(none)* | Extra Host names the console answers to, besides `localhost`, IP addresses and `*.doze`. Comma-separated or repeated. A guard against DNS rebinding. |
+| `--console-unprotected` | `false` | Serve the console beyond loopback although SASL or TLS is on. The console has no login, is plain HTTP and, with SASL, acts as a super user, so without this flag that combination is refused at start-up. With it, a warning says what is open. See [What SASL and TLS cover](auth-and-tls.md#what-sasl-and-tls-cover). |
 | `--trace-header` | *(none)* | A record header whose whole value is a trace id (a request or correlation id). The console's **Follow this trace** looks for it in addition to W3C `traceparent` and B3. See [Observability](observability.md). |
 
 ### Schema registry (see [Schema Registry](schema-registry.md))
@@ -151,7 +167,8 @@ where this one says `kafka-version`; that spelling is still read.
 | Flag | Default | Meaning |
 |---|---|---|
 | `--schema-registry` | `true` | Serve the built-in Confluent-compatible schema registry. `--schema-registry=false` to turn it off. |
-| `--schema-registry-addr` | *beside the broker* | `host:port` for the registry's HTTP listener. Unset, it is port 8081 on the name's own address (and `http://schema.<name>.doze`, port-less, through the shared front door); under `--listen`, `127.0.0.1:8081`. A taken port is an error naming this flag. |
+| `--schema-registry-addr` | *beside the broker* | `host:port` for the registry's HTTP listener. Unset, it is port 8081 on the name's own address (and `http://schema.<name>.doze`, port-less, through the shared front door); under `--listen`, `127.0.0.1:8081`, or a free loopback port when `--listen` is on port 0. A taken port is an error naming this flag. |
+| `--schema-registry-tls` | `true` | Serve the registry over HTTPS, with the broker's certificate, when `--tls-cert` and `--tls-key` are set; without them it changes nothing. `--schema-registry-tls=false` keeps the registry plain HTTP beside a TLS broker, and warns at start-up if it is then on an address other machines can reach. |
 
 ### Process
 
@@ -167,7 +184,7 @@ where this one says `kafka-version`; that spelling is still read.
 | Command | Does |
 |---|---|
 | `doze-kafka version` / `--version` / `-v` | Print doze-kafka's version and the Kafka range it speaks. |
-| `doze-kafka env` | Print the shell block that points a client at this instance (`eval "$(doze-kafka env)"`): `KAFKA_BOOTSTRAP_SERVERS` and `KAFKA_BROKERS`. |
+| `doze-kafka env` | Print the shell block that points a client at this instance (`eval "$(doze-kafka env)"`): `KAFKA_BOOTSTRAP_SERVERS` and `KAFKA_BROKERS`, `SCHEMA_REGISTRY_URL` while the registry is on, and `KAFKA_SASL_MECHANISM` (the first of `--sasl-mechanisms`) under SASL; never a password. It reads its own flags and `doze-kafka.toml`, not a running broker: under `--listen`, run the one the start-up summary prints. |
 | `doze-kafka doctor` | Report what is set up for `.doze` names and what is not, and which process holds which name. Needs no privilege. |
 | `doze-kafka config print [--show-secrets] [flags]` | Print the effective configuration as TOML, passwords as `"<redacted>"` unless `--show-secrets`. |
 | `doze-kafka dns-setup` | One-time setup for the shared `.doze` names. See [Endpoints](endpoints.md). |
@@ -204,11 +221,12 @@ consumer groups only):
 ./doze-kafka --kafka-version 3
 ```
 
-**Throwaway broker on a random port** (handy for scripts and CI):
+**Throwaway broker on a random port** (handy for scripts and CI). With `--listen` on
+port 0 the console and the registry take free ports too, so two of these run at once:
 
 ```sh
-./doze-kafka --listen 127.0.0.1:0 --console-addr 127.0.0.1:0 --data-dir "$(mktemp -d)"
-# the summary printed at start-up has the bootstrap address and the console URL
+./doze-kafka --listen 127.0.0.1:0 --data-dir "$(mktemp -d)"
+# the summary printed at start-up has the bootstrap address, the console and the registry URL
 ```
 
 **Reachable from a container on this machine:**
@@ -234,6 +252,7 @@ Once everything is bound — and only then — doze-kafka prints where it is:
 
     kafka     kafka.project.doze:9092
     console   http://kafka.project.doze   topics, messages and consumer groups, live
+    registry  http://schema.project.doze   Confluent-compatible schema registry
     data      /home/you/project/data
     serving   Kafka 4 protocol · no auth · plaintext
 
@@ -242,15 +261,19 @@ Once everything is bound — and only then — doze-kafka prints where it is:
 ```
 
 The summary goes to **stdout** and the log lines to stderr, so `doze-kafka 2>/dev/null`
-shows just the summary. The kafka line is the name, or the address where the name does not
+shows just the summary. Under `--listen` its last lines are `point this shell at it:`
+and the whole `eval "$(doze-kafka env --listen … --config '')"` command, carrying this
+broker's bound addresses, since a bare `doze-kafka env` knows only its own flags and
+`doze-kafka.toml`. The kafka line is the name, or the address where the name does not
 resolve on this machine. With `--listen :9092` it gives the advertised address
 (`localhost:9092`) and notes that the broker is listening on every interface, since
 `[::]:9092` is not something to paste into a client. Ctrl-C, `SIGTERM` and closing the terminal (`SIGHUP`) all stop the
 broker cleanly: it stops accepting, flushes the logs and exits 0. With
 `--log-format json` it is a single `ready` record instead, and with
 `--log-level warn` or `error` it is not printed. The first run on a machine without `.doze`
-set up asks once (root installs without asking; a terminal gets a Y/n prompt; with neither,
-it prints the command and exits).
+set up asks once: root installs without asking; a terminal (both stdin and stderr) gets a
+Y/n prompt, where Enter, `y` or `yes` runs one `sudo` and anything else, end of input
+included, changes nothing; with neither, it prints the command and exits 1.
 
 ## A note on `--advertised-host`
 

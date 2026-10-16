@@ -8,6 +8,7 @@ import (
 	"hash/fnv"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -31,7 +32,8 @@ import (
 //     until its segment has been cleaned before and is older than delete.retention.ms.
 //  4. Each rewritten segment is swapped in without a window in which the log is
 //     unreadable (see swapSegment). Offsets never move: a rewritten batch keeps its base
-//     offset and last offset delta, so records leave gaps, as on a real broker.
+//     offset and last offset delta, so records leave gaps, as on a real broker
+//     (claim: topics R11).
 //
 // A segment the cleaner empties is deleted, except the first, whose base offset is the
 // log-start offset: removing it would move the start and send consumers to reset.
@@ -41,14 +43,16 @@ var ErrNoKey = errors.New("log: a compacted topic cannot accept a message withou
 
 // RequireKeys checks that every record in a Produce payload that has passed
 // ValidateBatches has a key, which a compacted topic needs: the key is what a record
-// replaces. Kafka refuses the batch (INVALID_RECORD) and so does this.
+// replaces. Kafka refuses the batch (INVALID_RECORD) and so does this (claim: topics R13,
+// still memory).
 func RequireKeys(records []byte) error {
 	return CheckRecords(records, RecordCheck{RequireKeys: true})
 }
 
 // ErrStoredTooLarge is returned for a batch that Kafka would store, uncompressed, at
 // more than the topic's max.message.bytes (the topic has compression.type=uncompressed,
-// so the broker inflates what a producer compressed). Kafka answers MESSAGE_TOO_LARGE.
+// so the broker inflates what a producer compressed). Kafka answers MESSAGE_TOO_LARGE
+// (claim: bad-days Q10b).
 var ErrStoredTooLarge = errors.New("log: the batch, stored uncompressed, is larger than the topic allows")
 
 // RecordCheck is what a Produce payload is looked at for beyond its shape.
@@ -145,6 +149,9 @@ type CleanResult struct {
 	// Complete is false when the key map filled before the end of the sealed log, so
 	// more of it is left for the next pass.
 	Complete bool
+	// Unreadable is how many batches the pass kept as they were because their records
+	// cannot be read (a log written before produce read every record).
+	Unreadable int64
 }
 
 const (
@@ -176,12 +183,15 @@ func (p *Partition) cleanedToLocked() int64 {
 func (p *Partition) setCleanedTo(offset int64) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.cleanedTo, p.cleanedLoaded = offset, true
-	tmp := filepath.Join(p.dir, cleanedFile+".tmp")
-	if err := os.WriteFile(tmp, []byte(strconv.FormatInt(offset, 10)+"\n"), 0o644); err != nil {
+	// Durably, and before it is believed: the offset says which segments have been
+	// cleaned once already, which is what lets a tombstone in them be dropped. One
+	// that is too high (a file whose bytes never reached the disk, read back as
+	// something else) drops tombstones a pass early and brings old values back.
+	if err := writeFileDurably(filepath.Join(p.dir, cleanedFile), []byte(strconv.FormatInt(offset, 10)+"\n")); err != nil {
 		return err
 	}
-	return os.Rename(tmp, filepath.Join(p.dir, cleanedFile))
+	p.cleanedTo, p.cleanedLoaded = offset, true
+	return nil
 }
 
 // LastClean is the most recent pass that did anything or looked.
@@ -248,7 +258,11 @@ func keysOf(s *Segment, aborted abortedSet) (map[uint64]int64, error) {
 		}
 		recs, err := DecodeRecords(batch)
 		if err != nil {
-			return err
+			// A batch that cannot be read (a log from before produce read every
+			// record can hold one): its keys are not known, so it replaces nothing,
+			// and cleanSegment keeps it as it is. One such batch used to stop the
+			// partition from ever being cleaned again.
+			return nil
 		}
 		for _, r := range recs {
 			if r.Key != nil {
@@ -367,6 +381,7 @@ func (p *Partition) Compact(pol CompactionPolicy, now time.Time) (CleanResult, e
 		p.forgetAborted(stats.droppedMarkers)
 		res.RecordsRemoved += stats.records
 		res.MarkersRemoved += stats.markers
+		res.Unreadable += stats.unreadable
 		switch {
 		case stats.removedFile:
 			res.SegmentsRemoved++
@@ -433,6 +448,7 @@ type segmentStats struct {
 	// droppedMarkers are the offsets of the markers this segment lost.
 	droppedMarkers   []int64
 	records, markers int64
+	unreadable       int64 // batches kept as they were: their records cannot be read.
 	bytesAfter       int64
 	rewritten        bool
 	removedFile      bool
@@ -443,12 +459,12 @@ type segmentStats struct {
 func (p *Partition) rewriteSegment(s *Segment, first bool, c rewriteCtx) (segmentStats, error) {
 	base := filepath.Join(p.dir, segmentName(s.baseOffset))
 	logTmp, idxTmp := base+".log"+cleanedExt, base+cleanerIndex+cleanedExt
-	f, err := os.OpenFile(logTmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	f, _, err := fsOpenFile(logTmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		return segmentStats{}, err
 	}
-	cleanup := func() { f.Close(); os.Remove(logTmp); os.Remove(idxTmp) }
-	w := bufio.NewWriterSize(f, 1<<20)
+	cleanup := func() { f.Close(); _ = fsRemove(logTmp); _ = fsRemove(idxTmp) }
+	w := bufio.NewWriterSize(cleanedWriter{f}, 1<<20)
 
 	// A tombstone is dropped once its segment has been cleaned before and is older than
 	// delete.retention.ms. Cleaned before is what makes that safe: a pass over a tombstone
@@ -477,7 +493,13 @@ func (p *Partition) rewriteSegment(s *Segment, first bool, c rewriteCtx) (segmen
 		default:
 			recs, err := DecodeRecords(batch)
 			if err != nil {
-				return err
+				// Unreadable: kept whole, where it is (see keysOf).
+				stats.unreadable++
+				out = batch
+				if attrs&batchTransactionalBit != 0 {
+					c.retained[pid]++ // its transaction's marker stays with it.
+				}
+				break
 			}
 			transactional := attrs&batchTransactionalBit != 0
 			abortedBatch := transactional && c.aborted.covers(pid, info.baseOffset)
@@ -537,18 +559,20 @@ func (p *Partition) rewriteSegment(s *Segment, first bool, c rewriteCtx) (segmen
 		cleanup()
 		return segmentStats{}, err
 	}
-	if err := f.Sync(); err != nil {
+	// The cleaned segment is flushed before it can replace the one it was made
+	// from: once the names are swapped it is the only copy of every record in it.
+	if err := fsSync(f); err != nil {
 		cleanup()
 		return segmentStats{}, err
 	}
 	if err := f.Close(); err != nil {
-		os.Remove(logTmp)
-		os.Remove(idxTmp)
+		_ = fsRemove(logTmp)
+		_ = fsRemove(idxTmp)
 		return segmentStats{}, err
 	}
 	if err := writeIndexFile(idxTmp, entries); err != nil {
-		os.Remove(logTmp)
-		os.Remove(idxTmp)
+		_ = fsRemove(logTmp)
+		_ = fsRemove(idxTmp)
 		return segmentStats{}, err
 	}
 	empty := written == 0
@@ -564,21 +588,38 @@ func (p *Partition) rewriteSegment(s *Segment, first bool, c rewriteCtx) (segmen
 	return stats, nil
 }
 
+// cleanedWriter writes a cleaned segment through the file seam and the fault
+// seam's "log.file.write" point.
+type cleanedWriter struct{ f *os.File }
+
+func (w cleanedWriter) Write(b []byte) (int, error) {
+	if err := faultAt("log.file.write"); err != nil {
+		return 0, err
+	}
+	return fsWriter(w).Write(b)
+}
+
 func writeIndexFile(path string, entries []indexEntry) error {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	f, _, err := fsOpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		return err
 	}
-	var buf [indexEntryBytes]byte
-	for i, e := range entries {
-		binary.BigEndian.PutUint64(buf[0:], uint64(e.offset))
-		binary.BigEndian.PutUint64(buf[8:], uint64(e.position))
-		if _, err := f.WriteAt(buf[:], int64(i)*indexEntryBytes); err != nil {
+	raw := make([]byte, 0, len(entries)*indexEntryBytes)
+	for _, e := range entries {
+		raw = binary.BigEndian.AppendUint64(raw, uint64(e.offset))
+		raw = binary.BigEndian.AppendUint64(raw, uint64(e.position))
+	}
+	if err := fsTruncate(f, 0); err != nil { // O_TRUNC, said at the seam.
+		f.Close()
+		return err
+	}
+	if len(raw) > 0 {
+		if _, err := (cleanedWriter{f}).Write(raw); err != nil {
 			f.Close()
 			return err
 		}
 	}
-	if err := f.Sync(); err != nil {
+	if err := fsSync(f); err != nil {
 		f.Close()
 		return err
 	}
@@ -595,57 +636,107 @@ func writeIndexFile(path string, entries []indexEntry) error {
 func (p *Partition) swapSegment(old *Segment, logTmp, idxTmp string, remove bool) (bool, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	i := -1
-	for j, s := range p.segments {
-		if s == old {
-			i = j
-		}
-	}
+	i := slices.Index(p.segments, old)
 	if i < 0 || i == len(p.segments)-1 {
-		os.Remove(logTmp)
-		os.Remove(idxTmp)
+		_ = fsRemove(logTmp)
+		_ = fsRemove(idxTmp)
 		return false, nil
 	}
 	if remove {
-		os.Remove(logTmp)
-		os.Remove(idxTmp)
-		if err := old.close(); err != nil {
-			return false, err
+		_ = fsRemove(logTmp)
+		_ = fsRemove(idxTmp)
+		if err := old.retire(); err != nil {
+			return false, p.reinstate(i, old, "", err)
 		}
 		if err := removeSegmentFiles(p.dir, old.baseOffset); err != nil {
-			return false, err
+			if _, statErr := os.Lstat(filepath.Join(p.dir, segmentName(old.baseOffset)+".log")); statErr == nil {
+				return false, p.reinstate(i, old, "", err) // the log is still there: serve it.
+			}
+			// The log is gone and its index is not: what it held was all cleaned
+			// away, so the segment goes. The index left behind belongs to no log and
+			// the next open ignores it.
 		}
-		p.segments = append(p.segments[:i], p.segments[i+1:]...)
+		p.forgetUnsynced(old)
+		p.segments = slices.Delete(p.segments, i, i+1)
+		p.dirSeq++
 		return true, nil
 	}
 
+	// The old segment is closed before its names are replaced (Windows renames no
+	// file that is open). From here every failure puts a readable segment back in
+	// its place before it returns (reinstate): the old one while its log is still
+	// under its name, the cleaned one once it is. A closed segment left in the
+	// list failed every later read and every later pass until a restart.
 	base := filepath.Join(p.dir, segmentName(old.baseOffset))
 	mtime := old.lastModified
-	if err := old.close(); err != nil {
-		return false, err
+	if err := old.retire(); err != nil {
+		return false, p.reinstate(i, old, "", err)
 	}
 	mark := base + swapMarkExt
-	if err := os.WriteFile(mark, nil, 0o644); err != nil {
-		return false, err
+	undo := func(err error) (bool, error) {
+		// Nothing has been renamed: the old files stand, and so does the cleaned
+		// one, which the next pass or the next open removes.
+		_ = fsRemove(mark)
+		return false, p.reinstate(i, old, "", err)
 	}
-	syncDir(p.dir)
-	if err := os.Rename(logTmp, base+".log"); err != nil {
-		return false, err
+	mf, _, err := fsOpenFile(mark, os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return undo(err)
 	}
-	if err := os.Rename(idxTmp, base+cleanerIndex); err != nil {
-		return false, err
+	mf.Close()
+	p.dirSeq++
+	if err := p.syncDirLocked(); err != nil {
+		return undo(err)
+	}
+	if err := fsRename(logTmp, base+".log"); err != nil {
+		return undo(err)
+	}
+	if err := fsRename(idxTmp, base+cleanerIndex); err != nil {
+		// The cleaned log is in place and the old index under its name does not
+		// match it. The cleaned index is still beside it: serve the pair. The
+		// marker stays, so the next open rebuilds the index from the log.
+		return false, p.reinstate(i, old, idxTmp, err)
 	}
 	// The modification time is the segment's age for retention: rewriting it is not new
 	// data, and must not postpone the day it is deleted.
 	_ = os.Chtimes(base+".log", mtime, mtime)
-	syncDir(p.dir)
-	os.Remove(mark)
-	ns, err := openSegment(p.dir, old.baseOffset, p.indexInterval, p.beforeSync)
-	if err != nil {
-		return false, fmt.Errorf("log: reopening a cleaned segment: %w", err)
+	p.dirSeq++
+	if err := p.syncDirLocked(); err != nil {
+		// Both names are replaced but may not be on disk: the marker stays for
+		// the next open, and the cleaned segment is served meanwhile.
+		return false, p.reinstate(i, old, "", err)
 	}
+	_ = fsRemove(mark)
+	ns, _, err := openSegment(p.dir, old.baseOffset, p.indexInterval, p.beforeSync)
+	if err != nil {
+		return false, p.reinstate(i, old, "", fmt.Errorf("log: reopening a cleaned segment: %w", err))
+	}
+	p.forgetUnsynced(old)
 	p.segments[i] = ns
 	return true, nil
+}
+
+// reinstate puts a readable segment back at p.segments[i] after a swap that
+// failed part-way: whatever log is under old's name (the old one or the cleaned
+// one; a rename replaces a name whole), with its own index, or with the index at
+// indexPath when that is the one that matches. It returns cause, or cause and
+// the reason the segment could not be reopened, in which case old, closed, stays
+// in the list and reads of it fail until a restart.
+func (p *Partition) reinstate(i int, old *Segment, indexPath string, cause error) error {
+	base := filepath.Join(p.dir, segmentName(old.baseOffset))
+	if indexPath == "" {
+		indexPath = base + cleanerIndex
+	}
+	ns, err := openSegmentAt(base+".log", indexPath, old.baseOffset, p.indexInterval, p.beforeSync)
+	if err != nil {
+		return fmt.Errorf("%w (and the segment could not be reopened: %v)", cause, err)
+	}
+	// One that still had to be flushed still has to be (it may be the old log).
+	if j := slices.Index(p.unsynced, old); j >= 0 {
+		p.unsynced[j] = ns
+	}
+	p.segments[i] = ns
+	return cause
 }
 
 // recoverSwaps finishes or undoes a cleaner swap a crash interrupted: a leftover
@@ -660,16 +751,16 @@ func recoverSwaps(dir string) error {
 	for _, e := range entries {
 		name := e.Name()
 		switch {
-		case strings.HasSuffix(name, cleanedExt):
-			_ = os.Remove(filepath.Join(dir, name))
-		case strings.HasSuffix(name, ".tmp") && strings.HasPrefix(name, cleanedFile):
-			_ = os.Remove(filepath.Join(dir, name))
+		case strings.HasSuffix(name, cleanedExt), strings.HasSuffix(name, ".tmp"):
+			// A cleaned segment that was never swapped in, or a small file's
+			// replacement that was never renamed over it (writeFileDurably).
+			_ = fsRemove(filepath.Join(dir, name))
 		case strings.HasSuffix(name, swapMarkExt):
 			base := strings.TrimSuffix(name, swapMarkExt)
 			if err := rebuildIndex(filepath.Join(dir, base)); err != nil {
 				return err
 			}
-			if err := os.Remove(filepath.Join(dir, name)); err != nil {
+			if err := fsRemove(filepath.Join(dir, name)); err != nil {
 				return err
 			}
 		}

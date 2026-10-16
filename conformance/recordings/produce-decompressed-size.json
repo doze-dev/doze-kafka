@@ -247,6 +247,47 @@
       }
     },
     {
+      "label": "keep-uncompressed-over then end",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "keep"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 0,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "keep"
+          }
+        ]
+      }
+    },
+    {
       "label": "keep-gzip-small-inflates-50k",
       "api": "Produce",
       "version": 9,
@@ -289,6 +330,47 @@
             ],
             "Topic": "keep",
             "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "keep-gzip-small-inflates-50k then end",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "keep"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 1,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "keep"
           }
         ]
       }
@@ -341,6 +423,47 @@
       }
     },
     {
+      "label": "keep-zstd-small-inflates-50k then end",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "keep"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 2,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "keep"
+          }
+        ]
+      }
+    },
+    {
       "label": "keep-gzip-compressed-over",
       "api": "Produce",
       "version": 9,
@@ -383,6 +506,47 @@
             ],
             "Topic": "keep",
             "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "keep-gzip-compressed-over then end",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "keep"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 2,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "keep"
           }
         ]
       }
@@ -435,6 +599,47 @@
       }
     },
     {
+      "label": "plain-gzip-small-inflates-50k then end",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "plain"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 0,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "plain"
+          }
+        ]
+      }
+    },
+    {
       "label": "plain-gzip-small-inflates-1k",
       "api": "Produce",
       "version": 9,
@@ -477,6 +682,47 @@
             ],
             "Topic": "plain",
             "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "plain-gzip-small-inflates-1k then end",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "plain"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 1,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "plain"
           }
         ]
       }
@@ -529,6 +775,47 @@
       }
     },
     {
+      "label": "recompress-zstd-small-inflates-50k then end",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "recompress"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 1,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "recompress"
+          }
+        ]
+      }
+    },
+    {
       "label": "compact-gzip-small-inflates-50k",
       "api": "Produce",
       "version": 9,
@@ -576,6 +863,47 @@
       }
     },
     {
+      "label": "compact-gzip-small-inflates-50k then end",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "compact"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 1,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "compact"
+          }
+        ]
+      }
+    },
+    {
       "label": "default-gzip-inflates-20m",
       "api": "Produce",
       "version": 9,
@@ -618,6 +946,47 @@
             ],
             "Topic": "default",
             "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "default-gzip-inflates-20m then end",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "default"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 1,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "default"
           }
         ]
       }

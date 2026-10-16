@@ -6,8 +6,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
+	"unicode/utf8"
+
+	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
 // normalizer turns a request or response into plain JSON with everything that
@@ -24,6 +28,11 @@ type normalizer struct {
 	// instances and subscriptions are the ids KIP-714 has the broker make up.
 	instances     map[string]string
 	subscriptions map[string]string
+	// What a SASL token holds that differs from run to run (Env.Scrub and
+	// Env.ClientNonce; saslToken below).
+	scrub        [][2]string
+	clientNonces []string
+	serverNonces int
 }
 
 func newNormalizer() *normalizer {
@@ -35,8 +44,47 @@ var (
 	nodeKeys     = map[string]bool{"NodeID": true, "Leader": true, "ControllerID": true, "BrokerID": true, "PreferredReadReplica": true, "CurrentLeader": false}
 	nodeListKeys = map[string]bool{"Replicas": true, "ISR": true, "OfflineReplicas": true, "ReplicaNodes": true}
 	memberKeys   = map[string]bool{"MemberID": true, "LeaderID": true, "MemberId": true, "ConsumerID": true}
-	dropKeys     = map[string]bool{"Version": true, "UnknownTags": true}
+	// UnknownTags marshals as {} whatever it holds (its fields are unexported):
+	// normalize counts the tags instead (unknownTagsKey).
+	dropKeys = map[string]bool{"UnknownTags": true}
 )
+
+// unknownTagsKey, at the top of a normalised message, is how many tagged fields
+// the decoder did not know, anywhere in it; absent when there are none. One broker
+// sending a tagged field the other does not is a difference.
+const unknownTagsKey = "(unknown tagged fields)"
+
+// countUnknownTags counts the unknown tagged fields in a kmsg value.
+func countUnknownTags(v reflect.Value) int {
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		if v.IsNil() {
+			return 0
+		}
+		return countUnknownTags(v.Elem())
+	case reflect.Struct:
+		if t, ok := v.Interface().(kmsg.Tags); ok {
+			return t.Len()
+		}
+		n := 0
+		for i := 0; i < v.NumField(); i++ {
+			if v.Type().Field(i).IsExported() {
+				n += countUnknownTags(v.Field(i))
+			}
+		}
+		return n
+	case reflect.Slice, reflect.Array:
+		if v.Type().Elem().Kind() == reflect.Uint8 {
+			return 0
+		}
+		n := 0
+		for i := 0; i < v.Len(); i++ {
+			n += countUnknownTags(v.Index(i))
+		}
+		return n
+	}
+	return 0
+}
 
 // normalize takes a kmsg request or response (any JSON-marshalable value).
 func (n *normalizer) normalize(v any) (any, error) {
@@ -50,7 +98,16 @@ func (n *normalizer) normalize(v any) (any, error) {
 	if err := dec.Decode(&tree); err != nil {
 		return nil, err
 	}
-	return n.walk(tree, ""), nil
+	out := n.walk(tree, "")
+	if m, ok := out.(map[string]any); ok {
+		// The message's own Version is the version it was sent at, which the step
+		// already names; a field called Version inside it is data and stays.
+		delete(m, "Version")
+		if c := countUnknownTags(reflect.ValueOf(v)); c > 0 {
+			m[unknownTagsKey] = c
+		}
+	}
+	return out, nil
 }
 
 func (n *normalizer) walk(v any, key string) any {
@@ -102,9 +159,12 @@ func (n *normalizer) walk(v any, key string) any {
 			return "<node>"
 		case key == "Port":
 			return "<port>"
-		case key == "SubscriptionID":
+		case key == "SubscriptionID" && x.String() != "0":
 			// Kafka makes it up from the subscription's content, a client of this
 			// repository from a random number: only whether two are the same matters.
+			// Zero stays zero: it is "no subscription" (a client's first
+			// GetTelemetrySubscriptions), and a made-up id where Kafka sent 0 must
+			// show (TestZeroSubscriptionIDIsKeptByTheNormalizer).
 			if p, ok := n.subscriptions[x.String()]; ok {
 				return p
 			}
@@ -136,6 +196,8 @@ func (n *normalizer) walk(v any, key string) any {
 			return fmt.Sprintf("<%d bytes, sha256 %x>", len(raw), sum[:6])
 		case key == "ClusterID":
 			return "<cluster>"
+		case key == "SASLAuthBytes":
+			return n.saslToken(x)
 		case memberKeys[key] && x != "":
 			if m, ok := n.members[x]; ok {
 				return m
@@ -383,4 +445,53 @@ func sortMembers(list []any) {
 		b, _ := list[j].(map[string]any)["MemberID"].(string)
 		return a < b
 	})
+}
+
+// saslToken makes a SASL token readable and stable. kmsg marshals the bytes as
+// base64; a token that is text (every PLAIN and SCRAM message a script sends, and
+// every SCRAM message a broker answers) is recorded as that text, anything else as
+// "base64:" and the bytes. Of a SCRAM exchange three things differ on every run and
+// are replaced, in a broker's server-first and server-final messages only:
+//
+//   - the server's half of the nonce (what follows a client nonce the script
+//     registered with Env.ClientNonce) is <server-nonce:N>, and the same
+//     placeholder wherever it appears afterwards, so a client-final message that
+//     returns the right nonce reads as such and one that does not keeps what the
+//     script wrote;
+//   - the salt (doze-kafka draws one per start) is <salt>;
+//   - the server signature is <server-signature>: the script checks it against the
+//     password itself and fails the run if it is wrong (scenarios_sasl.go).
+//
+// What a script sends that depends on those (a proof) it names itself, with
+// Env.Scrub, so the recording says which proof it was.
+func (n *normalizer) saslToken(b64 string) string {
+	raw, err := base64.StdEncoding.DecodeString(b64)
+	if err != nil {
+		return b64
+	}
+	if !utf8.Valid(raw) {
+		return "base64:" + b64
+	}
+	text := string(raw)
+	attrs := strings.Split(text, ",")
+	serverFirst := len(attrs) >= 3 && strings.HasPrefix(attrs[0], "r=") && strings.HasPrefix(attrs[1], "s=") && strings.HasPrefix(attrs[2], "i=")
+	if serverFirst {
+		nonce := strings.TrimPrefix(attrs[0], "r=")
+		for _, c := range n.clientNonces {
+			if rest, ok := strings.CutPrefix(nonce, c); ok && rest != "" {
+				n.serverNonces++
+				n.scrub = append(n.scrub, [2]string{rest, fmt.Sprintf("<server-nonce:%d>", n.serverNonces)})
+				break
+			}
+		}
+		attrs[1] = "s=<salt>"
+		text = strings.Join(attrs, ",")
+	}
+	if len(attrs) == 1 && strings.HasPrefix(text, "v=") {
+		text = "v=<server-signature>"
+	}
+	for _, r := range n.scrub {
+		text = strings.ReplaceAll(text, r[0], r[1])
+	}
+	return text
 }

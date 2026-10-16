@@ -60,31 +60,35 @@ func TestReplay(t *testing.T) {
 			continue
 		}
 		if s.DiskMiB > 0 || s.NoReplay != "" {
-			continue // a volume of its own (Scenario.DiskMiB), or evidence only (Scenario.NoReplay).
+			continue // a volume of its own (Scenario.DiskMiB: TestReplayFullDisk), or evidence only (Scenario.NoReplay).
 		}
-		t.Run(s.Name, func(t *testing.T) {
-			rec, err := Load(recordingsDir, s.Name)
-			if err != nil {
-				t.Fatalf("no recording: %v (go tool task conformance:record)", err)
-			}
-			target, err := StartDozeFor(t.TempDir(), s)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer target.Close()
-			steps, err := Run(s, target)
-			if err != nil {
-				t.Fatal(err)
-			}
-			diffs := Compare(rec, steps)
-			unknown, stale := s.Unexplained(diffs)
-			for _, u := range unknown {
-				t.Errorf("differs from %s: %s", rec.Kafka, u)
-			}
-			for _, k := range stale {
-				t.Errorf("listed as a known difference but no longer differs: step %q path %q", k.Step, k.Path)
-			}
-		})
+		t.Run(s.Name, func(t *testing.T) { replayOne(t, s) })
+	}
+}
+
+// replayOne replays one scenario against a doze-kafka in this process and
+// compares it with its recording.
+func replayOne(t *testing.T, s Scenario) {
+	rec, err := Load(recordingsDir, s.Name)
+	if err != nil {
+		t.Fatalf("no recording: %v (go tool task conformance:record)", err)
+	}
+	target, err := StartDozeFor(t.TempDir(), s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer target.Close()
+	steps, err := Run(s, target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	diffs := Compare(rec, steps)
+	unknown, stale := s.Unexplained(diffs)
+	for _, u := range unknown {
+		t.Errorf("differs from %s: %s", rec.Kafka, u)
+	}
+	for _, k := range stale {
+		t.Errorf("listed as a known difference but no longer differs: step %q path %q", k.Step, k.Path)
 	}
 }
 

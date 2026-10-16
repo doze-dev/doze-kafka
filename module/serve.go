@@ -12,6 +12,9 @@ import (
 	"syscall"
 
 	"github.com/doze-dev/doze-kafka/console"
+	"github.com/doze-dev/doze-kafka/internal/consolefeed"
+	"github.com/doze-dev/doze-kafka/internal/embed"
+	"github.com/doze-dev/doze-kafka/internal/serverhook"
 	"github.com/doze-dev/doze-kafka/server"
 )
 
@@ -61,7 +64,17 @@ func ServeFromArgs(argv []string) error {
 		opts.AutoCreateTopics = &b
 	}
 
-	srv, err := server.New(opts)
+	// A broker that will have a console keeps what the console's Traffic page reads
+	// (the record of requests, and what clients report about themselves under
+	// KIP-714, which it then offers them the APIs for), as the doze-kafka command's
+	// broker does. One with no console keeps neither and offers neither: nobody
+	// would read them. (The module used to build every broker the second way and
+	// then start a console over it, which therefore had no Traffic.)
+	newServer := server.New
+	if *consoleAddr != "" {
+		newServer = embed.NewWithConsole
+	}
+	srv, err := newServer(opts)
 	if err != nil {
 		return err
 	}
@@ -69,6 +82,7 @@ func ServeFromArgs(argv []string) error {
 	_ = os.Remove(*socket)
 	ln, err := net.Listen("unix", *socket)
 	if err != nil {
+		srv.Close() // storage and the lock on the data directory.
 		return fmt.Errorf("listen on %s: %w", *socket, err)
 	}
 
@@ -80,7 +94,11 @@ func ServeFromArgs(argv []string) error {
 	// its idle client would count as a live connection and pin the instance
 	// awake forever. Console failure never takes the broker down.
 	if *consoleAddr != "" {
-		con, err := console.New(console.Options{Addr: "unix://" + *socket, DisplayAddr: *advertise})
+		con, err := console.New(console.Options{
+			Addr: "unix://" + *socket, DisplayAddr: *advertise,
+			Traffic:       consolefeed.Traffic(serverhook.Traffic(srv)),
+			ClientMetrics: consolefeed.ClientMetrics(serverhook.ClientMetrics(srv)),
+		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "kafka console: %v\n", err)
 		} else {

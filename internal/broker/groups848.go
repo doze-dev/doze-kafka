@@ -62,11 +62,13 @@ func (b *Broker) handleConsumerGroupDescribe(ctx context.Context, req *protocol.
 		}
 		state, epoch, assignor, members, ok := b.cg848.describe(group)
 		if !ok || (len(members) == 0 && b.claims.ownerOf(group) == protoClassic) {
+			// In Kafka's words (recorded: mixed-protocol-rolling, offsets-retention-restart).
 			rg.ErrorCode = kerr.GroupIDNotFound.Code
+			msg := "Group " + group + " not found."
 			if b.claims.ownerOf(group) == protoClassic {
-				msg := "Group " + group + " is not a consumer group."
-				rg.ErrorMessage = &msg
+				msg = "Group " + group + " is not a consumer group."
 			}
+			rg.ErrorMessage = &msg
 			resp.Groups = append(resp.Groups, rg)
 			continue
 		}
@@ -83,7 +85,7 @@ func (b *Broker) handleConsumerGroupDescribe(ctx context.Context, req *protocol.
 			rm.RackID = mem.rack
 			rm.MemberEpoch = mem.epoch
 			rm.SubscribedTopics = mem.subscribed
-			regex := mem.regex // "" when there is none, as Kafka sends it.
+			regex := mem.regex // "" when there is none, as Kafka sends it (claim: api V12).
 			rm.SubscribedTopicRegex = &regex
 			rm.Assignment = b.describeAssignment(mem.assigned)
 			rm.TargetAssignment = b.describeAssignment(mem.target)

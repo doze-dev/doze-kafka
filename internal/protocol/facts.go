@@ -410,6 +410,9 @@ func answerFor[RT, RP any](answers []RT, ti, pi int, partition int32,
 // decodedFields is the request as JSON, small enough to hold. It tries a broad view
 // first and narrows (fewer items of each list, fewer levels) until it fits.
 func decodedFields(q kmsg.Request) string {
+	if IsAuthAPI(APIKey(q.Key())) {
+		return authDecodedFields(q) // a list of what may be shown, not of what may not: factsauth.go.
+	}
 	v := reflect.ValueOf(q)
 	for _, lim := range []struct{ items, depth int }{{8, 8}, {4, 6}, {2, 5}, {1, 4}, {1, 3}} {
 		var b strings.Builder

@@ -51,6 +51,13 @@ Kafka does, recorded in `conformance/recordings/mixed-protocol-groups.json` and
 - A consumer-protocol member joining a classic group (protocol type `consumer`) turns it
   into a consumer group. The classic members stay in it, holding the partitions they
   held, until they rejoin; the new member waits for what they give up.
+- A classic group that is in the middle of a rebalance when that happens is taken as it
+  is. A `JoinGroup` or `SyncGroup` that was waiting on the rebalance is answered
+  `REBALANCE_IN_PROGRESS`, and the member that sent it is a member of the consumer
+  group, under the id it has, with nothing assigned: it asks again and is given its
+  partitions. A member whose new generation had no assignments yet keeps what it held
+  in the one before. A `SyncGroup` from a member the group has moved on from is
+  `REBALANCE_IN_PROGRESS` too: it has to join again first.
 - A classic client joining a consumer group becomes one of its members. Nobody relays
   its assignment: its `JoinGroup` is answered with no leader and no member list, and its
   `SyncGroup` carries the partitions it may have now.
@@ -73,21 +80,56 @@ group is shown `Assigning`; this broker computes it first.
 Offsets are not kept for ever: as on Kafka (`offsets.retention.minutes`), they expire
 after `--offsets-retention` (default 7 days; `0` keeps them for ever). Which clock
 applies is Kafka's, recorded against `apache/kafka:4.3.1`
-(`conformance/recordings/offsets-retention.json`):
+(`conformance/recordings/offsets-retention.json`, `offsets-retention-restart.json`,
+`offsets-retention-recreate.json`):
 
-- A group that **had members and has none now** keeps its offsets for the retention from
-  the moment it became empty, however late its last commit was. A commit made into an
-  empty group does not extend it.
+- A **classic group that had members and has none now** keeps its offsets for the
+  retention from the moment it became empty, however late its last commit was. A commit
+  made into an empty group does not extend it.
 - A group **nobody ever joined** (a standalone consumer committing by hand) keeps each
-  offset for the retention from its own commit.
+  offset for the retention from its own commit. So does a **consumer-protocol group
+  whose members have gone**: Kafka keeps no moment of emptying for it.
 - A group **with members** never loses the offsets of the topics it is subscribed to;
   those of a topic it is not subscribed to expire from their own commit. A group in the
   middle of a rebalance is not looked at.
-- A group whose offsets are all gone is gone: it is no longer listed.
+- A group with **no members and no offsets** is gone at the next sweep: its last offset
+  expired or was deleted, or it never committed one. It is no longer listed, and its id,
+  used again, is a new group that nothing of the old one counts against. Until that
+  sweep it is listed `Empty` and is still the group it was, so a commit made into it in
+  between is a commit into an empty group. `DeleteGroups` does the same at once.
 
-When a group became empty is kept in the metadata database, so a restart does not give
-it a new retention. An offset stored by a version that did not record commit times is
-given the time of the first sweep that sees it.
+The sweep runs every hundredth of the retention, at least every 50 ms and at most every
+ten minutes, which is Kafka's `offsets.retention.check.interval.ms` default and what a
+default broker gets. With `--offsets-retention 0` it runs every ten minutes and only
+drops the groups that hold nothing.
+
+**Across a restart** a real broker has its groups' members again when it is back. A
+member that does not return runs out of session, and the group is without members from
+then: not from the restart, and not from its commits. doze-kafka does not keep members
+([limitations](limitations.md)), so it keeps what that rule needs. The metadata
+database records, for each group, that it has members and the longest session among
+them, written before the first member's join is answered, or when a classic group lost
+its last one. After a restart, a clean one or a crash, a group recorded as having
+members is treated as having them until that session has passed with nobody joining,
+and as having lost them at that moment. An application that is back within its session
+timeout finds its offsets, however old they are. One that stays away gets the retention
+from there if it is a classic group, and for a consumer-protocol group offsets as old
+as their commits, as on Kafka. Until the session has passed nothing of such a group
+expires, not even the offsets of a topic it was not subscribed to.
+
+Three things follow from keeping that record:
+
+- A join that cannot be recorded (the metadata database cannot be written) is refused
+  with `COORDINATOR_NOT_AVAILABLE` and tried again by the client; the member is not
+  seated in a group the store would later take for one nobody joined.
+- The record is kept with `--offsets-retention 0` too, so turning the retention on later
+  does not expire the offsets of groups that were live all along.
+- A data directory written before the record existed is adopted once: every group that
+  has offsets and no record is treated as having had members with a 45-second session.
+  Which of them really had is not known, and an offset is kept when that is in doubt.
+
+An offset stored by a version that did not record commit times is given the time of the
+first sweep that sees it.
 
 ## Two protocols, chosen automatically
 
@@ -148,7 +190,11 @@ picks the right one automatically.
 ## Limits
 
 Single node means every group is coordinated by the one broker, which keeps this
-simple. Not implemented: static membership (`group.instance.id` is accepted but not
-acted on) and the sticky cross-topic balancing of the reference `uniform` assignor —
-doze-kafka's assignor is a straightforward, even round-robin. Neither matters for
-local development.
+simple. Static membership (`group.instance.id`) works as it does on Kafka, on both
+protocols and in a group that mixes them: a restarted instance takes its predecessor's
+place and partitions without a rebalance, the old member id is fenced
+(`FENCED_INSTANCE_ID`), and a consumer-protocol member that leaves with epoch -2 keeps
+its place until its session runs out (recorded: `mixed-protocol-static.json`,
+`group-requests-refused.json`). Not implemented: the sticky cross-topic balancing of the
+reference `uniform` assignor — doze-kafka's assignor is a straightforward, even
+round-robin. That does not matter for local development.

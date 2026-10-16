@@ -63,7 +63,7 @@ func (b *Broker) handleOffsetCommit(ctx context.Context, req *protocol.Request, 
 		resp.Topics = append(resp.Topics, rt)
 	}
 	if err := b.meta.CommitOffsets(oc.Group, commits); err != nil {
-		code := b.storageFault("offset commit", err, "group", oc.Group, "partitions", len(commits))
+		code := b.coordinatorFault("offset commit", err, "group", oc.Group, "partitions", len(commits))
 		for _, s := range slots {
 			resp.Topics[s.topic].Partitions[s.part].ErrorCode = code
 		}
@@ -275,7 +275,7 @@ func (b *Broker) commitFence(oc *kmsg.OffsetCommitRequest) int16 {
 		return kerr.InvalidGroupID.Code
 	}
 	if b.claims.ownerOf(oc.Group) == protoConsumer {
-		return b.cg848.validateCommit(oc.Group, oc.MemberID, oc.Generation)
+		return b.cg848.validateCommitAt(oc.Group, oc.MemberID, oc.Generation, oc.GetVersion())
 	}
 	return b.groups.validateCommit(oc.Group, oc.MemberID, oc.InstanceID, oc.Generation)
 }

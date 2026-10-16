@@ -138,7 +138,7 @@ func walkRecordsDrain(batch []byte, limit int, needKey, drain bool, visit func(i
 			if err != nil {
 				return fail(i, "has no key length", err)
 			}
-			h.KeyNull = keyLen == -1
+			h.KeyNull = keyLen < 0 // any negative length is a null key, as Kafka reads it.
 		}
 		if used := cr.n - recStart; used > length {
 			return 0, fmt.Errorf("%w: record %d is shorter than its own fields", errRecords, i)
@@ -277,6 +277,44 @@ func (x *xerialReader) Read(p []byte) (int, error) {
 	return n, nil
 }
 
+// gzipMembers reads gzip as the JVM's GZIPInputStream does, which is what Kafka reads
+// a batch with: member after member, and bytes after a member that are not the
+// start of another are the end of the data, not an error. (Go's reader fails on
+// them. Recorded: produce-validation, gzip-then-bytes-after-the-stream, which Kafka
+// stores; a batch like it must be readable here too.)
+type gzipMembers struct {
+	src *bytes.Reader
+	zr  *gzip.Reader
+}
+
+func newGzipMembers(body []byte) (*gzipMembers, error) {
+	g := &gzipMembers{src: bytes.NewReader(body)}
+	zr, err := gzip.NewReader(g.src)
+	if err != nil {
+		return nil, err
+	}
+	zr.Multistream(false)
+	g.zr = zr
+	return g, nil
+}
+
+func (g *gzipMembers) Read(p []byte) (int, error) {
+	for {
+		n, err := g.zr.Read(p)
+		if err != io.EOF {
+			return n, err
+		}
+		// This member is done. Another may follow; anything else ends the data.
+		if g.src.Len() == 0 || g.zr.Reset(g.src) != nil {
+			return n, io.EOF
+		}
+		g.zr.Multistream(false)
+		if n > 0 {
+			return n, nil
+		}
+	}
+}
+
 // openInflated is the records section of a batch body as a stream, failing with
 // ErrInflatedTooLarge once it has produced more than limit bytes. What it holds is the
 // decompressor's window and buffers, never the inflated payload; the returned function
@@ -287,7 +325,7 @@ func openInflated(codec int, body []byte, limit int) (io.Reader, func(), error) 
 	case codecNone:
 		return &boundedReader{r: bytes.NewReader(body), left: int64(limit)}, nop, nil
 	case codecGzip:
-		r, err := gzip.NewReader(bytes.NewReader(body))
+		r, err := newGzipMembers(body)
 		if err != nil {
 			return nil, nop, fmt.Errorf("%w: gzip: %v", errRecords, err)
 		}

@@ -175,6 +175,7 @@ func TestGroupKIP848_RequestsAreValidated(t *testing.T) {
 		m.assign = ""
 		return m.raw(t, ctx, func(r *kmsg.ConsumerGroupHeartbeatRequest) {
 			r.SubscribedTopicNames = []string{"t"}
+			r.Topics = []kmsg.ConsumerGroupHeartbeatRequestTopic{} // a join owns nothing.
 			mut(r)
 		}).ErrorCode
 	}
@@ -190,7 +191,14 @@ func TestGroupKIP848_RequestsAreValidated(t *testing.T) {
 		{"no group id", func(r *kmsg.ConsumerGroupHeartbeatRequest) { r.Group = "" }, 42},
 		{"an epoch below -2", func(r *kmsg.ConsumerGroupHeartbeatRequest) { r.MemberEpoch = -3 }, 42},
 		{"a pattern that does not compile", func(r *kmsg.ConsumerGroupHeartbeatRequest) { r.SubscribedTopicRegex = kmsg.StringPtr("(") }, 128}, // INVALID_REGULAR_EXPRESSION. (It was answered as 117, UNKNOWN_SUBSCRIPTION_ID, from a mistyped constant.)
-		{"an unknown member at a later epoch", func(r *kmsg.ConsumerGroupHeartbeatRequest) { r.MemberEpoch = 3 }, 25},
+		{"a later epoch in a group that does not exist", func(r *kmsg.ConsumerGroupHeartbeatRequest) { r.MemberEpoch = 3 }, 69},                // recorded: ch-unknown-member-epoch-5.
+		{"a join that owns partitions", func(r *kmsg.ConsumerGroupHeartbeatRequest) {
+			r.Topics = append(r.Topics, kmsg.ConsumerGroupHeartbeatRequestTopic{Partitions: []int32{0}})
+		}, 42},
+		{"a join that does not say what it owns", func(r *kmsg.ConsumerGroupHeartbeatRequest) { r.Topics = nil }, 42},
+		{"a rebalance timeout of zero", func(r *kmsg.ConsumerGroupHeartbeatRequest) { r.RebalanceTimeoutMillis = 0 }, 0},
+		{"an empty instance id", func(r *kmsg.ConsumerGroupHeartbeatRequest) { r.InstanceID = kmsg.StringPtr("") }, 42},
+		{"a static leave with no instance id", func(r *kmsg.ConsumerGroupHeartbeatRequest) { r.MemberEpoch = -2 }, 42},
 		{"leaving a group that does not exist", func(r *kmsg.ConsumerGroupHeartbeatRequest) { r.MemberEpoch = -1 }, 69},
 	} {
 		if got := code("validate-"+tc.name, "m", tc.mut); got != tc.want {

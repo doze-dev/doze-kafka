@@ -1,0 +1,21 @@
+# Vulnerabilities govulncheck reports as reachable that cannot be fixed by an upgrade,
+# each with the test that keeps hostile input away from the vulnerable code.
+# `go tool task vuln` (scripts/vulncheck) fails on any reachable vulnerability that is
+# not here, on an entry whose advisory has gained a fixed version, on an entry that
+# is no longer reported, and on an entry whose test is gone.
+#
+#   ID  directory.TestName  why there is nothing to upgrade to, and what guards it
+#
+# github.com/hamba/avro/v2 is archived; v2.31.0 is its last release and none fixes
+# these. All three are in its binary decoder, which this module calls in one place:
+# schemaregistry.Codec.Decode, for the console's view of a message (a record value any
+# producer may have written, against a schema anyone may have registered). Every value
+# is walked against its schema by checkAvro before the decoder is given it
+# (schemaregistry/avroguard.go); FuzzDecode fuzzes the pair. The rest of what the
+# scan lists as reached (schema parsing, compatibility checks, the encoder) does not
+# decode bytes. The fixes exist in a fork, github.com/iskorotkov/avro/v2 (v2.33.0+);
+# moving to it is a decision about who publishes this dependency, not taken here.
+
+GO-2026-5046 schemaregistry.TestHostileAvroIsRefusedBeforeTheDecoderSeesIt a block claiming up to 2^63 elements is looped over; checkAvro bounds every count by the bytes left or by maxAvroItems
+GO-2026-5047 schemaregistry.TestHostileAvroIsRefusedBeforeTheDecoderSeesIt counts and lengths that overflow or are negative; checkAvro refuses each (-2^63 counts, negative sizes, sums past the limit)
+GO-2026-5048 schemaregistry.TestHostileAvroIsRefusedBeforeTheDecoderSeesIt maps grow without a bound; checkAvro bounds the arrays and maps of a whole value to maxAvroItems elements

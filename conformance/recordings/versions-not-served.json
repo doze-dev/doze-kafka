@@ -1,0 +1,752 @@
+{
+  "scenario": "versions-not-served",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "ListOffsets v0 below or above",
+      "api": "ListOffsets",
+      "version": 0,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": null
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "ListOffsets v0 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetCommit v0 below or above",
+      "api": "OffsetCommit",
+      "version": 0,
+      "request": {
+        "Generation": -1,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": null
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "OffsetCommit v0 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetCommit v1 below or above",
+      "api": "OffsetCommit",
+      "version": 1,
+      "request": {
+        "Generation": -1,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": null
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "OffsetCommit v1 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetFetch v0 below or above",
+      "api": "OffsetFetch",
+      "version": 0,
+      "request": {
+        "Group": "",
+        "Groups": null,
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "OffsetFetch v0 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "CreateTopics v0 below or above",
+      "api": "CreateTopics",
+      "version": 0,
+      "request": {
+        "TimeoutMillis": 60000,
+        "Topics": null,
+        "ValidateOnly": false
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "CreateTopics v0 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "CreateTopics v1 below or above",
+      "api": "CreateTopics",
+      "version": 1,
+      "request": {
+        "TimeoutMillis": 60000,
+        "Topics": null,
+        "ValidateOnly": false
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "CreateTopics v1 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DeleteTopics v0 below or above",
+      "api": "DeleteTopics",
+      "version": 0,
+      "request": {
+        "TimeoutMillis": 15000,
+        "TopicNames": null,
+        "Topics": null
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "DeleteTopics v0 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DescribeACLs v0 below or above",
+      "api": "DescribeACLs",
+      "version": 0,
+      "request": {
+        "Host": null,
+        "Operation": "UNKNOWN",
+        "PermissionType": "UNKNOWN",
+        "Principal": null,
+        "ResourceName": null,
+        "ResourcePatternType": "LITERAL",
+        "ResourceType": "UNKNOWN"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "DescribeACLs v0 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "CreateACLs v0 below or above",
+      "api": "CreateACLs",
+      "version": 0,
+      "request": {
+        "Creations": null
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "CreateACLs v0 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DeleteACLs v0 below or above",
+      "api": "DeleteACLs",
+      "version": 0,
+      "request": {
+        "Filters": null
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "DeleteACLs v0 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DescribeConfigs v0 below or above",
+      "api": "DescribeConfigs",
+      "version": 0,
+      "request": {
+        "IncludeDocumentation": false,
+        "IncludeSynonyms": false,
+        "Resources": null
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "DescribeConfigs v0 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Fetch v3 below or above",
+      "api": "Fetch",
+      "version": 3,
+      "request": {
+        "ClusterID": null,
+        "ForgottenTopics": null,
+        "IsolationLevel": 0,
+        "MaxBytes": 2147483647,
+        "MaxWaitMillis": 0,
+        "MinBytes": 0,
+        "Rack": "",
+        "ReplicaID": -1,
+        "ReplicaState": {
+          "Epoch": -1,
+          "ID": -1
+        },
+        "SessionEpoch": -1,
+        "SessionID": 0,
+        "Topics": null
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "Fetch v3 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Metadata v14 below or above",
+      "api": "Metadata",
+      "version": 14,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": null
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "Metadata v14 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "FindCoordinator v7 below or above",
+      "api": "FindCoordinator",
+      "version": 7,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": null,
+        "CoordinatorType": 0
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "FindCoordinator v7 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Heartbeat v5 below or above",
+      "api": "Heartbeat",
+      "version": 5,
+      "request": {
+        "Generation": 0,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": ""
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "Heartbeat v5 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DescribeConfigs v5 below or above",
+      "api": "DescribeConfigs",
+      "version": 5,
+      "request": {
+        "IncludeDocumentation": false,
+        "IncludeSynonyms": false,
+        "Resources": null
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "DescribeConfigs v5 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "LeaderAndISR v5 below or above",
+      "api": "LeaderAndISR",
+      "version": 5,
+      "request": {
+        "BrokerEpoch": -1,
+        "ControllerEpoch": 0,
+        "ControllerID": "\u003cnode\u003e",
+        "IsKRaftController": false,
+        "LiveLeaders": null,
+        "PartitionStates": null,
+        "TopicStates": null,
+        "Type": 0
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "LeaderAndISR v5 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "ControlledShutdown v3 below or above",
+      "api": "ControlledShutdown",
+      "version": 3,
+      "request": {
+        "BrokerEpoch": -1,
+        "BrokerID": "\u003cnode\u003e"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "ControlledShutdown v3 then served",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": []
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    }
+  ]
+}

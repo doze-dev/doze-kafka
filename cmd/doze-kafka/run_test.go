@@ -34,7 +34,11 @@ func start(t *testing.T, flags ...string) (out *safeBuf, stop func() error) {
 	out = &safeBuf{}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
-	go func() { done <- run(ctx, st, newLogger(st.cfg, out), out) }()
+	logger := newLogger(st.cfg, out)
+	for _, n := range st.notices { // as realMain does, before anything starts.
+		logger.Warn(n)
+	}
+	go func() { done <- run(ctx, st, logger, out) }()
 	var once sync.Once
 	var result error
 	stop = func() error {
@@ -63,7 +67,7 @@ func TestStartupSummaryNamesWhatIsListening(t *testing.T) {
 	out, stop := start(t)
 	waitFor(t, "the summary", func() bool { return strings.Contains(out.String(), "doze-kafka is up") })
 	text := out.String()
-	for _, want := range []string{"doze-kafka is up", "kafka     127.0.0.1:", "console   http://127.0.0.1:", "data      ", "Kafka 4 protocol · no auth · plaintext", `eval "$(doze-kafka env)"`, "doze-kafka doctor"} {
+	for _, want := range []string{"doze-kafka is up", "kafka     127.0.0.1:", "console   http://127.0.0.1:", "data      ", "Kafka 4 protocol · no auth · plaintext", `eval "$(doze-kafka env --listen 127.0.0.1:`, "doze-kafka doctor"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("the summary is missing %q:\n%s", want, text)
 		}

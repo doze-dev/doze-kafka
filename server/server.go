@@ -92,6 +92,11 @@ type Options struct {
 	// heartbeat before it is evicted; 0 uses the default (45s). Tests of failure
 	// handling set it low.
 	ConsumerSessionTimeout time.Duration
+	// OffsetsRetention is how long a group's committed offsets are kept once nothing
+	// is reading them, as the CLI's --offsets-retention and Kafka's
+	// offsets.retention.minutes. Zero uses the default (7 days); a negative value
+	// keeps them for ever (the CLI's 0).
+	OffsetsRetention time.Duration
 
 	// Auth (all optional). SASL and TLS are independent and composable.
 	SASLMechanisms []string
@@ -112,6 +117,7 @@ const trafficRows = 2000
 // internal/serverhook by this module's own commands.
 func init() {
 	serverhook.New = func(cfg config.Config, logger *slog.Logger) (any, error) { return newFromConfig(cfg, logger) }
+	serverhook.NewWithConsole = func(opts any) (any, error) { return newFromOptions(opts.(Options), true) }
 	serverhook.Traffic = func(srv any) *traffic.Recorder { return srv.(*Server).rec }
 	serverhook.ClientMetrics = func(srv any) *telemetry.Store { return srv.(*Server).b.Telemetry() }
 }
@@ -128,22 +134,33 @@ type Server struct {
 	tls  bool              // the listener terminates TLS, from cert files or Options.TLSConfig.
 
 	mu      sync.Mutex
-	bound   net.Addr // set by Bind.
-	claimed bool     // Serve or ServeListener has been called.
-	closed  bool     // Close has been called.
+	bound   net.Addr           // set by Bind.
+	claimed bool               // Serve or ServeListener has been called.
+	closed  bool               // Close has been called.
+	stop    context.CancelFunc // ends the Serve in progress; nil until one is.
+	served  chan struct{}      // closed when that Serve has released everything.
+
+	bindMu sync.Mutex // Bind, or Close's release: never the two at once.
 
 	dirLock io.Closer // held for the life of the server: one broker per data directory.
 
 	closeOnce sync.Once
 	closeErr  error
 
-	ready     chan struct{} // closed once the listener is bound, or Serve has returned.
+	ready     chan struct{} // closed once the listener is bound, or the server has ended without one.
 	readyOnce sync.Once
 }
 
 // New validates the options and opens storage + broker + router. It does not
 // bind a listener yet — call Serve (or Bind) to start accepting.
-func New(opts Options) (*Server, error) {
+func New(opts Options) (*Server, error) { return newFromOptions(opts, false) }
+
+// newFromOptions is New, told whether a console will be attached to the broker:
+// only then does it keep the record of requests and the store of client metrics
+// that a console reads, and offer the client-telemetry APIs (docs/observability.md).
+// An embedder has no console to attach (the types it would need are internal), so
+// New says no; the doze module, which starts one, says yes through internal/embed.
+func newFromOptions(opts Options, console bool) (*Server, error) {
 	if opts.DataDir == "" {
 		return nil, errors.New("server: Options.DataDir is required (a test can use t.TempDir())")
 	}
@@ -152,7 +169,7 @@ func New(opts Options) (*Server, error) {
 		cfg.Version = opts.Version
 	}
 	cfg.DataDir = opts.DataDir
-	cfg.Console = false      // an embedded broker runs no console, so keeps no record for one.
+	cfg.Console = console    // an embedded broker runs no console, so keeps no record for one.
 	cfg.MetaDB = opts.MetaDB // empty is resolved to <DataDir>/meta.db by newFromConfig.
 	// An embedder asked for no particular address; the CLI default (port 9092) is
 	// the wrong answer for a library, which would fight over a fixed port with
@@ -182,6 +199,9 @@ func New(opts Options) (*Server, error) {
 	}
 	if opts.ConsumerSessionTimeout != 0 {
 		cfg.ConsumerSessionTimeout = opts.ConsumerSessionTimeout
+	}
+	if opts.OffsetsRetention != 0 {
+		cfg.OffsetsRetention = max(opts.OffsetsRetention, 0)
 	}
 	if opts.FsyncInterval != 0 {
 		cfg.FsyncInterval = opts.FsyncInterval
@@ -223,6 +243,12 @@ func newFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
+	// Read now, before anything is opened, so that nothing below the broker can
+	// fail: it starts a goroutine of its own.
+	tlsCfg, err := cfg.TLSConfig()
+	if err != nil {
+		return nil, err
+	}
 	// bbolt creates the file but not its directory, and the log manager creates
 	// the data dir only after the metadata store is open — so a fresh data dir
 	// failed with "no such file or directory", including the example in this
@@ -232,6 +258,20 @@ func newFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 			return nil, fmt.Errorf("create %s: %w", dir, err)
 		}
 	}
+	// Whatever is opened below is closed again, newest first, if a later step
+	// fails. (The lock on the data directory used to be kept by a failure after the
+	// log manager opened, so the directory stayed "in use" for the life of the
+	// process.)
+	var opened []func()
+	built := false
+	defer func() {
+		if built {
+			return
+		}
+		for i := len(opened) - 1; i >= 0; i-- {
+			opened[i]()
+		}
+	}()
 	// One broker per data directory. The metadata database is locked by whoever
 	// opens it, but it can live elsewhere (--meta-db), and two brokers with
 	// different databases over one data directory would write the same log files.
@@ -239,17 +279,16 @@ func newFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	opened = append(opened, func() { dirLock.Close() })
 	metaStore, err := meta.Open(cfg.MetaDB)
 	if err != nil {
-		dirLock.Close()
 		return nil, err
 	}
+	opened = append(opened, func() { metaStore.Close() })
 	// Topics with a segment size or retention of their own, in place before the
 	// log manager's first retention sweep.
 	registered, err := metaStore.ListTopics()
 	if err != nil {
-		metaStore.Close()
-		dirLock.Close()
 		return nil, err
 	}
 	topicConfigs := make(map[string]map[string]string, len(registered))
@@ -265,34 +304,22 @@ func newFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		Logger:             logger,
 	})
 	if err != nil {
-		metaStore.Close()
-		dirLock.Close()
 		return nil, err
 	}
-	if err := reconcileDisk(cfg, logger, logs, metaStore); err != nil {
-		logs.Close()
-		metaStore.Close()
-		return nil, err
-	}
+	opened = append(opened, func() { logs.Close() })
+	reconcileDisk(cfg, logger, logs, registered)
 	b, err := broker.New(cfg, logger, logs, metaStore)
 	if err != nil {
-		logs.Close()
-		metaStore.Close()
 		return nil, err
 	}
+	opened = append(opened, b.Stop)
 	router := protocol.NewRouter()
 	b.Register(router)
 	b.AnnounceACLs()
 	b.RecoverTransactions() // finish what a stop left half done, before anyone connects.
 
 	srv := protocol.NewServer(cfg.ListenAddr, router, logger)
-	if cfg.TLSEnabled() {
-		tlsCfg, err := cfg.TLSConfig()
-		if err != nil {
-			logs.Close()
-			metaStore.Close()
-			return nil, err
-		}
+	if tlsCfg != nil {
 		srv.UseTLS(tlsCfg)
 	}
 	if cfg.AuthEnabled() {
@@ -306,6 +333,7 @@ func newFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 		srv.SetObserver(rec)
 		b.SetGroupEvents(rec)
 	}
+	built = true
 	return &Server{cfg: cfg, log: logger, meta: metaStore, logs: logs, srv: srv, b: b, rec: rec, tls: cfg.TLSEnabled(), dirLock: dirLock, ready: make(chan struct{})}, nil
 }
 
@@ -317,11 +345,7 @@ func newFromConfig(cfg config.Config, logger *slog.Logger) (*Server, error) {
 // touched: they are what is left when the metadata database was lost or the broker
 // was pointed at a different one, and saying nothing made that look like an empty
 // broker.
-func reconcileDisk(cfg config.Config, logger *slog.Logger, logs *log.Manager, store meta.Store) error {
-	topics, err := store.ListTopics()
-	if err != nil {
-		return err
-	}
+func reconcileDisk(cfg config.Config, logger *slog.Logger, logs *log.Manager, topics []meta.Topic) {
 	counts := make(map[string]int32, len(topics))
 	for _, t := range topics {
 		counts[t.Name] = t.Partitions
@@ -339,13 +363,17 @@ func reconcileDisk(cfg config.Config, logger *slog.Logger, logs *log.Manager, st
 			"if the database was moved, point at it with --meta-db (the data is left untouched until a topic of the same name is created)",
 			"data_dir", cfg.DataDir, "meta_db", cfg.MetaDB, "directories", len(stray), "examples", strings.Join(sample, ", "))
 	}
-	return nil
 }
 
 // Bind opens the TCP listener without accepting and returns the bound address
 // (useful with a ":0" ListenAddr). Serve does this itself if it was not called;
-// it is not used with ServeListener.
+// it is not used with ServeListener. If it fails the server still holds its
+// storage and any AlsoListen listener: Close releases them.
 func (s *Server) Bind(ctx context.Context) (net.Addr, error) {
+	// Not while Close is releasing: a listener opened as Close ran would be told to
+	// a waiter on Ready after it had been told the server never bound.
+	s.bindMu.Lock()
+	defer s.bindMu.Unlock()
 	addr, err := s.srv.Bind(ctx)
 	if err != nil {
 		return nil, err
@@ -360,10 +388,18 @@ func (s *Server) Bind(ctx context.Context) (net.Addr, error) {
 
 func (s *Server) markReady() { s.readyOnce.Do(func() { close(s.ready) }) }
 
-// Ready is closed once the broker's listener is bound, so Addr is valid and
-// clients can connect: a goroutine running Serve can be waited on without a
-// sleep or a retry loop. It is also closed if Serve returns first (a failed bind,
-// an immediate cancel), so waiting on it never hangs; check Addr for nil.
+// Ready is closed when the outcome of starting is known, whichever it is, so a
+// goroutine running Serve can be waited on without a sleep or a retry loop and the
+// wait never hangs. It is closed
+//
+//   - once the listener is bound (by Bind, Serve or ServeListener): Addr is then
+//     not nil, and a client that dials it is served as soon as Serve accepts; or
+//   - once the server has ended without ever binding: Serve returned first (a
+//     failed bind, a context already cancelled) or Close was called. Addr is then
+//     nil, and stays nil.
+//
+// So after <-srv.Ready(), Addr() != nil means ready and Addr() == nil means the
+// server ended without becoming ready (the error is the one Serve returned).
 func (s *Server) Ready() <-chan struct{} { return s.ready }
 
 // AlsoListen opens another TCP listener, on addr, that serves this same broker —
@@ -371,30 +407,32 @@ func (s *Server) Ready() <-chan struct{} { return s.ready }
 // kafka.doze, say) when the main one is narrower than the wildcard. Call it
 // before Serve: once Serve has started it returns an error, because Serve is what
 // starts accepting on each listener. Clients are still told the main listener's
-// port.
+// port. The listener is closed when Serve returns, or by Close.
 func (s *Server) AlsoListen(ctx context.Context, addr string) (net.Addr, error) {
 	return s.srv.AlsoListen(ctx, addr)
 }
 
-// Addr is the address the listener is bound to, or nil before Bind (or Serve)
-// has run. Metadata advertises this port, so a client dialling it is told to
-// stay on it.
+// Addr is the address the listener is bound to, or nil if none has been: before
+// Bind (or Serve) has run, and for good on a server that ended without binding.
+// Metadata advertises this port, so a client dialling it is told to stay on it.
 func (s *Server) Addr() net.Addr {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.bound
 }
 
-// Serve accepts connections until ctx is cancelled, drains in-flight
-// connections, then flushes partition logs and closes the metadata store. A
-// Server is served once: a second call (or a call after Close) returns an error
-// and leaves the first undisturbed.
+// Serve accepts connections until ctx is cancelled (or Close is called), drains
+// in-flight connections, then flushes partition logs and closes the metadata
+// store. However it returns, with or without an error, nothing is left behind:
+// every listener (the AlsoListen ones too) is closed, storage is closed and the
+// lock on the data directory is released. A Server is served once: a second call
+// (or a call after Close) returns an error and leaves the first undisturbed.
 func (s *Server) Serve(ctx context.Context) (err error) {
-	if err := s.claim(); err != nil {
+	ctx, err = s.claim(ctx)
+	if err != nil {
 		return err
 	}
-	defer s.closeStorage(&err)
-	defer s.markReady()
+	defer s.release(&err)
 	if s.Addr() == nil {
 		// Bind here rather than letting protocol.Server do it, so the broker
 		// learns the real port before the first client connects.
@@ -402,47 +440,86 @@ func (s *Server) Serve(ctx context.Context) (err error) {
 			return err
 		}
 	}
-	go s.b.RunTransactions(ctx)
-	return s.srv.Serve(ctx)
+	return s.serve(ctx)
 }
 
 // ServeListener is Serve on a caller-provided listener — the doze module passes
 // a unix-socket listener the proxy splices TCP clients onto. Kafka framing is
 // transport-agnostic, so this works unmodified. With a TCP listener, clients are
 // told its port (unless AdvertisedPort says otherwise), as with Serve.
+//
+// The listener becomes the server's, and is closed when ServeListener returns. The
+// one exception is a call that is refused because the server is already serving or
+// already closed: that call has not touched ln, which is still the caller's.
 func (s *Server) ServeListener(ctx context.Context, ln net.Listener) (err error) {
-	if err := s.claim(); err != nil {
+	ctx, err = s.claim(ctx)
+	if err != nil {
 		return err
 	}
-	defer s.closeStorage(&err)
-	defer s.markReady()
+	defer s.release(&err)
 	s.srv.UseListener(ln)
+	s.mu.Lock()
+	if s.closed {
+		// Close ran between the claim and here; it has told Ready's waiters that
+		// this server never bound, and that stays true.
+		s.mu.Unlock()
+		return protocol.ErrServerClosed
+	}
 	if _, ok := ln.Addr().(*net.TCPAddr); ok {
 		// Metadata used to advertise the default port (9092) for a listener the
 		// broker did not bind itself, so a client that bootstrapped fine was then
 		// sent to a port nothing was listening on.
 		s.b.SetBoundAddr(ln.Addr())
 	}
-	s.mu.Lock()
 	s.bound = ln.Addr()
 	s.mu.Unlock()
 	s.markReady()
-	go s.b.RunTransactions(ctx)
-	return s.srv.Serve(ctx)
+	return s.serve(ctx)
 }
 
-// claim marks the server as being served, once.
-func (s *Server) claim() error {
+// serve accepts until ctx ends. The transaction timer runs beside it and has
+// stopped by the time it returns: it writes to storage, which the caller closes
+// next.
+func (s *Server) serve(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	timer := make(chan struct{})
+	go func() {
+		defer close(timer)
+		s.b.RunTransactions(ctx)
+	}()
+	err := s.srv.Serve(ctx)
+	cancel()
+	<-timer
+	return err
+}
+
+// claim marks the server as being served, once, and returns the context that
+// serving runs under: the caller's, which Close can also end.
+func (s *Server) claim(ctx context.Context) (context.Context, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	switch {
 	case s.closed:
-		return errors.New("server: Serve called after Close")
+		return nil, errors.New("server: Serve called after Close")
 	case s.claimed:
-		return errors.New("server: already serving; a Server is served once")
+		return nil, errors.New("server: already serving; a Server is served once")
 	}
 	s.claimed = true
-	return nil
+	ctx, s.stop = context.WithCancel(ctx)
+	s.served = make(chan struct{})
+	return ctx, nil
+}
+
+// release is the end of every Serve: whatever happened, the listeners are closed
+// (a failed bind used to leave the AlsoListen ones bound and accepting, with
+// storage already closed behind them), then storage, and whoever waits on Ready or
+// in Close is let go.
+func (s *Server) release(err *error) {
+	s.stop()
+	_ = s.srv.Close()
+	s.closeStorage(err)
+	s.markReady()
+	close(s.served)
 }
 
 // closeStorage flushes and closes the partition logs and the metadata store, and
@@ -467,20 +544,36 @@ func (s *Server) closeStorage(err *error) {
 	}
 }
 
-// Close releases everything a server holds that was built but never served — a
-// start-up step failed after New or Bind succeeded, say: the listeners it bound,
-// its storage and the lock on its data directory. It is safe to call more than
-// once and after Serve (which closes storage itself). To stop a server that is
-// serving, cancel the context passed to Serve instead.
+// Close releases everything the server holds: the listeners Bind and AlsoListen
+// opened, its storage and the lock on its data directory. On a server that was
+// built but never served (a start-up step failed after New or Bind, say) that is
+// all there is to do. On one that is serving it also stops it, exactly as
+// cancelling Serve's context does, and returns once Serve has drained its
+// connections and closed storage, with what that reported. It is safe to call more
+// than once, from any goroutine, and after Serve. A waiter on Ready is released.
 func (s *Server) Close() error {
 	s.mu.Lock()
 	s.closed = true
+	stop, served := s.stop, s.served
 	s.mu.Unlock()
+	if served != nil {
+		// Storage is Serve's to close, after the connections using it are gone.
+		stop()
+		<-served
+		var err error
+		s.closeStorage(&err)
+		return err
+	}
+	// A Bind in progress finishes first (and what it opened is closed here); one
+	// that comes after is refused, the listeners being closed.
+	s.bindMu.Lock()
+	defer s.bindMu.Unlock()
 	// The listeners first: Bind opens one, and it used to stay bound (and
 	// accepting into a backlog nobody served) for the life of the process.
 	lerr := s.srv.Close()
 	var err error
 	s.closeStorage(&err)
+	s.markReady()
 	if err == nil {
 		err = lerr
 	}

@@ -60,6 +60,38 @@ func TestEmbeddedBrokerDoesNotAdvertiseTelemetry(t *testing.T) {
 	}
 }
 
+// The doze module starts a console beside the broker it embeds, so it builds the
+// broker as one that has a console (internal/embed.NewWithConsole): from the same
+// Options, it keeps the traffic record and the client-metrics store and offers the
+// two APIs, exactly as the command's broker does with its console on.
+func TestABrokerBuiltForAConsoleKeepsTrafficAndTelemetry(t *testing.T) {
+	srv, err := embed.NewWithConsole(server.Options{DataDir: t.TempDir(), Version: 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	if serverhook.Traffic(srv) == nil {
+		t.Error("a broker built for a console keeps no traffic record")
+	}
+	if serverhook.ClientMetrics(srv) == nil {
+		t.Error("a broker built for a console keeps no client-metrics store")
+	}
+	if get, push := advertisesTelemetry(t, srv); !get || !push {
+		t.Errorf("a broker built for a console advertises get=%v push=%v, want both", get, push)
+	}
+	// Everything else about it is what the same Options give server.New.
+	plain, err := server.New(server.Options{DataDir: t.TempDir(), Version: 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer plain.Close()
+	a, b := srv.Config(), plain.Config()
+	a.DataDir, a.MetaDB, b.DataDir, b.MetaDB = "", "", "", ""
+	if a != b {
+		t.Errorf("Config differs beyond the console: %+v and %+v", a, b)
+	}
+}
+
 func TestNoConsoleMeansNoTelemetry(t *testing.T) {
 	cfg := config.Default()
 	cfg.DataDir, cfg.ListenAddr, cfg.Console = t.TempDir(), "127.0.0.1:0", false

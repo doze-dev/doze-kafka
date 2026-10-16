@@ -127,7 +127,7 @@ From `console/console.go:227-239`. Target adds the rows marked new.
 
 | Package | Statement coverage | Functions below 70% worth naming |
 |---|---|---|
-| `internal/storage/log` | 80.5% | `RequireKeys`, `LargestBatch`, `StampLogAppendTime`, `LastClean`, `cleanerReadFailed` (all 0% in the package; covered only through the broker), `SetTopicLimits`, `ClearTopicLimits`, `SyncPartition`, `setSegmentBytes`, `CodecByName` (0%), `openIndex` 62%, `writeLogStart` 56%, `markTransactional` 69% |
+| `internal/storage/log` | 80.5% | `RequireKeys`, `StampLogAppendTime`, `LastClean`, `cleanerReadFailed` (all 0% in the package; covered only through the broker), `SetTopicLimits`, `ClearTopicLimits`, `SyncPartition`, `setSegmentBytes`, `CodecByName` (0%), `openIndex` 62%, `writeLogStart` 56%, `markTransactional` 69% |
 | `internal/storage/meta` | 80.7% | `Open` 67% (the lock-timeout branch), `RegistryAll`/`RegistryApply` 0% (schemas stage), `PutTxn`/`ListTxns` 0% (cluster stage) |
 | `internal/broker` (all) | 89.1% (27.5% under `-short`) | topic files: `maybeAutoCreate` 58%, `materialize` 64%, `appendPlain` 60%, `appendIdempotent` 70%, `compactionPolicy` 73%, `alterTopic` 76%, `handleDescribeConfigs` 75%, `growTopic` 77%, `readPartition` 78%, `handleListOffsets` 81%, `isFloat` 20%, `anyValue` 0%, `alterError.Error` 0% |
 | `console` (all) | 87.8% | topic files: `saslMechanism` 0%, `newReader` 44%, `newBackend` 63%, `searchTopic` 73%, `topicResend` 79%, `topicMessageRaw` 78% |
@@ -385,7 +385,7 @@ Every finding gets its red test first (protocol step 2). By layer:
   `TestFirstTimeLookupDoesNotBlockAppends` (TOP-22), `TestCleanerHashCollision`
   (TOP-25), `TestDeleteRecordsInsideOpenTransaction` (TOP-34),
   `TestCleanerCountersAccumulate` (TOP-28), `TestPartitionStatsReportSegments`
-  (TOP-27), `TestRequireKeysAndLargestBatchAndStamp` (the three 0% functions),
+  (TOP-27), `TestRequireKeysAndStamp` (the three 0% functions),
   `TestValidateBatchesDecodesRecords` (TOP-4), `TestTopicNameCollisionDotUnderscore`
   and `TestConfigChangeHistorySurvivesRestart` (meta, TOP-5, TOP-37).
 - Property: random torn tails of a random log recover to a prefix of whole
@@ -448,7 +448,7 @@ Every finding gets its red test first (protocol step 2). By layer:
 
 | Package | Baseline | Target | Functions that must be covered to get there |
 |---|---|---|---|
-| `internal/storage/log` | 80.5% | 87% | `RequireKeys`, `LargestBatch`, `StampLogAppendTime`, `LastClean`, `cleanerReadFailed`, `SetTopicLimits`, `ClearTopicLimits`, `SyncPartition`, `setSegmentBytes`, `CodecByName`, `writeLogStart` error branches, `openIndex` error branches |
+| `internal/storage/log` | 80.5% | 87% | `RequireKeys`, `StampLogAppendTime`, `LastClean`, `cleanerReadFailed`, `SetTopicLimits`, `ClearTopicLimits`, `SyncPartition`, `setSegmentBytes`, `CodecByName`, `writeLogStart` error branches, `openIndex` error branches |
 | `internal/storage/meta` (topic half) | 80.7% | 86% | `Open` lock-timeout, change-history, collision |
 | `internal/broker` | 89.0% | 91% | `alterError.Error`, `isFloat`, `anyValue`, `maybeAutoCreate`, `materialize` rollback, `appendPlain` error, `growTopic` assignment branches, `handleDescribeConfigs` broker resource |
 | `console` | 87.8% | 90% | `saslMechanism`, `newReader`, `newBackend` TLS and SASL, `searchTopic`, `topicResend`, `topicMessageRaw`, new handlers |

@@ -42,12 +42,19 @@ give each a tier.
 - **C, cosmetic.** Accepted and round-tripped with no local effect (a
   replication factor above 1 is reported as 1; a quota is stored and not
   applied). The ledger, and the console wherever the setting is shown, say so.
-- **S, stub.** Refused honestly: the API is not advertised in `ApiVersions`, or
-  the request is answered with the error real Kafka gives when the feature is
-  off (`UNSUPPORTED_VERSION`, `UNSUPPORTED_FOR_MESSAGE_FORMAT`,
-  `SECURITY_DISABLED`, `CLUSTER_AUTHORIZATION_FAILED`), never a dropped
-  connection and never a success. Listed in `docs/limitations.md` with the
-  scenario that shows it.
+- **S, stub.** Refused honestly, in one of two ways, and never with a success.
+  An API (or a version of one) that is not served is not advertised in
+  `ApiVersions`, and a request for it closes the connection: that is what Apache
+  Kafka does with an API it does not list and with a version outside the range
+  it lists (recorded against `apache/kafka:4.3.1`: `versions-not-served`,
+  `conformance/claims/api.md` V2 and V3), so a client that negotiates never
+  sends one and a client that does not is told the same thing by both brokers.
+  An API that is advertised with a feature of it off answers the error real
+  Kafka gives for that (`UNSUPPORTED_VERSION` to an ApiVersions request,
+  `UNSUPPORTED_FOR_MESSAGE_FORMAT`, `SECURITY_DISABLED`,
+  `CLUSTER_AUTHORIZATION_FAILED`), never a dropped connection. Listed in
+  `docs/api-support.md` (every S row says why) or `docs/limitations.md`, with
+  the scenario that shows it.
 
 Nothing may be absent and nothing may be silently wrong: an API that returns
 success and does nothing is C only if it says so, otherwise it is a bug. The

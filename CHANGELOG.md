@@ -52,6 +52,296 @@ here that contains "server API"; `task api` fails without it.
   `from=0%26committed%3d1`. A subject's dock no longer links to a Traffic page that has
   no filter for a subject.
 
+- Produce reads every batch before storing it, as Apache Kafka does, on every kind of
+  topic and every Produce version (recorded against `apache/kafka:4.3.1`:
+  `produce-validation`, `produce-inflated-size`). Batches Kafka refuses used to be
+  acknowledged and stored on any topic that did not compact: a records section that is
+  not the codec it names (now UNKNOWN_SERVER_ERROR, as Kafka answers), a header claiming
+  more or fewer records than it holds (it advanced the log by the claimed count), two
+  batches for one partition, an empty record set, a base offset other than 0, a producer
+  id with sequence -1 (INVALID_RECORD); a transactional batch with no transactional id
+  (TRANSACTIONAL_ID_AUTHORIZATION_FAILED); a timestamp outside
+  `message.timestamp.before.max.ms` / `after.max.ms`, now applied, or a client-set
+  LogAppendTime bit (INVALID_TIMESTAMP). Refusals Kafka also made now carry Kafka's code
+  (INVALID_RECORD where this said CORRUPT_MESSAGE for a zero-count batch, a legacy magic, a
+  control batch or a short record set), base offset -1 and Kafka's message or none.
+  **A topic with no `max.message.bytes` is now held to the broker's `message.max.bytes`,
+  Kafka's default of 1048588** (`--message-max-bytes`, `message-max-bytes` in the file):
+  a batch over 1 MB was accepted here and refused by every production broker. A topic
+  whose `compression.type` is not the batch's stores it re-written in its codec and holds
+  that size to the limit. A batch inflating past 64 MiB, a zstd window past 8 MiB and a
+  compressed record whose length disagrees with its fields are refused here and kept by
+  Kafka (`docs/limitations.md`). A log from an earlier version holding an unreadable batch
+  still opens: compaction and timestamp lookups go past it instead of failing for good.
+  A retry of an idempotent batch is answered with the timestamp it was stored with.
+- Security: an Avro value is checked against its schema before the Avro decoder sees it.
+  The console decodes registry-framed record values, which any producer can write, with
+  `hamba/avro`, which is archived and has three open advisories against its decoder
+  (GO-2026-5046, 5047, 5048; no fixed release). 328 bytes naming 64 arrays of a million
+  nulls made the console allocate 5 GiB, and a registered `fixed` of 512 MiB allocated
+  2 GiB for a seven-byte value. Every length and count is now checked first: the arrays
+  and maps of one value hold at most 1,048,576 elements between them, nothing nests more
+  than 1,024 deep, and nothing claims more bytes than are there. A truncated value is no
+  longer shown as if it had decoded. `go tool task vuln` (govulncheck, in CI on every push
+  and daily) fails on any reachable vulnerability that is not accepted with a guarding
+  test in `testdata/vulncheck-accepted.txt`; it found five more in the doze module's
+  dependencies, fixed by upgrades (`golang.org/x/net` 0.60.0, `google.golang.org/grpc`
+  1.83.2).
+- `go tool task check` runs every benchmark once (`bench:smoke`).
+
+- The doze module's console (the one `doze` starts beside a `kafka` instance) has the
+  Traffic page and the clients' own metrics, as the `doze-kafka` command's console has.
+  Its broker was built as one with no console, so nothing was recorded, `/traffic` was a
+  404 and the client-telemetry APIs (71, 72) were not offered. A module instance started
+  with no console address still keeps and offers neither, and neither does a broker built
+  with `server.New`.
+
+- CreateTopics: a request for many topics no longer compares each name with every topic
+  (twice: the handler listed them all and the store looked at them all, so a batch was
+  quadratic); both ask an index kept by the metadata store. Which names collide is now
+  exactly Apache Kafka's, from a recording of 4.3.1 (`createtopics-collisions`): a name is
+  held against the topics that existed before the request and not against the others in
+  it, so `a.b` and `a_b` sent in one request are both created, where this broker used to
+  refuse the second with `INVALID_TOPIC_EXCEPTION`. A name that collides with an existing
+  topic is still refused, with or without `validate_only`, and names that differ only in
+  letter case are refused everywhere.
+
+- Embedding (`server/`): nothing outlives a failure. A `Serve` that cannot bind closes the
+  `AlsoListen` listeners too (they stayed bound and accepting); a `New` that fails closes
+  what it had opened, the lock on the data directory included (a broken record in the
+  metadata database left the directory "in use" by a broker that did not exist).
+  `Close` on a server that is serving now stops it, as cancelling its context does, and
+  returns once `Serve` has drained and closed storage; before, it closed storage under
+  the connections still using it. `Ready()` is closed by `Close` as well, so waiting on it
+  never hangs, and what it means is read from `Addr()`: not nil, the listener is bound;
+  nil, the server ended without ever binding. `ServeListener` owns the listener it is
+  given and closes it when it returns, except when the call is refused. No change to the
+  exported surface.
+
+- With `--listen` on port 0 the console and the schema registry take free loopback
+  ports too, so the documented throwaway broker runs twice at once (the second one
+  failed on 8081). A fixed `--listen` keeps `127.0.0.1:9093` and `127.0.0.1:8081`.
+- The start-up summary's last-but-one line is an `env` command that gives this
+  broker: under `--listen` it carries the bound addresses (`eval "$(doze-kafka env
+  --listen 127.0.0.1:… --config '')"`), where the bare `doze-kafka env` printed the
+  `.doze` name. `doze-kafka env` accepts `--sasl-mechanisms` without `--sasl-user`.
+- `--zone=false` (`zone = false`, `DOZE_ZONE=off`) without `--listen` is a configuration
+  error, one line and exit 2, in every command; it used to fail after start-up began,
+  exit 1, and `doctor` and `env` reported a name that was not served.
+- `config print` prints every setting at its effective value, `console-prefix` and
+  `acl-default` included, and `meta-db` as a comment while it follows `data-dir`.
+  `DOZE_KAFKA_CONSOLE_PREFIX` is now validated like the flag.
+- `--console-prefix` (`console-prefix`, or `DOZE_KAFKA_CONSOLE_PREFIX`) serves the console
+  under another path, for a reverse proxy; `/` serves it at the root of its port.
+- Console: the home page is Traffic, or the first-run page on a broker with nothing in
+  it that has heard from no client (it was Topics); `/connect` is new and says how to
+  connect an app; `/trace` without an id is a page with a field for one (it was a 400);
+  the rail is grouped Observe, Data, Broker; the inspector, in the page's flow, replaces
+  the drawer; a high-contrast theme joins light and dark, and the palette no longer has
+  theme rows (the top bar's switch does it).
+- Protocol answers: CreateTopics refuses a manual assignment with a replication factor
+  or partition count set (`INVALID_REQUEST`) and a malformed one, such as a repeated or
+  missing partition, an empty replica list or an unknown broker
+  (`INVALID_REPLICA_ASSIGNMENT`); FindCoordinator answers `INVALID_REQUEST` for an
+  unknown key type; OffsetCommit answers `OFFSET_METADATA_TOO_LARGE` for metadata above
+  4096 bytes; `cleanup.policy` accepts a repeated value, as Kafka's list validator does.
+- Go 1.27 is required to build doze-kafka or embed it (`go.mod` says `go 1.27.0`).
+- The schema registry is served over TLS when the broker is: with `--tls-cert` and
+  `--tls-key` it answers `https://` with the same certificate (it stayed plain HTTP
+  before, so `schema.registry.url=https://...` failed and basic-auth passwords crossed in
+  the clear beside an encrypted broker). The summary and `doze-kafka env` print the
+  `https://` URL; by name that is `https://kafka.<name>.doze:8081`.
+  `--schema-registry-tls=false` (`schema-registry-tls`) keeps it plain HTTP, with a
+  warning at start-up when it is then reachable from other machines. **If you run with
+  a certificate, change `http://` to `https://` in your registry URL.**
+- With SASL or TLS on, a console address beyond loopback is refused at start-up (exit
+  2): the console has no login, is plain HTTP and acts as a super user.
+  `--console-unprotected` (`console-unprotected`) accepts it, with a warning.
+  [What SASL and TLS cover](docs/auth-and-tls.md#what-sasl-and-tls-cover) says what
+  each setting reaches.
+
+- Groups: an empty group with committed offsets is listed and described after a restart
+  as before it (recorded: `groups-listed-after-restart`): a classic group kept its
+  offsets but lost its protocol type, and an emptied consumer-protocol group was gone
+  from `ConsumerGroupDescribe` and listed as classic. The store's record of a group now
+  carries its protocol type, or its epoch and assignor (records of earlier versions are
+  still read).
+
+- Groups: requests Kafka refuses are refused, with Kafka's codes (recorded:
+  `group-requests-refused`). An empty group id is `INVALID_GROUP_ID` on every classic
+  group API and `OffsetDelete` (a v0 `JoinGroup` used to join a group named ""). A
+  classic `JoinGroup` with no protocol type is `INCONSISTENT_GROUP_PROTOCOL`. A
+  `ConsumerGroupHeartbeat` join that says it owns partitions, or does not say, is
+  `INVALID_REQUEST`, as is a static leave with no instance id and an empty instance id;
+  a rebalance timeout of 0 is accepted; a later epoch in a group that does not exist is
+  `GROUP_ID_NOT_FOUND`; the messages are Kafka's. `OffsetCommit` below v9 from a
+  consumer-protocol member is `UNSUPPORTED_VERSION`. In a consumer group, a classic
+  `SyncGroup` with the wrong protocol type or name is `INCONSISTENT_GROUP_PROTOCOL`, a
+  classic `JoinGroup` must share a protocol with the other classic members, an unknown
+  member id is seated as Kafka seats it, a classic member's `ConsumerGroupHeartbeat` is
+  answered, and a classic `LeaveGroup` can remove a consumer-protocol member. A
+  `LeaveGroup` from v3 answers 0 at the top level and each member's code beside it.
+- Groups: static membership fencing. A request naming a static instance nobody holds is
+  `UNKNOWN_MEMBER_ID`, and one naming an instance another member holds is
+  `FENCED_INSTANCE_ID`, on `Heartbeat`, `SyncGroup`, `OffsetCommit` and
+  `ConsumerGroupHeartbeat` (a member heartbeating with the wrong instance id used to be
+  answered 0; the member a restarted consumer-protocol instance replaced was
+  `UNKNOWN_MEMBER_ID`). An empty `group.instance.id` is an instance id on a classic
+  `JoinGroup`, as on Kafka. The docs no longer say static membership is not acted on.
+
+- server API: `Options.OffsetsRetention` sets how long committed offsets are kept once
+  nothing reads them, as the CLI's `--offsets-retention`. An embedder had expiry at the
+  7-day default with no way to change or turn it off; zero is still that default and a
+  negative value keeps offsets for ever.
+
+- Groups: a classic member of a consumer group that rejoins keeps the partitions its
+  `JoinGroup` says it still owns, as Apache Kafka 4.3.1 does (recorded:
+  `mixed-protocol-cooperative`). Every rejoin used to give up everything, which is
+  true of an eager consumer only: a cooperative-sticky one goes on reading until its
+  `SyncGroup` returns, and its partitions could be handed to another member meanwhile.
+  Its assignment is written at the version of its subscription. A static classic
+  member (`group.instance.id`) that restarts takes the place of the member holding its
+  instance instead of being seated twice, and the old member id is
+  `FENCED_INSTANCE_ID` (recorded: `mixed-protocol-static`).
+
+- Groups: a classic group upgraded in the middle of a rebalance answers what it had
+  parked as Apache Kafka 4.3.1 does (recorded: `mixed-protocol-parked`). A `JoinGroup`
+  waiting for the others to rejoin was answered `UNKNOWN_MEMBER_ID`, which makes a
+  client throw its member id away, while that id was kept as a member of the new
+  consumer group and held a share of the partitions until its session ran out (45 s
+  for a Java client). It is now `REBALANCE_IN_PROGRESS`, the member keeps its id and
+  its next `JoinGroup` finds its seat. A group upgraded between its `JoinGroup`s and
+  the leader's `SyncGroup` keeps each member's partitions of the generation before
+  (they were dropped, which freed them for the new member while a cooperative consumer
+  was still reading them), and the `SyncGroup`s that follow are
+  `REBALANCE_IN_PROGRESS`. A refused `SyncGroup` carries no protocol type and no
+  protocol name.
+
+- Offsets retention: a group that is gone leaves nothing behind. `DeleteGroups` removed
+  the group's offsets and left "empty since" in memory, so the same id used afterwards
+  by a standalone committer had its new offsets judged by when the deleted group had
+  emptied, and lost them early. The record now goes with the group, before its offsets
+  do. As on Apache Kafka 4.3.1 (recorded: `offsets-retention-recreate`), a group with no
+  members and no offsets is dropped by the next sweep, classic or consumer-protocol:
+  until then it is listed `Empty` and a commit made into it is a commit into an empty
+  group; after it, the id is a new group. Before this a classic group with no offsets
+  was unlisted the moment its last member left (Kafka lists it until its next check),
+  an emptied consumer-protocol group with no offsets stayed listed until the broker
+  restarted, and the emptiness of a group that then lost its last offset was counted
+  against later commits for a whole retention. A classic group that empties moves on a
+  generation, as Kafka's does: the next member to join is told two more than the last
+  one had.
+
+- Offsets retention: a restart no longer expires the offsets of a group that was live
+  when the broker stopped. Members are not kept across a restart, and a group with none
+  in memory and no record of having emptied was taken for one nobody had ever joined:
+  each offset expired from its own commit, so the first sweep after a restart could
+  delete an old, valid offset on a quiet partition before its consumer was back. The
+  metadata database now records that a group has members (and their longest session)
+  before the first member's join is answered, so it is there after a crash too. After a
+  restart such a group is treated as Apache Kafka 4.3.1 treats the members it loads
+  back (recorded: `offsets-retention-restart`): they are there until their session has
+  passed with nobody joining; from then a classic group has its retention to go, and a
+  consumer-protocol group's offsets are as old as their commits. That last is Kafka's
+  rule for any consumer-protocol group with no members, and is new here: such a group
+  used to keep its offsets for the retention from when it emptied. A data directory
+  from an earlier version is adopted on first start (every group with offsets is taken
+  to have had members). The record is kept with `--offsets-retention 0` as well. A join
+  that cannot be recorded is `COORDINATOR_NOT_AVAILABLE`. The sweep judges a group from
+  one view of it, taken with both coordinators held still, where it read three things
+  under three locks; a failed write of the record is tried again; and a group being
+  deleted is skipped. ConsumerGroupDescribe of a group that does not exist carries
+  Kafka's message, `Group <id> not found.`
+
+- A Fetch at an offset out of range (above the log end or below its start) answers
+  `OFFSET_OUT_OF_RANGE` with high watermark, last stable offset and log start offset
+  -1, as `apache/kafka:4.3.1` does (it used to carry the partition's real offsets), and
+  DescribeConfigs answers a resource with an empty error message rather than null
+  (recorded: `fetch-above-the-end`, `list-config-append`; `conformance/claims/api.md`
+  V6, V7). Every code comment that says what Kafka does now names the claims row
+  that shows it, and a test holds new ones to that.
+
+- Transactions and ACLs refuse malformed requests as `apache/kafka:4.3.1` does
+  (recorded: `txn-empty-id`, `acl-unknown-codes`; `conformance/claims/api.md` V4, V5).
+  An empty transactional id is `INVALID_REQUEST` in EndTxn, AddOffsetsToTxn,
+  AddPartitionsToTxn and InitProducerId (InitProducerId used to hand out a producer id
+  for it, as for a null id); AddOffsetsToTxn no longer refuses an empty group id.
+  An ACL request naming the UNKNOWN (0) code for resource type, pattern type, operation
+  or permission closes the connection; a code that is no value matches nothing in
+  DescribeAcls and is `INVALID_REQUEST` in Kafka's words in DeleteAcls and CreateAcls;
+  CreateAcls with ANY or MATCH answers `UNKNOWN_SERVER_ERROR`.
+
+- API versions: no `--kafka-version` profile offers a version the real broker of that
+  major does not serve. At the default, `--kafka-version 4`, nine old versions that
+  Kafka 4 removed (KIP-896) are no longer served: ListOffsets v0, OffsetCommit v0–1,
+  OffsetFetch v0, CreateTopics v0–1, DeleteTopics v0, DescribeAcls, CreateAcls and
+  DeleteAcls v0, DescribeConfigs v0. A request at one closes the connection, as on
+  `apache/kafka:4.3.1` (recorded: `versions-not-served`). A client that old works at
+  `--kafka-version 3`, as it does against a Kafka 3 broker. At `--kafka-version 1`,
+  six maxima come down to what Kafka 1.1.1 has (Metadata v5, FindCoordinator v1,
+  ListGroups v1, InitProducerId v0, SaslAuthenticate v0, DeleteGroups v0). Every
+  column of the version table is now held by a test to the recorded `ApiVersions`
+  answer of a real broker of that major (`conformance/recordings/api-versions.json`;
+  `docs/api-support.md` says which image stands for which).
+
+- **Security: SASL.** A connection logs in once, as the user whose password it proved,
+  and stays that user. Before this (a) a PLAIN token naming another user as its
+  authorization id (`bob NUL alice NUL alice's password`) was accepted, where Kafka
+  refuses it; SCRAM ignored `a=` the same way; (b) a connection that had logged in could
+  send a second `SaslAuthenticate` and become that token's user (alice became bob with
+  bob's password), and a wrong password on it logged the connection out; (c) a refused
+  `SaslHandshake` left the connection open for another try. Every answer to a login now
+  is the one `apache/kafka:4.3.1` gives, from two recordings of it (`sasl-plain`, 143
+  steps; `sasl-scram`, 293 steps; `conformance/claims/auth.md`): the authorization id
+  must be empty or the user's own name; after a login `SaslHandshake` and
+  `SaslAuthenticate` are `ILLEGAL_SASL_STATE` and change nothing; a `SaslAuthenticate`
+  with no handshake, a second `ApiVersions` before the handshake and a request in the
+  middle of a login close the connection; a second handshake mid-login is
+  `ILLEGAL_SASL_STATE` and closed; the refusal texts are Kafka's ("Authentication
+  failed: Invalid username or password", the same for an unknown user); an accepted
+  token answers an empty error message, not a null one; SCRAM takes only the `n`
+  channel-binding flag (it accepted `y`), does not sign a reserved `m=` attribute,
+  refuses a bad `=XX` escape in a user name and anything around the three attributes of
+  a client-final message, and closes without an answer on a proof of the wrong length.
+  Two answers stay stricter than Kafka's and are written in `docs/limitations.md`.
+  `CreateAcls` answers an empty error message for an ACL it created, as Kafka does.
+- Traffic inspector: for the requests that carry a credential (`SaslHandshake`,
+  `SaslAuthenticate`, the SCRAM-credential and delegation-token requests) the decoded
+  fields are held to a list of what may be shown; every other field reads `"(hidden)"`.
+  The length of a SASL token is no longer shown (`"AuthBytes": "29 bytes"` gave the
+  length of a PLAIN password), and neither is the size of a `SaslAuthenticate` request,
+  which gave it too: its row reads `0 B in`.
+
+- Config file errors name the line and the key and never repeat what the file says. An
+  unquoted value outside `[credentials]` used to be quoted back (`expected value but
+  found "hunter2"`), as did a bad duration, and a password typed where the user's name
+  goes was printed whole; under `[credentials]` the key is no longer named, only the
+  line. `credentials` written as anything but a table (`credentials = "..."`) is refused:
+  it used to load as a broker with no users.
+
+- Credentials: `--pprof-addr` no longer serves `/debug/pprof/cmdline` (the command line,
+  which is where `--sasl-user user:password` is); the other profiles are unchanged. The log
+  line for a handler that panicked during a SASL exchange names the type of the panic's
+  value and the stack, not its text. The test that reads every output for a planted
+  password now reads text and JSON logs at every level, logins with PLAIN and both SCRAM
+  mechanisms (right and wrong password), malformed SASL input, the panic line, the pprof
+  pages, the schema registry's answers to HTTP Basic credentials, `/healthz`, the console
+  and its Traffic inspector, every file of the data directory (and its mode), `env`,
+  `doctor`, `--help`, `config print`, and a restart over the same data; a surface it did
+  not reach fails it.
+
+- Durability: an idempotent `acks=all` retry after the broker was killed and restarted
+  is fsynced before it is acknowledged, and a roll after a restart flushes the segment
+  it seals; after an unclean stop nothing read back is taken to be on disk until it has
+  been flushed (a clean stop writes `data/clean-shutdown`). EndTxn is answered only
+  with every marker on disk, and the opposite decision of a decided transaction is
+  answered as Kafka answers it (`CONCURRENT_TRANSACTIONS`, then `INVALID_TXN_STATE`)
+  instead of being acknowledged. On a full or failing disk OffsetCommit and the
+  transaction APIs answer `NOT_COORDINATOR`, as Kafka does, and a refused Produce
+  answers -1 offsets and no message. A cleaning pass that fails part-way leaves the log
+  readable without a restart. A multi-batch produce whose write fails part-way leaves
+  nothing in the log.
+
 - Console: every button reads weight 400 whether it is a button or a link drawn as one (the
   boards draw them all as buttons). A request that took under a millisecond shows its
   measured time (`42 µs`, `0.4 ms`) rather than the design boards' `0 ms`: a broker

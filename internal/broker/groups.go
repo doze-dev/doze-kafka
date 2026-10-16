@@ -45,7 +45,7 @@ func (b *Broker) handleFindCoordinator(ctx context.Context, req *protocol.Reques
 
 	// Only a group (0) and a transaction (1) have a coordinator here. A share
 	// group (2) needs v6, which is not offered; anything else is no type at all.
-	// Kafka answers INVALID_REQUEST, and says nothing in the share-group case.
+	// Kafka answers INVALID_REQUEST, and says nothing in the share-group case (claim: cluster FC1).
 	badType := fr.CoordinatorType != 0 && fr.CoordinatorType != 1 && req.Header.APIVersion >= 1
 	badMessage := func() *string {
 		if fr.CoordinatorType == 2 {
@@ -110,6 +110,12 @@ func (b *Broker) handleJoinGroup(ctx context.Context, req *protocol.Request, jr 
 		resp.Generation = -1
 		return nil
 	}
+	// An empty group id is refused before anything else is looked at, the session
+	// timeout included (recorded: group-requests-refused, ej-*).
+	if jr.Group == "" {
+		resp.ErrorCode, resp.Generation = kerr.InvalidGroupID.Code, -1
+		return nil
+	}
 	// What the request names is kept for as long as the group or the member is, so it
 	// is bounded before either coordinator sees it (bounds.go).
 	if meta.ValidateGroupID(jr.Group) != nil {
@@ -171,11 +177,18 @@ func (b *Broker) handleSyncGroup(ctx context.Context, req *protocol.Request, sr 
 		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
 		return nil
 	}
+	if sr.Group == "" {
+		resp.ErrorCode = kerr.InvalidGroupID.Code
+		return nil
+	}
 	if assignment, code, taken := b.cg848.classicSync(sr); taken {
 		resp.ErrorCode = code
 		resp.MemberAssignment = assignment
-		resp.ProtocolType = sr.ProtocolType
-		resp.Protocol = sr.Protocol
+		// A refusal names no protocol (recorded: mixed-protocol-parked, ps-b-sync-parked).
+		if code == errNone {
+			resp.ProtocolType = sr.ProtocolType
+			resp.Protocol = sr.Protocol
+		}
 		return nil
 	}
 	res, err := b.groups.sync(ctx, sr)
@@ -185,8 +198,10 @@ func (b *Broker) handleSyncGroup(ctx context.Context, req *protocol.Request, sr 
 
 	resp.ErrorCode = res.errorCode
 	resp.MemberAssignment = res.assignment
-	resp.ProtocolType = sr.ProtocolType // v5+; nil echoes to nothing on older versions.
-	resp.Protocol = sr.Protocol
+	if res.errorCode == errNone {
+		resp.ProtocolType = sr.ProtocolType // v5+; nil echoes to nothing on older versions.
+		resp.Protocol = sr.Protocol
+	}
 	return nil
 }
 
@@ -196,6 +211,10 @@ func (b *Broker) handleSyncGroup(ctx context.Context, req *protocol.Request, sr 
 func (b *Broker) handleHeartbeat(ctx context.Context, req *protocol.Request, hr *kmsg.HeartbeatRequest, resp *kmsg.HeartbeatResponse) error {
 	if !b.canGroup(req.Conn, hr.Group, opRead) {
 		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
+		return nil
+	}
+	if hr.Group == "" {
+		resp.ErrorCode = kerr.InvalidGroupID.Code
 		return nil
 	}
 	if code, taken := b.cg848.classicHeartbeat(hr); taken {
@@ -219,12 +238,19 @@ func (b *Broker) handleLeaveGroup(ctx context.Context, req *protocol.Request, lr
 		}
 		return nil
 	}
+	if lr.Group == "" {
+		resp.ErrorCode = kerr.InvalidGroupID.Code
+		return nil
+	}
 	results, taken := b.cg848.classicLeave(lr)
 	if !taken {
 		results = b.groups.leave(lr)
 	}
 
-	if len(results) > 0 {
+	// From v3 a request names several members and each has its own code; the
+	// request's is 0 even when none of them, or no group, is there (recorded:
+	// group-requests-refused, cm-leave-unknown-member, lv-unknown-group-v4).
+	if len(results) > 0 && lr.GetVersion() < 3 {
 		resp.ErrorCode = results[0].errorCode
 	}
 	for _, r := range results {

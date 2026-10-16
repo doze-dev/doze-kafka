@@ -13,9 +13,11 @@ package main
 //	               writing /etc/hosts is unremarkable and there is nobody to
 //	               ask. No prompt, no TTY needed.
 //
-//	a TTY          offer it, and run one sudo. A developer at a terminal can
+//	a terminal     offer it, and run one sudo. A developer at a terminal can
 //	               answer, and names.Install does the whole thing under a
-//	               single prompt.
+//	               single prompt. "A terminal" means stdin AND the stream the
+//	               question is written to are both terminals: the question has
+//	               to be seen and the answer has to be typed.
 //
 //	neither        print the command and exit. This is CI, a systemd unit, a
 //	               background `doze-kafka &`.
@@ -31,6 +33,15 @@ package main
 // An unexpected password prompt from a long-running server is also the shape
 // users are rightly trained to distrust. From `doze-kafka dns-setup` it is
 // unremarkable; from "start the server" it is not.
+//
+// # Yes is something a person typed
+//
+// The default answer is yes, and only a pressed Enter selects it. End of input
+// and a failed read are not answers: they are what a stdin that nobody is at
+// looks like (/dev/null, a closed descriptor, a hung-up terminal), and they
+// used to be read as "the default", which ran sudo for a process started by
+// systemd, launchd, nohup or `docker run` without -i. With passwordless sudo
+// that rewrote the machine's DNS as a side effect of starting a broker.
 
 import (
 	"bufio"
@@ -40,6 +51,7 @@ import (
 	"strings"
 
 	names "github.com/doze-dev/doze-names"
+	"golang.org/x/term"
 )
 
 // dnsState is what a startup check found, so the caller can report it.
@@ -72,21 +84,46 @@ func liveNameEnv() nameEnv {
 		install: names.Install,
 		script:  func(w io.Writer) error { return names.Install(names.Options{Out: w, Print: true}) },
 		isRoot:  func() bool { return os.Geteuid() == 0 },
-		isTTY:   stdinIsTTY,
+		isTTY:   promptIsInteractive,
 		in:      os.Stdin,
 		out:     os.Stderr,
 	}
 }
 
-// stdinIsTTY reports whether stdin is a terminal, using the character-device
-// bit rather than a terminal library — this is the only thing here that needs
-// the answer, and it does not need to be clever about it.
-func stdinIsTTY() bool {
-	fi, err := os.Stdin.Stat()
-	if err != nil {
+// promptIsInteractive reports whether a question can be asked here: stdin and
+// the stream the question is written to (stderr) are both terminals.
+func promptIsInteractive() bool { return isTerminal(os.Stdin) && isTerminal(os.Stderr) }
+
+// isTerminal reports whether f is a terminal, by asking the operating system
+// (isatty on Unix, the console mode on Windows).
+//
+// It used to test the character-device bit, and /dev/null is a character
+// device: `doze-kafka </dev/null` was taken for a person at a keyboard.
+func isTerminal(f *os.File) bool {
+	if f == nil {
 		return false
 	}
-	return fi.Mode()&os.ModeCharDevice != 0
+	fd := f.Fd()
+	if fd == ^uintptr(0) { // a closed file.
+		return false
+	}
+	return term.IsTerminal(int(fd))
+}
+
+// answeredYes reads one line from in and reports whether it says yes.
+//
+// Yes is "y", "yes", or Enter on its own (the default the prompt shows). The
+// second result is false when nothing was answered at all: the input ended, or
+// could not be read, before anything was typed. That is never a yes, and it is
+// not a "no" anyone typed either, so the caller reports it in its own words.
+func answeredYes(in io.Reader) (yes, answered bool) {
+	line, err := bufio.NewReader(in).ReadString('\n')
+	word := strings.ToLower(strings.TrimSpace(line))
+	if err != nil && word == "" {
+		return false, false
+	}
+	// An empty word here is a completed line: Enter.
+	return word == "" || word == "y" || word == "yes", true
 }
 
 func ensureNames(e nameEnv) (dnsState, error) {
@@ -107,15 +144,19 @@ func ensureNames(e nameEnv) (dnsState, error) {
 		fmt.Fprintln(e.out, "doze-kafka addresses itself by name, and .doze does not resolve on this machine yet.")
 		fmt.Fprintln(e.out, "Setting it up needs sudo once — per machine, not per project.")
 		fmt.Fprint(e.out, "Set it up now? [Y/n] ")
-		answer, _ := bufio.NewReader(e.in).ReadString('\n')
-		switch strings.ToLower(strings.TrimSpace(answer)) {
-		case "", "y", "yes":
-			if err := e.install(names.Options{Out: e.out}); err != nil {
-				return dnsUnavailable, fmt.Errorf("setting up .doze: %w", err)
-			}
-			return dnsInstalled, nil
+		yes, answered := answeredYes(e.in)
+		if !answered {
+			fmt.Fprintln(e.out) // the cursor is still on the question's line.
+			fmt.Fprintln(e.out, "No answer was given, so nothing has been changed.")
+			return dnsUnavailable, errNamesUnanswered
 		}
-		return dnsUnavailable, errNamesDeclined
+		if !yes {
+			return dnsUnavailable, errNamesDeclined
+		}
+		if err := e.install(names.Options{Out: e.out}); err != nil {
+			return dnsUnavailable, fmt.Errorf("setting up .doze: %w", err)
+		}
+		return dnsInstalled, nil
 	}
 
 	// Neither. Say what to run and stop — never wait on a password nobody can
@@ -133,5 +174,6 @@ func ensureNames(e nameEnv) (dnsState, error) {
 // nobody to ask", and report each in its own words.
 var (
 	errNamesDeclined    = fmt.Errorf("doze-kafka: .doze setup declined")
+	errNamesUnanswered  = fmt.Errorf("doze-kafka: .doze setup was offered and the input ended before an answer")
 	errNamesUnavailable = fmt.Errorf("doze-kafka: .doze does not resolve and cannot be set up without a terminal")
 )

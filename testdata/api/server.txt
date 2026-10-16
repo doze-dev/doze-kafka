@@ -18,6 +18,7 @@ field Options.IndexIntervalBytes int64
 field Options.ListenAddr string
 field Options.Logger *slog.Logger
 field Options.MetaDB string
+field Options.OffsetsRetention time.Duration
 field Options.RetentionBytes int64
 field Options.RetentionMs int64
 field Options.SASLMechanisms []string

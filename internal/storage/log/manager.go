@@ -56,6 +56,13 @@ type ManagerOptions struct {
 	// Logger receives background-loop warnings (fsync/retention errors). Nil
 	// discards them.
 	Logger *slog.Logger
+
+	// What the manager knows about a partition it is opening (cleanstop.go):
+	// vouched, that the last stop was clean and flushed it; unvalidated, that its
+	// sealed segments are not known to be whole. A partition opened without a
+	// manager is neither vouched for nor unvalidated.
+	vouched     bool
+	unvalidated bool
 }
 
 // Manager owns every open partition log under a single data directory and runs the
@@ -74,6 +81,11 @@ type Manager struct {
 	wg     sync.WaitGroup
 	bounds map[topicPartition]cachedBounds // Bounds answers for closed partitions; guarded by mu.
 	limits map[string]TopicLimits          // topics with limits of their own; guarded by mu.
+
+	// From the last stop (cleanstop.go); guarded by mu after OpenManager.
+	cleanStart  bool                // the last stop was clean.
+	unvouched   map[string]struct{} // partition directories a clean stop did not cover.
+	unvalidated map[string]struct{} // partition directories whose sealed segments are unchecked.
 }
 
 // TopicLimits is one topic's segment size and retention, where they differ from
@@ -178,8 +190,14 @@ var ErrUnsafeTopicName = errors.New("log: topic name is not safe to use as a dir
 // retention policy is configured, a background maintenance goroutine is started
 // and runs until Close.
 func OpenManager(dir string, opts ManagerOptions) (*Manager, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, err
+	if _, statErr := os.Stat(dir); os.IsNotExist(statErr) {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, err
+		}
+		// The new directory's own name. Best effort, unlike every flush inside the
+		// data directory: its parent is the user's, and may be one this process can
+		// search but not open.
+		_ = fsSyncDir(filepath.Dir(dir))
 	}
 	logger := opts.Logger
 	if logger == nil {
@@ -196,6 +214,9 @@ func OpenManager(dir string, opts ManagerOptions) (*Manager, error) {
 	}
 	for topic, l := range opts.TopicLimits {
 		m.limits[topic] = l
+	}
+	if err := m.loadStopState(); err != nil {
+		return nil, fmt.Errorf("log: reading how the last stop ended: %w", err)
 	}
 	// Always: a topic can be given retention of its own at any time, whatever the
 	// broker-wide setting was at start-up. An idle sweep costs nothing on disk.
@@ -249,11 +270,14 @@ func (m *Manager) open(topic string, partition int32, create bool) (*Partition, 
 	}
 	opts := m.opts
 	opts.SegmentBytes = m.segmentBytesLocked(topic)
+	name := filepath.Base(dir)
+	opts.vouched = m.vouchedLocked(name)
+	_, opts.unvalidated = m.unvalidated[name]
 	p, err := openPartition(dir, opts)
 	if err != nil {
 		return nil, err
 	}
-	p.topic = topic
+	p.topic, p.number = topic, partition
 	m.partitions[tp] = p
 	return p, nil
 }
@@ -281,17 +305,25 @@ func (m *Manager) dirFor(tp topicPartition) (string, error) {
 // created. Partitions are opened when first produced to or fetched from; the
 // registry, not an empty directory, is what makes a topic exist.
 func (m *Manager) EnsurePartitionDirs(topic string, partitions int32) error {
+	made := false
 	for p := int32(0); p < partitions; p++ {
 		dir, err := m.dirFor(topicPartition{topic, p})
 		if err != nil {
 			return err
 		}
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+		created, err := fsMkdir(dir)
+		if err != nil {
 			return err
 		}
+		made = made || created
 	}
-	syncDir(m.dir) // one flush for all the new entries.
-	return nil
+	if !made {
+		return nil
+	}
+	// One flush for all the new entries, and it has to succeed: a topic whose
+	// creation was acknowledged must not come back from a power cut without its
+	// partition directories.
+	return fsSyncDir(m.dir)
 }
 
 // StrayDirs lists the partition directories on disk whose topic the registry does
@@ -344,10 +376,17 @@ func (m *Manager) RemoveStrayTopicDirs(topic string) (int, error) {
 			_ = p.close()
 			delete(m.partitions, tp)
 		}
-		if err := os.RemoveAll(filepath.Join(m.dir, e.Name())); err != nil {
+		if err := m.removeDirLocked(e.Name()); err != nil {
 			return n, err
 		}
 		n++
+	}
+	if n > 0 {
+		// The removals, on disk, before a new topic of this name is made: one that
+		// came back in a power cut would be the new topic's first records.
+		if err := fsSyncDir(m.dir); err != nil {
+			return n, err
+		}
 	}
 	return n, nil
 }
@@ -395,7 +434,11 @@ func (m *Manager) Bounds(topic string, partition int32) (start, end int64, err e
 	if c, hit := m.bounds[tp]; ok && hit && c.sig == sig {
 		return c.start, c.end, nil
 	}
-	start, end, err = boundsFromDisk(dir)
+	// As opening it would: every batch of the last segment checked unless the last
+	// stop vouched for the partition.
+	name := filepath.Base(dir)
+	_, unvalidated := m.unvalidated[name]
+	start, end, err = boundsFromDisk(dir, unvalidated || !m.vouchedLocked(name))
 	if err == nil && ok {
 		m.bounds[tp] = cachedBounds{sig: sig, start: start, end: end}
 	} else {
@@ -434,11 +477,35 @@ func (m *Manager) RemoveTopic(topic string, partitions int32) error {
 			}
 			delete(m.partitions, tp)
 		}
-		if err := os.RemoveAll(dir); err != nil && firstErr == nil {
+		if err := m.removeDirLocked(filepath.Base(dir)); err != nil && firstErr == nil {
 			firstErr = err
 		}
 	}
+	// On disk: a deleted topic's directories that came back in a power cut would
+	// be data with no topic.
+	if err := fsSyncDir(m.dir); err != nil && firstErr == nil {
+		firstErr = err
+	}
 	return firstErr
+}
+
+// removeDirLocked deletes a partition directory and forgets what was known about
+// it: the next directory of that name is a new partition. The caller holds mu.
+func (m *Manager) removeDirLocked(name string) error {
+	path := filepath.Join(m.dir, name)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil
+	}
+	if err := fsBefore(FSRemove, path, ""); err != nil {
+		return err
+	}
+	if err := os.RemoveAll(path); err != nil {
+		return err
+	}
+	fsDone(FSRemove, path, "")
+	delete(m.unvouched, name)
+	delete(m.unvalidated, name)
+	return nil
 }
 
 // snapshot returns the currently open partitions. The maintenance loop and Sync
@@ -485,6 +552,35 @@ func (m *Manager) Sync() error {
 	return firstErr
 }
 
+// periodicSync is Sync for the timer. A partition that cannot be flushed is
+// reported by name, once per failure rather than once per tick: an offline
+// partition fails every tick until the broker restarts, and the same line twice
+// a second for hours buried everything else in the log.
+func (m *Manager) periodicSync() {
+	for _, p := range m.snapshot() {
+		err := p.Sync()
+		if err == nil {
+			p.syncWarned.Store(nil)
+			continue
+		}
+		// An offline partition fails every tick, first with the fsync's own error
+		// and then with "offline" wrapped round it: one line for all of them.
+		msg := err.Error()
+		if p.Offline() {
+			msg = "offline"
+		}
+		if last := p.syncWarned.Load(); last != nil && *last == msg {
+			continue
+		}
+		p.syncWarned.Store(&msg)
+		if p.Offline() {
+			m.log.Error("periodic fsync failed: the partition takes no writes and acknowledges nothing until the broker restarts", "topic", p.topic, "partition", p.number, "err", err)
+		} else {
+			m.log.Warn("periodic fsync failed", "topic", p.topic, "partition", p.number, "err", err)
+		}
+	}
+}
+
 // EnforceRetention applies the retention policy to every open partition. It is
 // called by the maintenance loop and is exported so tests can trigger a sweep
 // deterministically.
@@ -517,6 +613,10 @@ func (m *Manager) EnforceCompaction() error {
 		res, err := p.Compact(pol, time.Now())
 		if err != nil && firstErr == nil {
 			firstErr = err
+		}
+		if res.Unreadable > 0 {
+			m.log.Warn("compaction kept batches it cannot read as they are; they were stored by an earlier version, which did not read a batch's records before storing it",
+				"topic", p.topic, "dir", filepath.Base(p.dir), "batches", res.Unreadable)
 		}
 		if res.Ran && (res.RecordsRemoved > 0 || res.MarkersRemoved > 0 || res.SegmentsRemoved > 0) {
 			m.log.Info("compacted a partition", "topic", p.topic, "dir", filepath.Base(p.dir),
@@ -558,15 +658,16 @@ func (m *Manager) maintain() {
 		case <-m.done:
 			return
 		case <-fsyncC:
-			if err := m.Sync(); err != nil {
-				m.log.Warn("periodic fsync failed", "err", err)
-			}
+			m.periodicSync()
 		case <-retentionC:
 			if err := m.EnforceCompaction(); err != nil {
 				m.log.Warn("compaction failed", "err", err)
 			}
 			if err := m.EnforceRetention(); err != nil {
 				m.log.Warn("retention enforcement failed", "err", err)
+			}
+			if err := m.saveUnvalidated(); err != nil {
+				m.log.Warn("could not record which partitions have been checked", "err", err)
 			}
 		case <-closedC:
 			if err := m.EnforceClosedRetention(); err != nil {
@@ -602,22 +703,62 @@ func (m *Manager) Close() error {
 		firstErr error
 		sem      = make(chan struct{}, closeConcurrency)
 	)
+	closed := make(map[string]struct{}, len(m.partitions))
 	for _, p := range m.partitions {
 		sem <- struct{}{}
 		wg.Add(1)
 		go func() {
 			defer func() { <-sem; wg.Done() }()
-			if err := p.close(); err != nil {
-				errMu.Lock()
-				if firstErr == nil {
-					firstErr = err
-				}
-				errMu.Unlock()
+			err := p.close()
+			errMu.Lock()
+			if err != nil && firstErr == nil {
+				firstErr = err
 			}
+			if err == nil {
+				closed[filepath.Base(p.dir)] = struct{}{}
+			}
+			errMu.Unlock()
 		}()
 	}
 	wg.Wait()
+	// What was checked and flushed need not be checked again, however this stop
+	// ends. (The partitions are closed; validated only reads a flag.)
+	if err := m.saveUnvalidatedLocked(); err != nil && firstErr == nil {
+		firstErr = err
+	}
+	// Only a stop that flushed everything may say so. One that could not leaves no
+	// marker, and the next start trusts nothing it finds.
+	if firstErr == nil {
+		firstErr = m.writeCleanStop(closed)
+	}
 	return firstErr
+}
+
+// AbandonForTest stops the manager the way SIGKILL stops a process: the
+// maintenance loop ends and every file is closed, with nothing flushed and no
+// marker of a clean stop written. What was written and not flushed stays in the
+// page cache, so the next manager on the directory reads it back, which is the
+// situation a restart after a kill is in. Nothing in the broker calls it.
+func (m *Manager) AbandonForTest() {
+	m.mu.Lock()
+	if m.stopped {
+		m.mu.Unlock()
+		return
+	}
+	m.stopped = true
+	close(m.done)
+	m.mu.Unlock()
+	m.wg.Wait()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, p := range m.partitions {
+		p.mu.Lock()
+		for _, s := range p.segments {
+			s.close()
+		}
+		p.mu.Unlock()
+	}
+	m.partitions = make(map[topicPartition]*Partition)
 }
 
 // closeConcurrency bounds the parallel partition closes at shutdown.
