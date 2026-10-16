@@ -6,6 +6,23 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Console: the Traffic pages are drawn as their boards and say only what the broker knows.
+  A design gate (`go tool task design`) renders each board's own files and compares the
+  live page to them element by element, with real clients (classic and KIP-848 groups,
+  telemetry), against a ledger of what they sent; a difference that is not on its
+  allow-list, each entry quoting the plan's record, fails. Wrong before: a client's
+  refusal streak crossed its connections' requests; a fold claimed 169 identical
+  heartbeats across six rebalances; `client=checkout` listed `checkout-api`; "last
+  minute" was 55 to 60 s; the ApiVersions downgrade claimed the client asks again;
+  Metadata said "auto-create on" from the request's flag on a broker with it off; a
+  client's requests a minute fell when one of its connections closed; a client that hung
+  up before its answer, or an API key no Kafka has, counted as the broker failing; times
+  under a millisecond read `0.4 ms`, where the boards print `0 ms` (the exact value is in
+  the title). Esc clears the filter; the keys strip follows each state; the rows are one
+  tab stop of a grid; the inspector announces what it holds; a request's decoded fields
+  are written in the specification's snake case. The keys strip is a region, and the
+  phone's brand link keeps its name.
+
 - Console: Traffic holds a client's long names (client id, software, group, transactional
   id, a 249-character topic) in its columns, cut with an ellipsis and whole in the title
   and the inspector. A client with 90-character names made the clients table 3,675 px

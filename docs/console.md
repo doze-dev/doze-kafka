@@ -113,8 +113,11 @@ Select a row for the request in full (how each partition went, its decoded field
 a refusal happened and what to do), a folded row for its ticks, or a client for its own
 page, with what it reports about itself (KIP-714: metrics, not traces). **Clients**
 (`?view=clients`) lists who is connected and how each is behaving; a group filter tells
-the group's rebalances in order. Pausing keeps the list still and counts what it
-missed. See [Observability](observability.md) for what each number is counted over and
+the group's rebalances in order, in epochs for a KIP-848 group. Pausing keeps the list
+still and counts what it missed; Esc clears a filter, and the strip of keys at the foot
+is the page's own for the state it is in. The page is drawn as its boards (design gate:
+`go tool task design`, [`e2e/design/README.md`](../e2e/design/README.md)); each row is
+one tab stop of a grid, moved with the arrows. See [Observability](observability.md) for what each number is counted over and
 what is kept.
 
 ## Schemas
