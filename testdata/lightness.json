@@ -1,10 +1,10 @@
 {
   "build": "CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w' ./cmd/doze-kafka",
-  "run": "GOMAXPROCS=2 doze-kafka --listen 127.0.0.1:0 --console-addr 127.0.0.1:0 --schema-registry-addr 127.0.0.1:0 --data-dir <empty> --pprof-addr 127.0.0.1:<free>; heap = HeapAlloc of the third /debug/pprof/heap?gc=1, one second after pprof answers",
-  "modules": 421,
+  "run": "GOMAXPROCS=2 doze-kafka --listen 127.0.0.1:0 --console-addr 127.0.0.1:0 --schema-registry-addr 127.0.0.1:0 --data-dir \u003cempty\u003e --pprof-addr 127.0.0.1:\u003cfree\u003e; heap = HeapAlloc of the third /debug/pprof/heap?gc=1, one second after pprof answers",
+  "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 27417106,
+      "binaryBytes": 27553442,
       "idleHeapBytes": 1340088,
       "idleHeapNoiseBytes": 5352,
       "go": "go1.27.2",
@@ -12,9 +12,9 @@
       "where": "macOS 27, Apple M-series, native"
     },
     "linux/arm64": {
-      "binaryBytes": 26607776,
-      "idleHeapBytes": 1334064,
-      "idleHeapNoiseBytes": 6376,
+      "binaryBytes": 26738848,
+      "idleHeapBytes": 1343248,
+      "idleHeapNoiseBytes": 7144,
       "go": "go1.27.2",
       "recorded": "2026-10-16",
       "where": "golang:1.27 container, linux/arm64, native on Apple M-series (Docker VM)"
@@ -75,6 +75,34 @@
       "from": 27313762,
       "to": 27448258,
       "reason": "f896df5 re-recorded after D6 and D7 (ed6b701..f896df5): offsets expiry and mixed classic/consumer groups (b1cadf5), redacted config printing (a06eabc), streamed decompression bounds in produce (e908c93), the traffic story and protocol Detail additions"
+    },
+    {
+      "date": "2026-10-16",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 27417106,
+      "to": 27553442,
+      "reason": "the merge of main 62fc8bc: produce reads every batch whole through its codec (9b90f55), the registry over TLS and the console guard beyond loopback (3840d1a), golang.org/x/term made direct for the isatty check before sudo (f68e29c), config print of every setting (18c7cd5), the module's console feed (e66da06); the one more module is github.com/twmb/franz-go/pkg/sr, a test dependency of 3840d1a (franz-go sr against the registry over https), counted by go list -m all"
+    },
+    {
+      "date": "2026-10-16",
+      "key": "modules",
+      "from": 421,
+      "to": 422,
+      "reason": "the merge of main 62fc8bc: produce reads every batch whole through its codec (9b90f55), the registry over TLS and the console guard beyond loopback (3840d1a), golang.org/x/term made direct for the isatty check before sudo (f68e29c), config print of every setting (18c7cd5), the module's console feed (e66da06); the one more module is github.com/twmb/franz-go/pkg/sr, a test dependency of 3840d1a (franz-go sr against the registry over https), counted by go list -m all"
+    },
+    {
+      "date": "2026-10-16",
+      "key": "linux/arm64 binaryBytes",
+      "from": 26607776,
+      "to": 26738848,
+      "reason": "the merge of main 62fc8bc: produce reads every batch whole through its codec (9b90f55), the registry over TLS and the console guard beyond loopback (3840d1a), golang.org/x/term made direct for the isatty check before sudo (f68e29c), config print of every setting (18c7cd5), the module's console feed (e66da06); the one more module is github.com/twmb/franz-go/pkg/sr, a test dependency of 3840d1a (franz-go sr against the registry over https), counted by go list -m all"
+    },
+    {
+      "date": "2026-10-16",
+      "key": "linux/arm64 idleHeapBytes",
+      "from": 1334064,
+      "to": 1343248,
+      "reason": "the merge of main 62fc8bc: produce reads every batch whole through its codec (9b90f55), the registry over TLS and the console guard beyond loopback (3840d1a), golang.org/x/term made direct for the isatty check before sudo (f68e29c), config print of every setting (18c7cd5), the module's console feed (e66da06); the one more module is github.com/twmb/franz-go/pkg/sr, a test dependency of 3840d1a (franz-go sr against the registry over https), counted by go list -m all"
     }
   ]
 }
