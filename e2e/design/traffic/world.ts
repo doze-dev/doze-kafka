@@ -157,7 +157,12 @@ export async function startWorld(base: number, prefix: string): Promise<World> {
       await at(22_000);
       await kill('depot-router-3', 'SIGKILL');
       await kill('router-next-2', 'SIGTERM');
-      await at(32_000);
+      // The scenario is over when the console's minute holds none of the requests that
+      // were in flight as depot-router-3 died (the client wrote none of them down, so
+      // the broker may have counted one the ledger does not have: a window that holds
+      // the kill can only be known to within them) and its session has expired.
+      const gone = Date.now();
+      await new Promise((r) => setTimeout(r, Math.max(0, gone + 62_000 - Date.now())));
     } catch (e) {
       await stopAll();
       throw e;

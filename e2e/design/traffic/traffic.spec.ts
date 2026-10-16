@@ -8,7 +8,7 @@ import { snapshot } from '../lib/measure';
 import { diffPairs, entryFor, judge, loadAllow, report, selectors, type Diff } from '../lib/diff';
 import { Ledger } from '../lib/ledger';
 import { BOARDS, type Board } from './boards';
-import { TRUTHS } from './truth';
+import { TRUTHS, type Edge } from './truth';
 import { startWorld, type World } from './world';
 
 // The design gate for Traffic (plan/01-protocol.md, "Design conformance"): each board of
@@ -68,7 +68,7 @@ async function enter(want: 'empty' | 'traffic' | 'lost') {
     if (phase === 'empty') await world!.scenario();
     const lostBoard = BOARDS.find((b) => b.phase === 'lost')!;
     for (const theme of THEMES) {
-      const page = await livePage(theme, 1440);
+      const page = await livePage(theme, 1440, false);
       await lostBoard.state(page, base, ledger);
       lostPages.set(theme, page);
     }
@@ -85,17 +85,41 @@ test.afterAll(async () => {
   await world?.stopAll();
 });
 
-async function livePage(theme: Theme, width: number): Promise<Page> {
+// The pages are measured as rendered. A live page swaps its list, its summary and its notes
+// for a newer render every 2.5 s, and not all at once (the count beside the errors list and
+// the filter's "N of M" are drawn when the page is, the rest on each poll), so a poll that
+// lands between the render and the read puts parts of two renders in one reading. The
+// poll is answered "nothing changed" (204, the console's own answer when the hash is the
+// same) until the gate asks for a render of its own (rerender). A page that is to lose the
+// broker (Traf-10) keeps polling: that is how it finds out.
+const thawed = new WeakSet<Page>();
+async function livePage(theme: Theme, width: number, frozen = true): Promise<Page> {
   const ctx = await browser.newContext({ viewport: { width, height: 900 }, colorScheme: theme });
-  return ctx.newPage();
+  const page = await ctx.newPage();
+  if (frozen) await page.route(/\/traffic\/live(\?|$)/, (route) => (thawed.has(page) ? route.continue() : route.fulfill({ status: 204 })));
+  return page;
 }
 
-// Reads the page and checks its data against the ledger, again when the read fell on an
-// edge the ledger cannot settle.
-async function readSettled(page: Page, board: Board, sels: string[]) {
+/** Lets the page's next poll through and waits for the render it brings. */
+async function rerender(page: Page) {
+  const hash = await page.locator('#traffic-live').getAttribute('data-hash').catch(() => null);
+  thawed.add(page);
+  await page.waitForFunction((h) => { const el = document.getElementById('traffic-live'); return !el || el.getAttribute('data-hash') !== h; }, hash, { timeout: 8000 }).catch(() => {});
+  thawed.delete(page);
+}
+
+// Reads the page and checks its data against the ledger. A count the ledger cannot settle
+// (a request began within a few milliseconds of an edge of the window counted) is read
+// again on a render of the page's own, and one that passed on a render is not asked of
+// the next; a count that differs from a ledger that has no doubt about it on three renders
+// in a row is the page's, and so is any other difference.
+async function readSettled(page: Page, board: Board, sels: string[], frozen: boolean) {
   const truthSels = board.truths.flatMap((t) => TRUTHS[t].sels);
+  const strikes = new Map<string, number>();
+  const failed = new Set<string>();
+  const settled = new Set<string>();
   let last = '';
-  for (let attempt = 0; attempt < 8; attempt++) {
+  for (let attempt = 0; attempt < 30; attempt++) {
     const snap = await snapshot(page, [...sels, ...truthSels]);
     const at = Date.now();
     await page.waitForTimeout(400); // a connection that opened or closed near `at` is in the ledger by now.
@@ -103,16 +127,30 @@ async function readSettled(page: Page, board: Board, sels: string[]) {
     ledger.read(world ? await world.sync() : undefined);
     const problems: string[] = [];
     let again = '';
+    const edges: Edge[] = [];
     for (const t of board.truths) {
       const v = TRUTHS[t].check(snap, ledger, at);
       problems.push(...v.problems.map((x) => `${t}: ${x}`));
       if (v.again) again = v.again;
+      edges.push(...(v.edges ?? []).map((e) => ({ ...e, key: `${t}: ${e.key}` })));
     }
-    if (!again) return { snap, problems };
-    last = again;
-    await page.waitForTimeout(700);
+    const now = new Set(edges.map((e) => e.key));
+    for (const k of failed) if (!now.has(k)) settled.add(k);
+    const waiting: Edge[] = [];
+    for (const e of edges) {
+      if (settled.has(e.key)) continue;
+      failed.add(e.key);
+      const n = e.firm ? (strikes.get(e.key) ?? 0) + 1 : 0;
+      strikes.set(e.key, n);
+      if (n >= 3) problems.push(`${e.key}: ${e.msg}`);
+      else waiting.push(e);
+    }
+    if (!again && !waiting.length) return { snap, problems };
+    last = again || waiting.map((e) => e.msg).join('; ');
+    if (waiting.length && frozen) await rerender(page);
+    else await page.waitForTimeout(700);
   }
-  throw new Error(`${board.id}: the page could not be read off an edge in 8 tries (${last})`);
+  throw new Error(`${board.id}: the page could not be read off an edge in 30 tries (${last})`);
 }
 
 // One test, a step a board and theme, each failing softly: every board is measured in
@@ -138,7 +176,7 @@ test('the Traffic pages are the boards, element by element, at 1440 in light and
         // Lost: the page has noticed (its first poll after the stop failed).
         if (want === 'lost') await page.locator('html[data-connection-lost]').waitFor({ timeout: 15_000 });
         await page.waitForTimeout(600);
-        const { snap, problems } = await readSettled(page, board, sels.live);
+        const { snap, problems } = await readSettled(page, board, sels.live, want !== 'lost');
         await page.context().close();
 
         const where = { board: board.id, theme, width };

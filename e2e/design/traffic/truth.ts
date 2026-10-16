@@ -13,18 +13,19 @@ export type Poll = { sent: number; got?: number; n: number; atLeast: boolean };
 export const polls: Poll[] = [];
 
 export type Snap = Record<string, El[]>;
-export type Verdict = { problems: string[]; again?: string };
+export type Verdict = { problems: string[]; again?: string; edges?: Edge[] };
 export type Truth = {
   /** The selectors the check reads, measured in the same snapshot as the pairs. */
   sels: string[];
   check: (snap: Snap, ledger: Ledger, at: number) => Verdict;
 };
 
-// When the broker took a request in: after the client began writing it and before the
-// client read the answer (the broker's time is when it read the request, which may wait
-// behind the one before it on the connection). A count over a window is then known
-// exactly when no request has an edge of the window inside that span, and otherwise
-// lies between the requests certainly in and those possibly in: the check says both.
+// When the broker took a request in: after the client began writing it (the time taken
+// just before the write: see gen) and before the client read the answer (the broker's
+// time is when it read the request, which may wait behind the one before it on the
+// connection). A count over a window is then known exactly when no request has an edge
+// of the window inside that span, and otherwise lies between the requests certainly in
+// and those possibly in: the check says both.
 const SKEW = 1;
 const inside = (r: Req, from: number, to: number) => r.start >= from && r.upper + SKEW < to;
 const maybe = (r: Req, from: number, to: number) => r.upper + SKEW >= from && r.start < to;
@@ -35,6 +36,31 @@ function bounds(reqs: Req[], from: number, to: number) {
     if (maybe(r, from, to)) hi++;
   }
   return { lo, hi };
+}
+
+// A window the console counted (the summary's minute, a client's requests a minute, the
+// five minutes of the callout) is held to the count exactly. The broker reads a request
+// as it arrives, so for these READ ms after the write is when it was read, not the whole
+// wait for the answer (a Fetch waits half a second for one). The ledger then knows the
+// count unless a request began within READ ms of an edge of the window; that is not a
+// reason to loosen the comparison but to read the page again on a window of its own
+// (readSettled), and a count that is wrong on three windows in a row is wrong. A request
+// the broker read later than READ after the write makes one window wrong, not three.
+const READ = 5;
+const readBy = (r: Req) => Math.min(r.upper, r.start + READ);
+function counted(reqs: Req[], from: number, to: number) {
+  let lo = 0, hi = 0;
+  for (const r of reqs) {
+    if (r.start >= from && readBy(r) + SKEW < to) lo++;
+    if (readBy(r) + SKEW >= from && r.start < to) hi++;
+  }
+  return { lo, hi };
+}
+/** A count the page gave that the ledger does not settle yet, or settles against it. */
+export type Edge = { key: string; msg: string; firm: boolean };
+function exact(edges: Edge[], key: string, said: number, b: { lo: number; hi: number }, msg: string) {
+  if (said === b.lo && b.lo === b.hi) return;
+  edges.push({ key, msg, firm: !(said >= b.lo && said <= b.hi) });
 }
 const within = (n: number, b: { lo: number; hi: number }) => n >= b.lo && n <= b.hi;
 const range = (b: { lo: number; hi: number }) => (b.lo === b.hi ? `${b.lo}` : `${b.lo} to ${b.hi}`);
@@ -84,20 +110,25 @@ export const TRUTHS: Record<string, Truth> = {
       const clients = openClients(ledger, at).size;
       const want = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
       if (items[0] !== `${want(clients, 'client')} connected`) p.push(`"${items[0]}": the ledger has ${clients} clients with a connection open`);
-      const reqs = bounds(ledger.reqs, from, to);
+      const edges: Edge[] = [];
+      const reqs = counted(ledger.reqs, from, to);
       // A client killed with requests in flight wrote none of them down; the broker may
       // have read one on each connection it had open.
       for (const [client, t] of ledger.killed) {
         if (t >= from && t < to) reqs.hi += ledger.conns.filter((c) => c.client === client && c.open <= t && c.close === t).length;
       }
       const said = Number(/^(\d+)/.exec(items[2] ?? '')?.[1]);
-      if (items.length > 2 && (!within(said, reqs) || items[2] !== `${want(said, 'request')} in the last minute`)) p.push(`"${items[2]}": the ledger has ${range(reqs)} requests that began in [${new Date(from).toISOString()}, ${new Date(to).toISOString()})`);
-      if (items.length > 4 && /error/.test(items[4])) {
-        const e = bounds(scriptedErrors(ledger), from, to);
-        const n = Number(/^(\d+)/.exec(items[4])?.[1]);
-        if (!within(n, e) || items[4] !== want(n, 'error')) p.push(`"${items[4]}": the scenario's errors in that minute are ${range(e)}`);
+      if (items.length > 2) {
+        if (items[2] !== `${want(said, 'request')} in the last minute`) p.push(`"${items[2]}": not a count of requests in the last minute`);
+        else exact(edges, 'summary requests', said, reqs, `"${items[2]}": the ledger has ${range(reqs)} requests that began in [${new Date(from).toISOString()}, ${new Date(to).toISOString()})`);
       }
-      return { problems: p };
+      if (items.length > 4 && /error/.test(items[4])) {
+        const e = counted(scriptedErrors(ledger), from, to);
+        const n = Number(/^(\d+)/.exec(items[4])?.[1]);
+        if (items[4] !== want(n, 'error')) p.push(`"${items[4]}": not a count of errors`);
+        else exact(edges, 'summary errors', n, e, `"${items[4]}": the scenario's errors in that minute are ${range(e)}`);
+      }
+      return { problems: p, edges };
     },
   },
 
@@ -385,6 +416,7 @@ export const TRUTHS: Record<string, Truth> = {
       const per = rows.length ? cells.length / rows.length : 0;
       if (rows.length !== open.size) p.push(`${rows.length} rows, ${open.size} clients in the ledger`);
       const win = snap['#traffic-summary'][0]?.attrs;
+      const edges: Edge[] = [];
       for (let i = 0; i < rows.length; i++) {
         const c = cells.slice(i * per, i * per + per).map((e) => e.t);
         const name = c[0];
@@ -395,8 +427,8 @@ export const TRUTHS: Record<string, Truth> = {
           const addr = c[3].split(' ')[0];
           if (!open.get(name)!.includes(addr)) p.push(`row ${i}: ${name} address ${addr}`);
           if (win) {
-            const b = bounds(ledger.reqs.filter((r) => r.client === name), Number(win['data-window-from']), Number(win['data-window-to']));
-            if (!within(Number(c[6]), b)) p.push(`row ${i}: ${name} ${c[6]} a minute, the ledger ${range(b)}`);
+            const b = counted(ledger.reqs.filter((r) => r.client === name), Number(win['data-window-from']), Number(win['data-window-to']));
+            exact(edges, `clients ${name} a minute`, Number(c[6]), b, `row ${i}: ${name} ${c[6]} a minute, the ledger ${range(b)}`);
           }
         }
       }
@@ -404,15 +436,16 @@ export const TRUTHS: Record<string, Truth> = {
       // raised by the five-minute rule, not by a streak.
       const look = snap['#attention > .b'][0]?.t ?? '';
       const lm = /^loyalty-etl had (\d+) errors among its (\d+) requests in the last five minutes$/.exec(look);
-      if (!look) return { problems: p }; // a client is open: the board draws no callout (Traf-07, 11).
+      if (!look) return { problems: p, edges }; // a client is open: the board draws no callout (Traf-07, 11).
       if (!lm) p.push(`callout "${look}"`);
       else if (win) {
         const to = Number(win['data-window-to']), from = to - 300_000;
-        const errs = bounds(ledger.reqs.filter((r) => r.client === 'loyalty-etl' && r.api === 'FindCoordinator'), from, to);
-        const all = bounds(ledger.reqs.filter((r) => r.client === 'loyalty-etl'), from, to);
-        if (!within(Number(lm[1]), errs) || !within(Number(lm[2]), all)) p.push(`callout "${look}": the ledger has ${range(errs)} denied of ${range(all)}`);
+        const errs = counted(ledger.reqs.filter((r) => r.client === 'loyalty-etl' && r.api === 'FindCoordinator'), from, to);
+        const all = counted(ledger.reqs.filter((r) => r.client === 'loyalty-etl'), from, to);
+        exact(edges, 'callout denied', Number(lm[1]), errs, `callout "${look}": the ledger has ${range(errs)} denied`);
+        exact(edges, 'callout requests', Number(lm[2]), all, `callout "${look}": the ledger has ${range(all)} requests`);
       }
-      return { problems: p };
+      return { problems: p, edges };
     },
   },
 
