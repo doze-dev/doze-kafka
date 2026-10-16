@@ -88,8 +88,10 @@ partitions in use, and it follows these rules:
 - `min.cleanable.dirty.ratio` (here 0: clean as soon as a segment has rolled, rather than
   Kafka's 0.5), `min.compaction.lag.ms` and `max.compaction.lag.ms` decide when. Rewritten
   batches are uncompressed unless the topic's `compression.type` names a codec.
-- A rewrite is swapped in without a moment when the log cannot be read, and a stop at any
-  point leaves a log that opens: a half-written file is discarded, and an index that no
+- A rewrite is swapped in without a moment when the log cannot be read; a swap that
+  fails at any step (a full disk, say) puts a readable segment back before it returns,
+  so the log reads on without a restart; and a stop or a power cut at any point leaves a
+  log that opens: a half-written file is discarded, and an index that no
   longer matches its log is rebuilt from it. The segment keeps its original age, so a
   rewrite does not postpone retention.
 
@@ -125,11 +127,23 @@ producer's `acks` setting, which is exactly the Kafka knob for durability:
   didn't ask for.
 - **`acks=0`** — fire and forget; no acknowledgement at all.
 
-Either way, on the next start recovery scans the active segment, truncates any
-half-written tail, and resumes at the last intact record — it comes back without
-corruption. This is exercised directly by a chaos harness (`go tool task chaos`) that
-`SIGKILL`s and restarts the broker under sustained load: acknowledged `acks=all`
-records survive every crash, with no loss and no gaps.
+Either way, the next start knows whether the last stop was clean: a graceful stop
+that flushed everything writes `data/clean-shutdown` (as Kafka writes
+`.kafka_cleanshutdown`), and the next start removes it. Without it nothing read back
+from disk is taken to be on disk: a partition's active segment is checked batch by
+batch (every CRC, not only the tail), a half-written tail is cut, and the segment and
+its directory count as unflushed, so the first flush after the start (an `acks=all`,
+the timer, the roll that seals it, the end of a transaction) flushes them, whatever
+this process wrote or did not. A segment is flushed by the roll that seals it, so a
+sealed one needs no second look; a data directory from before that held is checked
+whole, every segment of every partition, once. Opening a partition costs the same
+after a crash as before; the extra flush is paid by its first sync (measured with 5,000
+partitions on a loaded macOS machine: listening in about 15 ms either way, the first
+touch of all of them in under a second, and the first `acks=all` to each one 11 to 58
+seconds against 11 to 18 before, `F_FULLFSYNC` of each segment and directory being the
+cost; later ones as before). This is exercised by a chaos harness (`go tool task
+chaos`) that `SIGKILL`s and restarts the broker under sustained load, and by the
+power-cut model below, which `SIGKILL` cannot be.
 
 Tighten the `acks=1` window by lowering `--fsync-interval` (at some throughput cost),
 or set it to `0` to rely purely on `acks=all` fsyncs plus the flush-on-shutdown.
@@ -137,8 +151,10 @@ or set it to `0` to rely purely on `acks=all` fsyncs plus the flush-on-shutdown.
 An `acks=all` acknowledgement is also given for a **duplicate** of a batch the log
 already holds (an idempotent producer's retry): the retry is answered with the
 original offset only after the partition has been fsynced, because the first send may
-have reached the page cache and no further. An earlier version acknowledged that retry
-without a sync (BAD-1).
+have reached the page cache and no further — including when the broker was killed and
+restarted between the first send and the retry, when the batch was read back from a
+file this process never flushed. Earlier versions acknowledged that retry without a
+sync (BAD-1), and after a restart still did.
 
 ### When the disk misbehaves
 
@@ -157,13 +173,24 @@ without a sync (BAD-1).
   have thrown the unflushed pages away and reported the error once, so a second
   `fsync` returning success would acknowledge data that is gone. The partition's log
   segment goes offline: appends and syncs answer `KAFKA_STORAGE_ERROR` until the
-  broker is restarted, and recovery then keeps exactly what reached the disk. The
-  batch whose fsync failed was already appended, so a consumer may read a record its
-  producer was told failed; retry it idempotently.
-- **Power loss** is modelled by the test `TestPowerCutKeepsEveryAcksAllRecord`: it
-  keeps only what was fsynced (three variants for the unsynced tail: dropped, zeroed,
-  partly kept), reopens, and requires every `acks=all` record to be there. `SIGKILL`
-  keeps the page cache and cannot tell whether `acks=all` fsyncs; this test can.
+  broker is restarted. Recovery then keeps whatever intact batches the files hold
+  (which may include the one whose fsync failed, if the pages survived) and treats
+  none of it as flushed until it has flushed it. The batch whose fsync failed was
+  already appended, so a consumer may read a record its producer was told failed;
+  retry it idempotently. A write that fails part-way through a request leaves nothing
+  of that request in the log.
+- **Power loss** is modelled (`internal/powercut`): every file is cut to what its last
+  fsync covered (the unflushed bytes dropped, zeroed, partly kept, or kept page by
+  page), and every name created, renamed or removed since its directory's last fsync
+  is gone or back — segments, indexes, `meta.db`, `log-start`, the transaction mark,
+  `cleaner-offset`. `TestPowerCutKeepsEveryAcksAllRecord` cuts the power after each
+  step of a workload over several topics (produces, offset commits, a config change,
+  DeleteRecords, a kill and restart, committed and aborted transactions, topics
+  created and deleted) and requires every acknowledged record, transaction outcome,
+  committed offset, topic and log start to be there. A sweep fails, and separately
+  cuts the power after, each one of the 137 file operations of another workload
+  (`TestEveryFileOperationFailingOrCutLosesNothingAcknowledged`). `SIGKILL` keeps the
+  page cache and cannot tell whether anything was fsynced; these can.
 
 ## Committed offsets
 

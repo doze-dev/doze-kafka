@@ -36,6 +36,20 @@ really is gone is found by that. (Aborting it at start-up would fence a live pro
 good, since a client treats being fenced as fatal, and every restart of the broker would
 kill the application's producer.)
 
+EndTxn is answered with success, and the transaction recorded complete, only when every
+one of its markers is on disk (each partition is flushed, whoever appended the marker)
+and, for a commit, its offsets are stored: a power cut the moment after cannot take a
+committed transaction back. When a marker cannot be written or flushed the decision
+stands and EndTxn answers `CONCURRENT_TRANSACTIONS`, which is what Kafka answers while a
+decided transaction's markers are being written; the coordinator keeps trying on its
+own, and a client that asks again gets the outcome. The other decision is never carried
+out instead: an EndTxn that names it is answered `CONCURRENT_TRANSACTIONS` while the
+first is being carried out and `INVALID_TXN_STATE` once it has been, and a repeat of the
+same decision succeeds, as Kafka 4.3.1 answers them (recorded:
+`conformance/recordings/endtxn-decisions.json`, `endtxn-while-preparing.json`). The
+coordinator's state in memory never runs ahead of `meta.db`: a write that fails changes
+nothing, and the request is answered `NOT_COORDINATOR`.
+
 A marker takes an offset, so a partition's offsets have gaps where transactions ended.
 Consumers skip them; the console shows them as dividers.
 
