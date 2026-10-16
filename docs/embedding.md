@@ -41,7 +41,10 @@ is compiled and run by `TestEmbeddingDocCompiles`, so it cannot rot.
 - **Self-contained data.** The metadata database lives at `<DataDir>/meta.db`.
   `t.TempDir()` therefore leaves nothing behind.
 - **Topics appear on first use** (`AutoCreateTopics`, one partition), as with the
-  binary.
+  binary, for a client that asks for it in its Metadata request. The Java client,
+  Sarama and librdkafka do by default; franz-go does only with
+  `kgo.AllowAutoTopicCreation()`, and without it a produce to a new topic fails with
+  `UNKNOWN_TOPIC_OR_PARTITION`.
 
 ## Lifecycle
 
@@ -107,6 +110,7 @@ Every exit is held by a test: `TestAFailureAtAnyStepOfConstructionReleasesEveryt
 fails each step of `New`, `Bind` and `Serve` in turn and then counts goroutines and
 open file descriptors and opens the same data directory again.
 | `Config()` | The effective configuration as a plain `server.Config`. |
+| `SchemaRegistry()` | The built-in Confluent-compatible schema registry as an `http.Handler`, for you to serve on a listener of your own. Its schemas are kept in the broker's metadata database; when the broker requires SASL, the handler requires the same users as HTTP basic authentication. Valid until the server is closed. |
 
 ## Options
 
@@ -136,7 +140,8 @@ on, so Metadata sends them there rather than to the socket.
 
 ## What is not here
 
-The embed API is the broker. The web console is a separate package
+The embed API is the broker, and the schema registry as a handler you serve yourself
+(`SchemaRegistry()`, above). The web console is a separate package
 (`github.com/doze-dev/doze-kafka/console`) that talks to a broker as any Kafka
 client would; embedding it is optional. A console started that way shows topics,
 messages and groups, and no Traffic: what clients asked is kept inside the broker,

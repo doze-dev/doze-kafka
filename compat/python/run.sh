@@ -5,6 +5,7 @@
 set -euo pipefail
 export PROTO_UV_VERSION=${PROTO_UV_VERSION:-$(ls ~/.proto/tools/uv 2>/dev/null | grep -E '^[0-9]' | tail -1)}
 command -v uv >/dev/null || { echo "uv is not installed"; exit 77; }
-uv run --quiet --with confluent-kafka python check.py
+. ../versions.env
+uv run --quiet --with "confluent-kafka==$CONFLUENT_KAFKA_PY" python check.py
 # The serializers need the registry, which the runner gives both ways.
-[ -z "${REGISTRY_URL:-}" ] || uv run --quiet --with "confluent-kafka[avro,json,protobuf,schemaregistry]" python serdes.py
+[ -z "${REGISTRY_URL:-}" ] || uv run --quiet --with "confluent-kafka[avro,json,protobuf,schemaregistry]==$CONFLUENT_KAFKA_PY" python serdes.py

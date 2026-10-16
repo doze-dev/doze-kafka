@@ -3,7 +3,7 @@
 doze-kafka serves a small web console beside the broker. It is on by default at
 **http://kafka.&lt;name&gt;.doze** (port-less, through the shared front door; the start-up
 summary prints the address). Under `--listen` there is no name and it is on
-`127.0.0.1:9093`. Turn it off with
+`127.0.0.1:9093` (a free loopback port when `--listen` is on port 0). Turn it off with
 `--console=false`; move it with `--console-addr`.
 
 It is a development tool, not an operations product. It answers the questions you
@@ -252,10 +252,16 @@ Times are shown in your browser's zone, with the zone and the UTC instant on hov
   addresses, `*.doze`, and anything you add with `--console-allow-host` — and
   refuses state-changing requests from other origins. That keeps a web page open in
   your browser from reaching it through DNS rebinding or a forged form.
-- `DOZE_KAFKA_CONSOLE_PREFIX` mounts it somewhere other than `/_console` (behind a
-  reverse proxy, or to prove in a test that nothing assumes the default).
-- It is plain HTTP with no login of its own. Bind it beyond loopback only on a
-  network you trust.
+- `--console-prefix` (`console-prefix` in the file) mounts it somewhere other than
+  `/_console`, behind a reverse proxy; `/` serves it at the root of its port.
+  `DOZE_KAFKA_CONSOLE_PREFIX` does the same when neither is set (the test suites use it
+  to show nothing assumes the default).
+- It is plain HTTP with no login of its own, and with SASL on it acts on the broker as
+  a super user. It listens on loopback. With SASL or TLS on, a `--console-addr` beyond
+  loopback is refused at start-up unless `--console-unprotected` accepts it; what to
+  put in front of it instead is in
+  [What SASL and TLS cover](auth-and-tls.md#what-sasl-and-tls-cover). Without either,
+  bind it beyond loopback only on a network you trust.
 
 ## Errors
 

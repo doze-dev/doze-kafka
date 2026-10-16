@@ -92,7 +92,10 @@ run_all() { # security docker(yes|no)
 }
 
 export SASL_USER=dev SASL_PASS=dev-pass SASL_MECHANISM=SCRAM-SHA-512 CA_CERT=$WORK/cert.pem
-SECURE=(--sasl-mechanisms SCRAM-SHA-512 --sasl-user "$SASL_USER:$SASL_PASS" --tls-cert "$WORK/cert.pem" --tls-key "$WORK/key.pem")
+# The registry is kept on plain HTTP here (--schema-registry-tls=false): every cell
+# reads REGISTRY_URL as http:// and none is given the CA for it yet. The broker serves
+# it over TLS by default; cmd/doze-kafka's registry_tls_test.go is what holds that.
+SECURE=(--sasl-mechanisms SCRAM-SHA-512 --sasl-user "$SASL_USER:$SASL_PASS" --tls-cert "$WORK/cert.pem" --tls-key "$WORK/key.pem" --schema-registry-tls=false)
 for dock in no yes; do
   if [ $dock = yes ]; then
     HOST=host.docker.internal

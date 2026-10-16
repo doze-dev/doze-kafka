@@ -78,7 +78,7 @@ func TestSchemaRegistryIsServedAndSurvivesARestart(t *testing.T) {
 func TestSchemaRegistryCanBeTurnedOff(t *testing.T) {
 	out, _ := start(t, "--schema-registry=false")
 	waitFor(t, "the summary", func() bool { return strings.Contains(out.String(), "doze-kafka is up") })
-	if strings.Contains(out.String(), "registry") {
+	if regexp.MustCompile(`(?m)^\s+registry\s`).MatchString(out.String()) {
 		t.Errorf("--schema-registry=false but the summary names a registry:\n%s", out.String())
 	}
 }

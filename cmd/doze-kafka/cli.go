@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
+	names "github.com/doze-dev/doze-names"
 )
 
 // startup is everything resolved from the command line and config file before the
@@ -92,8 +93,8 @@ var helpGroups = []struct {
 	{"Retention and durability", []string{"retention-bytes", "retention-ms", "fsync-interval"}},
 	{"Topics and groups", []string{"kafka-version", "auto-create-topics", "default-partitions", "max-partitions", "message-max-bytes", "consumer-session-timeout", "offsets-retention", "client-telemetry"}},
 	{"Security", []string{"sasl-mechanisms", "sasl-user", "tls-cert", "tls-key", "acl-default", "acl-super-user"}},
-	{"Console", []string{"console", "console-addr", "console-prefix", "console-allow-host", "trace-header"}},
-	{"Schema registry", []string{"schema-registry", "schema-registry-addr"}},
+	{"Console", []string{"console", "console-addr", "console-prefix", "console-allow-host", "console-unprotected", "trace-header"}},
+	{"Schema registry", []string{"schema-registry", "schema-registry-addr", "schema-registry-tls"}},
 	{"Process", []string{"config", "log-level", "log-format", "pprof-addr"}},
 }
 
@@ -141,7 +142,8 @@ file, the file over the defaults.
 	}
 	fmt.Fprint(w, `
 Examples:
-  doze-kafka                                   run on 127.0.0.1:9092, console on :9093
+  doze-kafka                                   serve kafka.<dir>.doze:9092, console at http://kafka.<dir>.doze
+  doze-kafka --listen 127.0.0.1:9092           serve an address instead of the name (console 127.0.0.1:9093)
   doze-kafka --listen :9092 --advertised-host host.docker.internal
                                                reachable from containers on this machine
   doze-kafka --data-dir /tmp/kafka --retention-ms 3600000
@@ -155,7 +157,15 @@ Examples:
 //
 // The result is validated here, before anything starts, so every configuration
 // mistake is reported the same way at the same moment.
-func loadConfig(args []string) (startup, error) {
+func loadConfig(args []string) (startup, error) { return loadConfigFor(args, false) }
+
+// loadEnvConfig is loadConfig for `doze-kafka env`, which prints where a client
+// connects and never a password: there SASL mechanisms without users are
+// accepted, so `env --sasl-mechanisms SCRAM-SHA-512` (what the start-up summary
+// prints under SASL) works without the passwords on a command line.
+func loadEnvConfig(args []string) (startup, error) { return loadConfigFor(args, true) }
+
+func loadConfigFor(args []string, forEnv bool) (startup, error) {
 	args, showVersion, notices := normalizeArgs(args)
 	if showVersion {
 		return startup{}, errShowVersion
@@ -198,9 +208,26 @@ func loadConfig(args []string) (startup, error) {
 	}
 	c.ResolveAdvertisedHost()
 	c.ResolveConsoleAddr()
-	if err := c.Validate(); err != nil {
+	if c.ConsolePrefix == "" {
+		// The console's own fallback, resolved here so that `config print` shows the
+		// path it is really served under and Validate checks it like a flag.
+		c.ConsolePrefix = os.Getenv("DOZE_KAFKA_CONSOLE_PREFIX")
+	}
+	if c.ConsolePrefix == "" {
+		c.ConsolePrefix = config.DefaultConsolePrefix
+	}
+	check := c
+	if forEnv && check.AuthEnabled() && len(check.Credentials) == 0 {
+		check.Credentials = map[string]string{"env": "not printed"}
+	}
+	if err := check.Validate(); err != nil {
 		return startup{}, err
 	}
+	if c.ByName() && c.Zone && names.Disabled() {
+		// The same refusal as --zone=false, for the switch every doze binary reads.
+		return startup{}, fmt.Errorf("config: DOZE_ZONE=off turns .doze names off, and no --listen was set, so there is nothing to listen on; give --listen host:port (127.0.0.1:9092 for this machine only), or unset DOZE_ZONE")
+	}
+	notices = append(notices, c.Warnings()...)
 	return startup{cfg: c, configFile: configPath, notices: notices}, nil
 }
 
@@ -373,12 +400,14 @@ func registerFlags(fs *flag.FlagSet, cfg *config.Config) {
 	// Console.
 	fs.BoolVar(&cfg.Console, "console", cfg.Console, "serve the web console (topics, messages, consumer groups)")
 	fs.BoolVar(&cfg.SchemaRegistry, "schema-registry", cfg.SchemaRegistry, "serve a Confluent-compatible schema registry (Avro, JSON Schema, Protobuf)")
-	fs.StringVar(&cfg.SchemaRegistryAddr, "schema-registry-addr", cfg.SchemaRegistryAddr, "host:port for the schema registry (default: 8081 beside the broker, on its name's address or on loopback)")
+	fs.StringVar(&cfg.SchemaRegistryAddr, "schema-registry-addr", cfg.SchemaRegistryAddr, "host:port for the schema registry (default: 8081 beside the broker, on its name's address or on loopback; a free loopback port when --listen is on port 0)")
+	fs.BoolVar(&cfg.SchemaRegistryTLS, "schema-registry-tls", cfg.SchemaRegistryTLS, "serve the schema registry over TLS, with the broker's certificate, when --tls-cert and --tls-key are set; --schema-registry-tls=false keeps it plain HTTP")
 	fs.BoolVar(&cfg.Zone, "zone", cfg.Zone, "join the shared .doze zone (names and the console front door); --zone=false is the same as DOZE_ZONE=off")
 	fs.BoolVar(&cfg.ClientTelemetry, "client-telemetry", cfg.ClientTelemetry, "accept the metrics clients push about themselves (KIP-714) and show them in the console; --client-telemetry=false stops advertising the two APIs")
 	fs.StringVar(&cfg.TraceHeader, "trace-header", cfg.TraceHeader, "record header that holds a trace id (a request or correlation id), beside W3C traceparent and B3, for the console's \"follow this message\"")
-	fs.StringVar(&cfg.ConsoleAddr, "console-addr", cfg.ConsoleAddr, "host:port for the web console (Kafka's wire protocol cannot share a port with HTTP)")
+	fs.StringVar(&cfg.ConsoleAddr, "console-addr", cfg.ConsoleAddr, "host:port for the web console (default: 9093 beside the broker, on its name's address or on loopback; a free loopback port when --listen is on port 0)")
 	fs.StringVar(&cfg.ConsolePrefix, "console-prefix", cfg.ConsolePrefix, "URL path the web console is served under, for a reverse proxy that mounts it below a path (default /_console)")
+	fs.BoolVar(&cfg.ConsoleUnprotected, "console-unprotected", cfg.ConsoleUnprotected, "serve the console beyond loopback although SASL or TLS is on: it has no login, is plain HTTP and acts as a super user, so without this that start is refused")
 	fs.Var(&stringSliceFlag{vals: &cfg.ConsoleAllowHosts}, "console-allow-host", "extra host name the console answers to, besides localhost, IP addresses and *.doze (comma-separated or repeated); guards against DNS rebinding")
 
 	// Process.

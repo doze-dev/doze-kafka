@@ -24,7 +24,7 @@ tasks:
       - go build -o bin/{{.BINARY}} ./cmd/doze-kafka
 
   run:
-    desc: 'Build and run the broker (zero config: 127.0.0.1:9092, console on :9093)'
+    desc: 'Build and run the broker (zero config: kafka.<dir>.doze:9092, console at http://kafka.<dir>.doze)'
     deps: [build]
     cmds:
       - ./bin/{{.BINARY}}

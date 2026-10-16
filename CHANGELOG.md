@@ -101,6 +101,48 @@ here that contains "server API"; `task api` fails without it.
   given and closes it when it returns, except when the call is refused. No change to the
   exported surface.
 
+- With `--listen` on port 0 the console and the schema registry take free loopback
+  ports too, so the documented throwaway broker runs twice at once (the second one
+  failed on 8081). A fixed `--listen` keeps `127.0.0.1:9093` and `127.0.0.1:8081`.
+- The start-up summary's last-but-one line is an `env` command that gives this
+  broker: under `--listen` it carries the bound addresses (`eval "$(doze-kafka env
+  --listen 127.0.0.1:… --config '')"`), where the bare `doze-kafka env` printed the
+  `.doze` name. `doze-kafka env` accepts `--sasl-mechanisms` without `--sasl-user`.
+- `--zone=false` (`zone = false`, `DOZE_ZONE=off`) without `--listen` is a configuration
+  error, one line and exit 2, in every command; it used to fail after start-up began,
+  exit 1, and `doctor` and `env` reported a name that was not served.
+- `config print` prints every setting at its effective value, `console-prefix` and
+  `acl-default` included, and `meta-db` as a comment while it follows `data-dir`.
+  `DOZE_KAFKA_CONSOLE_PREFIX` is now validated like the flag.
+- `--console-prefix` (`console-prefix`, or `DOZE_KAFKA_CONSOLE_PREFIX`) serves the console
+  under another path, for a reverse proxy; `/` serves it at the root of its port.
+- Console: the home page is Traffic, or the first-run page on a broker with nothing in
+  it that has heard from no client (it was Topics); `/connect` is new and says how to
+  connect an app; `/trace` without an id is a page with a field for one (it was a 400);
+  the rail is grouped Observe, Data, Broker; the inspector, in the page's flow, replaces
+  the drawer; a high-contrast theme joins light and dark, and the palette no longer has
+  theme rows (the top bar's switch does it).
+- Protocol answers: CreateTopics refuses a manual assignment with a replication factor
+  or partition count set (`INVALID_REQUEST`) and a malformed one, such as a repeated or
+  missing partition, an empty replica list or an unknown broker
+  (`INVALID_REPLICA_ASSIGNMENT`); FindCoordinator answers `INVALID_REQUEST` for an
+  unknown key type; OffsetCommit answers `OFFSET_METADATA_TOO_LARGE` for metadata above
+  4096 bytes; `cleanup.policy` accepts a repeated value, as Kafka's list validator does.
+- Go 1.27 is required to build doze-kafka or embed it (`go.mod` says `go 1.27.0`).
+- The schema registry is served over TLS when the broker is: with `--tls-cert` and
+  `--tls-key` it answers `https://` with the same certificate (it stayed plain HTTP
+  before, so `schema.registry.url=https://...` failed and basic-auth passwords crossed in
+  the clear beside an encrypted broker). The summary and `doze-kafka env` print the
+  `https://` URL; by name that is `https://kafka.<name>.doze:8081`.
+  `--schema-registry-tls=false` (`schema-registry-tls`) keeps it plain HTTP, with a
+  warning at start-up when it is then reachable from other machines. **If you run with
+  a certificate, change `http://` to `https://` in your registry URL.**
+- With SASL or TLS on, a console address beyond loopback is refused at start-up (exit
+  2): the console has no login, is plain HTTP and acts as a super user.
+  `--console-unprotected` (`console-unprotected`) accepts it, with a warning.
+  [What SASL and TLS cover](docs/auth-and-tls.md#what-sasl-and-tls-cover) says what
+  each setting reaches.
+
 - Console: every button reads weight 400 whether it is a button or a link drawn as one (the
   boards draw them all as buttons). A request that took under a millisecond shows its
   measured time (`42 µs`, `0.4 ms`) rather than the design boards' `0 ms`: a broker
