@@ -199,7 +199,7 @@ tasks:
       - scripts/lightness.sh record {{.CLI_ARGS}}
 
   mutate:record:
-    desc: 'Mutation-test packages (gremlins, a go tool) and store counts and surviving mutants as file:line:type in testdata/mutation.json. Name packages: task mutate:record -- ./internal/protocol'
+    desc: 'Mutation-test units (scripts/mutate: each mutant runs the tests that reach it) and store every lived, uncovered, timed-out and setup-failed mutant, with a reason or "open", in testdata/mutation.json. Name units: task mutate:record -- internal/protocol'
     cmds:
       - go run ./scripts/mutate record {{.CLI_ARGS}}
 

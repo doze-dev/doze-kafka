@@ -39,8 +39,10 @@ type Unit struct {
 	Dir  string   // package directory, slash-separated, relative to the module root.
 	Only []string // file names (without .go) to mutate; empty means all of them.
 	// Shards is how many jobs the weekly workflow splits the unit into, so that
-	// none passes the plan's ten minutes by much on a four-core runner. The
-	// figures beside each are this machine's (18 cores, 4 workers), measured.
+	// none passes the plan's ten minutes by much on a GitHub runner. The figures
+	// beside each are whole-unit times measured on 2026-10-16 on a shared, loaded
+	// 18-core Mac with 3 workers (a runner has 4 cores, so about the same per
+	// shard); the broker groups took about two hours each.
 	Shards int
 	// Whole runs the whole suite for each mutant. For a package whose tests do
 	// not all pass on their own.
@@ -50,24 +52,24 @@ type Unit struct {
 // Units is every package the plan names (B3), the broker by file group, and the
 // three small packages the binary's behaviour starts in.
 var Units = []Unit{
-	{Name: "internal/protocol", Dir: "internal/protocol", Shards: 1},
-	{Name: "internal/storage/log", Dir: "internal/storage/log", Shards: 1},
-	{Name: "internal/storage/meta", Dir: "internal/storage/meta", Shards: 1},
-	{Name: "internal/traffic", Dir: "internal/traffic", Shards: 1},
-	{Name: "internal/telemetry", Dir: "internal/telemetry", Shards: 1},
-	{Name: "internal/settings", Dir: "internal/settings", Shards: 1},
-	{Name: "internal/config", Dir: "internal/config", Shards: 1},
-	{Name: "schemaregistry", Dir: "schemaregistry", Shards: 1},
-	{Name: "console", Dir: "console", Shards: 1},
-	{Name: "cmd/doze-kafka", Dir: "cmd/doze-kafka", Shards: 1},
+	{Name: "internal/protocol", Dir: "internal/protocol", Shards: 2},         // 13 min (3 workers, loaded)
+	{Name: "internal/storage/log", Dir: "internal/storage/log", Shards: 4},   // 35 min
+	{Name: "internal/storage/meta", Dir: "internal/storage/meta", Shards: 1}, // 4 min
+	{Name: "internal/traffic", Dir: "internal/traffic", Shards: 1},           // 3 min
+	{Name: "internal/telemetry", Dir: "internal/telemetry", Shards: 1},       // 37 s
+	{Name: "internal/settings", Dir: "internal/settings", Shards: 1},         // 2 min
+	{Name: "internal/config", Dir: "internal/config", Shards: 1},             // 2 min
+	{Name: "schemaregistry", Dir: "schemaregistry", Shards: 2},               // 14 min
+	{Name: "console", Dir: "console", Shards: 8},                             // 80 min (4 workers)
+	{Name: "cmd/doze-kafka", Dir: "cmd/doze-kafka", Shards: 2},               // 15 min
 	// The broker by what the file does: each group is one unit.
-	{Name: "internal/broker:groups", Dir: "internal/broker", Shards: 1, Only: []string{
+	{Name: "internal/broker:groups", Dir: "internal/broker", Shards: 8, Only: []string{
 		"group", "group848", "group848_assign", "groups", "groups848", "groupadmin", "groupdelete", "groupevents", "grouptimer", "groupmigrate", "offsetexpiry", "offsets"}},
-	{Name: "internal/broker:data", Dir: "internal/broker", Shards: 1, Only: []string{
+	{Name: "internal/broker:data", Dir: "internal/broker", Shards: 8, Only: []string{
 		"produce", "fetch", "idempotency", "listoffsets", "deleterecords", "producerid", "txn", "txnapis"}},
-	{Name: "internal/broker:admin", Dir: "internal/broker", Shards: 1, Only: []string{
+	{Name: "internal/broker:admin", Dir: "internal/broker", Shards: 8, Only: []string{
 		"topics", "topicconfig", "topiclimits", "configs", "alterconfigs", "createpartitions", "metadata", "apiversions", "telemetry", "bounds"}},
-	{Name: "internal/broker:auth", Dir: "internal/broker", Shards: 1, Only: []string{
+	{Name: "internal/broker:auth", Dir: "internal/broker", Shards: 8, Only: []string{
 		"auth", "authorizer", "acls", "scram", "broker"}},
 }
 

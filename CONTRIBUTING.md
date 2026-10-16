@@ -67,10 +67,14 @@ first and watch it fail.
   with neither, and on a marker or a listed target with nothing at its other end.
   `soak` and `chaos` run the long harnesses.
 - Tests notice when the code is wrong, not only when it runs: `go tool task
-  mutate:check -- ./internal/protocol` fails on a surviving mutant that
-  `testdata/mutation.json` does not list (`mutate:record` after killing or
-  understanding one; `mutate:list` shows the units, the broker is split by file
-  group). It takes minutes to hours, so it runs weekly in CI, not in `task check`.
+  mutate:check -- internal/protocol` (scripts/mutate) runs the tests that reach each
+  mutant and fails on any lived, uncovered, timed-out or setup-failed mutant that
+  `testdata/mutation.json` does not list, and on a listed one that is now killed. A
+  build or setup failure is never counted as a kill. Each listed mutant carries a
+  reason, or "open" while nobody has examined it; `plan/evidence/mutation-survivors.md`
+  lists them (`go run ./scripts/mutate report`). `mutate:list` shows the units and
+  their shards. It takes minutes to hours: CI runs the units a pull request changed,
+  and every shard weekly, not in `task check` (the gate's own self-test is).
 - The embedding API (`server/`) is pinned: `go tool task api` fails when its exported
   surface changed without a `CHANGELOG.md` line containing "server API"
   (`task api:record` writes the new surface).

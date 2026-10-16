@@ -190,10 +190,14 @@ either fixed (with the red test) or written in `docs/limitations.md`.
 
 ### B3. Mutation per package
 
-A mutation tool (gremlins) added as a `go tool`; `task mutate:record -- ./pkg/...`
-stores counts and surviving mutants as `file:line:type` in
-`testdata/mutation.json`; `task mutate:check` fails on a survivor the baseline
-does not have. Packages: `internal/protocol`, `internal/storage/log`,
+A mutation tool; `task mutate:record -- <unit>` stores counts and surviving mutants
+as `file:line:type` in `testdata/mutation.json`; `task mutate:check` fails on a
+survivor the baseline does not have. (Built first on gremlins as a `go tool`, which
+counted every mutant whose test run failed to start as killed: `--test-cpu 2`
+reached `go test` as one argument and every run failed in setup, so every baseline
+it recorded said zero lived and none was true. It is `scripts/mutate` now, with a
+self-test that plants that fault; see `plan/evidence/mutation-survivors.md` for the
+honest numbers.) Packages: `internal/protocol`, `internal/storage/log`,
 `internal/storage/meta`, `internal/broker` (split by file group for time),
 `internal/traffic`, `internal/telemetry`, `schemaregistry`, `console`.
 

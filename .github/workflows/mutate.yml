@@ -50,9 +50,10 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.units.outputs.matrix) }}
     runs-on: ubuntu-latest
-    # The slowest shard measured on a loaded 10-core Mac with 4 workers is under
-    # 25 minutes (plan/evidence/mutation-survivors.md has every unit's time); a
-    # 2-core runner takes about twice as long.
+    # A shard takes about its unit's time over its shard count: the units' times,
+    # measured on a loaded Mac with 3 workers, are beside their shard counts in
+    # scripts/mutate/main.go (the slowest unit is about two hours, in 8 shards).
+    # Not yet run on a GitHub runner; the timeout is the margin for that.
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
