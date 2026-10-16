@@ -1,7 +1,7 @@
 package conformance
 
 import (
-	"fmt"
+	"time"
 
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
@@ -12,13 +12,24 @@ import (
 // seam (TestFullDiskProduceIsKafkaStorageError_FaultSeam). It lives in a test
 // file because nothing replays it: the recorder is a test.
 func init() {
-	Scenarios = append(Scenarios, Scenario{Name: "full-disk", Run: fullDisk, DiskMiB: 24})
+	Scenarios = append(Scenarios,
+		Scenario{Name: "full-disk", Run: fullDisk(-1), DiskMiB: 24},
+		Scenario{Name: "full-disk-acks-1", Run: fullDisk(1), DiskMiB: 24})
 }
 
-// fullDisk is Q2: the data volume fills while a producer writes. It records
-// the code of the first refused Produce at acks=all and at acks=1, what a Fetch
-// and a Metadata request do afterwards, and whether the broker is still there.
-func fullDisk(e *Env) {
+// fullDisk is Q2: the data volume fills while a producer writes at acks. It
+// records the code of the first refused Produce and then that the broker goes
+// away. It does not record requests between the two: a single-directory Kafka
+// whose log directory failed shuts itself down a moment later, and whether a
+// request is answered first is a race inside Kafka (one recording answered
+// Metadata, the next closed the connection). So the script waits, up to a
+// minute, until the broker no longer answers, and records that; which is why
+// acks=1 is a scenario of its own and not a request after the acks=all one.
+func fullDisk(acks int16) func(e *Env) {
+	return func(e *Env) { fullDiskAt(e, acks) }
+}
+
+func fullDiskAt(e *Env, acks int16) {
 	e.Do("create", createTopics(false, newTopic("disk", 1, 1)), 7)
 	e.Produce("small-ok", "disk", 0, ProduceRecord{TimestampMs: 1000, Key: "k", Value: "v"})
 
@@ -41,7 +52,7 @@ func fullDisk(e *Env) {
 	// the broker, so only the refusal is recorded, with a stub request.
 	var first *kmsg.ProduceResponse
 	for i := 0; i < 200 && first == nil; i++ {
-		resp, err := e.w.roundTrip(req(-1), 9)
+		resp, err := e.w.roundTrip(req(acks), 9)
 		if err != nil {
 			e.fail("fill %d: %v", i, err)
 			return
@@ -59,32 +70,24 @@ func fullDisk(e *Env) {
 		e.fail("normalize: %v", err)
 		return
 	}
-	e.steps = append(e.steps, Step{Label: "first-refused-acks-all", API: "Produce", Version: 9,
-		Request: map[string]any{"(a batch of 700 KiB, repeated until the volume was full)": 0}, Response: nresp})
+	e.steps = append(e.steps, Step{Label: "first-refused", API: "Produce", Version: 9,
+		Request: map[string]any{"(a batch of 700 KiB, repeated until the volume was full)": acks}, Response: nresp})
 
-	stub := func(label string, acks int16) {
-		resp, err := e.w.roundTrip(req(acks), 9)
+	gone := "still answering a minute after the refusal"
+	for deadline := time.Now().Add(time.Minute); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
+		w, err := dialOnce(e.target.Addr())
 		if err != nil {
-			e.steps = append(e.steps, Step{Label: label, API: "Produce", Version: 9,
-				Request:  map[string]any{"(a batch of 700 KiB)": acks},
-				Response: map[string]any{"(connection)": fmt.Sprint("error: ", err)}})
-			return
+			gone = "stopped"
+			break
 		}
-		n, _ := e.norm.normalize(resp)
-		e.steps = append(e.steps, Step{Label: label, API: "Produce", Version: 9,
-			Request: map[string]any{"(a batch of 700 KiB)": acks}, Response: n})
+		w.fast = true
+		_, err = w.roundTrip(metadata(false, "disk"), 9)
+		w.close()
+		if err != nil {
+			gone = "stopped"
+			break
+		}
 	}
-	stub("refused-again-acks-all", -1)
-	stub("refused-acks-1", 1)
-
-	e.Do("metadata-after", metadata(false, "disk"), 9)
-	lo := kmsg.NewPtrListOffsetsRequest()
-	lt := kmsg.NewListOffsetsRequestTopic()
-	lt.Topic = "disk"
-	lp := kmsg.NewListOffsetsRequestTopicPartition()
-	lp.Partition, lp.Timestamp = 0, -2
-	lt.Partitions = append(lt.Partitions, lp)
-	lo.Topics = append(lo.Topics, lt)
-	e.Do("list-earliest-after", lo, 7)
-	e.Do("create-after", createTopics(false, newTopic("disk-2", 1, 1)), 7)
+	e.steps = append(e.steps, Step{Label: "broker-after-the-refusal", API: "(broker)",
+		Request: map[string]any{"(Metadata on a new connection, until it is not answered)": 0}, Response: map[string]any{"(broker)": gone}})
 }

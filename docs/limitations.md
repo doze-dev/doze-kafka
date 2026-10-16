@@ -26,7 +26,7 @@ implement it.
   `acks=all`; at `acks=0`, which has no response to carry it, the connection is closed.
   Reads, Metadata and group traffic keep working, and freeing space lets writes resume
   without a restart. Kafka goes further: with its only log directory failed the broker
-  shuts down (the recording's last two steps are a closed connection); this one stays
+  shuts down within a minute (the recordings' last step, `broker-after-the-refusal`); this one stays
   up, which is kinder to a development machine and not what a production broker does.
 - **After a failed `fsync` the partition refuses writes until the broker restarts.**
   On Linux a failed `fsync` can drop the unflushed pages and clear the error, so a
