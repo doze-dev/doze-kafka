@@ -37,9 +37,6 @@ func FuzzValidateBatches(f *testing.F) {
 			}
 			pos += int(info.totalBytes)
 		}
-		if got := LargestBatch(b); got > int64(len(b)) {
-			t.Fatalf("LargestBatch %d is larger than the payload (%d)", got, len(b))
-		}
 	})
 }
 

@@ -134,7 +134,8 @@ func (n *node) Start() {
 
 func (n *node) launch() {
 	args := []string{"-listen", n.Addr, "-data-dir", n.DataDir, "-meta-db", n.MetaDB,
-		"-fsync-interval", n.fsync, "-kafka-version", strconv.Itoa(nodeKafkaVersion), "-console=false"}
+		"-fsync-interval", n.fsync, "-kafka-version", strconv.Itoa(nodeKafkaVersion), "-console=false",
+		"-schema-registry=false"} // a crash test needs neither, and a fixed port taken by anything else on the machine would stop the broker starting
 	if n.pprofAddr != "" {
 		args = append(args, "-pprof-addr", n.pprofAddr)
 	}
