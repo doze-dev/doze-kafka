@@ -166,7 +166,7 @@ func (b *Broker) handleListGroups(ctx context.Context, req *protocol.Request, lr
 // protocol groups are described via ConsumerGroupDescribe). An unknown group is
 // reported as Dead with no members — Kafka's behaviour, not an error.
 func (b *Broker) handleDescribeGroups(ctx context.Context, req *protocol.Request, dr *kmsg.DescribeGroupsRequest, resp *kmsg.DescribeGroupsResponse) error {
-	for _, id := range dr.Groups {
+	for _, id := range inKafkaGroupOrder(dr.Groups) {
 		rg := kmsg.NewDescribeGroupsResponseGroup()
 		rg.Group = id
 		if !b.canGroup(req.Conn, id, opDescribe) {

@@ -23,7 +23,7 @@ func (b *Broker) groupIsActive(id string) bool {
 // handleDeleteGroups removes empty groups. A group with live members is refused
 // (NON_EMPTY_GROUP), an unknown one is GROUP_ID_NOT_FOUND, as on Kafka.
 func (b *Broker) handleDeleteGroups(ctx context.Context, req *protocol.Request, dr *kmsg.DeleteGroupsRequest, resp *kmsg.DeleteGroupsResponse) error {
-	for _, id := range dr.Groups {
+	for _, id := range inKafkaGroupOrder(dr.Groups) {
 		rg := kmsg.NewDeleteGroupsResponseGroup()
 		rg.Group = id
 		if !b.canGroup(req.Conn, id, opDelete) {

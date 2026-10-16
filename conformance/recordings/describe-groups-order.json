@@ -1,0 +1,3451 @@
+{
+  "scenario": "describe-groups-order",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "dgo"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "dgo",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "find-coordinators",
+      "api": "FindCoordinator",
+      "version": 4,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": [
+          "dgo-a",
+          "dgo-b",
+          "dgo-c",
+          "dgo-d",
+          "dgo-x",
+          "dgo-y"
+        ],
+        "CoordinatorType": 0
+      },
+      "response": {
+        "Coordinators": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "dgo-a",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "dgo-b",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "dgo-c",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "dgo-d",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "dgo-x",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "dgo-y",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          }
+        ],
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "dgo-a-join-needs-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "dgo-a",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANkZ2//////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "dgo-a-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "dgo-a",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANkZ2//////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:1\u003e",
+            "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "dgo-a-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "dgo-a",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+            "MemberID": "\u003cmember:1\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "dgo-b-join-needs-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "dgo-b",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANkZ2//////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "dgo-b-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "dgo-b",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANkZ2//////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:2\u003e",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:2\u003e",
+            "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "dgo-b-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "dgo-b",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+            "MemberID": "\u003cmember:2\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "dgo-c-join-needs-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "dgo-c",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANkZ2//////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:3\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "dgo-c-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "dgo-c",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:3\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANkZ2//////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:3\u003e",
+        "MemberID": "\u003cmember:3\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:3\u003e",
+            "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "dgo-c-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "dgo-c",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+            "MemberID": "\u003cmember:3\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:3\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "dgo-d-join-needs-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "dgo-d",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANkZ2//////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:4\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "dgo-d-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "dgo-d",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAANkZ2//////",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:4\u003e",
+        "MemberID": "\u003cmember:4\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:4\u003e",
+            "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "dgo-d-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "dgo-d",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+            "MemberID": "\u003cmember:4\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-forward",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "dgo-a",
+          "dgo-b",
+          "dgo-c",
+          "dgo-d",
+          "dgo-x",
+          "dgo-y"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-x",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-y",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-d",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:4\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-b",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:2\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-c",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:3\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-a",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:1\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-backward",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "dgo-y",
+          "dgo-x",
+          "dgo-d",
+          "dgo-c",
+          "dgo-b",
+          "dgo-a"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-x",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-y",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-d",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:4\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-b",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:2\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-c",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:3\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-a",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:1\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-mixed",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "dgo-c",
+          "dgo-x",
+          "dgo-a",
+          "dgo-d",
+          "dgo-y",
+          "dgo-b"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-x",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-y",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-d",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:4\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-b",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:2\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-c",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:3\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-a",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:1\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-twice",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "dgo-b",
+          "dgo-a",
+          "dgo-b"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-b",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:2\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-b",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:2\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-a",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:1\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-two",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "dgo-d",
+          "dgo-a"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-d",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:4\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-a",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:1\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-two-again",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "dgo-a",
+          "dgo-d"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-d",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:4\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-a",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:1\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-empty-id",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "dgo-c",
+          "",
+          "dgo-x",
+          "dgo-a"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-x",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-c",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:3\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-a",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "AAAAAAABAANkZ28AAAACAAAAAAAAAAH/////",
+                "MemberID": "\u003cmember:1\u003e",
+                "ProtocolMetadata": "AAAAAAABAANkZ2//////"
+              }
+            ],
+            "Protocol": "range",
+            "ProtocolType": "consumer",
+            "State": "Stable"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "dgo-n1-join",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "dgo-n1",
+        "InstanceID": null,
+        "MemberEpoch": 0,
+        "MemberID": "",
+        "RackID": null,
+        "RebalanceTimeoutMillis": 30000,
+        "ServerAssignor": "uniform",
+        "SubscribedTopicNames": [
+          "dgo"
+        ],
+        "SubscribedTopicRegex": null,
+        "Topics": []
+      },
+      "response": {
+        "Assignment": {
+          "Topics": [
+            {
+              "Partitions": [
+                0
+              ],
+              "TopicID": "\u003ctopic-id:1\u003e"
+            }
+          ]
+        },
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:5\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "dgo-n2-join",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "dgo-n2",
+        "InstanceID": null,
+        "MemberEpoch": 0,
+        "MemberID": "",
+        "RackID": null,
+        "RebalanceTimeoutMillis": 30000,
+        "ServerAssignor": "uniform",
+        "SubscribedTopicNames": [
+          "dgo"
+        ],
+        "SubscribedTopicRegex": null,
+        "Topics": []
+      },
+      "response": {
+        "Assignment": {
+          "Topics": [
+            {
+              "Partitions": [
+                0
+              ],
+              "TopicID": "\u003ctopic-id:1\u003e"
+            }
+          ]
+        },
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:6\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "dgo-n3-join",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "dgo-n3",
+        "InstanceID": null,
+        "MemberEpoch": 0,
+        "MemberID": "",
+        "RackID": null,
+        "RebalanceTimeoutMillis": 30000,
+        "ServerAssignor": "uniform",
+        "SubscribedTopicNames": [
+          "dgo"
+        ],
+        "SubscribedTopicRegex": null,
+        "Topics": []
+      },
+      "response": {
+        "Assignment": {
+          "Topics": [
+            {
+              "Partitions": [
+                0
+              ],
+              "TopicID": "\u003ctopic-id:1\u003e"
+            }
+          ]
+        },
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:7\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "consumer-describe-forward",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "dgo-n3",
+          "dgo-n1",
+          "dgo-n2",
+          "dgo-a",
+          "dgo-b",
+          "dgo-c",
+          "dgo-d",
+          "dgo-x",
+          "dgo-y"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n2",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:6\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "dgo"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          },
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n1",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:5\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "dgo"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-x not found.",
+            "Group": "dgo-x",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-y not found.",
+            "Group": "dgo-y",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n3",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:7\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "dgo"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-d is not a consumer group.",
+            "Group": "dgo-d",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-b is not a consumer group.",
+            "Group": "dgo-b",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-c is not a consumer group.",
+            "Group": "dgo-c",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-a is not a consumer group.",
+            "Group": "dgo-a",
+            "Members": null,
+            "State": ""
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "consumer-describe-backward",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "dgo-n3",
+          "dgo-n1",
+          "dgo-n2",
+          "dgo-y",
+          "dgo-x",
+          "dgo-d",
+          "dgo-c",
+          "dgo-b",
+          "dgo-a"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n2",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:6\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "dgo"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          },
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n1",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:5\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "dgo"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-x not found.",
+            "Group": "dgo-x",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-y not found.",
+            "Group": "dgo-y",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n3",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:7\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "dgo"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-d is not a consumer group.",
+            "Group": "dgo-d",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-b is not a consumer group.",
+            "Group": "dgo-b",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-c is not a consumer group.",
+            "Group": "dgo-c",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-a is not a consumer group.",
+            "Group": "dgo-a",
+            "Members": null,
+            "State": ""
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "consumer-describe-mixed",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "dgo-n3",
+          "dgo-n1",
+          "dgo-n2",
+          "dgo-c",
+          "dgo-x",
+          "dgo-a",
+          "dgo-d",
+          "dgo-y",
+          "dgo-b"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n2",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:6\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "dgo"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          },
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n1",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:5\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "dgo"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-x not found.",
+            "Group": "dgo-x",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-y not found.",
+            "Group": "dgo-y",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n3",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:7\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "dgo"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-d is not a consumer group.",
+            "Group": "dgo-d",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-b is not a consumer group.",
+            "Group": "dgo-b",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-c is not a consumer group.",
+            "Group": "dgo-c",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-a is not a consumer group.",
+            "Group": "dgo-a",
+            "Members": null,
+            "State": ""
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "offset-fetch-forward",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "dgo-a",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": null
+          },
+          {
+            "Group": "dgo-b",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": null
+          },
+          {
+            "Group": "dgo-c",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": null
+          },
+          {
+            "Group": "dgo-d",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": null
+          },
+          {
+            "Group": "dgo-x",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": null
+          },
+          {
+            "Group": "dgo-y",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": null
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "dgo-a",
+            "Topics": null
+          },
+          {
+            "ErrorCode": 0,
+            "Group": "dgo-b",
+            "Topics": null
+          },
+          {
+            "ErrorCode": 0,
+            "Group": "dgo-c",
+            "Topics": null
+          },
+          {
+            "ErrorCode": 0,
+            "Group": "dgo-d",
+            "Topics": null
+          },
+          {
+            "ErrorCode": 0,
+            "Group": "dgo-x",
+            "Topics": null
+          },
+          {
+            "ErrorCode": 0,
+            "Group": "dgo-y",
+            "Topics": null
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "offset-fetch-mixed",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "dgo-c",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": null
+          },
+          {
+            "Group": "dgo-x",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": null
+          },
+          {
+            "Group": "dgo-a",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": null
+          },
+          {
+            "Group": "dgo-d",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": null
+          },
+          {
+            "Group": "dgo-y",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": null
+          },
+          {
+            "Group": "dgo-b",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": null
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "dgo-c",
+            "Topics": null
+          },
+          {
+            "ErrorCode": 0,
+            "Group": "dgo-x",
+            "Topics": null
+          },
+          {
+            "ErrorCode": 0,
+            "Group": "dgo-a",
+            "Topics": null
+          },
+          {
+            "ErrorCode": 0,
+            "Group": "dgo-d",
+            "Topics": null
+          },
+          {
+            "ErrorCode": 0,
+            "Group": "dgo-y",
+            "Topics": null
+          },
+          {
+            "ErrorCode": 0,
+            "Group": "dgo-b",
+            "Topics": null
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "offset-fetch-empty-id",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "dgo-c",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": null
+          },
+          {
+            "Group": "",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": null
+          },
+          {
+            "Group": "dgo-x",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": null
+          },
+          {
+            "Group": "dgo-a",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": null
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "dgo-c",
+            "Topics": null
+          },
+          {
+            "ErrorCode": 0,
+            "Group": "",
+            "Topics": null
+          },
+          {
+            "ErrorCode": 0,
+            "Group": "dgo-x",
+            "Topics": null
+          },
+          {
+            "ErrorCode": 0,
+            "Group": "dgo-a",
+            "Topics": null
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "consumer-describe-one-bucket-0",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "dgo-n3",
+          "dgo-y"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-y not found.",
+            "Group": "dgo-y",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n3",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:7\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "dgo"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-one-bucket-0",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "dgo-n3",
+          "dgo-y"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-y",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n3",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "consumer-describe-one-bucket-1",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "dgo-y",
+          "dgo-n3"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n3",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:7\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "dgo"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-y not found.",
+            "Group": "dgo-y",
+            "Members": null,
+            "State": ""
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-one-bucket-1",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "dgo-y",
+          "dgo-n3"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n3",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-y",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "consumer-describe-one-bucket-2",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "dgo-n3",
+          "dgo-y",
+          "dgo-x"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-x not found.",
+            "Group": "dgo-x",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-y not found.",
+            "Group": "dgo-y",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n3",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:7\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "dgo"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-one-bucket-2",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "dgo-n3",
+          "dgo-y",
+          "dgo-x"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-x",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-y",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n3",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "consumer-describe-one-bucket-3",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "dgo-n1",
+          "dgo-n3",
+          "dgo-y"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n1",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:5\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "dgo"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-y not found.",
+            "Group": "dgo-y",
+            "Members": null,
+            "State": ""
+          },
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n3",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:7\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "dgo"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-one-bucket-3",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "dgo-n1",
+          "dgo-n3",
+          "dgo-y"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n1",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-y",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n3",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "consumer-describe-one-bucket-4",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "dgo-y",
+          "dgo-n1",
+          "dgo-n3"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n1",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:5\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "dgo"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          },
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n3",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:7\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "dgo"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0
+                      ],
+                      "Topic": "dgo",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          },
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group dgo-y not found.",
+            "Group": "dgo-y",
+            "Members": null,
+            "State": ""
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-one-bucket-4",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "dgo-y",
+          "dgo-n1",
+          "dgo-n3"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n1",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-n3",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-y",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-one-partition-or-many-0",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "dgo-p8",
+          "dgo-x",
+          "dgo-p44"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p8",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-x",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p44",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-one-partition-or-many-1",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "dgo-p44",
+          "dgo-x",
+          "dgo-p8"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p44",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-x",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p8",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-one-partition-or-many-2",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "dgo-p0",
+          "dgo-p1",
+          "dgo-p2",
+          "dgo-p3",
+          "dgo-p4",
+          "dgo-p5",
+          "dgo-p6",
+          "dgo-p7",
+          "dgo-p8",
+          "dgo-p9",
+          "dgo-p10",
+          "dgo-p11",
+          "dgo-p12",
+          "dgo-p13",
+          "dgo-p14",
+          "dgo-p15",
+          "dgo-p16",
+          "dgo-p17",
+          "dgo-p18",
+          "dgo-p19"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p2",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p13",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p1",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p14",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p4",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p11",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p3",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p12",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p6",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p5",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p10",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p8",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p7",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p19",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p17",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p18",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p0",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p15",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p16",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p9",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "describe-one-partition-or-many-3",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "dgo-p19",
+          "dgo-p18",
+          "dgo-p17",
+          "dgo-p16",
+          "dgo-p15",
+          "dgo-p14",
+          "dgo-p13",
+          "dgo-p12",
+          "dgo-p11",
+          "dgo-p10",
+          "dgo-p9",
+          "dgo-p8",
+          "dgo-p7",
+          "dgo-p6",
+          "dgo-p5",
+          "dgo-p4",
+          "dgo-p3",
+          "dgo-p2",
+          "dgo-p1",
+          "dgo-p0"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p13",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p2",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p14",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p1",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p11",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p4",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p12",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p3",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p6",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p10",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p5",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p8",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p7",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p19",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p17",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p18",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p15",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p0",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p16",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "dgo-p9",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Dead"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "delete-mixed",
+      "api": "DeleteGroups",
+      "version": 2,
+      "request": {
+        "Groups": [
+          "dgo-y",
+          "dgo-c",
+          "dgo-x",
+          "dgo-a",
+          "dgo-b"
+        ]
+      },
+      "response": {
+        "Groups": [
+          {
+            "ErrorCode": 69,
+            "ErrorMessage": null,
+            "Group": "dgo-x"
+          },
+          {
+            "ErrorCode": 69,
+            "ErrorMessage": null,
+            "Group": "dgo-y"
+          },
+          {
+            "ErrorCode": 68,
+            "ErrorMessage": null,
+            "Group": "dgo-b"
+          },
+          {
+            "ErrorCode": 68,
+            "ErrorMessage": null,
+            "Group": "dgo-c"
+          },
+          {
+            "ErrorCode": 68,
+            "ErrorMessage": null,
+            "Group": "dgo-a"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}

@@ -6,6 +6,12 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Groups: DescribeGroups, ConsumerGroupDescribe and DeleteGroups that name several
+  groups answer them in Kafka's order, which is not the request's (it follows the
+  groups' __consumer_offsets partitions); doze answered in the request's order. A client
+  that pairs the answers with what it asked by position now pairs them as on Kafka
+  (recorded: describe-groups-order).
+
 - Groups: ConsumerGroupDescribe shows a static member that has left for a restart
   (epoch -2) at epoch -2, and its group Reconciling, as Kafka does; it showed the epoch
   it had left at and the group Stable (recorded: consumer-static-leave).
