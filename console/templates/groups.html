@@ -86,7 +86,7 @@
 {{define "group_detail"}}{{template "shell_top" .}}
   {{template "group_lp" (dict "Groups" .Groups "Sel" .Group.ID)}}
   <main class="main workbench" id="detail">
-    <div class="backrow"><a class="btn sm" href="{{.Prefix}}/groups">‹ <span class="back-wide">Groups</span><span class="back-narrow">All groups</span></a><span class="note">{{len .Groups}} group{{if ne (len .Groups) 1}}s{{end}}, the list is one tap away</span></div>
+    <div class="backrow"><a class="btn sm" href="{{.Prefix}}/groups">‹&nbsp;<span class="back-wide">Groups</span><span class="back-narrow">All groups</span></a><span class="note">{{len .Groups}} group{{if ne (len .Groups) 1}}s{{end}}, the list is one tap away</span></div>
     {{template "group_live" .}}
   </main>
   {{template "wire_dock" .}}

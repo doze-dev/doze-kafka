@@ -136,7 +136,7 @@
 {{define "topic_detail"}}{{template "shell_top" .}}
   {{template "topic_lp" (dict "List" .List "Sel" .Topic.Name)}}
   <main class="main workbench gap8" id="detail">
-    <div class="backrow"><a class="btn sm" href="{{.Prefix}}/topics">‹ <span class="back-wide">Topics</span><span class="back-narrow">All topics</span></a><span class="note">{{.ListCount}} topic{{if ne .ListCount 1}}s{{end}}, the list is one tap away</span></div>
+    <div class="backrow"><a class="btn sm" href="{{.Prefix}}/topics">‹&nbsp;<span class="back-wide">Topics</span><span class="back-narrow">All topics</span></a><span class="note">{{.ListCount}} topic{{if ne .ListCount 1}}s{{end}}, the list is one tap away</span></div>
 
     <div class="row sb ce idband">
       <h1 class="h1 m">{{.Topic.Name}}</h1>

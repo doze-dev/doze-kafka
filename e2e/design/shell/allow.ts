@@ -29,6 +29,20 @@ const TABLE_72 = 'as TABLE, and the offset track is 72 px, not 62, so 1,234,567 
 const HEAD_ROW = 'the inspector\'s head is a row: its text, and Tp-06\'s older, newer and close beside it (Sy-02 draws none); the 12 px is between those two, the cap is as wide as its word, and the text\'s lines are where Sy-02 draws them';
 const VALUE_ROW = 'the value\'s caption shares its row with Tp-06\'s Text, Hex and Base64 switch (24 px), centred in it: 5 px lower than Sy-02\'s caption alone, as wide as its words, and the value 6 px lower';
 
+const STACKED = 'at 960 the message is the inspector drawn as a card in its own row under main (the same panel at every width, so its keys and address are the same), not inside main: main ends above it, and the card\'s 16 px inset is its margin';
+const BACK_PARTS = 'the arrow and the word are two parts (the word is "Topics" at 960 and "All topics" at 390), so the button\'s 6 px gap is none and the space between them is the text\'s own, as the board\'s one run of text';
+const FIELD_NAMES = 'the boards disagree on the field names\' column (Sy-02 and Tp-06 84 px, Sy-03 70, Sy-04 64): the console draws one at every width, Sy-02\'s and Tp-06\'s';
+const VALUE_COL = 'the value is in a column with its caption and Tp-06\'s Text, Hex and Base64 switch, which shares the card equally with the fields (416 px each); the board\'s code block, alone, takes its own 26 px of padding and border over its share';
+const TP05_WIRE_960 = 'at 960 Tp-05\'s six columns fit (912 px) and the console draws them; Sy-03 draws four (no client, no took)';
+const SR_WORDS = 'the button keeps its words, "Jump or act…", for a screen reader, clipped to nothing; the board names it with aria-label instead';
+const DOT = 'the dot is inside the broker pill, whose address is read to a screen reader and not drawn, and the pill\'s type is 12 px; the board\'s dot sits in the top bar\'s 13 px; a dot has no text';
+const TABS_SCROLL = 'the tabs scroll sideways in their own box, the screen\'s width less its margins (366); the board scrolls a wrapper the screen\'s width with the tabs 470 wide inside it: the same tabs and the same scroll';
+const CARD_ROW = 'a card is the table\'s row laid out as a grid (the records are a table at every width): the key and its position share its first row 8 px apart (the board\'s row.sb), and the 8 px between cards is its margin, not the list\'s gap';
+const SCRIM = 'the scrim is the sheet\'s own shadow, 100vmax of the board\'s scrim colour (narrow.spec checks the colour), not an element of its own';
+const GRAB = 'the grab handle is the sheet\'s ::before, 36 x 4, centred, 8 px down, as the board\'s (narrow.spec checks it): the gate cannot select a pseudo-element';
+const SHEET_PARTS = 'the sheet\'s head and body carry its 14 px and the 8 px between its parts themselves, so the record scrolls in the body under a head that stays; the board pads the sheet';
+const TP06_ACTS = 'the actions are Tp-06\'s, Send again, Edit a copy… and Download value, beside Follow this trace (Copy as curl is CUT: plan/00-foundation.md), so they take two rows; they stay at the sheet\'s foot as the board\'s do, on the card\'s colour because the record scrolls under them';
+
 // ---------- data: the seed is not the boards' sample ----------
 const LIST_CAP = 'the caption is Tp-05\'s, "Topics · N · messages", with the seed\'s 14 topics; Sy-01 writes "Every topic" and Sy-02 "Topics"';
 const SEED_ORDER = 'the open topic is seed-orders, the tenth of the seed\'s topics by name; the board\'s is its first';
@@ -41,6 +55,7 @@ const AD1_FILTER = 'AD1: a filter field at the top of the list pane, which the b
 export const ALLOW: Allowed[] = [
   ...shellAllow('Sy-01'),
   ...shellAllow('Sy-02', ['1440-dark']),
+  ...shellAllow('Sy-03', ['960-dark', '960-light']),
   { board: 'Sy-01', el: 'list head', prop: 'h', board_value: "36", live_value: "45", at: ['1440-dark', '1440-light'], reason: TP05_LIST_HEAD, per: {board: 'Tp-05-Messages'} },
   { board: 'Sy-01', el: 'list head', prop: 'padding', board_value: "10px 12px 6px", live_value: "10px 12px", at: ['1440-dark', '1440-light'], reason: TP05_LIST_HEAD, per: {board: 'Tp-05-Messages'} },
   { board: 'Sy-01', el: 'list head', prop: 'gap', board_value: "6px 6px", live_value: "12px 12px", at: ['1440-dark', '1440-light'], reason: TP05_LIST_HEAD, per: {board: 'Tp-05-Messages'} },
@@ -293,4 +308,47 @@ export const ALLOW: Allowed[] = [
   { board: 'Sy-02', el: 'value cap', prop: 'w', board_value: "387", live_value: "117.7", at: ['1440-dark'], reason: VALUE_ROW },
   { board: 'Sy-02', el: 'value', prop: 'y', board_value: "253", live_value: "259", at: ['1440-dark'], reason: VALUE_ROW },
   { board: 'Sy-02', el: 'callout', prop: 'presence', board_value: "present", live_value: "absent", at: ['1440-dark'], reason: NO_SCHEMA },
+  { board: 'Sy-03', el: 'main', prop: 'h', board_value: "628", live_value: "373", at: ['960-dark', '960-light'], reason: STACKED },
+  { board: 'Sy-03', el: 'back', prop: 'gap', board_value: "6px 6px", live_value: "0px 0px", at: ['960-dark', '960-light'], reason: BACK_PARTS },
+  { board: 'Sy-03', el: 'h1', prop: 'font', board_value: "IBM Plex Sans 600 16px/24px", live_value: "IBM Plex Sans 600 18px/24px", at: ['960-dark', '960-light'], reason: SPECIMEN, per: {board: 'Tp-05-Messages'} },
+  { board: 'Sy-03', el: 'record', prop: 'padding', board_value: "0px 12px", live_value: "0px", at: ['960-dark', '960-light'], reason: TABLE },
+  { board: 'Sy-03', el: 'record', prop: 'gap', board_value: "normal 14px", live_value: "normal normal", at: ['960-dark', '960-light'], reason: TABLE },
+  { board: 'Sy-03', el: 'record', prop: 'border', board_value: "0 | 0 | 1 rgb(233, 232, 227) | 0", live_value: "0 | 0 | 0 | 0", at: ['960-light'], reason: TABLE },
+  { board: 'Sy-03', el: 'record', prop: 'display', board_value: "grid", live_value: "table-row", at: ['960-dark', '960-light'], reason: TABLE },
+  { board: 'Sy-03', el: 'record', prop: 'tracks', board_value: "22px 56px 118px 562px 40px", live_value: "", at: ['960-dark', '960-light'], reason: TABLE },
+  { board: 'Sy-03', el: 'message', prop: 'margin', board_value: "0px", live_value: "0px 16px 8px", at: ['960-dark', '960-light'], reason: STACKED },
+  { board: 'Sy-03', el: 'message', prop: 'display', board_value: "block", live_value: "flex", at: ['960-dark', '960-light'], reason: STACKED },
+  { board: 'Sy-03', el: 'message fields', prop: 'w', board_value: "403", live_value: "416", at: ['960-dark', '960-light'], reason: VALUE_COL },
+  { board: 'Sy-03', el: 'message fields', prop: 'tracks', board_value: "70px 321px", live_value: "84px 320px", at: ['960-dark', '960-light'], reason: FIELD_NAMES },
+  { board: 'Sy-03', el: 'message value', prop: 'x', board_value: "500", live_value: "513", at: ['960-dark', '960-light'], reason: VALUE_COL },
+  { board: 'Sy-03', el: 'message value', prop: 'w', board_value: "429", live_value: "416", at: ['960-dark', '960-light'], reason: VALUE_COL },
+  { board: 'Sy-03', el: 'dock', prop: 'margin', board_value: "0px -16px", live_value: "0px", at: ['960-dark', '960-light'], reason: ONE_GRID },
+  { board: 'Sy-03', el: 'dock row', prop: 'h', board_value: "28", live_value: "24", at: ['960-dark', '960-light'], reason: DOCK3, per: {board: 'Tp-05-Messages'} },
+  { board: 'Sy-03', el: 'dock row', prop: 'tracks', board_value: "92px 100px 598px 56px", live_value: "92px 120px 100px 398px 60px 48px", at: ['960-dark', '960-light'], reason: TP05_WIRE_960 },
+  { board: 'Sy-03', el: 'record', prop: 'border', board_value: "0 | 0 | 1 rgb(35, 39, 43) | 0", live_value: "0 | 0 | 0 | 0", at: ['960-dark'], reason: TABLE },
+  { board: 'Sy-04', el: 'jump', prop: 'text', board_value: "⌘K", live_value: "Jump or act… ⌘K", at: ['390-dark', '390-light'], reason: SR_WORDS },
+  { board: 'Sy-04', el: 'broker dot', prop: 'font', board_value: "IBM Plex Sans 400 13px/20px", live_value: "IBM Plex Sans 400 12px/20px", at: ['390-dark', '390-light'], reason: DOT },
+  { board: 'Sy-04', el: 'back', prop: 'gap', board_value: "normal normal", live_value: "0px 0px", at: ['390-dark', '390-light'], reason: BACK_PARTS },
+  { board: 'Sy-04', el: 'tabs', prop: 'w', board_value: "470", live_value: "366", at: ['390-dark', '390-light'], reason: TABS_SCROLL },
+  { board: 'Sy-04', el: 'card', prop: 'margin', board_value: "0px", live_value: "0px 0px 8px", at: ['390-dark', '390-light'], reason: CARD_ROW },
+  { board: 'Sy-04', el: 'card', prop: 'gap', board_value: "4px 4px", live_value: "4px 8px", at: ['390-dark', '390-light'], reason: CARD_ROW },
+  { board: 'Sy-04', el: 'card', prop: 'display', board_value: "flex", live_value: "grid", at: ['390-dark', '390-light'], reason: CARD_ROW },
+  { board: 'Sy-04', el: 'card', prop: 'tracks', board_value: "", live_value: "281.594px 50.4062px", at: ['390-dark', '390-light'], reason: CARD_ROW },
+  { board: 'Sy-04', el: 'card value', prop: 'color', board_value: "rgb(86, 91, 99)", live_value: "rgb(23, 25, 28)", at: ['390-light'], reason: TP05_VALUE, per: {board: 'Tp-05-Messages',sel: 'main .card .r:not(.h):not(.on) > span',nth: 4} },
+  { board: 'Sy-04', el: 'scrim', prop: 'presence', board_value: "present", live_value: "absent", at: ['390-dark', '390-light'], reason: SCRIM },
+  { board: 'Sy-04', el: 'sheet', prop: 'padding', board_value: "8px 14px 14px", live_value: "0px", at: ['390-dark', '390-light'], reason: SHEET_PARTS },
+  { board: 'Sy-04', el: 'sheet', prop: 'gap', board_value: "8px 8px", live_value: "normal normal", at: ['390-dark', '390-light'], reason: SHEET_PARTS },
+  { board: 'Sy-04', el: 'grab', prop: 'presence', board_value: "present", live_value: "absent", at: ['390-dark', '390-light'], reason: GRAB },
+  { board: 'Sy-04', el: 'sheet fields', prop: 'tracks', board_value: "64px 284px", live_value: "84px 264px", at: ['390-dark', '390-light'], reason: FIELD_NAMES },
+  { board: 'Sy-04', el: 'sheet actions', prop: 'x', board_value: "15", live_value: "1", at: ['390-dark', '390-light'], reason: TP06_ACTS },
+  { board: 'Sy-04', el: 'sheet actions', prop: 'y', board_value: "801", live_value: "757", at: ['390-dark', '390-light'], reason: TP06_ACTS },
+  { board: 'Sy-04', el: 'sheet actions', prop: 'w', board_value: "360", live_value: "388", at: ['390-dark', '390-light'], reason: TP06_ACTS },
+  { board: 'Sy-04', el: 'sheet actions', prop: 'h', board_value: "28", live_value: "86", at: ['390-dark', '390-light'], reason: TP06_ACTS },
+  { board: 'Sy-04', el: 'sheet actions', prop: 'bg', board_value: "rgba(0, 0, 0, 0)", live_value: "rgb(255, 255, 255)", at: ['390-light'], reason: TP06_ACTS },
+  { board: 'Sy-04', el: 'sheet actions', prop: 'padding', board_value: "0px", live_value: "8px 14px 14px", at: ['390-dark', '390-light'], reason: TP06_ACTS },
+  { board: 'Sy-04', el: 'sheet actions', prop: 'margin', board_value: "0px", live_value: "0px -14px", at: ['390-dark', '390-light'], reason: TP06_ACTS },
+  { board: 'Sy-04', el: 'sheet follow', prop: 'y', board_value: "801", live_value: "765", at: ['390-dark', '390-light'], reason: TP06_ACTS },
+  { board: 'Sy-04', el: 'sheet follow', prop: 'w', board_value: "176", live_value: "132.8", at: ['390-dark', '390-light'], reason: TP06_ACTS },
+  { board: 'Sy-04', el: 'card value', prop: 'color', board_value: "rgb(163, 169, 176)", live_value: "rgb(233, 234, 235)", at: ['390-dark'], reason: TP05_VALUE, per: {board: 'Tp-05-Messages',sel: 'main .card .r:not(.h):not(.on) > span',nth: 4} },
+  { board: 'Sy-04', el: 'sheet actions', prop: 'bg', board_value: "rgba(0, 0, 0, 0)", live_value: "rgb(25, 28, 31)", at: ['390-dark'], reason: TP06_ACTS },
 ];

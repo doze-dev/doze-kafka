@@ -53,6 +53,7 @@
   --chip-ink-dark: #000000;
   --c-tp: #2f6bff; --c-gr: #00857a; --c-sc: #a83bf0; --c-tr: #c85f0a; --c-ac: #d02f25; --c-cl: #5b6678; --c-tc: #d6247a;
   --scrim: rgba(20, 22, 25, .34);
+  --scrim-sheet: rgba(20, 22, 25, .28); /* Sy-04's sheet; Tp-24's dialogs are --scrim */
   --shadow-modal: 0 18px 50px rgba(0, 0, 0, .22);
 
   --background: var(--bg); --foreground: var(--ink); --popover: var(--card);
@@ -95,6 +96,7 @@
   --ok: #6dff9f; --warn: #ffd24d; --bad: #ff9f94; --deny: #d9c2ff;
   --okbg: #06260f; --warnbg: #2b2000; --badbg: #330806; --denybg: #1f1238;
   --scrim: rgba(0, 0, 0, .6);
+  --scrim-sheet: rgba(0, 0, 0, .6);
   --shadow-modal: 0 0 0 2px #ffffff;
 }
 
@@ -172,6 +174,8 @@ h1, h2, h3 { margin: 0; }
 .icon-btn .ic { width: 15px; height: 15px; }
 .icon-btn.sm { width: 22px; height: 22px; }
 .icon-btn[disabled] { opacity: .35; cursor: default; }
+/* The inspector's close is Tp-06's x; below 1100 it is a word (inspector.html). */
+.insp-close .close-t, .insp-close .close-word { display: none; }
 
 /* A key: ⌘K, j, esc (the boards' .k). */
 .kbd {
@@ -1033,6 +1037,18 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .insp[data-kind="message"] .insp-sel .inspector-b > :not(:first-child):not(:nth-child(2)) { grid-column: 1 / -1; }
   .tape-strip, .tape-foot { display: none; }
   .backrow { display: flex; }
+  /* Sy-03's back is a.btn.sm, a link drawn as a button: 500, "‹ Topics" one run of text. */
+  .backrow > a.btn { font-weight: 500; gap: 0; }
+  /* Sy-03's wells are 26 px (2 px above and below). */
+  .neighbours a.well { padding-top: 2px; padding-bottom: 2px; }
+  /* Sy-03 and Sy-04 close the message with a word (esc, Close) and draw no older and
+     newer: j and k step through the records. */
+  .insp-sel .insp-step { display: none; }
+  .insp-sel .insp-close { width: auto; height: 24px; padding: 0 8px; gap: 6px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); color: var(--ink); font-size: var(--fs-sm); }
+  .insp-sel .insp-close .ic { display: none; }
+  .insp-sel .insp-close .close-t { display: inline; }
+  /* Sy-03 and Sy-04 write which message it is in mono, 12 px, 600. */
+  .insp-sel .inspector-h #inspector-title { font-family: var(--mono); font-size: var(--fs-sm); font-weight: 600; }
   .idband { flex-wrap: wrap; }
   .crow { flex-wrap: wrap; }
   .field.w-part, .field.w-acks { flex: 1 1 150px; }
@@ -1051,12 +1067,18 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .tb-right .pill.live:not(.disconnected) .pill-addr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
   .backrow > .note, .backrow .back-wide { display: none; }
   .backrow .back-narrow { display: inline; }
-  .backrow > a.btn { border: 0; background: none; padding: 0; height: auto; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 2px; }
+  .backrow { display: block; }
+  /* Sy-04's back is a.note: a line of its own, 12 px, muted, underlined as the boards' links. */
+  .backrow > a.btn { display: block; border: 0; border-radius: 0; background: none; padding: 0; height: auto; font-weight: 400; color: inherit; text-decoration: underline; text-decoration-color: var(--mut); text-underline-offset: 2px; }
+  .insp-sel .insp-close .close-esc { display: none; }
+  .insp-sel .insp-close .close-word { display: inline; }
   #facts-newest { display: none; } /* Sy-04's sentence: partitions, messages, how long they are kept. */
   .panes > .dock { display: none; } /* Sy-04 draws no wire on a phone; it is the wide page's. */
-  .menu-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); color: var(--ink); cursor: pointer; flex: none; }
+  /* Sy-04's ☰ and ⌘K are .btn.sm: 24 px high, 12 px type, on the card. */
+  .menu-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 32px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); color: var(--ink); cursor: pointer; flex: none; font-size: var(--fs-sm); }
   .pg-title { display: block; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .tb-palette { flex: none; width: auto; padding: 0 8px; }
+  .tb-palette { flex: none; width: auto; height: 24px; padding: 0 8px; gap: 6px; background: var(--card); color: var(--ink); font-size: var(--fs-sm); }
+  .tb-palette .kbd { border: 0; background: none; padding: 0; margin: 0; min-width: 0; font: inherit; color: inherit; }
   .tb-palette .grow { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
   /* The rail is what the menu opens. */
   .body { position: relative; }
@@ -1074,18 +1096,20 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .tbl-wrap table.tbl thead { display: none; }
   .tbl-wrap table.tbl, .tbl-wrap table.tbl tbody { display: block; }
   .tbl-wrap table.tbl tbody tr:not(.txnmark) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; padding: 8px 10px; border-bottom: 1px solid var(--line2); }
-  .tbl-wrap table.tbl tbody tr:not(.txnmark) td { display: block; padding: 0; border: 0; min-width: 0; max-width: none; }
+  .tbl-wrap table.tbl tbody tr:not(.txnmark) td { display: block; padding: 0; border: 0; min-width: 0; max-width: none; min-height: 0; height: auto; line-height: 20px; }
   .tbl-wrap table.tbl td.cell-key { grid-column: 1; grid-row: 1; font-weight: 600; max-width: none; }
   .tbl-wrap table.tbl td.cell-offset { grid-column: 2; grid-row: 1; text-align: right; color: var(--mut); }
   .tbl-wrap table.tbl td.cell-val { grid-column: 1 / -1; grid-row: 2; }
-  .tbl-wrap table.tbl td.cell-age { display: block; grid-column: 1 / -1; grid-row: 3; text-align: left; color: var(--mut); font-size: var(--fs-xs); }
+  .tbl-wrap table.tbl td.cell-age { display: block; grid-column: 1 / -1; grid-row: 3; text-align: left; color: var(--mut); font-family: var(--sans); font-size: var(--fs-sm); }
   .tbl-wrap table.tbl td.cell-age::after { content: " ago"; }
   .tbl-wrap table.tbl td.cell-age:has(time[data-now])::after { content: none; }
   .tbl-wrap table.tbl tbody tr:not(.txnmark) td.col-p { display: none; } /* (the cell rule above is more specific than a bare td.col-p) */
   /* Sy-04's cards: each record its own bordered card, the open one ringed in ink. */
   .tbl-wrap:has(#messages-table) { border: 0; background: none; overflow: visible; }
-  #messages-table tbody tr:not(.txnmark) { margin-bottom: 8px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); padding: 10px 12px; gap: 4px 8px; }
+  #messages-table tbody tr:not(.txnmark) { margin-bottom: 8px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); padding: 9px 12px; gap: 4px 8px; }
+  /* The open card is ringed in ink, as Sy-04 draws it; its cells are not filled. */
   #messages-table tbody tr.on:not(.txnmark) { border-color: var(--ink); }
+  #messages-table tbody tr.on:not(.txnmark) > td { background: none; }
   /* A home's table: each row a card, its name first, then each value after its column's name. */
   main .card > .r.h { display: none; }
   main .card > .r:not(.h) { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 8px 12px; min-height: 0; }
@@ -1100,21 +1124,28 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .tb-spacer { display: none; }
   .panes > .main { padding: 10px 12px 0; gap: 8px; }
   .panes > .insp:has(.insp-sel:not([hidden])) {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; margin: 0; height: 400px; max-height: 90vh; overflow: hidden; border: 0; border-top: 1px solid var(--line);
-    border-radius: 12px 12px 0 0; box-shadow: 0 0 0 100vmax var(--scrim);
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; margin: 0; height: 400px; max-height: 90vh; overflow: hidden; border: 1px solid var(--line);
+    border-radius: 12px 12px 0 0; box-shadow: 0 0 0 100vmax var(--scrim-sheet);
   }
   /* The board's sheet is a fixed 400 px: the record scrolls inside it and its actions
      stay pinned at the foot (the sheet's own padding is 14 at the foot). */
   .insp-sel { overflow: hidden; }
   .insp-sel .inspector-b { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 0; }
-  .insp[data-kind="message"] .insp-sel .inspector-b { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 0; } /* the sheet is a column, not 960's two */
-  .insp-sel .inspector-h { padding: 12px 16px 10px; align-items: flex-start; }
-  .insp-sel .inspector-h > div:first-child { flex-direction: column; align-items: stretch; gap: 4px; }
-  .insp-sel .inspector-acts { position: sticky; bottom: 0; margin: auto -16px 0; padding: 10px 16px 14px; background: var(--card); border-top: 1px solid var(--line2); }
+  /* Sy-04's sheet: 14 px in from its border, 8 px between its parts, one column the
+     sheet's width (not 960's two). */
+  .insp-sel .inspector-b, .insp[data-kind="message"] .insp-sel .inspector-b { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 8px 14px 0; }
+  .insp-sel .inspector-h { padding: 8px 14px 0; align-items: center; border-bottom: 0; }
+  .insp-sel .inspector-h > div:first-child { flex-direction: column; align-items: stretch; gap: 0; }
+  /* Its actions at the foot, each as wide as its share of the row (the board's .grow). */
+  .insp-sel .inspector-acts { position: sticky; bottom: 0; margin: auto -14px 0; padding: 8px 14px 14px; background: var(--card); }
+  .insp-sel .inspector-acts > .btn { flex: 1 1 auto; }
   /* Sy-04: the title is 15 px on its own row, then the action the width of the page with
      the menu beside it. */
-  .idband h1, .idband h1.m, .idband h1.page-title { font-size: var(--fs-phone-h1); line-height: 20px; flex: 1 1 100%; }
+  .idband h1, .idband h1.m, .idband h1.page-title { font-size: var(--fs-phone-h1); line-height: 24px; flex: 1 1 100%; }
   .idband > .idband-acts { flex: 1 1 100%; flex-wrap: nowrap; }
+  .idband { row-gap: 8px; } /* Sy-04: the action 8 px under the title */
+  /* Sy-04's sentence is a .note: 12 px, muted. */
+  #topic-facts { font-size: var(--fs-sm); color: var(--mut); }
   .idband-acts > .btn.pri { flex: 1; }
   /* Sy-04: 400 of 844 (47%), so the page's own tabs and first card stay in view under
      it, and the grab handle the board draws: 36 x 4, centred, 8 px from the top. */

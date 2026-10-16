@@ -91,7 +91,7 @@
 {{define "schema_detail"}}{{template "shell_top" .}}
   {{template "schema_lp" (dict "List" .List "Sel" .Sel)}}
   <main class="main" id="detail">
-    <div class="backrow"><a class="btn sm" href="{{prefix}}/schemas">‹ <span class="back-wide">Schemas</span><span class="back-narrow">All subjects</span></a><span class="note">{{len .List}} subject{{if ne (len .List) 1}}s{{end}}, the list is one tap away</span></div>
+    <div class="backrow"><a class="btn sm" href="{{prefix}}/schemas">‹&nbsp;<span class="back-wide">Schemas</span><span class="back-narrow">All subjects</span></a><span class="note">{{len .List}} subject{{if ne (len .List) 1}}s{{end}}, the list is one tap away</span></div>
     <div class="row sb ce idband">
       <div class="row ce g8 wrap"><h1 class="h1 m">{{.Subject}}</h1><span class="pill">{{.Cur.TypeLabel}}</span></div>
       <div class="row g8 ce idband-acts">
