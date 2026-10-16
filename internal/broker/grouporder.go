@@ -49,6 +49,7 @@ func topicPartitionHash(partition int32) int32 {
 }
 
 // inKafkaGroupOrder returns groups (duplicates kept) in the order Kafka answers them.
+// claim: groups R25a
 func inKafkaGroupOrder(groups []string) []string {
 	var parts []int32 // in the order first named.
 	byPart := map[int32][]string{}
