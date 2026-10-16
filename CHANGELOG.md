@@ -6,6 +6,47 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Console: the design gate (`go tool task test:design`, part of `test:e2e`) renders
+  each board of the shell and the section homes from its own source and compares it
+  with the live console element by element, in light and dark at 1440 and at the
+  boards' 960 and 390; every difference is on an allow-list with its reason, and the
+  numbers on the homes are held to what the broker and the registry hold. It is shown
+  to bite on every run (a planted pixel and a planted count are both reported).
+
+- Console: the topic page is the boards'. Closed, the composer is a key, a value and
+  Send (it was a title bar); the neighbours are wells in ink; the wire is its head and
+  three rows, and beside an open record it drops the time each request took (it ran
+  off the edge); the open record's card at 960 closes with `esc` and the phone's sheet
+  with Close (the board's words), one column the sheet's width (it was squeezed into
+  two), over the board's lighter scrim; a phone's cards are the board's 88 px, the
+  open one ringed in ink rather than filled cell by cell.
+
+- Console: the palette's field, its count and its chosen row are the board's, `⌘K`
+  closes it, and a subject says its versions and compatibility level; the list of
+  keys is in the board's order; while a dialog is open the strip shows that dialog's
+  keys, not the page's.
+
+- Console: high contrast outlines every selection, a table's open row too, and draws
+  its edges 1 px as the design's set does (controls were 2 px); a card's last row keeps
+  its rule; the first run's connection facts are two columns as drawn (they stacked
+  at desktop width); a field's placeholder is full strength (it was 3.92:1).
+
+- Console: accessibility, swept over every page and state at three widths in three
+  themes with moderate findings failing too: the keys strip is the page's footer
+  landmark; the brand keeps its name at phone width; the close button's and the
+  base64 toggles' names hold what they show; the value editor is named; the More menu
+  is a disclosure, not a menu of plain buttons; a box that scrolls can take focus; an
+  aborted transaction's records are muted and struck through, not faded below 4.5:1.
+
+- Console: nothing a page does logs an error. A refusal is said beside the form and is
+  no longer also an htmx console error; the command previews inside the create forms
+  no longer error on every keystroke; the ACL form's preview trigger was invalid; and
+  a preview refreshing after a refusal no longer wipes it.
+
+- Console: a schema the registry cannot read, when checked, is the registry's refusal
+  (42201) like every other "no"; every route's refusals, and the teaching line under
+  every field (the acknowledgements, the topic name rule), are held from data.
+
 - Console: the Traffic pages are drawn as their boards and say only what the broker knows.
   A design gate (`go tool task design`) renders each board's own files and compares the
   live page to them element by element, with real clients (classic and KIP-848 groups,
@@ -342,8 +383,9 @@ here that contains "server API"; `task api` fails without it.
   readable without a restart. A multi-batch produce whose write fails part-way leaves
   nothing in the log.
 
-- Console: every button reads weight 400 whether it is a button or a link drawn as one (the
-  boards draw them all as buttons). A request that took under a millisecond shows its
+- Console: a button reads weight 400, and a link the boards draw as a link (Create topic,
+  Connect an app, Create ACL, Register schema, the first run's three) reads 500, as the
+  boards render them. A request that took under a millisecond shows its
   measured time (`42 µs`, `0.4 ms`) rather than the design boards' `0 ms`: a broker
   answering from memory does that constantly, and `0 ms` says nothing was measured (AD6).
 

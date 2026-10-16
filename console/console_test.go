@@ -60,7 +60,7 @@ func newTestConsoleAddr(t testing.TB, mod ...func(*Options)) (*Console, string) 
 	go func() { defer close(done); srv.Serve(ctx) }()
 	t.Cleanup(func() { cancel(); <-done })
 
-	opts := Options{Addr: addr}
+	opts := Options{Addr: addr, Facts: BrokerFacts{DataDir: dataDir}}
 	for _, m := range mod {
 		m(&opts)
 	}

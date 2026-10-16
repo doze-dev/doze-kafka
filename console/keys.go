@@ -59,16 +59,18 @@ var keyMap = []keyBinding{
 	{"]", "]", "tab-next", "Next tab", ScopeLists, ""},
 	{"[", "[", "tab-prev", "Previous tab", ScopeLists, ""},
 
+	// Sy-06's order: pause, create, produce, and this help last; the keys the board
+	// predates (A7's r, AD17's e u m c, ⌘↵) go before it.
 	{"p", "p", "pause", "Pause or resume the live view", ScopePage, ""},
+	{"c", "c", "create", "Create (on Topics, Subjects, Access); connect an app (on an empty Traffic); copy the bootstrap address (on Cluster)", ScopePage, ""},
 	{"p", "p", "produce", "Produce (on a topic)", ScopePage, ""},
-	{"c", "c", "create", "Create (on Topics, Subjects); connect an app (on an empty Traffic)", ScopePage, ""},
 	{"r", "r", "retry", "Retry now, when the broker is lost (on Traffic)", ScopePage, ""},
 	{"e", "e", "errors", "Errors only, and back (on Traffic)", ScopePage, ""},
 	{"u", "u", "unfold", "Unfold the open folded row (on Traffic)", ScopePage, ""},
 	{"m", "m", "metrics", "All metrics of the open client (on Traffic)", ScopePage, ""},
 	{"c", "c", "copy", "Copy the decoded fields of the open request (on Traffic)", ScopePage, ""},
+	{"Mod+Enter", "⌘↵", "send", "Send from the composer; create, on a create form", ScopePage, ""},
 	{"?", "?", "help", "This help", ScopePage, ""},
-	{"Mod+Enter", "⌘↵", "send", "Send from the composer", ScopePage, ""},
 
 	{"ArrowDown", "↓", "palette-down", "Next result in the palette", ScopeDialogs, ""},
 	{"ArrowUp", "↑", "palette-up", "Previous result in the palette", ScopeDialogs, ""},
@@ -109,7 +111,13 @@ type keyHint struct {
 	// Only says when the hint is drawn: "" always, "live" while the broker answers,
 	// "lost" while it does not (the page's own state, an attribute on the document).
 	Only string
+	// Width says at which widths: "" all, "wide" above 1100 px (Sy-01's strip),
+	// "narrow" at 1100 and below (Sy-03's).
+	Width string
 }
+
+func wide(h keyHint) keyHint   { h.Width = "wide"; return h }
+func narrow(h keyHint) keyHint { h.Width = "narrow"; return h }
 
 var (
 	hintMove   = keyHint{Keys: []string{"j", "k"}, Label: "move"}
@@ -121,7 +129,9 @@ var (
 )
 
 // pageHints are the hints each kind of page draws at its foot. Every key named here is
-// one the page really has (design_test.go in the browser suite presses them).
+// one the page really has: e2e/tests/strip.spec.ts reads the strip of every kind of
+// page, presses each key it shows there and asserts what it does, and fails for a
+// hint whose effect it does not know.
 func pageHints(view string) []keyHint {
 	switch view {
 	case "traffic":
@@ -136,7 +146,9 @@ func pageHints(view string) []keyHint {
 	case "topics":
 		return []keyHint{hintMove, hintOpen, hintFilter, {Keys: []string{"c"}, Label: "create topic"}, hintJump}
 	case "topic":
-		return []keyHint{hintMove, hintOpen, hintClose, {Keys: []string{"g", "t"}, Label: "topics"}, {Keys: []string{"p"}, Label: "produce"}, hintHelp}
+		// Sy-01 at full width; Sy-03's four at 1100 px and below.
+		return []keyHint{hintMove, hintOpen, wide(hintClose), narrow(keyHint{Keys: []string{"esc"}, Label: "close"}),
+			wide(keyHint{Keys: []string{"g", "t"}, Label: "topics"}), wide(keyHint{Keys: []string{"p"}, Label: "produce"}), wide(hintHelp), narrow(hintJump)}
 	case "groups":
 		return []keyHint{hintMove, hintOpen, hintFilter, hintJump}
 	case "group":
@@ -146,15 +158,48 @@ func pageHints(view string) []keyHint {
 	case "schema":
 		return []keyHint{hintMove, hintClose, {Keys: []string{"g", "s"}, Label: "schemas"}, hintHelp}
 	case "cluster":
-		return []keyHint{{Keys: []string{"g", "c"}, Label: "cluster"}, hintOpen, hintJump, hintHelp}
+		// Cl-Home's strip, with j k: ↵ opens the row the cursor is on, and they put it there.
+		return []keyHint{{Keys: []string{"g", "c"}, Label: "cluster"}, hintMove, hintOpen, {Keys: []string{"c"}, Label: "copy bootstrap"}, hintJump}
 	case "access":
-		return []keyHint{hintMove, hintOpen, hintFilter, hintJump}
+		return []keyHint{hintMove, hintOpen, {Keys: []string{"c"}, Label: "create ACL"}, hintFilter, hintJump}
 	case "trace":
 		return []keyHint{{Keys: []string{"/"}, Label: "trace id"}, hintMove, {Keys: []string{"↵"}, Label: "follow"}, hintJump}
+	case "trace_none":
+		// No recent record carries a trace header: nothing to move over or follow.
+		return []keyHint{{Keys: []string{"/"}, Label: "trace id"}, hintJump}
+	case "access_check":
+		// Ac-05: Enter asks, Esc goes back to the list.
+		return []keyHint{{Keys: []string{"↵"}, Label: "check"}, {Keys: []string{"esc"}, Label: "back"}, hintJump}
+	case "acl_create":
+		// Ac-03: Tab to the next field, ⌘↵ creates, Esc cancels.
+		return []keyHint{{Keys: []string{"tab"}, Label: "next field"}, {Keys: []string{"⌘↵"}, Label: "create"}, {Keys: []string{"esc"}, Label: "cancel"}}
 	case "first_run":
 		return []keyHint{{Keys: []string{"c"}, Label: "create a topic"}, hintJump, hintHelp}
 	}
 	return []keyHint{hintJump, hintHelp}
+}
+
+// dialogStrip is the strip while a dialog is open: the keys that work then, which
+// are all the keys there are (shell.js turns the page's off and marks <html> with
+// data-dialog, the strip's Kind).
+type dialogStrip struct {
+	Kind  string
+	Hints []keyHint
+}
+
+// dialogHints are the strips of the three dialogs: a confirm's own keys (Tp-24); the
+// palette's ⌘K, which closes it (Sy-05; its own keys are in its foot); the shortcuts'
+// ? and ⌘K, which close it and open the palette in its place (Sy-06).
+func dialogHints() []dialogStrip {
+	return []dialogStrip{
+		{Kind: "confirm", Hints: []keyHint{
+			{Keys: []string{"tab"}, Label: "move between buttons"},
+			{Keys: []string{"esc"}, Label: "cancel"},
+			{Keys: []string{"↵"}, Label: "press the focused button"},
+		}},
+		{Kind: "palette", Hints: []keyHint{{Keys: []string{"⌘K"}, Label: "jump or act"}}},
+		{Kind: "help", Hints: []keyHint{{Keys: []string{"?"}, Label: "all keys"}, {Keys: []string{"⌘K"}, Label: "jump or act"}}},
+	}
 }
 
 func live(h keyHint) keyHint { h.Only = "live"; return h }

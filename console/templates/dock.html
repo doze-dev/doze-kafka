@@ -11,31 +11,33 @@
 
 {{define "wire_dock"}}
 {{if .HasDock}}
-<section class="dock" id="wire-dock" aria-label="The wire: requests for {{.DockFilter.Topic}}{{.DockFilter.Group}}{{.DockFilter.Subject}}" data-live="{{.DockLive}}" data-hash="{{.DockHash}}" data-live-ms="3000">
-  <div class="dh"><span class="b">The wire, underneath</span>
+<section class="dock{{if .DockFilter.ACL}} dock-acl{{end}}" id="wire-dock" aria-label="The wire: {{if .DockFilter.ACL}}ACL requests and refusals{{else}}requests for {{.DockFilter.Topic}}{{.DockFilter.Group}}{{.DockFilter.Subject}}{{end}}" data-live="{{.DockLive}}" data-hash="{{.DockHash}}" data-live-ms="3000">
+  <div class="dh">{{if .DockFilter.ACL}}<span class="cap">The wire, underneath</span>{{else}}<span class="b">The wire, underneath</span>{{end}}
     {{if .DockToggle}}<button type="button" class="livetoggle" data-live-toggle aria-pressed="false" title="Pause live updates"><span class="livedot" aria-hidden="true"></span><span class="livetoggle-l">Live</span></button>
     {{else}}<span class="pill ok"><span class="dot" aria-hidden="true"></span>live</span>{{end}}
-    <span class="note">{{if .DockPaged}}older requests{{else}}requests{{end}} that touched {{if .DockFilter.Topic}}{{.DockFilter.Topic}}{{else if .DockFilter.Group}}{{.DockFilter.Group}}{{else}}{{.DockFilter.Subject}}{{end}}</span>
+    <span class="note">{{if .DockFilter.ACL}}{{if .DockPaged}}older {{end}}ACL requests and refusals{{else}}{{if .DockPaged}}older requests{{else}}requests{{end}} that touched {{if .DockFilter.Topic}}{{.DockFilter.Topic}}{{else if .DockFilter.Group}}{{.DockFilter.Group}}{{else}}{{.DockFilter.Subject}}{{end}}{{end}}</span>
   </div>
   {{if not .DockKnown}}
   <div class="note dock-more">The registry's own requests are not recorded yet, so there is nothing to show for a subject here.</div>
   {{else if .DockRows}}
   <div id="wire-dock-rows">
-    {{range .DockRows}}<div class="r" style="--c: 92px 120px 100px minmax(120px, 1fr) 60px 48px" id="wd-{{.ID}}" {{if .Kind}}tabindex="0" role="button" data-inspector-open
+    {{range .DockRows}}<div class="r" id="wd-{{.ID}}" {{if .Kind}}tabindex="0" role="button" data-inspector-open
         hx-get="{{$.Prefix}}/inspect/{{.Kind}}?key={{.ID}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"{{end}}>
       <span class="m">{{when .Time "clockms"}}</span>
       <span class="m" title="{{.Client}}">{{.Client}}</span>
-      <span class="m b" title="{{.Request}}">{{.Name}}{{if gt .Count 1}} <span class="tag">×{{.Count}}</span>{{end}}</span>
+      {{if $.DockFilter.ACL}}<span class="m el" title="{{.Request}}{{if .Target}} · {{.Target}}{{end}}">{{.Request}}{{if .Target}} · {{.Target}}{{end}}{{if gt .Count 1}} <span class="tag">×{{.Count}}</span>{{end}}</span>
+      {{if .Error}}<span class="m deny" title="The response carried this error: {{.Error}}">{{.Error}}</span>{{else}}<span class="m ok">ok</span>{{end}}
+      {{else}}<span class="m b" title="{{.Request}}">{{.Name}}{{if gt .Count 1}} <span class="tag">×{{.Count}}</span>{{end}}</span>
       <span class="m mut el" title="{{.Detail}}">{{.Detail}}</span>
       {{if .Error}}<span class="m bad" title="The response carried this error: {{.Error}}">{{.Error}}</span>{{else}}<span class="m ok">ok</span>{{end}}
-      <span class="m ra">{{.Took}}</span>
+      <span class="m ra took">{{.Took}}</span>{{end}}
     </div>{{end}}
   </div>
   {{if or .DockMore .DockPaged}}<div class="note dock-more">{{template "dock_pager" .}}{{if and .DockMore .DockTraffic}} <span>Older requests are on the <a href="{{.DockTraffic}}">Traffic page</a>.</span>{{end}}</div>{{end}}
   {{else if .DockPaged}}
   <div class="note dock-more">{{template "dock_pager" .}} <span>Nothing older is kept.</span></div>
   {{else}}
-  <div class="note dock-more">No request has touched this since the broker started.</div>
+  <div class="note dock-more">{{if .DockFilter.ACL}}No ACL request, and no request an ACL refused, among those the broker keeps.{{else}}No request has touched this since the broker started.{{end}}</div>
   {{end}}
 </section>
 {{end}}

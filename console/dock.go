@@ -22,6 +22,9 @@ import (
 // DockFilter names the one resource a dock is about. Exactly one is set.
 type DockFilter struct {
 	Topic, Group, Subject string
+	// ACL is the Access page's dock: the requests about ACLs (DescribeAcls, CreateAcls,
+	// DeleteAcls) and every request an ACL refused.
+	ACL bool
 }
 
 func (f DockFilter) empty() bool { return f == DockFilter{} }
@@ -39,6 +42,8 @@ func (f DockFilter) values() url.Values {
 		v.Set("group", f.Group)
 	case f.Subject != "":
 		v.Set("subject", f.Subject)
+	case f.ACL:
+		v.Set("acl", "1")
 	}
 	return v
 }
@@ -82,7 +87,16 @@ func (d trafficDock) DockEvents(f DockFilter, limit int, after string) ([]DockEv
 	if f.Subject != "" {
 		return nil, "" // the registry's requests are not recorded yet.
 	}
-	all := d.src.Events(TrafficFilter{Topic: f.Topic, Group: f.Group}, 0)
+	var all []TrafficEvent
+	if f.ACL {
+		for _, e := range d.src.Events(TrafficFilter{}, 0) {
+			if e.API == "DescribeAcls" || e.API == "CreateAcls" || e.API == "DeleteAcls" || e.Class == "denied" {
+				all = append(all, e)
+			}
+		}
+	} else {
+		all = d.src.Events(TrafficFilter{Topic: f.Topic, Group: f.Group}, 0)
+	}
 	start := 0
 	if after != "" {
 		start = len(all)
@@ -184,7 +198,7 @@ func (c *Console) dockPage(v dockView) map[string]any {
 	d["DockLive"] = c.dockURL(v)
 	// The Traffic page filters by topic and by group. It has no filter for a subject,
 	// so a subject's dock does not link there as if it had.
-	if f.Subject == "" {
+	if f.Subject == "" && !f.ACL {
 		d["DockTraffic"] = template.URL(c.prefix + "/traffic?" + f.values().Encode())
 	}
 	if src == nil {
@@ -214,7 +228,7 @@ func (c *Console) dockPage(v dockView) map[string]any {
 // cursor on (after=, the contract's cursor: foundation A4), or 204 when nothing moved.
 func (c *Console) dockLive(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	f := DockFilter{Topic: q.Get("topic"), Group: q.Get("group"), Subject: q.Get("subject")}
+	f := DockFilter{Topic: q.Get("topic"), Group: q.Get("group"), Subject: q.Get("subject"), ACL: q.Get("acl") == "1"}
 	if f.empty() {
 		c.fail(w, r, badInput("a dock is about one topic, group or subject"))
 		return

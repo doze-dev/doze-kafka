@@ -104,7 +104,8 @@ test('a reset can be limited to one topic', async ({ page }) => {
   // g-lag has offsets on one topic only, so the choice is not offered; the other
   // half of this is covered where a group has two (Go tests). Here: no selector, still resets.
   await page.goto('groups/g-reset-latest?tab=offsets');
-  await expect(page.locator('#reset-scope')).toHaveCount(0);
+  await expect(page.locator('select#reset-scope')).toHaveCount(0); // no choice offered
+  await expect(page.locator('input#reset-scope[type=hidden]')).toHaveValue(''); // the scope the buttons send: all its topics
 });
 
 test('the tabs of a group are Lag, Members, Timeline and Offsets, and ] and [ walk them', async ({ page }) => {

@@ -53,6 +53,7 @@
   --chip-ink-dark: #000000;
   --c-tp: #2f6bff; --c-gr: #00857a; --c-sc: #a83bf0; --c-tr: #c85f0a; --c-ac: #d02f25; --c-cl: #5b6678; --c-tc: #d6247a;
   --scrim: rgba(20, 22, 25, .34);
+  --scrim-sheet: rgba(20, 22, 25, .28); /* Sy-04's sheet; Tp-24's dialogs are --scrim */
   --shadow-modal: 0 18px 50px rgba(0, 0, 0, .22);
 
   --background: var(--bg); --foreground: var(--ink); --popover: var(--card);
@@ -95,6 +96,7 @@
   --ok: #6dff9f; --warn: #ffd24d; --bad: #ff9f94; --deny: #d9c2ff;
   --okbg: #06260f; --warnbg: #2b2000; --badbg: #330806; --denybg: #1f1238;
   --scrim: rgba(0, 0, 0, .6);
+  --scrim-sheet: rgba(0, 0, 0, .6);
   --shadow-modal: 0 0 0 2px #ffffff;
 }
 
@@ -141,6 +143,7 @@ h1, h2, h3 { margin: 0; }
 }
 .tb-palette:hover { color: var(--ink); }
 .tb-palette .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tb-palette .tb-short { display: none; }
 .tb-right { display: flex; align-items: center; gap: 10px; }
 .tb-menu { display: none; }
 /* The theme switch: words, not icons (Sy-07). */
@@ -171,6 +174,8 @@ h1, h2, h3 { margin: 0; }
 .icon-btn .ic { width: 15px; height: 15px; }
 .icon-btn.sm { width: 22px; height: 22px; }
 .icon-btn[disabled] { opacity: .35; cursor: default; }
+/* The inspector's close is Tp-06's x; below 1100 it is a word (inspector.html). */
+.insp-close .close-t, .insp-close .close-word { display: none; }
 
 /* A key: ⌘K, j, esc (the boards' .k). */
 .kbd {
@@ -180,11 +185,14 @@ h1, h2, h3 { margin: 0; }
 
 .body { display: flex; flex: 1; min-height: 0; }
 /* Below the width where the rail folds to chips the top bar keeps what Sy-03 draws:
-   the name, a shorter jump field and the address. The theme is one action away in
-   the palette. */
+   the name, a shorter jump field ("Jump or act…") and the address, and Sy-07's theme
+   switch. At phone width the switch moves to the foot of the ☰ menu. */
+.rail .rail-theme { display: none; }
 @media (max-width: 1100px) {
-  .theme-seg, #compat-pill { display: none; }
+  #compat-pill { display: none; }
   .tb-palette { flex-basis: 300px; width: 300px; }
+  .tb-palette .tb-long { display: none; }
+  .tb-palette .tb-short { display: block; }
 }
 
 /* ---------- rail ----------
@@ -218,7 +226,8 @@ h1, h2, h3 { margin: 0; }
 .sv.c-tp, .sv.c-tr { color: var(--chip-ink-dark); }
 .c-ac { --c: var(--c-ac); } .c-cl { --c: var(--c-cl); } .c-tc { --c: var(--c-tc); } .c-mut { --c: var(--mut); }
 /* In high contrast the selected item also wears a 2 px outline (Sy-07). */
-:root[data-theme="contrast"] .nav.on, :root[data-theme="contrast"] .li.on, :root[data-theme="contrast"] .r.on { outline: 2px solid var(--ink); outline-offset: -2px; }
+/* Sy-07: "Selection in high contrast also gets a 2 px outline, so it does not depend on a fill." Every selection: a section, a list item, a row of a grid or of a table, a palette result. */
+:root[data-theme="contrast"] .nav.on, :root[data-theme="contrast"] .li.on, :root[data-theme="contrast"] .r.on, :root[data-theme="contrast"] tr.on { outline: 2px solid var(--ink); outline-offset: -2px; }
 .menu-btn, .pg-title { display: none; }
 @media (max-width: 1100px) {
   .rail { width: 48px; padding: 10px 0; align-items: center; gap: 4px; }
@@ -237,7 +246,7 @@ h1, h2, h3 { margin: 0; }
 .row { display: flex; gap: 12px; } .col { display: flex; flex-direction: column; }
 .ce { align-items: center; } .sb { justify-content: space-between; }
 .grow { flex: 1; min-width: 0; min-height: 0; }
-.g4 { gap: 4px; } .g6 { gap: 6px; } .g8 { gap: 8px; } .g12 { gap: 12px; } .g16 { gap: 16px; } .g20 { gap: 20px; }
+.g4 { gap: 4px; } .g6 { gap: 6px; } .g8 { gap: 8px; } .g10 { gap: 10px; } .g12 { gap: 12px; } .g16 { gap: 16px; } .g20 { gap: 20px; }
 .wrap { flex-wrap: wrap; }
 .el { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .h1 { font-size: var(--fs-xl); font-weight: 600; line-height: 24px; }
@@ -259,7 +268,6 @@ a.well:hover { border-color: var(--line); }
   letter-spacing: .09em; text-transform: uppercase; border-bottom: 1px solid var(--line);
 }
 .r.on { background: var(--sel); }
-.r:last-child { border-bottom: 0; }
 a.r { color: inherit; }
 a.r:hover { background: var(--well); }
 .kv { display: grid; grid-template-columns: var(--c, 96px 1fr); column-gap: 12px; row-gap: 5px; }
@@ -283,6 +291,8 @@ a.r:hover { background: var(--well); }
   margin-bottom: -1px; text-decoration: none; white-space: nowrap;
 }
 .tab:hover { color: var(--ink); }
+/* The boards' `.app a { color: inherit }` outranks `.tab`'s muted colour: a tab that is a link renders ink on every board (Sy-01, Tp-05, Tp-06). */
+a.tab { color: var(--ink); }
 .tab.on { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
 .tag { font-family: var(--mono); font-weight: 500; font-size: var(--fs-xs); line-height: 1; color: var(--mut); }
 .tag.new { color: var(--deny); border: 1px solid var(--deny); border-radius: var(--radius-sm); padding: 1px 5px; font-size: var(--fs-2xs); }
@@ -294,7 +304,8 @@ span.num {
   height: 28px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); color: var(--ink);
   width: 100%; font-family: inherit; font-size: var(--fs-md);
 }
-.inp.m { font-family: var(--mono); font-size: var(--fs-sm); }
+/* The boards write their fields .inp.m and draw them in the page's face: con.css's `.app input { font: inherit }` outranks .m. The console draws what they render. */
+.inp.m { font-family: var(--sans); font-size: var(--fs-md); line-height: 20px; }
 .inp:focus { outline: 2px solid var(--ring); outline-offset: 1px; }
 .inp::placeholder { color: var(--mut); }
 .page-title-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
@@ -315,6 +326,7 @@ span.num {
 .steps { align-items: stretch; }
 .steps > .card { min-width: 220px; }
 .firstrun-foot { padding: 10px 14px; }
+.firstrun-foot .kbd { margin-right: 6px; } /* the board's .k: 6 px before its words */
 .well.pad.slim { padding: 10px 14px; }
 .btn.pill-x { height: 18px; padding: 0 4px; }
 /* The three cards share the page: where one is narrower than a console address needs
@@ -322,8 +334,14 @@ span.num {
    mid-word (Sy-08 at 1440). */
 .steps > .card { container-type: inline-size; }
 .kv.kv-stack > span { overflow-wrap: normal; }
-@container (max-width: 440px) { .kv-stack { grid-template-columns: 1fr; row-gap: 0; } .kv-stack > :nth-child(even) { margin-bottom: 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; } }
+/* Sy-08's facts are two columns in its 367 px card; an address longer than its column
+   scrolls in its own box (never broken mid-word), and below 320 px they stack. */
+.kv-stack > :nth-child(even) { overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; white-space: nowrap; }
+@container (max-width: 320px) { .kv-stack { grid-template-columns: 1fr; row-gap: 0; } .kv-stack > :nth-child(even) { margin-bottom: 5px; } }
 .snippets { align-items: flex-start; }
+.snippets > .col { min-width: 0; }
+.snippets pre.code { overflow-x: auto; }
+@media (max-width: 640px) { .snippets { flex-direction: column; align-items: stretch; } }
 @media (max-width: 1100px) { .steps { flex-wrap: wrap; } .firstrun { padding: 24px 20px 0; } }
 .workspace { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .workspace > .flash { margin: 12px 16px 0; }
@@ -339,6 +357,8 @@ span.num {
 .list .li.on { background: var(--sel); font-weight: 600; }
 .list .li.cursor { outline: 1px dashed var(--mut); outline-offset: -2px; }
 .list-h { padding: 10px 12px 6px; flex: none; }
+/* Tp-Home and Tp-05's list head: the count and + New over a rule. */
+.list-h.ruled { padding: 10px 12px; border-bottom: 1px solid var(--line2); }
 .list-note { padding: 8px 12px; flex: none; }
 .list-scroll { flex: 1; min-height: 0; overflow-y: auto; }
 
@@ -369,13 +389,25 @@ span.num {
 .insp .bd.flush { padding: 0; gap: 0; }
 #clients-list > .callout { margin: 14px; } /* Main's panel: the board's callout at its foot */
 
-.dock { background: var(--card); border-top: 1px solid var(--line); display: flex; flex-direction: column; flex: none; max-height: 168px; overflow: auto; }
+/* Its head and three rows, as Sy-01 and Tp-05 draw it (Tp-05's 24 px rows: 1 + 30 + 3 x 24 = 103); the rest of the page of rows scrolls. */
+.dock { background: var(--card); border-top: 1px solid var(--line); display: flex; flex-direction: column; flex: none; max-height: 103px; overflow: auto; }
 .dock .dh { height: 30px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 14px; border-bottom: 1px solid var(--line2); }
 .dock .dh .livetoggle { margin-left: 0; }
 .dock .r { min-height: 24px; }
 .dock .r[data-inspector-open] { cursor: pointer; }
 .dock .r[data-inspector-open]:hover { background: var(--well); }
 .dock .dock-more { padding: 6px 14px; }
+/* Ac-Home's wire: time, client, the request and what it was about, the result. */
+.dock-acl .r { --c: 92px 120px 1fr 190px; }
+/* Tp-05's six columns: time, client, request, detail, result, took. */
+.dock:not(.dock-acl) .r { --c: 92px 120px 100px minmax(120px, 1fr) 60px 48px; }
+/* With a selection open beside it (Tp-06), the page is 576 px and the six need 634:
+   Tp-06's five, time 92, client 110, request 80, detail, result 40; the time it took is
+   in the request's inspector. */
+@media (min-width: 1101px) {
+  body:has(#inspector:not([hidden])) .dock:not(.dock-acl) .r { --c: 92px 110px 80px minmax(0, 1fr) 40px; }
+  body:has(#inspector:not([hidden])) .dock:not(.dock-acl) .r > .took { display: none; }
+}
 
 .keys {
   flex: none; height: 28px; display: flex; align-items: center; gap: 18px; padding: 0 14px; background: var(--card); border-top: 1px solid var(--line);
@@ -391,13 +423,22 @@ span.num {
 .keys .keys-lost { display: none; }
 html[data-connection-lost] .keys .keys-lost { display: inline; }
 html[data-connection-lost] .keys .keys-live { display: none; }
+.keys > .keys-w-narrow { display: none; }
+@media (max-width: 1100px) { .keys > .keys-w-wide { display: none; } .keys > .keys-w-narrow { display: inline; } }
+/* While a dialog is open the strip says what the keys do in it (Tp-24, Sy-05, Sy-06). */
+.keys .keys-dialog { display: none; }
+html[data-dialog] .keys > span { display: none; }
+html[data-dialog="confirm"] .keys > .keys-dialog-confirm, html[data-dialog="palette"] .keys > .keys-dialog-palette, html[data-dialog="help"] .keys > .keys-dialog-help { display: inline; }
 
 /* The row at the head of a page that is reached from a list: at narrow widths the
    list is not drawn, and this is the way back to it (Sy-03). */
 .backrow { display: none; align-items: center; gap: 8px; }
+.backrow .back-narrow { display: none; }
+.narrow-only { display: none; }
+@media (max-width: 1100px) { .wide-only { display: none; } .narrow-only { display: inline; } } /* the list is not beside the page */
 
 /* The ··· menu: what is not the page's one action (Delete, Purge) lives under it. */
-.more { position: relative; display: inline-block; }
+.more { position: relative; display: flex; } /* the boards put ··· in their flex row: the button is a flex item, as theirs */
 .more .menu {
   position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 190px; padding: 4px; display: flex; flex-direction: column; gap: 2px;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-modal);
@@ -419,10 +460,38 @@ html[data-connection-lost] .keys .keys-live { display: none; }
 .nomatch { padding: 14px 12px; color: var(--mut); }
 
 .r.denyrow { background: var(--denybg); }
+.r > .pill { width: fit-content; } /* a pill that is a cell is as wide as its word (Tp-Home's compact) */
+/* Tp-Home's tracks (Size is there when the console can read the data directory). At
+   1100 px and below the board's fixed tracks leave the name nothing, so the name, the
+   readers and the subject share what is left, the name first. */
+#topics-table.sized { --c: 1fr 70px 80px 78px 76px 150px 72px 230px; }
+#topics-table:not(.sized) { --c: 1fr 70px 80px 76px 150px 72px 230px; }
+@media (max-width: 1100px) {
+  #topics-table.sized { --c: minmax(140px, 1.2fr) 70px 80px 78px 76px minmax(0, 1fr) 72px minmax(0, 1fr); }
+  #topics-table:not(.sized) { --c: minmax(140px, 1.2fr) 70px 80px 76px minmax(0, 1fr) 72px minmax(0, 1fr); }
+}
+/* Tc-Home: the recent records that carry a trace header, and the formats it reads. */
+#trace-recent .r { --c: 92px 1fr 70px 1fr 90px; }
+#trace-recent .trace-recent-h { padding-bottom: 6px; }
+.kv.trace-formats { --c: 120px 1fr; }
+/* Access (Ac-Home, Ac-03, Ac-05): the boards' tracks and the widths of their fields. */
+#acl-table { --c: 120px 80px 1fr 80px 84px 84px 44px; }
+#groups-table { --c: 1.3fr 96px 86px 80px 1.4fr 86px 110px; } /* Gr-Home's tracks */
+#schemas-table { --c: 1fr 70px 70px 80px 150px 1fr; } /* Sc-Home's */
+/* Sc-Home's list: the filter over a rule, the columns' names, and the foot over a rule. */
+.list .list-filter-first { padding: 10px 12px; border-bottom: 1px solid var(--line2); }
+.list .list-cols { padding: 6px 12px 2px; flex: none; }
+.list .list-foot.ruled { padding: 10px 12px; border-top: 1px solid var(--line2); }
+#check-decided { --c: 120px 1fr 80px 84px 84px 44px; }
+.w90 { width: 90px; } .w100 { width: 100px; } .w110 { width: 110px; } .w130 { width: 130px; }
+.w150 { width: 150px; } .w170 { width: 170px; } .w180 { width: 180px; } .w200 { width: 200px; }
+span.num-off { background: var(--mut); } /* a rule the check did not reach (Ac-05) */
 .r.totalrow { background: var(--well); }
 .list.wide { width: 232px; }
 .list.narrow { width: 220px; }
-.card.side { width: 340px; max-width: 100%; }
+.list .li.list-tall { height: 34px; } /* Cl-Home's "This broker" */
+.card.side { width: 420px; max-width: 100%; flex: none; } /* Cl-Home's Counts card */
+@media (max-width: 640px) { .card.side { width: 100%; } }
 .callout.spaced { margin: 14px; }
 .stack { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .stack > * { flex: none; }
@@ -432,7 +501,8 @@ html[data-connection-lost] .keys .keys-live { display: none; }
 .callouts > .callout { min-width: 240px; }
 .facts-line { font-size: var(--fs-md); }
 .list-filter { padding: 8px 12px; border-bottom: 1px solid var(--line2); flex: none; }
-.list-foot { border-top: 1px solid var(--line2); }
+.list-foot { border-top: 0; }
+.list-foot.wide-pad { padding: 10px 12px; } /* Gr-Home's */
 .list .li.two { height: 40px; }
 .list .li .col { min-width: 0; }
 .metrics-cap { margin-top: 6px; }
@@ -444,6 +514,8 @@ html[data-connection-lost] .keys .keys-live { display: none; }
 
 /* Note under a table, as on the boards. */
 .tablenote { color: var(--mut); font-size: var(--fs-sm); }
+/* A home's note at the foot of the page (Tp-Home, Gr-Home): the board's 8 px under it. */
+.main > .footnote { padding-bottom: 8px; }
 
 /* A row that is an address or a selection. */
 .r[data-inspector-open], .r.is-link { cursor: pointer; }
@@ -486,7 +558,7 @@ html[data-connection-lost] .keys .keys-live { display: none; }
 table.tbl tbody tr.hl td { animation: rowflash 2.2s ease 1; }
 @keyframes rowflash { 0%, 55% { background: var(--accent); } 100% { background: transparent; } }
 
-.idband { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.idband { display: flex; align-items: center; justify-content: space-between; gap: 12px; } /* the boards' .row.sb.ce */
 .idband > div:first-child { min-width: 0; }
 .idband h1 { font-size: var(--fs-xl); font-weight: 600; line-height: 24px; overflow-wrap: anywhere; }
 .idband h1.m { font-family: var(--sans); font-size: var(--fs-xl); }  /* the boards' .h1.m: .h1's font shorthand, declared after .m, sets the family back to Plex Sans, 600 */
@@ -509,10 +581,10 @@ table.tbl tbody tr.hl td { animation: rowflash 2.2s ease 1; }
   color: var(--ink); white-space: nowrap;
 }
 .btn:hover { background: var(--well); }
-/* The boards draw every control as a <button>, where `.app button { font: inherit }` outranks
-   `.btn { font-weight: 500 }`: 400. The console draws many as <a class="btn"> (navigation) and
-   they match, so one row never mixes weights. Only Cl-Home's "Connect an app" is an <a> on the
-   board, and so 500 (.w5). */
+/* The boards' cascade: `.btn` is 500, and `.app button { font: inherit }` sets a <button> back
+   to the page's 400. So where a board draws a link as a button (Create topic, Connect an app, Create ACL,
+   Register schema, Back to the list, Check first, the first run's links) it is 500 (.w5);
+   every other .btn is drawn at a <button>'s 400, so one row never mixes weights. */
 .btn.w5 { font-weight: 500; }
 .btn.pri { background: var(--ink); border-color: var(--ink); color: var(--card); }
 .btn.pri:hover { background: var(--ink); opacity: .88; }
@@ -642,9 +714,13 @@ p.note { margin: 0; }
    The bar is always there; the form opens in place (the Produce button and p open
    it). Whether it is open is on <html> (data-dock), set before paint and kept
    across navigation. */
-.tryit { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-md); flex: none; }
-.dock-bar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; cursor: pointer; user-select: none; width: 100%; background: none; border: 0; text-align: left; font: inherit; color: inherit; }
-.dock-bar:hover { background: var(--well); }
+/* Sy-01's card: .card.pad.col.g8, the title over a key, a value and Send. */
+.tryit { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-md); flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; }
+.dock-bar { display: flex; align-items: center; gap: 8px; padding: 0; cursor: pointer; user-select: none; width: 100%; background: none; border: 0; text-align: left; font: inherit; color: inherit; }
+.tryit .quick .quick-key { width: 150px; flex: none; }
+.tryit .quick .form-err { margin-top: 8px; }
+:root[data-dock="open"] .tryit .quick { display: none; }
+.dock-bar:hover .t { text-decoration: underline; text-underline-offset: 2px; }
 .dock-bar:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .dock-bar .ic { width: 15px; height: 15px; flex: none; }
 .dock-bar .t { font-weight: 600; white-space: nowrap; }
@@ -653,7 +729,7 @@ p.note { margin: 0; }
 .dock-bar .twist { display: inline-flex; }
 .dock-bar .twist .ic { color: var(--mut); transition: transform .15s ease; transform: rotate(-90deg); }
 :root[data-dock="open"] .dock-bar .twist .ic { transform: rotate(90deg); }
-.dock-form { display: none; padding: 2px 14px 14px; border-top: 1px solid var(--line2); }
+.dock-form { display: none; margin: 4px -14px -12px; padding: 2px 14px 14px; border-top: 1px solid var(--line2); }
 :root[data-dock="open"] .dock-form { display: block; }
 .dock-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 12px; }
 .crow { display: flex; gap: 12px; margin-top: 12px; }
@@ -671,7 +747,7 @@ p.note { margin: 0; }
   color: var(--foreground); font-size: var(--fs-md); font-family: var(--sans); width: 100%;
 }
 .input.mono { font-family: var(--mono); }
-.input::placeholder { color: var(--muted-foreground); opacity: .8; }
+.input::placeholder { color: var(--muted-foreground); opacity: 1; } /* full strength: at .8 it was 3.92:1 on the card (a11y.spec measures every placeholder) */
 .input:focus, textarea.input:focus, select.input:focus { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 25%, transparent); }
 textarea.input.mono { font-size: var(--fs-md); min-height: 96px; resize: vertical; line-height: 1.6; }
 /* A segmented control (the boards' .seg): one of a few, the chosen one in ink. */
@@ -760,6 +836,8 @@ table.msg-table td { overflow: hidden; text-overflow: ellipsis; }
 .inspector-acts .btn-name { max-width: 100%; min-width: 0; }
 .inspector-acts { margin-top: 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .inspector-b { padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+/* Sy-02, Tp-06: the body runs to the panel's foot (.bd is flex: 1); taller, it scrolls with the panel. */
+@media (min-width: 1101px) { .insp-sel .inspector-b { flex: 1 0 auto; } }
 .insp-sel.busy .inspector-b { opacity: .45; transition: opacity .15s ease .15s; }
 .inspector-dl { margin-top: 0; }
 .inspector-loading { padding: 28px 16px; color: var(--mut); font-size: var(--fs-md); }
@@ -773,6 +851,8 @@ table.msg-table td { overflow: hidden; text-overflow: ellipsis; }
 .kv-copy { display: inline-flex; align-items: flex-start; gap: 4px; max-width: 100%; min-width: 0; }
 .kv-copy .kv { min-width: 0; overflow-wrap: anywhere; display: inline; }
 .sz { font-family: var(--sans); font-size: var(--fs-xs); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted-foreground); }
+/* In a cap the size is part of it, as Tp-06 writes "VALUE · 69 B · JSON". */
+.cap .sz { font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; }
 .hdrlist { display: flex; flex-direction: column; gap: 4px; }
 .hdrpair { display: flex; gap: 8px; font-family: var(--mono); font-size: var(--fs-sm); padding: 2px 0; }
 .hdrpair .hk { color: var(--mut); flex: 0 1 auto; min-width: 0; max-width: 45%; overflow-wrap: anywhere; }
@@ -785,30 +865,37 @@ table.msg-table td { overflow: hidden; text-overflow: ellipsis; }
 .palette-overlay { padding-top: 70px; }
 .palette { width: 100%; max-width: 640px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-xl); box-shadow: var(--shadow-modal); overflow: hidden; display: flex; flex-direction: column; max-height: calc(100vh - 100px); }
 .pal-input { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); flex: none; }
-.pal-input input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; font-family: var(--mono); font-size: var(--fs-base); color: var(--ink); height: 24px; padding: 0; }
+/* Sy-05's field is .inp.m with no border, 24 px, 14 px in the page's face (con.css's
+   `.app input { font: inherit }` outranks .m), on the card, and as wide as the row lets
+   it be: the count beside it wraps to two lines before it gives way. */
+.pal-input input { flex: 1 1 100%; width: 100%; min-width: 0; border: 0; border-radius: var(--radius-md); background: var(--card); outline: none; font-family: var(--sans); font-size: var(--fs-base); font-weight: 400; line-height: 20px; color: var(--ink); height: 24px; padding: 0; }
 .pal-input input::placeholder { color: var(--mut); }
 .pal-list { overflow-y: auto; padding: 6px 0; flex: 1; min-height: 0; }
 .pal-cap { padding: 8px 14px 2px; }
-.pal-cap:first-child { padding-top: 4px; }
+.pal-cap:first-child { padding-top: 6px; }
 .pal-item { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 14px; font-size: var(--fs-md); cursor: pointer; color: var(--ink); }
 .pal-item.sel { background: var(--sel); }
 :root[data-theme="contrast"] .pal-item.sel { outline: 2px solid var(--ink); outline-offset: -2px; }
 .pal-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pal-name.m { font-family: var(--mono); font-size: var(--fs-sm); }
-.pal-name b { font-weight: 700; }
+.pal-name b { font-weight: 700; } /* Plex Mono ends at 700: the board's "bolder" than 600 (900) is drawn with this face too */
+.pal-item.sel .pal-name { font-weight: 600; } /* Sy-05's chosen row: its name is .m.b */
 .pal-detail { min-width: 0; }
 .pal-glyph { width: 14px; text-align: center; flex: none; }
 .pal-item .kbd { margin: 0; flex: none; }
 .pal-empty { padding: 22px; text-align: center; color: var(--mut); font-size: var(--fs-md); }
-.pal-foot { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; border-top: 1px solid var(--line); background: var(--well); flex: none; }
-.pal-foot .kbd { margin-right: 4px; }
+.pal-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; border-top: 1px solid var(--line); background: var(--well); border-radius: 0 0 6px 6px; flex: none; }
+.pal-foot .kbd { margin-right: 6px; }
 
-/* styled confirm */
+/* the key sheet's box */
 .dialog { width: 100%; max-width: 440px; background: var(--popover); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--sh-lg); overflow: hidden; }
-.dialog-h { padding: 18px 20px 16px; }
-.dialog-h h3 { margin: 0; font-size: var(--fs-lg); font-weight: 600; }
-.dialog-h p { margin: 6px 0 0; font-size: var(--fs-md); color: var(--muted-foreground); overflow-wrap: anywhere; }
-.dialog-f { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--muted); }
+/* The confirm (Tp-24): the boards' .modal, 470 wide and 150 down, its paragraph in ink,
+   a table of what goes and stays, Cancel and the verb at the right. */
+.modal { width: 470px; max-width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 18px 50px rgba(0, 0, 0, .22); }
+#confirm.overlay { padding-top: 150px; }
+#confirm-msg { margin: 0; overflow-wrap: anywhere; }
+#confirm-rows > span { overflow-wrap: anywhere; }
+.confirm-f { justify-content: flex-end; }
 
 /* ---------- flash banner ---------- */
 .flash {
@@ -947,7 +1034,37 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .panes > .insp:has(.insp-sel:not([hidden])) { border-color: var(--ink); }
   .insp[data-kind="message"] { width: auto; }
   .panes > .dock { grid-column: 1; grid-row: 3; }
+  /* Sy-03 on one screen: the dock is its header and two rows (it scrolls for more), and
+     the stacked card is the board's height, its record's fields beside its value; the
+     rest of the record (headers, actions) is in the card's own scroll. The tape keeps its
+     head (the partitions, live, the log end) and leaves its marks to the wide page. */
+  .panes > .dock { max-height: 87px; }
+  .panes > .insp:has(.insp-sel:not([hidden])) { max-height: 160px; }
+  .insp-sel .inspector-h { padding: 8px 14px; align-items: center; }
+  .insp-sel .inspector-h > div:first-child { flex-direction: row; align-items: baseline; gap: 8px; }
+  .insp-sel .inspector-h .inspector-sub { display: none; } /* Sy-03's card header is one line: what it is and which */
+  /* The records come right after the tape's head; the search and the jumps follow them. */
+  #tape-and-table { display: flex; flex-direction: column; gap: 8px; }
+  #tape-and-table > .secrow { order: 2; }
+  .insp[data-kind="message"] .insp-sel .inspector-b { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 10px 18px; padding: 10px 14px; }
+  .nbnote { display: none; } /* how the neighbours are counted waits for the wide page */
+  .neighbours { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .neighbours a.well { flex: none; }
+  .insp[data-kind="message"] .insp-sel .inspector-b > :not(:first-child):not(:nth-child(2)) { grid-column: 1 / -1; }
+  .tape-strip, .tape-foot { display: none; }
   .backrow { display: flex; }
+  /* Sy-03's back is a.btn.sm, a link drawn as a button: 500, "‹ Topics" one run of text. */
+  .backrow > a.btn { font-weight: 500; gap: 0; }
+  /* Sy-03's wells are 26 px (2 px above and below). */
+  .neighbours a.well { padding-top: 2px; padding-bottom: 2px; }
+  /* Sy-03 and Sy-04 close the message with a word (esc, Close) and draw no older and
+     newer: j and k step through the records. */
+  .insp-sel .insp-step { display: none; }
+  .insp-sel .insp-close { width: auto; height: 24px; padding: 0 8px; gap: 6px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); color: var(--ink); font-size: var(--fs-sm); }
+  .insp-sel .insp-close .ic { display: none; }
+  .insp-sel .insp-close .close-t { display: inline; }
+  /* Sy-03 and Sy-04 write which message it is in mono, 12 px, 600. */
+  .insp-sel .inspector-h #inspector-title { font-family: var(--mono); font-size: var(--fs-sm); font-weight: 600; }
   .idband { flex-wrap: wrap; }
   .crow { flex-wrap: wrap; }
   .field.w-part, .field.w-acks { flex: 1 1 150px; }
@@ -959,12 +1076,26 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
 @media (max-width: 640px) {
   :root { --pad: 12px; }
   .topbar { gap: 10px; padding: 0 10px; }
-  .brand .sub, .tb-right .pill.live { display: none; } /* the endpoint is on the Cluster page */
-  /* The name is not drawn on a phone but the link keeps it: it is the link's name. */
-  .brand-name { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .menu-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); color: var(--ink); cursor: pointer; flex: none; }
+  /* The brand is the logo alone; its words stay its name for a screen reader. */
+  .brand .sub, .brand-name { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  /* Sy-04's status: the dot alone (the address is its name, for a screen reader, and
+     its tooltip); when the broker is lost the pill says so in full. */
+  .tb-right .pill.live:not(.disconnected) { border: 0; background: none; padding: 0; height: auto; }
+  .tb-right .pill.live:not(.disconnected) .pill-addr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .backrow > .note, .backrow .back-wide { display: none; }
+  .backrow .back-narrow { display: inline; }
+  .backrow { display: block; }
+  /* Sy-04's back is a.note: a line of its own, 12 px, muted, underlined as the boards' links. */
+  .backrow > a.btn { display: block; border: 0; border-radius: 0; background: none; padding: 0; height: auto; font-weight: 400; color: inherit; text-decoration: underline; text-decoration-color: var(--mut); text-underline-offset: 2px; }
+  .insp-sel .insp-close .close-esc { display: none; }
+  .insp-sel .insp-close .close-word { display: inline; }
+  #facts-newest { display: none; } /* Sy-04's sentence: partitions, messages, how long they are kept. */
+  .panes > .dock { display: none; } /* Sy-04 draws no wire on a phone; it is the wide page's. */
+  /* Sy-04's ☰ and ⌘K are .btn.sm: 24 px high, 12 px type, on the card. */
+  .menu-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 32px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); color: var(--ink); cursor: pointer; flex: none; font-size: var(--fs-sm); }
   .pg-title { display: block; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .tb-palette { flex: none; width: auto; padding: 0 8px; }
+  .tb-palette { flex: none; width: auto; height: 24px; padding: 0 8px; gap: 6px; background: var(--card); color: var(--ink); font-size: var(--fs-sm); }
+  .tb-palette .kbd { border: 0; background: none; padding: 0; margin: 0; min-width: 0; font: inherit; color: inherit; }
   .tb-palette .grow { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
   /* The rail is what the menu opens. */
   .body { position: relative; }
@@ -973,35 +1104,65 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   :root[data-menu="open"] .rail .cap { display: block; }
   :root[data-menu="open"] .rail .nav .nm, :root[data-menu="open"] .rail .nav .n { position: static; width: auto; height: auto; margin: 0; clip: auto; }
   :root[data-menu="open"] .rail .nav .n { margin-left: auto; }
+  .tb-right .theme-seg { display: none; }
+  :root[data-menu="open"] .rail .rail-theme { display: grid; grid-template-columns: 1fr 1fr; flex: none; margin: 8px 0 0; align-self: stretch; }
+  :root[data-menu="open"] .rail .rail-theme button { justify-content: center; padding: 0 6px; border-bottom: 1px solid var(--line); }
+  :root[data-menu="open"] .rail .rail-theme button:nth-child(2n) { border-right: 0; }
+  :root[data-menu="open"] .rail .rail-theme button:nth-child(n+3) { border-bottom: 0; }
   /* Messages are cards: the key and offset, the value, then when and from whom. */
   .tbl-wrap table.tbl thead { display: none; }
   .tbl-wrap table.tbl, .tbl-wrap table.tbl tbody { display: block; }
   .tbl-wrap table.tbl tbody tr:not(.txnmark) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; padding: 8px 10px; border-bottom: 1px solid var(--line2); }
-  .tbl-wrap table.tbl tbody tr:not(.txnmark) td { display: block; padding: 0; border: 0; min-width: 0; max-width: none; }
+  .tbl-wrap table.tbl tbody tr:not(.txnmark) td { display: block; padding: 0; border: 0; min-width: 0; max-width: none; min-height: 0; height: auto; line-height: 20px; }
   .tbl-wrap table.tbl td.cell-key { grid-column: 1; grid-row: 1; font-weight: 600; max-width: none; }
   .tbl-wrap table.tbl td.cell-offset { grid-column: 2; grid-row: 1; text-align: right; color: var(--mut); }
   .tbl-wrap table.tbl td.cell-val { grid-column: 1 / -1; grid-row: 2; }
-  .tbl-wrap table.tbl td.cell-age { display: block; grid-column: 1 / -1; grid-row: 3; text-align: left; color: var(--mut); font-size: var(--fs-xs); }
+  .tbl-wrap table.tbl td.cell-age { display: block; grid-column: 1 / -1; grid-row: 3; text-align: left; color: var(--mut); font-family: var(--sans); font-size: var(--fs-sm); }
   .tbl-wrap table.tbl td.cell-age::after { content: " ago"; }
-  .tbl-wrap table.tbl td.col-p { display: none; }
+  .tbl-wrap table.tbl td.cell-age:has(time[data-now])::after { content: none; }
+  .tbl-wrap table.tbl tbody tr:not(.txnmark) td.col-p { display: none; } /* (the cell rule above is more specific than a bare td.col-p) */
+  /* Sy-04's cards: each record its own bordered card, the open one ringed in ink. */
+  .tbl-wrap:has(#messages-table) { border: 0; background: none; overflow: visible; }
+  #messages-table tbody tr:not(.txnmark) { margin-bottom: 8px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); padding: 9px 12px; gap: 4px 8px; }
+  /* The open card is ringed in ink, as Sy-04 draws it; its cells are not filled. */
+  #messages-table tbody tr.on:not(.txnmark) { border-color: var(--ink); }
+  #messages-table tbody tr.on:not(.txnmark) > td { background: none; }
+  /* A home's table: each row a card, its name first, then each value after its column's name. */
+  main .card > .r.h { display: none; }
+  main .card > .r:not(.h) { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 8px 12px; min-height: 0; }
+  main .card > .r:not(.h) > * { white-space: normal; overflow: visible; overflow-wrap: anywhere; min-width: 0; }
+  main .card > .r:not(.h) > :first-child { flex: 1 1 100%; font-weight: 600; }
+  main .card > .r:not(.h) > [data-l]::before { content: attr(data-l) " "; color: var(--mut); font-family: var(--sans); font-weight: 400; font-size: var(--fs-sm); }
+  main .card > .r:not(.h) > [data-l]:empty { display: none; }
+
   .tbl-wrap table.tbl td.cell-offset .p-inline { display: inline; }
   .tb-right .pill.live.disconnected { display: inline-flex; } /* ...but "not connected" is never hidden */
   .tb-right .pill.live.disconnected .pill-addr { display: none; }
   .tb-spacer { display: none; }
   .panes > .main { padding: 10px 12px 0; gap: 8px; }
   .panes > .insp:has(.insp-sel:not([hidden])) {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; margin: 0; height: 400px; max-height: 90vh; overflow: hidden; border: 0; border-top: 1px solid var(--line);
-    border-radius: 12px 12px 0 0; box-shadow: 0 0 0 100vmax var(--scrim);
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; margin: 0; height: 400px; max-height: 90vh; overflow: hidden; border: 1px solid var(--line);
+    border-radius: 12px 12px 0 0; box-shadow: 0 0 0 100vmax var(--scrim-sheet);
   }
   /* The board's sheet is a fixed 400 px: the record scrolls inside it and its actions
      stay pinned at the foot (the sheet's own padding is 14 at the foot). */
   .insp-sel { overflow: hidden; }
   .insp-sel .inspector-b { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 0; }
-  .insp-sel .inspector-acts { position: sticky; bottom: 0; margin: auto -16px 0; padding: 10px 16px 14px; background: var(--card); border-top: 1px solid var(--line2); }
+  /* Sy-04's sheet: 14 px in from its border, 8 px between its parts, one column the
+     sheet's width (not 960's two). */
+  .insp-sel .inspector-b, .insp[data-kind="message"] .insp-sel .inspector-b { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 8px 14px 0; }
+  .insp-sel .inspector-h { padding: 8px 14px 0; align-items: center; border-bottom: 0; }
+  .insp-sel .inspector-h > div:first-child { flex-direction: column; align-items: stretch; gap: 0; }
+  /* Its actions at the foot, each as wide as its share of the row (the board's .grow). */
+  .insp-sel .inspector-acts { position: sticky; bottom: 0; margin: auto -14px 0; padding: 8px 14px 14px; background: var(--card); }
+  .insp-sel .inspector-acts > .btn { flex: 1 1 auto; }
   /* Sy-04: the title is 15 px on its own row, then the action the width of the page with
      the menu beside it. */
-  .idband h1, .idband h1.m, .idband h1.page-title { font-size: var(--fs-phone-h1); line-height: 20px; flex: 1 1 100%; }
+  .idband h1, .idband h1.m, .idband h1.page-title { font-size: var(--fs-phone-h1); line-height: 24px; flex: 1 1 100%; }
   .idband > .idband-acts { flex: 1 1 100%; flex-wrap: nowrap; }
+  .idband { row-gap: 8px; } /* Sy-04: the action 8 px under the title */
+  /* Sy-04's sentence is a .note: 12 px, muted. */
+  #topic-facts { font-size: var(--fs-sm); color: var(--mut); }
   .idband-acts > .btn.pri { flex: 1; }
   /* Sy-04: 400 of 844 (47%), so the page's own tabs and first card stay in view under
      it, and the grab handle the board draws: 36 x 4, centred, 8 px from the top. */
@@ -1039,7 +1200,8 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
 
 /* Transactions on the tape: records of a transaction that is open or aborted are dimmed
    and badged, and a commit or abort marker is a thin divider, not a record. */
-.tbl tr.txn-aborted td { opacity: .55; }
+/* An aborted record: muted and struck through, never faded (.55 opacity was 2.5 to 3.9:1). */
+.tbl tr.txn-aborted td, .tbl tr.txn-aborted td * { color: var(--mut); }
 .tbl tr.txn-aborted .cell-val { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--bad) 60%, transparent); }
 .tbl tr.txn-open td { background: color-mix(in srgb, var(--warn) 6%, transparent); }
 .txnbadge { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: var(--fs-xs); line-height: 16px; font-family: var(--font-sans); border: 1px solid var(--border); color: var(--dim); }
@@ -1047,7 +1209,7 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
 .txnbadge-aborted { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--border)); }
 .tbl tr.txnmark td { padding-top: 1px; padding-bottom: 1px; font-size: var(--fs-xs); color: var(--dim); border-top: 1px dashed var(--border); border-bottom: 1px dashed var(--border); background: transparent; }
 .tbl tr.txnmark .txnmark-l { letter-spacing: .04em; text-transform: lowercase; }
-.txntoggle[aria-pressed="true"] { background: var(--sel); }
+.txntoggle[data-on="true"] { background: var(--sel); }
 
 /* ---- schemas ---- */
 .badge.schema-type { background: var(--denybg); color: var(--deny); }
@@ -1120,13 +1282,12 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
 .wiredock tr[data-inspector-open] td { white-space: nowrap; }
 
 /* The neighbours sentence under a page's title. */
-.neighbours { margin: 10px 0 0; font-size: var(--fs-md); color: var(--muted-foreground); line-height: 1.6; }
-.neighbours a { color: var(--foreground); border-bottom: 1px solid var(--border); }
-.neighbours a:hover { border-bottom-color: var(--foreground); }
+/* Sy-01, Sy-02 and Tp-05 draw the neighbours as wells in ink, on the page's 20 px line, with the page's gap above. */
+.neighbours { margin: 0; font-size: var(--fs-md); color: var(--ink); line-height: 20px; }
+.neighbours a { color: var(--ink); }
+.neighbours a.well:hover { border-color: var(--line); }
 
-/* High contrast also thickens the edges a control is found by. */
-:root[data-theme="contrast"] .btn, :root[data-theme="contrast"] .input, :root[data-theme="contrast"] .chip,
-:root[data-theme="contrast"] .tbl-wrap, :root[data-theme="contrast"] .panel { border-width: 2px; }
+/* High contrast draws its edges 1 px, white, as Sy-07's set does; focus is 3 px. */
 :root[data-theme="contrast"] :focus-visible { outline-width: 3px; }
 
 /* The keys overlay (Sy-06), generated from the declared key map: three columns. */
@@ -1136,10 +1297,13 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
 .help-b { padding: 16px 18px; overflow-y: auto; display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
 .help-g { flex: 1 1 0; min-width: 220px; }
 .help-r { gap: 12px; }
-.help-k { display: inline-flex; gap: 4px; flex: none; }
-.help-k .kbd { margin: 0; }
+/* Sy-06's keys: inline-blocks 6 px apart, on the line's baseline, as .k draws them. */
+.help-k { display: inline; flex: none; white-space: nowrap; }
+.help-k .kbd { display: inline-block; margin: 0 6px 0 0; }
+.help-k .kbd:last-child { margin-right: 0; }
 .help-l { color: var(--ink); }
 .help-f { padding: 10px 18px; border-top: 1px solid var(--line); background: var(--well); border-radius: 0 0 6px 6px; flex: none; }
+.help-f .note { flex: 1; }
 .lane { position: relative; height: 8px; background: var(--line2); border-radius: 2px; min-width: 60px; }
 .lane > div { position: absolute; top: 0; left: 0; height: 8px; border-radius: 2px; background: var(--ink); }
 .lane > div.bad { background: var(--bad); }

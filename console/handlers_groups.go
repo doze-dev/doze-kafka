@@ -14,10 +14,30 @@ import (
 // groups is the Groups home (Gr-Home): every group, how far behind each is, and which
 // need a look.
 func (c *Console) groups(w http.ResponseWriter, r *http.Request) {
-	list, err := c.be.ListGroups(r.Context())
+	data, err := c.groupsHomeData(r)
 	if err != nil {
 		c.fail(w, r, err)
 		return
+	}
+	data["LiveHash"], _ = c.liveHash("groups_live", data)
+	c.render(w, r, "groups_home", data)
+}
+
+// groupsLive is Gr-Home's summary, table and callouts, polled every 3 s as the board
+// says ("refreshes every 3 s").
+func (c *Console) groupsLive(w http.ResponseWriter, r *http.Request) {
+	data, err := c.groupsHomeData(r)
+	if err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	c.livePartial(w, r, "groups_live", data)
+}
+
+func (c *Console) groupsHomeData(r *http.Request) (map[string]any, error) {
+	list, err := c.be.ListGroups(r.Context())
+	if err != nil {
+		return nil, err
 	}
 	rows := c.groupRows(r.Context(), list)
 	var withMembers, members int
@@ -33,8 +53,8 @@ func (c *Console) groups(w http.ResponseWriter, r *http.Request) {
 			need = append(need, g)
 		}
 	}
-	c.render(w, r, "groups_home", map[string]any{"Groups": rows, "Page": "groups", "Title": "Groups",
-		"WithMembers": withMembers, "MemberCount": members, "TotalLag": lag, "NeedALook": need})
+	return map[string]any{"Groups": rows, "Page": "groups", "Title": "Groups",
+		"WithMembers": withMembers, "MemberCount": members, "TotalLag": lag, "NeedALook": need}, nil
 }
 
 // groupLagRow is one topic-partition's committed-vs-latest offset, dressed

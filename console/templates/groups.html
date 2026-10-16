@@ -1,21 +1,21 @@
 {{/* Groups. The list is the groups with the one number that matters (lag); the page
      is Gr-Home, or one group (Gr-02: Lag, Members, Timeline, Offsets). */}}
 {{define "group_lp"}}
-<aside class="list wide" aria-label="Consumer groups">
+<aside class="list wide" aria-label="Consumer groups" data-list="groups">
   <div class="row sb ce list-h"><span class="cap">Consumer groups</span><span class="cap">Lag</span></div>
   <div class="list-filter"><input class="inp m" type="search" placeholder="Filter groups" aria-label="Filter Groups" data-filter-target=".list .li" data-filter-none="#list-none" spellcheck="false" autocomplete="off"></div>
   <div class="list-scroll">
     {{if not .Groups}}<div class="note list-note"><b>{{t "groups.none.title"}}</b><br>{{t "groups.none.hint"}}</div>{{end}}
     {{range .Groups}}
     <a class="li {{if eq .ID $.Sel}}on{{end}}" href="{{.URL}}" data-name="{{.ID}}"{{if eq .ID $.Sel}} aria-current="page"{{end}}>
-      <span class="dot {{if eq .State "Stable"}}{{else if eq .State "Empty"}}off{{else if eq .State "Dead"}}bad{{else}}warn{{end}}" title="{{.State}}"></span>
+      <span class="dot {{groupDot .State}}" title="{{.State}}"></span>
       <span class="grow el m">{{.ID}}</span>
-      <span class="m {{if .Behind}}warn{{else}}mut{{end}}">{{num .Lag}}</span>
+      <span class="m{{if .Behind}} warn{{end}}" data-n>{{num .Lag}}</span>
     </a>
     {{end}}
     <div class="note list-note" id="list-none" hidden>No group matches the filter.</div>
   </div>
-  <div class="note list-note list-foot">{{if .Sel}}{{else}}Nothing selected. {{end}}Groups are not created here. One appears when a consumer joins.</div>
+  <div class="note list-note list-foot wide-pad">{{if .Sel}}{{else}}Nothing selected. {{end}}Groups are not created here. One appears when a consumer joins.</div>
 </aside>
 {{end}}
 
@@ -25,9 +25,19 @@
   <main class="main" id="detail">
     <div class="row sb ce idband">
       <div class="col"><h1 class="h1">Groups</h1><span class="note">Everything that has joined or committed to this broker. Committed offsets survive a restart; members do not.</span></div>
-      <div class="row ce g8"><span class="pill ok"><span class="dot" aria-hidden="true"></span>live</span></div>
+      <div class="row ce g8"><span class="pill ok" data-live-state><span class="dot" aria-hidden="true"></span><span data-live-state-l>live</span></span></div>
     </div>
 
+    {{template "groups_live" .}}
+    <div class="grow"></div>
+    <div class="note footnote">Select a group to open it. Press <span class="kbd">⌘K</span> to jump to one by name.</div>
+  </main>
+{{template "shell_bottom" .}}{{end}}
+
+{{/* Gr-Home's summary, filters, table and callouts: polled every 3 s (live/groups), as
+     the board says. What is typed in the filter and the kind chosen stay through a poll. */}}
+{{define "groups_live"}}<div class="col g10" id="groups-live" data-live="{{.Prefix}}/live/groups" data-hash="{{.LiveHash}}" data-live-ms="3000">{{template "groups_live_in" .}}</div>{{end}}
+{{define "groups_live_in"}}
     {{if .Groups}}
     <div class="row ce g8 wrap" id="groups-summary">
       <span class="m">{{len .Groups}} group{{if ne (len .Groups) 1}}s{{end}}</span><span class="mut">·</span>
@@ -37,7 +47,7 @@
     </div>
 
     <div class="filterrow">
-      <input class="inp m" type="search" placeholder="Group, topic or client" aria-label="Filter groups" data-filter-target="#groups-table > a.r" data-filter-none="#groups-none" spellcheck="false" autocomplete="off">
+      <input class="inp m" id="groups-filter" type="search" placeholder="Group, topic or client" aria-label="Filter groups" data-filter-target="#groups-table > a.r" data-filter-none="#groups-none" spellcheck="false" autocomplete="off">
       <div class="seg" role="group" aria-label="Which groups" data-seg-for="#groups-table > a.r">
         <button type="button" class="on" data-seg-value="" aria-pressed="true">all</button>
         <button type="button" data-seg-value="with-members" aria-pressed="false">with members</button>
@@ -45,20 +55,20 @@
         <button type="button" data-seg-value="behind" aria-pressed="false">behind</button>
       </div>
       <div class="grow"></div>
-      <span class="note">filters this list; the broker is asked afresh on each load</span>
+      <span class="note">refreshes every 3 s</span>
     </div>
 
-    <div class="card" id="groups-table" style="--c: minmax(0, 1.3fr) 110px 110px 70px minmax(0, 1.4fr) 86px 110px">
+    <div class="card" id="groups-table">
       <div class="r h"><span>Group</span><span>Protocol</span><span>State</span><span class="ra">Members</span><span>Topics</span><span class="ra">Lag</span><span class="ra">Generation</span></div>
       {{range .Groups}}
       <a class="r" href="{{.URL}}" data-row data-name="{{.ID}}" data-text="{{range .Topics}}{{.}} {{end}}" data-seg="{{if .Members}}with-members{{else}}empty{{end}}{{if .Behind}} behind{{end}}">
         <span class="m b">{{.ID}}</span>
-        <span class="m">{{if eq .Protocol "848"}}consumer <span class="tag">KIP-848</span>{{else}}classic{{end}}</span>
-        <span class="m {{if eq .State "Stable"}}ok{{else if eq .State "Dead"}}bad{{else if eq .State "Empty"}}mut{{else}}warn{{end}}">{{.State}}</span>
-        <span class="m ra">{{.Members}}</span>
-        <span class="m el">{{if .Topics}}{{range $i, $t := .Topics}}{{if $i}}, {{end}}{{$t}}{{end}}{{else}}<span class="mut">—</span>{{end}}</span>
-        <span class="m ra {{if .Behind}}warn{{else if .HasOffsets}}ok{{else}}mut{{end}}">{{if .HasOffsets}}{{num .Lag}}{{else}}—{{end}}</span>
-        <span class="m ra {{if not .Members}}mut{{end}}">{{if .Generation}}{{if eq .Protocol "848"}}epoch{{else}}generation{{end}} {{.Generation}}{{else}}<span class="mut">—</span>{{end}}</span>
+        <span class="m" data-l="Protocol">{{if eq .Protocol "848"}}consumer <span class="tag">KIP-848</span>{{else}}classic{{end}}</span>
+        <span class="m {{if eq .State "Stable"}}ok{{else if eq .State "Dead"}}bad{{else if eq .State "Empty"}}mut{{else}}warn{{end}}" data-l="State">{{.State}}</span>
+        <span class="m ra" data-l="Members">{{.Members}}</span>
+        <span class="m el" data-l="Topics">{{if .Topics}}{{range $i, $t := .Topics}}{{if $i}}, {{end}}{{$t}}{{end}}{{else}}<span class="mut">—</span>{{end}}</span>
+        <span class="m ra{{if .Behind}} warn{{else if not .HasOffsets}} mut{{end}}" data-l="Lag">{{if .HasOffsets}}{{num .Lag}}{{else}}—{{end}}</span>
+        <span class="m ra {{if not .Members}}mut{{end}}" data-l="Generation">{{if .Generation}}{{if eq .Protocol "848"}}epoch{{else}}generation{{end}} {{.Generation}}{{else}}<span class="mut">—</span>{{end}}</span>
       </a>
       {{end}}
     </div>
@@ -66,20 +76,17 @@
 
     <div class="row g12 wrap callouts">
       <div class="callout grow"><span class="b">Reading the table</span><span class="note">Protocol is what the client chose: <span class="m">classic</span> (JoinGroup, SyncGroup, Heartbeat) or <span class="m">consumer</span> (ConsumerGroupHeartbeat, KIP-848). Lag is log end minus committed, summed over the topics. An empty group keeps its offsets, so its lag keeps growing as producers write. A generation is shown when the broker has seen its coordinator say one.</span></div>
-      {{if .NeedALook}}<div class="callout warn grow"><span class="b">{{len .NeedALook}} group{{if ne (len .NeedALook) 1}}s need{{else}} needs{{end}} a look</span><span class="note">{{range $i, $g := .NeedALook}}{{if $i}} {{end}}<a href="{{$g.URL}}">{{$g.ID}}</a> is empty and <span class="m">{{num $g.Lag}}</span> record{{if ne $g.Lag 1}}s{{end}} behind: nothing is reading it.{{end}}</span></div>{{end}}
+      {{if .NeedALook}}<div class="callout warn grow"><span class="b">{{countWord (len .NeedALook)}} group{{if ne (len .NeedALook) 1}}s need{{else}} needs{{end}} a look</span><span class="note">{{range $i, $g := .NeedALook}}{{if $i}} {{end}}<a href="{{$g.URL}}">{{$g.ID}}</a> is empty and <span class="m">{{num $g.Lag}}</span> record{{if ne $g.Lag 1}}s{{end}} behind: nothing is reading it.{{end}}</span></div>{{end}}
     </div>
     {{else}}
     <div class="callout"><span class="b">{{t "groups.none.title"}}</span><span class="note">{{t "groups.none.hint"}}</span></div>
     {{end}}
-    <div class="grow"></div>
-    <div class="tablenote">Select a group to open it. Press <span class="kbd">⌘K</span> to jump to one by name.</div>
-  </main>
-{{template "shell_bottom" .}}{{end}}
+{{end}}
 
 {{define "group_detail"}}{{template "shell_top" .}}
   {{template "group_lp" (dict "Groups" .Groups "Sel" .Group.ID)}}
   <main class="main workbench" id="detail">
-    <div class="backrow"><a class="btn sm" href="{{.Prefix}}/groups">‹ Groups</a><span class="note">{{len .Groups}} group{{if ne (len .Groups) 1}}s{{end}}, the list is one tap away</span></div>
+    <div class="backrow"><a class="btn sm" href="{{.Prefix}}/groups">‹&nbsp;<span class="back-wide">Groups</span><span class="back-narrow">All groups</span></a><span class="note">{{len .Groups}} group{{if ne (len .Groups) 1}}s{{end}}, the list is one tap away</span></div>
     {{template "group_live" .}}
   </main>
   {{template "wire_dock" .}}
@@ -99,8 +106,8 @@
       </div>
       <div class="row ce g8 idband-acts">
         <a class="btn pri" href="{{groupURL .Group.ID}}?tab=offsets#reset">Reset offsets…</a>
-        <div class="more"><button type="button" class="btn" aria-label="More actions for {{.Group.ID}}" title="More actions" aria-haspopup="true" aria-expanded="false" data-more>···</button>
-          <div class="menu" role="menu" hidden>
+        <div class="more"><button type="button" class="btn" aria-label="More actions for {{.Group.ID}}" title="More actions" aria-expanded="false" data-more>···</button>
+          <div class="menu" role="group" aria-label="More actions" hidden>
             <button type="button" class="btn danger" {{if not .CanAct}}disabled title="Stop the group's consumers first"{{end}}
               hx-post="{{groupURL .Group.ID}}/delete" hx-disabled-elt="this" data-confirm-url="{{confirmURL "group.delete" "group" .Group.ID}}" data-confirm-title="{{(index .Confirm "group.delete").Title}}" data-confirm-verb="{{(index .Confirm "group.delete").Verb}}" hx-confirm="{{(index .Confirm "group.delete").Text}}">{{icon "trash"}} Delete</button>
             {{if not .CanAct}}<div class="menu-note">Delete is possible once no member is connected.</div>{{end}}
@@ -210,6 +217,7 @@
           <option value="">all topics</option>
           {{range .Topics}}<option value="{{.}}">{{.}}</option>{{end}}
         </select></label>
+      {{else}}{{/* One topic: no choice to offer, and the buttons still send the scope they include (all of them). */}}<input type="hidden" id="reset-scope" name="topic" value="">
       {{end}}
       <button type="button" class="btn" {{if not (and .CanAct .Offsets)}}disabled title="{{if .Members}}Stop the group's {{len .Members}} consumer{{if ne (len .Members) 1}}s{{end}} first{{else}}No committed offsets to reset{{end}}"{{end}}
         hx-post="{{groupURL .Group.ID}}/reset" hx-include="#reset-scope" hx-vals='{"to":"earliest","tab":"offsets"}' data-confirm-url="{{confirmURL "group.reset.earliest" "group" .Group.ID}}" data-confirm-title="{{(index .Confirm "group.reset.earliest").Title}}" data-confirm-verb="{{(index .Confirm "group.reset.earliest").Verb}}" hx-confirm="{{(index .Confirm "group.reset.earliest").Text}}" hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this">{{icon "skip-back"}} Reset to earliest</button>

@@ -10,7 +10,7 @@
       <div class="row g8 ce"><button type="button" class="btn pri" id="copy-all" data-copy="{{range .Facts.Properties}}{{.}}&#10;{{end}}">Copy all settings</button></div>
     </div>
 
-    <div class="card pad" id="connect-summary">This broker is at <span class="m b">{{.Facts.Bootstrap}}</span>{{if .Facts.SASL}} with <span class="m b">SASL {{range $i, $m := .Facts.Mechanisms}}{{if $i}} or {{end}}{{$m}}{{end}}</span>{{else}} with no authentication{{end}}, {{if .Facts.TLS}}over TLS{{else}}no TLS{{end}}{{if .Facts.Registry}}, the registry at <span class="m b">{{.Facts.Registry}}</span>{{end}}. A client in the same shell can skip all of it: <span class="m b">eval "$(doze-kafka env)"</span> sets <span class="m">KAFKA_BOOTSTRAP_SERVERS</span> and <span class="m">KAFKA_BROKERS</span>.</div>
+    <div class="card pad" id="connect-summary">This broker is at <span class="m b">{{.Facts.Bootstrap}}</span>{{if .Facts.SASL}} with <span class="m b">SASL {{range $i, $m := .Facts.Mechanisms}}{{if $i}} or {{end}}{{$m}}{{end}}</span>{{else}} with no authentication{{end}}, {{if .Facts.TLS}}over TLS{{else}}no TLS{{end}}{{if .Facts.Registry}}, the registry at <span class="m b">{{.Facts.Registry}}</span>{{if .Facts.SASL}} (it asks for the same user and password, as HTTP basic authentication){{end}}{{end}}. {{if .Facts.SASL}}A client in the same shell gets the addresses from <span class="m b">eval "$(doze-kafka env)"</span>, which sets {{template "envnames" .Facts.EnvNames}}; its user and password are not printed there, and are the client's to set.{{else}}A client in the same shell can skip all of it: <span class="m b">eval "$(doze-kafka env)"</span> sets {{template "envnames" .Facts.EnvNames}}.{{end}}</div>
 
     <div class="card" id="connect-settings" style="--c: 190px 1fr 90px">
       <div class="r h"><span>Setting</span><span>Value</span><span class="ra"></span></div>
@@ -20,15 +20,17 @@
     </div>
 
     <div class="row g12 snippets">
-      <div class="col g8 grow"><span class="cap">Environment</span><pre class="code">{{range .Facts.Env}}{{.}}
+      <div class="col g8 grow"><span class="cap" id="env-l">Environment</span><pre class="code" tabindex="0" aria-labelledby="env-l">{{range .Facts.Env}}{{.}}
 {{end}}</pre></div>
-      <div class="col g8 grow"><span class="cap">client.properties</span><pre class="code">{{range .Facts.Properties}}{{.}}
+      <div class="col g8 grow"><span class="cap" id="props-l">client.properties</span><pre class="code" tabindex="0" aria-labelledby="props-l">{{range .Facts.Properties}}{{.}}
 {{end}}</pre></div>
     </div>
 
     <div class="callout"><span class="b">Two things that catch people</span><span class="note">Clients reconnect to the <span class="b">advertised</span> address, not the bootstrap one: from a container, that address has to be one the container can reach (<span class="m">--advertised-host</span>). And {{if .Facts.SASL}}with SASL on, every client must be configured to match or it will not get past the handshake.{{else}}if you turn SASL or TLS on later, every client must be configured to match or it will not get past the handshake.{{end}}</span></div>
   </main>
 {{template "shell_bottom" .}}{{end}}
+
+{{define "envnames"}}{{range $i, $n := .}}{{if $i}}{{if eq (add $i 1) (len $)}} and {{else}}, {{end}}{{end}}<span class="m">{{$n}}</span>{{end}}{{end}}
 
 {{/* Sy-08: a broker with nothing in it and no one talking to it. Three steps, each a
      command that is real for this broker. */}}
@@ -49,19 +51,19 @@
   {{.Facts.CommandConfig}}--create --topic orders \
   --partitions 3</pre>
         <div class="grow"></div>
-        <div class="row ce g8"><a class="btn pri" href="{{newTopicURL}}">Or create it here</a><span class="note">same call, same errors</span></div>
+        <div class="row ce g8"><a class="btn pri w5" href="{{newTopicURL}}">Or create it here</a><span class="note">same call, same errors</span></div>
       </section>
 
       <section class="card pad col g12 grow" aria-label="Step 2, connect an app">
         <div class="row ce g8"><span class="num">2</span><h2 class="h2">Connect an app</h2></div>
         <span class="note">Point any client at the broker.{{if .Facts.Registry}} The built-in schema registry answers on its own port, no second container.{{end}}</span>
-        <div class="kv kv-stack" style="--c: 120px 1fr"><span>Bootstrap</span><span class="m">{{.Facts.Bootstrap}}</span>{{if .Facts.Registry}}<span>Schema registry</span><span class="m">{{.Facts.Registry}}</span>{{end}}<span>Console</span><span class="m">{{.Facts.Console}}</span></div>
+        {{/* A value longer than its column scrolls in its own box, so it can be focused. */}}<div class="kv kv-stack" style="--c: 120px 1fr"><span>Bootstrap</span><span class="m" tabindex="0">{{.Facts.Bootstrap}}</span>{{if .Facts.Registry}}<span>Schema registry</span><span class="m" tabindex="0">{{.Facts.Registry}}</span>{{end}}<span>Console</span><span class="m" tabindex="0">{{.Facts.Console}}</span></div>
         <pre class="code">kafka-console-producer.sh \
   --bootstrap-server {{.Facts.Bootstrap}} \
   {{if .Facts.CommandConfig}}--producer.config client.properties \
   {{end}}--topic orders</pre>
         <div class="grow"></div>
-        <div class="row ce g8"><a class="btn" href="{{prefix}}/connect">Settings for your client</a><span class="note">the values, filled in</span></div>
+        <div class="row ce g8"><a class="btn w5" href="{{prefix}}/connect">Settings for your client</a><span class="note">the values, filled in</span></div>
       </section>
 
       <section class="card pad col g12 grow" aria-label="Step 3, watch it">
@@ -73,13 +75,13 @@
   {{end}}--topic orders \
   --from-beginning</pre>
         <div class="grow"></div>
-        <div class="row ce g8">{{if .HasTrafficLink}}<a class="btn" href="{{prefix}}/traffic">Open Traffic</a>{{else}}<a class="btn" href="{{prefix}}/topics">Open Topics</a>{{end}}<span class="pill"><span class="dot off"></span>waiting for the first request</span></div>
+        <div class="row ce g8">{{if .HasTrafficLink}}<a class="btn w5" href="{{prefix}}/traffic">Open Traffic</a>{{else}}<a class="btn w5" href="{{prefix}}/topics">Open Topics</a>{{end}}<span class="pill"><span class="dot off"></span>waiting for the first request</span></div>
       </section>
     </div>
 
     <div class="well row ce sb firstrun-foot">
       <span class="note">Prefer to see it first? The <a href="{{prefix}}/connect">connection settings</a> are filled in for this broker.</span>
-      <span class="note"><span class="kbd">⌘K</span> jump or act when you have something to jump to</span>
+      <span class="note"><span class="kbd">⌘K</span>jump or act when you have something to jump to</span>
     </div>
   </main>
 {{template "shell_bottom" .}}{{end}}

@@ -12,8 +12,8 @@
     {{if or .InspSub (not .InspSubTime.IsZero)}}<span class="inspector-sub mono">{{if not .InspSubTime.IsZero}}{{when .InspSubTime "clockms"}}{{if .InspSub}} · {{end}}{{end}}{{.InspSub}}</span>{{end}}
   </div>
   <div class="inspector-nav">
-    {{range .InspNav}}<button type="button" class="icon-btn" aria-label="{{.Label}}" title="{{.Title}}" {{if .Disabled}}disabled{{else}}hx-get="{{.URL}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"{{end}}>{{icon .Glyph}}</button>{{end}}
-    <button type="button" class="icon-btn" aria-label="Close" title="Close (esc)" data-inspector-close>{{icon "x"}}</button>
+    {{range .InspNav}}<button type="button" class="icon-btn insp-step" aria-label="{{.Label}}" title="{{.Title}}" {{if .Disabled}}disabled{{else}}hx-get="{{.URL}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"{{end}}>{{icon .Glyph}}</button>{{end}}
+    <button type="button" class="icon-btn insp-close" aria-label="Close, esc" title="Close (esc)" data-inspector-close>{{icon "x"}}<span class="close-t" aria-hidden="true"><span class="close-esc">esc</span><span class="close-word">Close</span></span></button>
   </div>
 </div>
 {{if .InspGone}}
@@ -23,6 +23,7 @@
 {{else if eq .InspKind "subject"}}{{template "inspector_subject" .}}
 {{else if eq .InspKind "transaction"}}{{template "inspector_transaction" .}}
 {{else if eq .InspKind "event"}}{{template "inspector_event" .}}
+{{else if eq .InspKind "acl"}}{{template "inspector_acl" .}}
 {{end}}
 {{end}}
 

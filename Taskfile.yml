@@ -110,6 +110,17 @@ tasks:
       - bun install --frozen-lockfile
       - bunx playwright install chromium
       - bunx playwright test
+      - task: test:design
+
+  test:design:
+    desc: 'The design gate (e2e/design): each board of the design rendered from its own files and compared with the live console element by element, in light and dark at 1440 and at the widths the boards draw; every difference is on an allow-list with its reason, or the gate fails. Its own broker on E2E_PORT=14192.'
+    dir: e2e
+    env:
+      E2E_PORT: '{{.E2E_PORT | default "14192"}}'
+    cmds:
+      - bun install --frozen-lockfile
+      - bunx playwright install chromium
+      - bunx playwright test -c design/playwright.config.ts
 
   design:
     desc: 'The design gate alone: the Traffic pages measured element by element against their boards (e2e/design/README.md), with real traffic, in light and dark'

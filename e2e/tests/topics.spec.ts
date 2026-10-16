@@ -79,7 +79,8 @@ test('Purge empties a topic but keeps its settings; Delete removes it', async ({
   await page.getByRole('button', { name: 'More actions' }).click();
   await page.getByRole('button', { name: 'Purge', exact: true }).click();
   // The page was drawn before the send; the dialog is measured when the button is pressed.
-  await expect(page.locator('#confirm-msg')).toContainText('deletes its 1 record');
+  await expect(page.locator('#confirm-msg')).toContainText('in its 1 partition, up to the high watermark: 1 record');
+  await expect(page.locator('#confirm-yes')).toHaveText('Purge 1 record');
   await confirmDialog('accept');
   await expect(page.locator('.tape-empty')).toBeVisible();
   await expect(page.locator('#topic-facts')).toContainText('kept 3 d'); // a purge used to drop the topic's own settings.
@@ -131,6 +132,8 @@ test('partitions are added after a warning, the tabs grow, and a bad number is e
   await page.locator('#f-addparts').fill('2');
   await page.locator('#topic-addparts').getByRole('button', { name: 'Add partitions' }).click();
   await expect(page.locator('#confirm')).toContainText('cannot be removed'); // the cost is said before it is paid.
+  await expect(page.locator('#confirm')).toContainText('which has 2 partitions now, 4 after'); // and how many, as typed.
+  await expect(page.locator('#confirm-yes')).toHaveText('Add 2 partitions');
   await confirmDialog('accept');
   await expect(page.locator('#flashbar')).toContainText('Topic now has 4 partitions');
   await expect(page.locator('#topic-facts')).toContainText('4 partitions');
@@ -178,4 +181,14 @@ test('transactions on the tape: aborted and open records are marked, markers are
   await page.goto('cluster?view=transactions');
   await expect(page.locator('#open-transactions')).toContainText('seed-open');
   await expect(page.locator('#open-transactions')).toContainText('Ongoing');
+});
+
+// The command preview inside the form asks again 200 ms after typing; that request
+// used to clear the form's error slot, so a refusal that came first was wiped.
+test('a refusal stays when the form\'s preview refreshes after it', async ({ page }) => {
+  await page.goto('new/topic');
+  await page.locator('#f-name').fill('bad name!');
+  await page.getByRole('button', { name: 'Create topic' }).click();
+  await page.waitForTimeout(1200); // the preview's request (200 ms after typing) has come and gone.
+  await expect(page.locator('[data-err-slot]')).toContainText('invalid topic name');
 });

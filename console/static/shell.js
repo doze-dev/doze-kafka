@@ -27,7 +27,10 @@
   // them from the OS settings (dark, or a request for more contrast), and
   // following them when they change; it is stored as the absence of a choice.
   // (The same resolution runs inline in <head>, before first paint.)
-  var themeSeg = document.getElementById("theme-seg");
+  // The switch is in the top bar, and at phone width at the foot of the ☰ menu (Sy-07: "a
+  // switch in the top bar overrides it"; a 390 px top bar has room for none): every
+  // copy of it says the same.
+  var themeSegs = document.querySelectorAll(".theme-seg");
   var darkMQ = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
   var contrastMQ = window.matchMedia ? window.matchMedia("(prefers-contrast: more)") : null;
   function themeMode() {
@@ -38,16 +41,18 @@
     var system = contrastMQ && contrastMQ.matches ? "contrast" : (darkMQ && darkMQ.matches ? "dark" : "light");
     root.setAttribute("data-theme", mode === "system" ? system : mode);
     store("theme", mode === "system" ? null : mode);
-    if (themeSeg) themeSeg.querySelectorAll("button").forEach(function (b) {
+    Array.prototype.forEach.call(document.querySelectorAll(".theme-seg button"), function (b) {
       var on = b.getAttribute("data-mode") === mode;
       b.classList.toggle("on", on);
       b.setAttribute("aria-pressed", on ? "true" : "false");
     });
   }
   applyTheme(themeMode());
-  if (themeSeg) themeSeg.addEventListener("click", function (e) {
-    var b = e.target.closest("button[data-mode]");
-    if (b) applyTheme(b.getAttribute("data-mode"));
+  Array.prototype.forEach.call(themeSegs, function (seg) {
+    seg.addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-mode]");
+      if (b) applyTheme(b.getAttribute("data-mode"));
+    });
   });
   [darkMQ, contrastMQ].forEach(function (mq) {
     if (mq && mq.addEventListener) mq.addEventListener("change", function () {
@@ -55,22 +60,92 @@
     });
   });
 
-  // ---------- the rail's numbers ----------
-  // The counts beside Traffic, Topics, Groups and Schemas, refreshed gently. The
-  // server draws them with the page; this keeps them current. An item that has no
-  // number (the broker did not answer) keeps whatever it was showing.
-  function refreshCounts() {
-    if (document.hidden) return;
-    fetch(PREFIX + "/api/counts").then(function (r) { return r.json(); }).then(function (counts) {
-      document.querySelectorAll(".rail [data-ct]").forEach(function (el) {
-        var n = counts[el.getAttribute("data-ct")];
-        if (n == null) return;
-        el.textContent = String(n) + (el.getAttribute("data-ct-unit") || "");
-      });
-    }).catch(function () {});
+  // ---------- the heartbeat, and the rail's numbers ----------
+  // Every page, whatever it shows, asks /api/counts every 5 s while it is in front.
+  // The answer is the counts beside Traffic, Topics, Groups and Schemas (an item with
+  // no number keeps what it showed), and whether the broker answered ("broker": 1).
+  // It is the shell's own word on the broker (A7): a page with nothing live of its
+  // own (the Topics list, Cluster, Connect, a form) shows "not reachable" on the pill
+  // from it, and comes back from it, as a page whose rows poll does. No answer at all
+  // (the console's process is gone) is the same state.
+  var brokerLost = false, beating = false;
+  function heartbeat() {
+    if (document.hidden || beating) return;
+    beating = true;
+    var ctl = window.AbortController ? new AbortController() : null;
+    var timer = ctl ? setTimeout(function () { ctl.abort(); }, 4500) : 0;
+    fetch(PREFIX + "/api/counts", { headers: { Accept: "application/json" }, cache: "no-store", signal: ctl ? ctl.signal : undefined })
+      .then(function (r) { if (!r.ok) throw new Error("status " + r.status); return r.json(); })
+      .then(function (counts) {
+        document.querySelectorAll(".rail [data-ct]").forEach(function (el) {
+          var n = counts[el.getAttribute("data-ct")];
+          if (n == null) return;
+          el.textContent = String(n) + (el.getAttribute("data-ct-unit") || "");
+        });
+        setBrokerLost(counts.broker === 0);
+      }, function () { setBrokerLost(true); })
+      .then(function () { clearTimeout(timer); beating = false; });
   }
-  refreshCounts();
-  setInterval(refreshCounts, 5000);
+  function setBrokerLost(lost) {
+    var was = brokerLost;
+    brokerLost = lost;
+    if (!lost) lastGood = Date.now();
+    // Back: every region that froze asks again now rather than at its next tick.
+    if (was && !lost) retryFrozen();
+    if (was !== lost) renderPill();
+  }
+  heartbeat();
+  setInterval(heartbeat, 5000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) heartbeat(); });
+
+  // ---------- the list pane's numbers ----------
+  // A list of topics or groups (data-list) keeps its numbers current: every 5 s, while
+  // the page is in front and the broker answers, the list's numbers are asked for and
+  // redrawn in place (the filter, the scroll and the selection stay). A list whose
+  // names changed (a topic made or deleted elsewhere) is fetched again with the page
+  // and replaced, keeping what was typed into its filter.
+  var listBusy = false;
+  function refreshList() {
+    var list = document.querySelector(".list[data-list]");
+    if (!list || document.hidden || listBusy || brokerLost) return;
+    listBusy = true;
+    fetch(PREFIX + "/api/list/" + list.getAttribute("data-list"), { headers: { Accept: "application/json" }, cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error("status " + r.status); return r.json(); })
+      .then(function (rows) {
+        rows = rows || [];
+        var items = list.querySelectorAll(".li[data-name]");
+        var same = items.length === rows.length;
+        for (var i = 0; same && i < rows.length; i++) same = items[i].getAttribute("data-name") === rows[i].name;
+        if (!same) return replaceList(list);
+        rows.forEach(function (row, i) {
+          var n = items[i].querySelector("[data-n]"), dot = items[i].querySelector(".dot");
+          if (n && n.textContent !== row.n) n.textContent = row.n;
+          if (n) { n.classList.toggle("warn", row.tone === "warn"); n.classList.toggle("mut", row.tone !== "warn"); }
+          if (dot) dot.className = "dot" + (row.dot ? " " + row.dot : "");
+        });
+      })
+      .catch(function () {})
+      .then(function () { listBusy = false; });
+  }
+  function replaceList(list) {
+    return fetch(location.href, { headers: { Accept: "text/html" }, cache: "no-store" })
+      .then(function (r) { return r.ok ? r.text() : null; })
+      .then(function (html) {
+        if (!html) return;
+        var fresh = new DOMParser().parseFromString(html, "text/html").querySelector(".list[data-list]");
+        var cur = document.querySelector(".list[data-list]");
+        if (!fresh || !cur) return;
+        var q = cur.querySelector("input[data-filter-target]"), sc = cur.querySelector(".list-scroll");
+        var typed = q ? q.value : "", top = sc ? sc.scrollTop : 0;
+        cur.replaceWith(fresh);
+        var q2 = fresh.querySelector("input[data-filter-target]"), sc2 = fresh.querySelector(".list-scroll");
+        if (q2 && typed) q2.value = typed;
+        if (sc2) sc2.scrollTop = top;
+        if (window.htmx) htmx.process(fresh);
+        applyFilters();
+      });
+  }
+  setInterval(refreshList, 5000);
 
   // ---------- the traces you opened ----------
   // Kept in this tab only (sessionStorage): the ids of the traces followed, newest
@@ -165,7 +240,7 @@
   }
   function renderPill() {
     var pill = document.getElementById("live-pill");
-    var down = document.querySelectorAll("[data-live].disconnected").length > 0;
+    var down = brokerLost || document.querySelectorAll("[data-live].disconnected").length > 0;
     document.documentElement.toggleAttribute("data-connection-lost", down);
     if (!pill) return;
     pill.classList.toggle("disconnected", down);
@@ -205,13 +280,19 @@
     if (!on && regions.length) lastGood = Date.now();
     renderPill();
   }
-  document.addEventListener("click", function (e) {
-    if (!e.target.closest("#pill-retry, [data-retry]") || !window.htmx) return;
-    // One retry: every frozen region asks now rather than at its next tick.
+  // One retry: the heartbeat asks now, and every frozen region asks now rather than
+  // at its next tick.
+  function retryFrozen() {
+    if (!window.htmx) return;
     document.querySelectorAll("[data-live].disconnected").forEach(function (el) {
       var url = el.getAttribute("data-live");
       if (url && el.id) htmx.ajax("GET", url + (url.indexOf("?") >= 0 ? "&" : "?") + "h=", { target: "#" + el.id, swap: "outerHTML" }).catch(function () {});
     });
+  }
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest("#pill-retry, [data-retry]")) return;
+    heartbeat();
+    retryFrozen();
   });
   // An error response is shown where the person is looking: in the failed form's
   // error slot if it has one, else a toast. (The inspector reports its own; see below.)
@@ -219,12 +300,16 @@
     var msg = errorText(e.detail.xhr);
     if (isLivePoll(e)) { setDisconnected(true, msg, pollPath(e)); return; }
     if (isInspectorRequest(e)) return;
-    var elt = e.detail.elt;
+    sayFailure(e, msg);
+  });
+  function sayFailure(e, msg) {
+    // The element that asked: in htmx:beforeSwap, detail.elt is where it would swap.
+    var elt = (e.detail.requestConfig && e.detail.requestConfig.elt) || e.detail.elt;
     var form = elt && elt.closest ? elt.closest("form") : null;
     var slot = form && form.querySelector("[data-err-slot]");
     if (slot) { slot.textContent = msg; slot.hidden = false; return; }
     toast(msg.length > 140 ? msg.slice(0, 140) + "…" : msg, "err");
-  });
+  }
   // Nothing came back at all (the console server itself is gone).
   function networkFailure(e) {
     if (isLivePoll(e)) { setDisconnected(true, "the console server did not answer", pollPath(e)); return; }
@@ -240,6 +325,14 @@
     var xhr = e.detail.xhr;
     if (xhr && xhr.getResponseHeader("X-Doze-Page") === "error") {
       e.detail.shouldSwap = true;
+      e.detail.isError = false;
+    } else if (xhr && xhr.status >= 400 && !isLivePoll(e) && !isInspectorRequest(e)) {
+      // A refusal (A2: Kafka's 4xx) or a failure, from something the person did: it
+      // is said where they are looking, and is the answer, not an error of the page's.
+      // htmx would also log every one as a console error; told it is not an error, it
+      // does not, and what reads "successful" reads the status instead.
+      sayFailure(e, errorText(xhr));
+      e.detail.shouldSwap = false;
       e.detail.isError = false;
     }
   });
@@ -259,7 +352,10 @@
     var elt = e.detail.elt;
     var form = elt && elt.closest ? elt.closest("form") : null;
     var slot = form && form.querySelector("[data-err-slot]");
-    if (slot) { slot.hidden = true; slot.textContent = ""; }
+    // Only the form's own sending clears its last error: a preview inside the form (a
+    // GET as it is typed into) refreshing after a refusal wiped the refusal.
+    var verb = e.detail.requestConfig && e.detail.requestConfig.verb;
+    if (slot && verb && verb !== "get") { slot.hidden = true; slot.textContent = ""; }
     var bar = document.getElementById("reqbar");
     inflight++;
     if (!slowTimer && bar) slowTimer = setTimeout(function () { bar.hidden = false; }, 500);
@@ -314,7 +410,7 @@
     var panel = document.getElementById("compose-panel");
     if (!panel) return;
     setDock(true);
-    var form = panel.querySelector("form");
+    var form = panel.querySelector("#compose-body form");
     var st = window.Alpine ? Alpine.$data(form) : null;
     var key = form.querySelector('input[name="key"]');
     if (key) key.value = b.getAttribute("data-key") || "";
@@ -370,6 +466,18 @@
   // one drawn into the page is as old as the page, and a topic gains records. The
   // drawn one is the fallback when the console cannot answer.
   var confirmPending = false;
+  // segs draws a confirm's runs of text (plain, mono, bold) with textContent: a name
+  // in a sentence is the broker's, never markup.
+  function segs(el, list) {
+    el.textContent = "";
+    (list || []).forEach(function (s) {
+      if (!s.m && !s.b) { el.appendChild(document.createTextNode(s.t)); return; }
+      var n = document.createElement("span");
+      n.className = s.m ? "m" : "b";
+      n.textContent = s.t;
+      el.appendChild(n);
+    });
+  }
   document.addEventListener("htmx:confirm", function (e) {
     var box = document.getElementById("confirm");
     var q = e.detail.question;
@@ -380,24 +488,43 @@
     var opener = document.activeElement;
     if (data.confirmUrl) {
       confirmPending = true;
-      fetch(data.confirmUrl, { headers: { Accept: "application/json" } })
+      // A form's confirm is measured with what was typed into it (how many
+      // partitions to add).
+      var url = data.confirmUrl;
+      if (elt.tagName === "FORM") {
+        new FormData(elt).forEach(function (v, k) { if (typeof v === "string") url += "&" + encodeURIComponent(k) + "=" + encodeURIComponent(v); });
+      }
+      fetch(url, { headers: { Accept: "application/json" } })
         .then(function (r) { return r.ok ? r.json() : null; })
         .catch(function () { return null; })
         .then(function (fresh) {
           confirmPending = false;
-          showConfirm(fresh && fresh.text ? fresh.text : q, fresh && fresh.title || data.confirmTitle, fresh && fresh.verb || data.confirmVerb);
+          showConfirm(fresh && fresh.text ? fresh : { text: q, title: data.confirmTitle, verb: data.confirmVerb });
         });
       return;
     }
-    showConfirm(q, data.confirmTitle, data.confirmVerb);
-    function showConfirm(text, title, verb) {
-    document.getElementById("confirm-title").textContent = title || "Are you sure?";
-    document.getElementById("confirm-msg").textContent = text;
+    showConfirm({ text: q, title: data.confirmTitle, verb: data.confirmVerb });
+    function showConfirm(say) {
+    document.getElementById("confirm-title").textContent = say.title || "Are you sure?";
+    var msg = document.getElementById("confirm-msg"), rows = document.getElementById("confirm-rows");
+    // The measured confirm comes as a paragraph and a table (Tp-24); the fallback is
+    // the one sentence drawn into the page.
+    if (say.body) segs(msg, say.body); else msg.textContent = say.text;
+    rows.textContent = "";
+    (say.rows || []).forEach(function (r) {
+      var l = document.createElement("span"), v = document.createElement("span");
+      l.textContent = r.label; segs(v, r.value);
+      rows.appendChild(l); rows.appendChild(v);
+    });
+    rows.hidden = !(say.rows && say.rows.length);
     var yes = document.getElementById("confirm-yes"), no = document.getElementById("confirm-no");
-    yes.textContent = verb || "Confirm";
+    yes.textContent = say.verb || "Confirm";
     box.hidden = false;
+    // The keys strip says what the keys do in the dialog while it is open (Tp-24).
+    root.setAttribute("data-dialog", "confirm");
     function close(restore) {
       box.hidden = true; yes.onclick = no.onclick = box.onclick = null;
+      root.removeAttribute("data-dialog");
       document.removeEventListener("keydown", onKey, true);
       if (restore && opener && document.contains(opener) && opener.focus) opener.focus();
     }
@@ -485,6 +612,7 @@
     if (helpOpen()) closeHelp();
     if (!paletteOpen()) palOpener = document.activeElement;
     pal.hidden = false; palQ.value = ""; palSel = 0;
+    root.setAttribute("data-dialog", "palette"); // the strip is the palette's (Sy-05)
     var here = location.pathname;
     var recents = [];
     try {
@@ -624,6 +752,7 @@
   function closePalette() {
     if (!paletteOpen()) return;
     pal.hidden = true;
+    if (root.getAttribute("data-dialog") === "palette") root.removeAttribute("data-dialog");
     if (palOpener && document.contains(palOpener) && palOpener.focus) palOpener.focus();
   }
   // The phone's menu: the rail, opened over the page.
@@ -700,6 +829,9 @@
     var rows = listRows();
     if (!rows.length) return;
     var at = rows.indexOf(cursorEl);
+    // In the list, the first j moves from the open row (the page being looked at), not
+    // from the top: landing on the open row and pressing ↵ opened what was already open.
+    if (at < 0) at = rows.findIndex(function (r) { return r.classList.contains("on"); });
     var next = at < 0 ? (d > 0 ? 0 : rows.length - 1) : Math.min(rows.length - 1, Math.max(0, at + d));
     document.querySelectorAll(".cursor").forEach(function (r) { r.classList.remove("cursor"); });
     cursorEl = rows[next];
@@ -734,6 +866,7 @@
       var items = palFiltered();
       if (e.key === "Tab") { e.preventDefault(); return; } // one control; focus stays on the search box.
       if (e.key === "Escape") { closePalette(); e.preventDefault(); }
+      else if (mod && !e.altKey && !e.shiftKey && e.key === "k") { closePalette(); e.preventDefault(); } // the strip's ⌘K (Sy-05)
       else if (e.key === "ArrowDown") { palSel = Math.min(palSel + 1, items.length - 1); renderPal(); e.preventDefault(); }
       else if (e.key === "ArrowUp") { palSel = Math.max(palSel - 1, 0); renderPal(); e.preventDefault(); }
       else if (e.key === "Enter") { var it = items[palSel]; if (it) goTo(it); e.preventDefault(); }
@@ -744,8 +877,9 @@
     // ⌘⏎ sends from the composer, from a plain field or from inside the editor.
     // Once per press: a held key repeats, and each repeat used to send a record.
     if (mod && e.key === "Enter") {
-      var form = active.closest ? active.closest("form") : null;
-      if (form && form.querySelector("textarea, .cm-editor")) {
+      // A create form (data-mod-enter, Ac-03) is sent from anywhere on its page.
+      var form = (active.closest ? active.closest("form") : null) || document.querySelector("main form[data-mod-enter]");
+      if (form && (form.hasAttribute("data-mod-enter") || form.querySelector("textarea, .cm-editor"))) {
         e.preventDefault();
         if (!e.repeat && !form.classList.contains("htmx-request")) form.requestSubmit();
       }
@@ -805,10 +939,13 @@
     return out;
   }
   var pageActions = {
+    // / is the page's own field: the trace id on Trace (data-slash), else the filter of
+    // the table or of the list. A page with neither has no / (its strip does not name
+    // one); it was the palette, which ⌘K already is.
     filter: function (e) {
-      var f = document.querySelector("main input[data-filter-target]") || document.querySelector(".list input[data-filter-target]");
-      if (f && visible(f)) { f.focus(); e.preventDefault(); return; }
-      openPalette();
+      var f = document.querySelector("main [data-slash]") || document.querySelector("main input[data-filter-target]") || document.querySelector(".list input[data-filter-target]");
+      if (!f || !visible(f)) return false;
+      f.focus();
       e.preventDefault();
     },
     next: function () { moveCursor(1); },
@@ -822,7 +959,12 @@
         // same Enter then activates that button and shuts what it just opened.
         e.preventDefault();
         cursorEl.click();
+        return;
       }
+      // A page that is one question (Ac-05's checker, data-enter) asks it.
+      var ask = document.querySelector("main form[data-enter]");
+      if (ask) { e.preventDefault(); ask.requestSubmit(); return; }
+      return false;
     },
     create: function () {
       var nb = document.querySelector("[data-create]");
@@ -874,6 +1016,9 @@
       if (inspectorIsOpen()) { closeInspector(); e.preventDefault(); return; }
       var f = document.querySelector("input[data-filter-target]");
       if (f && f.value) { f.value = ""; f.dispatchEvent(new Event("input", { bubbles: true })); e.preventDefault(); return; }
+      // A page reached from a list goes back to it (Ac-03's cancel, Ac-05's back).
+      var back = document.querySelector("main [data-esc]");
+      if (back) { e.preventDefault(); back.click(); return; }
       return false;
     },
     // The chord's own binding is handled where the chord is; these have no key alone.
@@ -895,12 +1040,14 @@
     if (paletteOpen()) closePalette();
     if (!helpOpen()) helpOpener = document.activeElement;
     helpBox.hidden = false;
+    root.setAttribute("data-dialog", "help"); // the strip is the sheet's (Sy-06)
     var c = document.getElementById("help-close");
     if (c) c.focus();
   }
   function closeHelp() {
     if (!helpOpen()) return;
     helpBox.hidden = true;
+    if (root.getAttribute("data-dialog") === "help") root.removeAttribute("data-dialog");
     if (helpOpener && document.contains(helpOpener) && helpOpener.focus) helpOpener.focus();
   }
   if (helpBox) {
@@ -948,9 +1095,9 @@
     document.querySelectorAll("[data-open-keys]").forEach(function (el) {
       var on = open != null && (" " + el.getAttribute("data-open-keys") + " ").indexOf(" " + open + " ") >= 0;
       el.classList.toggle("on", on);
-      // A row of a table or a grid (Traffic's) is selected; a div that is a row of a
-      // list is the current one.
-      if (el.tagName === "TR" || el.getAttribute("role") === "row") el.setAttribute("aria-selected", on ? "true" : "false");
+      // A row of a table or a grid (Traffic's) is selected; a row that is a button (a
+      // record), or a div that is a row of a list, is the current one.
+      if ((el.tagName === "TR" && el.getAttribute("role") !== "button") || el.getAttribute("role") === "row") el.setAttribute("aria-selected", on ? "true" : "false");
       else if (on) el.setAttribute("aria-current", "true");
       else el.removeAttribute("aria-current");
     });
@@ -971,6 +1118,10 @@
     inspectorPanel.hidden = false;
     var def = document.getElementById("insp-default");
     if (def) def.hidden = true;
+    // Where the panel is stacked under the page (Sy-03) it takes the foot of the screen:
+    // the row that opened it is kept in view above it.
+    var row = from && from.closest && from.closest("tr, .r");
+    if (row) requestAnimationFrame(function () { if (document.contains(row)) row.scrollIntoView({ block: "nearest" }); });
   }
   // closeInspector(restoreFocus, keepURL): the URL loses ?open= unless the close
   // is the answer to the URL having already lost it (Back).
@@ -1071,6 +1222,9 @@
     var isMessage = title && title.hasAttribute("data-offset");
     if (open && (!isMessage || (region && region.hasAttribute("data-msg-base")))) setOpenParam(open, openParamNow() !== open);
     markOpenRow();
+    // The open row stays in view when the panel takes room from the page (Sy-03).
+    var onRow = document.querySelector("main tr.on, main .r.on");
+    if (onRow) requestAnimationFrame(function () { onRow.scrollIntoView({ block: "nearest" }); });
     var again = inspectorRefocus && t.querySelector('button[aria-label="' + inspectorRefocus + '"]:not([disabled])');
     var btn = again || t.querySelector("[data-inspector-close]");
     if (btn) btn.focus();
@@ -1108,7 +1262,7 @@
   // failure it stays open, and the error is a toast.
   document.addEventListener("htmx:afterRequest", function (e) {
     var el = e.detail.elt;
-    if (el && el.hasAttribute && el.hasAttribute("data-close-inspector-on-success") && e.detail.successful) closeInspector(false);
+    if (el && el.hasAttribute && el.hasAttribute("data-close-inspector-on-success") && e.detail.xhr && e.detail.xhr.status < 400) closeInspector(false);
   });
 
   // ---------- docked composer ----------
@@ -1131,6 +1285,25 @@
     if (e.target.closest("[data-dock-toggle]")) setDock(!dockOpen());
   });
   document.addEventListener("DOMContentLoaded", syncDock);
+
+  // ---------- scroll regions ----------
+  // A box whose content is wider or taller than it scrolls; someone without a mouse
+  // can only scroll it if it can take focus. Every such box gets tabindex=0 while it
+  // overflows (a command, a value, a request's fields, the inspector), after every
+  // swap and when the window changes size.
+  function focusableScrollers() {
+    document.querySelectorAll("pre, .code, #inspector-panel, .insp-sel, .inspector-b, [data-scroller]").forEach(function (el) {
+      if (!el.getClientRects().length) return;
+      var cs = getComputedStyle(el);
+      var scrolls = (/(auto|scroll)/.test(cs.overflowX) && el.scrollWidth > el.clientWidth + 1) || (/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 1);
+      if (scrolls && !el.hasAttribute("tabindex")) { el.setAttribute("tabindex", "0"); el.setAttribute("data-scroll-focus", ""); }
+      else if (!scrolls && el.hasAttribute("data-scroll-focus")) { el.removeAttribute("tabindex"); el.removeAttribute("data-scroll-focus"); }
+    });
+  }
+  document.addEventListener("DOMContentLoaded", focusableScrollers);
+  document.addEventListener("htmx:afterSettle", function () { requestAnimationFrame(focusableScrollers); });
+  var scrollerTimer = 0;
+  window.addEventListener("resize", function () { clearTimeout(scrollerTimer); scrollerTimer = setTimeout(focusableScrollers, 150); });
   document.addEventListener("htmx:afterSettle", syncDock);
 
   // ---------- filters ----------
@@ -1299,6 +1472,8 @@
     var style = el.getAttribute("data-style") || "clock", d = new Date(ms);
     if (style === "ago") el.textContent = agoText(Date.now() - ms);
     else if (style === "since") el.textContent = spanText(Date.now() - ms);
+    // "just now" takes no "ago" after it where a page adds one (a phone's card).
+    if (style === "since") el.toggleAttribute("data-now", el.textContent === "just now");
     else el.textContent = local(ms, style);
     // On hover: the moment in this browser's zone, then the same instant in UTC.
     var utc = new Date(ms).toISOString().replace("T", " ").replace("Z", " UTC");
@@ -1332,6 +1507,15 @@
     } catch (e) {}
   }
   document.addEventListener("DOMContentLoaded", stripFlash);
+  // The banner says what the last action did. The next action makes it old news:
+  // left up, "Topic created" stood beside the refusal of what came after it.
+  document.addEventListener("htmx:beforeRequest", function (e) {
+    var elt = e.detail && e.detail.elt;
+    if (!elt || isLivePoll(e) || isInspectorRequest(e)) return;
+    if (!(elt.tagName === "FORM" || (elt.closest && elt.closest("form, button")))) return;
+    var bar = document.getElementById("flashbar");
+    if (bar) bar.remove();
+  });
 
   // ---------- jump-to-offset landing ----------
   // The row a jump lands on is marked by the server; bring it into view when the
@@ -1524,7 +1708,8 @@
   function renderTrafficKeys(page, open) {
     var strip = document.getElementById("keys");
     if (!strip) return;
-    var lost = Array.prototype.filter.call(strip.children, function (s) { return s.classList.contains("keys-lost"); });
+    // What the page does not draw stays: the hints of a lost broker, and the strips of the dialogs.
+    var lost = Array.prototype.filter.call(strip.children, function (s) { return s.classList.contains("keys-lost") || s.classList.contains("keys-dialog"); });
     strip.textContent = "";
     trafficKeys(page, open).forEach(function (h) {
       var s = document.createElement("span");
@@ -1616,8 +1801,13 @@
       // among the region's focusable elements, which a refresh rarely changes.
       focus = active.id ? { id: active.id } : { at: Array.prototype.indexOf.call(t.querySelectorAll(FOCUSABLE), active), tag: active.tagName };
     }
+    // Which kind a segmented filter in the region shows ("with members"), by what it filters.
+    var segs = {};
+    t.querySelectorAll(".seg[data-seg-for] .on[data-seg-value]").forEach(function (b) {
+      segs[b.closest(".seg").getAttribute("data-seg-for")] = b.getAttribute("data-seg-value");
+    });
     liveState = {
-      id: t.id, focus: focus, typed: typed, poll: isLivePoll(e),
+      id: t.id, focus: focus, typed: typed, poll: isLivePoll(e), segs: segs,
       selStart: jump ? jump.selectionStart : null, selEnd: jump ? jump.selectionEnd : null,
       scrollTop: wrap ? wrap.scrollTop : 0, scrollLeft: wrap ? wrap.scrollLeft : 0,
       atTop: !wrap || wrap.scrollTop < 4,
@@ -1637,6 +1827,14 @@
       if (!i || !region.contains(i)) return;
       if (i.type === "checkbox") i.checked = st.typed[id]; else if (st.typed[id]) i.value = st.typed[id];
     });
+    Object.keys(st.segs || {}).forEach(function (sel) {
+      region.querySelectorAll('.seg[data-seg-for="' + sel + '"] [data-seg-value]').forEach(function (b) {
+        var on = b.getAttribute("data-seg-value") === st.segs[sel];
+        b.classList.toggle("on", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+    });
+    applyFilters();
     // A record that arrived while you were watching lands with a small motion.
     if (st.poll) region.classList.add("landed");
     var wrap = region.querySelector(".tbl-wrap");
@@ -1657,7 +1855,10 @@
   document.addEventListener("htmx:afterRequest", function (e) {
     var xhr = e.detail.xhr;
     if (!xhr) return;
-    if (e.detail.successful && isLivePoll(e)) setDisconnected(false, "", pollPath(e));
+    if (e.detail.successful && isLivePoll(e)) {
+      setDisconnected(false, "", pollPath(e));
+      if (brokerLost) setBrokerLost(false); // the region's answer came from the broker.
+    }
     var h = xhr.getResponseHeader("HX-Live-Hash");
     if (!h || xhr.dozeHeld) return;
     var path = (e.detail.requestConfig && e.detail.requestConfig.path) || "";

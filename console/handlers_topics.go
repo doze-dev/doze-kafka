@@ -21,11 +21,31 @@ type topicRef struct{ Name string }
 // topics is the Topics home (Tp-Home): every topic, the table of them and what needs a
 // look. Nothing is selected.
 func (c *Console) topics(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	list, err := c.be.ListTopics(ctx)
+	data, err := c.topicsHomeData(r)
 	if err != nil {
 		c.fail(w, r, err)
 		return
+	}
+	data["LiveHash"], _ = c.liveHash("topics_live", data)
+	c.render(w, r, "topics_home", data)
+}
+
+// topicsLive is Tp-Home's table and what is counted over it, polled: the rail's count
+// moves when a topic gains records, and the table beside it moves with it.
+func (c *Console) topicsLive(w http.ResponseWriter, r *http.Request) {
+	data, err := c.topicsHomeData(r)
+	if err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	c.livePartial(w, r, "topics_live", data)
+}
+
+func (c *Console) topicsHomeData(r *http.Request) (map[string]any, error) {
+	ctx := r.Context()
+	list, err := c.be.ListTopics(ctx)
+	if err != nil {
+		return nil, err
 	}
 	groups := c.groupRows(ctx, c.listGroupsQuiet(ctx))
 	rows := c.topicRows(ctx, list, groups, true)
@@ -36,9 +56,13 @@ func (c *Console) topics(w http.ResponseWriter, r *http.Request) {
 	readers := map[string]bool{}
 	var deadNames []string
 	var deadUnread []string
+	var size int64
+	hasSize := len(rows) > 0
 	for _, t := range rows {
 		partitions += int(t.Partitions)
 		messages += t.Msgs
+		size += t.Size
+		hasSize = hasSize && t.HasSize
 		if t.Compact {
 			compacted++
 		}
@@ -56,6 +80,7 @@ func (c *Console) topics(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{
 		"List": list, "Rows": rows, "Page": "topics", "Title": "Topics", "Groups": groups,
 		"Partitions": partitions, "Messages": messages, "ReaderCount": len(readers),
+		"Size": diskSize(size), "HasSize": hasSize, "CompactedWord": countWord(compacted),
 		"Compacted": compacted, "DeadLetters": dead, "DeadNames": deadNames, "DeadUnread": deadUnread,
 		"AutoCreate": c.facts.AutoCreateTopics, "AutoParts": c.facts.DefaultPartitions, "KnowsAuto": c.facts.KafkaMajor > 0,
 	}
@@ -79,7 +104,7 @@ func (c *Console) topics(w http.ResponseWriter, r *http.Request) {
 	} else {
 		data["Facts"] = connectFacts{DataDir: c.facts.DataDir}
 	}
-	c.render(w, r, "topics_home", data)
+	return data, nil
 }
 
 // listGroupsQuiet is ListGroups for a page that can do without it: a broker that does
@@ -225,7 +250,7 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		data["Bounds"] = bounds
-		data["Facts"] = c.topicSummary(detail, bounds, schemas)
+		data["Facts"] = c.topicSummary(ctx, detail, bounds)
 		data["PartitionRange"] = partitionRange(detail.Partitions)
 		switch tab {
 		case "partitions":
@@ -249,7 +274,7 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		data["Search"], data["PartitionRange"], data["Rows"] = found, partitionRange(detail.Partitions), found.Rows
 		if bounds, err := c.be.PartitionBounds(ctx, name, detail.Partitions); err == nil {
-			data["Facts"] = c.topicSummary(detail, bounds, schemas)
+			data["Facts"] = c.topicSummary(ctx, detail, bounds)
 		}
 		c.composerSchemas(r, name, data)
 		c.render(w, r, "topic_detail", data)
@@ -271,7 +296,7 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	maps.Copy(data, tape)
 	if bounds, ok := tape["Bounds"].([]PartitionBound); ok {
-		data["Facts"] = c.topicSummary(detail, bounds, schemas)
+		data["Facts"] = c.topicSummary(ctx, detail, bounds)
 	}
 	c.composerSchemas(r, name, data)
 	if atNote != "" && tape["JumpNote"] == "" {
@@ -283,27 +308,21 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 // topicFactsView is the one sentence under a topic's name (Sy-01 part 4): partitions,
 // messages, how long they are kept, the schema, and when the newest was written.
 type topicFactsView struct {
-	Partitions  int32
-	Messages    int64
-	Retention   string
-	Compact     bool
-	SchemaType  string // "Avro", "JSON Schema" or "Protobuf" for the value subject, or "".
-	SchemaVer   int
-	Newest      time.Time
-	HasNewest   bool
-	Subject     string
-	SubjectURL  string
-	SchemaLabel string
+	Partitions int32
+	Messages   int64
+	Retention  string
+	Compact    bool
+	SchemaType string // "Avro", "JSON Schema" or "Protobuf" for the value subject, or "".
+	SchemaVer  int
+	Newest     time.Time
+	HasNewest  bool
+	Subject    string
+	SubjectURL string
 }
 
-func (c *Console) topicSummary(d *TopicDetail, bounds []PartitionBound, schemas []topicSchema) topicFactsView {
-	f := topicFactsView{Partitions: d.Partitions}
-	for _, b := range bounds {
-		f.Messages += b.Count()
-		if b.Newest.After(f.Newest) {
-			f.Newest, f.HasNewest = b.Newest, true
-		}
-	}
+func (c *Console) topicSummary(ctx context.Context, d *TopicDetail, bounds []PartitionBound) topicFactsView {
+	f := c.boundsFacts(ctx, d.Name, bounds)
+	f.Partitions = d.Partitions
 	policy, retention := "", ""
 	for _, e := range d.Config {
 		switch e.Name {
@@ -320,12 +339,41 @@ func (c *Console) topicSummary(d *TopicDetail, bounds []PartitionBound, schemas 
 	default:
 		f.Retention = retentionText(retention)
 	}
-	for _, s := range schemas {
-		if s.Label == "value" || f.Subject == "" {
-			f.SchemaType, f.SchemaVer, f.Subject, f.SubjectURL, f.SchemaLabel = s.TypeLabel, s.Version, s.Subject, s.URL, s.Label
+	return f
+}
+
+// boundsFacts is the part of the facts sentence that moves as records arrive: how
+// many there are, when the newest was written, and what it is. The tape's poll sends
+// it with the tape (topic_facts_live), so the sentence and the tape never disagree.
+func (c *Console) boundsFacts(ctx context.Context, topic string, bounds []PartitionBound) topicFactsView {
+	var f topicFactsView
+	newestIn := -1
+	for i, b := range bounds {
+		f.Messages += b.Count()
+		if b.Count() > 0 && b.Newest.After(f.Newest) {
+			f.Newest, f.HasNewest, newestIn = b.Newest, true, i
+		}
+	}
+	// The schema is the newest record's, read from its bytes: a value a registry-aware
+	// serializer wrote carries the schema's id. A subject named like the topic says
+	// nothing about what was written (a producer need not use it), so it is not asked.
+	if newestIn >= 0 && c.reg != nil {
+		b := bounds[newestIn]
+		if msgs, err := c.be.FetchWindow(ctx, topic, b.Partition, b.Latest-1, 1); err == nil && len(msgs) > 0 {
+			if v := c.msgView(ctx, topic, msgs[len(msgs)-1]); v.Value.Schema != nil {
+				s := v.Value.Schema
+				f.SchemaType, f.SchemaVer, f.Subject, f.SubjectURL = s.TypeLabel, s.Version, s.Subject, s.URL
+			}
 		}
 	}
 	return f
+}
+
+// withLiveFacts adds the moving part of the facts sentence to a tape answer.
+func (c *Console) withLiveFacts(ctx context.Context, topic string, data map[string]any) {
+	if bounds, ok := data["Bounds"].([]PartitionBound); ok {
+		data["FactsLive"] = c.boundsFacts(ctx, topic, bounds)
+	}
 }
 
 // tabLink is one tab of a topic's page.
@@ -491,6 +539,7 @@ func (c *Console) topicTape(w http.ResponseWriter, r *http.Request) {
 	}
 	data := map[string]any{"Topic": topicRef{Name: name}, "Partition": partition}
 	maps.Copy(data, tape)
+	c.withLiveFacts(ctx, name, data)
 	c.partial(w, "tape_and_table", data)
 }
 
@@ -559,6 +608,7 @@ func (c *Console) topicProduce(w http.ResponseWriter, r *http.Request) {
 	}
 	data := map[string]any{"Topic": topicRef{Name: name}, "Partition": viewing}
 	maps.Copy(data, tape)
+	c.withLiveFacts(ctx, name, data)
 	c.partial(w, "tape_and_table", data)
 }
 
@@ -676,6 +726,7 @@ func (c *Console) topicResend(w http.ResponseWriter, r *http.Request) {
 	}
 	data := map[string]any{"Topic": topicRef{Name: name}, "Partition": partition}
 	maps.Copy(data, tape)
+	c.withLiveFacts(ctx, name, data)
 	c.partial(w, "tape_and_table", data)
 }
 

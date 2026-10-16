@@ -9,7 +9,8 @@ test('single keys act alone: with a modifier held, or typing in a field, they do
   await expect(page).toHaveURL(/\/topics$/);
   await expect(page.locator('.list input[data-filter-target]')).toHaveValue('cmj');
   await page.locator('.list input[data-filter-target]').fill('');
-  await page.locator('body').click({ position: { x: 700, y: 400 } });
+  // Out of the field (a click at a fixed point lands on whatever row the home table puts there).
+  await page.locator('.list input[data-filter-target]').blur();
   await page.keyboard.press('c');
   await expect(page).toHaveURL(/new\/topic/);
 });

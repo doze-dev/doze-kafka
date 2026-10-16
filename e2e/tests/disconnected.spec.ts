@@ -110,6 +110,65 @@ test('the broker stops mid-poll: one state on the pill, the rows frozen, no toas
   expect(await page.evaluate(() => (window as any).__toasts)).toBe(0);
 });
 
+// The pill is the shell's, on every page (A7): a page with nothing live of its own (the
+// Topics list, Cluster, Connect, a form, a page that says "not found") learns from the
+// shell's heartbeat that the broker is gone, says so on the pill, raises no error, and
+// comes back by itself. The verification of 82b8752 found the pill green on 10 of 19
+// page kinds 8 s after the process was killed.
+test('every kind of page says the broker is gone, and comes back, without a reload or an error', async ({ context, request, uniqueName }) => {
+  test.setTimeout(240_000);
+  const topic = uniqueName('every');
+  expect((await request.post(`${CONSOLE}new/topic`, { form: { name: topic, partitions: '1' } })).ok()).toBe(true);
+  // A group with a member, so a group's own page (two regions that poll) is among them.
+  const holdBin = join(ROOT, 'e2e', '.tmp', 'bin', `hold-every-${PORT}`);
+  execFileSync('go', ['build', '-o', holdBin, './e2e/hold'], { cwd: ROOT, env: { ...process.env, GOWORK: 'off' } });
+  const hold = spawn(holdBin, [`127.0.0.1:${PORT}`, 'every-hold', `${topic}-group`, topic],
+    { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, E2E_SASL_USER: '', E2E_TLS: '' } });
+  await new Promise<void>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('the held consumer never joined its group')), 20_000);
+    hold.stdout!.on('data', (b) => { if (String(b).includes('ready')) { clearTimeout(t); resolve(); } });
+    hold.on('exit', () => reject(new Error('the held consumer exited')));
+  });
+  hold.kill('SIGTERM'); // its committed offsets keep the group; its page is what is wanted.
+  const kinds = ['traffic', 'traffic?view=clients', 'trace', 'topics', `topics/${topic}`, `topics/${topic}?tab=partitions`, `topics/${topic}?tab=config`,
+    'groups', `groups/${topic}-group`, `groups/${topic}-group?tab=members`, 'groups/nobody-here', 'topics/nothing-here', 'schemas', 'new/schema',
+    'access', 'cluster', 'cluster?view=transactions', 'connect', 'new/topic', ''];
+  const pages = [];
+  const errors: string[] = [];
+  for (const k of kinds) {
+    const p = await context.newPage();
+    p.on('pageerror', (e) => errors.push(`${k}: ${e.message || String(e)}`));
+    await p.goto(CONSOLE + k);
+    await expect(p.locator('#live-pill')).not.toHaveClass(/disconnected/);
+    await p.evaluate(() => { (window as any).__marker = 'same-document'; });
+    pages.push(p);
+  }
+  await kill();
+  for (const [i, p] of pages.entries()) {
+    await p.bringToFront();
+    await expect(p.locator('#live-pill'), `${kinds[i]} while the broker is gone`).toHaveClass(/disconnected/, { timeout: 12_000 });
+    await expect(p.locator('#live-pill .pill-state')).toHaveText('not reachable');
+    await expect(p.locator('html')).toHaveAttribute('data-connection-lost', '');
+    await expect(p.locator('.toast')).toHaveCount(0);
+  }
+  // A page whose regions poll keeps failing while the broker is gone: several polls
+  // in front, and still no error and no toast.
+  for (const k of [`topics/${topic}`, `groups/${topic}-group`]) {
+    const p = pages[kinds.indexOf(k)];
+    await p.bringToFront();
+    await p.waitForTimeout(8_000);
+    await expect(p.locator('.toast')).toHaveCount(0);
+  }
+  await up();
+  for (const [i, p] of pages.entries()) {
+    await p.bringToFront();
+    await expect(p.locator('#live-pill'), `${kinds[i]} once the broker is back`).not.toHaveClass(/disconnected/, { timeout: 12_000 });
+    expect(await p.evaluate(() => (window as any).__marker)).toBe('same-document');
+  }
+  expect(errors).toEqual([]);
+  for (const p of pages) await p.close();
+});
+
 test('at a phone width the pill still says so, and Retry asks at once', async ({ page, request, uniqueName }) => {
   const topic = uniqueName('narrow');
   expect((await request.post(`${CONSOLE}new/topic`, { form: { name: topic, partitions: '1' } })).ok()).toBe(true);
