@@ -5,7 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
+
+// pluralWord is a noun's plural: fetch, fetches; heartbeat, heartbeats.
+func pluralWord(w string) string {
+	for _, end := range []string{"ch", "sh", "s", "x", "z"} {
+		if strings.HasSuffix(w, end) {
+			return w + "es"
+		}
+	}
+	return w + "s"
+}
 
 func pluralS(n int) string {
 	if n == 1 {

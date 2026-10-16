@@ -989,6 +989,7 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .tbl-wrap table.tbl td.cell-val { grid-column: 1 / -1; grid-row: 2; }
   .tbl-wrap table.tbl td.cell-age { display: block; grid-column: 1 / -1; grid-row: 3; text-align: left; color: var(--mut); font-size: var(--fs-xs); }
   .tbl-wrap table.tbl td.cell-age::after { content: " ago"; }
+  .tbl-wrap table.tbl td.cell-age:has(time[data-now])::after { content: none; }
   .tbl-wrap table.tbl td.col-p { display: none; }
   .tbl-wrap table.tbl td.cell-offset .p-inline { display: inline; }
   .tb-right .pill.live.disconnected { display: inline-flex; } /* ...but "not connected" is never hidden */

@@ -132,6 +132,11 @@ func kafkaRefusalFor(ke *kerr.Error, brokerMsg string, err error) Refusal {
 	say := brokerMsg
 	if say == "" {
 		say = strings.TrimSuffix(ke.Description, ".") + "."
+	} else {
+		// The broker said why. Kafka's stock text for the code is one fixed sentence
+		// per code ("Number of partitions is below 1." for every INVALID_PARTITIONS),
+		// which is not what decided here and may contradict it.
+		r.Rule = ""
 	}
 	switch {
 	case errors.Is(err, kerr.UnknownTopicOrPartition), errors.Is(err, kerr.UnknownTopicID), errors.Is(err, kerr.GroupIDNotFound):
@@ -190,10 +195,35 @@ func registryRefusal(re *regError, err error) Refusal {
 		r.Kind, r.Status, r.Heading = NotImplemented, http.StatusNotImplemented, "Not implemented"
 	case re.Status >= 500:
 		r.Kind, r.Status, r.Heading, r.Retry = Failed, http.StatusBadGateway, "The schema registry failed", true
-	case re.Status == http.StatusConflict || re.Status == http.StatusUnprocessableEntity:
-		r.Rule = "The registry's own rule (its compatibility level or its mode) said no."
+	default:
+		r.Rule = registryRule(re.Code)
 	}
 	return r
+}
+
+// registryRule is what a registry error_code means, from Confluent's REST API
+// reference (the codes schemaregistry/errors.go answers with). A code with no
+// sentence of its own gets none: the registry's message is then all there is.
+func registryRule(code int) string {
+	switch code {
+	case 409:
+		return "The schema is not compatible with the versions the subject's compatibility level checks it against."
+	case 42201:
+		return "The registry could not read the schema: it is not a valid schema of its type."
+	case 42202:
+		return "That is not a version the registry accepts: a positive number, or latest."
+	case 42203:
+		return "That is not a compatibility level the registry knows."
+	case 42204:
+		return "That is not a mode the registry knows."
+	case 42205:
+		return "The registry's mode does not permit this operation now."
+	case 42206:
+		return "Another schema references this version, so it is kept."
+	case 42207:
+		return "The registry found the request malformed."
+	}
+	return ""
 }
 
 // refusalData is a Refusal as template data.

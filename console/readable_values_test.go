@@ -45,7 +45,7 @@ func TestRetentionIsWrittenInItsBiggestWholeUnit(t *testing.T) {
 	for in, want := range map[string]string{
 		"604800000": "7 d", "86400000": "1 d", "43200000": "12 h", "3600000": "1 h",
 		"5400000": "90 m", "60000": "1 m", "30000": "30 s", "1000": "1 s", "1500": "1500 ms", "250": "250 ms",
-		"-1": "no limit", " 60000 ": "1 m", "soon": "",
+		"-1": "no time limit", " 60000 ": "1 m", "soon": "",
 	} {
 		if got := retentionText(in); got != want {
 			t.Errorf("retentionText(%q) = %q, want %q", in, got, want)

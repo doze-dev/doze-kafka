@@ -22,7 +22,7 @@ func TestTopicsSayWhatReadByAndWrittenByAreCountedFrom(t *testing.T) {
 	if strings.Contains(home, ">nobody<") {
 		t.Error("the Topics table still says a topic is read by nobody")
 	}
-	for _, want := range []string{"no group has committed", "written by 1 client", "from recent requests, the oldest 2m 05s old"} {
+	for _, want := range []string{"no group has committed", "written by 1 client", "from the last 2m 05s of requests"} {
 		if !strings.Contains(home, want) {
 			t.Errorf("the Topics page does not say %q", want)
 		}
@@ -30,7 +30,7 @@ func TestTopicsSayWhatReadByAndWrittenByAreCountedFrom(t *testing.T) {
 
 	page := req(t, c, "GET", "/_console/topics/orders", nil).Body.String()
 	note := between(page, `id="neighbours-note"`, "</div>")
-	for _, want := range []string{"Written by is from recent requests, the oldest 2m 05s old", "a consumer that assigns partitions itself has no group"} {
+	for _, want := range []string{"Written by is from the last 2m 05s of requests", "a consumer that assigns partitions itself has no group"} {
 		if !strings.Contains(note, want) {
 			t.Errorf("the topic's neighbours note does not say %q:\n%s", want, note)
 		}

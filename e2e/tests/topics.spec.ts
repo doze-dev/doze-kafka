@@ -132,6 +132,8 @@ test('partitions are added after a warning, the tabs grow, and a bad number is e
   await page.locator('#f-addparts').fill('2');
   await page.locator('#topic-addparts').getByRole('button', { name: 'Add partitions' }).click();
   await expect(page.locator('#confirm')).toContainText('cannot be removed'); // the cost is said before it is paid.
+  await expect(page.locator('#confirm')).toContainText('which has 2 partitions now, 4 after'); // and how many, as typed.
+  await expect(page.locator('#confirm-yes')).toHaveText('Add 2 partitions');
   await confirmDialog('accept');
   await expect(page.locator('#flashbar')).toContainText('Topic now has 4 partitions');
   await expect(page.locator('#topic-facts')).toContainText('4 partitions');

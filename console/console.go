@@ -432,6 +432,7 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 		// the declared key map, for the help overlay and for shell.js (keys.go).
 		"keyGroups":   keyGroups,
 		"dialogHints": dialogHints,
+		"pluralWord":  pluralWord,
 		"keymapJSON":  keymapJSON,
 		"whenText":    whenText,
 		"hasPrefix":   strings.HasPrefix,

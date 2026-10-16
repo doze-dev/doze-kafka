@@ -38,7 +38,7 @@
   {{if .Fix}}<div class="note">{{.Fix}}</div>{{end}}
   {{end}}
   {{if .Fold}}
-  <p id="fold-sentence">{{.R.Count}} identical {{.Fold.Unit}}s are shown as one row. Each one asked the same thing and got the same answer.</p>
+  <p id="fold-sentence">{{.R.Count}} identical {{pluralWord .Fold.Unit}} are shown as one row. Each one asked the same thing and got the same answer.</p>
   {{end}}
   <div class="kv" style="--c: 108px 1fr">
     {{if .Fold}}

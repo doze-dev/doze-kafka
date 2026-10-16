@@ -622,9 +622,9 @@ test('the Topics table qualifies read by and written by', async ({ page }) => {
   await page.goto('topics');
   await expect(page.locator('#topics-table')).not.toContainText(/^nobody$/m);
   await expect(page.locator('#topics-summary')).toContainText(/written by \d+ clients?/);
-  await expect(page.locator('#topics-summary')).toContainText(/from recent requests, the oldest .+ old/);
+  await expect(page.locator('#topics-summary')).toContainText(/from the last .+ of requests/);
   await page.goto('topics/seed-orders');
-  await expect(page.locator('#neighbours-note')).toContainText('Written by is from recent requests, the oldest');
+  await expect(page.locator('#neighbours-note')).toContainText('Written by is from the last ');
 });
 
 // Gr-02: the Lag tab ends in Try it, the fields OffsetCommit takes.

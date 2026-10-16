@@ -55,7 +55,7 @@ func (b *backend) TopicConfigs(ctx context.Context, names []string) map[string]m
 type topicRow struct {
 	TopicSummary
 	URL         string
-	Retention   string // "7 d", "kept per key" for a compacted topic, "no limit".
+	Retention   string // "7 d", "kept per key" for a compacted topic, "no time limit".
 	Compact     bool
 	ReadBy      []string
 	Subject     string // the value subject (or key subject) the registry has for it.
@@ -78,14 +78,15 @@ func isDeadLetterName(name string) bool {
 	return false
 }
 
-// retentionText is retention.ms as a person reads it: 7 d, 12 h, 90 m, no limit.
+// retentionText is retention.ms as a person reads it: 7 d, 12 h, 90 m, no time limit
+// (-1 is no limit by time; retention.bytes may still limit the topic by size).
 func retentionText(ms string) string {
 	n, err := strconv.ParseInt(strings.TrimSpace(ms), 10, 64)
 	if err != nil {
 		return ""
 	}
 	if n < 0 {
-		return "no limit"
+		return "no time limit"
 	}
 	d := time.Duration(n) * time.Millisecond
 	switch {

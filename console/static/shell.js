@@ -1328,6 +1328,8 @@
     var style = el.getAttribute("data-style") || "clock", d = new Date(ms);
     if (style === "ago") el.textContent = agoText(Date.now() - ms);
     else if (style === "since") el.textContent = spanText(Date.now() - ms);
+    // "just now" takes no "ago" after it where a page adds one (a phone's card).
+    if (style === "since") el.toggleAttribute("data-now", el.textContent === "just now");
     else el.textContent = local(ms, style);
     // On hover: the moment in this browser's zone, then the same instant in UTC.
     var utc = new Date(ms).toISOString().replace("T", " ").replace("Z", " UTC");
@@ -1361,6 +1363,15 @@
     } catch (e) {}
   }
   document.addEventListener("DOMContentLoaded", stripFlash);
+  // The banner says what the last action did. The next action makes it old news:
+  // left up, "Topic created" stood beside the refusal of what came after it.
+  document.addEventListener("htmx:beforeRequest", function (e) {
+    var elt = e.detail && e.detail.elt;
+    if (!elt || isLivePoll(e) || isInspectorRequest(e)) return;
+    if (!(elt.tagName === "FORM" || (elt.closest && elt.closest("form, button")))) return;
+    var bar = document.getElementById("flashbar");
+    if (bar) bar.remove();
+  });
 
   // ---------- jump-to-offset landing ----------
   // The row a jump lands on is marked by the server; bring it into view when the

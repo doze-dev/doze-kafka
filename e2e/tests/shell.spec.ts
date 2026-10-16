@@ -15,6 +15,19 @@ test('the theme choice sticks, and "system" follows the OS', async ({ page }) =>
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 });
 
+// "Topic created" stood beside the refusal of the next thing sent (A10).
+test('a success banner goes when the next action is refused', async ({ page, createTopic, uniqueName, setEditor }) => {
+  await createTopic(uniqueName('flash'));
+  await expect(page.locator('#flashbar')).toContainText('Topic created');
+  await page.locator('#compose-head').click();
+  await page.locator('#f-key').fill('%%% not base64');
+  await page.getByRole('button', { name: 'Key is base64' }).click();
+  await setEditor('{"a":1}');
+  await page.locator('#compose-panel').getByRole('button', { name: 'Send message' }).click();
+  await expect(page.locator('#compose-panel [data-err-slot]')).toBeVisible();
+  await expect(page.locator('#flashbar')).toHaveCount(0);
+});
+
 test('the fonts are the vendored Plex, served as fonts', async ({ page }) => {
   const fonts: string[] = [];
   page.on('response', (r) => { if (r.url().endsWith('.woff2')) fonts.push(`${r.status()} ${r.headers()['content-type']}`); });

@@ -140,7 +140,7 @@
     </div>
 
     {{with .Facts}}
-    <p class="facts-line" id="topic-facts">{{.Partitions}} partition{{if ne .Partitions 1}}s{{end}}, <span class="m">{{num .Messages}}</span> message{{if ne .Messages 1}}s{{end}}{{if eq .Retention "no limit"}}, kept with <span class="m">no limit</span>{{else if .Retention}}, kept <span class="m">{{.Retention}}</span>{{end}}{{if .Compact}}, compacted{{end}}{{if .SchemaType}}, {{.SchemaType}} {{.SchemaLabel}} with schema <a class="m" href="{{.SubjectURL}}">{{.Subject}}</a> <span class="m">v{{.SchemaVer}}</span>{{end}}{{if .HasNewest}}, newest <span class="m">{{when .Newest "clock"}}</span>{{end}}.</p>
+    <p class="facts-line" id="topic-facts">{{.Partitions}} partition{{if ne .Partitions 1}}s{{end}}, <span class="m">{{num .Messages}}</span> message{{if ne .Messages 1}}s{{end}}{{if eq .Retention "no time limit"}}, kept with no time limit{{else if .Retention}}, kept <span class="m">{{.Retention}}</span>{{end}}{{if .Compact}}, compacted{{end}}{{if .SchemaType}}, {{.SchemaType}} {{.SchemaLabel}} with schema <a class="m" href="{{.SubjectURL}}">{{.Subject}}</a> <span class="m">v{{.SchemaVer}}</span>{{end}}{{if .HasNewest}}, newest <span class="m">{{when .Newest "clock"}}</span>{{end}}.</p>
     {{end}}
 
     {{template "neighbours" .}}
