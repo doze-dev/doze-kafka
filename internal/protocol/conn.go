@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 	"unicode/utf8"
 
@@ -301,7 +302,7 @@ func (c *Conn) serve(ctx context.Context) {
 		header, bodyOffset, err := ParseRequestHeader(frame)
 		if err != nil {
 			c.log.Warn("bad request header", "err", err)
-			c.observeClosed(&RequestHeader{APIKey: -1}, time.Now(), len(frame), "the request header could not be read: "+err.Error())
+			c.observeClosed(&RequestHeader{APIKey: -1}, time.Now(), len(frame), "the request header could not be read: "+err.Error(), ClassRefused)
 			return
 		}
 		// Debug: one line per request is a firehose at info (a consumer polls many
@@ -318,7 +319,7 @@ func (c *Conn) serve(ctx context.Context) {
 		// misbehaving or unauthenticated client — drop the connection.
 		if c.authRequired && !c.authenticated && !preAuthAllowed(header.APIKey) {
 			c.log.Warn("unauthenticated request rejected", "api", APIName(header.APIKey))
-			c.observeClosed(&header, time.Now(), len(frame), "the request came before authentication")
+			c.observeClosed(&header, time.Now(), len(frame), "the request came before authentication", ClassDenied)
 			return
 		}
 
@@ -331,7 +332,7 @@ func (c *Conn) serve(ctx context.Context) {
 			// other client keeps being served.
 			c.log.Error("handler panicked; closing the connection", "api", APIName(header.APIKey),
 				"version", header.APIVersion, "client_id", header.ClientID, "panic", pe.value, "stack", pe.stack)
-			c.observeClosed(&header, began, len(frame), "the broker's handler panicked")
+			c.observeClosed(&header, began, len(frame), "the broker's handler panicked", ClassFailed)
 			return
 		}
 		if err != nil {
@@ -341,7 +342,7 @@ func (c *Conn) serve(ctx context.Context) {
 			// hanging until its own timeout. Conformant clients never hit this —
 			// they only call APIs we advertise.
 			c.log.Warn("closing connection: unhandled request", "api", APIName(header.APIKey), "err", err)
-			c.observeClosed(&header, began, len(frame), notServed(header))
+			c.observeClosed(&header, began, len(frame), notServed(header), notServedClass(header))
 			return
 		}
 		if resp == nil {
@@ -354,12 +355,14 @@ func (c *Conn) serve(ctx context.Context) {
 		_ = c.raw.SetWriteDeadline(time.Now().Add(c.writeTimeout))
 		if err := WriteFrame(c.w, resp); err != nil {
 			c.log.Debug("write failed", "err", err)
-			c.observeClosed(&header, began, len(frame), "the answer could not be written: "+err.Error())
+			why, class := writeFailure(err)
+			c.observeClosed(&header, began, len(frame), why, class)
 			return
 		}
 		if err := c.w.Flush(); err != nil {
 			c.log.Debug("flush failed", "err", err)
-			c.observeClosed(&header, began, len(frame), "the answer could not be written: "+err.Error())
+			why, class := writeFailure(err)
+			c.observeClosed(&header, began, len(frame), why, class)
 			return
 		}
 		if c.observer != nil {
@@ -397,13 +400,14 @@ func (c *Conn) observe(req *Request, began time.Time, reqBytes, respBytes int) {
 // observeClosed tells the observer that this request ended the connection, and why.
 // It is the row "why does my app keep disconnecting" needs: the loop returns, and
 // before this the only trace was a log line.
-func (c *Conn) observeClosed(h *RequestHeader, began time.Time, reqBytes int, reason string) {
+//
+// class is what kind of no it was, and whose: the client's bytes or the API key it
+// asked (refused: no broker answers them), the login (denied), the broker's own bug
+// (failed), or the client hanging up before its answer (expected: the broker did not
+// fail; a consumer closes its fetch connection under a long poll at a rebalance).
+func (c *Conn) observeClosed(h *RequestHeader, began time.Time, reqBytes int, reason string, class Class) {
 	if c.observer == nil {
 		return
-	}
-	class := ClassFailed
-	if strings.Contains(reason, "authentication") {
-		class = ClassDenied
 	}
 	c.observer.Request(Observation{
 		Conn: c.id, Remote: c.raw.RemoteAddr().String(), Principal: c.Principal(),
@@ -436,6 +440,26 @@ func (c *Conn) route(ctx context.Context, req *Request) (resp []byte, err error)
 // notServed says why a request the router would not take ended its connection: an API
 // the broker knows by name but not at the version asked for ("Produce v99 is not served
 // by this broker"), or a key it has never heard of ("API key 999 is not served...").
+// notServedClass is what kind of no an unserved request is: an API Kafka has and this
+// broker does not serve is not implemented; a key no version of Kafka has is the
+// client's (refused).
+func notServedClass(h RequestHeader) Class {
+	if kmsg.RequestForKey(int16(h.APIKey)) != nil {
+		return ClassNotImplemented
+	}
+	return ClassRefused
+}
+
+// writeFailure says why an answer could not be written, and whose that was: a client
+// that closed its connection before its answer came (a reset, a broken pipe) left; any
+// other failure to write is the broker's.
+func writeFailure(err error) (string, Class) {
+	if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) || errors.Is(err, net.ErrClosed) {
+		return "the client closed the connection before the answer", ClassExpected
+	}
+	return "the answer could not be written: " + err.Error(), ClassFailed
+}
+
 func notServed(h RequestHeader) string {
 	if kmsg.RequestForKey(int16(h.APIKey)) != nil {
 		return h.APIKey.Name() + " v" + strconv.Itoa(int(h.APIVersion)) + " is not served by this broker"

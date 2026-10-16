@@ -150,3 +150,37 @@ func TestTheLastMinuteIsAWholeMinute(t *testing.T) {
 		}
 	}
 }
+
+// A client's requests a minute were the sum over its open connections: a client that
+// reconnected (a group member whose fetch connection was closed at a rebalance) lost the
+// requests of the closed one, and the clients view said 116 a minute for a client that
+// had sent 178 (the design gate's ledger). A client's counts are its own, whichever of
+// its connections carried them, for as long as it has one open.
+func TestAClientsCountsOutliveItsConnections(t *testing.T) {
+	r := New(100, nil)
+	now := t0.Add(2 * time.Minute)
+	r.now = func() time.Time { return now }
+	r.ConnOpened(1, "a")
+	r.ConnOpened(2, "b")
+	for i := range 3 {
+		r.Request(obs(1, "depot-router", kmsg.Fetch, 70*time.Second+time.Duration(i)*time.Second))
+	}
+	r.Request(obs(2, "depot-router", kmsg.Heartbeat, 80*time.Second))
+	r.ConnClosed(1)
+	r.ConnOpened(3, "c")
+	r.Request(obs(3, "depot-router", kmsg.Fetch, 90*time.Second, func(o *protocol.Observation) { o.ErrorCode, o.Class = 1, protocol.ClassRefused }))
+	cs := r.Clients()
+	if len(cs) != 2 {
+		t.Fatalf("%d connections open, want 2", len(cs))
+	}
+	for _, c := range cs {
+		if c.ClientReq1m != 5 || c.ClientReq5m != 5 || c.ClientErr5m != 1 {
+			t.Errorf("connection %d: the client's minute %d, five minutes %d with %d errors; want 5, 5 and 1", c.Conn, c.ClientReq1m, c.ClientReq5m, c.ClientErr5m)
+		}
+	}
+	r.ConnClosed(2)
+	r.ConnClosed(3)
+	if len(r.streaks) != 0 {
+		t.Errorf("a client with no connection open is still counted: %d", len(r.streaks))
+	}
+}

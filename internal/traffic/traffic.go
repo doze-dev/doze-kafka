@@ -210,7 +210,11 @@ type Client struct {
 	// belongs to (its client id, or its address when it has none): its requests in the
 	// order they came, whichever of its connections carried them (A2).
 	ClientStreak    int
+	ClientLastClass protocol.Class
 	ClientLastError string
+	// ClientReq1m, ClientReq5m and ClientErr5m are the client's counts, across every
+	// connection it has had while one of them has stayed open.
+	ClientReq1m, ClientReq5m, ClientErr5m int
 }
 
 // GroupEvent is something a coordinator did: a member joined, a generation began.
@@ -338,8 +342,11 @@ type conn struct {
 // connections, in the order they came (A2).
 type streak struct {
 	n     int
+	class protocol.Class
 	last  string
 	conns int
+	// counts are the client's requests and errors, whichever connection carried them.
+	counts counters
 }
 
 // groupLog is one group's events.
@@ -488,7 +495,6 @@ func (r *Recorder) prepare(o *protocol.Observation) prepared {
 	if p.class == "" && o.ErrorCode != 0 {
 		p.class = protocol.Classify(o.API, o.ErrorCode)
 	}
-	p.isErr = p.class.IsError() || o.Closed != ""
 	p.errName = protocol.ErrorName(o.ErrorCode)
 	if o.Closed != "" {
 		p.errName = "CONNECTION_CLOSED"
@@ -496,6 +502,9 @@ func (r *Recorder) prepare(o *protocol.Observation) prepared {
 			p.class = protocol.ClassFailed
 		}
 	}
+	// A connection that ended is an error by its class: a client that hung up before its
+	// answer is not one (the broker did not fail).
+	p.isErr = p.class.IsError()
 	topics := o.Topics
 	if len(o.TopicIDs) > 0 && r.resolve != nil {
 		topics = slices.Clone(o.Topics)
@@ -623,11 +632,12 @@ func (r *Recorder) count(c *conn, o *protocol.Observation, p *prepared) {
 	}
 	r.countUnder(c, key)
 	s := r.streaks[key]
+	s.counts.add(o.Start, p.isErr)
 	if p.isErr {
 		s.n++
-		s.last = p.errName
+		s.last, s.class = p.errName, p.class
 	} else {
-		s.n, s.last = 0, ""
+		s.n, s.last, s.class = 0, "", ""
 	}
 }
 
@@ -944,7 +954,9 @@ func (r *Recorder) Clients() []Client {
 		cc.Req1m, _ = c.counts.sum(now, time.Minute)
 		cc.Req5m, cc.Err5m = c.counts.sum(now, 5*time.Minute)
 		if s := r.streaks[c.skey]; s != nil {
-			cc.ClientStreak, cc.ClientLastError = s.n, s.last
+			cc.ClientStreak, cc.ClientLastError, cc.ClientLastClass = s.n, s.last, s.class
+			cc.ClientReq1m, _ = s.counts.sum(now, time.Minute)
+			cc.ClientReq5m, cc.ClientErr5m = s.counts.sum(now, 5*time.Minute)
 		}
 		out = append(out, cc)
 	}

@@ -67,8 +67,10 @@ func TestConnectionEndingRequestsAreObserved(t *testing.T) {
 		conn, obs := serveObserved(t, NewRouter())
 		sendRaw(t, conn, 99, 0, 41, "stranger", nil)
 		got := waitObservations(t, obs, 1)[0]
-		if got.Class != ClassFailed || got.Closed == "" || !strings.Contains(got.Closed, "99") {
-			t.Errorf("observed %+v, want a failed row that says the connection was closed because key 99 is not served", got)
+		// Key 99 is in no version of Kafka's specification: the client asked something
+		// no broker answers, and the broker did not fail (A9: the row was red).
+		if got.Class != ClassRefused || got.Closed == "" || !strings.Contains(got.Closed, "99") {
+			t.Errorf("observed %+v, want a refused row that says the connection was closed because key 99 is not served", got)
 		}
 		if got.ClientID != "stranger" || got.Correlation != 41 {
 			t.Errorf("who and which: %q %d", got.ClientID, got.Correlation)
@@ -96,8 +98,39 @@ func TestConnectionEndingRequestsAreObserved(t *testing.T) {
 			t.Fatal(err)
 		}
 		got := waitObservations(t, obs, 1)[0]
-		if got.Class != ClassFailed || got.Closed == "" {
-			t.Errorf("observed %+v", got)
+		if got.Class != ClassRefused || got.Closed == "" {
+			t.Errorf("observed %+v, want refused: the bytes were the client's", got)
+		}
+	})
+	// A consumer that closes its connection under a long-poll fetch (franz-go does, at a
+	// KIP-848 rebalance) leaves the broker an answer it cannot write. The broker did not
+	// fail: the row was red, and counted among the minute's errors (the design gate's
+	// ledger found the one error no client was answered with).
+	t.Run("a client that hangs up before its answer", func(t *testing.T) {
+		router := NewRouter()
+		gone := make(chan struct{})
+		router.Register(kmsg.Heartbeat, func(_ context.Context, req *Request) ([]byte, error) {
+			<-gone
+			time.Sleep(200 * time.Millisecond) // the reset has arrived.
+			q, err := req.Decode()
+			if err != nil {
+				return nil, err
+			}
+			resp := q.ResponseKind().(*kmsg.HeartbeatResponse)
+			resp.SetVersion(req.Header.APIVersion)
+			return req.Reply(resp), nil
+		})
+		conn, obs := serveObserved(t, router)
+		hb := kmsg.NewPtrHeartbeatRequest()
+		hb.SetVersion(1)
+		sendRaw(t, conn, kmsg.Heartbeat, 1, 9, "leaver", hb.AppendTo(nil))
+		time.Sleep(50 * time.Millisecond)
+		_ = conn.(*net.TCPConn).SetLinger(0)
+		conn.Close()
+		close(gone)
+		got := waitObservations(t, obs, 1)[0]
+		if got.Class != ClassExpected || !strings.Contains(got.Closed, "the client closed the connection before the answer") {
+			t.Errorf("observed %+v, want an expected row: the client left before the answer", got)
 		}
 	})
 	t.Run("a request before authentication", func(t *testing.T) {

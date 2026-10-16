@@ -68,7 +68,7 @@ type errorRow struct {
 var errorTable = []errorRow{
 	// The request is not valid.
 	{kerr.InvalidRequest, ClassRefused, "A field is missing or out of range for the version the client spoke.", "Compare the client library's version with the broker's, and the request it was building."},
-	{kerr.UnknownTopicOrPartition, ClassRefused, "The app names a topic this broker does not have, or a partition past the topic's last.", "Check the name for a typo, create the topic, or let the producer's first Metadata create it."},
+	{kerr.UnknownTopicOrPartition, ClassRefused, "The app names a topic that is not on this broker, or a partition past the topic's last. Usually the name has a typo, or the topic is created by a setup step that has not run yet.", "Check the name for a typo, create the topic, or let the producer's first Metadata create it."},
 	{kerr.UnknownTopicID, ClassRefused, "A request named a topic by an id that no topic has now: it was deleted and made again.", "Nothing: the client refreshes its metadata and asks again."},
 	{kerr.TopicAlreadyExists, ClassRefused, "CreateTopics for a name that is already a topic.", "Treat it as done, or choose another name."},
 	{kerr.InvalidTopicException, ClassRefused, "The topic name is empty, is '.' or '..', is longer than 249 bytes, or has a character a name may not.", "Use letters, digits, '.', '_' and '-'."},
