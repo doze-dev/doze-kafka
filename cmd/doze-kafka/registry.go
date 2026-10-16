@@ -50,7 +50,8 @@ func startRegistry(ctx context.Context, cfg config.Config, srv *server.Server, l
 // routeRegistry publishes the registry under its own name, schema.<instance>.doze, so
 // http://schema.<instance>.doze reaches it through the shared front door the same way
 // the console is reached. It returns the URL to print: port-less when a front door is
-// up, port-ful otherwise, "" when this instance has no name.
+// up, port-ful otherwise, the address it bound when the name does not answer, and ""
+// when this instance has no name.
 func (z *zone) routeRegistry(logger *slog.Logger, instance, registryAddr string) string {
 	if z == nil || z.own == nil {
 		return ""
@@ -77,7 +78,10 @@ func (z *zone) routeRegistry(logger *slog.Logger, instance, registryAddr string)
 	for {
 		u := z.reg.URLFor(name)
 		if u == "http://"+name || time.Now().After(deadline) {
-			return u
+			// The registry binds beside the broker, on the instance's address, and
+			// this name has an address of its own: without a front door the port-ful
+			// URL names an address nothing listens on, which is what asking catches.
+			return z.byNameOrAddress(logger, "schema registry", u, net.JoinHostPort(host, port))
 		}
 		time.Sleep(20 * time.Millisecond)
 	}

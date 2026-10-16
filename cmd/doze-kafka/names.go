@@ -43,7 +43,9 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/url"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
@@ -64,6 +66,81 @@ type zone struct {
 	// held records who owns this instance's name when the claim lost, so startup
 	// can name the process instead of reporting a nameless failure.
 	holder *heldBy
+	// reach stands in for names.Reachable in a test; nil is the real one.
+	reach reachFunc
+}
+
+// reachFunc is names.Reachable: does something accept a TCP connection at host:port.
+type reachFunc func(host string, port int) bool
+
+// nameReachable is the check outside a zone (`env` runs as its own process and has
+// none). A variable so a test can stand in a machine of its choosing.
+var nameReachable reachFunc = names.Reachable
+
+// machineLookup is how this machine resolves a name, for the same commands.
+var machineLookup lookupFunc = net.DefaultResolver.LookupHost
+
+// reachable asks whether host:port answers, through the zone's stand-in if it has one.
+func (z *zone) reachable(host string, port int) bool {
+	if z != nil && z.reach != nil {
+		return z.reach(host, port)
+	}
+	return nameReachable(host, port)
+}
+
+// whyNotByName says why this instance's name must not be told to anyone, or "" when
+// it may be. Two questions, in the order that costs least:
+//
+// Does it resolve HERE, to this instance's address? The setup knows a lot about
+// whether names ought to resolve, and every one of those facts is a proxy for the
+// thing that matters. Resolving it answers the question directly.
+//
+// Does it answer? Resolving is necessary and not enough: on a Mac the name's address
+// is carried to the listener by the zone's network daemon, and a name can go on
+// resolving after the daemon has gone. names.Reachable dials it, which is the whole
+// of what a client is about to do. The listener is already bound when this is asked,
+// so the dial completes without anything accepting it.
+func (z *zone) whyNotByName(lookup lookupFunc, port int) string {
+	if !resolvesHere(lookup, z.host(), z.ip()) {
+		return "does not resolve here"
+	}
+	if !z.reachable(z.host(), port) {
+		return "resolves here but nothing answers at it"
+	}
+	return ""
+}
+
+// byNameOrAddress is the URL to print for something this instance serves by name:
+// byName when something answers there, and otherwise the address it bound, with the
+// reason said once. A URL that is not by name (no zone, or an address already) is
+// returned as it is.
+func (z *zone) byNameOrAddress(logger *slog.Logger, what, byName, addr string) string {
+	if answersAt(z.reachable, byName) {
+		return byName
+	}
+	byAddr := httpURL(addr)
+	// Info, as the broker's own line is: it happens once at startup, and it is the
+	// only explanation of why the summary shows an address where a name was expected.
+	logger.Info("the "+what+"'s name does not answer here, so its address is what to open",
+		"name", byName, "address", byAddr, "fix", "doze-kafka doctor")
+	return byAddr
+}
+
+// answersAt reports whether a by-name URL answers: its host on its port, 80 when the
+// URL has none (the shared front door). A URL outside the zone is not this check's
+// business and is said to answer.
+func answersAt(reach reachFunc, rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil || !names.InZone(u.Hostname()) {
+		return true
+	}
+	port := 80
+	if p := u.Port(); p != "" {
+		if port, err = strconv.Atoi(p); err != nil {
+			return false
+		}
+	}
+	return reach(u.Hostname(), port)
 }
 
 // joinZone claims this instance's name and starts serving the zone if nobody else
@@ -143,8 +220,9 @@ func (z *zone) heldBy() *heldBy {
 
 // routeConsole publishes where the front door should send this instance's name, so
 // http://kafka.<instance>.doze serves the console. It returns the URL to print,
-// which is port-less when a front door is up and port-ful when it is not, so the
-// line printed at startup is one that actually works.
+// which is port-less when a front door is up and port-ful when it is not, and the
+// address the console bound when the name does not answer at all (see
+// byNameOrAddress), so the line printed at startup is one that actually works.
 func (z *zone) routeConsole(logger *slog.Logger, consoleAddr string) string {
 	if z == nil || z.own == nil {
 		return ""
@@ -180,7 +258,7 @@ func (z *zone) routeConsole(logger *slog.Logger, consoleAddr string) string {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	return u
+	return z.byNameOrAddress(logger, "console", u, net.JoinHostPort(host, port))
 }
 
 // close releases the name and stops serving the zone. The registry would prune this
@@ -206,16 +284,36 @@ func (z *zone) close() {
 func qualifiedHost(instance string) string { return names.Qualified("kafka", instance).Host }
 
 // registered asks the registry what a running instance published for host: the
-// address it actually bound for the console (which carries the name's own
-// loopback address), and the URL a person should open for it. Both are "" when
+// address the name resolves to, the address it actually bound for what the name
+// serves over HTTP, and the URL a person should open for it. All are "" when
 // nothing is running.
-func registered(host string) (target, consoleURL string) {
+//
+// The name's address and the bound one are not always the same address: the schema
+// registry binds beside the broker, on the instance's address, and is reached at its
+// own name through the front door. So "does the name resolve here" is asked of ip,
+// never of the target's host.
+func registered(host string) (ip, target, openURL string) {
 	reg := names.Open(names.Home(), "doze-kafka")
-	consoleURL = reg.URLFor(host)
+	openURL = reg.URLFor(host)
 	if e, ok := reg.Snapshot()[host]; ok {
-		target = e.Target
+		ip, target = e.IP, e.Target
 	}
-	return target, consoleURL
+	return ip, target, openURL
+}
+
+// publishedURL is the URL to print, from a process that is not the server, for what a
+// running instance serves at host: the by-name one when the name resolves to the
+// address the zone gave it and answers, and otherwise the address it bound. "" when
+// nothing is running.
+func publishedURL(host string) string {
+	ip, target, u := registered(host)
+	if u == "" {
+		return ""
+	}
+	if !resolvesHere(machineLookup, host, ip) || !answersAt(nameReachable, u) {
+		return httpURL(target)
+	}
+	return u
 }
 
 // runDNSSetup is `doze-kafka dns-setup`. The same command exists in doze and

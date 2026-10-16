@@ -106,6 +106,31 @@ jobs:
       - name: Coverage floor
         run: scripts/coverage.sh
 
+  # The by-name path (doze-names, C1) for real: the runner is set up for .doze the
+  # way a developer's machine is (`dns-setup`: the sysctl, the /etc/hosts block and
+  # the systemd-resolved route), and DOZE_NAMES_REQUIRED turns every skip of a
+  # by-name test into a failure, so a runner that lost the zone fails here rather
+  # than going green on tests that never ran. Not run on a GitHub runner yet: in a
+  # golang:1.27 container (plain /etc/resolv.conf, no systemd-resolved) only the
+  # apex names resolve and TestByNameEndToEnd and TestNameModeAdvertisesWhereTheBrokerIs
+  # fail as they should; ubuntu-latest has systemd-resolved, which this needs.
+  names:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Set the runner up for .doze (one sudo, as on a developer's machine)
+        run: |
+          go build -o doze-kafka ./cmd/doze-kafka
+          ./doze-kafka dns-setup </dev/null
+          ./doze-kafka doctor
+      - name: By-name tests, every skip a failure
+        env:
+          DOZE_NAMES_REQUIRED: "1"
+        run: go test -count=1 -v -run 'ByName|NameMode|Unresolvable|TakenAddress|TheNameOnlyWhen|MustResolveHere|EnvPrintsTheName|RegistryGetsItsOwnName' ./cmd/doze-kafka
+
   # The budget is per platform and recorded natively on linux/arm64 (a golang:1.27
   # container on an arm64 Mac) and darwin/arm64; linux/amd64 could not be recorded
   # natively (Go under amd64 emulation on that machine crashes), so the gate runs

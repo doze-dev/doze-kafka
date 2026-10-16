@@ -23,7 +23,7 @@ Facts, each measured on 2026-10-11 against `main` at `7b0b17e`.
 | Mutation testing | not set up |
 | Coverage floor in CI | not set up |
 | Idle-heap and binary-size budget | not set up |
-| `doze-names` | all three repositories pin `fcf6a9e`; `main` is one commit ahead (`d5a7201`) |
+| `doze-names` | all three repositories pin `fcf6a9e`; `main` was ahead (`d5a7201`, then `dc00aee`) |
 
 The two gaps that matter most are the last-but-three and the oracle: without a
 recording of a real broker, "the same error code as Kafka" is a belief, and
@@ -315,13 +315,16 @@ tag contains none of it (a test greps the symbol table).
 
 ## C. The move to the latest `doze-names`
 
-`doze-names` `main` is `d5a7201`. All three repositories (doze-kafka, doze-aws,
-doze) pin `fcf6a9e`, one commit behind; the remote branch `zone-hardening` is
-already contained in both and can go.
+When this was written `doze-names` `main` was `d5a7201` and all three repositories
+pinned `fcf6a9e`. `main` is now `dc00aee` (two commits after `d5a7201`: the daemon
+records the home it serves, and looks at the registry again whenever a connection
+opens), and all three repositories pin `dc00aee` (checked 2026-10-16:
+`v0.1.1-0.20261010121557-dc00aeec3013` in each go.mod). The remote branch
+`zone-hardening` (`a18b816`) is an ancestor of `main` and can go.
 
 ### C1. One pin, three repositories
 
-`d5a7201` changes `pool.go` and the daemon test, not the API that callers use,
+`d5a7201` and `dc00aee` change the daemon and its tests, not the API that callers use,
 but the series since the old pin (one network daemon on macOS, `Lease.Twin`,
 `Registry.Listen` by address, `OnThisMachine`, a daemon serving the home it was
 installed for) is what doze-kafka's `names.go` was last compiled against.

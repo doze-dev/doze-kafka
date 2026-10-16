@@ -6,6 +6,29 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Names: a by-name address is printed only when something answers at it. The start-up
+  summary, `doze-kafka env` and the console and registry URLs used to give the name
+  whenever it resolved on the machine; on a Mac a name can go on resolving after the
+  zone's network daemon has gone, and clients were sent to a name nothing listened on.
+  Now the name is also dialled (`names.Reachable`) and, when it does not answer, the
+  address is given instead, with one log line saying why (`doze-kafka doctor` to fix).
+
+- Built against `doze-names` `dc00aee` (from `fcf6a9e`): one network daemon on macOS
+  that serves the home it was installed for, a second name on one address
+  (`Lease.Twin`), `Registry.Listen` by address.
+
+- `--zone` (and `zone` in the config file): `--zone=false` keeps the instance out of the
+  shared `.doze` zone (no name, no front door), the same as `DOZE_ZONE=off`.
+
+- Console: a third theme (high contrast) beside light and dark; one key map for the
+  whole console, with a help overlay generated from it (`?`), and the palette's actions
+  (themes, rail, pause, help) beside its search; destructive actions (delete a topic,
+  delete records, reset or delete a group's offsets) confirm in a sentence built from
+  what the action will do on this broker (partitions, records, the groups that lose
+  offsets); deleting a topic says that its groups' committed offsets go with it. Topic
+  and group pages have a wire dock at their foot: the requests about that topic or
+  group, live.
+
 - Console: a B3 span or parent id in a record's headers is shown only when it is one (16
   hex digits). A producer can write anything there, of any length, and the Trace page
   printed it as "span …"; such a value is now left out, and the trace id still finds

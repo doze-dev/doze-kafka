@@ -145,13 +145,12 @@ func openListener(cfg config.Config, z *zone, logger interface{ Info(string, ...
 		return binding{}, fmt.Errorf("doze-kafka: cannot listen on %s for %s: %w\n  %s", addr, z.host(), err, hint)
 	}
 
-	// The name is what to tell people, unless it does not resolve HERE: the setup
-	// knows a lot about whether names OUGHT to resolve, and every one of those facts is
-	// a proxy for the thing that matters. Resolving it answers the question directly.
+	// The name is what to tell people, unless it does not resolve HERE or nothing
+	// answers at it (see whyNotByName for why both are asked).
 	b := binding{ln: ln, what: "name", host: z.host(), bootstrap: net.JoinHostPort(z.host(), strconv.Itoa(kafkaPort))}
-	if !resolvesHere(lookup, z.host(), z.ip()) {
+	if why := z.whyNotByName(lookup, kafkaPort); why != "" {
 		b.host, b.bootstrap = z.ip(), addr
-		logger.Info("the instance name does not resolve here, so the address is what to use",
+		logger.Info("the instance name "+why+", so the address is what to use",
 			"name", z.host(), "address", addr, "fix", "doze-kafka doctor")
 	}
 	if cfg.AdvertisedHost != "" {
@@ -197,14 +196,10 @@ func registryURL(cfg config.Config) string {
 		return httpURL(cfg.SchemaRegistryAddr)
 	}
 	host := names.Qualified("schema", cfg.InstanceName()).Host
-	target, u := registered(host)
-	if u == "" {
-		return "http://" + host // not running: where it will be.
+	if u := publishedURL(host); u != "" {
+		return u
 	}
-	if ip, _, err := net.SplitHostPort(target); err == nil && !resolvesHere(net.DefaultResolver.LookupHost, host, ip) {
-		return "http://" + target
-	}
-	return u
+	return "http://" + host // not running: where it will be.
 }
 
 // instanceAddress is where a configuration says this instance answers: the broker's
@@ -234,19 +229,16 @@ func instanceAddress(cfg config.Config) (bootstrap, console string) {
 	}
 	host := qualifiedHost(cfg.InstanceName())
 	bootstrap = net.JoinHostPort(host, strconv.Itoa(kafkaPort))
-	target, u := registered(host)
-	if u != "" {
-		console = u
-	}
-	if ip, _, err := net.SplitHostPort(target); err == nil && !resolvesHere(net.DefaultResolver.LookupHost, host, ip) {
-		// The same question the banner asks, asked by a different process: `env` runs
-		// on its own, so it cannot look at the server's listener, but the registry
-		// records where the instance is. Without this the banner correctly printed an
-		// address while the command it points at exported the NAME, and
-		// `eval "$(doze-kafka env)"` in a container pointed every client at a host
-		// name that does not resolve.
+	// The same questions the banner asks (does the name resolve here, and does it
+	// answer), asked by a different process: `env` runs on its own, so it cannot
+	// look at the server's listener, but the registry records where the instance is.
+	// Without this the banner correctly printed an address while the command it
+	// points at exported the NAME, and `eval "$(doze-kafka env)"` in a container
+	// pointed every client at a host name that does not resolve.
+	console = publishedURL(host)
+	if ip, _, _ := registered(host); ip != "" &&
+		(!resolvesHere(machineLookup, host, ip) || !nameReachable(host, kafkaPort)) {
 		bootstrap = net.JoinHostPort(ip, strconv.Itoa(kafkaPort))
-		console = "http://" + target
 	}
 	if cfg.AdvertisedHost != "" {
 		bootstrap = net.JoinHostPort(cfg.AdvertisedHost, strconv.Itoa(kafkaPort))
