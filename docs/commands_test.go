@@ -183,7 +183,15 @@ func TestGettingStartedRunsAsWrittenAndPrintsWhatItShows(t *testing.T) {
 				for _, d := range compareExact(summary, got) {
 					t.Errorf("getting-started.md:%d (the start-up summary): %s", blk.line, d)
 				}
-				for _, d := range compareIncluded(logLines, splitLines(b.stderr.String())) {
+				// The log goes on after the summary (the "listening" line is written
+				// just after it): give it a few seconds to arrive.
+				var logBad []string
+				for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(100 * time.Millisecond) {
+					if logBad = compareIncluded(logLines, splitLines(b.stderr.String())); len(logBad) == 0 || time.Now().After(deadline) {
+						break
+					}
+				}
+				for _, d := range logBad {
 					t.Errorf("getting-started.md:%d (the start-up log): %s", blk.line, d)
 				}
 			case "consume":
