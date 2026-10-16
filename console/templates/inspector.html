@@ -141,11 +141,11 @@ enable.metrics.push=<span class="jt-n">true</span>
   <div class="callout"><span class="b">This broker does not collect client metrics</span><span class="note">Start it with <span class="m">--client-telemetry</span> to see what clients report about themselves.</span></div>
   {{end}}
   <div class="kv" style="--c: 108px 1fr">
-    <span>Client id</span><span class="m">{{if .C.ClientID}}{{.C.ClientID}}{{else}}<span class="mut">none sent</span>{{end}}</span>
+    <span>Client id</span><span class="m" data-full="client-id">{{if .C.ClientID}}{{.C.ClientID}}{{else}}<span class="mut">none sent</span>{{end}}</span>
     <span>Open for</span><span class="m">{{when .C.Opened "since"}}</span>
     <span>Last request</span><span class="m">{{when .C.Last "since"}}</span>
     <span>Requests</span><span class="m">{{.C.Requests}}</span>
-    {{if .C.TxnID}}<span>Transactional id</span><span class="m">{{.C.TxnID}}</span>{{end}}
+    {{if .C.TxnID}}<span>Transactional id</span><span class="m" data-full="txn-id">{{.C.TxnID}}</span>{{end}}
     {{if .Members}}<span>Connections</span><span class="m">{{.C.Conns}} open</span>{{end}}
   </div>
   {{if .Members}}
@@ -160,7 +160,7 @@ enable.metrics.push=<span class="jt-n">true</span>
   <div class="grow"></div>
   <div class="inspector-acts">
     <a class="btn" href="{{.Reqs}}">Its requests <span aria-hidden="true">→</span></a>
-    {{range .GroupLinks}}<a class="btn" href="{{.URL}}">{{.Name}} <span aria-hidden="true">→</span></a>{{end}}
+    {{range .GroupLinks}}<a class="btn btn-name" href="{{.URL}}" title="{{.Name}}"><span class="el">{{.Name}}</span> <span aria-hidden="true">→</span></a>{{end}}
     {{if .HasMetrics}}{{if .M.More}}<a class="btn" data-all-metrics hx-get="{{inspectHref "client" .InspKey}}&amp;all=1" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false" href="#">All {{.M.Metrics}} metrics</a>{{end}}{{end}}
     {{if .OtherURL}}<a class="btn" data-inspector-open hx-get="{{.OtherURL}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false" href="#">See a client that reports</a>{{end}}
   </div>

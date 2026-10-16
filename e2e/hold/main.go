@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -112,6 +113,30 @@ func main() {
 	// the console would show whichever pushed last.
 	if os.Getenv("HOLD_NO_METRICS") != "" || os.Getenv("HOLD_TELEMETRY") != "" {
 		opts = append(opts, kgo.DisableClientMetrics())
+	}
+	// HOLD_SOFTWARE="name version" is what the client says it is in ApiVersions, where the
+	// library would say "kgo": a test of long names needs a long one.
+	if name, version, ok := strings.Cut(os.Getenv("HOLD_SOFTWARE"), " "); ok {
+		opts = append(opts, kgo.SoftwareNameAndVersion(name, version))
+	}
+	// HOLD_TXN=<transactional id> writes one record to the topic in a transaction first,
+	// over a connection of its own under the same client id (the topic is made if it is
+	// not there): the client is then a producer with a transactional id as well.
+	if id := os.Getenv("HOLD_TXN"); id != "" {
+		tx, err := kgo.NewClient(append(append([]kgo.Opt{}, opts...), kgo.SeedBrokers(os.Args[1]), kgo.ClientID(os.Args[2]),
+			kgo.TransactionalID(id), kgo.AllowAutoTopicCreation())...)
+		if err == nil {
+			defer tx.Close()
+			if err = tx.BeginTransaction(); err == nil {
+				if err = tx.ProduceSync(ctx, &kgo.Record{Topic: os.Args[4], Value: []byte("held")}).FirstErr(); err == nil {
+					err = tx.EndTransaction(ctx, kgo.TryCommit)
+				}
+			}
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "hold: the transaction:", err)
+			os.Exit(1)
+		}
 	}
 	cl, err := kgo.NewClient(append(opts, kgo.SeedBrokers(os.Args[1]), kgo.ClientID(os.Args[2]), kgo.ConsumerGroup(os.Args[3]), kgo.ConsumeTopics(os.Args[4]),
 		kgo.OnPartitionsAssigned(func(context.Context, *kgo.Client, map[string][]int32) { fmt.Println("ready") }))...)

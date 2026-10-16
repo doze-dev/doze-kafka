@@ -362,6 +362,8 @@ span.num {
 }
 .insp[data-kind="message"] { width: 420px; }
 .insp-default, .insp-sel { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.insp .hd .h2 { min-width: 0; overflow-wrap: anywhere; } /* a 249-character topic in a heading breaks in the panel */
+.mw0 { min-width: 0; }
 .insp .hd { padding: 12px 16px 10px; border-bottom: 1px solid var(--line2); display: flex; flex-direction: column; gap: 4px; flex: none; }
 .insp .bd { padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
 .insp .bd.flush { padding: 0; gap: 0; }
@@ -369,6 +371,7 @@ span.num {
 .insp-client a.insp-client-open { display: grid; grid-template-columns: 1fr 72px 72px; column-gap: 12px; align-items: center; text-decoration: none; }
 .insp-client a.insp-client-open:hover .b { text-decoration: underline; }
 .insp-client.on { background: var(--sel); }
+.insp-client > span { min-width: 0; overflow-wrap: anywhere; } /* a long group or transactional id breaks in the panel */
 .insp-default .callout { margin: 14px; }
 
 .dock { background: var(--card); border-top: 1px solid var(--line); display: flex; flex-direction: column; flex: none; max-height: 168px; overflow: auto; }
@@ -752,6 +755,7 @@ table.msg-table td { overflow: hidden; text-overflow: ellipsis; }
 .inspector-h .t.mono { font-size: var(--fs-base); }
 .inspector-sub { display: block; font-size: var(--fs-sm); color: var(--mut); overflow-wrap: anywhere; }
 .inspector-nav { display: flex; align-items: center; gap: 2px; flex: none; }
+.inspector-acts .btn-name { max-width: 100%; min-width: 0; }
 .inspector-acts { margin-top: 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .inspector-b { padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .insp-sel.busy .inspector-b { opacity: .45; transition: opacity .15s ease .15s; }
@@ -1034,7 +1038,16 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .tbl-wrap table.tbl tbody tr.errrow:not(.txnmark) td { background: transparent; }
   .tf-table td.cell-time { grid-column: 1; grid-row: 4; color: var(--mut); font-size: var(--fs-xs); }
   .tf-table td.cell-client { grid-column: 2; grid-row: 4; color: var(--mut); font-size: var(--fs-xs); max-width: 150px; text-align: right; }
+  /* The card's cells are grid items that a long client id or topic would widen past the card
+     (the rule above that clears a cell's max-width is more specific): each is cut instead. */
+  .tbl-wrap table.tbl.tf-table tbody tr:not(.txnmark) td.cell-client { max-width: 150px; }
+  .tbl-wrap table.tbl.tf-table tbody tr:not(.txnmark) td { overflow: hidden; text-overflow: ellipsis; }
   .keys { display: none; } /* a phone has no keys; Sy-04 draws no strip */
+  /* A group's story at a phone's width: the board's six tracks (546 px and the text) do not
+     fit, so a row is two lines of three: time, client, request; then what happened, the
+     result and how long it took. */
+  #traffic-story.tf-story { --c: 64px minmax(0, 1fr) minmax(0, 1fr) !important; }
+  #traffic-story.tf-story .r { row-gap: 2px; }
   .panes > .insp:not(:has(.insp-sel:not([hidden]))) { display: none; } /* one screen at a time: the summary beside the page waits for a selection */
   .crow .field, .field.w-part, .field.w-acks { flex: 1 1 100%; }
   .cfgfoot { flex-direction: column; align-items: stretch; }
@@ -1279,6 +1292,14 @@ table.tbl tbody tr.errrow.failed td { background: var(--badbg); }
   #detail[data-traffic-view] .filterrow.story .inp { flex: 1 1 64px; min-width: 64px; width: auto; max-width: 300px; text-overflow: ellipsis; }
   #detail[data-traffic-view] .filterrow.story > #story-count { flex: 0 0 150px; min-width: 0; text-align: right; }
 }
+/* A filter's pill holds a name a client chose: the name is what gives, cut with an
+   ellipsis (its title has the whole), and the pill's × and "clear" stay on the page. */
+.pill.pill-name { max-width: 100%; min-width: 0; }
+.pill.pill-name > .m { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pill.pill-name > .mut, .pill.pill-name > .pill-x { flex: none; }
+#detail[data-traffic-view] .filterrow > .story-pills { flex: 0 1 auto; min-width: 0; }
+.story-pills > .pill-name { flex: 0 1 auto; }
+.story-pills > a { flex: none; }
 .tf-cut { margin: 0 0 6px; }
 .tf-story .r.kid { color: var(--mut); }
 .tf-story .r > .cell-result { white-space: normal; overflow: visible; overflow-wrap: break-word; text-overflow: clip; padding: 3px 0; } /* AD5: never cut; 20 + 6 + the rule is the board's 28 */
@@ -1295,7 +1316,10 @@ table.tbl tbody tr.errrow.failed td { background: var(--badbg); }
 .metric-list .mrow { display: grid; grid-template-columns: 1fr 76px 72px; column-gap: 10px; align-items: center; }
 .metric-list .mr-s svg.spark { width: 76px; height: 16px; }
 .metric-list .mr-v { text-align: right; }
-.tf-clients { table-layout: auto; width: 100%; }
+/* Fixed tracks: a name a client chose is cut with an ellipsis in its column, the whole
+   of it in the cell's title and the inspector, as the boards cut a long name. */
+.tf-clients { table-layout: fixed; width: 100%; }
+.tf-clients td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tf-clients td, .tf-clients th { padding-left: 7px; padding-right: 7px; }
 .tf-clients td:first-child, .tf-clients th:first-child { padding-left: 12px; }
 .tf-clients tr { cursor: pointer; }
@@ -1304,7 +1328,9 @@ table.tbl tbody tr.errrow.failed td { background: var(--badbg); }
    takes, and no wrapping: "just now" and "+3" are one line each, so a row is 28 px. */
 .tf-clients .c-sw { width: 204px; } .tf-clients .c-pr { width: 124px; } .tf-clients .c-ad { width: 144px; }
 .tf-clients .c-op { width: 94px; } .tf-clients .c-la { width: 114px; } .tf-clients .c-rq { width: 104px; } .tf-clients .c-gr { width: 144px; }
-@media (min-width: 641px) { .tf-clients td { white-space: nowrap; } }
+/* Below 1180 there is no room for nine columns with a client's name: the principal,
+   when it opened and its last request are in its inspector, one click away. */
+@media (min-width: 641px) and (max-width: 1179px) { .tf-clients .c-pr, .tf-clients .c-op, .tf-clients .c-la { display: none; } }
 /* With a client open on the right there is no room for nine columns: the board keeps
    the client, its software, requests a minute and errors (Traf-07). */
 .panes:has(#inspector:not([hidden])) .tf-clients .c-pr,

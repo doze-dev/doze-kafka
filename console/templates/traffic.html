@@ -45,8 +45,8 @@
         {{range .Kinds}}<a class="{{if .On}}on{{end}}" href="{{.URL}}" {{if .On}}aria-current="true"{{end}}>{{.Label}}</a>{{end}}
       </div>
       {{if .HasStory}}
-      <span class="row ce g8 nw">
-      {{range .Pills}}<span class="pill"><span class="mut">{{.Name}}</span><span class="m">{{.Value}}</span><a class="btn ghost sm pill-x" href="{{.URL}}" aria-label="Remove {{.Name}} filter">×</a></span>{{end}}
+      <span class="row ce g8 nw story-pills">
+      {{range .Pills}}<span class="pill pill-name"><span class="mut">{{.Name}}</span><span class="m" title="{{.Value}}">{{.Value}}</span><a class="btn ghost sm pill-x" href="{{.URL}}" aria-label="Remove {{.Name}} filter">×</a></span>{{end}}
       <a href="{{.Prefix}}/traffic" class="b">clear</a>
       </span>
       {{end}}
@@ -58,7 +58,7 @@
     {{if and .HasPills (not .HasStory)}}
     <div class="row ce g8 wrap" id="filter-pills">
       <span class="cap">Filters</span>
-      {{range .Pills}}<span class="pill"><span class="mut">{{.Name}}</span><span class="m">{{.Value}}</span><a class="btn ghost sm pill-x" href="{{.URL}}" aria-label="Remove {{.Name}} filter">×</a></span>{{end}}
+      {{range .Pills}}<span class="pill pill-name"><span class="mut">{{.Name}}</span><span class="m" title="{{.Value}}">{{.Value}}</span><a class="btn ghost sm pill-x" href="{{.URL}}" aria-label="Remove {{.Name}} filter">×</a></span>{{end}}
       <span class="pill"><span class="mut">kind</span><span class="m">{{.KindWord}}</span></span>
       <a href="{{.Prefix}}/traffic" class="b">clear</a>
       <div class="grow"></div>
@@ -166,14 +166,14 @@
     <table class="tbl tf-clients" id="clients-table"><thead><tr><th>Client</th><th class="c-sw">Software</th><th class="c-pr">Principal</th><th class="c-ad">Address</th><th class="c-op">Open for</th><th class="c-la">Last request</th><th class="num c-rq">Req/min</th><th class="c-gr">Groups</th><th class="num c-er">Error rate</th></tr>
       <tr class="frozen-line lost-only"><td colspan="9" class="m">Frozen at <span data-lastgood></span>. Nothing newer than this line is known.</td></tr></thead>
       <tbody>{{range .Clients}}<tr id="cl-{{.Conn}}" class="{{if .NeedsALook}}needs-look{{end}}" tabindex="0" data-inspector-open data-open-keys="{{.Keys}}" aria-selected="false" hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
-        <td class="m b nw cell-client"><a class="m b" href="{{.Href}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false">{{.Who}}</a>{{if gt .Conns 1}} <span class="mut" title="{{.Conns}} open connections from this client id">{{.Conns}} connections</span>{{end}}</td>
-        <td class="m c-sw">{{if .Software}}{{.Software}}{{else}}<span class="mut">not reported</span>{{end}}</td>
-        <td class="m c-pr">{{.Principal}}</td>
-        <td class="m c-ad">{{.Remote}}{{if gt .Conns 1}} <span class="mut">+{{.More}}</span>{{end}}</td>
+        <td class="m b nw cell-client"><a class="m b" href="{{.Href}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false" title="{{.Who}}">{{.Who}}</a>{{if gt .Conns 1}} <span class="mut" title="{{.Conns}} open connections from this client id">{{.Conns}} connections</span>{{end}}</td>
+        <td class="m c-sw"{{if .Software}} title="{{.Software}}"{{end}}>{{if .Software}}{{.Software}}{{else}}<span class="mut">not reported</span>{{end}}</td>
+        <td class="m c-pr" title="{{.Principal}}">{{.Principal}}</td>
+        <td class="m c-ad" title="{{.Remote}}">{{.Remote}}{{if gt .Conns 1}} <span class="mut">+{{.More}}</span>{{end}}</td>
         <td class="m c-op">{{when .Opened "since"}}</td>
         <td class="m c-la">{{when .Last "clock"}}</td>
         <td class="m num c-rq">{{.Req1m}}</td>
-        <td class="c-gr {{if and .NeedsALook .Groups}}m warn{{else if eq .Groups "none"}}mut{{else if eq .Groups "none (producer)"}}mut{{else}}m{{end}}">{{.Groups}}</td>
+        <td title="{{.Groups}}" class="c-gr {{if and .NeedsALook .Groups}}m warn{{else if eq .Groups "none"}}mut{{else if eq .Groups "none (producer)"}}mut{{else}}m{{end}}">{{.Groups}}</td>
         <td class="m num c-er {{.RateTon}}">{{.Rate}}</td>
       </tr>{{end}}</tbody>
     </table>
@@ -220,8 +220,8 @@
   <div class="r h" style="--c: 1fr 70px 56px"><span>Client</span><span>Open for</span><span class="ra">Idle</span></div>
   {{range .Clients}}
   <div class="insp-client" id="icl-{{.Conn}}" data-row data-open-keys="{{.Keys}}">
-    <a class="insp-client-open" href="{{.Href}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"><span class="b el">{{.Who}}</span><span class="m mut">{{when .Opened "since"}}</span><span class="m mut ra">{{when .Last "since"}}</span></a>
-    <span class="m mut">{{if .Software}}{{.Software}}{{else}}software not reported{{end}} · {{.Principal}} · {{.Remote}}{{if gt .Conns 1}} · {{.Conns}} connections{{end}}</span>
+    <a class="insp-client-open" href="{{.Href}}" data-inspector-open hx-get="{{$.Prefix}}/inspect/client?key={{.Conn}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"><span class="b el" title="{{.Who}}">{{.Who}}</span><span class="m mut">{{when .Opened "since"}}</span><span class="m mut ra">{{when .Last "since"}}</span></a>
+    <span class="m mut el" title="{{.Software}} · {{.Principal}} · {{.Remote}}">{{if .Software}}{{.Software}}{{else}}software not reported{{end}} · {{.Principal}} · {{.Remote}}{{if gt .Conns 1}} · {{.Conns}} connections{{end}}</span>
     <span class="note{{if .NeedsALook}} bad{{end}}">{{if .NeedsALook}}{{.LookNote}}{{else if .Doing}}{{.Doing}}{{else}}no requests kept{{end}}</span>
   </div>
   {{else}}
@@ -270,7 +270,7 @@
     <span>Fetch requests</span><span class="m">{{.Fetches}}{{if .FetchesFolded}} ({{.FetchesFolded}} folded){{end}}</span>
     <span>Errors</span><span class="m {{if .Errors}}bad{{else}}ok{{end}}">{{.Errors}}</span>
   </div>
-  <div class="well pad col g4"><span class="b">Open the topic</span><span class="note">Messages, partitions and the schema are on its own page.</span><a href="{{.TopicURL}}" class="row ce g6"><span class="sv sm c-tp" aria-hidden="true">TP</span>{{.Topic}}</a></div>
+  <div class="well pad col g4"><span class="b">Open the topic</span><span class="note">Messages, partitions and the schema are on its own page.</span><a href="{{.TopicURL}}" class="row ce g6 mw0" title="{{.Topic}}"><span class="sv sm c-tp" aria-hidden="true">TP</span><span class="el">{{.Topic}}</span></a></div>
   <div class="note">Select a row to see the whole request.</div>
 </div>
 {{end}}
@@ -278,7 +278,7 @@
 
 {{define "traffic_group_default"}}
 {{with .GroupSummary}}
-<div class="hd"><span class="cap">Group timeline</span><div class="row sb ce"><span class="h2">{{.Group}}</span>{{if .State}}<span class="badge {{stateBadge .State}}">{{.State}}</span>{{end}}</div><span class="m mut">{{.Protocol}}{{range $i, $t := .Topics}}{{if eq $i 0}} · {{end}}{{if $i}}, {{end}}{{$t}}{{end}}</span></div>
+<div class="hd"><span class="cap">Group timeline</span><div class="row sb ce"><span class="h2 el" title="{{.Group}}">{{.Group}}</span>{{if .State}}<span class="badge {{stateBadge .State}}">{{.State}}</span>{{end}}</div><span class="m mut">{{.Protocol}}{{range $i, $t := .Topics}}{{if eq $i 0}} · {{end}}{{if $i}}, {{end}}{{$t}}{{end}}</span></div>
 <div class="bd" id="group-summary">
   {{if .Has}}<div class="callout"><span class="b">Why it rebalanced</span><span>{{.Why}}{{if .WhyDetail}} {{.WhyDetail}}{{end}}</span>{{if not .Epochs}}<span class="note">Real Kafka does the same: any join in the classic protocol makes everyone rejoin.</span>{{end}}</div>{{end}}
   {{if .Generations}}

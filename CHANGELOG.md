@@ -6,6 +6,13 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Console: Traffic holds a client's long names (client id, software, group, transactional
+  id, a 249-character topic) in its columns, cut with an ellipsis and whole in the title
+  and the inspector. A client with 90-character names made the clients table 3,675 px
+  wide, the inspector scroll sideways and a group's pill push its controls off the page;
+  at a phone's width the requests' cards lost their time and request to the client id.
+  Between 641 and 1179 px the clients table leaves out principal, opened and last request.
+
 - Console: the wire dock at the foot of a topic or group page pages back through the
   requests it holds (Older, Newest); it showed the newest eight and no more.
 
