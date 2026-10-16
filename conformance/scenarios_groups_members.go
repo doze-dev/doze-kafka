@@ -17,24 +17,18 @@ func init() {
 }
 
 // What these scenarios differ in is what every mixed group does (scenarios_groups.go):
-// the interval a consumer-protocol member is asked to heartbeat at, and the target
-// assignment being there when a join is answered, so that a classic member that has
-// just joined is told a generation one higher and a describe shows no Assigning.
+// the interval a consumer-protocol member is asked to heartbeat at.
 
 func mixedCooperativeKnown() []Known {
 	k := knownSteps(limHeartbeatInterval, "HeartbeatIntervalMillis", "co-n-join", "co-n-heartbeat-1", "v3-n-join",
 		"co-n-heartbeat-after-1a", "co-n-heartbeat-after-1b", "co-n-heartbeat-after-2a", "co-n-heartbeat-after-2b",
 		"co-n-heartbeat-after-3a", "co-n-heartbeat-after-3b")
-	k = append(k, knownSteps(limAssignAfter, pathGeneration, "v3-c-join")...)
-	return append(k, knownSteps(limAssignAfter, pathRequest, "v3-c-sync")...)
+	return k
 }
 
 func mixedStaticKnown() []Known {
 	k := knownSteps(limHeartbeatInterval, "HeartbeatIntervalMillis", "sd-n-join", "sd-n-heartbeat", "su-n-join", "su-n-heartbeat", "sh-n-join-static")
-	k = append(k, knownSteps(limAssignAfter, pathGeneration, "sd-s1-join", "sd-s2-join")...)
-	k = append(k, knownSteps(limAssignAfter, pathRequest, "sd-s1-sync", "sd-s2-sync", "sd-s2-heartbeat",
-		"sd-s1-heartbeat-old-id", "sd-s1-heartbeat-old-id-no-instance", "sd-s1-commit-old-id", "sd-s1-sync-old-id")...)
-	return append(k, knownSteps(limAssignAfter, pathGroups, "sd-describe", "sd-describe-after-restart", "sd-describe-after-old-id", "su-describe-after-leave")...)
+	return k
 }
 
 // consumerSubscriptionOwning is the classic consumer protocol's subscription at version

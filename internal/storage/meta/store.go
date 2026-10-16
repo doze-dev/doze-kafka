@@ -867,13 +867,18 @@ type GroupLiveness struct {
 	Consumer     bool
 	Epoch        int32
 	Assignor     string
+	// AssignmentEpoch is the epoch its last target assignment was computed for, which
+	// ConsumerGroupDescribe shows and which is below Epoch once the group has emptied
+	// (recorded: groups-listed-after-restart, after-describe-consumer).
+	AssignmentEpoch int32
 }
 
 // emptySincePrefix keys, in the meta bucket, what is kept about a group's members.
 // Written by an earlier version: 8 bytes are when it lost the last one, 9 bytes are a
 // group that has some (the kind of group, then its session in milliseconds). Written
 // now: livenessV2, flags, empty since (8), session in milliseconds (8), epoch (4),
-// then the protocol type and the assignor, each a 2-byte length and its bytes.
+// then the protocol type and the assignor, each a 2-byte length and its bytes, then the
+// assignment epoch (4; a record without it is read as at Epoch).
 var emptySincePrefix = []byte("empty_since\x00")
 
 // keyGroupsAdopted is set once AdoptGroupsWithOffsets has run.
@@ -911,7 +916,8 @@ func encodeGroupLiveness(st GroupLiveness) []byte {
 	b = binary.BigEndian.AppendUint16(b, uint16(len(st.ProtocolType)))
 	b = append(b, st.ProtocolType...)
 	b = binary.BigEndian.AppendUint16(b, uint16(len(st.Assignor)))
-	return append(b, st.Assignor...)
+	b = append(b, st.Assignor...)
+	return binary.BigEndian.AppendUint32(b, uint32(st.AssignmentEpoch))
 }
 
 func decodeGroupLiveness(v []byte) (GroupLiveness, bool) {
@@ -940,7 +946,15 @@ func decodeGroupLiveness(v []byte) (GroupLiveness, bool) {
 		var ok1, ok2 bool
 		st.ProtocolType, ok1 = str()
 		st.Assignor, ok2 = str()
-		return st, ok1 && ok2 && len(rest) == 0
+		switch len(rest) {
+		case 0:
+			st.AssignmentEpoch = st.Epoch
+		case 4:
+			st.AssignmentEpoch = int32(binary.BigEndian.Uint32(rest))
+		default:
+			return st, false
+		}
+		return st, ok1 && ok2
 	}
 	return GroupLiveness{}, false
 }

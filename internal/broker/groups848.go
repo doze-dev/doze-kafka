@@ -52,7 +52,7 @@ func (b *Broker) handleConsumerGroupHeartbeat(ctx context.Context, req *protocol
 // members with their current assignments — the data `kafka-consumer-groups
 // --describe` shows. Unknown groups get GROUP_ID_NOT_FOUND.
 func (b *Broker) handleConsumerGroupDescribe(ctx context.Context, req *protocol.Request, dr *kmsg.ConsumerGroupDescribeRequest, resp *kmsg.ConsumerGroupDescribeResponse) error {
-	for _, group := range dr.Groups {
+	for _, group := range inKafkaGroupOrder(dr.Groups) {
 		rg := kmsg.NewConsumerGroupDescribeResponseGroup()
 		rg.Group = group
 		if !b.canGroup(req.Conn, group, opDescribe) {
@@ -60,7 +60,7 @@ func (b *Broker) handleConsumerGroupDescribe(ctx context.Context, req *protocol.
 			resp.Groups = append(resp.Groups, rg)
 			continue
 		}
-		state, epoch, assignor, members, ok := b.cg848.describe(group)
+		state, epoch, targetEpoch, assignor, members, ok := b.cg848.describe(group)
 		if !ok || (len(members) == 0 && b.claims.ownerOf(group) == protoClassic) {
 			// In Kafka's words (recorded: mixed-protocol-rolling, offsets-retention-restart).
 			rg.ErrorCode = kerr.GroupIDNotFound.Code
@@ -74,7 +74,7 @@ func (b *Broker) handleConsumerGroupDescribe(ctx context.Context, req *protocol.
 		}
 		rg.State = state
 		rg.Epoch = epoch
-		rg.AssignmentEpoch = epoch
+		rg.AssignmentEpoch = targetEpoch
 		rg.AssignorName = assignor
 		for _, mem := range members {
 			rm := kmsg.NewConsumerGroupDescribeResponseGroupMember()

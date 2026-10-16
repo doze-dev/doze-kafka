@@ -30,4 +30,7 @@ var (
 	// ClientMetrics returns the server's client-telemetry store, or nil when client
 	// telemetry is off. The argument is a *server.Server.
 	ClientMetrics func(srv any) *telemetry.Store
+	// CheckOffsets applies the offsets retention of a *server.Server now, as its
+	// scheduled check does, and returns once it has.
+	CheckOffsets func(srv any)
 )

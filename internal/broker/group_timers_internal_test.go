@@ -31,9 +31,9 @@ func joinReq(group, member string) *kmsg.JoinGroupRequest {
 
 func noDelay(t *testing.T) {
 	t.Helper()
-	old := initialRebalanceDelay
-	initialRebalanceDelay = 0
-	t.Cleanup(func() { initialRebalanceDelay = old })
+	old := defaultInitialRebalanceDelay
+	defaultInitialRebalanceDelay = 0
+	t.Cleanup(func() { defaultInitialRebalanceDelay = old })
 }
 
 func TestStaleSessionTimerDoesNotEvictALiveMember(t *testing.T) {
@@ -213,7 +213,7 @@ func new848Manager(t *testing.T) *cg848Manager {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { store.Close() })
-	return newCG848Manager(store, slog.New(slog.NewTextHandler(io.Discard, nil)), time.Hour, nil)
+	return newCG848Manager(store, slog.New(slog.NewTextHandler(io.Discard, nil)), time.Hour, 0, nil)
 }
 
 func TestKIP848StaleSessionTimerDoesNotEvictALiveMember(t *testing.T) {

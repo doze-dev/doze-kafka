@@ -205,6 +205,18 @@ func (e *Env) Wait(d time.Duration) {
 	time.Sleep(time.Duration(float64(d) / e.speed))
 }
 
+// CheckOffsets is a point of the script by which the real broker's offsets check has
+// run (KafkaEnv sets its interval well below the script's waits): against doze-kafka,
+// whose replay sets the interval long (Scenario.Replay), it runs the check now and
+// returns once it has. A scenario whose answers depend on whether a check ran between
+// two requests is then decided by the script, not by when a ticker fires. It is not a
+// step, and against Kafka it does nothing.
+func (e *Env) CheckOffsets() {
+	if c, ok := e.target.(interface{ CheckOffsets() }); ok {
+		c.CheckOffsets()
+	}
+}
+
 // Quiet sends req and discards the answer, without recording a step: the keep-alive
 // traffic of a script (a member that must not be expired while the script waits).
 func (e *Env) Quiet(req kmsg.Request, version int16) {
@@ -696,6 +708,13 @@ type Pending struct {
 
 // Start sends req over the current connection and returns at once.
 func (e *Env) Start(label string, req kmsg.Request, version int16) *Pending {
+	return e.StartHeld(label, req, version, 0)
+}
+
+// StartHeld is Start for a request the broker is meant to hold for about hold (a
+// JoinGroup parked for a rebalance longer than the minute any answer is otherwise
+// given): its answer is waited for that long and a minute more.
+func (e *Env) StartHeld(label string, req kmsg.Request, version int16, hold time.Duration) *Pending {
 	e.fail2(label)
 	nreq, err := e.norm.normalize(req)
 	if err != nil {
@@ -704,7 +723,7 @@ func (e *Env) Start(label string, req kmsg.Request, version int16) *Pending {
 	p := &Pending{label: label, conn: e.cur, req: req, version: version, nreq: nreq, done: make(chan struct{})}
 	w := e.w
 	go func() {
-		p.resp, p.err = w.roundTrip(req, version)
+		p.resp, p.err = w.roundTripWithin(req, version, hold+60*time.Second)
 		close(p.done)
 	}()
 	return p

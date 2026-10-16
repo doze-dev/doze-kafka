@@ -77,21 +77,17 @@ implement it.
   UNKNOWN_SERVER_ERROR as this does). A batch stored by an earlier version that cannot
   be read is kept, and skipped by the readers that look inside (timestamp lookups and
   the cleaner use its header), so such a log still opens and serves.
+- **The first rebalance of an empty classic group waits 200 ms for more members**,
+  where Kafka's `group.initial.rebalance.delay.ms` is 3 seconds. Every application
+  that starts with the classic protocol waits it before its first partitions; 200 ms is
+  long enough for the consumers of one process to arrive together. How it waits is
+  Kafka's: a member that joins during the wait starts another, cut to what the
+  rebalance timeout leaves, and the first member to join leads
+  (recorded at Kafka's 3 s: `classic-initial-rebalance-delay.json`, replayed with
+  `--group-initial-rebalance-delay=3s`, which gives Kafka's wait).
 - **A consumer-protocol member is asked to heartbeat every second**, where Kafka's
   `group.consumer.heartbeat.interval.ms` is 5 seconds: rebalances settle in a couple of
   seconds on a development machine instead of ten.
-- **A consumer group's target assignment is computed before the request that causes it
-  is answered.** Kafka answers a join first and runs the assignor after, so a describe
-  taken in between shows the group `Assigning`, the old targets, and a classic member
-  that has just joined is told the epoch before its own join as its generation. Here the
-  new targets are there when the join is answered, the group is never `Assigning`, and
-  that generation is one higher. Which request is answered with which code is the same
-  (recorded: `mixed-protocol-groups.json`, `mixed-protocol-rolling.json`).
-- **A classic member of a consumer group whose subscription cannot be read** is refused
-  `INCONSISTENT_GROUP_PROTOCOL` on the `JoinGroup` that brings its member id. Kafka
-  answers that `JoinGroup` `UNKNOWN_SERVER_ERROR` (an exception it did not catch); both
-  are refusals a client does not retry (recorded: `group-requests-refused.json`, step
-  `cm-classic-join-unreadable-subscription-with-id`).
 - **How often committed offsets are checked is not a setting.** Kafka has
   `offsets.retention.check.interval.ms` (10 minutes); here the check runs every
   hundredth of `--offsets-retention`, between 50 ms and 10 minutes, so it is Kafka's

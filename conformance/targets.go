@@ -13,6 +13,8 @@ import (
 
 	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/internal/embed"
+	"github.com/doze-dev/doze-kafka/internal/serverhook"
+	"github.com/doze-dev/doze-kafka/server"
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
@@ -248,6 +250,7 @@ type dozeTarget struct {
 	cancel context.CancelFunc
 	done   chan struct{}
 	mod    func(*config.Config)
+	srv    *server.Server
 }
 
 // StartDoze runs doze-kafka in this process over dir, on a free loopback port,
@@ -258,6 +261,9 @@ func StartDoze(dir string) (Target, error) { return startDoze(dir, nil) }
 // what Doze and Replay change, and the speed its waits run at.
 func StartDozeFor(dir string, s Scenario) (Target, error) {
 	t, err := startDozeWith(dir, func(c *config.Config) {
+		// What the recorded broker has (KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0 in
+		// startKafka); a scenario that sets another sets both.
+		c.GroupInitialRebalanceDelay = 0
 		if len(s.Users) > 0 {
 			c.SASLMechanisms = []string{config.SASLPlain}
 			if len(s.Mechanisms) > 0 {
@@ -320,11 +326,15 @@ func (t *dozeTarget) start() error {
 		return err
 	}
 	t.cancel, t.done = cancel, make(chan struct{})
+	t.srv = srv
 	go func() { srv.Serve(ctx); close(t.done) }()
 	return nil
 }
 
 func (t *dozeTarget) Addr() string { return t.addr }
+
+// CheckOffsets applies the offsets retention now (Env.CheckOffsets).
+func (t *dozeTarget) CheckOffsets() { serverhook.CheckOffsets(t.srv) }
 
 func (t *dozeTarget) Restart() error {
 	t.Close()

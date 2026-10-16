@@ -28,7 +28,12 @@ type ownership struct {
 func newOwnership() *ownership { return &ownership{owner: map[int32]string{}} }
 
 // callbacks are the options that report member name's partitions to o.
-func (o *ownership) callbacks(name string) []kgo.Opt {
+func (o *ownership) callbacks(name string) []kgo.Opt { return o.callbacksSlow(name, 0) }
+
+// callbacksSlow is callbacks for a member that takes slow to give partitions up: its
+// revoke callback (where an application commits and stops reading) holds them that
+// long before they are its no more.
+func (o *ownership) callbacksSlow(name string, slow time.Duration) []kgo.Opt {
 	gone := func(_ context.Context, _ *kgo.Client, lost map[string][]int32) {
 		o.mu.Lock()
 		defer o.mu.Unlock()
@@ -53,7 +58,10 @@ func (o *ownership) callbacks(name string) []kgo.Opt {
 				}
 			}
 		}),
-		kgo.OnPartitionsRevoked(gone),
+		kgo.OnPartitionsRevoked(func(ctx context.Context, cl *kgo.Client, revoked map[string][]int32) {
+			time.Sleep(slow)
+			gone(ctx, cl, revoked)
+		}),
 		kgo.OnPartitionsLost(gone),
 	}
 }
@@ -138,7 +146,11 @@ func (o *ownership) eventually(t *testing.T, what string, want map[string]int) {
 
 // A cooperative-sticky classic consumer and a consumer-protocol one in one group: the
 // classic one goes on reading through the rebalance and gives up half, and at no moment
-// do the two clients both believe a partition is theirs.
+// do the two clients both believe a partition is theirs. The classic member takes three
+// seconds over giving its half up (its revoke callback), so a broker that let the
+// consumer-protocol member have those partitions before the classic member's next
+// JoinGroup says it has let them go (it used to take its rejoin for "owns nothing")
+// hands them over while they are still read, and the ownership records it.
 func TestMixedGroup_CooperativeClassicMemberAndConsumerProtocolMemberNeverShareAPartition(t *testing.T) {
 	addr := startBroker(t, 4)
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
@@ -148,7 +160,7 @@ func TestMixedGroup_CooperativeClassicMemberAndConsumerProtocolMemberNeverShareA
 	mustCreateTopic(t, ctx, admin, "t", 4)
 
 	own := newOwnership()
-	member(t, ctx, addr, "g", "t", append(own.callbacks("classic"), kgo.Balancers(kgo.CooperativeStickyBalancer()))...)
+	member(t, ctx, addr, "g", "t", append(own.callbacksSlow("classic", 3*time.Second), kgo.Balancers(kgo.CooperativeStickyBalancer()))...)
 	own.eventually(t, "the cooperative member alone", map[string]int{"classic": 4})
 
 	stopNew := member(t, ctx, addr, "g", "t", append(own.callbacks("consumer"), kip848Opts()...)...)

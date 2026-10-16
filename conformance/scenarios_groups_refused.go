@@ -19,17 +19,8 @@ func groupRefusedKnown() []Known {
 	k := knownSteps(limHeartbeatInterval, "HeartbeatIntervalMillis", "ch-rebalance-timeout-0", "cm-n-join",
 		"cm-n-heartbeat", "cm-classic-member-sends-consumer-heartbeat", "ca-n-join", "cs-join", "cs-heartbeat",
 		"cs-rejoin-same-instance", "cs-rejoin-after-leave")
-	k = append(k, knownSteps(limAssignAfter, pathGeneration, "cm-classic-join", "cm-classic-join-unknown-member-id",
-		"ca-classic-join-custom-assignor-with-id")...)
-	k = append(k, knownSteps(limAssignAfter, pathRequest, "cm-sync-wrong-protocol-type", "cm-sync-wrong-protocol-name",
-		"cm-sync-unknown-member", "cm-sync", "cm-classic-member-sends-consumer-heartbeat")...)
-	k = append(k, knownSteps(limAssignAfter, pathMemberEpoch, "cm-classic-member-sends-consumer-heartbeat", "cs-rejoin-after-leave")...)
-	k = append(k, knownSteps(limAssignAfter, pathAssignment, "cs-rejoin-after-leave")...)
-	k = append(k, knownSteps(limAssignAfter, pathGroups, "cm-describe-after-leave", "ca-describe", "cs-describe")...)
-	return append(k, Known{Step: "cm-classic-join-unreadable-subscription-with-id", Limitation: limUnreadableSubscription})
+	return k
 }
-
-const limUnreadableSubscription = "A classic member of a consumer group whose subscription cannot be read"
 
 // consumerJoinRequest is a ConsumerGroupHeartbeat v0 joining group with topic, owning
 // nothing, at a rebalance timeout of 30 s.

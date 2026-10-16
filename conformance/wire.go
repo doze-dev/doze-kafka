@@ -98,8 +98,18 @@ func (w *wire) frame(req kmsg.Request, version int16) []byte {
 	return append(frame, buf...)
 }
 
-// roundTrip sends req at version and reads its response.
+// roundTrip sends req at version and reads its response, within a minute (three
+// seconds for a probe).
 func (w *wire) roundTrip(req kmsg.Request, version int16) (kmsg.Response, error) {
+	limit := 60 * time.Second
+	if w.fast {
+		limit = 3 * time.Second
+	}
+	return w.roundTripWithin(req, version, limit)
+}
+
+// roundTripWithin is roundTrip with the time the answer may take.
+func (w *wire) roundTripWithin(req kmsg.Request, version int16, limit time.Duration) (kmsg.Response, error) {
 	req.SetVersion(version)
 	w.corr++
 	var buf []byte
@@ -116,10 +126,6 @@ func (w *wire) roundTrip(req kmsg.Request, version int16) (kmsg.Response, error)
 	frame := binary.BigEndian.AppendUint32(nil, uint32(len(buf)))
 	frame = append(frame, buf...)
 
-	limit := 60 * time.Second
-	if w.fast {
-		limit = 3 * time.Second
-	}
 	w.conn.SetDeadline(time.Now().Add(limit))
 	if _, err := w.conn.Write(frame); err != nil {
 		return nil, err

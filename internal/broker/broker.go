@@ -96,7 +96,7 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 		// An emptied group stays until the offsets retention's sweep finds it holds
 		// nothing (offsetexpiry.go).
 		groups:  newGroupManager(func(string) bool { return true }, claims),
-		cg848:   newCG848Manager(m, logger, cfg.ConsumerSessionTimeout, claims),
+		cg848:   newCG848Manager(m, logger, cfg.ConsumerSessionTimeout, cfg.ConsumerAssignmentInterval, claims),
 		auth:    auth,
 		idem:    newIdempotency(),
 		profile: profile,
@@ -105,10 +105,11 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 	// Only a broker with a console keeps what clients report: the console is its one
 	// reader, and a broker without one advertises nothing for clients to push into.
 	b.cg848.bridge = b.groups
+	b.groups.initialDelay = cfg.GroupInitialRebalanceDelay
 	// Which groups have members is recorded whatever the retention is, zero included:
 	// a broker run for a while with the retention off and then with it on must not
 	// take the groups of that while for groups nobody ever joined.
-	exp, err := newOffsetExpiry(b, cfg.OffsetsRetention)
+	exp, err := newOffsetExpiry(b, cfg.OffsetsRetention, cfg.OffsetsRetentionCheckInterval)
 	if err != nil {
 		return nil, fmt.Errorf("broker: read what is recorded of the groups' members: %w", err)
 	}
@@ -122,6 +123,10 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 	}
 	return b, nil
 }
+
+// CheckOffsets applies the offsets retention now, as its scheduled check does, and
+// returns once it has (reached through serverhook by the conformance replays).
+func (b *Broker) CheckOffsets() { b.expiry.checkNow() }
 
 // Register binds a handler to every API the active profile offers, and tells the
 // router to refuse everything else. What is offered comes from protocol.APIs; what

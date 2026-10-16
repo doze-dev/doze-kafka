@@ -22,7 +22,9 @@ import (
 //   - A group with members expires nothing for the topics it is subscribed to. The
 //     offsets of a topic it is not subscribed to expire from their own commit, which
 //     is how an application that stopped reading one topic stops carrying it. A group
-//     in the middle of a rebalance is not looked at at all.
+//     in the middle of a rebalance is not looked at at all, nor is a classic group
+//     whose protocol type is not "consumer" (a Connect worker's), or whose members'
+//     subscriptions cannot be read (claim: groups R24d).
 //   - A group with no members and no offsets is gone at the next sweep: it is not
 //     listed, DescribeGroups says Dead, and its id, used again, is a new group. Until
 //     that sweep it is the group it was: a commit made into it in between is a commit
@@ -54,6 +56,7 @@ type groupLiveness struct {
 type offsetExpiry struct {
 	b         *Broker
 	retention time.Duration // 0: nothing expires; what is known of the groups is kept all the same.
+	every     time.Duration // the check interval; 0 is interval's default.
 	now       func() time.Time
 	started   time.Time // when the presumed groups' sessions began to run.
 
@@ -64,9 +67,10 @@ type offsetExpiry struct {
 	groups map[string]groupLiveness
 	dirty  map[string]bool // the groups whose record is not yet in the store; true once a failure was logged.
 
-	wake chan struct{} // something became dirty: write it now, not at the next tick.
-	stop chan struct{}
-	done chan struct{}
+	wake     chan struct{}      // something became dirty: write it now, not at the next tick.
+	checkReq chan chan struct{} // CheckOffsets: one sweep now, on the sweep's goroutine.
+	stop     chan struct{}
+	done     chan struct{}
 }
 
 // adoptedSession is the session given to the groups of a store written before groups
@@ -75,7 +79,7 @@ const adoptedSession = 45 * time.Second
 
 // newOffsetExpiry loads what the store remembers of the groups. It does not start the
 // sweep: start does.
-func newOffsetExpiry(b *Broker, retention time.Duration) (*offsetExpiry, error) {
+func newOffsetExpiry(b *Broker, retention, every time.Duration) (*offsetExpiry, error) {
 	n, err := b.meta.AdoptGroupsWithOffsets(adoptedSession)
 	if err != nil {
 		return nil, err
@@ -87,7 +91,7 @@ func newOffsetExpiry(b *Broker, retention time.Duration) (*offsetExpiry, error) 
 	if err != nil {
 		return nil, err
 	}
-	e := &offsetExpiry{b: b, retention: retention, now: time.Now, started: time.Now(),
+	e := &offsetExpiry{b: b, retention: retention, every: every, now: time.Now, started: time.Now(), checkReq: make(chan chan struct{}),
 		groups: make(map[string]groupLiveness, len(stored)), dirty: map[string]bool{},
 		wake: make(chan struct{}, 1), stop: make(chan struct{}), done: make(chan struct{})}
 	for id, st := range stored {
@@ -107,7 +111,7 @@ func (e *offsetExpiry) restoreEmptyGroups() {
 	for id, st := range e.groups {
 		switch {
 		case st.Consumer:
-			e.b.cg848.restoreEmpty(id, st.Epoch, st.Assignor)
+			e.b.cg848.restoreEmpty(id, st.Epoch, st.AssignmentEpoch, st.Assignor)
 		case !st.Live && st.ProtocolType != "":
 			e.b.groups.restoreEmpty(id, st.ProtocolType)
 		}
@@ -144,6 +148,7 @@ func (e *offsetExpiry) joining(group string, classic bool, session time.Duration
 type groupKind struct {
 	protocolType string
 	epoch        int32
+	targetEpoch  int32 // the epoch of its last target assignment.
 	assignor     string
 }
 
@@ -155,7 +160,7 @@ func (e *offsetExpiry) emptied(group string, classic bool, kind groupKind) {
 	if classic {
 		e.groups[group] = groupLiveness{GroupLiveness: meta.GroupLiveness{EmptySince: e.now().UnixMilli(), ProtocolType: kind.protocolType}}
 	} else {
-		e.groups[group] = groupLiveness{GroupLiveness: meta.GroupLiveness{Consumer: true, Epoch: kind.epoch, Assignor: kind.assignor}}
+		e.groups[group] = groupLiveness{GroupLiveness: meta.GroupLiveness{Consumer: true, Epoch: kind.epoch, AssignmentEpoch: kind.targetEpoch, Assignor: kind.assignor}}
 	}
 	e.markDirty(group)
 	e.mu.Unlock()
@@ -214,6 +219,9 @@ func (e *offsetExpiry) flush() {
 // ten minutes (Kafka's offsets.retention.check.interval.ms default), which is also what
 // it is with no retention.
 func (e *offsetExpiry) interval() time.Duration {
+	if e.every > 0 {
+		return e.every
+	}
 	if e.retention <= 0 {
 		return 10 * time.Minute
 	}
@@ -238,9 +246,23 @@ func (e *offsetExpiry) start() {
 				e.flush()
 			case <-sweep.C:
 				e.sweep()
+			case done := <-e.checkReq:
+				e.sweep()
+				close(done)
 			}
 		}
 	}()
+}
+
+// checkNow runs one sweep and returns once it has: what a scheduled check would do,
+// at a moment the caller chooses. It does nothing once the sweep has stopped.
+func (e *offsetExpiry) checkNow() {
+	done := make(chan struct{})
+	select {
+	case e.checkReq <- done:
+		<-done
+	case <-e.done:
+	}
 }
 
 // stopAndFlush ends the sweep and writes what is still only in memory.
@@ -486,8 +508,8 @@ func decodeConsumerSubscription(b []byte) (topics []string, ok bool) {
 
 // subscription reports, for a classic group with members, whether a topic is one it
 // reads. It is nil when nothing may be expired from the group: it is in a rebalance, or
-// it is not a consumer group whose subscriptions are known. Caller holds the
-// coordinator's lock.
+// it is not a consumer group whose subscriptions are known (claim: groups R24d).
+// Caller holds the coordinator's lock.
 func (g *group) subscription() (live func(topic string) bool) {
 	if g.state != stateStable || g.protocolType != "consumer" {
 		return nil

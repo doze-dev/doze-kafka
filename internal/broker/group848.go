@@ -142,16 +142,23 @@ type cg848Manager struct {
 	// pending holds the member ids handed out to classic clients joining a consumer
 	// group with MEMBER_ID_REQUIRED, and not yet used.
 	pending map[string]map[string]time.Time
+
+	// assignInterval is the least time between two computations of a group's target
+	// assignment (config.ConsumerAssignmentInterval: Kafka's
+	// group.consumer.assignment.interval.ms and its default, 1 s; recorded:
+	// group-coordinator-defaults).
+	assignInterval time.Duration
 }
 
-func newCG848Manager(m meta.Store, logger *slog.Logger, sessionTimeout time.Duration, claims *groupClaims) *cg848Manager {
+func newCG848Manager(m meta.Store, logger *slog.Logger, sessionTimeout, assignInterval time.Duration, claims *groupClaims) *cg848Manager {
 	if sessionTimeout <= 0 {
 		sessionTimeout = cg848DefaultSessionTimeout
 	}
 	if claims == nil {
 		claims = newGroupClaims()
 	}
-	return &cg848Manager{groups: make(map[string]*cg848Group), meta: m, log: logger, sessionTimeout: sessionTimeout, claims: claims}
+	return &cg848Manager{groups: make(map[string]*cg848Group), meta: m, log: logger, sessionTimeout: sessionTimeout, claims: claims,
+		assignInterval: assignInterval}
 }
 
 // stop cancels every timer. After the broker has shut down a session timer would
@@ -172,6 +179,14 @@ type cg848Group struct {
 	epoch    int32  // bumped whenever membership, subscriptions or topics change.
 	assignor string // the assignor in use (the members' most common preference).
 	members  map[string]*cg848Member
+
+	// targetEpoch is the group epoch the members' targets were computed for, and
+	// assignedAt when. Below epoch, the group is Assigning: the targets are computed
+	// by the first heartbeat or classic JoinGroup at least assignInterval after the
+	// last time, never by a leave, an expiry or the passing of time (claim: groups
+	// R22a, R22b). A member is at targetEpoch at most.
+	targetEpoch int32
+	assignedAt  time.Time
 }
 
 type cg848Member struct {
@@ -307,7 +322,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 		if r.MemberEpoch == -2 && static {
 			// A static member going away for a restart: its place and its
 			// partitions are held until its session runs out, so coming back does
-			// not move anything.
+			// not move anything (claim: groups R24a, R24b).
 			mem.left = true
 			mem.revoke.stop()
 			m.resetSession(g, mem)
@@ -315,7 +330,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 		}
 		m.emit(g, "left", r.MemberID, "a member left the group", "")
 		m.removeMember(g, r.MemberID)
-		m.bumpAndReassign(g, "a member left")
+		m.bumpForRemoval(g, "a member left")
 		m.maybeDowngrade(g)
 		return cg848Result{memberID: r.MemberID, memberEpoch: r.MemberEpoch}
 	}
@@ -362,7 +377,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 		if adopted == nil {
 			// Epoch 1 before anyone has joined: the first member's join takes it to 2, which
 			// is the first epoch Kafka gives a member of a new group (recorded).
-			adopted = &cg848Group{id: r.Group, epoch: 1, assignor: assignorUniform, members: make(map[string]*cg848Member)}
+			adopted = &cg848Group{id: r.Group, epoch: 1, targetEpoch: 1, assignor: assignorUniform, members: make(map[string]*cg848Member)}
 			m.groups[r.Group] = adopted
 			created = true
 		}
@@ -406,7 +421,8 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 					return cg848Error(kerr.UnreleasedInstanceID.Code, "Static member "+r.MemberID+" with instance id "+
 						*r.InstanceID+" cannot join the group because the instance id is owned by "+id+" member.")
 				}
-				// Its restarted self: take over the place it left, partitions and all.
+				// Its restarted self: take over the place it left, partitions and all
+				// (claim: groups R24b).
 				other.stopTimers()
 				delete(g.members, id)
 				mem = &cg848Member{id: r.MemberID, target: other.target, assigned: other.assigned,
@@ -475,6 +491,8 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 	m.resetSession(g, mem)
 	if changed {
 		m.bumpAndReassign(g, "a member joined or changed its subscription")
+	} else {
+		m.assignIfDue(g)
 	}
 
 	var reported tpSet // nil = the member did not report what it owns this time.
@@ -508,7 +526,7 @@ func (m *cg848Manager) reconcile(g *cg848Group, mem *cg848Member, reported tpSet
 		mem.revoking = nil
 		mem.revoke.stop()
 	}
-	if mem.epoch == g.epoch && mem.assigned.equal(mem.target) {
+	if mem.epoch == g.targetEpoch && mem.assigned.equal(mem.target) {
 		return
 	}
 	// 2. Anything it holds that is no longer its target must be revoked first.
@@ -535,8 +553,8 @@ func (m *cg848Manager) reconcile(g *cg848Group, mem *cg848Member, reported tpSet
 		}
 	}
 	mem.assigned = keep
-	if mem.epoch != g.epoch {
-		mem.prevEpoch, mem.epoch = mem.epoch, g.epoch
+	if mem.epoch != g.targetEpoch {
+		mem.prevEpoch, mem.epoch = mem.epoch, g.targetEpoch
 	}
 }
 
@@ -574,19 +592,50 @@ func (m *cg848Manager) revokeExpired(g *cg848Group, mem *cg848Member, gen uint64
 		"group", g.id, "member", mem.id)
 	m.emit(g, "expired", mem.id, "a member did not acknowledge a revocation within its rebalance timeout", "")
 	m.removeMember(g, mem.id)
-	m.bumpAndReassign(g, "a member was removed")
+	m.bumpForRemoval(g, "a member was removed")
 	m.maybeDowngrade(g)
 }
 
-// bumpAndReassign advances the group epoch and recomputes every member's target.
+// bumpAndReassign advances the group epoch for a change a member's own heartbeat or
+// classic JoinGroup made, and computes the targets if it is time to (assignIfDue).
 func (m *cg848Manager) bumpAndReassign(g *cg848Group, why string) {
 	if len(g.members) == 0 {
 		return
 	}
 	g.epoch++
+	detail := why + "; the targets wait for a heartbeat at least the assignment interval after the last ones"
+	if m.assignIfDue(g) {
+		detail = why + "; " + plural(len(g.members), "member") + " reassigned"
+	}
+	m.emit(g, "epoch", "", detail, why)
+}
+
+// bumpForRemoval advances the group epoch for a member that left or was removed. The
+// targets wait for the next heartbeat (recorded: consumer-assignment-interval,
+// b-leaves-1500ms; consumer-assignment-expiry, describe-8s-x-expired).
+func (m *cg848Manager) bumpForRemoval(g *cg848Group, why string) {
+	if len(g.members) == 0 {
+		return
+	}
+	g.epoch++
+	m.emit(g, "epoch", "", why+"; the targets wait for the next heartbeat", why)
+}
+
+// assignIfDue computes every member's target for the group epoch when they are behind
+// it and the last computation is at least assignInterval ago, and reports whether it did.
+func (m *cg848Manager) assignIfDue(g *cg848Group) bool {
+	if len(g.members) == 0 || g.targetEpoch >= g.epoch || time.Since(g.assignedAt) < m.assignInterval {
+		return false
+	}
+	m.computeTargets(g)
+	return true
+}
+
+// computeTargets runs the assignor for the group's epoch now.
+func (m *cg848Manager) computeTargets(g *cg848Group) {
 	m.assign(g)
+	g.targetEpoch, g.assignedAt = g.epoch, time.Now()
 	m.armClassicRevocations(g)
-	m.emit(g, "epoch", "", why+"; "+plural(len(g.members), "member")+" reassigned", why)
 }
 
 func (m *cg848Manager) resetSession(g *cg848Group, mem *cg848Member) {
@@ -607,7 +656,7 @@ func (m *cg848Manager) sessionExpired(g *cg848Group, mem *cg848Member, gen uint6
 	}
 	m.emit(g, "expired", mem.id, "a member sent no heartbeat within its session timeout", "")
 	m.removeMember(g, mem.id)
-	m.bumpAndReassign(g, "a member's session expired")
+	m.bumpForRemoval(g, "a member's session expired")
 	m.maybeDowngrade(g)
 	m.log.Info("KIP-848 member session expired", "group", g.id, "member", mem.id)
 }
@@ -628,14 +677,14 @@ func (m *cg848Manager) removeMember(g *cg848Group, id string) {
 		g.epoch++
 		m.claims.release(g.id, protoConsumer)
 		if m.liveness != nil {
-			m.liveness.emptied(g.id, false, groupKind{protocolType: "consumer", epoch: g.epoch, assignor: g.assignor})
+			m.liveness.emptied(g.id, false, groupKind{protocolType: "consumer", epoch: g.epoch, targetEpoch: g.targetEpoch, assignor: g.assignor})
 		}
 	}
 }
 
 // restoreEmpty puts back an emptied consumer group found in the store at start, at the
-// epoch it was at and with its assignor.
-func (m *cg848Manager) restoreEmpty(id string, epoch int32, assignor string) {
+// epochs it was at and with its assignor.
+func (m *cg848Manager) restoreEmpty(id string, epoch, targetEpoch int32, assignor string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.groups[id] != nil {
@@ -644,7 +693,7 @@ func (m *cg848Manager) restoreEmpty(id string, epoch int32, assignor string) {
 	if assignor == "" {
 		assignor = assignorUniform
 	}
-	m.groups[id] = &cg848Group{id: id, epoch: epoch, assignor: assignor, members: make(map[string]*cg848Member)}
+	m.groups[id] = &cg848Group{id: id, epoch: epoch, targetEpoch: targetEpoch, assignor: assignor, members: make(map[string]*cg848Member)}
 }
 
 // hasClassic reports whether any member arrived by the classic protocol.
@@ -698,6 +747,7 @@ func (m *cg848Manager) topicChanged(topic string) {
 				break
 			}
 		}
+		g.targetEpoch, g.assignedAt = g.epoch, time.Now()
 	}
 }
 
@@ -757,8 +807,13 @@ func (g *cg848Group) stateName() string {
 	if len(g.members) == 0 {
 		return "Empty"
 	}
+	if g.targetEpoch < g.epoch {
+		return "Assigning"
+	}
 	for _, mem := range g.members {
-		if mem.epoch != g.epoch || len(mem.revoking) > 0 || !mem.assigned.equal(mem.target) {
+		// A static member away for a restart is not at the group's epoch (claim: groups
+		// R24a).
+		if mem.left || mem.epoch != g.targetEpoch || len(mem.revoking) > 0 || !mem.assigned.equal(mem.target) {
 			return "Reconciling"
 		}
 	}
@@ -779,12 +834,12 @@ type cg848MemberDesc struct {
 }
 
 // describe returns the KIP-848 view of a group, or ok=false if it is unknown.
-func (m *cg848Manager) describe(group string) (state string, epoch int32, assignor string, members []cg848MemberDesc, ok bool) {
+func (m *cg848Manager) describe(group string) (state string, epoch, targetEpoch int32, assignor string, members []cg848MemberDesc, ok bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	g := m.groups[group]
 	if g == nil {
-		return "", 0, "", nil, false
+		return "", 0, 0, "", nil, false
 	}
 	ids := make([]string, 0, len(g.members))
 	for id := range g.members {
@@ -793,21 +848,25 @@ func (m *cg848Manager) describe(group string) (state string, epoch int32, assign
 	slices.Sort(ids)
 	for _, id := range ids {
 		mem := g.members[id]
+		// A member holds what it has been told to give up until it says it has: a
+		// classic member by its next JoinGroup (recorded: co-describe-after-1), a
+		// consumer-protocol one by a heartbeat that no longer lists them (recorded:
+		// consumer-assignment-interval, describe-after-a-heartbeat).
 		assigned := mem.assigned.clone()
-		if mem.classic != nil {
-			// A classic member holds what it has been told to give up until its next
-			// JoinGroup says it has (recorded: co-describe-after-1).
-			for p := range mem.revoking {
-				assigned[p] = struct{}{}
-			}
+		for p := range mem.revoking {
+			assigned[p] = struct{}{}
+		}
+		epoch := mem.epoch
+		if mem.left {
+			epoch = -2 // the epoch it left with, as Kafka shows it (claim: groups R24a).
 		}
 		members = append(members, cg848MemberDesc{
-			client: mem.client, id: mem.id, instanceID: mem.instanceID, rack: mem.rack, epoch: mem.epoch,
+			client: mem.client, id: mem.id, instanceID: mem.instanceID, rack: mem.rack, epoch: epoch,
 			subscribed: append([]string(nil), mem.subscribed...), regex: mem.regexText,
 			assigned: assigned, target: mem.target.clone(),
 		})
 	}
-	return g.stateName(), g.epoch, g.assignor, members, true
+	return g.stateName(), g.epoch, g.targetEpoch, g.assignor, members, true
 }
 
 // acquire takes the group id for the consumer protocol. A classic group holding it with

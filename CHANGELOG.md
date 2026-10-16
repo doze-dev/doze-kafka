@@ -23,6 +23,41 @@ here that contains "server API"; `task api` fails without it.
   are written in the specification's snake case. The keys strip is a region, and the
   phone's brand link keeps its name.
 
+- Groups: a classic JoinGroup into a consumer group whose subscription cannot be read is
+  answered UNKNOWN_SERVER_ERROR with no member id, as Kafka answers it (it fails to read
+  it with an exception it does not catch), where doze answered INCONSISTENT_GROUP_PROTOCOL;
+  a static join and a JoinGroup v3 too (recorded: unreadable-subscription).
+
+- Groups: DescribeGroups, ConsumerGroupDescribe and DeleteGroups that name several
+  groups answer them in Kafka's order, which is not the request's (it follows the
+  groups' __consumer_offsets partitions); doze answered in the request's order. A client
+  that pairs the answers with what it asked by position now pairs them as on Kafka
+  (recorded: describe-groups-order).
+
+- Groups: ConsumerGroupDescribe shows a static member that has left for a restart
+  (epoch -2) at epoch -2, and its group Reconciling, as Kafka does; it showed the epoch
+  it had left at and the group Stable (recorded: consumer-static-leave).
+
+- Groups: the first rebalance of an empty classic group waits as Kafka's does: a member
+  that joins during the delay starts another (cut to what the rebalance timeout
+  leaves), and the first member to join is the leader; it used to wait one delay from
+  the first join and pick a leader by member id. The delay is a setting,
+  `--group-initial-rebalance-delay` (TOML `group-initial-rebalance-delay`; Kafka's
+  `group.initial.rebalance.delay.ms`), 200 ms by default where Kafka's is 3 s. server API:
+  `Options.GroupInitialRebalanceDelay` (0 is the default, negative does not wait).
+  DescribeGroups shows a group's protocol and its members' metadata only once it is
+  Stable, as Kafka does (recorded: classic-initial-rebalance-delay).
+
+- Groups: a consumer group's new targets are computed at most once a second, by a
+  member's heartbeat (or a classic member's JoinGroup), as on Kafka
+  (`group.consumer.assignment.interval.ms`). A member that joins or leaves within a
+  second of the last targets leaves the group `Assigning`, the joiner at the targets'
+  epoch, until such a heartbeat; a leave or an expired session no longer moves anyone's
+  partitions by itself. Before, the targets were computed when the change was made, so
+  epochs and generations read one higher than Kafka's and the group was never
+  `Assigning`. A describe now shows a member's partitions with those it has been told to
+  give up and has not yet (recorded: consumer-assignment-interval, consumer-assignment-expiry).
+
 - Console: Traffic holds a client's long names (client id, software, group, transactional
   id, a 249-character topic) in its columns, cut with an ellipsis and whole in the title
   and the inspector. A client with 90-character names made the clients table 3,675 px

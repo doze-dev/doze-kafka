@@ -6,8 +6,7 @@ import (
 
 func init() {
 	Scenarios = append(Scenarios, Scenario{Name: "groups-listed-after-restart", Run: groupsListedAfterRestart,
-		Known: append(knownSteps(limHeartbeatInterval, "HeartbeatIntervalMillis", "c-join"),
-			knownSteps(limAssignAfter, pathGroups, "before-describe-consumer", "after-describe-consumer")...)})
+		Known: knownSteps(limHeartbeatInterval, "HeartbeatIntervalMillis", "c-join")})
 }
 
 // groupsListedAfterRestart is how empty groups with committed offsets are listed and

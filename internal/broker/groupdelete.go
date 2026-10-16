@@ -24,7 +24,7 @@ func (b *Broker) groupIsActive(id string) bool {
 // (NON_EMPTY_GROUP), an unknown one is GROUP_ID_NOT_FOUND, as on Kafka
 // (claim: groups-requests G1).
 func (b *Broker) handleDeleteGroups(ctx context.Context, req *protocol.Request, dr *kmsg.DeleteGroupsRequest, resp *kmsg.DeleteGroupsResponse) error {
-	for _, id := range dr.Groups {
+	for _, id := range inKafkaGroupOrder(dr.Groups) {
 		rg := kmsg.NewDeleteGroupsResponseGroup()
 		rg.Group = id
 		if !b.canGroup(req.Conn, id, opDelete) {
