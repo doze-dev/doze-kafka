@@ -42,6 +42,9 @@ run; any connector that needs only the Kafka protocol should work.
 
 ```properties
 bootstrap.servers=kafka.myproject.doze:9092
+group.id=connect-cluster
+key.converter=org.apache.kafka.connect.storage.StringConverter
+value.converter=org.apache.kafka.connect.storage.StringConverter
 offset.storage.topic=connect-offsets
 config.storage.topic=connect-configs
 status.storage.topic=connect-status
@@ -49,6 +52,9 @@ offset.storage.replication.factor=1
 config.storage.replication.factor=1
 status.storage.replication.factor=1
 ```
+
+These are the worker settings `compat/connect` runs with (it adds a per-run suffix to the
+group and topic names); `group.id` is required in distributed mode.
 
 ## Schema Registry
 

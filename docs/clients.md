@@ -69,14 +69,17 @@ kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -L                  # list metadata
 **franz-go** (Go):
 
 ```go
-cl, _ := kgo.NewClient(kgo.SeedBrokers("kafka.myproject.doze:9092"))
+cl, _ := kgo.NewClient(kgo.SeedBrokers("kafka.myproject.doze:9092"),
+	kgo.AllowAutoTopicCreation()) // franz-go does not ask for a new topic to be created otherwise
 cl.ProduceSync(ctx, &kgo.Record{Topic: "demo", Value: []byte("hi")})
 ```
 
 **Sarama** (Go):
 
 ```go
-p, _ := sarama.NewSyncProducer([]string{"kafka.myproject.doze:9092"}, sarama.NewConfig())
+cfg := sarama.NewConfig()
+cfg.Producer.Return.Successes = true // a SyncProducer refuses to start without it
+p, _ := sarama.NewSyncProducer([]string{"kafka.myproject.doze:9092"}, cfg)
 p.SendMessage(&sarama.ProducerMessage{Topic: "demo", Value: sarama.StringEncoder("hi")})
 ```
 

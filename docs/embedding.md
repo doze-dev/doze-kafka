@@ -41,7 +41,10 @@ is compiled and run by `TestEmbeddingDocCompiles`, so it cannot rot.
 - **Self-contained data.** The metadata database lives at `<DataDir>/meta.db`.
   `t.TempDir()` therefore leaves nothing behind.
 - **Topics appear on first use** (`AutoCreateTopics`, one partition), as with the
-  binary.
+  binary, for a client that asks for it in its Metadata request. The Java client,
+  Sarama and librdkafka do by default; franz-go does only with
+  `kgo.AllowAutoTopicCreation()`, and without it a produce to a new topic fails with
+  `UNKNOWN_TOPIC_OR_PARTITION`.
 
 ## Lifecycle
 
