@@ -628,10 +628,15 @@ func (p *Partition) swapSegment(old *Segment, logTmp, idxTmp string, remove bool
 		_ = fsRemove(logTmp)
 		_ = fsRemove(idxTmp)
 		if err := old.retire(); err != nil {
-			return false, err
+			return false, p.reinstate(i, old, "", err)
 		}
 		if err := removeSegmentFiles(p.dir, old.baseOffset); err != nil {
-			return false, err
+			if _, statErr := os.Lstat(filepath.Join(p.dir, segmentName(old.baseOffset)+".log")); statErr == nil {
+				return false, p.reinstate(i, old, "", err) // the log is still there: serve it.
+			}
+			// The log is gone and its index is not: what it held was all cleaned
+			// away, so the segment goes. The index left behind belongs to no log and
+			// the next open ignores it.
 		}
 		p.forgetUnsynced(old)
 		p.segments = slices.Delete(p.segments, i, i+1)
@@ -639,42 +644,81 @@ func (p *Partition) swapSegment(old *Segment, logTmp, idxTmp string, remove bool
 		return true, nil
 	}
 
+	// The old segment is closed before its names are replaced (Windows renames no
+	// file that is open). From here every failure puts a readable segment back in
+	// its place before it returns (reinstate): the old one while its log is still
+	// under its name, the cleaned one once it is. A closed segment left in the
+	// list failed every later read and every later pass until a restart.
 	base := filepath.Join(p.dir, segmentName(old.baseOffset))
 	mtime := old.lastModified
 	if err := old.retire(); err != nil {
-		return false, err
+		return false, p.reinstate(i, old, "", err)
 	}
 	mark := base + swapMarkExt
+	undo := func(err error) (bool, error) {
+		// Nothing has been renamed: the old files stand, and so does the cleaned
+		// one, which the next pass or the next open removes.
+		_ = fsRemove(mark)
+		return false, p.reinstate(i, old, "", err)
+	}
 	mf, _, err := fsOpenFile(mark, os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
-		return false, err
+		return undo(err)
 	}
 	mf.Close()
 	p.dirSeq++
 	if err := p.syncDirLocked(); err != nil {
-		return false, err
+		return undo(err)
 	}
 	if err := fsRename(logTmp, base+".log"); err != nil {
-		return false, err
+		return undo(err)
 	}
 	if err := fsRename(idxTmp, base+cleanerIndex); err != nil {
-		return false, err
+		// The cleaned log is in place and the old index under its name does not
+		// match it. The cleaned index is still beside it: serve the pair. The
+		// marker stays, so the next open rebuilds the index from the log.
+		return false, p.reinstate(i, old, idxTmp, err)
 	}
 	// The modification time is the segment's age for retention: rewriting it is not new
 	// data, and must not postpone the day it is deleted.
 	_ = os.Chtimes(base+".log", mtime, mtime)
 	p.dirSeq++
 	if err := p.syncDirLocked(); err != nil {
-		return false, err
+		// Both names are replaced but may not be on disk: the marker stays for
+		// the next open, and the cleaned segment is served meanwhile.
+		return false, p.reinstate(i, old, "", err)
 	}
 	_ = fsRemove(mark)
 	ns, _, err := openSegment(p.dir, old.baseOffset, p.indexInterval, p.beforeSync)
 	if err != nil {
-		return false, fmt.Errorf("log: reopening a cleaned segment: %w", err)
+		return false, p.reinstate(i, old, "", fmt.Errorf("log: reopening a cleaned segment: %w", err))
 	}
 	p.forgetUnsynced(old)
 	p.segments[i] = ns
 	return true, nil
+}
+
+// reinstate puts a readable segment back at p.segments[i] after a swap that
+// failed part-way: whatever log is under old's name (the old one or the cleaned
+// one; a rename replaces a name whole), with its own index, or with the index at
+// indexPath when that is the one that matches. It returns cause, or cause and
+// the reason the segment could not be reopened, in which case old, closed, stays
+// in the list and reads of it fail until a restart.
+func (p *Partition) reinstate(i int, old *Segment, indexPath string, cause error) error {
+	base := filepath.Join(p.dir, segmentName(old.baseOffset))
+	if indexPath == "" {
+		indexPath = base + cleanerIndex
+	}
+	ns, err := openSegmentAt(base+".log", indexPath, old.baseOffset, p.indexInterval, p.beforeSync)
+	if err != nil {
+		return fmt.Errorf("%w (and the segment could not be reopened: %v)", cause, err)
+	}
+	// One that still had to be flushed still has to be (it may be the old log).
+	if j := slices.Index(p.unsynced, old); j >= 0 {
+		p.unsynced[j] = ns
+	}
+	p.segments[i] = ns
+	return cause
 }
 
 // recoverSwaps finishes or undoes a cleaner swap a crash interrupted: a leftover
