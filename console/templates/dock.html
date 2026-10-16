@@ -21,7 +21,7 @@
   <div class="note dock-more">The registry's own requests are not recorded yet, so there is nothing to show for a subject here.</div>
   {{else if .DockRows}}
   <div id="wire-dock-rows">
-    {{range .DockRows}}<div class="r" {{if not $.DockFilter.ACL}}style="--c: 92px 120px 100px minmax(120px, 1fr) 60px 48px" {{end}}id="wd-{{.ID}}" {{if .Kind}}tabindex="0" role="button" data-inspector-open
+    {{range .DockRows}}<div class="r" id="wd-{{.ID}}" {{if .Kind}}tabindex="0" role="button" data-inspector-open
         hx-get="{{$.Prefix}}/inspect/{{.Kind}}?key={{.ID}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"{{end}}>
       <span class="m">{{when .Time "clockms"}}</span>
       <span class="m" title="{{.Client}}">{{.Client}}</span>
@@ -30,7 +30,7 @@
       {{else}}<span class="m b" title="{{.Request}}">{{.Name}}{{if gt .Count 1}} <span class="tag">×{{.Count}}</span>{{end}}</span>
       <span class="m mut el" title="{{.Detail}}">{{.Detail}}</span>
       {{if .Error}}<span class="m bad" title="The response carried this error: {{.Error}}">{{.Error}}</span>{{else}}<span class="m ok">ok</span>{{end}}
-      <span class="m ra">{{.Took}}</span>{{end}}
+      <span class="m ra took">{{.Took}}</span>{{end}}
     </div>{{end}}
   </div>
   {{if or .DockMore .DockPaged}}<div class="note dock-more">{{template "dock_pager" .}}{{if and .DockMore .DockTraffic}} <span>Older requests are on the <a href="{{.DockTraffic}}">Traffic page</a>.</span>{{end}}</div>{{end}}

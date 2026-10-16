@@ -48,6 +48,13 @@ export type Allowed = {
   reason: string;
   /** Where it holds: "1440-light", "1440-dark", "960-light"…; absent: everywhere it is measured. */
   at?: string[];
+  /**
+   * The boards disagree, and the console draws another board's value: that board's
+   * file (without .dc.html), and the selector there when it is not the probe's. The
+   * gate measures it and the entry fails unless that board gives the live value, so
+   * "as Tp-05 draws it" is checked, not taken on trust.
+   */
+  per?: { board: string; sel?: string; nth?: number };
 };
 
 export type Diff = { el: string; prop: Prop | 'presence'; board: string; live: string };

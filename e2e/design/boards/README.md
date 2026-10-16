@@ -9,10 +9,13 @@ here is byte-identical in both (the hashes are in `SHA256SUMS`).
 
 - `con.css`: the shared stylesheet every board links;
 - `canvas.json`: the artifact's index of boards (names, sizes, order);
-- `<Board>.dc.html`: one board each. Only the boards a committed spec compares are
-  here: Sy-01 to Sy-08, the section homes (Tp-Home, Gr-Home, Sc-Home, Tc-Home,
-  Ac-Home, Cl-Home), Tp-24, and the Access boards the Access home builds from
-  (Ac-03 Create, Ac-05 Check).
+- `<Board>.dc.html`: one board each. Only the boards a committed spec compares or an
+  allow-list entry cites are here: Sy-01 to Sy-08, the section homes (Tp-Home,
+  Gr-Home, Sc-Home, Tc-Home, Ac-Home, Cl-Home), Tp-24, the Access boards the Access
+  home builds from (Ac-03 Create, Ac-05 Check), and the topic page's own boards that
+  the Sy allow-list measures where the boards disagree (Tp-05 Messages, Tp-06
+  Message: an entry with `per` is checked against them) or names (Tp-14 Go to
+  offset). Tp-05, Tp-06 and Tp-14 were read at 1792149264-d921 only.
 
 A board is a static page: it links `./support.js` (the design runtime, which these
 boards do not need: they have no holes to fill; the gate serves an empty file in its

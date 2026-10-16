@@ -28,6 +28,7 @@ the console): the numbers a page shows are held to those.
 | `lib/compare.ts` | `Probe` (one element on each side), `measure`, `diffProbes`, `explain` (sorts differences against an allow-list), `stale`, `report`. |
 | `lib/gate.ts` | `runBoard(browser, run)`: one board in each of its places (default 1440 light and dark); returns what nothing explains and the stale entries. `truth()` is the seeded world. |
 | `lib/probes.ts` | Probes every page shares: the top bar, the rail, the keys strip; a section home's list, id band, summary, table and notes. |
+| `lib/topic.ts` | A topic page's probes (list, id band, facts, neighbours, tabs, records, composer, wire, inspector), the record Sy-02 opens, and `dropMarkers`. |
 | `shell/` | Sy-01 to Sy-08, and `common-allow.ts` (what every board's top bar may differ in). |
 | `homes/` | Tp-Home, Gr-Home, Sc-Home, Tc-Home, Ac-Home, Cl-Home, the homes at 960 and 390, and Tp-24. |
 | `truth/` | Prints what the broker and the registry hold, as JSON. |
@@ -45,6 +46,18 @@ width that is its text when the text is the seed's and not the board's sample, o
 position after such a text. Those reasons are printed with the allow-lists in
 plan/00-foundation.md. Everything else that differs is an allow-list entry: board,
 element, property, both values as measured, the places it holds, and the reason.
+
+The boards do not always agree with one another (Sy-01 draws a specimen topic page;
+Tp-05 and Tp-06, the topic page's own boards, draw it a little differently). Where
+the console draws another board's value, the entry says so with `per: { board, sel?,
+nth? }`, and the gate opens that board in the same theme, measures the element there
+and fails the entry unless it gives the live value: "as Tp-05 draws it" is measured,
+not taken on trust. A value that depends on the page's width (a `1fr` track) cannot
+be checked that way and is written out in the reason instead.
+
+A board drawn with numbered markers (Sy-01's "the numbers on the left mark each
+part") has them taken out before it is measured (`lib/topic.ts`, `dropMarkers`):
+they are annotations, and the console has none.
 
 ## Reading a failure
 

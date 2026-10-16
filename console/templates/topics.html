@@ -172,12 +172,23 @@
 
     <div class="tryit" id="compose-panel">
       <button type="button" class="dock-bar" id="compose-head" data-dock-toggle aria-expanded="false" aria-controls="compose-body">
-        {{icon "send"}}
         <span class="t">Try it: produce</span>
-        <span class="sub">the same fields the Produce API has · to {{.Topic.Name}} · P{{.Partition}}</span>
+        <span class="sub">the same fields the Produce API has</span>
         <span class="kbd">p</span>
         <span class="twist">{{icon "chevron"}}</span>
       </button>
+      {{/* Sy-01 part 7 (and Tp-05's Try it row): closed, the composer is still a key, a
+           value and Send. The partition is chosen by the key and acks is 1, as the open
+           form's defaults; p or the bar opens the whole form. */}}
+      <form class="quick" id="compose-quick" hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" {{if eq .Tab "messages"}}hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML"{{else}}hx-swap="none"{{end}} @htmx:after-request="if($event.detail.successful){$el.reset()}" x-data>
+        <input type="hidden" name="partition_ctx" value="{{.Partition}}">
+        <div class="row g8">
+          <input class="inp m quick-key" name="key" aria-label="Key (optional)" placeholder="key" autocomplete="off">
+          <input class="inp m grow" name="value" aria-label="Value" placeholder='{"orderId": "ord_8901"}' autocomplete="off">
+          <button class="btn pri" type="submit">Send</button>
+        </div>
+        <div class="err form-err" data-err-slot hidden role="alert"></div>
+      </form>
       <div class="dock-form" id="compose-body">
         <form hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" {{if eq .Tab "messages"}}hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML"{{else}}hx-swap="none"{{end}} x-data="{hdrs:[], acks:'1', keyB64:false, valB64:false, tomb:false}" x-effect="window.dozeEditor && dozeEditor.setValidate($refs.value, !(valB64 || tomb), tomb ? 'null value — nothing is sent' : (valB64 ? 'base64 — sent as raw bytes' : ''))" @htmx:after-request="if($event.detail.successful){window.dozeEditor?dozeEditor.set($refs.value,''):$refs.value.value='';$refs.key.value='';hdrs=[];keyB64=false;valB64=false;tomb=false}">
           <input type="hidden" name="partition_ctx" value="{{.Partition}}">
@@ -525,7 +536,7 @@
 
   <div x-data="{f: '{{if .Value.Binary}}hex{{else}}text{{end}}'}" class="col g8">
     <div class="row sb ce">
-      <span class="cap">Value{{if or .Value.Null .Value.Empty}} <span class="sz">{{if .Value.Null}}null — a tombstone{{else}}empty{{end}}</span>{{else}} <span class="sz">{{.Value.SizeText}}{{if .Value.Binary}} · binary{{else if .Value.Pretty}} · JSON{{end}}</span>{{end}}</span>
+      <span class="cap">Value · {{if or .Value.Null .Value.Empty}}<span class="sz">{{if .Value.Null}}null — a tombstone{{else}}empty{{end}}</span>{{else}}<span class="sz">{{.Value.SizeText}}{{if .Value.Binary}} · binary{{else if .Value.Pretty}} · JSON{{end}}</span>{{end}}</span>
       {{if not (or .Value.Null .Value.Empty)}}<span class="row ce g6">
       <span class="seg fmt" role="group" aria-label="Value format">
         {{if not .Value.Binary}}<button type="button" :class="f==='text'&&'on'" :aria-pressed="f==='text'" @click="f='text'">Text</button>{{end}}

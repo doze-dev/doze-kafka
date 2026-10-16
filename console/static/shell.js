@@ -395,7 +395,7 @@
     var panel = document.getElementById("compose-panel");
     if (!panel) return;
     setDock(true);
-    var form = panel.querySelector("form");
+    var form = panel.querySelector("#compose-body form");
     var st = window.Alpine ? Alpine.$data(form) : null;
     var key = form.querySelector('input[name="key"]');
     if (key) key.value = b.getAttribute("data-key") || "";

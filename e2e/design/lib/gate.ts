@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Browser, Page } from '@playwright/test';
-import { diffProbes, explain, report, stale, type Allowed, type Diff, type Probe } from './compare';
+import { diffProbes, explain, measure, report, stale, type Allowed, type Diff, type Probe } from './compare';
 import { openBoard, openLive, settle, type Size, type Theme } from './render';
 
 // One board against the live console, in every place it is compared. The spec names
@@ -34,6 +34,7 @@ export const BOTH_THEMES: Place[] = [{ size: 1440, theme: 'light' }, { size: 144
 export async function runBoard(browser: Browser, run: BoardRun): Promise<Outcome> {
   const used = new Set<Allowed>();
   const unexplained: Outcome['unexplained'] = [];
+  const falsePer: string[] = [];
   for (const place of run.places ?? BOTH_THEMES) {
     const at = placeName(place);
     const board = await openBoard(browser, run.file, run.boardSize ?? place.size, place.theme);
@@ -48,8 +49,11 @@ export async function runBoard(browser: Browser, run: BoardRun): Promise<Outcome
         await live.screenshot({ path: `${base}-live.png` });
       }
       const diffs = await diffProbes(board, live, run.probes);
-      const rest = explain(run.id, at, diffs, run.allow, used);
+      const hits = new Set<Allowed>();
+      const rest = explain(run.id, at, diffs, run.allow, hits);
+      hits.forEach((a) => used.add(a));
       if (rest.length) unexplained.push({ at, diffs: rest });
+      falsePer.push(...await checkPer(browser, run, place, [...hits]));
     } finally {
       await board.context().close();
       await live.context().close();
@@ -59,7 +63,36 @@ export async function runBoard(browser: Browser, run: BoardRun): Promise<Outcome
   let text = '';
   for (const u of unexplained) text += `\n${run.id} at ${u.at}: ${u.diffs.length} difference(s) nothing explains:\n${report(run.id, u.at, u.diffs)}\n`;
   for (const a of old) text += `\n${run.id}: allow-list entry explains nothing: ${a.el} ${a.prop} ${JSON.stringify(a.board_value)} -> ${JSON.stringify(a.live_value)}`;
+  for (const f of falsePer) text += `\n${run.id}: ${f}`;
   return { unexplained, stale: old, text };
+}
+
+/**
+ * The entries that say the console draws another board's value (`per`), checked: the
+ * other board is opened in the same place and the element measured there. Returns a
+ * line for each entry whose board does not give the live value.
+ */
+async function checkPer(browser: Browser, run: BoardRun, place: Place, hits: Allowed[]): Promise<string[]> {
+  const out: string[] = [];
+  const pages = new Map<string, Page>();
+  try {
+    for (const a of hits) {
+      if (!a.per) continue;
+      const probe = run.probes.find((p) => p.el === a.el);
+      if (!probe) { out.push(`allow-list entry for ${a.el} names no probe`); continue; }
+      let page = pages.get(a.per.board);
+      if (!page) {
+        page = await openBoard(browser, a.per.board, 1440, place.theme);
+        pages.set(a.per.board, page);
+      }
+      const m = await measure(page, a.per.sel ?? probe.board, a.per.nth ?? probe.nth ?? 0);
+      const got = a.prop === 'presence' ? (m ? 'present' : 'absent') : m?.[a.prop] ?? '(absent)';
+      if (got !== a.live_value) out.push(`allow-list entry says ${a.per.board} draws ${a.el} ${a.prop} ${JSON.stringify(a.live_value)}, and it draws ${JSON.stringify(got)} at ${placeName(place)}`);
+    }
+  } finally {
+    for (const p of pages.values()) await p.context().close();
+  }
+  return out;
 }
 
 /** The live page of a place: a URL of the console, in that size and theme. */

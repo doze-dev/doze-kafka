@@ -24,7 +24,7 @@ test('a success banner goes when the next action is refused', async ({ page, cre
   await page.getByRole('button', { name: 'Key is base64' }).click();
   await setEditor('{"a":1}');
   await page.locator('#compose-panel').getByRole('button', { name: 'Send message' }).click();
-  await expect(page.locator('#compose-panel [data-err-slot]')).toBeVisible();
+  await expect(page.locator('#compose-body [data-err-slot]')).toBeVisible();
   await expect(page.locator('#flashbar')).toHaveCount(0);
 });
 

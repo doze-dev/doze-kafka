@@ -1,5 +1,27 @@
 import { test, expect } from '../fixtures/console';
 
+// Sy-01 part 7 and Tp-05's Try it: closed, the composer is a key, a value and Send.
+// The record goes where the key puts it with acks 1, the open form's defaults, and the
+// fields clear once the broker has it.
+test('closed, the composer sends a key and a value from its one row', async ({ page, createTopic, uniqueName, waitForToast, waitForLive }) => {
+  await createTopic(uniqueName('quick'));
+  const quick = page.locator('#compose-quick');
+  await expect(quick).toBeVisible();
+  await expect(page.locator('#compose-body')).toBeHidden();
+  await quick.getByLabel('Key (optional)').fill('quick-1');
+  await quick.getByLabel('Value').fill('{"id": 7}');
+  await quick.getByRole('button', { name: 'Send' }).click();
+  expect(await waitForToast()).toContain('Sent to partition 0');
+  await waitForLive((t) => t.includes('quick-1'));
+  await expect(quick.getByLabel('Value')).toHaveValue('');
+  // Opening the whole form hides the row; closing it brings it back.
+  await page.locator('#compose-head').click();
+  await expect(quick).toBeHidden();
+  await expect(page.locator('#compose-body')).toBeVisible();
+  await page.locator('#compose-head').click();
+  await expect(quick).toBeVisible();
+});
+
 test('the composer sends text, JSON, a key and headers', async ({ page, createTopic, uniqueName, setEditor, waitForToast, waitForLive }) => {
   await createTopic(uniqueName('compose'));
   await page.locator('#compose-head').click();
@@ -37,7 +59,7 @@ test('a bad header is reported next to the composer and nothing is sent', async 
   await page.getByRole('button', { name: 'Header value is base64' }).click();
   await setEditor('x');
   await page.getByRole('button', { name: 'Send message' }).click();
-  await expect(page.locator('#compose-panel [data-err-slot]')).toBeVisible();
+  await expect(page.locator('#compose-body [data-err-slot]')).toBeVisible();
   await expect(page.locator('tr[id^="msg-"]')).toHaveCount(0);
 });
 

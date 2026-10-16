@@ -287,6 +287,8 @@ a.r:hover { background: var(--well); }
   margin-bottom: -1px; text-decoration: none; white-space: nowrap;
 }
 .tab:hover { color: var(--ink); }
+/* The boards' `.app a { color: inherit }` outranks `.tab`'s muted colour: a tab that is a link renders ink on every board (Sy-01, Tp-05, Tp-06). */
+a.tab { color: var(--ink); }
 .tab.on { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
 .tag { font-family: var(--mono); font-weight: 500; font-size: var(--fs-xs); line-height: 1; color: var(--mut); }
 .tag.new { color: var(--deny); border: 1px solid var(--deny); border-radius: var(--radius-sm); padding: 1px 5px; font-size: var(--fs-2xs); }
@@ -384,7 +386,8 @@ span.num {
 .insp-client > span { min-width: 0; overflow-wrap: anywhere; } /* a long group or transactional id breaks in the panel */
 .insp-default .callout { margin: 14px; }
 
-.dock { background: var(--card); border-top: 1px solid var(--line); display: flex; flex-direction: column; flex: none; max-height: 168px; overflow: auto; }
+/* Its head and three rows, as Sy-01 and Tp-05 draw it (Tp-05's 24 px rows: 1 + 30 + 3 x 24 = 103); the rest of the page of rows scrolls. */
+.dock { background: var(--card); border-top: 1px solid var(--line); display: flex; flex-direction: column; flex: none; max-height: 103px; overflow: auto; }
 .dock .dh { height: 30px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 14px; border-bottom: 1px solid var(--line2); }
 .dock .dh .livetoggle { margin-left: 0; }
 .dock .r { min-height: 24px; }
@@ -393,6 +396,15 @@ span.num {
 .dock .dock-more { padding: 6px 14px; }
 /* Ac-Home's wire: time, client, the request and what it was about, the result. */
 .dock-acl .r { --c: 92px 120px 1fr 190px; }
+/* Tp-05's six columns: time, client, request, detail, result, took. */
+.dock:not(.dock-acl) .r { --c: 92px 120px 100px minmax(120px, 1fr) 60px 48px; }
+/* With a selection open beside it (Tp-06), the page is 576 px and the six need 634:
+   Tp-06's five, time 92, client 110, request 80, detail, result 40; the time it took is
+   in the request's inspector. */
+@media (min-width: 1101px) {
+  body:has(#inspector:not([hidden])) .dock:not(.dock-acl) .r { --c: 92px 110px 80px minmax(0, 1fr) 40px; }
+  body:has(#inspector:not([hidden])) .dock:not(.dock-acl) .r > .took { display: none; }
+}
 
 .keys {
   flex: none; height: 28px; display: flex; align-items: center; gap: 18px; padding: 0 14px; background: var(--card); border-top: 1px solid var(--line);
@@ -409,7 +421,7 @@ span.num {
 @media (max-width: 1100px) { .wide-only { display: none; } .narrow-only { display: inline; } } /* the list is not beside the page */
 
 /* The ··· menu: what is not the page's one action (Delete, Purge) lives under it. */
-.more { position: relative; display: inline-block; }
+.more { position: relative; display: flex; } /* the boards put ··· in their flex row: the button is a flex item, as theirs */
 .more .menu {
   position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 190px; padding: 4px; display: flex; flex-direction: column; gap: 2px;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-modal);
@@ -685,9 +697,13 @@ p.note { margin: 0; }
    The bar is always there; the form opens in place (the Produce button and p open
    it). Whether it is open is on <html> (data-dock), set before paint and kept
    across navigation. */
-.tryit { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-md); flex: none; }
-.dock-bar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; cursor: pointer; user-select: none; width: 100%; background: none; border: 0; text-align: left; font: inherit; color: inherit; }
-.dock-bar:hover { background: var(--well); }
+/* Sy-01's card: .card.pad.col.g8, the title over a key, a value and Send. */
+.tryit { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-md); flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; }
+.dock-bar { display: flex; align-items: center; gap: 8px; padding: 0; cursor: pointer; user-select: none; width: 100%; background: none; border: 0; text-align: left; font: inherit; color: inherit; }
+.tryit .quick .quick-key { width: 150px; flex: none; }
+.tryit .quick .form-err { margin-top: 8px; }
+:root[data-dock="open"] .tryit .quick { display: none; }
+.dock-bar:hover .t { text-decoration: underline; text-underline-offset: 2px; }
 .dock-bar:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .dock-bar .ic { width: 15px; height: 15px; flex: none; }
 .dock-bar .t { font-weight: 600; white-space: nowrap; }
@@ -696,7 +712,7 @@ p.note { margin: 0; }
 .dock-bar .twist { display: inline-flex; }
 .dock-bar .twist .ic { color: var(--mut); transition: transform .15s ease; transform: rotate(-90deg); }
 :root[data-dock="open"] .dock-bar .twist .ic { transform: rotate(90deg); }
-.dock-form { display: none; padding: 2px 14px 14px; border-top: 1px solid var(--line2); }
+.dock-form { display: none; margin: 4px -14px -12px; padding: 2px 14px 14px; border-top: 1px solid var(--line2); }
 :root[data-dock="open"] .dock-form { display: block; }
 .dock-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 12px; }
 .crow { display: flex; gap: 12px; margin-top: 12px; }
@@ -804,6 +820,8 @@ table.msg-table td { overflow: hidden; text-overflow: ellipsis; }
 .inspector-acts .btn-name { max-width: 100%; min-width: 0; }
 .inspector-acts { margin-top: 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .inspector-b { padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+/* Sy-02, Tp-06: the body runs to the panel's foot (.bd is flex: 1); taller, it scrolls with the panel. */
+@media (min-width: 1101px) { .insp-sel .inspector-b { flex: 1 0 auto; } }
 .insp-sel.busy .inspector-b { opacity: .45; transition: opacity .15s ease .15s; }
 .inspector-dl { margin-top: 0; }
 .inspector-loading { padding: 28px 16px; color: var(--mut); font-size: var(--fs-md); }
@@ -817,6 +835,8 @@ table.msg-table td { overflow: hidden; text-overflow: ellipsis; }
 .kv-copy { display: inline-flex; align-items: flex-start; gap: 4px; max-width: 100%; min-width: 0; }
 .kv-copy .kv { min-width: 0; overflow-wrap: anywhere; display: inline; }
 .sz { font-family: var(--sans); font-size: var(--fs-xs); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted-foreground); }
+/* In a cap the size is part of it, as Tp-06 writes "VALUE · 69 B · JSON". */
+.cap .sz { font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; }
 .hdrlist { display: flex; flex-direction: column; gap: 4px; }
 .hdrpair { display: flex; gap: 8px; font-family: var(--mono); font-size: var(--fs-sm); padding: 2px 0; }
 .hdrpair .hk { color: var(--mut); flex: 0 1 auto; min-width: 0; max-width: 45%; overflow-wrap: anywhere; }
@@ -1321,9 +1341,10 @@ table.tbl.tf-table th:last-child, table.tbl.tf-table td:last-child { padding-rig
 .wiredock tr[data-inspector-open] td { white-space: nowrap; }
 
 /* The neighbours sentence under a page's title. */
-.neighbours { margin: 10px 0 0; font-size: var(--fs-md); color: var(--muted-foreground); line-height: 1.6; }
-.neighbours a { color: var(--foreground); border-bottom: 1px solid var(--border); }
-.neighbours a:hover { border-bottom-color: var(--foreground); }
+/* Sy-01, Sy-02 and Tp-05 draw the neighbours as wells in ink, on the page's 20 px line, with the page's gap above. */
+.neighbours { margin: 0; font-size: var(--fs-md); color: var(--ink); line-height: 20px; }
+.neighbours a { color: var(--ink); }
+.neighbours a.well:hover { border-color: var(--line); }
 
 /* High contrast also thickens the edges a control is found by. */
 :root[data-theme="contrast"] .btn, :root[data-theme="contrast"] .input, :root[data-theme="contrast"] .chip,
