@@ -87,7 +87,7 @@ type Config struct {
 	// Console: the web UI, served over HTTP beside the broker.
 	Console           bool     // serve the console.
 	ConsoleAddr       string   // host:port for the console's HTTP listener.
-	ConsolePrefix     string   // URL path the console is mounted under; "" is /_console.
+	ConsolePrefix     string   // URL path the console is mounted under; "" is DefaultConsolePrefix.
 	ConsoleAllowHosts []string // extra Host names the console answers to (DNS-rebinding guard).
 	// ConsoleUnprotected accepts serving the console beyond loopback while SASL or
 	// TLS is on. The console has no login and acts on the broker as a super user, so
@@ -251,6 +251,9 @@ func (c *Config) ResolveConsoleAddr() {
 		c.SchemaRegistryAddr = registry
 	}
 }
+
+// DefaultConsolePrefix is the URL path the console is served under by default.
+const DefaultConsolePrefix = "/_console"
 
 // DefaultDataDir is where a bare `doze-kafka` keeps its data.
 const DefaultDataDir = "./data"

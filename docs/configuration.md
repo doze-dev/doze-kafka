@@ -47,8 +47,9 @@ same broker.
 
 `doze-kafka config print` writes your *effective* configuration — defaults, then the
 file, then any flags — as TOML, so you can see exactly what the broker will run with,
-or generate a starter file. It validates first, so what it prints is something the
-broker would accept:
+or generate a starter file. Every setting is printed, defaults included; `meta-db`,
+unless you set it, is printed as a comment because it follows `data-dir`. It validates first, so what it prints is something the broker
+would accept, and starting from the printed file gives the same configuration:
 
 ```sh
 doze-kafka config print > doze-kafka.toml

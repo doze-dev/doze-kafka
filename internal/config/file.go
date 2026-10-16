@@ -275,12 +275,12 @@ func writeTOML(w io.Writer, cfg Config, secrets bool) error {
 	if len(cfg.ConsoleAllowHosts) > 0 {
 		fc.ConsoleAllowHost = cfg.ConsoleAllowHosts
 	}
-	if cfg.ConsolePrefix != "" {
-		fc.ConsolePrefix = &cfg.ConsolePrefix
+	prefix := cfg.ConsolePrefix
+	if prefix == "" {
+		prefix = DefaultConsolePrefix
 	}
-	if cfg.ACLDefault != ACLAllow {
-		fc.ACLDefault = &cfg.ACLDefault
-	}
+	fc.ConsolePrefix = &prefix
+	fc.ACLDefault = &cfg.ACLDefault
 	if len(cfg.ACLSuperUsers) > 0 {
 		fc.ACLSuperUsers = cfg.ACLSuperUsers
 	}
@@ -302,7 +302,17 @@ func writeTOML(w io.Writer, cfg Config, secrets bool) error {
 	if cfg.TLSCertFile != "" || cfg.TLSKeyFile != "" {
 		fc.TLS = &tlsFile{Cert: &cfg.TLSCertFile, Key: &cfg.TLSKeyFile}
 	}
-	return toml.NewEncoder(w).Encode(fc)
+	if err := toml.NewEncoder(w).Encode(fc); err != nil {
+		return err
+	}
+	if fc.MetaDB == nil {
+		// Said, as a comment: written as a key it would stay behind if data-dir were
+		// changed in the printed file, and the database would no longer be beside
+		// the data it describes.
+		_, err := fmt.Fprintf(w, "# meta-db = %q  (unset: <data-dir>/%s, following data-dir)\n", filepath.Join(cfg.DataDir, MetaDBFile), MetaDBFile)
+		return err
+	}
+	return nil
 }
 
 func strp(s string) *string { return &s }

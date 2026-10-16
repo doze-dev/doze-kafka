@@ -208,6 +208,14 @@ func loadConfigFor(args []string, forEnv bool) (startup, error) {
 	}
 	c.ResolveAdvertisedHost()
 	c.ResolveConsoleAddr()
+	if c.ConsolePrefix == "" {
+		// The console's own fallback, resolved here so that `config print` shows the
+		// path it is really served under and Validate checks it like a flag.
+		c.ConsolePrefix = os.Getenv("DOZE_KAFKA_CONSOLE_PREFIX")
+	}
+	if c.ConsolePrefix == "" {
+		c.ConsolePrefix = config.DefaultConsolePrefix
+	}
 	check := c
 	if forEnv && check.AuthEnabled() && len(check.Credentials) == 0 {
 		check.Credentials = map[string]string{"env": "not printed"}
