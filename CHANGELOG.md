@@ -6,6 +6,10 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Groups: ConsumerGroupDescribe shows a static member that has left for a restart
+  (epoch -2) at epoch -2, and its group Reconciling, as Kafka does; it showed the epoch
+  it had left at and the group Stable (recorded: consumer-static-leave).
+
 - Groups: the first rebalance of an empty classic group waits as Kafka's does: a member
   that joins during the delay starts another (cut to what the rebalance timeout
   leaves), and the first member to join is the leader; it used to wait one delay from

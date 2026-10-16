@@ -22,7 +22,9 @@ import (
 //   - A group with members expires nothing for the topics it is subscribed to. The
 //     offsets of a topic it is not subscribed to expire from their own commit, which
 //     is how an application that stopped reading one topic stops carrying it. A group
-//     in the middle of a rebalance is not looked at at all.
+//     in the middle of a rebalance is not looked at at all, nor is a classic group
+//     whose protocol type is not "consumer" (a Connect worker's), or whose members'
+//     subscriptions cannot be read (claim: groups R24d).
 //   - A group with no members and no offsets is gone at the next sweep: it is not
 //     listed, DescribeGroups says Dead, and its id, used again, is a new group. Until
 //     that sweep it is the group it was: a commit made into it in between is a commit
@@ -505,8 +507,8 @@ func decodeConsumerSubscription(b []byte) (topics []string, ok bool) {
 
 // subscription reports, for a classic group with members, whether a topic is one it
 // reads. It is nil when nothing may be expired from the group: it is in a rebalance, or
-// it is not a consumer group whose subscriptions are known. Caller holds the
-// coordinator's lock.
+// it is not a consumer group whose subscriptions are known (claim: groups R24d).
+// Caller holds the coordinator's lock.
 func (g *group) subscription() (live func(topic string) bool) {
 	if g.state != stateStable || g.protocolType != "consumer" {
 		return nil

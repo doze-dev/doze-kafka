@@ -322,7 +322,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 		if r.MemberEpoch == -2 && static {
 			// A static member going away for a restart: its place and its
 			// partitions are held until its session runs out, so coming back does
-			// not move anything.
+			// not move anything (claim: groups R24a, R24b).
 			mem.left = true
 			mem.revoke.stop()
 			m.resetSession(g, mem)
@@ -421,7 +421,8 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 					return cg848Error(kerr.UnreleasedInstanceID.Code, "Static member "+r.MemberID+" with instance id "+
 						*r.InstanceID+" cannot join the group because the instance id is owned by "+id+" member.")
 				}
-				// Its restarted self: take over the place it left, partitions and all.
+				// Its restarted self: take over the place it left, partitions and all
+				// (claim: groups R24b).
 				other.stopTimers()
 				delete(g.members, id)
 				mem = &cg848Member{id: r.MemberID, target: other.target, assigned: other.assigned,
@@ -810,7 +811,9 @@ func (g *cg848Group) stateName() string {
 		return "Assigning"
 	}
 	for _, mem := range g.members {
-		if mem.epoch != g.targetEpoch || len(mem.revoking) > 0 || !mem.assigned.equal(mem.target) {
+		// A static member away for a restart is not at the group's epoch (claim: groups
+		// R24a).
+		if mem.left || mem.epoch != g.targetEpoch || len(mem.revoking) > 0 || !mem.assigned.equal(mem.target) {
 			return "Reconciling"
 		}
 	}
@@ -853,8 +856,12 @@ func (m *cg848Manager) describe(group string) (state string, epoch, targetEpoch 
 		for p := range mem.revoking {
 			assigned[p] = struct{}{}
 		}
+		epoch := mem.epoch
+		if mem.left {
+			epoch = -2 // the epoch it left with, as Kafka shows it (claim: groups R24a).
+		}
 		members = append(members, cg848MemberDesc{
-			client: mem.client, id: mem.id, instanceID: mem.instanceID, rack: mem.rack, epoch: mem.epoch,
+			client: mem.client, id: mem.id, instanceID: mem.instanceID, rack: mem.rack, epoch: epoch,
 			subscribed: append([]string(nil), mem.subscribed...), regex: mem.regexText,
 			assigned: assigned, target: mem.target.clone(),
 		})

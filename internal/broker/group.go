@@ -258,7 +258,8 @@ type groupMember struct {
 
 	// rebalanceTimeout is how long this member says it may take to rejoin a
 	// rebalance (the client's max.poll.interval.ms). Zero means "not stated",
-	// which JoinGroup v0 cannot state: Kafka then uses the session timeout.
+	// which JoinGroup v0 cannot state: Kafka then uses the session timeout (claim:
+	// groups R24c).
 	rebalanceTimeout time.Duration
 }
 
@@ -840,9 +841,9 @@ func (m *groupMember) answerPendingJoin(code int16) {
 }
 
 // rebalanceTimeout is how long a rebalance may wait for members to rejoin: the
-// longest any member asked for (Kafka's rule), each falling back to its session
-// timeout. This is the client's max.poll.interval.ms, so a consumer busy in a
-// handler is waited for rather than evicted.
+// longest any member asked for, each falling back to its session timeout (JoinGroup
+// v0 states none) (claim: groups R24c). This is the client's max.poll.interval.ms,
+// so a consumer busy in a handler is waited for rather than evicted.
 func (g *group) rebalanceTimeout() time.Duration {
 	var longest time.Duration
 	for _, m := range g.members {
