@@ -37,4 +37,20 @@ deviation in `plan/00-foundation.md` and its entry in the allow-list.
 Change one padding of a Traffic rule in `console/static/app.css` by one pixel, or make
 a count of the summary line one too many in `console/traffic.go`, and run
 `go tool task design`: each must fail, naming the element, the property and both
-values. Revert afterwards.
+values. Revert afterwards. Both were tried:
+
+- `.tf-filter .inp { padding-left: 10px }` failed Main and Traf-02 in both themes:
+  `filter field[0].pad: board "0px 9px", live "0px 9px 0px 10px"`, and the
+  sub-pixel moves of the kinds control it pushed.
+- The clients count one too many failed Main in both themes: `summary: "10 clients
+  connected": the ledger has 9 clients with a connection open`.
+
+What it cannot catch: a requests-in-the-last-minute count off by a few. The ledger has
+only the client's times (when it began writing and read the answer), and the broker
+stamps a request when it begins handling it, somewhere in between, so a busy minute's
+count is a range (about 8 wide in the Traffic world: long-poll Fetches straddle the
+edges). One too many inside that range passes. Tightening the bound to when the client
+finished writing was tried, and failed real rows: the broker can begin a request a few
+milliseconds after that. Traf-02's "X of Y requests match" is checked only for X ≤ Y
+and for Y agreeing with the line under the table, so a Y one too many in both places
+passes too (it was tried alongside the padding change and was not caught).
