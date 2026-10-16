@@ -60,22 +60,92 @@
     });
   });
 
-  // ---------- the rail's numbers ----------
-  // The counts beside Traffic, Topics, Groups and Schemas, refreshed gently. The
-  // server draws them with the page; this keeps them current. An item that has no
-  // number (the broker did not answer) keeps whatever it was showing.
-  function refreshCounts() {
-    if (document.hidden) return;
-    fetch(PREFIX + "/api/counts").then(function (r) { return r.json(); }).then(function (counts) {
-      document.querySelectorAll(".rail [data-ct]").forEach(function (el) {
-        var n = counts[el.getAttribute("data-ct")];
-        if (n == null) return;
-        el.textContent = String(n) + (el.getAttribute("data-ct-unit") || "");
-      });
-    }).catch(function () {});
+  // ---------- the heartbeat, and the rail's numbers ----------
+  // Every page, whatever it shows, asks /api/counts every 5 s while it is in front.
+  // The answer is the counts beside Traffic, Topics, Groups and Schemas (an item with
+  // no number keeps what it showed), and whether the broker answered ("broker": 1).
+  // It is the shell's own word on the broker (A7): a page with nothing live of its
+  // own (the Topics list, Cluster, Connect, a form) shows "not reachable" on the pill
+  // from it, and comes back from it, as a page whose rows poll does. No answer at all
+  // (the console's process is gone) is the same state.
+  var brokerLost = false, beating = false;
+  function heartbeat() {
+    if (document.hidden || beating) return;
+    beating = true;
+    var ctl = window.AbortController ? new AbortController() : null;
+    var timer = ctl ? setTimeout(function () { ctl.abort(); }, 4500) : 0;
+    fetch(PREFIX + "/api/counts", { headers: { Accept: "application/json" }, cache: "no-store", signal: ctl ? ctl.signal : undefined })
+      .then(function (r) { if (!r.ok) throw new Error("status " + r.status); return r.json(); })
+      .then(function (counts) {
+        document.querySelectorAll(".rail [data-ct]").forEach(function (el) {
+          var n = counts[el.getAttribute("data-ct")];
+          if (n == null) return;
+          el.textContent = String(n) + (el.getAttribute("data-ct-unit") || "");
+        });
+        setBrokerLost(counts.broker === 0);
+      }, function () { setBrokerLost(true); })
+      .then(function () { clearTimeout(timer); beating = false; });
   }
-  refreshCounts();
-  setInterval(refreshCounts, 5000);
+  function setBrokerLost(lost) {
+    var was = brokerLost;
+    brokerLost = lost;
+    if (!lost) lastGood = Date.now();
+    // Back: every region that froze asks again now rather than at its next tick.
+    if (was && !lost) retryFrozen();
+    if (was !== lost) renderPill();
+  }
+  heartbeat();
+  setInterval(heartbeat, 5000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) heartbeat(); });
+
+  // ---------- the list pane's numbers ----------
+  // A list of topics or groups (data-list) keeps its numbers current: every 5 s, while
+  // the page is in front and the broker answers, the list's numbers are asked for and
+  // redrawn in place (the filter, the scroll and the selection stay). A list whose
+  // names changed (a topic made or deleted elsewhere) is fetched again with the page
+  // and replaced, keeping what was typed into its filter.
+  var listBusy = false;
+  function refreshList() {
+    var list = document.querySelector(".list[data-list]");
+    if (!list || document.hidden || listBusy || brokerLost) return;
+    listBusy = true;
+    fetch(PREFIX + "/api/list/" + list.getAttribute("data-list"), { headers: { Accept: "application/json" }, cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error("status " + r.status); return r.json(); })
+      .then(function (rows) {
+        rows = rows || [];
+        var items = list.querySelectorAll(".li[data-name]");
+        var same = items.length === rows.length;
+        for (var i = 0; same && i < rows.length; i++) same = items[i].getAttribute("data-name") === rows[i].name;
+        if (!same) return replaceList(list);
+        rows.forEach(function (row, i) {
+          var n = items[i].querySelector("[data-n]"), dot = items[i].querySelector(".dot");
+          if (n && n.textContent !== row.n) n.textContent = row.n;
+          if (n) { n.classList.toggle("warn", row.tone === "warn"); n.classList.toggle("mut", row.tone !== "warn"); }
+          if (dot) dot.className = "dot" + (row.dot ? " " + row.dot : "");
+        });
+      })
+      .catch(function () {})
+      .then(function () { listBusy = false; });
+  }
+  function replaceList(list) {
+    return fetch(location.href, { headers: { Accept: "text/html" }, cache: "no-store" })
+      .then(function (r) { return r.ok ? r.text() : null; })
+      .then(function (html) {
+        if (!html) return;
+        var fresh = new DOMParser().parseFromString(html, "text/html").querySelector(".list[data-list]");
+        var cur = document.querySelector(".list[data-list]");
+        if (!fresh || !cur) return;
+        var q = cur.querySelector("input[data-filter-target]"), sc = cur.querySelector(".list-scroll");
+        var typed = q ? q.value : "", top = sc ? sc.scrollTop : 0;
+        cur.replaceWith(fresh);
+        var q2 = fresh.querySelector("input[data-filter-target]"), sc2 = fresh.querySelector(".list-scroll");
+        if (q2 && typed) q2.value = typed;
+        if (sc2) sc2.scrollTop = top;
+        if (window.htmx) htmx.process(fresh);
+        applyFilters();
+      });
+  }
+  setInterval(refreshList, 5000);
 
   // ---------- the traces you opened ----------
   // Kept in this tab only (sessionStorage): the ids of the traces followed, newest
@@ -170,7 +240,7 @@
   }
   function renderPill() {
     var pill = document.getElementById("live-pill");
-    var down = document.querySelectorAll("[data-live].disconnected").length > 0;
+    var down = brokerLost || document.querySelectorAll("[data-live].disconnected").length > 0;
     document.documentElement.toggleAttribute("data-connection-lost", down);
     if (!pill) return;
     pill.classList.toggle("disconnected", down);
@@ -210,13 +280,19 @@
     if (!on && regions.length) lastGood = Date.now();
     renderPill();
   }
-  document.addEventListener("click", function (e) {
-    if (!e.target.closest("#pill-retry, [data-retry]") || !window.htmx) return;
-    // One retry: every frozen region asks now rather than at its next tick.
+  // One retry: the heartbeat asks now, and every frozen region asks now rather than
+  // at its next tick.
+  function retryFrozen() {
+    if (!window.htmx) return;
     document.querySelectorAll("[data-live].disconnected").forEach(function (el) {
       var url = el.getAttribute("data-live");
       if (url && el.id) htmx.ajax("GET", url + (url.indexOf("?") >= 0 ? "&" : "?") + "h=", { target: "#" + el.id, swap: "outerHTML" }).catch(function () {});
     });
+  }
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest("#pill-retry, [data-retry]")) return;
+    heartbeat();
+    retryFrozen();
   });
   // An error response is shown where the person is looking: in the failed form's
   // error slot if it has one, else a toast. (The inspector reports its own; see below.)
@@ -1530,8 +1606,13 @@
       // among the region's focusable elements, which a refresh rarely changes.
       focus = active.id ? { id: active.id } : { at: Array.prototype.indexOf.call(t.querySelectorAll(FOCUSABLE), active), tag: active.tagName };
     }
+    // Which kind a segmented filter in the region shows ("with members"), by what it filters.
+    var segs = {};
+    t.querySelectorAll(".seg[data-seg-for] .on[data-seg-value]").forEach(function (b) {
+      segs[b.closest(".seg").getAttribute("data-seg-for")] = b.getAttribute("data-seg-value");
+    });
     liveState = {
-      id: t.id, focus: focus, typed: typed, poll: isLivePoll(e),
+      id: t.id, focus: focus, typed: typed, poll: isLivePoll(e), segs: segs,
       selStart: jump ? jump.selectionStart : null, selEnd: jump ? jump.selectionEnd : null,
       scrollTop: wrap ? wrap.scrollTop : 0, scrollLeft: wrap ? wrap.scrollLeft : 0,
       atTop: !wrap || wrap.scrollTop < 4,
@@ -1551,6 +1632,14 @@
       if (!i || !region.contains(i)) return;
       if (i.type === "checkbox") i.checked = st.typed[id]; else if (st.typed[id]) i.value = st.typed[id];
     });
+    Object.keys(st.segs || {}).forEach(function (sel) {
+      region.querySelectorAll('.seg[data-seg-for="' + sel + '"] [data-seg-value]').forEach(function (b) {
+        var on = b.getAttribute("data-seg-value") === st.segs[sel];
+        b.classList.toggle("on", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+    });
+    applyFilters();
     // A record that arrived while you were watching lands with a small motion.
     if (st.poll) region.classList.add("landed");
     var wrap = region.querySelector(".tbl-wrap");
@@ -1571,7 +1660,10 @@
   document.addEventListener("htmx:afterRequest", function (e) {
     var xhr = e.detail.xhr;
     if (!xhr) return;
-    if (e.detail.successful && isLivePoll(e)) setDisconnected(false, "", pollPath(e));
+    if (e.detail.successful && isLivePoll(e)) {
+      setDisconnected(false, "", pollPath(e));
+      if (brokerLost) setBrokerLost(false); // the region's answer came from the broker.
+    }
     var h = xhr.getResponseHeader("HX-Live-Hash");
     if (!h || xhr.dozeHeld) return;
     var path = (e.detail.requestConfig && e.detail.requestConfig.path) || "";

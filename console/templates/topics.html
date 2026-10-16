@@ -1,14 +1,14 @@
 {{/* Topics. The list on the left (Sy-01 part 2), the page in the middle, the wire
      dock under it and the inspector on the right (in flow). */}}
 {{define "topic_lp"}}
-<aside class="list" aria-label="Topics">
+<aside class="list" aria-label="Topics" data-list="topics">
   <div class="row sb ce list-h"><span class="cap">Topics · {{len .List}} · messages</span><a class="btn sm" href="{{newTopicURL}}" data-create aria-label="New topic">+ New</a></div>
   <div class="list-filter"><input class="inp m" type="search" placeholder="Filter topics" aria-label="Filter Topics" data-filter-target=".list .li" data-filter-none="#list-none" spellcheck="false" autocomplete="off"></div>
   <div class="list-scroll">
     {{if not .List}}<div class="note list-note"><b>{{t "topics.none.title"}}</b><br>{{t "topics.none.hint"}}</div>{{end}}
     {{range .List}}
     <a class="li {{if eq .Name $.Sel}}on{{end}}" href="{{topicURL .Name}}" data-name="{{.Name}}"{{if eq .Name $.Sel}} aria-current="page"{{end}}>
-      <span class="grow el m">{{.Name}}</span><span class="m {{if needsLook .Name .Msgs}}warn{{else}}mut{{end}}">{{num .Msgs}}</span>
+      <span class="grow el m">{{.Name}}</span><span class="m {{if needsLook .Name .Msgs}}warn{{else}}mut{{end}}" data-n>{{num .Msgs}}</span>
     </a>
     {{end}}
     <div class="note list-note" id="list-none" hidden>No topic matches the filter.</div>
@@ -26,23 +26,37 @@
       <div class="row g8 ce"><a class="btn pri" href="{{newTopicURL}}">Create topic</a></div>
     </div>
 
+    {{template "topics_live" .}}
+    {{if .Rows}}<div class="grow"></div>
+    <div class="note footnote">{{if .HasSize}}Size is what is on disk under {{.Facts.DataDir}}. {{end}}Retention shows the topic's own setting, or the broker default.</div>{{end}}
+  </main>
+{{template "shell_bottom" .}}{{end}}
+
+
+{{/* Tp-Home's summary, table and callouts: polled (live/topics), so the table moves
+     with the rail's count beside it. */}}
+{{define "topics_live"}}<div class="col g12" id="topics-live" data-live="{{.Prefix}}/live/topics" data-hash="{{.LiveHash}}" data-live-ms="5000">{{template "topics_live_in" .}}</div>{{end}}
+{{define "topics_live_in"}}
     {{if .Rows}}
     <div class="row ce g8 wrap" id="topics-summary">
       <span class="m">{{len .Rows}} topic{{if ne (len .Rows) 1}}s{{end}}</span><span class="mut">·</span>
       <span class="m">{{num .Partitions}} partition{{if ne .Partitions 1}}s{{end}}</span><span class="mut">·</span>
-      <span class="m">{{num .Messages}} message{{if ne .Messages 1}}s{{end}}</span>
+      <span class="m">{{num .Messages}} message{{if ne .Messages 1}}s{{end}}{{if .HasSize}}, {{.Size}}{{end}}</span>
       {{if .HasWriters}}<span class="mut">·</span><span class="m">written by {{.Writers}} client{{if ne .Writers 1}}s{{end}}</span><span class="note" title="{{.WrittenFrom}}">{{.RingText}}</span>{{end}}
       <span class="mut">·</span><span class="m">read by {{.ReaderCount}} group{{if ne .ReaderCount 1}}s{{end}}</span>
       {{if .DeadLetters}}<span class="mut">·</span><span class="m warn">{{.DeadLetters}} topic{{if ne .DeadLetters 1}}s{{end}} with dead letters</span>{{end}}
     </div>
 
-    <div class="card" id="topics-table" style="--c: minmax(0, 1.6fr) 74px 84px 96px minmax(0, 1.3fr) 76px minmax(0, 1.4fr)">
-      <div class="r h"><span>Topic</span><span class="ra">Partitions</span><span class="ra">Messages</span><span>Retention</span><span>Read by</span><span>Compact</span><span>Schema subject</span></div>
+    {{/* Tp-Home's tracks. Size is the topic's files under the data directory, when the
+         console is told where that is (it runs in the broker's process). */}}
+    <div class="card" id="topics-table" style="--c: {{if .HasSize}}1fr 70px 80px 78px 76px 150px 72px 230px{{else}}1fr 70px 80px 76px 150px 72px 230px{{end}}">
+      <div class="r h"><span>Topic</span><span class="ra">Partitions</span><span class="ra">Messages</span>{{if .HasSize}}<span class="ra">Size</span>{{end}}<span>Retention</span><span>Read by</span><span>Compact</span><span>Schema subject</span></div>
       {{range .Rows}}
       <a class="r" href="{{.URL}}" data-row>
-        <span class="m b">{{.Name}}</span>
+        <span class="m b" title="{{.Name}}">{{.Name}}</span>
         <span class="m ra">{{.Partitions}}</span>
         <span class="m ra {{if .DeadLetter}}warn{{end}}">{{num .Msgs}}</span>
+        {{if $.HasSize}}<span class="m ra">{{diskSize .Size}}</span>{{end}}
         <span class="m {{if eq .Retention "kept per key"}}mut{{end}}">{{if .Retention}}{{.Retention}}{{else}}<span class="mut">—</span>{{end}}</span>
         <span class="m">{{if .ReadBy}}{{range $i, $g := .ReadBy}}{{if $i}}, {{end}}{{$g}}{{end}}{{else}}<span class="mut" title="Read by is the groups that have committed offsets on this topic. A consumer that assigns partitions itself has no group, so it is not counted.">no group has committed</span>{{end}}</span>
         <span>{{if .Compact}}<span class="pill">compact</span>{{else}}<span class="mut">—</span>{{end}}</span>
@@ -54,10 +68,9 @@
     <div class="row g12 wrap callouts">
       {{if .DeadUnread}}<div class="callout grow"><span class="b">Dead letters</span><span class="note">{{range $i, $n := .DeadUnread}}{{if $i}}, {{end}}<span class="m">{{$n}}</span>{{end}} {{if gt (len .DeadUnread) 1}}hold records and no group reads them{{else}}holds records and no group reads it{{end}}. Open {{if gt (len .DeadUnread) 1}}one{{else}}it{{end}} to see what is in it.</span></div>
       {{else if .DeadNames}}<div class="callout grow"><span class="b">Dead letters</span><span class="note">{{range $i, $n := .DeadNames}}{{if $i}}, {{end}}<span class="m">{{$n}}</span>{{end}} {{if gt (len .DeadNames) 1}}are named like dead-letter topics and hold records{{else}}is named like a dead-letter topic and holds records{{end}}. Open {{if gt (len .DeadNames) 1}}one{{else}}it{{end}} to see what failed.</span></div>{{end}}
-      {{if .Compacted}}<div class="callout grow"><span class="b">{{if eq .Compacted 1}}One topic is compacted{{else}}{{.Compacted}} topics are compacted{{end}}</span><span class="note">The broker keeps the latest record of each key. A record with no key is refused there.</span></div>{{end}}
+      {{if .Compacted}}<div class="callout grow"><span class="b">{{if eq .Compacted 1}}One topic is compacted{{else}}{{.CompactedWord}} topics are compacted{{end}}</span><span class="note">The broker keeps the latest record of each key. A record with no key is refused there.</span></div>{{end}}
       {{if .KnowsAuto}}<div class="callout grow"><span class="b">Auto-create is {{if .AutoCreate}}on{{else}}off{{end}}</span><span class="note">{{if .AutoCreate}}A producer that names a new topic makes it, with {{.AutoParts}} partition{{if ne .AutoParts 1}}s{{end}}. Create one here to choose partitions and settings.{{else}}A producer that names a topic that does not exist is refused. Create it here first.{{end}}</span></div>{{end}}
     </div>
-    <div class="tablenote">Retention shows the topic's own setting, or the broker default. Select a topic to open it.</div>
     {{else}}
     {{/* Tp-01: the broker is up and nothing is on it. It says so, says what it is not
          (a filter, a permission), and gives the same creation as a shell command. */}}
@@ -69,8 +82,7 @@
       <p class="note">{{if .Facts.SASL}}<span class="m">client.properties</span> carries the {{index .Facts.Mechanisms 0}} login. {{end}}The console makes exactly the same CreateTopics request.</p>
     </div>
     {{end}}
-  </main>
-{{template "shell_bottom" .}}{{end}}
+{{end}}
 
 {{/* Tp-02: create a topic. The page says what it sends (the same CreateTopics
      kafka-topics.sh sends), shows that call as a shell command that follows the form,
@@ -140,7 +152,7 @@
     </div>
 
     {{with .Facts}}
-    <p class="facts-line" id="topic-facts">{{.Partitions}} partition{{if ne .Partitions 1}}s{{end}}, <span class="m">{{num .Messages}}</span> message{{if ne .Messages 1}}s{{end}}{{if eq .Retention "no time limit"}}, kept with no time limit{{else if .Retention}}, kept <span class="m">{{.Retention}}</span>{{end}}{{if .Compact}}, compacted{{end}}{{if .HasNewest}}, newest <span class="m">{{when .Newest "clock"}}</span>{{if .SchemaType}}, {{if eq .SchemaType "Avro"}}an{{else}}a{{end}} {{.SchemaType}} value with schema <a class="m" href="{{.SubjectURL}}">{{.Subject}}</a> <span class="m">v{{.SchemaVer}}</span>{{end}}{{end}}.</p>
+    <p class="facts-line" id="topic-facts">{{.Partitions}} partition{{if ne .Partitions 1}}s{{end}}, {{template "facts_messages" .}}{{if eq .Retention "no time limit"}}, kept with no time limit{{else if .Retention}}, kept <span class="m">{{.Retention}}</span>{{end}}{{if .Compact}}, compacted{{end}}{{template "facts_newest" .}}.</p>
     {{end}}
 
     {{template "neighbours" .}}
@@ -230,6 +242,14 @@
   </main>
   {{template "wire_dock" .}}
 {{template "shell_bottom" .}}{{end}}
+
+{{/* The parts of the facts sentence that move as records arrive. The tape's answer
+     carries them out of band (FactsLive), so the sentence moves with the tape. */}}
+{{define "facts_messages"}}<span id="facts-messages"><span class="m">{{num .Messages}}</span> message{{if ne .Messages 1}}s{{end}}</span>{{end}}
+{{define "facts_messages_oob"}}<span id="facts-messages" hx-swap-oob="true"><span class="m">{{num .Messages}}</span> message{{if ne .Messages 1}}s{{end}}</span>{{end}}
+{{define "facts_newest"}}<span id="facts-newest">{{template "facts_newest_in" .}}</span>{{end}}
+{{define "facts_newest_oob"}}<span id="facts-newest" hx-swap-oob="true">{{template "facts_newest_in" .}}</span>{{end}}
+{{define "facts_newest_in"}}{{if .HasNewest}}, newest <span class="m">{{when .Newest "clock"}}</span>{{if .SchemaType}}, {{if eq .SchemaType "Avro"}}an{{else}}a{{end}} {{.SchemaType}} value with schema <a class="m" href="{{.SubjectURL}}">{{.Subject}}</a> <span class="m">v{{.SchemaVer}}</span>{{end}}{{end}}{{end}}
 
 {{/* tape_and_table is the live-polled unit: the tick strip + message table
      together, so a new message appearing updates both from one partial. With
@@ -331,6 +351,7 @@
     </div>
   </div>
 </div>
+{{with .FactsLive}}{{template "facts_messages_oob" .}}{{template "facts_newest_oob" .}}{{end}}
 {{end}}
 
 {{/* Partitions (Tp-16): where each partition's log starts and ends, and how far a

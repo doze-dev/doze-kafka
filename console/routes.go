@@ -103,6 +103,7 @@ func (c *Console) routeTable() []routeRow {
 
 		// Topics.
 		get("/topics", specTopics, "the list", c.topics),
+		get("/live/topics", specTopics, "Tp-Home's table, polled", c.topicsLive),
 		get("/new/topic", specTopics, "the create form", c.topicCreatePage),
 		get("/new/topic/shell", specDesign, "the create form's shell command, as typed", c.topicShell),
 		post("/new/topic", specTopics, "create a topic", c.topicCreate),
@@ -139,6 +140,7 @@ func (c *Console) routeTable() []routeRow {
 
 		// Consumer groups.
 		get("/groups", specGroups, "the list", c.groups),
+		get("/live/groups", specGroups, "Gr-Home's table, polled", c.groupsLive),
 		get("/groups/{id}", specGroups, "one group", c.groupDetail),
 		get("/groups/{id}/live", specGroups, "HTMX partial, polled", c.groupLive),
 		post("/groups/{id}/reset", specGroups, "move the group's offsets", c.groupReset),
@@ -160,7 +162,8 @@ func (c *Console) routeTable() []routeRow {
 
 		// The resource index for the command palette, and the rail's counts.
 		get("/api/palette", specShell, "the palette's catalogue", c.apiPalette),
-		get("/api/counts", specShell, "the rail's counts", c.apiCounts),
+		get("/api/counts", specShell, "the rail's counts, and the heartbeat: whether the broker answers", c.apiCounts),
+		get("/api/list/{section}", specShell, "the list pane's numbers, polled", c.apiList),
 	}
 }
 

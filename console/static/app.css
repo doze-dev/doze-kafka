@@ -445,6 +445,8 @@ span.num {
 
 /* Note under a table, as on the boards. */
 .tablenote { color: var(--mut); font-size: var(--fs-sm); }
+/* A home's note at the foot of the page (Tp-Home, Gr-Home): the board's 8 px under it. */
+.main > .footnote { padding-bottom: 8px; }
 
 /* A row that is an address or a selection. */
 .r[data-inspector-open], .r.is-link { cursor: pointer; }

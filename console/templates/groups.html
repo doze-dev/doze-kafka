@@ -1,16 +1,16 @@
 {{/* Groups. The list is the groups with the one number that matters (lag); the page
      is Gr-Home, or one group (Gr-02: Lag, Members, Timeline, Offsets). */}}
 {{define "group_lp"}}
-<aside class="list wide" aria-label="Consumer groups">
+<aside class="list wide" aria-label="Consumer groups" data-list="groups">
   <div class="row sb ce list-h"><span class="cap">Consumer groups</span><span class="cap">Lag</span></div>
   <div class="list-filter"><input class="inp m" type="search" placeholder="Filter groups" aria-label="Filter Groups" data-filter-target=".list .li" data-filter-none="#list-none" spellcheck="false" autocomplete="off"></div>
   <div class="list-scroll">
     {{if not .Groups}}<div class="note list-note"><b>{{t "groups.none.title"}}</b><br>{{t "groups.none.hint"}}</div>{{end}}
     {{range .Groups}}
     <a class="li {{if eq .ID $.Sel}}on{{end}}" href="{{.URL}}" data-name="{{.ID}}"{{if eq .ID $.Sel}} aria-current="page"{{end}}>
-      <span class="dot {{if eq .State "Stable"}}{{else if eq .State "Empty"}}off{{else if eq .State "Dead"}}bad{{else}}warn{{end}}" title="{{.State}}"></span>
+      <span class="dot {{groupDot .State}}" title="{{.State}}"></span>
       <span class="grow el m">{{.ID}}</span>
-      <span class="m {{if .Behind}}warn{{else}}mut{{end}}">{{num .Lag}}</span>
+      <span class="m {{if .Behind}}warn{{else}}mut{{end}}" data-n>{{num .Lag}}</span>
     </a>
     {{end}}
     <div class="note list-note" id="list-none" hidden>No group matches the filter.</div>
@@ -25,9 +25,19 @@
   <main class="main" id="detail">
     <div class="row sb ce idband">
       <div class="col"><h1 class="h1">Groups</h1><span class="note">Everything that has joined or committed to this broker. Committed offsets survive a restart; members do not.</span></div>
-      <div class="row ce g8"><span class="pill ok"><span class="dot" aria-hidden="true"></span>live</span></div>
+      <div class="row ce g8"><span class="pill ok" data-live-state><span class="dot" aria-hidden="true"></span><span data-live-state-l>live</span></span></div>
     </div>
 
+    {{template "groups_live" .}}
+    <div class="grow"></div>
+    <div class="note footnote">Select a group to open it. Press <span class="kbd">⌘K</span> to jump to one by name.</div>
+  </main>
+{{template "shell_bottom" .}}{{end}}
+
+{{/* Gr-Home's summary, filters, table and callouts: polled every 3 s (live/groups), as
+     the board says. What is typed in the filter and the kind chosen stay through a poll. */}}
+{{define "groups_live"}}<div class="col g12" id="groups-live" data-live="{{.Prefix}}/live/groups" data-hash="{{.LiveHash}}" data-live-ms="3000">{{template "groups_live_in" .}}</div>{{end}}
+{{define "groups_live_in"}}
     {{if .Groups}}
     <div class="row ce g8 wrap" id="groups-summary">
       <span class="m">{{len .Groups}} group{{if ne (len .Groups) 1}}s{{end}}</span><span class="mut">·</span>
@@ -37,7 +47,7 @@
     </div>
 
     <div class="filterrow">
-      <input class="inp m" type="search" placeholder="Group, topic or client" aria-label="Filter groups" data-filter-target="#groups-table > a.r" data-filter-none="#groups-none" spellcheck="false" autocomplete="off">
+      <input class="inp m" id="groups-filter" type="search" placeholder="Group, topic or client" aria-label="Filter groups" data-filter-target="#groups-table > a.r" data-filter-none="#groups-none" spellcheck="false" autocomplete="off">
       <div class="seg" role="group" aria-label="Which groups" data-seg-for="#groups-table > a.r">
         <button type="button" class="on" data-seg-value="" aria-pressed="true">all</button>
         <button type="button" data-seg-value="with-members" aria-pressed="false">with members</button>
@@ -45,7 +55,7 @@
         <button type="button" data-seg-value="behind" aria-pressed="false">behind</button>
       </div>
       <div class="grow"></div>
-      <span class="note">filters this list; the broker is asked afresh on each load</span>
+      <span class="note">refreshes every 3 s</span>
     </div>
 
     <div class="card" id="groups-table" style="--c: minmax(0, 1.3fr) 110px 110px 70px minmax(0, 1.4fr) 86px 110px">
@@ -71,10 +81,7 @@
     {{else}}
     <div class="callout"><span class="b">{{t "groups.none.title"}}</span><span class="note">{{t "groups.none.hint"}}</span></div>
     {{end}}
-    <div class="grow"></div>
-    <div class="tablenote">Select a group to open it. Press <span class="kbd">⌘K</span> to jump to one by name.</div>
-  </main>
-{{template "shell_bottom" .}}{{end}}
+{{end}}
 
 {{define "group_detail"}}{{template "shell_top" .}}
   {{template "group_lp" (dict "Groups" .Groups "Sel" .Group.ID)}}

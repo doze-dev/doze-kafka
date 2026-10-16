@@ -433,6 +433,8 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 		"keyGroups":   keyGroups,
 		"dialogHints": dialogHints,
 		"pluralWord":  pluralWord,
+		"diskSize":    diskSize,
+		"groupDot":    groupDot,
 		"keymapJSON":  keymapJSON,
 		"whenText":    whenText,
 		"hasPrefix":   strings.HasPrefix,

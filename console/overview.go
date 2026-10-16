@@ -63,6 +63,10 @@ type topicRow struct {
 	DeadLetter  bool // a dead-letter topic that has records in it.
 	NeedsALook  bool
 	ReadByCount int
+	// Size is what the topic takes on disk, when the console knows the data directory
+	// (HasSize).
+	Size    int64
+	HasSize bool
 }
 
 // isDeadLetterName says whether a topic is named like a dead-letter queue. It is a
@@ -146,6 +150,9 @@ func (c *Console) topicRows(ctx context.Context, topics []TopicSummary, groups [
 				r.SubjectURL = c.schemaURL(r.Subject)
 				break
 			}
+		}
+		if d, ok := c.topicDisk(t.Name, int(t.Partitions)); ok {
+			r.Size, r.HasSize = d.Bytes, true
 		}
 		r.DeadLetter = isDeadLetterName(t.Name) && t.Msgs > 0
 		r.NeedsALook = r.DeadLetter

@@ -60,6 +60,16 @@ func (c *Console) topicDisk(topic string, partitions int) (topicDisk, bool) {
 	return d, true
 }
 
+// countWord writes a small count as the boards' headings do ("Two topics are
+// compacted"), and a larger one in digits.
+func countWord(n int) string {
+	words := []string{"No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"}
+	if n >= 0 && n < len(words) {
+		return words[n]
+	}
+	return strconv.Itoa(n)
+}
+
 // diskSize writes a size on disk as the boards do: 9.4 KiB, 41 KiB, 5.6 MiB (one
 // decimal below ten, none above; binary units, as du -h and the boards use).
 func diskSize(n int64) string {

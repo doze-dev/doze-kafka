@@ -375,7 +375,7 @@ test('the keys strip is at the foot of every page and says keys the page has', a
 test('every section has the board\'s home: its title, its summary line and its table', async ({ page }) => {
   await page.goto('topics');
   await expect(page.locator('#topics-summary')).toContainText(/\d+ topics?/);
-  await expect(page.locator('#topics-table .r.h span')).toHaveText(['Topic', 'Partitions', 'Messages', 'Retention', 'Read by', 'Compact', 'Schema subject']);
+  await expect(page.locator('#topics-table .r.h span')).toHaveText(['Topic', 'Partitions', 'Messages', 'Size', 'Retention', 'Read by', 'Compact', 'Schema subject']);
   await page.goto('groups');
   await expect(page.locator('#groups-summary')).toContainText('records behind in total');
   await expect(page.locator('#groups-table .r.h span')).toHaveText(['Group', 'Protocol', 'State', 'Members', 'Topics', 'Lag', 'Generation']);
