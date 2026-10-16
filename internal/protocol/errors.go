@@ -78,6 +78,7 @@ var errorTable = []errorRow{
 	{kerr.InvalidConfig, ClassRefused, "A topic setting that is not one, or a value out of its range.", "See the topic's Config tab for the settings and their ranges."},
 	{kerr.InvalidRequiredAcks, ClassRefused, "A producer's acks that is not -1, 0 or 1.", "Set acks to all, 1 or 0."},
 	{kerr.MessageTooLarge, ClassRefused, "A batch larger than the topic's max.message.bytes.", "Send smaller batches, or raise max.message.bytes on the topic."},
+	{kerr.InvalidTimestamp, ClassRefused, "A record whose timestamp the topic will not take: a CreateTime further behind or ahead of the broker's clock than message.timestamp.before.max.ms / after.max.ms allow, or a LogAppendTime bit set by the client.", "Stamp records with the current time, or widen the topic's message.timestamp.before.max.ms / after.max.ms."},
 	{kerr.InvalidRecord, ClassRefused, "A record the topic will not take: on a compacted topic, one without a key. For a telemetry push, a body that does not decompress or inflates past the size the broker said it would take.", "Give every record on a compacted topic a key. A client that pushes metrics must compress them as the codec it names."},
 	{kerr.CorruptMessage, ClassRefused, "A record batch whose checksum or framing does not match.", "A client or proxy altered the bytes: look at what sits between the app and the broker."},
 	{kerr.OffsetOutOfRange, ClassRefused, "A consumer asked for an offset the log no longer has, or has not reached.", "The consumer resets by its auto.offset.reset; check retention if it keeps happening."},
