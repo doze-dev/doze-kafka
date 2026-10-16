@@ -2,7 +2,9 @@ package schemaregistry
 
 import (
 	"encoding/hex"
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -158,7 +160,7 @@ func FuzzDecode(f *testing.F) {
 	f.Add("", []byte{0, 0, 0, 0, 1, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01, 0, 0})
 	f.Add("", []byte{0, 0, 0, 0, 1, 0x80, 0x80, 0x80, 0x01, 0x80, 0x80, 0x80, 0x01, 0, 0})
 	f.Fuzz(func(t *testing.T, _ string, value []byte) {
-		for _, c := range fuzzCodecs {
+		for _, c := range fuzzCodecs(t) {
 			// Whatever the bytes, a value is decoded or refused in the time and
 			// memory its size is worth: a hang or a blow-up here is the finding.
 			start := time.Now()
@@ -183,7 +185,19 @@ var fuzzAvroSchemas = []string{
 	`{"type":"map","values":{"type":"map","values":["null","double",{"type":"enum","name":"K","symbols":["A","B"]}]}}`,
 }
 
-var fuzzCodecs = func() []*Codec {
+// fuzzCodecs is built by the first test that asks, not when the package loads: built
+// at load a codec that cannot be built panicked before any test had started, and the
+// mutation run could only call that a failed setup.
+func fuzzCodecs(t testing.TB) []*Codec {
+	t.Helper()
+	cs, err := fuzzCodecsOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cs
+}
+
+var fuzzCodecsOnce = sync.OnceValues(func() ([]*Codec, error) {
 	type schema struct{ typ, s string }
 	all := []schema{
 		{TypeProtobuf, `syntax = "proto3"; message A { int32 x = 1; repeated string s = 2; } message B { A a = 1; }`},
@@ -196,9 +210,9 @@ var fuzzCodecs = func() []*Codec {
 	for _, x := range all {
 		c, err := NewCodec(x.typ, x.s, nil)
 		if err != nil {
-			panic(err)
+			return nil, fmt.Errorf("the %s schema %s: %v", x.typ, x.s, err)
 		}
 		out = append(out, c)
 	}
-	return out
-}()
+	return out, nil
+})

@@ -33,7 +33,7 @@ func FuzzEncode(f *testing.F) {
 		if len(doc) > 1<<14 {
 			t.Skip()
 		}
-		for _, c := range fuzzCodecs {
+		for _, c := range fuzzCodecs(t) {
 			out, err := c.Encode(7, doc)
 			if err != nil {
 				if out != nil {
