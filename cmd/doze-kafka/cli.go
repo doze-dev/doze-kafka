@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
+	names "github.com/doze-dev/doze-names"
 )
 
 // startup is everything resolved from the command line and config file before the
@@ -212,6 +213,10 @@ func loadConfigFor(args []string, forEnv bool) (startup, error) {
 	}
 	if err := check.Validate(); err != nil {
 		return startup{}, err
+	}
+	if c.ByName() && c.Zone && names.Disabled() {
+		// The same refusal as --zone=false, for the switch every doze binary reads.
+		return startup{}, fmt.Errorf("config: DOZE_ZONE=off turns .doze names off, and no --listen was set, so there is nothing to listen on; give --listen host:port (127.0.0.1:9092 for this machine only), or unset DOZE_ZONE")
 	}
 	notices = append(notices, c.Warnings()...)
 	return startup{cfg: c, configFile: configPath, notices: notices}, nil

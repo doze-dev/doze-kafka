@@ -447,6 +447,12 @@ func (c Config) Validate() error {
 			}
 		}
 	}
+	if !c.Zone && c.ByName() {
+		// Without the zone there is no name, and without a name or an address there
+		// is nothing to listen on: a configuration that cannot start, so it is
+		// refused here like any other, not after the broker has begun starting.
+		return fmt.Errorf("config: --zone=false (zone = false) turns .doze names off, and no --listen was set, so there is nothing to listen on; give --listen host:port (127.0.0.1:9092 for this machine only), or drop --zone=false")
+	}
 	if (c.TLSCertFile == "") != (c.TLSKeyFile == "") {
 		return fmt.Errorf("config: TLS needs both --tls-cert and --tls-key, or neither")
 	}

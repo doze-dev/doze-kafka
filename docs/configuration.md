@@ -65,7 +65,8 @@ line names the flag or the line and not the value).
 
 A bad setting is reported once, before anything starts, as a single line, with exit
 code 2 (a broker that fails *while running* exits 1). That covers a mistyped flag, a
-value out of range, and a TLS certificate that is missing or does not match its key:
+value out of range, a TLS certificate that is missing or does not match its key, and
+`--zone=false` with no `--listen`:
 
 ```console
 $ doze-kafka --listen nonsense
@@ -123,7 +124,7 @@ where this one says `kafka-version`; that spelling is still read.
 | `--consumer-session-timeout` | `45s` | KIP-848 group session timeout: evict a member after this long without a heartbeat. (Classic groups use the timeout the client requests.) |
 | `--offsets-retention` | `168h` | How long a group's committed offsets are kept once nothing is reading them: Kafka's `offsets.retention.minutes` (7 days). `0` keeps them for ever. The rules are in [consumer groups](consumer-groups.md#when-committed-offsets-expire). |
 | `--client-telemetry` | `true` | Accept the metrics clients push about themselves (KIP-714: Java 3.7+, librdkafka 2.5+) and show the last few minutes in the console. `--client-telemetry=false` stops advertising the two APIs, so clients stop sending. See [Observability](observability.md). |
-| `--zone` | `true` | Join the shared `.doze` zone: claim `kafka.<name>.doze` and route the console through the front door. `--zone=false` is the same as `DOZE_ZONE=off` and needs `--listen`, since there is then no name to listen on. |
+| `--zone` | `true` | Join the shared `.doze` zone: claim `kafka.<name>.doze` and route the console through the front door. `--zone=false` is the same as `DOZE_ZONE=off` and needs `--listen`, since there is then no name to listen on: without it, either is a configuration error (one line, exit 2). |
 
 ### Authentication (all optional; see [Auth & TLS](auth-and-tls.md))
 

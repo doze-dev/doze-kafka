@@ -332,17 +332,21 @@ func TestZoneFlagAndFileKey(t *testing.T) {
 	if st, err := loadConfig(nil); err != nil || !st.cfg.Zone {
 		t.Fatalf("by default the zone is joined: %+v %v", st.cfg.Zone, err)
 	}
-	if st, err := loadConfig([]string{"--zone=false"}); err != nil || st.cfg.Zone {
+	if st, err := loadConfig([]string{"--zone=false", "--listen", "127.0.0.1:0"}); err != nil || st.cfg.Zone {
 		t.Errorf("--zone=false: %+v %v", st.cfg.Zone, err)
 	}
 	path := writeTOML(t, t.TempDir(), "zone = false\n")
-	if st, err := loadConfig([]string{"--config", path}); err != nil || st.cfg.Zone {
+	if st, err := loadConfig([]string{"--config", path, "--listen", "127.0.0.1:0"}); err != nil || st.cfg.Zone {
 		t.Errorf("zone = false in the file: %+v %v", st.cfg.Zone, err)
 	}
 	if st, _ := loadConfig([]string{"--config", path, "--zone=true"}); !st.cfg.Zone {
 		t.Error("the flag should beat the file")
 	}
-	if code, out, _ := run3("config", "print", "--zone=false"); code != 0 || !strings.Contains(out, "zone = false") {
+	// Off with nowhere else to listen is a configuration that cannot start.
+	if _, err := loadConfig([]string{"--zone=false"}); err == nil || !strings.Contains(err.Error(), "--listen") {
+		t.Errorf("--zone=false without --listen: %v, want a config error naming --listen", err)
+	}
+	if code, out, _ := run3("config", "print", "--zone=false", "--listen", "127.0.0.1:0"); code != 0 || !strings.Contains(out, "zone = false") {
 		t.Errorf("config print: %d %q", code, out)
 	}
 }
