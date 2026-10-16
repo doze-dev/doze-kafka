@@ -115,6 +115,14 @@ implement it.
   the broker as a super user of its own. It listens on loopback, and with SASL or TLS on
   it refuses to start on any other address unless `--console-unprotected` is given.
   See [What SASL and TLS cover](auth-and-tls.md#what-sasl-and-tls-cover).
+- **Under a fixed `--listen` the console and registry take fixed ports.** They are
+  `127.0.0.1:9093` and `127.0.0.1:8081` unless `--console-addr` and
+  `--schema-registry-addr` say otherwise, so two brokers each given their own
+  `--listen` port still collide there. A `--listen` on port 0 gives both free ports.
+- **`doze-kafka env` does not ask a running broker.** It prints what its own flags and
+  `doze-kafka.toml` describe. Under `--listen` the start-up summary prints the `env`
+  command, with flags, that gives that broker's addresses; a bare `doze-kafka env` is
+  right only by name, or when the file holds the same settings.
 - **The registry has users, not permissions.** With SASL on, any of the broker's users
   can read and change every subject: ACLs are about Kafka resources and do not reach
   the registry.
