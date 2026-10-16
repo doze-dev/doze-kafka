@@ -14,8 +14,37 @@ import (
 func init() {
 	Scenarios = append(Scenarios,
 		Scenario{Name: "versions-not-served", Run: versionsNotServed},
+		Scenario{Name: "version-matrix", Run: versionMatrix, Known: knownVersionMatrix},
 	)
 }
+
+// knownVersionMatrix is what doze-kafka answers differently to a default request,
+// each with its reason (docs/limitations.md).
+var knownVersionMatrix = func() []Known {
+	var k []Known
+	// Group APIs with an empty group id: Kafka answers INVALID_GROUP_ID (24) or
+	// NOT_COORDINATOR (16), doze-kafka the group's state. Open, and owned by the
+	// work on group*.go; listed so the replay holds the rest.
+	for _, s := range []string{"OffsetFetch v*", "JoinGroup v*", "Heartbeat v*", "LeaveGroup v*", "SyncGroup v*", "OffsetDelete v*"} {
+		k = append(k, Known{Step: s, Path: "ErrorCode", Limitation: limEmptyGroupID})
+	}
+	return append(k,
+		// The list of APIs is the table's (claims api V1); ApiVersions v3 with no
+		// client software name (Kafka: INVALID_REQUEST) is open, owned by the
+		// work on apiversions.go.
+		Known{Step: "ApiVersions v*", Path: "ApiKeys", Limitation: "ApiVersions lists the APIs and versions this broker serves, not Kafka's."},
+		Known{Step: "ApiVersions v3", Path: "ErrorCode", Limitation: limApiVersionsName},
+		Known{Step: "ConsumerGroupHeartbeat v*", Path: "ErrorMessage", Limitation: limMessages},
+		Known{Step: "GetTelemetrySubscriptions v*", Path: "PushIntervalMillis", Limitation: limSubscription},
+		Known{Step: "GetTelemetrySubscriptions v*", Path: "RequestedMetrics", Limitation: limSubscription},
+		Known{Step: "GetTelemetrySubscriptions v*", Path: "DeltaTemporality", Limitation: limSubscription},
+	)
+}()
+
+const (
+	limEmptyGroupID    = "A group request with an empty group id is answered for the group"
+	limApiVersionsName = "ApiVersions v3 with no client software name is answered"
+)
 
 // MatrixRequest is a request of an API with every field at its default, at a
 // version, with the few settings without which it would not be answered at once:
@@ -93,5 +122,3 @@ func versionsNotServed(e *Env) {
 		e.Do(MatrixLabel(kv[0], kv[1])+" then served", metadata(false), 9)
 	}
 }
-
-var knownVersionMatrix []Known

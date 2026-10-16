@@ -1,0 +1,4330 @@
+{
+  "scenario": "version-matrix",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "Produce v3",
+      "api": "Produce",
+      "version": 3,
+      "request": {
+        "Acks": 1,
+        "TimeoutMillis": 15000,
+        "Topics": null,
+        "TransactionID": null
+      },
+      "response": {
+        "Brokers": null,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Produce v4",
+      "api": "Produce",
+      "version": 4,
+      "request": {
+        "Acks": 1,
+        "TimeoutMillis": 15000,
+        "Topics": null,
+        "TransactionID": null
+      },
+      "response": {
+        "Brokers": null,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Produce v5",
+      "api": "Produce",
+      "version": 5,
+      "request": {
+        "Acks": 1,
+        "TimeoutMillis": 15000,
+        "Topics": null,
+        "TransactionID": null
+      },
+      "response": {
+        "Brokers": null,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Produce v6",
+      "api": "Produce",
+      "version": 6,
+      "request": {
+        "Acks": 1,
+        "TimeoutMillis": 15000,
+        "Topics": null,
+        "TransactionID": null
+      },
+      "response": {
+        "Brokers": null,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Produce v7",
+      "api": "Produce",
+      "version": 7,
+      "request": {
+        "Acks": 1,
+        "TimeoutMillis": 15000,
+        "Topics": null,
+        "TransactionID": null
+      },
+      "response": {
+        "Brokers": null,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Produce v8",
+      "api": "Produce",
+      "version": 8,
+      "request": {
+        "Acks": 1,
+        "TimeoutMillis": 15000,
+        "Topics": null,
+        "TransactionID": null
+      },
+      "response": {
+        "Brokers": null,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Produce v9",
+      "api": "Produce",
+      "version": 9,
+      "request": {
+        "Acks": 1,
+        "TimeoutMillis": 15000,
+        "Topics": null,
+        "TransactionID": null
+      },
+      "response": {
+        "Brokers": null,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Fetch v4",
+      "api": "Fetch",
+      "version": 4,
+      "request": {
+        "ClusterID": null,
+        "ForgottenTopics": null,
+        "IsolationLevel": 0,
+        "MaxBytes": 2147483647,
+        "MaxWaitMillis": 0,
+        "MinBytes": 0,
+        "Rack": "",
+        "ReplicaID": -1,
+        "ReplicaState": {
+          "Epoch": -1,
+          "ID": -1
+        },
+        "SessionEpoch": -1,
+        "SessionID": 0,
+        "Topics": null
+      },
+      "response": {
+        "Brokers": null,
+        "ErrorCode": 0,
+        "SessionID": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Fetch v5",
+      "api": "Fetch",
+      "version": 5,
+      "request": {
+        "ClusterID": null,
+        "ForgottenTopics": null,
+        "IsolationLevel": 0,
+        "MaxBytes": 2147483647,
+        "MaxWaitMillis": 0,
+        "MinBytes": 0,
+        "Rack": "",
+        "ReplicaID": -1,
+        "ReplicaState": {
+          "Epoch": -1,
+          "ID": -1
+        },
+        "SessionEpoch": -1,
+        "SessionID": 0,
+        "Topics": null
+      },
+      "response": {
+        "Brokers": null,
+        "ErrorCode": 0,
+        "SessionID": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Fetch v6",
+      "api": "Fetch",
+      "version": 6,
+      "request": {
+        "ClusterID": null,
+        "ForgottenTopics": null,
+        "IsolationLevel": 0,
+        "MaxBytes": 2147483647,
+        "MaxWaitMillis": 0,
+        "MinBytes": 0,
+        "Rack": "",
+        "ReplicaID": -1,
+        "ReplicaState": {
+          "Epoch": -1,
+          "ID": -1
+        },
+        "SessionEpoch": -1,
+        "SessionID": 0,
+        "Topics": null
+      },
+      "response": {
+        "Brokers": null,
+        "ErrorCode": 0,
+        "SessionID": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Fetch v7",
+      "api": "Fetch",
+      "version": 7,
+      "request": {
+        "ClusterID": null,
+        "ForgottenTopics": null,
+        "IsolationLevel": 0,
+        "MaxBytes": 2147483647,
+        "MaxWaitMillis": 0,
+        "MinBytes": 0,
+        "Rack": "",
+        "ReplicaID": -1,
+        "ReplicaState": {
+          "Epoch": -1,
+          "ID": -1
+        },
+        "SessionEpoch": -1,
+        "SessionID": 0,
+        "Topics": null
+      },
+      "response": {
+        "Brokers": null,
+        "ErrorCode": 0,
+        "SessionID": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Fetch v8",
+      "api": "Fetch",
+      "version": 8,
+      "request": {
+        "ClusterID": null,
+        "ForgottenTopics": null,
+        "IsolationLevel": 0,
+        "MaxBytes": 2147483647,
+        "MaxWaitMillis": 0,
+        "MinBytes": 0,
+        "Rack": "",
+        "ReplicaID": -1,
+        "ReplicaState": {
+          "Epoch": -1,
+          "ID": -1
+        },
+        "SessionEpoch": -1,
+        "SessionID": 0,
+        "Topics": null
+      },
+      "response": {
+        "Brokers": null,
+        "ErrorCode": 0,
+        "SessionID": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Fetch v9",
+      "api": "Fetch",
+      "version": 9,
+      "request": {
+        "ClusterID": null,
+        "ForgottenTopics": null,
+        "IsolationLevel": 0,
+        "MaxBytes": 2147483647,
+        "MaxWaitMillis": 0,
+        "MinBytes": 0,
+        "Rack": "",
+        "ReplicaID": -1,
+        "ReplicaState": {
+          "Epoch": -1,
+          "ID": -1
+        },
+        "SessionEpoch": -1,
+        "SessionID": 0,
+        "Topics": null
+      },
+      "response": {
+        "Brokers": null,
+        "ErrorCode": 0,
+        "SessionID": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Fetch v10",
+      "api": "Fetch",
+      "version": 10,
+      "request": {
+        "ClusterID": null,
+        "ForgottenTopics": null,
+        "IsolationLevel": 0,
+        "MaxBytes": 2147483647,
+        "MaxWaitMillis": 0,
+        "MinBytes": 0,
+        "Rack": "",
+        "ReplicaID": -1,
+        "ReplicaState": {
+          "Epoch": -1,
+          "ID": -1
+        },
+        "SessionEpoch": -1,
+        "SessionID": 0,
+        "Topics": null
+      },
+      "response": {
+        "Brokers": null,
+        "ErrorCode": 0,
+        "SessionID": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Fetch v11",
+      "api": "Fetch",
+      "version": 11,
+      "request": {
+        "ClusterID": null,
+        "ForgottenTopics": null,
+        "IsolationLevel": 0,
+        "MaxBytes": 2147483647,
+        "MaxWaitMillis": 0,
+        "MinBytes": 0,
+        "Rack": "",
+        "ReplicaID": -1,
+        "ReplicaState": {
+          "Epoch": -1,
+          "ID": -1
+        },
+        "SessionEpoch": -1,
+        "SessionID": 0,
+        "Topics": null
+      },
+      "response": {
+        "Brokers": null,
+        "ErrorCode": 0,
+        "SessionID": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Fetch v12",
+      "api": "Fetch",
+      "version": 12,
+      "request": {
+        "ClusterID": null,
+        "ForgottenTopics": null,
+        "IsolationLevel": 0,
+        "MaxBytes": 2147483647,
+        "MaxWaitMillis": 0,
+        "MinBytes": 0,
+        "Rack": "",
+        "ReplicaID": -1,
+        "ReplicaState": {
+          "Epoch": -1,
+          "ID": -1
+        },
+        "SessionEpoch": -1,
+        "SessionID": 0,
+        "Topics": null
+      },
+      "response": {
+        "Brokers": null,
+        "ErrorCode": 0,
+        "SessionID": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Fetch v13",
+      "api": "Fetch",
+      "version": 13,
+      "request": {
+        "ClusterID": null,
+        "ForgottenTopics": null,
+        "IsolationLevel": 0,
+        "MaxBytes": 2147483647,
+        "MaxWaitMillis": 0,
+        "MinBytes": 0,
+        "Rack": "",
+        "ReplicaID": -1,
+        "ReplicaState": {
+          "Epoch": -1,
+          "ID": -1
+        },
+        "SessionEpoch": -1,
+        "SessionID": 0,
+        "Topics": null
+      },
+      "response": {
+        "Brokers": null,
+        "ErrorCode": 0,
+        "SessionID": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "ListOffsets v1",
+      "api": "ListOffsets",
+      "version": 1,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "ListOffsets v2",
+      "api": "ListOffsets",
+      "version": 2,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "ListOffsets v3",
+      "api": "ListOffsets",
+      "version": 3,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "ListOffsets v4",
+      "api": "ListOffsets",
+      "version": 4,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "ListOffsets v5",
+      "api": "ListOffsets",
+      "version": 5,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "ListOffsets v6",
+      "api": "ListOffsets",
+      "version": 6,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "ListOffsets v7",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Metadata v0",
+      "api": "Metadata",
+      "version": 0,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": null
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": null,
+        "ControllerID": -1,
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Metadata v1",
+      "api": "Metadata",
+      "version": 1,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": null
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": null,
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Metadata v2",
+      "api": "Metadata",
+      "version": 2,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": null
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Metadata v3",
+      "api": "Metadata",
+      "version": 3,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": null
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Metadata v4",
+      "api": "Metadata",
+      "version": 4,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": null
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Metadata v5",
+      "api": "Metadata",
+      "version": 5,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": null
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Metadata v6",
+      "api": "Metadata",
+      "version": 6,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": null
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Metadata v7",
+      "api": "Metadata",
+      "version": 7,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": null
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Metadata v8",
+      "api": "Metadata",
+      "version": 8,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": null
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Metadata v9",
+      "api": "Metadata",
+      "version": 9,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": null
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Metadata v10",
+      "api": "Metadata",
+      "version": 10,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": null
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Metadata v11",
+      "api": "Metadata",
+      "version": 11,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": null
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "Metadata v12",
+      "api": "Metadata",
+      "version": 12,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": null
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetCommit v2",
+      "api": "OffsetCommit",
+      "version": 2,
+      "request": {
+        "Generation": -1,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetCommit v3",
+      "api": "OffsetCommit",
+      "version": 3,
+      "request": {
+        "Generation": -1,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetCommit v4",
+      "api": "OffsetCommit",
+      "version": 4,
+      "request": {
+        "Generation": -1,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetCommit v5",
+      "api": "OffsetCommit",
+      "version": 5,
+      "request": {
+        "Generation": -1,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetCommit v6",
+      "api": "OffsetCommit",
+      "version": 6,
+      "request": {
+        "Generation": -1,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetCommit v7",
+      "api": "OffsetCommit",
+      "version": 7,
+      "request": {
+        "Generation": -1,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetCommit v8",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": -1,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetCommit v9",
+      "api": "OffsetCommit",
+      "version": 9,
+      "request": {
+        "Generation": -1,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetFetch v1",
+      "api": "OffsetFetch",
+      "version": 1,
+      "request": {
+        "Group": "",
+        "Groups": null,
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": null,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetFetch v2",
+      "api": "OffsetFetch",
+      "version": 2,
+      "request": {
+        "Group": "",
+        "Groups": null,
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 16,
+        "Groups": null,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetFetch v3",
+      "api": "OffsetFetch",
+      "version": 3,
+      "request": {
+        "Group": "",
+        "Groups": null,
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 16,
+        "Groups": null,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetFetch v4",
+      "api": "OffsetFetch",
+      "version": 4,
+      "request": {
+        "Group": "",
+        "Groups": null,
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 16,
+        "Groups": null,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetFetch v5",
+      "api": "OffsetFetch",
+      "version": 5,
+      "request": {
+        "Group": "",
+        "Groups": null,
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 16,
+        "Groups": null,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetFetch v6",
+      "api": "OffsetFetch",
+      "version": 6,
+      "request": {
+        "Group": "",
+        "Groups": null,
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 16,
+        "Groups": null,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetFetch v7",
+      "api": "OffsetFetch",
+      "version": 7,
+      "request": {
+        "Group": "",
+        "Groups": null,
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 16,
+        "Groups": null,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetFetch v8",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": null,
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": null,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "OffsetFetch v9",
+      "api": "OffsetFetch",
+      "version": 9,
+      "request": {
+        "Group": "",
+        "Groups": null,
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": null,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "FindCoordinator v0",
+      "api": "FindCoordinator",
+      "version": 0,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": null,
+        "CoordinatorType": 0
+      },
+      "response": {
+        "Coordinators": null,
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "FindCoordinator v1",
+      "api": "FindCoordinator",
+      "version": 1,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": null,
+        "CoordinatorType": 0
+      },
+      "response": {
+        "Coordinators": null,
+        "ErrorCode": 0,
+        "ErrorMessage": "NONE",
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "FindCoordinator v2",
+      "api": "FindCoordinator",
+      "version": 2,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": null,
+        "CoordinatorType": 0
+      },
+      "response": {
+        "Coordinators": null,
+        "ErrorCode": 0,
+        "ErrorMessage": "NONE",
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "FindCoordinator v3",
+      "api": "FindCoordinator",
+      "version": 3,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": null,
+        "CoordinatorType": 0
+      },
+      "response": {
+        "Coordinators": null,
+        "ErrorCode": 0,
+        "ErrorMessage": "NONE",
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "FindCoordinator v4",
+      "api": "FindCoordinator",
+      "version": 4,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": null,
+        "CoordinatorType": 0
+      },
+      "response": {
+        "Coordinators": null,
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "JoinGroup v0",
+      "api": "JoinGroup",
+      "version": 0,
+      "request": {
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "",
+        "Protocols": null,
+        "Reason": null,
+        "RebalanceTimeoutMillis": -1,
+        "SessionTimeoutMillis": 0
+      },
+      "response": {
+        "ErrorCode": 24,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "",
+        "Members": null,
+        "Protocol": "",
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "JoinGroup v1",
+      "api": "JoinGroup",
+      "version": 1,
+      "request": {
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "",
+        "Protocols": null,
+        "Reason": null,
+        "RebalanceTimeoutMillis": -1,
+        "SessionTimeoutMillis": 0
+      },
+      "response": {
+        "ErrorCode": 24,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "",
+        "Members": null,
+        "Protocol": "",
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "JoinGroup v2",
+      "api": "JoinGroup",
+      "version": 2,
+      "request": {
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "",
+        "Protocols": null,
+        "Reason": null,
+        "RebalanceTimeoutMillis": -1,
+        "SessionTimeoutMillis": 0
+      },
+      "response": {
+        "ErrorCode": 24,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "",
+        "Members": null,
+        "Protocol": "",
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "JoinGroup v3",
+      "api": "JoinGroup",
+      "version": 3,
+      "request": {
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "",
+        "Protocols": null,
+        "Reason": null,
+        "RebalanceTimeoutMillis": -1,
+        "SessionTimeoutMillis": 0
+      },
+      "response": {
+        "ErrorCode": 24,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "",
+        "Members": null,
+        "Protocol": "",
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "JoinGroup v4",
+      "api": "JoinGroup",
+      "version": 4,
+      "request": {
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "",
+        "Protocols": null,
+        "Reason": null,
+        "RebalanceTimeoutMillis": -1,
+        "SessionTimeoutMillis": 0
+      },
+      "response": {
+        "ErrorCode": 24,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "",
+        "Members": null,
+        "Protocol": "",
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "JoinGroup v5",
+      "api": "JoinGroup",
+      "version": 5,
+      "request": {
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "",
+        "Protocols": null,
+        "Reason": null,
+        "RebalanceTimeoutMillis": -1,
+        "SessionTimeoutMillis": 0
+      },
+      "response": {
+        "ErrorCode": 24,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "",
+        "Members": null,
+        "Protocol": "",
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "JoinGroup v6",
+      "api": "JoinGroup",
+      "version": 6,
+      "request": {
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "",
+        "Protocols": null,
+        "Reason": null,
+        "RebalanceTimeoutMillis": -1,
+        "SessionTimeoutMillis": 0
+      },
+      "response": {
+        "ErrorCode": 24,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "",
+        "Members": null,
+        "Protocol": "",
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "JoinGroup v7",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "",
+        "Protocols": null,
+        "Reason": null,
+        "RebalanceTimeoutMillis": -1,
+        "SessionTimeoutMillis": 0
+      },
+      "response": {
+        "ErrorCode": 24,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "JoinGroup v8",
+      "api": "JoinGroup",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "",
+        "Protocols": null,
+        "Reason": null,
+        "RebalanceTimeoutMillis": -1,
+        "SessionTimeoutMillis": 0
+      },
+      "response": {
+        "ErrorCode": 24,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "JoinGroup v9",
+      "api": "JoinGroup",
+      "version": 9,
+      "request": {
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "",
+        "Protocols": null,
+        "Reason": null,
+        "RebalanceTimeoutMillis": -1,
+        "SessionTimeoutMillis": 0
+      },
+      "response": {
+        "ErrorCode": 24,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "Heartbeat v0",
+      "api": "Heartbeat",
+      "version": 0,
+      "request": {
+        "Generation": 0,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": ""
+      },
+      "response": {
+        "ErrorCode": 24,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "Heartbeat v1",
+      "api": "Heartbeat",
+      "version": 1,
+      "request": {
+        "Generation": 0,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": ""
+      },
+      "response": {
+        "ErrorCode": 24,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "Heartbeat v2",
+      "api": "Heartbeat",
+      "version": 2,
+      "request": {
+        "Generation": 0,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": ""
+      },
+      "response": {
+        "ErrorCode": 24,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "Heartbeat v3",
+      "api": "Heartbeat",
+      "version": 3,
+      "request": {
+        "Generation": 0,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": ""
+      },
+      "response": {
+        "ErrorCode": 24,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "Heartbeat v4",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 0,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": ""
+      },
+      "response": {
+        "ErrorCode": 24,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "LeaveGroup v0",
+      "api": "LeaveGroup",
+      "version": 0,
+      "request": {
+        "Group": "",
+        "MemberID": "",
+        "Members": null
+      },
+      "response": {
+        "ErrorCode": 24,
+        "Members": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "LeaveGroup v1",
+      "api": "LeaveGroup",
+      "version": 1,
+      "request": {
+        "Group": "",
+        "MemberID": "",
+        "Members": null
+      },
+      "response": {
+        "ErrorCode": 24,
+        "Members": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "LeaveGroup v2",
+      "api": "LeaveGroup",
+      "version": 2,
+      "request": {
+        "Group": "",
+        "MemberID": "",
+        "Members": null
+      },
+      "response": {
+        "ErrorCode": 24,
+        "Members": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "LeaveGroup v3",
+      "api": "LeaveGroup",
+      "version": 3,
+      "request": {
+        "Group": "",
+        "MemberID": "",
+        "Members": null
+      },
+      "response": {
+        "ErrorCode": 24,
+        "Members": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "LeaveGroup v4",
+      "api": "LeaveGroup",
+      "version": 4,
+      "request": {
+        "Group": "",
+        "MemberID": "",
+        "Members": null
+      },
+      "response": {
+        "ErrorCode": 24,
+        "Members": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "LeaveGroup v5",
+      "api": "LeaveGroup",
+      "version": 5,
+      "request": {
+        "Group": "",
+        "MemberID": "",
+        "Members": null
+      },
+      "response": {
+        "ErrorCode": 24,
+        "Members": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "SyncGroup v0",
+      "api": "SyncGroup",
+      "version": 0,
+      "request": {
+        "Generation": 0,
+        "Group": "",
+        "GroupAssignment": null,
+        "InstanceID": null,
+        "MemberID": "",
+        "Protocol": null,
+        "ProtocolType": null
+      },
+      "response": {
+        "ErrorCode": 24,
+        "MemberAssignment": "",
+        "Protocol": null,
+        "ProtocolType": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "SyncGroup v1",
+      "api": "SyncGroup",
+      "version": 1,
+      "request": {
+        "Generation": 0,
+        "Group": "",
+        "GroupAssignment": null,
+        "InstanceID": null,
+        "MemberID": "",
+        "Protocol": null,
+        "ProtocolType": null
+      },
+      "response": {
+        "ErrorCode": 24,
+        "MemberAssignment": "",
+        "Protocol": null,
+        "ProtocolType": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "SyncGroup v2",
+      "api": "SyncGroup",
+      "version": 2,
+      "request": {
+        "Generation": 0,
+        "Group": "",
+        "GroupAssignment": null,
+        "InstanceID": null,
+        "MemberID": "",
+        "Protocol": null,
+        "ProtocolType": null
+      },
+      "response": {
+        "ErrorCode": 24,
+        "MemberAssignment": "",
+        "Protocol": null,
+        "ProtocolType": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "SyncGroup v3",
+      "api": "SyncGroup",
+      "version": 3,
+      "request": {
+        "Generation": 0,
+        "Group": "",
+        "GroupAssignment": null,
+        "InstanceID": null,
+        "MemberID": "",
+        "Protocol": null,
+        "ProtocolType": null
+      },
+      "response": {
+        "ErrorCode": 24,
+        "MemberAssignment": "",
+        "Protocol": null,
+        "ProtocolType": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "SyncGroup v4",
+      "api": "SyncGroup",
+      "version": 4,
+      "request": {
+        "Generation": 0,
+        "Group": "",
+        "GroupAssignment": null,
+        "InstanceID": null,
+        "MemberID": "",
+        "Protocol": null,
+        "ProtocolType": null
+      },
+      "response": {
+        "ErrorCode": 24,
+        "MemberAssignment": "",
+        "Protocol": null,
+        "ProtocolType": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "SyncGroup v5",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 0,
+        "Group": "",
+        "GroupAssignment": null,
+        "InstanceID": null,
+        "MemberID": "",
+        "Protocol": null,
+        "ProtocolType": null
+      },
+      "response": {
+        "ErrorCode": 23,
+        "MemberAssignment": "",
+        "Protocol": null,
+        "ProtocolType": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DescribeGroups v0",
+      "api": "DescribeGroups",
+      "version": 0,
+      "request": {
+        "Groups": null,
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DescribeGroups v1",
+      "api": "DescribeGroups",
+      "version": 1,
+      "request": {
+        "Groups": null,
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DescribeGroups v2",
+      "api": "DescribeGroups",
+      "version": 2,
+      "request": {
+        "Groups": null,
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DescribeGroups v3",
+      "api": "DescribeGroups",
+      "version": 3,
+      "request": {
+        "Groups": null,
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DescribeGroups v4",
+      "api": "DescribeGroups",
+      "version": 4,
+      "request": {
+        "Groups": null,
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DescribeGroups v5",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": null,
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ListGroups v0",
+      "api": "ListGroups",
+      "version": 0,
+      "request": {
+        "StatesFilter": null,
+        "TypesFilter": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ListGroups v1",
+      "api": "ListGroups",
+      "version": 1,
+      "request": {
+        "StatesFilter": null,
+        "TypesFilter": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ListGroups v2",
+      "api": "ListGroups",
+      "version": 2,
+      "request": {
+        "StatesFilter": null,
+        "TypesFilter": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ListGroups v3",
+      "api": "ListGroups",
+      "version": 3,
+      "request": {
+        "StatesFilter": null,
+        "TypesFilter": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ListGroups v4",
+      "api": "ListGroups",
+      "version": 4,
+      "request": {
+        "StatesFilter": null,
+        "TypesFilter": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ListGroups v5",
+      "api": "ListGroups",
+      "version": 5,
+      "request": {
+        "StatesFilter": null,
+        "TypesFilter": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ApiVersions v0",
+      "api": "ApiVersions",
+      "version": 0,
+      "request": {
+        "ClientSoftwareName": "",
+        "ClientSoftwareVersion": "",
+        "ClusterID": null,
+        "NodeID": -1
+      },
+      "response": {
+        "ApiKeys": [
+          {
+            "ApiKey": 0,
+            "MaxVersion": 13,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 1,
+            "MaxVersion": 18,
+            "MinVersion": 4
+          },
+          {
+            "ApiKey": 2,
+            "MaxVersion": 11,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 3,
+            "MaxVersion": 13,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 8,
+            "MaxVersion": 10,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 9,
+            "MaxVersion": 10,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 10,
+            "MaxVersion": 6,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 11,
+            "MaxVersion": 9,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 12,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 13,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 14,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 15,
+            "MaxVersion": 6,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 16,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 17,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 18,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 19,
+            "MaxVersion": 7,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 20,
+            "MaxVersion": 6,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 21,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 22,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 23,
+            "MaxVersion": 4,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 24,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 25,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 26,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 27,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 28,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 29,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 30,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 31,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 32,
+            "MaxVersion": 4,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 33,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 34,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 35,
+            "MaxVersion": 5,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 36,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 37,
+            "MaxVersion": 3,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 38,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 39,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 40,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 41,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 42,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 43,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 44,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 45,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 46,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 47,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 48,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 49,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 50,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 51,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 55,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 57,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 60,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 61,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 64,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 65,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 66,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 68,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 69,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 74,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 75,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 76,
+            "MaxVersion": 1,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 77,
+            "MaxVersion": 1,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 78,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 79,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 80,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 81,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 83,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 84,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 85,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 86,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 87,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 88,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 89,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 90,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 91,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 92,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          }
+        ],
+        "ErrorCode": 0,
+        "FinalizedFeatures": null,
+        "FinalizedFeaturesEpoch": -1,
+        "SupportedFeatures": null,
+        "ThrottleMillis": 0,
+        "ZkMigrationReady": false
+      }
+    },
+    {
+      "label": "ApiVersions v1",
+      "api": "ApiVersions",
+      "version": 1,
+      "request": {
+        "ClientSoftwareName": "",
+        "ClientSoftwareVersion": "",
+        "ClusterID": null,
+        "NodeID": -1
+      },
+      "response": {
+        "ApiKeys": [
+          {
+            "ApiKey": 0,
+            "MaxVersion": 13,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 1,
+            "MaxVersion": 18,
+            "MinVersion": 4
+          },
+          {
+            "ApiKey": 2,
+            "MaxVersion": 11,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 3,
+            "MaxVersion": 13,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 8,
+            "MaxVersion": 10,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 9,
+            "MaxVersion": 10,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 10,
+            "MaxVersion": 6,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 11,
+            "MaxVersion": 9,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 12,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 13,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 14,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 15,
+            "MaxVersion": 6,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 16,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 17,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 18,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 19,
+            "MaxVersion": 7,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 20,
+            "MaxVersion": 6,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 21,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 22,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 23,
+            "MaxVersion": 4,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 24,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 25,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 26,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 27,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 28,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 29,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 30,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 31,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 32,
+            "MaxVersion": 4,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 33,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 34,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 35,
+            "MaxVersion": 5,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 36,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 37,
+            "MaxVersion": 3,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 38,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 39,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 40,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 41,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 42,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 43,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 44,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 45,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 46,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 47,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 48,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 49,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 50,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 51,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 55,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 57,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 60,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 61,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 64,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 65,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 66,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 68,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 69,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 74,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 75,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 76,
+            "MaxVersion": 1,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 77,
+            "MaxVersion": 1,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 78,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 79,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 80,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 81,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 83,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 84,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 85,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 86,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 87,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 88,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 89,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 90,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 91,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 92,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          }
+        ],
+        "ErrorCode": 0,
+        "FinalizedFeatures": null,
+        "FinalizedFeaturesEpoch": -1,
+        "SupportedFeatures": null,
+        "ThrottleMillis": 0,
+        "ZkMigrationReady": false
+      }
+    },
+    {
+      "label": "ApiVersions v2",
+      "api": "ApiVersions",
+      "version": 2,
+      "request": {
+        "ClientSoftwareName": "",
+        "ClientSoftwareVersion": "",
+        "ClusterID": null,
+        "NodeID": -1
+      },
+      "response": {
+        "ApiKeys": [
+          {
+            "ApiKey": 0,
+            "MaxVersion": 13,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 1,
+            "MaxVersion": 18,
+            "MinVersion": 4
+          },
+          {
+            "ApiKey": 2,
+            "MaxVersion": 11,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 3,
+            "MaxVersion": 13,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 8,
+            "MaxVersion": 10,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 9,
+            "MaxVersion": 10,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 10,
+            "MaxVersion": 6,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 11,
+            "MaxVersion": 9,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 12,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 13,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 14,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 15,
+            "MaxVersion": 6,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 16,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 17,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 18,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 19,
+            "MaxVersion": 7,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 20,
+            "MaxVersion": 6,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 21,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 22,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 23,
+            "MaxVersion": 4,
+            "MinVersion": 2
+          },
+          {
+            "ApiKey": 24,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 25,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 26,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 27,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 28,
+            "MaxVersion": 5,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 29,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 30,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 31,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 32,
+            "MaxVersion": 4,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 33,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 34,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 35,
+            "MaxVersion": 5,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 36,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 37,
+            "MaxVersion": 3,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 38,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 39,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 40,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 41,
+            "MaxVersion": 3,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 42,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 43,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 44,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 45,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 46,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 47,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 48,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 49,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 50,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 51,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 55,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 57,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 60,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 61,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 64,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 65,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 66,
+            "MaxVersion": 2,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 68,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 69,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 74,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 75,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 76,
+            "MaxVersion": 1,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 77,
+            "MaxVersion": 1,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 78,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 79,
+            "MaxVersion": 2,
+            "MinVersion": 1
+          },
+          {
+            "ApiKey": 80,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 81,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 83,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 84,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 85,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 86,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 87,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 88,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 89,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 90,
+            "MaxVersion": 1,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 91,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          },
+          {
+            "ApiKey": 92,
+            "MaxVersion": 0,
+            "MinVersion": 0
+          }
+        ],
+        "ErrorCode": 0,
+        "FinalizedFeatures": null,
+        "FinalizedFeaturesEpoch": -1,
+        "SupportedFeatures": null,
+        "ThrottleMillis": 0,
+        "ZkMigrationReady": false
+      }
+    },
+    {
+      "label": "ApiVersions v3",
+      "api": "ApiVersions",
+      "version": 3,
+      "request": {
+        "ClientSoftwareName": "",
+        "ClientSoftwareVersion": "",
+        "ClusterID": null,
+        "NodeID": -1
+      },
+      "response": {
+        "ApiKeys": null,
+        "ErrorCode": 42,
+        "FinalizedFeatures": null,
+        "FinalizedFeaturesEpoch": -1,
+        "SupportedFeatures": null,
+        "ThrottleMillis": 0,
+        "ZkMigrationReady": false
+      }
+    },
+    {
+      "label": "CreateTopics v2",
+      "api": "CreateTopics",
+      "version": 2,
+      "request": {
+        "TimeoutMillis": 60000,
+        "Topics": null,
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "CreateTopics v3",
+      "api": "CreateTopics",
+      "version": 3,
+      "request": {
+        "TimeoutMillis": 60000,
+        "Topics": null,
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "CreateTopics v4",
+      "api": "CreateTopics",
+      "version": 4,
+      "request": {
+        "TimeoutMillis": 60000,
+        "Topics": null,
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "CreateTopics v5",
+      "api": "CreateTopics",
+      "version": 5,
+      "request": {
+        "TimeoutMillis": 60000,
+        "Topics": null,
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "CreateTopics v6",
+      "api": "CreateTopics",
+      "version": 6,
+      "request": {
+        "TimeoutMillis": 60000,
+        "Topics": null,
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "CreateTopics v7",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 60000,
+        "Topics": null,
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DeleteTopics v1",
+      "api": "DeleteTopics",
+      "version": 1,
+      "request": {
+        "TimeoutMillis": 15000,
+        "TopicNames": null,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DeleteTopics v2",
+      "api": "DeleteTopics",
+      "version": 2,
+      "request": {
+        "TimeoutMillis": 15000,
+        "TopicNames": null,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DeleteTopics v3",
+      "api": "DeleteTopics",
+      "version": 3,
+      "request": {
+        "TimeoutMillis": 15000,
+        "TopicNames": null,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DeleteTopics v4",
+      "api": "DeleteTopics",
+      "version": 4,
+      "request": {
+        "TimeoutMillis": 15000,
+        "TopicNames": null,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DeleteTopics v5",
+      "api": "DeleteTopics",
+      "version": 5,
+      "request": {
+        "TimeoutMillis": 15000,
+        "TopicNames": null,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DeleteTopics v6",
+      "api": "DeleteTopics",
+      "version": 6,
+      "request": {
+        "TimeoutMillis": 15000,
+        "TopicNames": null,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DeleteRecords v0",
+      "api": "DeleteRecords",
+      "version": 0,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DeleteRecords v1",
+      "api": "DeleteRecords",
+      "version": 1,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DeleteRecords v2",
+      "api": "DeleteRecords",
+      "version": 2,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "InitProducerID v0",
+      "api": "InitProducerID",
+      "version": 0,
+      "request": {
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "TransactionTimeoutMillis": 0,
+        "TransactionalID": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "InitProducerID v1",
+      "api": "InitProducerID",
+      "version": 1,
+      "request": {
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "TransactionTimeoutMillis": 0,
+        "TransactionalID": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:2\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "InitProducerID v2",
+      "api": "InitProducerID",
+      "version": 2,
+      "request": {
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "TransactionTimeoutMillis": 0,
+        "TransactionalID": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:3\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "InitProducerID v3",
+      "api": "InitProducerID",
+      "version": 3,
+      "request": {
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "TransactionTimeoutMillis": 0,
+        "TransactionalID": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:4\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "InitProducerID v4",
+      "api": "InitProducerID",
+      "version": 4,
+      "request": {
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "TransactionTimeoutMillis": 0,
+        "TransactionalID": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:5\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "AddPartitionsToTxn v0",
+      "api": "AddPartitionsToTxn",
+      "version": 0,
+      "request": {
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "Topics": null,
+        "TransactionalID": "",
+        "Transactions": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null,
+        "Transactions": null
+      }
+    },
+    {
+      "label": "AddPartitionsToTxn v1",
+      "api": "AddPartitionsToTxn",
+      "version": 1,
+      "request": {
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "Topics": null,
+        "TransactionalID": "",
+        "Transactions": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null,
+        "Transactions": null
+      }
+    },
+    {
+      "label": "AddPartitionsToTxn v2",
+      "api": "AddPartitionsToTxn",
+      "version": 2,
+      "request": {
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "Topics": null,
+        "TransactionalID": "",
+        "Transactions": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null,
+        "Transactions": null
+      }
+    },
+    {
+      "label": "AddPartitionsToTxn v3",
+      "api": "AddPartitionsToTxn",
+      "version": 3,
+      "request": {
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "Topics": null,
+        "TransactionalID": "",
+        "Transactions": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": null,
+        "Transactions": null
+      }
+    },
+    {
+      "label": "AddOffsetsToTxn v0",
+      "api": "AddOffsetsToTxn",
+      "version": 0,
+      "request": {
+        "Group": "",
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "TransactionalID": ""
+      },
+      "response": {
+        "ErrorCode": 42,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "AddOffsetsToTxn v1",
+      "api": "AddOffsetsToTxn",
+      "version": 1,
+      "request": {
+        "Group": "",
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "TransactionalID": ""
+      },
+      "response": {
+        "ErrorCode": 42,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "AddOffsetsToTxn v2",
+      "api": "AddOffsetsToTxn",
+      "version": 2,
+      "request": {
+        "Group": "",
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "TransactionalID": ""
+      },
+      "response": {
+        "ErrorCode": 42,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "AddOffsetsToTxn v3",
+      "api": "AddOffsetsToTxn",
+      "version": 3,
+      "request": {
+        "Group": "",
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "TransactionalID": ""
+      },
+      "response": {
+        "ErrorCode": 42,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "EndTxn v0",
+      "api": "EndTxn",
+      "version": 0,
+      "request": {
+        "Commit": false,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "TransactionalID": ""
+      },
+      "response": {
+        "ErrorCode": 42,
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "EndTxn v1",
+      "api": "EndTxn",
+      "version": 1,
+      "request": {
+        "Commit": false,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "TransactionalID": ""
+      },
+      "response": {
+        "ErrorCode": 42,
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "EndTxn v2",
+      "api": "EndTxn",
+      "version": 2,
+      "request": {
+        "Commit": false,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "TransactionalID": ""
+      },
+      "response": {
+        "ErrorCode": 42,
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "EndTxn v3",
+      "api": "EndTxn",
+      "version": 3,
+      "request": {
+        "Commit": false,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "TransactionalID": ""
+      },
+      "response": {
+        "ErrorCode": 42,
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "TxnOffsetCommit v0",
+      "api": "TxnOffsetCommit",
+      "version": 0,
+      "request": {
+        "Generation": -1,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "Topics": null,
+        "TransactionalID": ""
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "TxnOffsetCommit v1",
+      "api": "TxnOffsetCommit",
+      "version": 1,
+      "request": {
+        "Generation": -1,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "Topics": null,
+        "TransactionalID": ""
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "TxnOffsetCommit v2",
+      "api": "TxnOffsetCommit",
+      "version": 2,
+      "request": {
+        "Generation": -1,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "Topics": null,
+        "TransactionalID": ""
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "TxnOffsetCommit v3",
+      "api": "TxnOffsetCommit",
+      "version": 3,
+      "request": {
+        "Generation": -1,
+        "Group": "",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "Topics": null,
+        "TransactionalID": ""
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DescribeACLs v1",
+      "api": "DescribeACLs",
+      "version": 1,
+      "request": {
+        "Host": null,
+        "Operation": "UNKNOWN",
+        "PermissionType": "UNKNOWN",
+        "Principal": null,
+        "ResourceName": null,
+        "ResourcePatternType": "LITERAL",
+        "ResourceType": "UNKNOWN"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "DescribeACLs v2",
+      "api": "DescribeACLs",
+      "version": 2,
+      "request": {
+        "Host": null,
+        "Operation": "UNKNOWN",
+        "PermissionType": "UNKNOWN",
+        "Principal": null,
+        "ResourceName": null,
+        "ResourcePatternType": "LITERAL",
+        "ResourceType": "UNKNOWN"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "DescribeACLs v3",
+      "api": "DescribeACLs",
+      "version": 3,
+      "request": {
+        "Host": null,
+        "Operation": "UNKNOWN",
+        "PermissionType": "UNKNOWN",
+        "Principal": null,
+        "ResourceName": null,
+        "ResourcePatternType": "LITERAL",
+        "ResourceType": "UNKNOWN"
+      },
+      "response": {
+        "(connection)": "closed by the broker"
+      }
+    },
+    {
+      "label": "CreateACLs v1",
+      "api": "CreateACLs",
+      "version": 1,
+      "request": {
+        "Creations": null
+      },
+      "response": {
+        "Results": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "CreateACLs v2",
+      "api": "CreateACLs",
+      "version": 2,
+      "request": {
+        "Creations": null
+      },
+      "response": {
+        "Results": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "CreateACLs v3",
+      "api": "CreateACLs",
+      "version": 3,
+      "request": {
+        "Creations": null
+      },
+      "response": {
+        "Results": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DeleteACLs v1",
+      "api": "DeleteACLs",
+      "version": 1,
+      "request": {
+        "Filters": null
+      },
+      "response": {
+        "Results": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DeleteACLs v2",
+      "api": "DeleteACLs",
+      "version": 2,
+      "request": {
+        "Filters": null
+      },
+      "response": {
+        "Results": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DeleteACLs v3",
+      "api": "DeleteACLs",
+      "version": 3,
+      "request": {
+        "Filters": null
+      },
+      "response": {
+        "Results": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DescribeConfigs v1",
+      "api": "DescribeConfigs",
+      "version": 1,
+      "request": {
+        "IncludeDocumentation": false,
+        "IncludeSynonyms": false,
+        "Resources": null
+      },
+      "response": {
+        "Resources": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DescribeConfigs v2",
+      "api": "DescribeConfigs",
+      "version": 2,
+      "request": {
+        "IncludeDocumentation": false,
+        "IncludeSynonyms": false,
+        "Resources": null
+      },
+      "response": {
+        "Resources": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DescribeConfigs v3",
+      "api": "DescribeConfigs",
+      "version": 3,
+      "request": {
+        "IncludeDocumentation": false,
+        "IncludeSynonyms": false,
+        "Resources": null
+      },
+      "response": {
+        "Resources": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DescribeConfigs v4",
+      "api": "DescribeConfigs",
+      "version": 4,
+      "request": {
+        "IncludeDocumentation": false,
+        "IncludeSynonyms": false,
+        "Resources": null
+      },
+      "response": {
+        "Resources": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "AlterConfigs v0",
+      "api": "AlterConfigs",
+      "version": 0,
+      "request": {
+        "Resources": null,
+        "ValidateOnly": false
+      },
+      "response": {
+        "Resources": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "AlterConfigs v1",
+      "api": "AlterConfigs",
+      "version": 1,
+      "request": {
+        "Resources": null,
+        "ValidateOnly": false
+      },
+      "response": {
+        "Resources": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "AlterConfigs v2",
+      "api": "AlterConfigs",
+      "version": 2,
+      "request": {
+        "Resources": null,
+        "ValidateOnly": false
+      },
+      "response": {
+        "Resources": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "CreatePartitions v0",
+      "api": "CreatePartitions",
+      "version": 0,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": null,
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "CreatePartitions v1",
+      "api": "CreatePartitions",
+      "version": 1,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": null,
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "CreatePartitions v2",
+      "api": "CreatePartitions",
+      "version": 2,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": null,
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "CreatePartitions v3",
+      "api": "CreatePartitions",
+      "version": 3,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": null,
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DeleteGroups v0",
+      "api": "DeleteGroups",
+      "version": 0,
+      "request": {
+        "Groups": null
+      },
+      "response": {
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DeleteGroups v1",
+      "api": "DeleteGroups",
+      "version": 1,
+      "request": {
+        "Groups": null
+      },
+      "response": {
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DeleteGroups v2",
+      "api": "DeleteGroups",
+      "version": 2,
+      "request": {
+        "Groups": null
+      },
+      "response": {
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "IncrementalAlterConfigs v0",
+      "api": "IncrementalAlterConfigs",
+      "version": 0,
+      "request": {
+        "Resources": null,
+        "ValidateOnly": false
+      },
+      "response": {
+        "Resources": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "IncrementalAlterConfigs v1",
+      "api": "IncrementalAlterConfigs",
+      "version": 1,
+      "request": {
+        "Resources": null,
+        "ValidateOnly": false
+      },
+      "response": {
+        "Resources": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "OffsetDelete v0",
+      "api": "OffsetDelete",
+      "version": 0,
+      "request": {
+        "Group": "",
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 24,
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DescribeCluster v0",
+      "api": "DescribeCluster",
+      "version": 0,
+      "request": {
+        "EndpointType": 1,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeFencedBrokers": false
+      },
+      "response": {
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "IsFenced": false,
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterAuthorizedOperations": -2147483648,
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "EndpointType": 1,
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DescribeCluster v1",
+      "api": "DescribeCluster",
+      "version": 1,
+      "request": {
+        "EndpointType": 1,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeFencedBrokers": false
+      },
+      "response": {
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "IsFenced": false,
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterAuthorizedOperations": -2147483648,
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "EndpointType": 1,
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DescribeCluster v2",
+      "api": "DescribeCluster",
+      "version": 2,
+      "request": {
+        "EndpointType": 1,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeFencedBrokers": false
+      },
+      "response": {
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "IsFenced": false,
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterAuthorizedOperations": -2147483648,
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "EndpointType": 1,
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "DescribeProducers v0",
+      "api": "DescribeProducers",
+      "version": 0,
+      "request": {
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "DescribeTransactions v0",
+      "api": "DescribeTransactions",
+      "version": 0,
+      "request": {
+        "TransactionalIDs": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "TransactionStates": null
+      }
+    },
+    {
+      "label": "ListTransactions v0",
+      "api": "ListTransactions",
+      "version": 0,
+      "request": {
+        "DurationFilterMillis": -1,
+        "ProducerIDFilters": null,
+        "StateFilters": null,
+        "TransactionalIDPattern": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "TransactionStates": null,
+        "UnknownStateFilters": null
+      }
+    },
+    {
+      "label": "ConsumerGroupHeartbeat v0",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "matrix",
+        "InstanceID": null,
+        "MemberEpoch": 0,
+        "MemberID": "",
+        "RackID": null,
+        "RebalanceTimeoutMillis": -1,
+        "ServerAssignor": null,
+        "SubscribedTopicNames": null,
+        "SubscribedTopicRegex": null,
+        "Topics": null
+      },
+      "response": {
+        "Assignment": null,
+        "ErrorCode": 42,
+        "ErrorMessage": "RebalanceTimeoutMs must be provided in first request.",
+        "HeartbeatIntervalMillis": 0,
+        "MemberEpoch": 0,
+        "MemberID": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ConsumerGroupHeartbeat v1",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 1,
+      "request": {
+        "Group": "matrix",
+        "InstanceID": null,
+        "MemberEpoch": 0,
+        "MemberID": "",
+        "RackID": null,
+        "RebalanceTimeoutMillis": -1,
+        "ServerAssignor": null,
+        "SubscribedTopicNames": null,
+        "SubscribedTopicRegex": null,
+        "Topics": null
+      },
+      "response": {
+        "Assignment": null,
+        "ErrorCode": 42,
+        "ErrorMessage": "MemberId can't be empty.",
+        "HeartbeatIntervalMillis": 0,
+        "MemberEpoch": 0,
+        "MemberID": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ConsumerGroupDescribe v0",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": null,
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "ConsumerGroupDescribe v1",
+      "api": "ConsumerGroupDescribe",
+      "version": 1,
+      "request": {
+        "Groups": null,
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": null,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "GetTelemetrySubscriptions v0",
+      "api": "GetTelemetrySubscriptions",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003czero-id\u003e"
+      },
+      "response": {
+        "AcceptedCompressionTypes": [
+          4,
+          3,
+          1,
+          2
+        ],
+        "ClientInstanceID": "\u003cinstance:1\u003e",
+        "DeltaTemporality": true,
+        "ErrorCode": 0,
+        "PushIntervalMillis": 300000,
+        "RequestedMetrics": null,
+        "SubscriptionID": "\u003csubscription:1\u003e",
+        "TelemetryMaxBytes": 1048576,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "PushTelemetry v0",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003czero-id\u003e",
+        "CompressionType": 0,
+        "Metrics": null,
+        "SubscriptionID": 0,
+        "Terminating": false
+      },
+      "response": {
+        "ErrorCode": 42,
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}

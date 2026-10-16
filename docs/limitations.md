@@ -202,6 +202,13 @@ implement it.
   (SUBTRACT `delete` from an unset `cleanup.policy` leaves `""`, recorded in
   `list-config-append`), for a log that is neither deleted nor compacted; this broker's
   log has no such mode, so it refuses what it would not do.
+- **A group request with an empty group id is answered for the group** (open). Apache
+  Kafka 4.3.1 answers a default JoinGroup, SyncGroup, Heartbeat, LeaveGroup and
+  OffsetDelete, whose group id is empty, with `INVALID_GROUP_ID`, and OffsetFetch v2 to
+  v7 with `NOT_COORDINATOR`; this broker answers as for a group that is not there
+  (`conformance/recordings/version-matrix.json`).
+- **ApiVersions v3 with no client software name is answered** (open): Kafka answers
+  `INVALID_REQUEST` (`version-matrix`, step `ApiVersions v3`).
 - **TxnOffsetCommit sent from outside the consumer group** (generation -1, no member id,
   as a producer that commits a consumer's offsets without being one sends it) is
   answered for the transaction's state: `INVALID_PRODUCER_ID_MAPPING`, `INVALID_TXN_STATE`,

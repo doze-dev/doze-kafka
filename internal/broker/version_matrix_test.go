@@ -21,6 +21,12 @@ import (
 // encodes to the same bytes. A wrong version range in the table (advertised past
 // what the handler can encode) or a handler that panics on an empty request shows
 // up here, for the API and version it is wrong at.
+//
+// What the answers say is compared with real Kafka elsewhere: the version-matrix
+// scenario (conformance/scenarios_versions.go) sends the same default request of
+// every API at every offered version to apache/kafka:4.3.1 and the replay holds
+// doze-kafka's error codes and shape to each recorded answer, with every accepted
+// difference listed (conformance/claims/api.md V13).
 
 // matrixVersions is the versions of a range to try: the ends and the middle.
 func matrixVersions(r protocol.VersionRange) []int16 {
