@@ -512,7 +512,7 @@ func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger
 		Traffic: traffic, TraceHeader: cfg.TraceHeader, ClientMetrics: clientMetrics,
 		Facts: console.BrokerFacts{
 			Workspace: workspaceLabel(cfg.InstanceName()), KafkaMajor: cfg.Version,
-			DataDir: cfg.DataDir, SASLMechanisms: cfg.SASLMechanisms, RegistryURL: registryPublic,
+			DataDir: cfg.DataDir, SASLMechanisms: cfg.SASLMechanisms, RegistryURL: registryPublic, RegistryBuiltIn: registryURL != "",
 			AutoCreateTopics: cfg.AutoCreateTopics, DefaultPartitions: cfg.DefaultPartitions, MaxPartitions: cfg.MaxPartitions,
 			Version: version, Started: time.Now(),
 		},

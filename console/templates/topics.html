@@ -2,7 +2,7 @@
      dock under it and the inspector on the right (in flow). */}}
 {{define "topic_lp"}}
 <aside class="list" aria-label="Topics" data-list="topics">
-  <div class="row sb ce list-h"><span class="cap">Topics · {{len .List}} · messages</span><a class="btn sm" href="{{newTopicURL}}" data-create aria-label="New topic">+ New</a></div>
+  <div class="row sb ce list-h ruled"><span class="cap">Topics · {{len .List}} · messages</span><a class="btn sm" href="{{newTopicURL}}" data-create aria-label="New topic">+ New</a></div>
   <div class="list-filter"><input class="inp m" type="search" placeholder="Filter topics" aria-label="Filter Topics" data-filter-target=".list .li" data-filter-none="#list-none" spellcheck="false" autocomplete="off"></div>
   <div class="list-scroll">
     {{if not .List}}<div class="note list-note"><b>{{t "topics.none.title"}}</b><br>{{t "topics.none.hint"}}</div>{{end}}
@@ -13,7 +13,7 @@
     {{end}}
     <div class="note list-note" id="list-none" hidden>No topic matches the filter.</div>
   </div>
-  <div class="note list-note list-foot">A number that needs a look is coloured.</div>
+  {{if .Sel}}<div class="note list-note list-foot">A number that needs a look is coloured.</div>{{end}}
 </aside>
 {{end}}
 
@@ -23,7 +23,7 @@
   <main class="main gap12" id="detail">
     <div class="row sb ce idband">
       <div class="col"><h1 class="h1">Topics</h1><span class="note">{{if .Rows}}Nothing selected. Pick a topic <span class="wide-only">on the left</span><span class="narrow-only">below</span>, or make one.{{else if .Facts.DataDir}}<span class="m">{{.Facts.DataDir}}</span> holds no topics.{{else}}This broker holds no topics.{{end}}</span></div>
-      <div class="row g8 ce"><a class="btn pri" href="{{newTopicURL}}">Create topic</a></div>
+      <div class="row g8 ce"><a class="btn pri w5" href="{{newTopicURL}}">Create topic</a></div>
     </div>
 
     {{template "topics_live" .}}
@@ -59,7 +59,7 @@
         {{if $.HasSize}}<span class="m ra" data-l="Size">{{diskSize .Size}}</span>{{end}}
         <span class="m {{if eq .Retention "kept per key"}}mut{{end}}" data-l="Retention">{{if .Retention}}{{.Retention}}{{else}}<span class="mut">—</span>{{end}}</span>
         <span class="m" data-l="Read by">{{if .ReadBy}}{{range $i, $g := .ReadBy}}{{if $i}}, {{end}}{{$g}}{{end}}{{else}}<span class="mut" title="Read by is the groups that have committed offsets on this topic. A consumer that assigns partitions itself has no group, so it is not counted.">no group has committed</span>{{end}}</span>
-        <span data-l="Compact">{{if .Compact}}<span class="pill">compact</span>{{else}}<span class="mut">—</span>{{end}}</span>
+        {{if .Compact}}<span class="pill" data-l="Compact">compact</span>{{else}}<span class="mut" data-l="Compact">—</span>{{end}}
         <span class="m" data-l="Schema subject">{{if .Subject}}{{.Subject}}{{else}}<span class="mut">—</span>{{end}}</span>
       </a>
       {{end}}

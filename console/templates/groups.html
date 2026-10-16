@@ -10,12 +10,12 @@
     <a class="li {{if eq .ID $.Sel}}on{{end}}" href="{{.URL}}" data-name="{{.ID}}"{{if eq .ID $.Sel}} aria-current="page"{{end}}>
       <span class="dot {{groupDot .State}}" title="{{.State}}"></span>
       <span class="grow el m">{{.ID}}</span>
-      <span class="m {{if .Behind}}warn{{else}}mut{{end}}" data-n>{{num .Lag}}</span>
+      <span class="m{{if .Behind}} warn{{end}}" data-n>{{num .Lag}}</span>
     </a>
     {{end}}
     <div class="note list-note" id="list-none" hidden>No group matches the filter.</div>
   </div>
-  <div class="note list-note list-foot">{{if .Sel}}{{else}}Nothing selected. {{end}}Groups are not created here. One appears when a consumer joins.</div>
+  <div class="note list-note list-foot wide-pad">{{if .Sel}}{{else}}Nothing selected. {{end}}Groups are not created here. One appears when a consumer joins.</div>
 </aside>
 {{end}}
 
@@ -36,7 +36,7 @@
 
 {{/* Gr-Home's summary, filters, table and callouts: polled every 3 s (live/groups), as
      the board says. What is typed in the filter and the kind chosen stay through a poll. */}}
-{{define "groups_live"}}<div class="col g12" id="groups-live" data-live="{{.Prefix}}/live/groups" data-hash="{{.LiveHash}}" data-live-ms="3000">{{template "groups_live_in" .}}</div>{{end}}
+{{define "groups_live"}}<div class="col g10" id="groups-live" data-live="{{.Prefix}}/live/groups" data-hash="{{.LiveHash}}" data-live-ms="3000">{{template "groups_live_in" .}}</div>{{end}}
 {{define "groups_live_in"}}
     {{if .Groups}}
     <div class="row ce g8 wrap" id="groups-summary">
@@ -58,7 +58,7 @@
       <span class="note">refreshes every 3 s</span>
     </div>
 
-    <div class="card" id="groups-table" style="--c: minmax(0, 1.3fr) 110px 110px 70px minmax(0, 1.4fr) 86px 110px">
+    <div class="card" id="groups-table">
       <div class="r h"><span>Group</span><span>Protocol</span><span>State</span><span class="ra">Members</span><span>Topics</span><span class="ra">Lag</span><span class="ra">Generation</span></div>
       {{range .Groups}}
       <a class="r" href="{{.URL}}" data-row data-name="{{.ID}}" data-text="{{range .Topics}}{{.}} {{end}}" data-seg="{{if .Members}}with-members{{else}}empty{{end}}{{if .Behind}} behind{{end}}">
@@ -67,7 +67,7 @@
         <span class="m {{if eq .State "Stable"}}ok{{else if eq .State "Dead"}}bad{{else if eq .State "Empty"}}mut{{else}}warn{{end}}" data-l="State">{{.State}}</span>
         <span class="m ra" data-l="Members">{{.Members}}</span>
         <span class="m el" data-l="Topics">{{if .Topics}}{{range $i, $t := .Topics}}{{if $i}}, {{end}}{{$t}}{{end}}{{else}}<span class="mut">—</span>{{end}}</span>
-        <span class="m ra {{if .Behind}}warn{{else if .HasOffsets}}ok{{else}}mut{{end}}" data-l="Lag">{{if .HasOffsets}}{{num .Lag}}{{else}}—{{end}}</span>
+        <span class="m ra{{if .Behind}} warn{{else if not .HasOffsets}} mut{{end}}" data-l="Lag">{{if .HasOffsets}}{{num .Lag}}{{else}}—{{end}}</span>
         <span class="m ra {{if not .Members}}mut{{end}}" data-l="Generation">{{if .Generation}}{{if eq .Protocol "848"}}epoch{{else}}generation{{end}} {{.Generation}}{{else}}<span class="mut">—</span>{{end}}</span>
       </a>
       {{end}}
@@ -76,7 +76,7 @@
 
     <div class="row g12 wrap callouts">
       <div class="callout grow"><span class="b">Reading the table</span><span class="note">Protocol is what the client chose: <span class="m">classic</span> (JoinGroup, SyncGroup, Heartbeat) or <span class="m">consumer</span> (ConsumerGroupHeartbeat, KIP-848). Lag is log end minus committed, summed over the topics. An empty group keeps its offsets, so its lag keeps growing as producers write. A generation is shown when the broker has seen its coordinator say one.</span></div>
-      {{if .NeedALook}}<div class="callout warn grow"><span class="b">{{len .NeedALook}} group{{if ne (len .NeedALook) 1}}s need{{else}} needs{{end}} a look</span><span class="note">{{range $i, $g := .NeedALook}}{{if $i}} {{end}}<a href="{{$g.URL}}">{{$g.ID}}</a> is empty and <span class="m">{{num $g.Lag}}</span> record{{if ne $g.Lag 1}}s{{end}} behind: nothing is reading it.{{end}}</span></div>{{end}}
+      {{if .NeedALook}}<div class="callout warn grow"><span class="b">{{countWord (len .NeedALook)}} group{{if ne (len .NeedALook) 1}}s need{{else}} needs{{end}} a look</span><span class="note">{{range $i, $g := .NeedALook}}{{if $i}} {{end}}<a href="{{$g.URL}}">{{$g.ID}}</a> is empty and <span class="m">{{num $g.Lag}}</span> record{{if ne $g.Lag 1}}s{{end}} behind: nothing is reading it.{{end}}</span></div>{{end}}
     </div>
     {{else}}
     <div class="callout"><span class="b">{{t "groups.none.title"}}</span><span class="note">{{t "groups.none.hint"}}</span></div>

@@ -14,6 +14,21 @@ import (
 var clusterViews = []string{"overview", "config", "apis", "transactions"}
 
 // cluster is Cl-Home: one broker, what it is, what it holds, and the pages under it.
+// upText is how long the broker has been up as Cl-Home's sentence writes it: "2 h 14 m",
+// "25 m 31 s", "40 s".
+func upText(d time.Duration) string {
+	s := int64(d / time.Second)
+	switch {
+	case s < 60:
+		return fmt.Sprintf("%d s", s)
+	case s < 3600:
+		return fmt.Sprintf("%d m %d s", s/60, s%60)
+	case s < 172800:
+		return fmt.Sprintf("%d h %d m", s/3600, s/60%60)
+	}
+	return fmt.Sprintf("%d d %d h", s/86400, s/3600%24)
+}
+
 func (c *Console) cluster(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	info, err := c.be.ClusterInfo(ctx)
@@ -73,7 +88,7 @@ func (c *Console) cluster(w http.ResponseWriter, r *http.Request) {
 		"Facts": c.connectFacts(r),
 	}
 	if !c.facts.Started.IsZero() {
-		data["UpFor"] = spanText(time.Since(c.facts.Started))
+		data["UpFor"] = upText(time.Since(c.facts.Started))
 	}
 	data["Version"] = c.facts.Version
 	if c.traffic != nil {

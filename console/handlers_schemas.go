@@ -40,7 +40,7 @@ func (c *Console) schemas(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	list, err := c.reg.Subjects(ctx)
+	list, ids, err := c.reg.Catalogue(ctx)
 	if err != nil {
 		c.fail(w, r, err)
 		return
@@ -63,10 +63,7 @@ func (c *Console) schemas(w http.ResponseWriter, r *http.Request) {
 	rows := make([]row, 0, len(list))
 	var versions int
 	for _, s := range list {
-		r := row{SubjectRow: s}
-		if vs, err := c.reg.Versions(ctx, s.Name); err == nil {
-			r.Versions = len(vs)
-		}
+		r := row{SubjectRow: s, Versions: s.Versions}
 		versions += r.Versions
 		r.Level, r.OwnLevel, _ = c.reg.Compat(ctx, s.Name)
 		if t := subjectTopic(s.Name); t != "" && topicSet[t] {
@@ -80,9 +77,41 @@ func (c *Console) schemas(w http.ResponseWriter, r *http.Request) {
 		regURL = c.reg.base
 	}
 	host := strings.TrimPrefix(strings.TrimPrefix(regURL, "http://"), "https://")
+	mode, _ := c.reg.Mode(ctx)
 	c.render(w, r, "schemas_home", map[string]any{"List": list, "Rows": rows, "Page": "schemas", "Title": "Schemas",
-		"VersionCount": versions, "GlobalLevel": global, "RegistryURL": regURL, "RegistryHost": host,
+		"VersionCount": versions, "GlobalLevel": global, "RegistryURL": regURL, "RegistryHost": host, "Mode": mode,
+		"BuiltIn": c.facts.RegistryBuiltIn, "IDs": idSummary(ids),
 		"SASL": len(c.facts.SASLMechanisms) > 0 || c.be.opts.SASLUser != ""})
+}
+
+// idSpan is Sc-Home's list foot: how many schemas, the ids they span, and the ids in
+// that span no version uses ("ids 1 to 10. Id 9 is not in use here.").
+type idSpan struct {
+	Count, From, To int
+	Unused          []int
+	More            int // unused ids past the ones named.
+}
+
+func idSummary(ids []int) idSpan {
+	s := idSpan{Count: len(ids)}
+	if len(ids) == 0 {
+		return s
+	}
+	s.From, s.To = ids[0], ids[len(ids)-1]
+	used := map[int]bool{}
+	for _, id := range ids {
+		used[id] = true
+	}
+	for id := s.From; id <= s.To; id++ {
+		if !used[id] {
+			if len(s.Unused) < 3 {
+				s.Unused = append(s.Unused, id)
+			} else {
+				s.More++
+			}
+		}
+	}
+	return s
 }
 
 func (c *Console) schemaCreatePage(w http.ResponseWriter, r *http.Request) {

@@ -51,7 +51,7 @@
   {{.Facts.CommandConfig}}--create --topic orders \
   --partitions 3</pre>
         <div class="grow"></div>
-        <div class="row ce g8"><a class="btn pri" href="{{newTopicURL}}">Or create it here</a><span class="note">same call, same errors</span></div>
+        <div class="row ce g8"><a class="btn pri w5" href="{{newTopicURL}}">Or create it here</a><span class="note">same call, same errors</span></div>
       </section>
 
       <section class="card pad col g12 grow" aria-label="Step 2, connect an app">
@@ -63,7 +63,7 @@
   {{if .Facts.CommandConfig}}--producer.config client.properties \
   {{end}}--topic orders</pre>
         <div class="grow"></div>
-        <div class="row ce g8"><a class="btn" href="{{prefix}}/connect">Settings for your client</a><span class="note">the values, filled in</span></div>
+        <div class="row ce g8"><a class="btn w5" href="{{prefix}}/connect">Settings for your client</a><span class="note">the values, filled in</span></div>
       </section>
 
       <section class="card pad col g12 grow" aria-label="Step 3, watch it">
@@ -75,7 +75,7 @@
   {{end}}--topic orders \
   --from-beginning</pre>
         <div class="grow"></div>
-        <div class="row ce g8">{{if .HasTrafficLink}}<a class="btn" href="{{prefix}}/traffic">Open Traffic</a>{{else}}<a class="btn" href="{{prefix}}/topics">Open Topics</a>{{end}}<span class="pill"><span class="dot off"></span>waiting for the first request</span></div>
+        <div class="row ce g8">{{if .HasTrafficLink}}<a class="btn w5" href="{{prefix}}/traffic">Open Traffic</a>{{else}}<a class="btn w5" href="{{prefix}}/topics">Open Topics</a>{{end}}<span class="pill"><span class="dot off"></span>waiting for the first request</span></div>
       </section>
     </div>
 

@@ -1,29 +1,30 @@
-{{/* Schemas. The list (Sc-Home): subject, its language and its latest version; the
-     page is the home, or one subject (Sc-05: Versions, Compatibility, Register). The
-     registry's own requests are not recorded, so there is no wire dock here. */}}
+{{/* Schemas. The list (Sc-Home): subject, its language and how many versions it has;
+     the page is the home, or one subject (Sc-05: Versions, Compatibility, Register).
+     The registry's own requests are not recorded, so there is no wire dock here. */}}
 {{define "schema_lp"}}
 <aside class="list" aria-label="Subjects">
   <div class="list-filter list-filter-first"><input class="inp m" type="search" placeholder="Filter subjects" aria-label="Filter Schemas" data-filter-target=".list .li" data-filter-none="#list-none" spellcheck="false" autocomplete="off"></div>
+  <div class="row sb list-cols"><span class="cap">Subject</span><span class="cap">Versions</span></div>
   <div class="list-scroll">
     {{if not .List}}<div class="note list-note"><b>{{t "schemas.none.title"}}</b><br>{{t "schemas.none.hint"}}</div>{{end}}
     {{range .List}}
     <a class="li two {{if eq .Name $.Sel}}on{{end}}" href="{{schemaURL .Name}}" data-name="{{.Name}}"{{if eq .Name $.Sel}} aria-current="page"{{end}}>
       <span class="col grow"><span class="m el">{{.Name}}</span><span class="note">{{.TypeLabel}}</span></span>
-      <span class="pill">{{.TypeShort}}</span><span class="m b">{{.Latest}}</span>
+      <span class="pill">{{.TypeShort}}</span><span class="m b">{{.Versions}}</span>
     </a>
     {{end}}
     <div class="note list-note" id="list-none" hidden>No subject matches the filter.</div>
   </div>
-  <div class="note list-note list-foot">{{len .List}} subject{{if ne (len .List) 1}}s{{end}}. The number is the latest version.</div>
+  <div class="note list-note list-foot ruled">{{len .List}} subject{{if ne (len .List) 1}}s{{end}}{{with .IDs}}{{if .Count}}, {{.Count}} schema{{if ne .Count 1}}s{{end}}, {{if eq .From .To}}id {{.From}}{{else}}ids {{.From}} to {{.To}}{{end}}{{end}}{{end}}.{{with .IDs}}{{if .Unused}} {{if eq (len .Unused) 1}}Id{{else}}Ids{{end}} {{range $i, $u := .Unused}}{{if $i}}, {{end}}{{$u}}{{end}}{{if .More}} and {{.More}} more{{end}} {{if and (eq (len .Unused) 1) (not .More)}}is{{else}}are{{end}} not in use here.{{end}}{{end}}</div>
 </aside>
 {{end}}
 
 {{define "schemas_home"}}{{template "shell_top" .}}
-  {{template "schema_lp" (dict "List" .List "Sel" "")}}
+  {{template "schema_lp" (dict "List" .List "Sel" "" "IDs" .IDs)}}
   <main class="main" id="detail">
     <div class="row sb ce idband">
       <div class="col"><h1 class="h1">Schemas</h1><span class="note">The built-in registry{{if .RegistryHost}} at <span class="m">{{.RegistryHost}}</span>{{end}}. Confluent's REST API, so stock serializers work with only <span class="m">schema.registry.url</span> changed.</span></div>
-      <div class="row g8 ce"><a class="btn pri" href="{{newSchemaURL ""}}" data-create>Register schema</a></div>
+      <div class="row g8 ce"><a class="btn pri w5" href="{{newSchemaURL ""}}" data-create>Register schema</a></div>
     </div>
 
     {{if .Rows}}
@@ -31,14 +32,16 @@
       <span class="m">{{len .Rows}} subject{{if ne (len .Rows) 1}}s{{end}}</span><span class="mut">·</span>
       <span class="m">{{.VersionCount}} version{{if ne .VersionCount 1}}s{{end}}</span>
       {{if .GlobalLevel}}<span class="mut">·</span><span class="m">global level {{.GlobalLevel}}</span>{{end}}
+      {{if .Mode}}<span class="mut">·</span><span class="m">mode {{.Mode}}</span>{{end}}
+      {{if .BuiltIn}}<span class="mut">·</span><span class="m mut">stored in meta.db, not a _schemas topic</span>{{end}}
     </div>
 
-    <div class="card" id="schemas-table" style="--c: minmax(0, 1.6fr) 90px 70px 80px 160px minmax(0, 1.2fr)">
+    <div class="card" id="schemas-table">
       <div class="r h"><span>Subject</span><span>Type</span><span class="ra">Versions</span><span class="ra">Latest id</span><span>Level</span><span>Topics using it</span></div>
       {{range .Rows}}
       <a class="r" href="{{schemaURL .Name}}" data-row>
         <span class="m b">{{.Name}}</span>
-        <span class="m" data-l="Type">{{.TypeShort}}</span>
+        <span class="m" data-l="Type">{{.TypeName}}</span>
         <span class="m ra" data-l="Versions">{{.Versions}}</span>
         <span class="m ra" data-l="Latest id">{{.ID}}</span>
         <span class="m {{if not .OwnLevel}}mut{{end}}" data-l="Level">{{if .Level}}{{.Level}}{{if not .OwnLevel}} (global){{end}}{{else}}—{{end}}</span>
@@ -54,8 +57,6 @@
     {{else}}
     <div class="callout"><span class="b">{{t "schemas.none.title"}}</span><span class="note">{{t "schemas.none.hint"}}</span></div>
     {{end}}
-    <div class="grow"></div>
-    <div class="tablenote">Select a subject to open it. The registry's own requests are not recorded, so there is no wire under this page.</div>
   </main>
 {{template "shell_bottom" .}}{{end}}
 

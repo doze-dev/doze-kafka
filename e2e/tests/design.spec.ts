@@ -813,7 +813,11 @@ test('the title of a topic, a group and a subject is the boards\' .h1.m: Plex Sa
   }
 });
 
-test('every .btn is weight 400, <button> or <a> (the boards draw them all as buttons); only Cl-Home\'s "Connect an app" is 500', async ({ page }) => {
+test('every .btn is weight 400, <button> or <a>; the links the boards draw as links (Cl-Home\'s "Connect an app", Ac-Home\'s "Create ACL", Sc-Home\'s "Register schema") are 500', async ({ page }) => {
+  await page.goto('access');
+  await expect(page.locator('main a.btn', { hasText: 'Create ACL' }).first()).toHaveCSS('font-weight', '500');
+  await page.goto('schemas');
+  await expect(page.locator('main a.btn', { hasText: 'Register schema' }).first()).toHaveCSS('font-weight', '500');
   await page.goto('topics/seed-orders');
   await expect(page.locator('main button.btn.pri').first()).toHaveCSS('font-weight', '400');
   await expect(page.locator('main button.btn').first()).toHaveCSS('font-weight', '400');

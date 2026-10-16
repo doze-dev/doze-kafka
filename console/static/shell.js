@@ -812,6 +812,9 @@
     var rows = listRows();
     if (!rows.length) return;
     var at = rows.indexOf(cursorEl);
+    // In the list, the first j moves from the open row (the page being looked at), not
+    // from the top: landing on the open row and pressing ↵ opened what was already open.
+    if (at < 0) at = rows.findIndex(function (r) { return r.classList.contains("on"); });
     var next = at < 0 ? (d > 0 ? 0 : rows.length - 1) : Math.min(rows.length - 1, Math.max(0, at + d));
     document.querySelectorAll(".cursor").forEach(function (r) { r.classList.remove("cursor"); });
     cursorEl = rows[next];

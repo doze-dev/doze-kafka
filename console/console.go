@@ -129,6 +129,9 @@ type BrokerFacts struct {
 	// RegistryURL is where clients reach the schema registry, which is not always
 	// where the console does (a name the zone routes, against the loopback port).
 	RegistryURL string
+	// RegistryBuiltIn says the registry is the broker's own, which keeps its schemas in
+	// the broker's metadata database (meta.db), not in a _schemas topic.
+	RegistryBuiltIn bool
 	// AutoCreateTopics says whether a producer that names a topic that does not exist
 	// makes it, with DefaultPartitions partitions.
 	AutoCreateTopics  bool
@@ -437,6 +440,7 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 		"add":         func(a, b int) int { return a + b },
 		"segs":        segsHTML,
 		"diskSize":    diskSize,
+		"countWord":   countWord,
 		"groupDot":    groupDot,
 		"keymapJSON":  keymapJSON,
 		"whenText":    whenText,

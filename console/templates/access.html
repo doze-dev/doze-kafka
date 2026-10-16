@@ -22,7 +22,7 @@
   <main class="main" id="detail">
     <div class="row sb ce idband">
       <div class="col"><h1 class="h1">Access</h1><span class="note">The ACLs on this broker. They are enforced on every request.</span></div>
-      <div class="row g8 ce"><a class="btn pri" href="{{prefix}}/new/acl" data-create>Create ACL</a></div>
+      <div class="row g8 ce"><a class="btn pri w5" href="{{prefix}}/new/acl" data-create>Create ACL</a></div>
     </div>
 
     <div class="callout" role="note"><span><span class="b">These are enforced.</span> {{if .OpenByDefault}}A topic, group or the cluster that no ACL is about is open to everyone (the default is <span class="m">allow</span>); one that has ACLs allows only what they allow, and a DENY always wins.{{else}}Anything an ACL does not allow is refused (the default is <span class="m">deny</span>); a DENY always wins.{{end}}{{if .SuperUserList}} Super users, never refused: {{range $i, $s := .SuperUserList}}{{if $i}}, {{end}}<span class="m">{{$s}}</span>{{end}}.{{end}} Without authentication every client is <span class="m">User:ANONYMOUS</span>.</span>
@@ -74,7 +74,7 @@
   <main class="main gap12" id="detail">
     <div class="row sb ce idband">
       <div class="col"><h1 class="h1">Check a request</h1><span class="note">Read by the rules the broker enforces, in its order, without sending the request. Nothing is changed or logged as a refusal.</span></div>
-      <div class="row g8 ce"><a class="btn" href="{{prefix}}/access" data-esc>Back to the list</a></div>
+      <div class="row g8 ce"><a class="btn w5" href="{{prefix}}/access" data-esc>Back to the list</a></div>
     </div>
 
     <form class="card pad col g8" method="get" action="{{prefix}}/access/check" data-enter>
@@ -119,7 +119,7 @@
   <main class="main gap12" id="detail">
     <div class="row sb ce idband">
       <div class="col"><h1 class="h1">Create an ACL</h1><span class="note">The same fields <span class="m">CreateAcls</span> has. The console sends it as <span class="m">{{.Console}}</span>{{if .ConsoleSuper}}, a super user{{end}}.</span></div>
-      <div class="row g8 ce"><a class="btn" href="{{prefix}}/access">Back to the list</a></div>
+      <div class="row g8 ce"><a class="btn w5" href="{{prefix}}/access">Back to the list</a></div>
     </div>
     <form class="col g12" id="create-acl" hx-post="{{prefix}}/new/acl" hx-disabled-elt="find button[type=submit]" x-data="{perm: '{{.A.Permission}}'}" data-mod-enter>
       <div class="card pad col g12">
@@ -140,7 +140,7 @@
       </div>
       <div id="acl-preview" hx-get="{{prefix}}/new/acl/preview" hx-trigger="input from:#create-acl delay:200ms, change from:#create-acl, click from:#create-acl .seg button" hx-include="#create-acl" hx-target="this" hx-select="unset" hx-swap="innerHTML" class="col g12">{{template "access_create_preview" .}}</div>
       <div class="err form-err" data-err-slot hidden role="alert"></div>
-      <div class="row g8"><button class="btn pri" type="submit">Create ACL</button><a class="btn" href="{{prefix}}/access/check?principal={{urlquery .A.Principal}}&amp;operation={{urlquery .A.Operation}}&amp;resource={{urlquery .A.Resource}}&amp;name={{urlquery .A.Name}}">Check first</a><a class="btn ghost" href="{{prefix}}/access" data-esc>Cancel</a></div>
+      <div class="row g8"><button class="btn pri" type="submit">Create ACL</button><a class="btn w5" href="{{prefix}}/access/check?principal={{urlquery .A.Principal}}&amp;operation={{urlquery .A.Operation}}&amp;resource={{urlquery .A.Resource}}&amp;name={{urlquery .A.Name}}">Check first</a><a class="btn ghost w5" href="{{prefix}}/access" data-esc>Cancel</a></div>
     </form>
   </main>
 {{template "shell_bottom" .}}{{end}}

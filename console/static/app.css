@@ -241,7 +241,7 @@ h1, h2, h3 { margin: 0; }
 .row { display: flex; gap: 12px; } .col { display: flex; flex-direction: column; }
 .ce { align-items: center; } .sb { justify-content: space-between; }
 .grow { flex: 1; min-width: 0; min-height: 0; }
-.g4 { gap: 4px; } .g6 { gap: 6px; } .g8 { gap: 8px; } .g12 { gap: 12px; } .g16 { gap: 16px; } .g20 { gap: 20px; }
+.g4 { gap: 4px; } .g6 { gap: 6px; } .g8 { gap: 8px; } .g10 { gap: 10px; } .g12 { gap: 12px; } .g16 { gap: 16px; } .g20 { gap: 20px; }
 .wrap { flex-wrap: wrap; }
 .el { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .h1 { font-size: var(--fs-xl); font-weight: 600; line-height: 24px; }
@@ -298,7 +298,8 @@ span.num {
   height: 28px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); color: var(--ink);
   width: 100%; font-family: inherit; font-size: var(--fs-md);
 }
-.inp.m { font-family: var(--mono); font-size: var(--fs-sm); }
+/* The boards write their fields .inp.m and draw them in the page's face: con.css's `.app input { font: inherit }` outranks .m. The console draws what they render. */
+.inp.m { font-family: var(--sans); font-size: var(--fs-md); line-height: 20px; }
 .inp:focus { outline: 2px solid var(--ring); outline-offset: 1px; }
 .inp::placeholder { color: var(--mut); }
 .page-title-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
@@ -346,6 +347,8 @@ span.num {
 .list .li.on { background: var(--sel); font-weight: 600; }
 .list .li.cursor { outline: 1px dashed var(--mut); outline-offset: -2px; }
 .list-h { padding: 10px 12px 6px; flex: none; }
+/* Tp-Home and Tp-05's list head: the count and + New over a rule. */
+.list-h.ruled { padding: 10px 12px; border-bottom: 1px solid var(--line2); }
 .list-note { padding: 8px 12px; flex: none; }
 .list-scroll { flex: 1; min-height: 0; overflow-y: auto; }
 
@@ -428,6 +431,7 @@ span.num {
 .nomatch { padding: 14px 12px; color: var(--mut); }
 
 .r.denyrow { background: var(--denybg); }
+.r > .pill { width: fit-content; } /* a pill that is a cell is as wide as its word (Tp-Home's compact) */
 /* Tp-Home's tracks (Size is there when the console can read the data directory). At
    1100 px and below the board's fixed tracks leave the name nothing, so the name, the
    readers and the subject share what is left, the name first. */
@@ -443,6 +447,12 @@ span.num {
 .kv.trace-formats { --c: 120px 1fr; }
 /* Access (Ac-Home, Ac-03, Ac-05): the boards' tracks and the widths of their fields. */
 #acl-table { --c: 120px 80px 1fr 80px 84px 84px 44px; }
+#groups-table { --c: 1.3fr 96px 86px 80px 1.4fr 86px 110px; } /* Gr-Home's tracks */
+#schemas-table { --c: 1fr 70px 70px 80px 150px 1fr; } /* Sc-Home's */
+/* Sc-Home's list: the filter over a rule, the columns' names, and the foot over a rule. */
+.list .list-filter-first { padding: 10px 12px; border-bottom: 1px solid var(--line2); }
+.list .list-cols { padding: 6px 12px 2px; flex: none; }
+.list .list-foot.ruled { padding: 10px 12px; border-top: 1px solid var(--line2); }
 #check-decided { --c: 120px 1fr 80px 84px 84px 44px; }
 .w90 { width: 90px; } .w100 { width: 100px; } .w110 { width: 110px; } .w130 { width: 130px; }
 .w150 { width: 150px; } .w170 { width: 170px; } .w180 { width: 180px; } .w200 { width: 200px; }
@@ -462,7 +472,8 @@ span.num-off { background: var(--mut); } /* a rule the check did not reach (Ac-0
 .callouts > .callout { min-width: 240px; }
 .facts-line { font-size: var(--fs-md); }
 .list-filter { padding: 8px 12px; border-bottom: 1px solid var(--line2); flex: none; }
-.list-foot { border-top: 1px solid var(--line2); }
+.list-foot { border-top: 0; }
+.list-foot.wide-pad { padding: 10px 12px; } /* Gr-Home's */
 .list .li.two { height: 40px; }
 .list .li .col { min-width: 0; }
 .metrics-cap { margin-top: 6px; }
@@ -518,7 +529,7 @@ span.num-off { background: var(--mut); } /* a rule the check did not reach (Ac-0
 table.tbl tbody tr.hl td { animation: rowflash 2.2s ease 1; }
 @keyframes rowflash { 0%, 55% { background: var(--accent); } 100% { background: transparent; } }
 
-.idband { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.idband { display: flex; align-items: center; justify-content: space-between; gap: 12px; } /* the boards' .row.sb.ce */
 .idband > div:first-child { min-width: 0; }
 .idband h1 { font-size: var(--fs-xl); font-weight: 600; line-height: 24px; overflow-wrap: anywhere; }
 .idband h1.m { font-family: var(--sans); font-size: var(--fs-xl); }  /* the boards' .h1.m: .h1's font shorthand, declared after .m, sets the family back to Plex Sans, 600 */
@@ -541,10 +552,10 @@ table.tbl tbody tr.hl td { animation: rowflash 2.2s ease 1; }
   color: var(--ink); white-space: nowrap;
 }
 .btn:hover { background: var(--well); }
-/* The boards draw every control as a <button>, where `.app button { font: inherit }` outranks
-   `.btn { font-weight: 500 }`: 400. The console draws many as <a class="btn"> (navigation) and
-   they match, so one row never mixes weights. Only Cl-Home's "Connect an app" is an <a> on the
-   board, and so 500 (.w5). */
+/* The boards' cascade: `.btn` is 500, and `.app button { font: inherit }` sets a <button> back
+   to the page's 400. So where a board draws a link as a button (Create topic, Connect an app, Create ACL,
+   Register schema, Back to the list, Check first, the first run's links) it is 500 (.w5);
+   every other .btn is drawn at a <button>'s 400, so one row never mixes weights. */
 .btn.w5 { font-weight: 500; }
 .btn.pri { background: var(--ink); border-color: var(--ink); color: var(--card); }
 .btn.pri:hover { background: var(--ink); opacity: .88; }
