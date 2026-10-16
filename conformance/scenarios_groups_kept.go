@@ -73,10 +73,11 @@ func offsetsRetentionMembers(e *Env) {
 	// B's join came on another connection: the describe waits until it has arrived.
 	dg := kmsg.NewPtrDescribeGroupsRequest()
 	dg.Groups = []string{"g-rebal"}
-	e.DoUntil("rebal-describe-at-once", dg, 5, func(r kmsg.Response) bool {
+	e.Await("B's join to be listed", dg, 5, func(r kmsg.Response) bool {
 		g := r.(*kmsg.DescribeGroupsResponse).Groups
 		return len(g) == 1 && len(g[0].Members) == 2
 	})
+	e.Do("rebal-describe-at-once", dg, 5)
 
 	elapsed := func() time.Duration { return time.Duration(float64(time.Since(start)) * e.speed) }
 	until := func(at time.Duration) {
