@@ -57,7 +57,7 @@
       <section class="card pad col g12 grow" aria-label="Step 2, connect an app">
         <div class="row ce g8"><span class="num">2</span><h2 class="h2">Connect an app</h2></div>
         <span class="note">Point any client at the broker.{{if .Facts.Registry}} The built-in schema registry answers on its own port, no second container.{{end}}</span>
-        <div class="kv kv-stack" style="--c: 120px 1fr"><span>Bootstrap</span><span class="m">{{.Facts.Bootstrap}}</span>{{if .Facts.Registry}}<span>Schema registry</span><span class="m">{{.Facts.Registry}}</span>{{end}}<span>Console</span><span class="m">{{.Facts.Console}}</span></div>
+        {{/* A value longer than its column scrolls in its own box, so it can be focused. */}}<div class="kv kv-stack" style="--c: 120px 1fr"><span>Bootstrap</span><span class="m" tabindex="0">{{.Facts.Bootstrap}}</span>{{if .Facts.Registry}}<span>Schema registry</span><span class="m" tabindex="0">{{.Facts.Registry}}</span>{{end}}<span>Console</span><span class="m" tabindex="0">{{.Facts.Console}}</span></div>
         <pre class="code">kafka-console-producer.sh \
   --bootstrap-server {{.Facts.Bootstrap}} \
   {{if .Facts.CommandConfig}}--producer.config client.properties \
@@ -81,7 +81,7 @@
 
     <div class="well row ce sb firstrun-foot">
       <span class="note">Prefer to see it first? The <a href="{{prefix}}/connect">connection settings</a> are filled in for this broker.</span>
-      <span class="note"><span class="kbd">⌘K</span> jump or act when you have something to jump to</span>
+      <span class="note"><span class="kbd">⌘K</span>jump or act when you have something to jump to</span>
     </div>
   </main>
 {{template "shell_bottom" .}}{{end}}

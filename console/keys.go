@@ -59,16 +59,18 @@ var keyMap = []keyBinding{
 	{"]", "]", "tab-next", "Next tab", ScopeLists, ""},
 	{"[", "[", "tab-prev", "Previous tab", ScopeLists, ""},
 
+	// Sy-06's order: pause, create, produce, and this help last; the keys the board
+	// predates (A7's r, AD17's e u m c, ⌘↵) go before it.
 	{"p", "p", "pause", "Pause or resume the live view", ScopePage, ""},
-	{"p", "p", "produce", "Produce (on a topic)", ScopePage, ""},
 	{"c", "c", "create", "Create (on Topics, Subjects, Access); connect an app (on an empty Traffic); copy the bootstrap address (on Cluster)", ScopePage, ""},
+	{"p", "p", "produce", "Produce (on a topic)", ScopePage, ""},
 	{"r", "r", "retry", "Retry now, when the broker is lost (on Traffic)", ScopePage, ""},
 	{"e", "e", "errors", "Errors only, and back (on Traffic)", ScopePage, ""},
 	{"u", "u", "unfold", "Unfold the open folded row (on Traffic)", ScopePage, ""},
 	{"m", "m", "metrics", "All metrics of the open client (on Traffic)", ScopePage, ""},
 	{"c", "c", "copy", "Copy the decoded fields of the open request (on Traffic)", ScopePage, ""},
-	{"?", "?", "help", "This help", ScopePage, ""},
 	{"Mod+Enter", "⌘↵", "send", "Send from the composer; create, on a create form", ScopePage, ""},
+	{"?", "?", "help", "This help", ScopePage, ""},
 
 	{"ArrowDown", "↓", "palette-down", "Next result in the palette", ScopeDialogs, ""},
 	{"ArrowUp", "↑", "palette-up", "Previous result in the palette", ScopeDialogs, ""},
@@ -184,13 +186,26 @@ func pageHints(view string) []keyHint {
 	return []keyHint{hintJump, hintHelp}
 }
 
-// dialogHints are the strip while a confirm is open (Tp-24): the dialog's own keys,
-// which are all the keys there are then (shell.js turns the page's off).
-func dialogHints() []keyHint {
-	return []keyHint{
-		{Keys: []string{"tab"}, Label: "move between buttons"},
-		{Keys: []string{"esc"}, Label: "cancel"},
-		{Keys: []string{"↵"}, Label: "press the focused button"},
+// dialogStrip is the strip while a dialog is open: the keys that work then, which
+// are all the keys there are (shell.js turns the page's off and marks <html> with
+// data-dialog, the strip's Kind).
+type dialogStrip struct {
+	Kind  string
+	Hints []keyHint
+}
+
+// dialogHints are the strips of the three dialogs: a confirm's own keys (Tp-24); the
+// palette's ⌘K, which closes it (Sy-05; its own keys are in its foot); the shortcuts'
+// ? and ⌘K, which close it and open the palette in its place (Sy-06).
+func dialogHints() []dialogStrip {
+	return []dialogStrip{
+		{Kind: "confirm", Hints: []keyHint{
+			{Keys: []string{"tab"}, Label: "move between buttons"},
+			{Keys: []string{"esc"}, Label: "cancel"},
+			{Keys: []string{"↵"}, Label: "press the focused button"},
+		}},
+		{Kind: "palette", Hints: []keyHint{{Keys: []string{"⌘K"}, Label: "jump or act"}}},
+		{Kind: "help", Hints: []keyHint{{Keys: []string{"?"}, Label: "all keys"}, {Keys: []string{"⌘K"}, Label: "jump or act"}}},
 	}
 }
 

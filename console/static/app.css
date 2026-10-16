@@ -226,7 +226,8 @@ h1, h2, h3 { margin: 0; }
 .sv.c-tp, .sv.c-tr { color: var(--chip-ink-dark); }
 .c-ac { --c: var(--c-ac); } .c-cl { --c: var(--c-cl); } .c-tc { --c: var(--c-tc); } .c-mut { --c: var(--mut); }
 /* In high contrast the selected item also wears a 2 px outline (Sy-07). */
-:root[data-theme="contrast"] .nav.on, :root[data-theme="contrast"] .li.on, :root[data-theme="contrast"] .r.on { outline: 2px solid var(--ink); outline-offset: -2px; }
+/* Sy-07: "Selection in high contrast also gets a 2 px outline, so it does not depend on a fill." Every selection: a section, a list item, a row of a grid or of a table, a palette result. */
+:root[data-theme="contrast"] .nav.on, :root[data-theme="contrast"] .li.on, :root[data-theme="contrast"] .r.on, :root[data-theme="contrast"] tr.on { outline: 2px solid var(--ink); outline-offset: -2px; }
 .menu-btn, .pg-title { display: none; }
 @media (max-width: 1100px) {
   .rail { width: 48px; padding: 10px 0; align-items: center; gap: 4px; }
@@ -267,7 +268,6 @@ a.well:hover { border-color: var(--line); }
   letter-spacing: .09em; text-transform: uppercase; border-bottom: 1px solid var(--line);
 }
 .r.on { background: var(--sel); }
-.r:last-child { border-bottom: 0; }
 a.r { color: inherit; }
 a.r:hover { background: var(--well); }
 .kv { display: grid; grid-template-columns: var(--c, 96px 1fr); column-gap: 12px; row-gap: 5px; }
@@ -326,6 +326,7 @@ span.num {
 .steps { align-items: stretch; }
 .steps > .card { min-width: 220px; }
 .firstrun-foot { padding: 10px 14px; }
+.firstrun-foot .kbd { margin-right: 6px; } /* the board's .k: 6 px before its words */
 .well.pad.slim { padding: 10px 14px; }
 .btn.pill-x { height: 18px; padding: 0 4px; }
 /* The three cards share the page: where one is narrower than a console address needs
@@ -333,7 +334,10 @@ span.num {
    mid-word (Sy-08 at 1440). */
 .steps > .card { container-type: inline-size; }
 .kv.kv-stack > span { overflow-wrap: normal; }
-@container (max-width: 440px) { .kv-stack { grid-template-columns: 1fr; row-gap: 0; } .kv-stack > :nth-child(even) { margin-bottom: 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; } }
+/* Sy-08's facts are two columns in its 367 px card; an address longer than its column
+   scrolls in its own box (never broken mid-word), and below 320 px they stack. */
+.kv-stack > :nth-child(even) { overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; white-space: nowrap; }
+@container (max-width: 320px) { .kv-stack { grid-template-columns: 1fr; row-gap: 0; } .kv-stack > :nth-child(even) { margin-bottom: 5px; } }
 .snippets { align-items: flex-start; }
 .snippets > .col { min-width: 0; }
 .snippets pre.code { overflow-x: auto; }
@@ -853,23 +857,27 @@ table.msg-table td { overflow: hidden; text-overflow: ellipsis; }
 .palette-overlay { padding-top: 70px; }
 .palette { width: 100%; max-width: 640px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-xl); box-shadow: var(--shadow-modal); overflow: hidden; display: flex; flex-direction: column; max-height: calc(100vh - 100px); }
 .pal-input { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); flex: none; }
-.pal-input input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; font-family: var(--mono); font-size: var(--fs-base); color: var(--ink); height: 24px; padding: 0; }
+/* Sy-05's field is .inp.m with no border, 24 px, 14 px in the page's face (con.css's
+   `.app input { font: inherit }` outranks .m), on the card, and as wide as the row lets
+   it be: the count beside it wraps to two lines before it gives way. */
+.pal-input input { flex: 1 1 100%; width: 100%; min-width: 0; border: 0; border-radius: var(--radius-md); background: var(--card); outline: none; font-family: var(--sans); font-size: var(--fs-base); font-weight: 400; line-height: 20px; color: var(--ink); height: 24px; padding: 0; }
 .pal-input input::placeholder { color: var(--mut); }
 .pal-list { overflow-y: auto; padding: 6px 0; flex: 1; min-height: 0; }
 .pal-cap { padding: 8px 14px 2px; }
-.pal-cap:first-child { padding-top: 4px; }
+.pal-cap:first-child { padding-top: 6px; }
 .pal-item { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 14px; font-size: var(--fs-md); cursor: pointer; color: var(--ink); }
 .pal-item.sel { background: var(--sel); }
 :root[data-theme="contrast"] .pal-item.sel { outline: 2px solid var(--ink); outline-offset: -2px; }
 .pal-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pal-name.m { font-family: var(--mono); font-size: var(--fs-sm); }
-.pal-name b { font-weight: 700; }
+.pal-name b { font-weight: 700; } /* Plex Mono ends at 700: the board's "bolder" than 600 (900) is drawn with this face too */
+.pal-item.sel .pal-name { font-weight: 600; } /* Sy-05's chosen row: its name is .m.b */
 .pal-detail { min-width: 0; }
 .pal-glyph { width: 14px; text-align: center; flex: none; }
 .pal-item .kbd { margin: 0; flex: none; }
 .pal-empty { padding: 22px; text-align: center; color: var(--mut); font-size: var(--fs-md); }
-.pal-foot { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; border-top: 1px solid var(--line); background: var(--well); flex: none; }
-.pal-foot .kbd { margin-right: 4px; }
+.pal-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; border-top: 1px solid var(--line); background: var(--well); border-radius: 0 0 6px 6px; flex: none; }
+.pal-foot .kbd { margin-right: 6px; }
 
 /* the key sheet's box */
 .dialog { width: 100%; max-width: 440px; background: var(--popover); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--sh-lg); overflow: hidden; }
@@ -1377,9 +1385,7 @@ table.tbl.tf-table th:last-child, table.tbl.tf-table td:last-child { padding-rig
 .neighbours a { color: var(--ink); }
 .neighbours a.well:hover { border-color: var(--line); }
 
-/* High contrast also thickens the edges a control is found by. */
-:root[data-theme="contrast"] .btn, :root[data-theme="contrast"] .input, :root[data-theme="contrast"] .chip,
-:root[data-theme="contrast"] .tbl-wrap, :root[data-theme="contrast"] .panel { border-width: 2px; }
+/* High contrast draws its edges 1 px, white, as Sy-07's set does; focus is 3 px. */
 :root[data-theme="contrast"] :focus-visible { outline-width: 3px; }
 
 /* The keys overlay (Sy-06), generated from the declared key map: three columns. */
@@ -1389,10 +1395,13 @@ table.tbl.tf-table th:last-child, table.tbl.tf-table td:last-child { padding-rig
 .help-b { padding: 16px 18px; overflow-y: auto; display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
 .help-g { flex: 1 1 0; min-width: 220px; }
 .help-r { gap: 12px; }
-.help-k { display: inline-flex; gap: 4px; flex: none; }
-.help-k .kbd { margin: 0; }
+/* Sy-06's keys: inline-blocks 6 px apart, on the line's baseline, as .k draws them. */
+.help-k { display: inline; flex: none; white-space: nowrap; }
+.help-k .kbd { display: inline-block; margin: 0 6px 0 0; }
+.help-k .kbd:last-child { margin-right: 0; }
 .help-l { color: var(--ink); }
 .help-f { padding: 10px 18px; border-top: 1px solid var(--line); background: var(--well); border-radius: 0 0 6px 6px; flex: none; }
+.help-f .note { flex: 1; }
 .lane { position: relative; height: 8px; background: var(--line2); border-radius: 2px; min-width: 60px; }
 .lane > div { position: absolute; top: 0; left: 0; height: 8px; border-radius: 2px; background: var(--ink); }
 .lane > div.bad { background: var(--bad); }
@@ -1517,7 +1526,7 @@ html[data-connection-lost] .panes:has(#insp-default) > #inspector-panel:has(#ins
 /* While the confirm is open the strip says what the keys do in it (Tp-24). */
 .keys .keys-dialog { display: none; }
 html[data-dialog] .keys > span { display: none; }
-html[data-dialog] .keys > .keys-dialog { display: inline; }
+html[data-dialog="confirm"] .keys > .keys-dialog-confirm, html[data-dialog="palette"] .keys > .keys-dialog-palette, html[data-dialog="help"] .keys > .keys-dialog-help { display: inline; }
 html[data-connection-lost] .keys .keys-lost { display: inline; }
 html[data-connection-lost] .keys .keys-live { display: none; }
 html[data-connection-lost] .up-only { display: none; }

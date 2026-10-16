@@ -597,6 +597,7 @@
     if (helpOpen()) closeHelp();
     if (!paletteOpen()) palOpener = document.activeElement;
     pal.hidden = false; palQ.value = ""; palSel = 0;
+    root.setAttribute("data-dialog", "palette"); // the strip is the palette's (Sy-05)
     var here = location.pathname;
     var recents = [];
     try {
@@ -736,6 +737,7 @@
   function closePalette() {
     if (!paletteOpen()) return;
     pal.hidden = true;
+    if (root.getAttribute("data-dialog") === "palette") root.removeAttribute("data-dialog");
     if (palOpener && document.contains(palOpener) && palOpener.focus) palOpener.focus();
   }
   // The phone's menu: the rail, opened over the page.
@@ -849,6 +851,7 @@
       var items = palFiltered();
       if (e.key === "Tab") { e.preventDefault(); return; } // one control; focus stays on the search box.
       if (e.key === "Escape") { closePalette(); e.preventDefault(); }
+      else if (mod && !e.altKey && !e.shiftKey && e.key === "k") { closePalette(); e.preventDefault(); } // the strip's ⌘K (Sy-05)
       else if (e.key === "ArrowDown") { palSel = Math.min(palSel + 1, items.length - 1); renderPal(); e.preventDefault(); }
       else if (e.key === "ArrowUp") { palSel = Math.max(palSel - 1, 0); renderPal(); e.preventDefault(); }
       else if (e.key === "Enter") { var it = items[palSel]; if (it) goTo(it); e.preventDefault(); }
@@ -1017,12 +1020,14 @@
     if (paletteOpen()) closePalette();
     if (!helpOpen()) helpOpener = document.activeElement;
     helpBox.hidden = false;
+    root.setAttribute("data-dialog", "help"); // the strip is the sheet's (Sy-06)
     var c = document.getElementById("help-close");
     if (c) c.focus();
   }
   function closeHelp() {
     if (!helpOpen()) return;
     helpBox.hidden = true;
+    if (root.getAttribute("data-dialog") === "help") root.removeAttribute("data-dialog");
     if (helpOpener && document.contains(helpOpener) && helpOpener.focus) helpOpener.focus();
   }
   if (helpBox) {

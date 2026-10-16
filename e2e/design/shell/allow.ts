@@ -1,5 +1,5 @@
 import type { Allowed } from '../lib/compare';
-import { shellAllow } from './common-allow';
+import { CHIP_INK, shellAllow } from './common-allow';
 
 // What the live shell may draw differently from Sy-01 to Sy-08, each with the reason
 // it is allowed. Every entry is one board, one element, one property and the two
@@ -43,6 +43,17 @@ const GRAB = 'the grab handle is the sheet\'s ::before, 36 x 4, centred, 8 px do
 const SHEET_PARTS = 'the sheet\'s head and body carry its 14 px and the 8 px between its parts themselves, so the record scrolls in the body under a head that stays; the board pads the sheet';
 const TP06_ACTS = 'the actions are Tp-06\'s, Send again, Edit a copy… and Download value, beside Follow this trace (Copy as curl is CUT: plan/00-foundation.md), so they take two rows; they stay at the sheet\'s foot as the board\'s do, on the card\'s colour because the record scrolls under them';
 
+const DIALOG_OVERLAY = 'the dialog is centred in an overlay with the board\'s 70 px (Sy-05) or 90 px (Sy-06) above it; the board places it absolutely over its scrim';
+const MORE_KEYS = 'the third column lists the keys the console binds that the board predates, each working on its page (strip.spec presses them): r (retry, A7), e, u, m and c (AD17), ⌘↵ (send; create on a create form), and Create also names Access, an empty Traffic and Cluster: the sheet is 164 px taller';
+const FOOT_SENTENCE = 'the board\'s foot is a note on the design (the key layer is proposed), two lines; the console\'s says what p and g do, in one';
+const SP_BORDERS = 'Sy-07\'s specimen sheet sets every pill\'s, button\'s, card\'s and callout\'s border to --line (its own .sp rule); con.css, which every other board uses, draws the primary button\'s border in ink, the delete\'s in red, and the ghost\'s and a coloured callout\'s transparent, and the console draws con.css\'s';
+
+const SY08_CLIENT = 'step 2\'s button is "Settings for your client": the Connect page is one client.properties and an environment for this broker, not a page per language (Cn-02 to Cn-07, the connect stage\'s), so "Settings for your language" with "Java, librdkafka, franz-go" would be false';
+const SY08_GUIDE = 'the board\'s foot points to "the bootstrap guide", which does not exist; the console\'s says the connection settings are filled in for this broker, and links them';
+const SY08_NUMBERS = 'the board draws the steps\' numbers in its marker style, #17191c with white in any theme (con.css\'s .num): on the dark card that circle is 1.03:1; the console draws them in the theme\'s ink, so they can be seen';
+
+const MONO_700 = 'the board\'s match is a <b> inside a 600 name, "bolder", which computes to 900; IBM Plex Mono\'s faces end at 700 (console/static/fonts), so the board draws it with the 700 face, which is what the console asks for (its type scale stops at 700)';
+
 // ---------- data: the seed is not the boards' sample ----------
 const LIST_CAP = 'the caption is Tp-05\'s, "Topics · N · messages", with the seed\'s 14 topics; Sy-01 writes "Every topic" and Sy-02 "Topics"';
 const SEED_ORDER = 'the open topic is seed-orders, the tenth of the seed\'s topics by name; the board\'s is its first';
@@ -56,6 +67,9 @@ export const ALLOW: Allowed[] = [
   ...shellAllow('Sy-01'),
   ...shellAllow('Sy-02', ['1440-dark']),
   ...shellAllow('Sy-03', ['960-dark', '960-light']),
+  ...shellAllow('Sy-05'),
+  ...shellAllow('Sy-06'),
+  ...shellAllow('Sy-08'),
   { board: 'Sy-01', el: 'list head', prop: 'h', board_value: "36", live_value: "45", at: ['1440-dark', '1440-light'], reason: TP05_LIST_HEAD, per: {board: 'Tp-05-Messages'} },
   { board: 'Sy-01', el: 'list head', prop: 'padding', board_value: "10px 12px 6px", live_value: "10px 12px", at: ['1440-dark', '1440-light'], reason: TP05_LIST_HEAD, per: {board: 'Tp-05-Messages'} },
   { board: 'Sy-01', el: 'list head', prop: 'gap', board_value: "6px 6px", live_value: "12px 12px", at: ['1440-dark', '1440-light'], reason: TP05_LIST_HEAD, per: {board: 'Tp-05-Messages'} },
@@ -351,4 +365,42 @@ export const ALLOW: Allowed[] = [
   { board: 'Sy-04', el: 'sheet follow', prop: 'w', board_value: "176", live_value: "132.8", at: ['390-dark', '390-light'], reason: TP06_ACTS },
   { board: 'Sy-04', el: 'card value', prop: 'color', board_value: "rgb(163, 169, 176)", live_value: "rgb(233, 234, 235)", at: ['390-dark'], reason: TP05_VALUE, per: {board: 'Tp-05-Messages',sel: 'main .card .r:not(.h):not(.on) > span',nth: 4} },
   { board: 'Sy-04', el: 'sheet actions', prop: 'bg', board_value: "rgba(0, 0, 0, 0)", live_value: "rgb(25, 28, 31)", at: ['390-dark'], reason: TP06_ACTS },
+  { board: 'Sy-05', el: 'scrim', prop: 'padding', board_value: "0px", live_value: "70px 16px 16px", at: ['1440-dark', '1440-light'], reason: DIALOG_OVERLAY },
+  { board: 'Sy-05', el: 'scrim', prop: 'display', board_value: "block", live_value: "grid", at: ['1440-dark', '1440-light'], reason: DIALOG_OVERLAY },
+  { board: 'Sy-05', el: 'scrim', prop: 'tracks', board_value: "", live_value: "1408px", at: ['1440-dark', '1440-light'], reason: DIALOG_OVERLAY },
+  { board: 'Sy-05', el: 'chip', prop: 'color', board_value: "rgb(255, 255, 255)", live_value: "rgb(0, 0, 0)", at: ['1440-dark', '1440-light'], reason: CHIP_INK },
+  { board: 'Sy-06', el: 'scrim', prop: 'padding', board_value: "0px", live_value: "90px 16px 16px", at: ['1440-dark', '1440-light'], reason: DIALOG_OVERLAY },
+  { board: 'Sy-06', el: 'scrim', prop: 'display', board_value: "block", live_value: "grid", at: ['1440-dark', '1440-light'], reason: DIALOG_OVERLAY },
+  { board: 'Sy-06', el: 'scrim', prop: 'tracks', board_value: "", live_value: "1408px", at: ['1440-dark', '1440-light'], reason: DIALOG_OVERLAY },
+  { board: 'Sy-06', el: 'sheet', prop: 'h', board_value: "372", live_value: "536", at: ['1440-dark', '1440-light'], reason: MORE_KEYS },
+  { board: 'Sy-06', el: 'sheet', prop: 'display', board_value: "block", live_value: "flex", at: ['1440-dark', '1440-light'], reason: MORE_KEYS },
+  { board: 'Sy-06', el: 'body', prop: 'h', board_value: "244", live_value: "428", at: ['1440-dark', '1440-light'], reason: MORE_KEYS },
+  { board: 'Sy-06', el: 'column 3', prop: 'h', board_value: "128", live_value: "396", at: ['1440-dark', '1440-light'], reason: MORE_KEYS },
+  { board: 'Sy-06', el: 'foot', prop: 'y', board_value: "310", live_value: "494", at: ['1440-dark', '1440-light'], reason: MORE_KEYS },
+  { board: 'Sy-06', el: 'foot', prop: 'h', board_value: "61", live_value: "41", at: ['1440-dark', '1440-light'], reason: FOOT_SENTENCE },
+  { board: 'Sy-06', el: 'foot note', prop: 'y', board_value: "321", live_value: "505", at: ['1440-dark', '1440-light'], reason: MORE_KEYS },
+  { board: 'Sy-06', el: 'foot note', prop: 'h', board_value: "40", live_value: "20", at: ['1440-dark', '1440-light'], reason: FOOT_SENTENCE },
+  { board: 'Sy-05', el: 'match', prop: 'font', board_value: "IBM Plex Mono 900 12px/20px", live_value: "IBM Plex Mono 700 12px/20px", at: ['1440-dark', '1440-light'], reason: MONO_700 },
+  { board: 'Sy-07', el: 'rail chip', prop: 'color', board_value: "rgb(255, 255, 255)", live_value: "rgb(0, 0, 0)", at: ['1440-light'], reason: CHIP_INK },
+  { board: 'Sy-07 Light', el: 'primary', prop: 'border', board_value: "1 rgb(217, 216, 210) | 1 rgb(217, 216, 210) | 1 rgb(217, 216, 210) | 1 rgb(217, 216, 210)", live_value: "1 rgb(23, 25, 28) | 1 rgb(23, 25, 28) | 1 rgb(23, 25, 28) | 1 rgb(23, 25, 28)", at: ['1440-light'], reason: SP_BORDERS },
+  { board: 'Sy-07 Light', el: 'delete', prop: 'border', board_value: "1 rgb(217, 216, 210) | 1 rgb(217, 216, 210) | 1 rgb(217, 216, 210) | 1 rgb(217, 216, 210)", live_value: "1 rgb(179, 37, 27) | 1 rgb(179, 37, 27) | 1 rgb(179, 37, 27) | 1 rgb(179, 37, 27)", at: ['1440-light'], reason: SP_BORDERS },
+  { board: 'Sy-07 Light', el: 'ghost', prop: 'border', board_value: "1 rgb(217, 216, 210) | 1 rgb(217, 216, 210) | 1 rgb(217, 216, 210) | 1 rgb(217, 216, 210)", live_value: "1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0)", at: ['1440-light'], reason: SP_BORDERS },
+  { board: 'Sy-07 Light', el: 'callout deny', prop: 'border', board_value: "1 rgb(217, 216, 210) | 1 rgb(217, 216, 210) | 1 rgb(217, 216, 210) | 1 rgb(217, 216, 210)", live_value: "1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0)", at: ['1440-light'], reason: SP_BORDERS },
+  { board: 'Sy-07 Light', el: 'callout warn', prop: 'border', board_value: "1 rgb(217, 216, 210) | 1 rgb(217, 216, 210) | 1 rgb(217, 216, 210) | 1 rgb(217, 216, 210)", live_value: "1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0)", at: ['1440-light'], reason: SP_BORDERS },
+  { board: 'Sy-07 Dark', el: 'primary', prop: 'border', board_value: "1 rgb(45, 49, 54) | 1 rgb(45, 49, 54) | 1 rgb(45, 49, 54) | 1 rgb(45, 49, 54)", live_value: "1 rgb(233, 234, 235) | 1 rgb(233, 234, 235) | 1 rgb(233, 234, 235) | 1 rgb(233, 234, 235)", at: ['1440-dark'], reason: SP_BORDERS },
+  { board: 'Sy-07 Dark', el: 'delete', prop: 'border', board_value: "1 rgb(45, 49, 54) | 1 rgb(45, 49, 54) | 1 rgb(45, 49, 54) | 1 rgb(45, 49, 54)", live_value: "1 rgb(255, 138, 126) | 1 rgb(255, 138, 126) | 1 rgb(255, 138, 126) | 1 rgb(255, 138, 126)", at: ['1440-dark'], reason: SP_BORDERS },
+  { board: 'Sy-07 Dark', el: 'ghost', prop: 'border', board_value: "1 rgb(45, 49, 54) | 1 rgb(45, 49, 54) | 1 rgb(45, 49, 54) | 1 rgb(45, 49, 54)", live_value: "1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0)", at: ['1440-dark'], reason: SP_BORDERS },
+  { board: 'Sy-07 Dark', el: 'callout deny', prop: 'border', board_value: "1 rgb(45, 49, 54) | 1 rgb(45, 49, 54) | 1 rgb(45, 49, 54) | 1 rgb(45, 49, 54)", live_value: "1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0)", at: ['1440-dark'], reason: SP_BORDERS },
+  { board: 'Sy-07 Dark', el: 'callout warn', prop: 'border', board_value: "1 rgb(45, 49, 54) | 1 rgb(45, 49, 54) | 1 rgb(45, 49, 54) | 1 rgb(45, 49, 54)", live_value: "1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0)", at: ['1440-dark'], reason: SP_BORDERS },
+  { board: 'Sy-07 High contrast', el: 'delete', prop: 'border', board_value: "1 rgb(255, 255, 255) | 1 rgb(255, 255, 255) | 1 rgb(255, 255, 255) | 1 rgb(255, 255, 255)", live_value: "1 rgb(255, 159, 148) | 1 rgb(255, 159, 148) | 1 rgb(255, 159, 148) | 1 rgb(255, 159, 148)", at: ['1440-contrast'], reason: SP_BORDERS },
+  { board: 'Sy-07 High contrast', el: 'ghost', prop: 'border', board_value: "1 rgb(255, 255, 255) | 1 rgb(255, 255, 255) | 1 rgb(255, 255, 255) | 1 rgb(255, 255, 255)", live_value: "1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0)", at: ['1440-contrast'], reason: SP_BORDERS },
+  { board: 'Sy-08', el: 'step 2 button', prop: 'w', board_value: "179.2", live_value: "158.3", at: ['1440-dark', '1440-light'], reason: SY08_CLIENT },
+  { board: 'Sy-08', el: 'step 2 button', prop: 'text', board_value: "Settings for your language", live_value: "Settings for your client", at: ['1440-dark', '1440-light'], reason: SY08_CLIENT },
+  { board: 'Sy-08', el: 'foot note', prop: 'w', board_value: "511", live_value: "382.7", at: ['1440-dark', '1440-light'], reason: SY08_GUIDE },
+  { board: 'Sy-08', el: 'step 1 number', prop: 'color', board_value: "rgb(255, 255, 255)", live_value: "rgb(25, 28, 31)", at: ['1440-dark'], reason: SY08_NUMBERS },
+  { board: 'Sy-08', el: 'step 1 number', prop: 'bg', board_value: "rgb(23, 25, 28)", live_value: "rgb(233, 234, 235)", at: ['1440-dark'], reason: SY08_NUMBERS },
+  { board: 'Sy-08', el: 'step 2 number', prop: 'color', board_value: "rgb(255, 255, 255)", live_value: "rgb(25, 28, 31)", at: ['1440-dark'], reason: SY08_NUMBERS },
+  { board: 'Sy-08', el: 'step 2 number', prop: 'bg', board_value: "rgb(23, 25, 28)", live_value: "rgb(233, 234, 235)", at: ['1440-dark'], reason: SY08_NUMBERS },
+  { board: 'Sy-08', el: 'step 3 number', prop: 'color', board_value: "rgb(255, 255, 255)", live_value: "rgb(25, 28, 31)", at: ['1440-dark'], reason: SY08_NUMBERS },
+  { board: 'Sy-08', el: 'step 3 number', prop: 'bg', board_value: "rgb(23, 25, 28)", live_value: "rgb(233, 234, 235)", at: ['1440-dark'], reason: SY08_NUMBERS },
 ];
