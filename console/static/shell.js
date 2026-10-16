@@ -27,7 +27,10 @@
   // them from the OS settings (dark, or a request for more contrast), and
   // following them when they change; it is stored as the absence of a choice.
   // (The same resolution runs inline in <head>, before first paint.)
-  var themeSeg = document.getElementById("theme-seg");
+  // The switch is in the top bar, and at phone width at the foot of the ☰ menu (Sy-07: "a
+  // switch in the top bar overrides it"; a 390 px top bar has room for none): every
+  // copy of it says the same.
+  var themeSegs = document.querySelectorAll(".theme-seg");
   var darkMQ = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
   var contrastMQ = window.matchMedia ? window.matchMedia("(prefers-contrast: more)") : null;
   function themeMode() {
@@ -38,16 +41,18 @@
     var system = contrastMQ && contrastMQ.matches ? "contrast" : (darkMQ && darkMQ.matches ? "dark" : "light");
     root.setAttribute("data-theme", mode === "system" ? system : mode);
     store("theme", mode === "system" ? null : mode);
-    if (themeSeg) themeSeg.querySelectorAll("button").forEach(function (b) {
+    Array.prototype.forEach.call(document.querySelectorAll(".theme-seg button"), function (b) {
       var on = b.getAttribute("data-mode") === mode;
       b.classList.toggle("on", on);
       b.setAttribute("aria-pressed", on ? "true" : "false");
     });
   }
   applyTheme(themeMode());
-  if (themeSeg) themeSeg.addEventListener("click", function (e) {
-    var b = e.target.closest("button[data-mode]");
-    if (b) applyTheme(b.getAttribute("data-mode"));
+  Array.prototype.forEach.call(themeSegs, function (seg) {
+    seg.addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-mode]");
+      if (b) applyTheme(b.getAttribute("data-mode"));
+    });
   });
   [darkMQ, contrastMQ].forEach(function (mq) {
     if (mq && mq.addEventListener) mq.addEventListener("change", function () {
@@ -370,6 +375,18 @@
   // one drawn into the page is as old as the page, and a topic gains records. The
   // drawn one is the fallback when the console cannot answer.
   var confirmPending = false;
+  // segs draws a confirm's runs of text (plain, mono, bold) with textContent: a name
+  // in a sentence is the broker's, never markup.
+  function segs(el, list) {
+    el.textContent = "";
+    (list || []).forEach(function (s) {
+      if (!s.m && !s.b) { el.appendChild(document.createTextNode(s.t)); return; }
+      var n = document.createElement("span");
+      n.className = s.m ? "m" : "b";
+      n.textContent = s.t;
+      el.appendChild(n);
+    });
+  }
   document.addEventListener("htmx:confirm", function (e) {
     var box = document.getElementById("confirm");
     var q = e.detail.question;
@@ -380,24 +397,43 @@
     var opener = document.activeElement;
     if (data.confirmUrl) {
       confirmPending = true;
-      fetch(data.confirmUrl, { headers: { Accept: "application/json" } })
+      // A form's confirm is measured with what was typed into it (how many
+      // partitions to add).
+      var url = data.confirmUrl;
+      if (elt.tagName === "FORM") {
+        new FormData(elt).forEach(function (v, k) { if (typeof v === "string") url += "&" + encodeURIComponent(k) + "=" + encodeURIComponent(v); });
+      }
+      fetch(url, { headers: { Accept: "application/json" } })
         .then(function (r) { return r.ok ? r.json() : null; })
         .catch(function () { return null; })
         .then(function (fresh) {
           confirmPending = false;
-          showConfirm(fresh && fresh.text ? fresh.text : q, fresh && fresh.title || data.confirmTitle, fresh && fresh.verb || data.confirmVerb);
+          showConfirm(fresh && fresh.text ? fresh : { text: q, title: data.confirmTitle, verb: data.confirmVerb });
         });
       return;
     }
-    showConfirm(q, data.confirmTitle, data.confirmVerb);
-    function showConfirm(text, title, verb) {
-    document.getElementById("confirm-title").textContent = title || "Are you sure?";
-    document.getElementById("confirm-msg").textContent = text;
+    showConfirm({ text: q, title: data.confirmTitle, verb: data.confirmVerb });
+    function showConfirm(say) {
+    document.getElementById("confirm-title").textContent = say.title || "Are you sure?";
+    var msg = document.getElementById("confirm-msg"), rows = document.getElementById("confirm-rows");
+    // The measured confirm comes as a paragraph and a table (Tp-24); the fallback is
+    // the one sentence drawn into the page.
+    if (say.body) segs(msg, say.body); else msg.textContent = say.text;
+    rows.textContent = "";
+    (say.rows || []).forEach(function (r) {
+      var l = document.createElement("span"), v = document.createElement("span");
+      l.textContent = r.label; segs(v, r.value);
+      rows.appendChild(l); rows.appendChild(v);
+    });
+    rows.hidden = !(say.rows && say.rows.length);
     var yes = document.getElementById("confirm-yes"), no = document.getElementById("confirm-no");
-    yes.textContent = verb || "Confirm";
+    yes.textContent = say.verb || "Confirm";
     box.hidden = false;
+    // The keys strip says what the keys do in the dialog while it is open (Tp-24).
+    root.setAttribute("data-dialog", "confirm");
     function close(restore) {
       box.hidden = true; yes.onclick = no.onclick = box.onclick = null;
+      root.removeAttribute("data-dialog");
       document.removeEventListener("keydown", onKey, true);
       if (restore && opener && document.contains(opener) && opener.focus) opener.focus();
     }

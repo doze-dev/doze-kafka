@@ -141,6 +141,7 @@ h1, h2, h3 { margin: 0; }
 }
 .tb-palette:hover { color: var(--ink); }
 .tb-palette .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tb-palette .tb-short { display: none; }
 .tb-right { display: flex; align-items: center; gap: 10px; }
 .tb-menu { display: none; }
 /* The theme switch: words, not icons (Sy-07). */
@@ -180,11 +181,14 @@ h1, h2, h3 { margin: 0; }
 
 .body { display: flex; flex: 1; min-height: 0; }
 /* Below the width where the rail folds to chips the top bar keeps what Sy-03 draws:
-   the name, a shorter jump field and the address. The theme is one action away in
-   the palette. */
+   the name, a shorter jump field ("Jump or act…") and the address, and Sy-07's theme
+   switch. At phone width the switch moves to the foot of the ☰ menu. */
+.rail .rail-theme { display: none; }
 @media (max-width: 1100px) {
-  .theme-seg, #compat-pill { display: none; }
+  #compat-pill { display: none; }
   .tb-palette { flex-basis: 300px; width: 300px; }
+  .tb-palette .tb-long { display: none; }
+  .tb-palette .tb-short { display: block; }
 }
 
 /* ---------- rail ----------
@@ -801,12 +805,15 @@ table.msg-table td { overflow: hidden; text-overflow: ellipsis; }
 .pal-foot { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; border-top: 1px solid var(--line); background: var(--well); flex: none; }
 .pal-foot .kbd { margin-right: 4px; }
 
-/* styled confirm */
+/* the key sheet's box */
 .dialog { width: 100%; max-width: 440px; background: var(--popover); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--sh-lg); overflow: hidden; }
-.dialog-h { padding: 18px 20px 16px; }
-.dialog-h h3 { margin: 0; font-size: var(--fs-lg); font-weight: 600; }
-.dialog-h p { margin: 6px 0 0; font-size: var(--fs-md); color: var(--muted-foreground); overflow-wrap: anywhere; }
-.dialog-f { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--muted); }
+/* The confirm (Tp-24): the boards' .modal, 470 wide and 150 down, its paragraph in ink,
+   a table of what goes and stays, Cancel and the verb at the right. */
+.modal { width: 470px; max-width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 18px 50px rgba(0, 0, 0, .22); }
+#confirm.overlay { padding-top: 150px; }
+#confirm-msg { margin: 0; overflow-wrap: anywhere; }
+#confirm-rows > span { overflow-wrap: anywhere; }
+.confirm-f { justify-content: flex-end; }
 
 /* ---------- flash banner ---------- */
 .flash {
@@ -969,6 +976,9 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   :root[data-menu="open"] .rail .cap { display: block; }
   :root[data-menu="open"] .rail .nav .nm, :root[data-menu="open"] .rail .nav .n { position: static; width: auto; height: auto; margin: 0; clip: auto; }
   :root[data-menu="open"] .rail .nav .n { margin-left: auto; }
+  .tb-right .theme-seg { display: none; }
+  :root[data-menu="open"] .rail .rail-theme { display: inline-flex; flex: none; margin: 8px 0 0; align-self: flex-start; }
+  :root[data-menu="open"] .rail .rail-theme button { padding: 0 7px; }
   /* Messages are cards: the key and offset, the value, then when and from whom. */
   .tbl-wrap table.tbl thead { display: none; }
   .tbl-wrap table.tbl, .tbl-wrap table.tbl tbody { display: block; }
@@ -1363,6 +1373,10 @@ html[data-connection-lost] #traffic-live .tf-story .r:not(.h) { opacity: .55; }
 html[data-connection-lost] #traffic-summary,
 html[data-connection-lost] .panes:has(#insp-default) > #inspector-panel:has(#inspector[hidden]) { display: none; }
 .keys .keys-lost { display: none; }
+/* While the confirm is open the strip says what the keys do in it (Tp-24). */
+.keys .keys-dialog { display: none; }
+html[data-dialog] .keys > span { display: none; }
+html[data-dialog] .keys > .keys-dialog { display: inline; }
 html[data-connection-lost] .keys .keys-lost { display: inline; }
 html[data-connection-lost] .keys .keys-live { display: none; }
 html[data-connection-lost] .up-only { display: none; }

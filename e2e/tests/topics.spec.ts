@@ -79,7 +79,8 @@ test('Purge empties a topic but keeps its settings; Delete removes it', async ({
   await page.getByRole('button', { name: 'More actions' }).click();
   await page.getByRole('button', { name: 'Purge', exact: true }).click();
   // The page was drawn before the send; the dialog is measured when the button is pressed.
-  await expect(page.locator('#confirm-msg')).toContainText('deletes its 1 record');
+  await expect(page.locator('#confirm-msg')).toContainText('in its 1 partition, up to the high watermark: 1 record');
+  await expect(page.locator('#confirm-yes')).toHaveText('Purge 1 record');
   await confirmDialog('accept');
   await expect(page.locator('.tape-empty')).toBeVisible();
   await expect(page.locator('#topic-facts')).toContainText('kept 3 d'); // a purge used to drop the topic's own settings.

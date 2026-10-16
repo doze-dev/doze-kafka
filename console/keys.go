@@ -157,6 +157,16 @@ func pageHints(view string) []keyHint {
 	return []keyHint{hintJump, hintHelp}
 }
 
+// dialogHints are the strip while a confirm is open (Tp-24): the dialog's own keys,
+// which are all the keys there are then (shell.js turns the page's off).
+func dialogHints() []keyHint {
+	return []keyHint{
+		{Keys: []string{"tab"}, Label: "move between buttons"},
+		{Keys: []string{"esc"}, Label: "cancel"},
+		{Keys: []string{"↵"}, Label: "press the focused button"},
+	}
+}
+
 func live(h keyHint) keyHint { h.Only = "live"; return h }
 func lost(h keyHint) keyHint { h.Only = "lost"; return h }
 

@@ -430,11 +430,12 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 		// its plain text, for an attribute.
 		"when": when,
 		// the declared key map, for the help overlay and for shell.js (keys.go).
-		"keyGroups":  keyGroups,
-		"keymapJSON": keymapJSON,
-		"whenText":   whenText,
-		"hasPrefix":  strings.HasPrefix,
-		"hasSuffix":  strings.HasSuffix,
+		"keyGroups":   keyGroups,
+		"dialogHints": dialogHints,
+		"keymapJSON":  keymapJSON,
+		"whenText":    whenText,
+		"hasPrefix":   strings.HasPrefix,
+		"hasSuffix":   strings.HasSuffix,
 		"refsJSON": func(refs any) string {
 			b, _ := json.Marshal(refs)
 			return string(b)

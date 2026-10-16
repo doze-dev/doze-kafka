@@ -91,12 +91,12 @@ func TestShellMarkupIsLabelled(t *testing.T) {
 	page := req(t, c, "GET", "/_console/topics/t", nil).Body.String()
 	for _, want := range []string{
 		`role="dialog" aria-modal="true" aria-label="Command palette"`,
-		`role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-msg"`,
+		`role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-msg confirm-rows"`,
 		`class="nav on" aria-current="page"`, // the name is the text: the narrow rail clips it, it does not remove it.
 		`<nav class="rail" aria-label="Sections"`,
 		`<main class="main`,
 		`aria-label="Filter Topics"`,
-		`data-confirm-title="Delete topic"`,
+		`data-confirm-title="Delete topic t"`,
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the topic page is missing %q", want)
