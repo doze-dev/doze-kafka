@@ -95,16 +95,34 @@ func newOffsetExpiry(b *Broker, retention time.Duration) (*offsetExpiry, error) 
 	return e, nil
 }
 
+// restoreEmptyGroups puts back, at start, the groups that were empty when the broker
+// stopped, as the coordinators keep an emptied group: listed and described as what it
+// was, a classic group with its protocol type, a consumer group with its epoch and
+// assignor (recorded: groups-listed-after-restart). One without offsets goes at the
+// first sweep, as it would have.
+func (e *offsetExpiry) restoreEmptyGroups() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for id, st := range e.groups {
+		switch {
+		case st.Consumer:
+			e.b.cg848.restoreEmpty(id, st.Epoch, st.Assignor)
+		case !st.Live && st.ProtocolType != "":
+			e.b.groups.restoreEmpty(id, st.ProtocolType)
+		}
+	}
+}
+
 // joining records that group is about to have a member of this kind with this session,
 // before the member is seated. It is called under a coordinator's lock. A group that
 // was not known to have members, or not such members, is written to the store before
 // joining returns: the member's commits must never be in a store that says its group
 // has nobody. An error means it could not be, and the member must not be seated.
-func (e *offsetExpiry) joining(group string, classic bool, session time.Duration) error {
+func (e *offsetExpiry) joining(group string, classic bool, session time.Duration, protocolType string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	was := e.groups[group]
-	st := groupLiveness{GroupLiveness: meta.GroupLiveness{Live: true, Classic: classic, Session: session}}
+	st := groupLiveness{GroupLiveness: meta.GroupLiveness{Live: true, Classic: classic, Session: session, ProtocolType: protocolType}}
 	if was.Live && !was.presumed {
 		st.Classic = st.Classic || was.Classic
 		st.Session = max(st.Session, was.Session)
@@ -120,15 +138,23 @@ func (e *offsetExpiry) joining(group string, classic bool, session time.Duration
 	return nil
 }
 
+// groupKind is what is shown of a group while it is empty, across a restart too: a
+// classic group's protocol type, a consumer group's epoch and assignor.
+type groupKind struct {
+	protocolType string
+	epoch        int32
+	assignor     string
+}
+
 // emptied records that group has just lost its last member. A classic group is empty
-// from now; a consumer group keeps nothing (recorded: its offsets expire from their
-// commits, as those of a group that never had a member do).
-func (e *offsetExpiry) emptied(group string, classic bool) {
+// from now; a consumer group has no such moment (recorded: its offsets expire from
+// their commits, as those of a group that never had a member do), only what it is.
+func (e *offsetExpiry) emptied(group string, classic bool, kind groupKind) {
 	e.mu.Lock()
 	if classic {
-		e.groups[group] = groupLiveness{GroupLiveness: meta.GroupLiveness{EmptySince: e.now().UnixMilli()}}
+		e.groups[group] = groupLiveness{GroupLiveness: meta.GroupLiveness{EmptySince: e.now().UnixMilli(), ProtocolType: kind.protocolType}}
 	} else {
-		delete(e.groups, group)
+		e.groups[group] = groupLiveness{GroupLiveness: meta.GroupLiveness{Consumer: true, Epoch: kind.epoch, Assignor: kind.assignor}}
 	}
 	e.markDirty(group)
 	e.mu.Unlock()
@@ -139,7 +165,7 @@ func (e *offsetExpiry) emptied(group string, classic bool) {
 func (e *offsetExpiry) consumerOnly(group string, session time.Duration) {
 	e.mu.Lock()
 	if st := e.groups[group]; st.Live && st.Classic {
-		e.groups[group] = groupLiveness{GroupLiveness: meta.GroupLiveness{Live: true, Session: session}}
+		e.groups[group] = groupLiveness{GroupLiveness: meta.GroupLiveness{Live: true, Session: session, ProtocolType: "consumer"}}
 		e.markDirty(group)
 	}
 	e.mu.Unlock()
@@ -301,12 +327,11 @@ func (e *offsetExpiry) settle(id string, now int64) groupLiveness {
 		return st
 	}
 	if st.Classic {
-		st = groupLiveness{GroupLiveness: meta.GroupLiveness{EmptySince: gone}}
-		e.groups[id] = st
+		st = groupLiveness{GroupLiveness: meta.GroupLiveness{EmptySince: gone, ProtocolType: st.ProtocolType}}
 	} else {
-		st = groupLiveness{}
-		delete(e.groups, id)
+		st = groupLiveness{GroupLiveness: meta.GroupLiveness{Consumer: true}}
 	}
+	e.groups[id] = st
 	e.markDirty(id)
 	return st
 }

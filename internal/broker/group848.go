@@ -412,7 +412,7 @@ func (m *cg848Manager) heartbeat(r *kmsg.ConsumerGroupHeartbeatRequest, who clie
 			// The group is recorded as having members before it has this one
 			// (offsetexpiry.go).
 			if m.liveness != nil {
-				if err := m.liveness.joining(g.id, false, m.sessionTimeout); err != nil {
+				if err := m.liveness.joining(g.id, false, m.sessionTimeout, "consumer"); err != nil {
 					if len(g.members) == 0 {
 						m.claims.release(g.id, protoConsumer)
 						if created {
@@ -620,9 +620,23 @@ func (m *cg848Manager) removeMember(g *cg848Group, id string) {
 		g.epoch++
 		m.claims.release(g.id, protoConsumer)
 		if m.liveness != nil {
-			m.liveness.emptied(g.id, false)
+			m.liveness.emptied(g.id, false, groupKind{protocolType: "consumer", epoch: g.epoch, assignor: g.assignor})
 		}
 	}
+}
+
+// restoreEmpty puts back an emptied consumer group found in the store at start, at the
+// epoch it was at and with its assignor.
+func (m *cg848Manager) restoreEmpty(id string, epoch int32, assignor string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.groups[id] != nil {
+		return
+	}
+	if assignor == "" {
+		assignor = assignorUniform
+	}
+	m.groups[id] = &cg848Group{id: id, epoch: epoch, assignor: assignor, members: make(map[string]*cg848Member)}
 }
 
 // hasClassic reports whether any member arrived by the classic protocol.

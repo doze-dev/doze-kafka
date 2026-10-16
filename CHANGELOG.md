@@ -6,6 +6,13 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Groups: an empty group with committed offsets is listed and described after a restart
+  as before it (recorded: `groups-listed-after-restart`): a classic group kept its
+  offsets but lost its protocol type, and an emptied consumer-protocol group was gone
+  from `ConsumerGroupDescribe` and listed as classic. The store's record of a group now
+  carries its protocol type, or its epoch and assignor (records of earlier versions are
+  still read).
+
 - Groups: requests Kafka refuses are refused, with Kafka's codes (recorded:
   `group-requests-refused`). An empty group id is `INVALID_GROUP_ID` on every classic
   group API and `OffsetDelete` (a v0 `JoinGroup` used to join a group named ""). A

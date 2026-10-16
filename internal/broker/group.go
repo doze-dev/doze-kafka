@@ -129,10 +129,10 @@ type livenessRecorder interface {
 	// its session. An error means the group could not be recorded as having members,
 	// and the member is refused: its commits would be in a store that says nobody is
 	// there to read them.
-	joining(group string, classic bool, session time.Duration) error
+	joining(group string, classic bool, session time.Duration, protocolType string) error
 	// emptied is called when the last member has gone; classic is the kind of group
-	// it was.
-	emptied(group string, classic bool)
+	// it was, and kind what is shown of it while it is empty.
+	emptied(group string, classic bool, kind groupKind)
 	// consumerOnly is called when the last classic member of a consumer group has
 	// gone and others remain.
 	consumerOnly(group string, session time.Duration)
@@ -396,7 +396,7 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 	// The group is recorded as having members before it has this one (offsetexpiry.go).
 	// A coordinator that cannot write that down is not available, and says so.
 	if gm.liveness != nil {
-		if err := gm.liveness.joining(g.id, true, time.Duration(r.SessionTimeoutMillis)*time.Millisecond); err != nil {
+		if err := gm.liveness.joining(g.id, true, time.Duration(r.SessionTimeoutMillis)*time.Millisecond, r.ProtocolType); err != nil {
 			if len(g.members) == 0 {
 				gm.claims.release(g.id, protoClassic)
 				if created {
@@ -776,6 +776,16 @@ func (gm *groupManager) validateCommit(groupID, memberID string, instanceID *str
 
 // --- internal state transitions (all called under gm.mu) ---
 
+// restoreEmpty puts back an empty group of this protocol type, found in the store at
+// start.
+func (gm *groupManager) restoreEmpty(id, protocolType string) {
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
+	if gm.groups[id] == nil {
+		gm.getOrCreate(id).protocolType = protocolType
+	}
+}
+
 func (gm *groupManager) getOrCreate(id string) *group {
 	g := gm.groups[id]
 	if g == nil {
@@ -939,7 +949,7 @@ func (gm *groupManager) dropIfUnused(g *group) {
 		return
 	}
 	if gm.liveness != nil {
-		gm.liveness.emptied(g.id, true)
+		gm.liveness.emptied(g.id, true, groupKind{protocolType: g.protocolType})
 	}
 	// No members: the id is free for either protocol again.
 	gm.claims.release(g.id, protoClassic)

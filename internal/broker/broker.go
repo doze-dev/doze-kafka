@@ -114,6 +114,7 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 	}
 	b.expiry = exp
 	b.groups.liveness, b.cg848.liveness = exp, exp
+	exp.restoreEmptyGroups()
 	exp.start()
 	if cfg.ClientTelemetry && cfg.Console {
 		b.telemetry = telemetry.NewStore()

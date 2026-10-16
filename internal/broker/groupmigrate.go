@@ -411,7 +411,7 @@ func (m *cg848Manager) classicJoin(r *kmsg.JoinGroupRequest, who clientRef) (res
 	// The group is recorded as having a classic member before it has this one
 	// (offsetexpiry.go). A join refused here has not used its id up: it comes again.
 	if m.liveness != nil {
-		if err := m.liveness.joining(g.id, true, time.Duration(r.SessionTimeoutMillis)*time.Millisecond); err != nil {
+		if err := m.liveness.joining(g.id, true, time.Duration(r.SessionTimeoutMillis)*time.Millisecond, "consumer"); err != nil {
 			return refuse(kerr.CoordinatorNotAvailable.Code)
 		}
 	}

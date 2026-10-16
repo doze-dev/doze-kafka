@@ -716,11 +716,24 @@ type GroupLiveness struct {
 	Live    bool
 	Classic bool
 	Session time.Duration
+
+	// What kind of group it is, which ListGroups and the describes show of an empty
+	// group after a restart as before it (recorded: groups-listed-after-restart):
+	// ProtocolType is a classic group's protocol type ("consumer", "connect", ...).
+	// Consumer is a consumer-protocol group with no members, which has no EmptySince
+	// (its offsets expire from their commits), and Epoch and Assignor are what it was
+	// at when it emptied.
+	ProtocolType string
+	Consumer     bool
+	Epoch        int32
+	Assignor     string
 }
 
-// emptySincePrefix keys, in the meta bucket, what is kept about a group's members: 8
-// bytes are when it lost the last one, 9 bytes are a group that has some (the kind of
-// group, then its session in milliseconds).
+// emptySincePrefix keys, in the meta bucket, what is kept about a group's members.
+// Written by an earlier version: 8 bytes are when it lost the last one, 9 bytes are a
+// group that has some (the kind of group, then its session in milliseconds). Written
+// now: livenessV2, flags, empty since (8), session in milliseconds (8), epoch (4),
+// then the protocol type and the assignor, each a 2-byte length and its bytes.
 var emptySincePrefix = []byte("empty_since\x00")
 
 // keyGroupsAdopted is set once AdoptGroupsWithOffsets has run.
@@ -729,6 +742,11 @@ var keyGroupsAdopted = []byte("groups_adopted")
 const (
 	liveClassic  byte = 'c'
 	liveConsumer byte = 'n'
+	livenessV2   byte = 'V'
+
+	flagLive     byte = 1
+	flagClassic  byte = 2
+	flagConsumer byte = 4
 )
 
 func emptySinceKey(group string) []byte {
@@ -736,14 +754,24 @@ func emptySinceKey(group string) []byte {
 }
 
 func encodeGroupLiveness(st GroupLiveness) []byte {
-	if !st.Live {
-		return binary.BigEndian.AppendUint64(nil, uint64(st.EmptySince))
+	var flags byte
+	if st.Live {
+		flags |= flagLive
 	}
-	kind := liveConsumer
 	if st.Classic {
-		kind = liveClassic
+		flags |= flagClassic
 	}
-	return binary.BigEndian.AppendUint64([]byte{kind}, uint64(st.Session.Milliseconds()))
+	if st.Consumer {
+		flags |= flagConsumer
+	}
+	b := []byte{livenessV2, flags}
+	b = binary.BigEndian.AppendUint64(b, uint64(st.EmptySince))
+	b = binary.BigEndian.AppendUint64(b, uint64(st.Session.Milliseconds()))
+	b = binary.BigEndian.AppendUint32(b, uint32(st.Epoch))
+	b = binary.BigEndian.AppendUint16(b, uint16(len(st.ProtocolType)))
+	b = append(b, st.ProtocolType...)
+	b = binary.BigEndian.AppendUint16(b, uint16(len(st.Assignor)))
+	return append(b, st.Assignor...)
 }
 
 func decodeGroupLiveness(v []byte) (GroupLiveness, bool) {
@@ -753,6 +781,26 @@ func decodeGroupLiveness(v []byte) (GroupLiveness, bool) {
 	case len(v) == 9 && (v[0] == liveClassic || v[0] == liveConsumer):
 		return GroupLiveness{Live: true, Classic: v[0] == liveClassic,
 			Session: time.Duration(binary.BigEndian.Uint64(v[1:])) * time.Millisecond}, true
+	case len(v) >= 24 && v[0] == livenessV2:
+		flags := v[1]
+		st := GroupLiveness{Live: flags&flagLive != 0, Classic: flags&flagClassic != 0, Consumer: flags&flagConsumer != 0,
+			EmptySince: int64(binary.BigEndian.Uint64(v[2:])),
+			Session:    time.Duration(binary.BigEndian.Uint64(v[10:])) * time.Millisecond,
+			Epoch:      int32(binary.BigEndian.Uint32(v[18:]))}
+		rest := v[22:]
+		str := func() (string, bool) {
+			if len(rest) < 2 || len(rest) < 2+int(binary.BigEndian.Uint16(rest)) {
+				return "", false
+			}
+			n := int(binary.BigEndian.Uint16(rest))
+			out := string(rest[2 : 2+n])
+			rest = rest[2+n:]
+			return out, true
+		}
+		var ok1, ok2 bool
+		st.ProtocolType, ok1 = str()
+		st.Assignor, ok2 = str()
+		return st, ok1 && ok2 && len(rest) == 0
 	}
 	return GroupLiveness{}, false
 }
@@ -760,7 +808,7 @@ func decodeGroupLiveness(v []byte) (GroupLiveness, bool) {
 func (s *boltStore) SetGroupLiveness(group string, state *GroupLiveness) error {
 	return s.update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucketMeta)
-		if state == nil || !state.Live && state.EmptySince == 0 {
+		if state == nil || !state.Live && state.EmptySince == 0 && !state.Consumer {
 			return b.Delete(emptySinceKey(group))
 		}
 		return b.Put(emptySinceKey(group), encodeGroupLiveness(*state))
