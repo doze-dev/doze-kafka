@@ -65,6 +65,26 @@ func TestSelfTest_AHeavierBinaryAndAHeavierHeapFail(t *testing.T) {
 	expect("no budget file", rc, out, 1)
 	rc, out = gate("record", "")
 	expect("record", rc, out, 0, "recorded "+platform)
+	// The stand-in's heap moves by a few KB from start to start when the machine is
+	// busy (its pprof handlers allocate while they answer: 121,728 to 129,224 bytes
+	// over three starts in a loaded Linux container), more than six starts at record
+	// time always see. A 16 KiB allowance keeps this test about the gate, and the 64
+	// KiB planted below is still four times over it.
+	path := filepath.Join(dir, filepath.FromSlash(budgetFile))
+	raw0, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b0, err := ParseBudget(raw0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p0 := b0.Platforms[platform]
+	p0.IdleHeapNoiseBytes = max(p0.IdleHeapNoiseBytes, 16<<10)
+	b0.Platforms[platform] = p0
+	if err := os.WriteFile(path, b0.format(), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	git("add", "-A")
 	git("commit", "-q", "-m", "budget")
 	rc, out = gate("check", "")

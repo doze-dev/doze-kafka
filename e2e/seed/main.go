@@ -184,14 +184,17 @@ func seedGroupTimeline(ctx context.Context, addr string) error {
 	if err != nil {
 		return err
 	}
-	for {
-		if cl.PollFetches(ctx).NumRecords() > 0 {
-			break
-		}
-		if ctx.Err() != nil {
-			cl.Close()
-			return fmt.Errorf("g-timeline: no record before the deadline: %w", ctx.Err())
-		}
+	// One loop whose every statement runs whether the first poll has the record
+	// or a later one does: written the other way (a check of the deadline after
+	// an empty poll) that check ran only on the runs where a poll came back
+	// empty, and the package's coverage read 78.4% or 78.5% by the weather.
+	got := 0
+	for got == 0 && ctx.Err() == nil {
+		got = cl.PollFetches(ctx).NumRecords()
+	}
+	if got == 0 {
+		cl.Close()
+		return fmt.Errorf("g-timeline: no record before the deadline: %w", ctx.Err())
 	}
 	if err := cl.CommitUncommittedOffsets(ctx); err != nil {
 		cl.Close()
