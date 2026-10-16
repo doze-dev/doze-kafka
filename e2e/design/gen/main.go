@@ -1,4 +1,5 @@
 //go:build !windows
+
 // (SIGUSR1, which the design gate signals it with, does not exist on Windows; the gate runs on Linux and macOS.)
 
 // Command gen is the design gate's traffic: real franz-go clients that do what the
