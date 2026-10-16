@@ -1,0 +1,648 @@
+{
+  "scenario": "createtopics-collisions",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "two-in-one-request",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "pair.one"
+          },
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "pair_one"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "pair.one",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          },
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "pair_one",
+            "TopicID": "\u003ctopic-id:2\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "two-in-one-request-other-order",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "pair_two"
+          },
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "pair.two"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "pair_two",
+            "TopicID": "\u003ctopic-id:3\u003e"
+          },
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "pair.two",
+            "TopicID": "\u003ctopic-id:4\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "three-in-one-request",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "tri.a.b"
+          },
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "tri_a.b"
+          },
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "tri.a_b"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "tri.a.b",
+            "TopicID": "\u003ctopic-id:5\u003e"
+          },
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "tri_a.b",
+            "TopicID": "\u003ctopic-id:6\u003e"
+          },
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "tri.a_b",
+            "TopicID": "\u003ctopic-id:7\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "validate-only-two-in-one-request",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "dry.one"
+          },
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "dry_one"
+          }
+        ],
+        "ValidateOnly": true
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "dry.one",
+            "TopicID": "\u003ctopic-id:8\u003e"
+          },
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "dry_one",
+            "TopicID": "\u003ctopic-id:9\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "existing",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "have.it"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "have.it",
+            "TopicID": "\u003ctopic-id:10\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "one-collides-with-existing-one-does-not",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "have_it"
+          },
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "fine"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 17,
+            "ErrorMessage": "Topic 'have_it' collides with existing topic: have.it",
+            "NumPartitions": -1,
+            "ReplicationFactor": -1,
+            "Topic": "have_it",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "fine",
+            "TopicID": "\u003ctopic-id:11\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "validate-only-collides-with-existing",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "have_it"
+          }
+        ],
+        "ValidateOnly": true
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 17,
+            "ErrorMessage": "Topic 'have_it' collides with existing topic: have.it",
+            "NumPartitions": -1,
+            "ReplicationFactor": -1,
+            "Topic": "have_it",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "same-name-is-not-a-collision",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "have.it"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 36,
+            "ErrorMessage": "Topic 'have.it' already exists.",
+            "NumPartitions": -1,
+            "ReplicationFactor": -1,
+            "Topic": "have.it",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "a-third-spelling-in-a-later-request",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "pair_one"
+          },
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "tri_a_b"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 36,
+            "ErrorMessage": "Topic 'pair_one' already exists.",
+            "NumPartitions": -1,
+            "ReplicationFactor": -1,
+            "Topic": "pair_one",
+            "TopicID": "\u003czero-id\u003e"
+          },
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 17,
+            "ErrorMessage": "Topic 'tri_a_b' collides with existing topic: tri.a_b",
+            "NumPartitions": -1,
+            "ReplicationFactor": -1,
+            "Topic": "tri_a_b",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "what-exists",
+      "api": "Metadata",
+      "version": 12,
+      "request": {
+        "AllowAutoTopicCreation": false,
+        "IncludeClusterAuthorizedOperations": false,
+        "IncludeTopicAuthorizedOperations": false,
+        "Topics": null
+      },
+      "response": {
+        "AuthorizedOperations": -2147483648,
+        "Brokers": [
+          {
+            "Host": "\u003chost\u003e",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e",
+            "Rack": null
+          }
+        ],
+        "ClusterID": "\u003ccluster\u003e",
+        "ControllerID": "\u003cnode\u003e",
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "fine",
+            "TopicID": "\u003ctopic-id:11\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "have.it",
+            "TopicID": "\u003ctopic-id:10\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "pair.one",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "pair.two",
+            "TopicID": "\u003ctopic-id:4\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "pair_one",
+            "TopicID": "\u003ctopic-id:2\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "pair_two",
+            "TopicID": "\u003ctopic-id:3\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "tri.a.b",
+            "TopicID": "\u003ctopic-id:5\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "tri.a_b",
+            "TopicID": "\u003ctopic-id:7\u003e"
+          },
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "IsInternal": false,
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "ISR": [
+                  "\u003cnode\u003e"
+                ],
+                "Leader": "\u003cnode\u003e",
+                "LeaderEpoch": 0,
+                "OfflineReplicas": null,
+                "Partition": 0,
+                "Replicas": [
+                  "\u003cnode\u003e"
+                ]
+              }
+            ],
+            "Topic": "tri_a.b",
+            "TopicID": "\u003ctopic-id:6\u003e"
+          }
+        ]
+      }
+    }
+  ]
+}

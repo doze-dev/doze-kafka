@@ -18,9 +18,19 @@ type fakeTraffic struct {
 	groups  map[string][]TrafficGroupEvent
 	story   TrafficStory
 	asked   []TrafficFilter
+	whole   int // how many times everything held was asked for.
 }
 
 func (f *fakeTraffic) Events(flt TrafficFilter, limit int) []TrafficEvent {
+	if flt == (TrafficFilter{}) && limit == 0 {
+		f.mu.Lock()
+		f.whole++ // a copy of everything held.
+		f.mu.Unlock()
+	}
+	return f.find(flt)
+}
+
+func (f *fakeTraffic) find(flt TrafficFilter) []TrafficEvent {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.asked = append(f.asked, flt)
@@ -29,12 +39,44 @@ func (f *fakeTraffic) Events(flt TrafficFilter, limit int) []TrafficEvent {
 		if flt.Topic != "" && !slices.Contains(e.Topics, flt.Topic) {
 			continue
 		}
+		if flt.Group != "" && e.Group != flt.Group && e.ViaGroup != flt.Group {
+			continue
+		}
 		if flt.ErrorsOnly && (e.Class == "" || e.Class == "expected") && !(e.Error != "" && e.Class == "") {
+			continue
+		}
+		if flt.Any != "" && !slices.ContainsFunc(append([]string{e.ClientID, e.Software, e.Remote, e.API, e.Group, e.ViaGroup, e.TxnID, e.Principal, e.Error}, e.Topics...),
+			func(s string) bool { return strings.Contains(strings.ToLower(s), strings.ToLower(flt.Any)) }) {
 			continue
 		}
 		out = append(out, e)
 	}
 	return out
+}
+
+// Query is Events with the counts the recorder keeps: what matched, and what is held.
+func (f *fakeTraffic) Query(flt TrafficFilter, limit int) TrafficResult {
+	var res TrafficResult
+	res.Rows = f.find(flt)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, e := range f.events {
+		res.Held += max(e.Count, 1)
+	}
+	for _, e := range res.Rows {
+		res.Total++
+		res.Requests += max(e.Count, 1)
+		if e.Time.After(res.Newest) {
+			res.Newest = e.Time
+		}
+		if res.Oldest.IsZero() || e.First.Before(res.Oldest) {
+			res.Oldest = e.First
+		}
+	}
+	if limit > 0 && len(res.Rows) > limit {
+		res.Rows = res.Rows[:limit]
+	}
+	return res
 }
 func (f *fakeTraffic) Row(id string) (TrafficEvent, bool) {
 	f.mu.Lock()

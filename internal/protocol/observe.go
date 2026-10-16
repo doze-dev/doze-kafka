@@ -83,6 +83,10 @@ type Observation struct {
 	// Closed, when set, says the broker closed the connection because of this request
 	// and why ("API key 99 is not served"). The answer, if any, was never sent.
 	Closed string
+	// Own says the connection is one this process opened to itself (Adopt): the
+	// console beside the broker. It is a fact about the connection, kept in memory,
+	// and nothing a client sends can set it.
+	Own bool
 	// Req and Resp are what the handler decoded and answered with, for an observer that
 	// wants to read more of them (Facts). They are read-only and must not be kept.
 	Req  kmsg.Request

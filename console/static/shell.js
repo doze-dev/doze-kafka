@@ -720,6 +720,16 @@
   document.addEventListener("keydown", function (e) {
     if (confirmOpen()) return; // the dialog has its own keys, and nothing else gets any.
     var mod = e.metaKey || e.ctrlKey;
+    // The key sheet is a dialog too (Sy-06): while it is open the page's keys are
+    // off. Its own keys are bound where it is (Esc and ? close it, Tab stays inside);
+    // ⌘K swaps it for the palette, one thing being open at a time. Without this
+    // every single key went through to the page behind the sheet: ? then p paused
+    // the tail, j and k moved a cursor nobody could see, c and the g chords left.
+    if (helpOpen()) {
+      chord = 0;
+      if (mod && !e.altKey && !e.shiftKey && e.key === "k") { e.preventDefault(); openPalette(); }
+      return;
+    }
     if (paletteOpen()) {
       var items = palFiltered();
       if (e.key === "Tab") { e.preventDefault(); return; } // one control; focus stays on the search box.

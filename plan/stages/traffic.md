@@ -366,7 +366,7 @@ On top of the common list in [01-protocol.md](../01-protocol.md).
 **Real clients**
 
 - [ ] Compat cells `java-telemetry`, `kcat-telemetry`, `kcat-traffic` pass, plain and SCRAM over TLS where applicable; the existing 20 cells still pass.
-- [ ] Recording scenarios R1 to R9 are recorded and replayed with zero "answered differently", or each difference is in `docs/limitations.md`; the count at `doc` or `memory` is written here: 0 (R9b, the first release of each client to push, is `spec` from KIP-714 and the release notes).
+- [ ] Recording scenarios R1 to R9 are recorded and replayed with zero "answered differently", or each difference is in `docs/limitations.md`; the count at `doc` or `memory` is written here: 2 (R9b, the first release of each client to push, is `doc`: KIP-714 and the release notes; R7b, the order of a Produce response, is `memory` until the harness records it).
 
 **Boards**
 
@@ -436,13 +436,13 @@ on the code before the fix and was run again with the fix reverted by hand.
 | TRF-14 | fixed, red | `TestEmbeddedBrokerDoesNotAdvertiseTelemetry`, `TestNoConsoleMeansNoTelemetry` |
 | TRF-15 | fixed | "N of M requests match" (requests among those kept); the table says when it is cut at 200 rows |
 | TRF-16 | cells written and run | `compat/java-telemetry`, `compat/kcat-telemetry`: the client's card on the page. The cells now grep the `Traffic` page's client list; see the compat note below. |
-| TRF-17 | fixed | `TestSummarisersReportWhatTheRequestNames` (22 rows) and the summariser coverage |
+| TRF-17 | fixed | `TestSummarisersReportWhatTheRequestNames` (22 rows) and, since the review of 2026-10-12 found the two sub-targets unmet (`summary.go` 89.7% against 92, `observe.go` 94.4% against 100), `TestSummarisersNameWhatAdminAndTransactionRequestsAreAbout` (21 more rows), `TestASummariserHandedAnotherAPIsRequestSaysNothing`, `TestFirstErrorLooksAtABoundedAmountOfAResponse`, `TestReplySizedFramesAndKeepsTheAnswerAsReplyDoes` (it is the fetch path, not dead code), `TestAnAnswerThatCannotBeWrittenIsObserved`, `TestAnObservationNamesWhoTheConnectionIs`: `summary.go` 100%, `observe.go` 100%, the observer paths of `conn.go` 100%, package 91.2% (`go test ./internal/protocol -cover`) |
 | TRF-18 | fixed, red | `TestGroupFilterIncludesItsMembersFetches` |
 | TRF-19 | fixed, red | `TestGroupEventsAreKeptInOrderPerGroup` (a noisy group), `TestTheQuietestGroupIsTheOneForgotten` |
 | TRF-20 | decided | a row's time is when it began, and the table is ordered by it; the row appears when the request ends |
-| TRF-21 | fixed, red | `TestOnlyTheConsolesOwnIdsAreLeftOut`, `TestTheRecordersLeftOutIdsAreTheConsolesOwn` |
+| TRF-21 | fixed again, red | The exact ids were still only names: a client that used one was invisible. The console is now known by its connections, which the process marks in memory (`protocol.Adopt`); a client id decides nothing. `TestOnlyAnAdoptedConnectionIsTheProcessesOwn`, `TestAdoptIsOnlyForConnectionsServedHereAndEndsWithThem`, `TestAClientThatCallsItselfTheConsoleIsListed`, `TestTheProcessesOwnRequestsAreLeftOutWhateverTheyAreCalled`, `TestTrafficLeavesOutTheConsoleAndNobodyElse` (the real binary, plain and SASL over TLS) |
 | TRF-22 | fixed | the client's chart copy says what it covers and "one point per report" (`TestClientInspectorShowsWhatItReportsAboutItself`) |
-| TRF-23 | fixed | `TestFactsNeverHoldRecordBytesOrSecrets`, the fields held are listed in `observability.md` |
+| TRF-23 | fixed | `TestFactsNeverHoldRecordBytesOrSecrets`, and `TestInspectorNeverContainsRecordBytes`, which this document named and which did not exist until 2026-10-12: it is in `cmd/doze-kafka`, because only the real binary has a console over a real recorder (the console package is tested over a fake source, which could only show that the console adds no bytes). Records with their own key, value and header, plain and under each codec, are written and read back through a group over SASL/PLAIN, and no page of Traffic, no request inspector (folded or unfolded) and no client inspector holds any of them or the password, as they are, in base64, in hex or escaped. The fields held are listed in `observability.md` |
 | TRF-24, 25, 26 | fixed, red | `TestTruncatedPointIsMalformed`, `TestPastTimestampsAreClamped`, `TestDroppedSeriesAreCounted` |
 | TRF-27 | **dropped, recorded (R4)** | an instance is tied to no connection and no principal: Apache Kafka 4.3.1 lets another connection and another user push it and ask for its subscription (`telemetry-instance-binding-spaced`), so the principal rule this stage added was stricter than Kafka and is removed (`TestAnyConnectionAndPrincipalMaySpeakForAnInstance`). What stays is a bound, not a rule: a connection keeps at most 8 instances, losing its own oldest, and the store 100. |
 | TRF-28 | fixed | metrics are off the request region; the hash is from counters (`TestClientMetricsDoNotRefreshTheRequestRegion`) |
@@ -452,14 +452,25 @@ on the code before the fix and was run again with the fix reverted by hand.
 
 **Not done, with the reason.**
 
-- **R1 to R9, C1 and C2 are recorded** against `apache/kafka:4.3.1`; none is left at
-  `doc` or `memory`. Three of the claims were wrong as the plan wrote them: the broker
-  does not advertise the two APIs without a plugin (R5), a restart does not make a push
-  `UNKNOWN_SUBSCRIPTION_ID` (C2), and the Java client uses one connection in a one-broker
-  cluster (C1). `telemetry-interval` and `telemetry-instance-binding-spaced` are evidence
-  only, because they define a `CLIENT_METRICS` resource.
-- **The dock endpoint** is the existing `/dock`, which now pages by the recorder's row ids
-  (the contract's cursor); no `/traffic/dock` was added.
+- **R1 to R9, C1 and C2 are recorded** against `apache/kafka:4.3.1`, with two left
+  that are not: R9b (the first release of each client to push) is `doc`, and R7b (the
+  order of a Produce response's partitions) is `memory`, because the harness sorts a
+  Produce response before it stores it. Three of the claims were wrong as the plan wrote
+  them: the broker does not advertise the two APIs without a plugin (R5), a restart does
+  not make a push `UNKNOWN_SUBSCRIPTION_ID` (C2), and the Java client uses one connection
+  in a one-broker cluster (C1). `telemetry-interval` and
+  `telemetry-instance-binding-spaced` were evidence only and are now replayed: Kafka is
+  recorded with the five-second interval this broker uses, in real time. Only
+  `telemetry-subscription-change` is evidence only. Recording them that way, and three
+  scenarios added after a review (`telemetry-terminating`, `telemetry-ask-again`,
+  `telemetry-no-console`: R10 to R12), found two differences, both fixed red-first: a
+  terminated instance was not kept terminated, and the subscription request after a push
+  refused for its subscription id or compression was throttled.
+- **The dock endpoint** is the existing `/dock`, which pages by the recorder's row ids
+  (the contract's cursor): `/dock?topic=…&after=<row id>` is the rows after that one,
+  and the dock's Older and Newest use it (AD20). Until the fixes of 2026-10-12 the
+  handler passed `after=""` whatever it was asked, so this sentence was not true; no
+  `/traffic/dock` was added.
 - **Per (client, topic, direction) totals** for the map (W5) were not built; the map stage
   owns them.
 - **Decoded fields use Kafka's JSON specification names** ("TransactionalId",

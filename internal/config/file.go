@@ -38,6 +38,7 @@ type fileConfig struct {
 	AutoCreateTopics       *bool             `toml:"auto-create-topics"`
 	DefaultPartitions      *int              `toml:"default-partitions"`
 	MaxPartitions          *int              `toml:"max-partitions"`
+	MessageMaxBytes        *int64            `toml:"message-max-bytes"`
 	SASLMechanisms         []string          `toml:"sasl-mechanisms"`
 	Credentials            map[string]string `toml:"credentials"`
 	TLS                    *tlsFile          `toml:"tls"`
@@ -47,11 +48,13 @@ type fileConfig struct {
 	ConsoleAddr            *string           `toml:"console-addr"`
 	ConsolePrefix          *string           `toml:"console-prefix"`
 	ConsoleAllowHost       []string          `toml:"console-allow-host"`
+	ConsoleUnprotected     *bool             `toml:"console-unprotected"`
 	TraceHeader            *string           `toml:"trace-header"`
 	ClientTelemetry        *bool             `toml:"client-telemetry"`
 	Zone                   *bool             `toml:"zone"`
 	SchemaRegistry         *bool             `toml:"schema-registry"`
 	SchemaRegistryAddr     *string           `toml:"schema-registry-addr"`
+	SchemaRegistryTLS      *bool             `toml:"schema-registry-tls"`
 	PprofAddr              *string           `toml:"pprof-addr"`
 	Name                   *string           `toml:"name"`
 	LogLevel               *string           `toml:"log-level"`
@@ -148,6 +151,9 @@ func (fc fileConfig) applyTo(cfg *Config) error {
 	if fc.MaxPartitions != nil {
 		cfg.MaxPartitions = *fc.MaxPartitions
 	}
+	if fc.MessageMaxBytes != nil {
+		cfg.MessageMaxBytes = *fc.MessageMaxBytes
+	}
 	if fc.SASLMechanisms != nil {
 		cfg.SASLMechanisms = fc.SASLMechanisms
 	}
@@ -176,6 +182,12 @@ func (fc fileConfig) applyTo(cfg *Config) error {
 	}
 	if fc.SchemaRegistryAddr != nil {
 		cfg.SchemaRegistryAddr = *fc.SchemaRegistryAddr
+	}
+	if fc.SchemaRegistryTLS != nil {
+		cfg.SchemaRegistryTLS = *fc.SchemaRegistryTLS
+	}
+	if fc.ConsoleUnprotected != nil {
+		cfg.ConsoleUnprotected = *fc.ConsoleUnprotected
 	}
 	if fc.ClientTelemetry != nil {
 		cfg.ClientTelemetry = *fc.ClientTelemetry
@@ -248,6 +260,7 @@ func writeTOML(w io.Writer, cfg Config, secrets bool) error {
 		AutoCreateTopics:       &cfg.AutoCreateTopics,
 		DefaultPartitions:      &cfg.DefaultPartitions,
 		MaxPartitions:          &cfg.MaxPartitions,
+		MessageMaxBytes:        &cfg.MessageMaxBytes,
 		Console:                &cfg.Console,
 		ConsoleAddr:            &cfg.ConsoleAddr,
 		TraceHeader:            &cfg.TraceHeader,
@@ -255,6 +268,8 @@ func writeTOML(w io.Writer, cfg Config, secrets bool) error {
 		Zone:                   &cfg.Zone,
 		SchemaRegistry:         &cfg.SchemaRegistry,
 		SchemaRegistryAddr:     &cfg.SchemaRegistryAddr,
+		SchemaRegistryTLS:      &cfg.SchemaRegistryTLS,
+		ConsoleUnprotected:     &cfg.ConsoleUnprotected,
 		Name:                   &cfg.Name,
 		LogLevel:               &cfg.LogLevel,
 		LogFormat:              &cfg.LogFormat,
@@ -267,12 +282,12 @@ func writeTOML(w io.Writer, cfg Config, secrets bool) error {
 	if len(cfg.ConsoleAllowHosts) > 0 {
 		fc.ConsoleAllowHost = cfg.ConsoleAllowHosts
 	}
-	if cfg.ConsolePrefix != "" {
-		fc.ConsolePrefix = &cfg.ConsolePrefix
+	prefix := cfg.ConsolePrefix
+	if prefix == "" {
+		prefix = DefaultConsolePrefix
 	}
-	if cfg.ACLDefault != ACLAllow {
-		fc.ACLDefault = &cfg.ACLDefault
-	}
+	fc.ConsolePrefix = &prefix
+	fc.ACLDefault = &cfg.ACLDefault
 	if len(cfg.ACLSuperUsers) > 0 {
 		fc.ACLSuperUsers = cfg.ACLSuperUsers
 	}
@@ -294,7 +309,17 @@ func writeTOML(w io.Writer, cfg Config, secrets bool) error {
 	if cfg.TLSCertFile != "" || cfg.TLSKeyFile != "" {
 		fc.TLS = &tlsFile{Cert: &cfg.TLSCertFile, Key: &cfg.TLSKeyFile}
 	}
-	return toml.NewEncoder(w).Encode(fc)
+	if err := toml.NewEncoder(w).Encode(fc); err != nil {
+		return err
+	}
+	if fc.MetaDB == nil {
+		// Said, as a comment: written as a key it would stay behind if data-dir were
+		// changed in the printed file, and the database would no longer be beside
+		// the data it describes.
+		_, err := fmt.Fprintf(w, "# meta-db = %q  (unset: <data-dir>/%s, following data-dir)\n", filepath.Join(cfg.DataDir, MetaDBFile), MetaDBFile)
+		return err
+	}
+	return nil
 }
 
 func strp(s string) *string { return &s }

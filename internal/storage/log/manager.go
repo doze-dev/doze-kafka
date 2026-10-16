@@ -518,6 +518,10 @@ func (m *Manager) EnforceCompaction() error {
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}
+		if res.Unreadable > 0 {
+			m.log.Warn("compaction kept batches it cannot read as they are; they were stored by an earlier version, which did not read a batch's records before storing it",
+				"topic", p.topic, "dir", filepath.Base(p.dir), "batches", res.Unreadable)
+		}
 		if res.Ran && (res.RecordsRemoved > 0 || res.MarkersRemoved > 0 || res.SegmentsRemoved > 0) {
 			m.log.Info("compacted a partition", "topic", p.topic, "dir", filepath.Base(p.dir),
 				"records_removed", res.RecordsRemoved, "markers_removed", res.MarkersRemoved,

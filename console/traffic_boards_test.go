@@ -91,7 +91,7 @@ func TestTrafficBoardsRenderWhatTheRecorderHolds(t *testing.T) {
 	}
 	// Traf-12 draws one row above the story: the field, the kinds, the group's pill, clear
 	// and the count; no summary line, no Filters row; its foot note and the way out.
-	for _, want := range []string{`class="seg"`, `class="pill"`, `class="b">clear</a>`, `id="story-count"`} {
+	for _, want := range []string{`class="seg"`, `class="pill pill-name"`, `class="b">clear</a>`, `id="story-count"`} {
 		if !strings.Contains(st, want) {
 			t.Errorf("the story's filter row does not show %q", want)
 		}

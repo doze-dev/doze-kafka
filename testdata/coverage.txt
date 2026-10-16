@@ -10,6 +10,8 @@ internal/broker 90.4 darwin
 internal/broker 90.4 linux
 internal/config 65.8 darwin
 internal/config 65.8 linux
+internal/consolefeed 100 darwin
+internal/consolefeed 100 linux
 internal/embed 100 darwin
 internal/embed 100 linux
 internal/hostguard 100 darwin
@@ -52,6 +54,7 @@ server 86.2 linux
 # lowered: 2026-10-11 internal/storage/log 84.2 -> 83.9: f0ed9ca called 84.2 one run's value and 83.9 the stable one, with no measurement in the commit; the maintenance tick again
 # lowered: 2026-10-12 internal/storage/log 85.1 -> 84.9: e96a084 measured 84.9 alone and 85.1 under ./... (8 of 8 runs each): the maintenance tick fired within other tests only under the full run. Fixed by maintain_tick_test.go: 86.4 in 6 of 6 runs since
 # lowered: 2026-10-12 e2e/seed 78.5 -> 78.4: e96a084 measured 78.4 in 8 of 8 runs; the deadline check after an empty poll in seedGroupTimeline ran only when a poll came back empty. That loop now runs every statement either way: 78.7 in 6 of 6 runs since
+# lowered: 2026-10-12 cmd/doze-kafka 82.3 -> 80.6: e66da06 moved the console's traffic and metrics adapter, with its mapping test, out of cmd/doze-kafka into internal/consolefeed (100%), so the module's console has them too
 # Per-file floors (every platform): the Traffic stage's targets are summary.go 92 and
 # observe.go 100 (plan/stages/traffic.md); these are today's values, to be raised to
 # the targets by the tests being written for them.

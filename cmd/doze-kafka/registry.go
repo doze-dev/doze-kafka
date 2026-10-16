@@ -25,6 +25,11 @@ func registryAddrFor(ip string) string { return net.JoinHostPort(ip, strconv.Ito
 // registry on it. As with the console, the bind is done before this returns so a
 // port that is taken is an error, not a "listening" that was a lie. It returns a
 // func that stops it and the address it bound.
+//
+// When the broker has a certificate the registry is served over TLS with it
+// (config.RegistryTLS): a client that sets security.protocol=SSL for the broker
+// sets schema.registry.url=https://... beside it, and with SASL the registry's
+// requests carry the same passwords.
 func startRegistry(ctx context.Context, cfg config.Config, srv *server.Server, logger *slog.Logger) (func(), string, error) {
 	handler, err := srv.SchemaRegistry()
 	if err != nil {
@@ -34,9 +39,25 @@ func startRegistry(ctx context.Context, cfg config.Config, srv *server.Server, l
 	if err != nil {
 		return nil, "", fmt.Errorf("schema registry: listen on %s: %w (choose another with --schema-registry-addr, or turn it off with --schema-registry=false)", cfg.SchemaRegistryAddr, err)
 	}
-	httpSrv := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
+	httpSrv := &http.Server{
+		Handler: handler, ReadHeaderTimeout: 10 * time.Second,
+		// A failed handshake (a plain-HTTP client on the TLS port, a client that does
+		// not trust the certificate) is the client's business: at debug, in the
+		// process's own log format, rather than on the standard logger.
+		ErrorLog: slog.NewLogLogger(logger.Handler(), slog.LevelDebug),
+	}
+	serve := func() error { return httpSrv.Serve(ln) }
+	if cfg.RegistryTLS() {
+		tlsCfg, err := cfg.TLSConfig()
+		if err != nil {
+			ln.Close()
+			return nil, "", err
+		}
+		httpSrv.TLSConfig = tlsCfg
+		serve = func() error { return httpSrv.ServeTLS(ln, "", "") }
+	}
 	go func() {
-		if err := httpSrv.Serve(ln); err != nil && err != http.ErrServerClosed {
+		if err := serve(); err != nil && err != http.ErrServerClosed {
 			logger.Warn("schema registry stopped", "err", err)
 		}
 	}()
@@ -45,6 +66,29 @@ func startRegistry(ctx context.Context, cfg config.Config, srv *server.Server, l
 		httpSrv.Close()
 	}()
 	return func() { httpSrv.Close() }, ln.Addr().String(), nil
+}
+
+// registryScheme is how a client reaches the registry: https when it is served
+// with the broker's certificate.
+func registryScheme(cfg config.Config) string {
+	if cfg.RegistryTLS() {
+		return "https"
+	}
+	return "http"
+}
+
+// registryTLSURL is where clients reach a registry served over TLS at bound.
+//
+// It is not behind the zone's front door, which speaks plain HTTP to what it
+// fronts and would be refused. Beside a named broker it is on the broker's own
+// host (the name, or the address where the name does not resolve here) on its own
+// port: the host the broker's certificate has to name anyway. Anywhere else it
+// is the address it was told to bind.
+func registryTLSURL(besideTheName bool, brokerHost, bound string) string {
+	if _, port, err := net.SplitHostPort(bound); err == nil && besideTheName && brokerHost != "" {
+		return "https://" + net.JoinHostPort(brokerHost, port)
+	}
+	return urlFor("https", bound)
 }
 
 // routeRegistry publishes the registry under its own name, schema.<instance>.doze, so

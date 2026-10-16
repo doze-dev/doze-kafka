@@ -314,6 +314,12 @@ func TestRecordClientTelemetry(t *testing.T) {
 	if !*record {
 		t.Skip("recorder: run with -record (go tool task conformance:record); needs Docker")
 	}
+	// -only names one thing to record. It used to be ignored here, so recording one
+	// scenario also ran the four clients for two and a half minutes and rewrote
+	// client-telemetry.json, which nobody had asked to change.
+	if *only != "" && *only != "client-telemetry" {
+		t.Skipf("-only=%s: the client runs are recorded with no -only, or -only=client-telemetry", *only)
+	}
 	if !DockerAvailable() {
 		t.Skip("Docker is not available: nothing was recorded")
 	}

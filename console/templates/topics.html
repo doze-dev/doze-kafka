@@ -235,7 +235,7 @@
      together, so a new message appearing updates both from one partial. With
      .Search set it shows what a search found instead, and does not poll. */}}
 {{define "tape_and_table"}}
-<div class="tapetable" id="tape-and-table" {{if not .Search}}data-msg-base="{{topicURL .Topic.Name}}/message?partition={{.Partition}}" {{if .AtTail}}data-live="{{topicURL .Topic.Name}}/tape?partition={{.Partition}}{{.CommittedQ}}" data-hash="{{.Hash}}" data-live-ms="2500"{{end}}{{end}}>
+<div class="tapetable" id="tape-and-table" {{if not .Search}}data-msg-base="{{topicURL .Topic.Name}}/message?partition={{.Partition}}" {{if .AtTail}}data-live="{{topicURL .Topic.Name}}/tape?partition={{.Partition}}{{if .CommittedOnly}}&amp;committed=1{{end}}" data-hash="{{.Hash}}" data-live-ms="2500"{{end}}{{end}}>
   {{if not .Search}}
   <div class="tape-panel">
   <div class="tape-head">
@@ -323,8 +323,8 @@
       <span>{{if .Rows}}{{len .Rows}} shown{{else}}No messages{{end}}</span>
       {{if not .Search}}
       <span class="pager">
-        {{if .HasOlder}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.OlderFrom}}{{.CommittedQ}}">← Older</a>{{end}}
-        {{if .HasNewer}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.NewerFrom}}{{.CommittedQ}}">Newer</a><a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}{{.CommittedQ}}">Latest →</a>{{end}}
+        {{if .HasOlder}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.OlderFrom}}{{if .CommittedOnly}}&amp;committed=1{{end}}">← Older</a>{{end}}
+        {{if .HasNewer}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.NewerFrom}}{{if .CommittedOnly}}&amp;committed=1{{end}}">Newer</a><a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}{{if .CommittedOnly}}&amp;committed=1{{end}}">Latest →</a>{{end}}
         <span title="The oldest retained offset, and the log-end offset (where the next message goes)">log start {{.Earliest}} · log end {{.Latest}}</span>
       </span>
       {{end}}

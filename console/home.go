@@ -49,7 +49,7 @@ func (c *Console) isFirstRun(ctx context.Context) bool {
 		}
 	}
 	if c.traffic != nil {
-		if len(c.traffic.Events(TrafficFilter{}, 1)) != 0 || len(c.traffic.Clients()) != 0 {
+		if c.traffic.Query(TrafficFilter{}, 1).Total != 0 || len(c.traffic.Clients()) != 0 {
 			return false
 		}
 	}

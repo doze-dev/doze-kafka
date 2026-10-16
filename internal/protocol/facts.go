@@ -60,90 +60,353 @@ type Facts struct {
 // filled in (nil for a request that was not answered).
 //
 //fuzz:parser FuzzDescribe
-func DescribeFacts(q kmsg.Request, r kmsg.Response) Facts {
+func DescribeFacts(q kmsg.Request, r kmsg.Response) Facts { return DescribeFactsNamed(q, r, nil) }
+
+// DescribeFactsNamed is DescribeFacts for a caller that can name a topic from its id:
+// a fetch from v13 names its topics by id alone, and a partition listed without its
+// topic says nothing. The name the broker put in its answer is used first; resolve
+// (which may be nil) is asked only when there is none.
+//
+// The cost is bounded by what is kept. Only the first MaxFactPartitions partitions are
+// read and paired with their answers; the rest are counted from the lengths of the
+// lists. It was not always so: every partition was looked up in every partition of the
+// response, and a fetch of 4,000 partitions took 48 ms to describe.
+func DescribeFactsNamed(q kmsg.Request, r kmsg.Response, resolve func([16]byte) string) Facts {
 	var f Facts
 	if q == nil {
 		return f
-	}
-	add := func(p PartResult) {
-		if len(f.Partitions) >= MaxFactPartitions {
-			f.PartitionsMore++
-			return
-		}
-		f.Partitions = append(f.Partitions, p)
 	}
 	switch req := q.(type) {
 	case *kmsg.ProduceRequest:
 		f.Acks, f.HasAcks = req.Acks, true
 		resp, _ := r.(*kmsg.ProduceResponse)
-		for _, t := range req.Topics {
-			for _, p := range t.Partitions {
-				b, n := batchCounts(p.Records)
-				_ = b
-				pr := PartResult{Topic: t.Topic, Partition: p.Partition, Records: n, Bytes: len(p.Records)}
-				if resp != nil {
-					for _, rt := range resp.Topics {
-						if rt.Topic != t.Topic {
-							continue
-						}
-						for _, rp := range rt.Partitions {
-							if rp.Partition == p.Partition {
-								pr.ErrorCode = rp.ErrorCode
-								if rp.ErrorCode == 0 {
-									pr.Offset, pr.HasOffset = rp.BaseOffset, true
-								}
-							}
-						}
+		var answers []kmsg.ProduceResponseTopic
+		if resp != nil {
+			answers = resp.Topics
+		}
+		kept(&f, req.Topics, func(t *kmsg.ProduceRequestTopic) int { return len(t.Partitions) },
+			func(ti, pi int, t *kmsg.ProduceRequestTopic) PartResult {
+				p := &t.Partitions[pi]
+				_, n := batchCounts(p.Records)
+				pr := PartResult{Topic: topicName(t.Topic, t.TopicID, resolve), Partition: p.Partition, Records: n, Bytes: len(p.Records)}
+				rt, rp := answerFor(answers, ti, pi, p.Partition,
+					func(rt *kmsg.ProduceResponseTopic) bool { return sameTopic(t.Topic, t.TopicID, rt.Topic, rt.TopicID) },
+					func(rt *kmsg.ProduceResponseTopic) []kmsg.ProduceResponseTopicPartition { return rt.Partitions },
+					func(rp *kmsg.ProduceResponseTopicPartition) int32 { return rp.Partition })
+				if rp != nil {
+					pr.ErrorCode = rp.ErrorCode
+					if rp.ErrorCode == 0 {
+						pr.Offset, pr.HasOffset = rp.BaseOffset, true
+					}
+					if pr.Topic == "" {
+						pr.Topic = rt.Topic
 					}
 				}
-				add(pr)
-			}
-		}
+				return pr
+			})
 	case *kmsg.FetchRequest:
 		resp, _ := r.(*kmsg.FetchResponse)
-		for _, t := range req.Topics {
-			for _, p := range t.Partitions {
+		var answers []kmsg.FetchResponseTopic
+		if resp != nil {
+			answers = resp.Topics
+		}
+		kept(&f, req.Topics, func(t *kmsg.FetchRequestTopic) int { return len(t.Partitions) },
+			func(ti, pi int, t *kmsg.FetchRequestTopic) PartResult {
+				p := &t.Partitions[pi]
 				pr := PartResult{Topic: t.Topic, Partition: p.Partition, Offset: p.FetchOffset, HasOffset: true}
-				if resp != nil {
-					for _, rt := range resp.Topics {
-						if rt.Topic != t.Topic && rt.TopicID != t.TopicID {
-							continue
-						}
-						for _, rp := range rt.Partitions {
-							if rp.Partition == p.Partition {
-								pr.ErrorCode = rp.ErrorCode
-								_, pr.Records = batchCounts(rp.RecordBatches)
-								pr.Bytes = len(rp.RecordBatches)
-							}
-						}
+				rt, rp := answerFor(answers, ti, pi, p.Partition,
+					func(rt *kmsg.FetchResponseTopic) bool { return sameTopic(t.Topic, t.TopicID, rt.Topic, rt.TopicID) },
+					func(rt *kmsg.FetchResponseTopic) []kmsg.FetchResponseTopicPartition { return rt.Partitions },
+					func(rp *kmsg.FetchResponseTopicPartition) int32 { return rp.Partition })
+				if rp != nil {
+					pr.ErrorCode = rp.ErrorCode
+					_, pr.Records = batchCounts(rp.RecordBatches)
+					pr.Bytes = len(rp.RecordBatches)
+					if pr.Topic == "" {
+						pr.Topic = rt.Topic // the broker resolved the id to answer it.
 					}
 				}
-				add(pr)
-			}
-		}
+				if pr.Topic == "" {
+					pr.Topic = topicName("", t.TopicID, resolve)
+				}
+				return pr
+			})
 	case *kmsg.OffsetCommitRequest:
 		resp, _ := r.(*kmsg.OffsetCommitResponse)
-		for _, t := range req.Topics {
-			for _, p := range t.Partitions {
-				pr := PartResult{Topic: t.Topic, Partition: p.Partition, Offset: p.Offset, HasOffset: true}
-				if resp != nil {
-					for _, rt := range resp.Topics {
-						if rt.Topic != t.Topic {
-							continue
-						}
-						for _, rp := range rt.Partitions {
-							if rp.Partition == p.Partition {
-								pr.ErrorCode = rp.ErrorCode
-							}
-						}
+		var answers []kmsg.OffsetCommitResponseTopic
+		if resp != nil {
+			answers = resp.Topics
+		}
+		kept(&f, req.Topics, func(t *kmsg.OffsetCommitRequestTopic) int { return len(t.Partitions) },
+			func(ti, pi int, t *kmsg.OffsetCommitRequestTopic) PartResult {
+				p := &t.Partitions[pi]
+				pr := PartResult{Topic: topicName(t.Topic, t.TopicID, resolve), Partition: p.Partition, Offset: p.Offset, HasOffset: true}
+				rt, rp := answerFor(answers, ti, pi, p.Partition,
+					func(rt *kmsg.OffsetCommitResponseTopic) bool {
+						return sameTopic(t.Topic, t.TopicID, rt.Topic, rt.TopicID)
+					},
+					func(rt *kmsg.OffsetCommitResponseTopic) []kmsg.OffsetCommitResponseTopicPartition {
+						return rt.Partitions
+					},
+					func(rp *kmsg.OffsetCommitResponseTopicPartition) int32 { return rp.Partition })
+				if rp != nil {
+					pr.ErrorCode = rp.ErrorCode
+					if pr.Topic == "" {
+						pr.Topic = rt.Topic
 					}
 				}
-				add(pr)
-			}
+				return pr
+			})
+	case *kmsg.TxnOffsetCommitRequest:
+		resp, _ := r.(*kmsg.TxnOffsetCommitResponse)
+		var answers []kmsg.TxnOffsetCommitResponseTopic
+		if resp != nil {
+			answers = resp.Topics
 		}
+		kept(&f, req.Topics, func(t *kmsg.TxnOffsetCommitRequestTopic) int { return len(t.Partitions) },
+			func(ti, pi int, t *kmsg.TxnOffsetCommitRequestTopic) PartResult {
+				p := &t.Partitions[pi]
+				pr := PartResult{Topic: t.Topic, Partition: p.Partition, Offset: p.Offset, HasOffset: true}
+				_, rp := answerFor(answers, ti, pi, p.Partition,
+					func(rt *kmsg.TxnOffsetCommitResponseTopic) bool { return rt.Topic == t.Topic },
+					func(rt *kmsg.TxnOffsetCommitResponseTopic) []kmsg.TxnOffsetCommitResponseTopicPartition {
+						return rt.Partitions
+					},
+					func(rp *kmsg.TxnOffsetCommitResponseTopicPartition) int32 { return rp.Partition })
+				if rp != nil {
+					pr.ErrorCode = rp.ErrorCode
+				}
+				return pr
+			})
+	case *kmsg.ListOffsetsRequest:
+		resp, _ := r.(*kmsg.ListOffsetsResponse)
+		var answers []kmsg.ListOffsetsResponseTopic
+		if resp != nil {
+			answers = resp.Topics
+		}
+		kept(&f, req.Topics, func(t *kmsg.ListOffsetsRequestTopic) int { return len(t.Partitions) },
+			func(ti, pi int, t *kmsg.ListOffsetsRequestTopic) PartResult {
+				p := &t.Partitions[pi]
+				pr := PartResult{Topic: t.Topic, Partition: p.Partition}
+				_, rp := answerFor(answers, ti, pi, p.Partition,
+					func(rt *kmsg.ListOffsetsResponseTopic) bool { return rt.Topic == t.Topic },
+					func(rt *kmsg.ListOffsetsResponseTopic) []kmsg.ListOffsetsResponseTopicPartition { return rt.Partitions },
+					func(rp *kmsg.ListOffsetsResponseTopicPartition) int32 { return rp.Partition })
+				if rp != nil {
+					pr.ErrorCode = rp.ErrorCode
+					switch {
+					case rp.ErrorCode != 0:
+					case resp.Version == 0:
+						// v0 answers a list of offsets, newest first; the first is the one asked for.
+						if len(rp.OldStyleOffsets) > 0 {
+							pr.Offset, pr.HasOffset = rp.OldStyleOffsets[0], true
+						}
+					case rp.Offset >= 0: // -1: no offset at that time.
+						pr.Offset, pr.HasOffset = rp.Offset, true
+					}
+				}
+				return pr
+			})
+	case *kmsg.DeleteRecordsRequest:
+		resp, _ := r.(*kmsg.DeleteRecordsResponse)
+		var answers []kmsg.DeleteRecordsResponseTopic
+		if resp != nil {
+			answers = resp.Topics
+		}
+		kept(&f, req.Topics, func(t *kmsg.DeleteRecordsRequestTopic) int { return len(t.Partitions) },
+			func(ti, pi int, t *kmsg.DeleteRecordsRequestTopic) PartResult {
+				p := &t.Partitions[pi]
+				pr := PartResult{Topic: t.Topic, Partition: p.Partition}
+				_, rp := answerFor(answers, ti, pi, p.Partition,
+					func(rt *kmsg.DeleteRecordsResponseTopic) bool { return rt.Topic == t.Topic },
+					func(rt *kmsg.DeleteRecordsResponseTopic) []kmsg.DeleteRecordsResponseTopicPartition {
+						return rt.Partitions
+					},
+					func(rp *kmsg.DeleteRecordsResponseTopicPartition) int32 { return rp.Partition })
+				if rp != nil {
+					pr.ErrorCode = rp.ErrorCode
+					if rp.ErrorCode == 0 {
+						// Where the partition begins now: the request's own offset may be -1,
+						// "up to the end", and this is what that came to.
+						pr.Offset, pr.HasOffset = rp.LowWatermark, true
+					}
+				}
+				return pr
+			})
+	case *kmsg.OffsetDeleteRequest:
+		resp, _ := r.(*kmsg.OffsetDeleteResponse)
+		var answers []kmsg.OffsetDeleteResponseTopic
+		if resp != nil {
+			answers = resp.Topics
+		}
+		kept(&f, req.Topics, func(t *kmsg.OffsetDeleteRequestTopic) int { return len(t.Partitions) },
+			func(ti, pi int, t *kmsg.OffsetDeleteRequestTopic) PartResult {
+				p := &t.Partitions[pi]
+				pr := PartResult{Topic: t.Topic, Partition: p.Partition}
+				_, rp := answerFor(answers, ti, pi, p.Partition,
+					func(rt *kmsg.OffsetDeleteResponseTopic) bool { return rt.Topic == t.Topic },
+					func(rt *kmsg.OffsetDeleteResponseTopic) []kmsg.OffsetDeleteResponseTopicPartition {
+						return rt.Partitions
+					},
+					func(rp *kmsg.OffsetDeleteResponseTopicPartition) int32 { return rp.Partition })
+				if rp != nil {
+					pr.ErrorCode = rp.ErrorCode
+				}
+				return pr
+			})
+	case *kmsg.OffsetFetchRequest:
+		offsetFetchFacts(&f, req, r, resolve)
 	}
 	f.Decoded = decodedFields(q)
 	return f
+}
+
+// offsetFetchFacts lists the committed offsets a group was asked for. The request has
+// two shapes (one group at the top to v7, a list of groups from v8) and may name no
+// partition at all, which asks for every one the group has committed: then what came
+// back is the list. A request for several groups lists nothing, since a partition's
+// row has no place to say which group it is of.
+func offsetFetchFacts(f *Facts, req *kmsg.OffsetFetchRequest, r kmsg.Response, resolve func([16]byte) string) {
+	resp, _ := r.(*kmsg.OffsetFetchResponse)
+	committed := func(pr *PartResult, code int16, offset int64) {
+		pr.ErrorCode = code
+		if code == 0 && offset >= 0 { // -1: the group has committed nothing there.
+			pr.Offset, pr.HasOffset = offset, true
+		}
+	}
+	if len(req.Groups) == 0 {
+		var answers []kmsg.OffsetFetchResponseTopic
+		if resp != nil {
+			answers = resp.Topics
+		}
+		if len(req.Topics) == 0 {
+			kept(f, answers, func(t *kmsg.OffsetFetchResponseTopic) int { return len(t.Partitions) },
+				func(_, pi int, t *kmsg.OffsetFetchResponseTopic) PartResult {
+					pr := PartResult{Topic: t.Topic, Partition: t.Partitions[pi].Partition}
+					committed(&pr, t.Partitions[pi].ErrorCode, t.Partitions[pi].Offset)
+					return pr
+				})
+			return
+		}
+		kept(f, req.Topics, func(t *kmsg.OffsetFetchRequestTopic) int { return len(t.Partitions) },
+			func(ti, pi int, t *kmsg.OffsetFetchRequestTopic) PartResult {
+				pr := PartResult{Topic: t.Topic, Partition: t.Partitions[pi]}
+				_, rp := answerFor(answers, ti, pi, pr.Partition,
+					func(rt *kmsg.OffsetFetchResponseTopic) bool { return rt.Topic == t.Topic },
+					func(rt *kmsg.OffsetFetchResponseTopic) []kmsg.OffsetFetchResponseTopicPartition { return rt.Partitions },
+					func(rp *kmsg.OffsetFetchResponseTopicPartition) int32 { return rp.Partition })
+				if rp != nil {
+					committed(&pr, rp.ErrorCode, rp.Offset)
+				}
+				return pr
+			})
+		return
+	}
+	if len(req.Groups) != 1 {
+		return
+	}
+	g := &req.Groups[0]
+	var answers []kmsg.OffsetFetchResponseGroupTopic
+	if resp != nil {
+		for i := range resp.Groups {
+			if resp.Groups[i].Group == g.Group {
+				answers = resp.Groups[i].Topics
+				break
+			}
+		}
+	}
+	if len(g.Topics) == 0 {
+		kept(f, answers, func(t *kmsg.OffsetFetchResponseGroupTopic) int { return len(t.Partitions) },
+			func(_, pi int, t *kmsg.OffsetFetchResponseGroupTopic) PartResult {
+				pr := PartResult{Topic: topicName(t.Topic, t.TopicID, resolve), Partition: t.Partitions[pi].Partition}
+				committed(&pr, t.Partitions[pi].ErrorCode, t.Partitions[pi].Offset)
+				return pr
+			})
+		return
+	}
+	kept(f, g.Topics, func(t *kmsg.OffsetFetchRequestGroupTopic) int { return len(t.Partitions) },
+		func(ti, pi int, t *kmsg.OffsetFetchRequestGroupTopic) PartResult {
+			pr := PartResult{Topic: topicName(t.Topic, t.TopicID, resolve), Partition: t.Partitions[pi]}
+			rt, rp := answerFor(answers, ti, pi, pr.Partition,
+				func(rt *kmsg.OffsetFetchResponseGroupTopic) bool {
+					return sameTopic(t.Topic, t.TopicID, rt.Topic, rt.TopicID)
+				},
+				func(rt *kmsg.OffsetFetchResponseGroupTopic) []kmsg.OffsetFetchResponseGroupTopicPartition {
+					return rt.Partitions
+				},
+				func(rp *kmsg.OffsetFetchResponseGroupTopicPartition) int32 { return rp.Partition })
+			if rp != nil {
+				committed(&pr, rp.ErrorCode, rp.Offset)
+				if pr.Topic == "" {
+					pr.Topic = rt.Topic
+				}
+			}
+			return pr
+		})
+}
+
+// kept walks a request's topics and their partitions, hands the first
+// MaxFactPartitions of them to describe, and counts the rest from the lengths of the
+// lists without reading them.
+func kept[T any](f *Facts, topics []T, partitions func(*T) int, describe func(ti, pi int, t *T) PartResult) {
+	total := 0
+	for ti := range topics {
+		t := &topics[ti]
+		n := partitions(t)
+		total += n
+		for pi := 0; pi < n && len(f.Partitions) < MaxFactPartitions; pi++ {
+			f.Partitions = append(f.Partitions, describe(ti, pi, t))
+		}
+	}
+	f.PartitionsMore = total - len(f.Partitions)
+}
+
+// sameTopic says whether an answered topic is the asked one. A version that names
+// topics by id (Fetch from v13) carries no name in the request, and one that names
+// them by name carries no id, so the two must not be compared together: with both ids
+// zero "the ids are equal" made every topic the same topic.
+func sameTopic(askedName string, askedID [16]byte, name string, id [16]byte) bool {
+	if askedID != ([16]byte{}) {
+		return id == askedID
+	}
+	return name == askedName
+}
+
+// topicName is a topic's name, from the request or, for one named by id, from resolve.
+func topicName(name string, id [16]byte, resolve func([16]byte) string) string {
+	if name == "" && resolve != nil && id != ([16]byte{}) {
+		return resolve(id)
+	}
+	return name
+}
+
+// answerFor finds the answer to the partition asked at position (ti, pi). The broker
+// answers in the order it was asked, so it is almost always at the same position, and
+// that is looked at first: one comparison, however many partitions there are. Only
+// when it is not there (a response cut short, a handler that answers in another
+// order) is the response searched, and the search ends at the first match.
+func answerFor[RT, RP any](answers []RT, ti, pi int, partition int32,
+	same func(*RT) bool, partitions func(*RT) []RP, number func(*RP) int32) (*RT, *RP) {
+	if ti < len(answers) {
+		if rt := &answers[ti]; same(rt) {
+			if ps := partitions(rt); pi < len(ps) && number(&ps[pi]) == partition {
+				return rt, &ps[pi]
+			}
+		}
+	}
+	for i := range answers {
+		rt := &answers[i]
+		if !same(rt) {
+			continue
+		}
+		ps := partitions(rt)
+		for j := range ps {
+			if number(&ps[j]) == partition {
+				return rt, &ps[j]
+			}
+		}
+	}
+	return nil, nil
 }
 
 // decodedFields is the request as JSON, small enough to hold. It tries a broad view

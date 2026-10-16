@@ -113,7 +113,7 @@ func metricsPayload(v float64) []byte {
 
 func TestClientTelemetryIsAdvertisedOnlyWhereKafkaOffersItAndWhenOn(t *testing.T) {
 	has := func(addr string) (get, push bool) {
-		resp := ask(t, openRaw(t, addr), kmsg.NewPtrApiVersionsRequest(), 3, kmsg.NewPtrApiVersionsResponse())
+		resp := askVersions(t, openRaw(t, addr), 3, "doze-test", "1")
 		for _, k := range resp.ApiKeys {
 			switch k.ApiKey {
 			case int16(kmsg.GetTelemetrySubscriptions):

@@ -1,0 +1,62 @@
+{
+  "scenario": "telemetry-no-console",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "subscribe-not-advertised",
+      "api": "GetTelemetrySubscriptions",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003czero-id\u003e"
+      },
+      "response": {
+        "AcceptedCompressionTypes": [
+          4,
+          3,
+          1,
+          2
+        ],
+        "ClientInstanceID": "\u003cinstance:1\u003e",
+        "DeltaTemporality": true,
+        "ErrorCode": 0,
+        "PushIntervalMillis": 300000,
+        "RequestedMetrics": null,
+        "SubscriptionID": "\u003csubscription:1\u003e",
+        "TelemetryMaxBytes": 1048576,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "push-not-advertised",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003cinstance:2\u003e",
+        "CompressionType": 0,
+        "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
+        "SubscriptionID": "\u003csubscription:2\u003e",
+        "Terminating": false
+      },
+      "response": {
+        "ErrorCode": 117,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "push-not-advertised-no-instance",
+      "api": "PushTelemetry",
+      "version": 0,
+      "request": {
+        "ClientInstanceID": "\u003czero-id\u003e",
+        "CompressionType": 0,
+        "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
+        "SubscriptionID": "\u003csubscription:2\u003e",
+        "Terminating": false
+      },
+      "response": {
+        "ErrorCode": 42,
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}

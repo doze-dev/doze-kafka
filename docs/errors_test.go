@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -31,8 +32,9 @@ import (
 //     %-verb there, and a <placeholder> in the document, stand for anything).
 //  3. A log line in a fence (level=... msg=...): its msg is in the source.
 //
-// The strings of the source are its string literals outside tests, and the text of
-// the console's templates.
+// The strings of the source are its string literals outside tests, the text of the
+// console's templates and the shell scripts, and the string literals of the standard
+// library packages that answer for it (net/http, crypto/tls).
 
 var (
 	upperSnake = regexp.MustCompile(`^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$`)
@@ -89,7 +91,37 @@ var sourceStrings = sync.OnceValues(func() ([]string, error) {
 		}
 		return nil
 	})
-	return out, err
+	if err != nil {
+		return nil, err
+	}
+	// What the program prints includes what the standard library it links prints for
+	// it: net/http's answers (a plain request to the TLS registry is net/http's 400)
+	// and crypto/tls's errors.
+	goroot, err := exec.Command("go", "env", "GOROOT").Output()
+	if err != nil {
+		return nil, err
+	}
+	for _, pkg := range []string{"net/http", "crypto/tls"} {
+		files, _ := filepath.Glob(filepath.Join(strings.TrimSpace(string(goroot)), "src", filepath.FromSlash(pkg), "*.go"))
+		for _, p := range files {
+			if strings.HasSuffix(p, "_test.go") {
+				continue
+			}
+			f, err := parser.ParseFile(fset, p, nil, parser.SkipObjectResolution)
+			if err != nil {
+				return nil, err
+			}
+			ast.Inspect(f, func(n ast.Node) bool {
+				if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+					if s, err := strconv.Unquote(lit.Value); err == nil {
+						out = append(out, s)
+					}
+				}
+				return true
+			})
+		}
+	}
+	return out, nil
 })
 
 // inSource reports whether claimed text is in one of the source's strings: whether

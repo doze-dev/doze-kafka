@@ -120,10 +120,13 @@ func (b *Broker) handlePushTelemetry(ctx context.Context, req *protocol.Request,
 	}
 	switch {
 	case q.SubscriptionID != subscriptionID(q.ClientInstanceID):
-		// A subscription this instance was not given: the client is meant to ask again.
+		// A subscription this instance was not given: the client is meant to ask again,
+		// and its next subscription request is answered though it comes at once.
 		resp.ErrorCode = kerr.UnknownSubscriptionID.Code
+		b.telemetry.AskAgain(q.ClientInstanceID)
 	case q.CompressionType < 0 || q.CompressionType > 4:
 		resp.ErrorCode = kerr.UnsupportedCompressionType.Code
+		b.telemetry.AskAgain(q.ClientInstanceID)
 	case len(q.Metrics) > telemetryMaxBytes:
 		resp.ErrorCode = kerr.TelemetryTooLarge.Code
 	default:

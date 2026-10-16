@@ -27,9 +27,9 @@ func newProducers() *partitionProducers {
 func TestRetryIsRecognisedAfterManyOtherProducers(t *testing.T) {
 	stepClock(t)
 	pp := newProducers()
-	pp.record(7, 0, 0, 0, 42)
+	pp.record(7, 0, 0, 0, 42, 0)
 	for pid := int64(1000); pid < 4000; pid++ {
-		pp.record(pid, 0, 0, 0, pid)
+		pp.record(pid, 0, 0, 0, pid, 0)
 	}
 	if v := pp.check(7, 0, 0, 0); v.kind != seqDuplicate || v.offset != 42 {
 		t.Fatalf("producer 7's retry after 3000 other producers: verdict %+v, want a duplicate at offset 42", v)
@@ -41,10 +41,10 @@ func TestRetryIsRecognisedAfterManyOtherProducers(t *testing.T) {
 func TestProducerStateExpiresByIdleTimeAndIsBounded(t *testing.T) {
 	advance := stepClock(t)
 	pp := newProducers()
-	pp.record(1, 0, 0, 0, 1)
+	pp.record(1, 0, 0, 0, 1, 0)
 	advance(producerIdleExpiry + time.Minute)
 	for pid := int64(2); pid < 2+producerSweepEvery+1; pid++ {
-		pp.record(pid, 0, 0, 0, pid)
+		pp.record(pid, 0, 0, 0, pid, 0)
 	}
 	if _, ok := pp.producers[1]; ok {
 		t.Error("a producer idle past the expiry was kept through a sweep")
@@ -56,7 +56,7 @@ func TestProducerStateExpiresByIdleTimeAndIsBounded(t *testing.T) {
 	pp = newProducers()
 	const n = maxProducersPerPartition + 250
 	for pid := int64(1); pid <= n; pid++ {
-		pp.record(pid, 0, 0, 0, pid)
+		pp.record(pid, 0, 0, 0, pid, 0)
 	}
 	if got := len(pp.producers); got > maxProducersPerPartition {
 		t.Fatalf("tracking %d producers, want at most %d", got, maxProducersPerPartition)
@@ -73,8 +73,8 @@ func TestSequenceVerdicts(t *testing.T) {
 	stepClock(t)
 	pp := newProducers()
 	// Batches seq 0-4 and 5-9 at offsets 100 and 105.
-	pp.record(1, 0, 0, 4, 100)
-	pp.record(1, 0, 5, 9, 105)
+	pp.record(1, 0, 0, 4, 100, 0)
+	pp.record(1, 0, 5, 9, 105, 0)
 
 	for _, tc := range []struct {
 		name        string
@@ -101,7 +101,7 @@ func TestSequenceVerdicts(t *testing.T) {
 
 	// Older than everything remembered: applied, but where is no longer known.
 	for i := int32(2); i < 10; i++ {
-		pp.record(1, 0, i*5, i*5+4, int64(100+i*5))
+		pp.record(1, 0, i*5, i*5+4, int64(100+i*5), 0)
 	}
 	if v := pp.check(1, 0, 0, 4); v.kind != seqDuplicateOld {
 		t.Errorf("a retry older than the remembered window: verdict %+v, want seqDuplicateOld", v)
@@ -112,14 +112,14 @@ func TestSequenceVerdicts(t *testing.T) {
 func TestSequenceWrapsToZero(t *testing.T) {
 	stepClock(t)
 	pp := newProducers()
-	pp.record(1, 0, math.MaxInt32-1, math.MaxInt32, 10)
+	pp.record(1, 0, math.MaxInt32-1, math.MaxInt32, 10, 0)
 	if v := pp.check(1, 0, 0, 1); v.kind != seqAccept {
 		t.Errorf("sequence 0 after MaxInt32: verdict %+v, want accept", v)
 	}
 	if got := lastSeqOf(math.MaxInt32-1, 4); got != 1 {
 		t.Errorf("a 4-record batch starting at MaxInt32-1 ends at sequence %d, want 1", got)
 	}
-	pp.record(1, 0, math.MaxInt32-1, lastSeqOf(math.MaxInt32-1, 4), 20)
+	pp.record(1, 0, math.MaxInt32-1, lastSeqOf(math.MaxInt32-1, 4), 20, 0)
 	if v := pp.check(1, 0, 2, 2); v.kind != seqAccept {
 		t.Errorf("the batch after one that spanned the wrap: verdict %+v, want accept", v)
 	}

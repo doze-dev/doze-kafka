@@ -368,7 +368,16 @@ func topicSettings() []Setting {
 			s.Default = func(config.Config) string { return "delete" }
 			return s
 		}(),
-		choice(stored("compression.type", "", "", oneOf("uncompressed", "zstd", "lz4", "snappy", "gzip", "producer"), "the codec of records the cleaner rewrites"),
+		// compression.type acts in two places and not in a third. The log cleaner writes
+		// the batches it rewrites in the codec it names (topiclimits.go; "producer" and
+		// "uncompressed" both mean none). The produce handler holds a compressed batch
+		// on an "uncompressed" topic to max.message.bytes at the size it inflates to, as
+		// Kafka does (produce.go; recorded: produce-decompressed-size). What a producer
+		// sends is stored as it came: it is not re-compressed (docs/limitations.md).
+		// The record said "stored only" from before either existed.
+		choice(t("compression.type", "", "", oneOf("uncompressed", "zstd", "lz4", "snappy", "gzip", "producer"), Applied,
+			"log cleaner (the codec it rewrites in), produce handler (uncompressed: MESSAGE_TOO_LARGE by inflated size)",
+			"the codec of records the cleaner rewrites; uncompressed also holds a compressed batch to max.message.bytes as it inflates"),
 			"uncompressed", "zstd", "lz4", "snappy", "gzip", "producer"),
 		stored("compression.gzip.level", "", "-1 or more", isInt(-1), "gzip level when the broker compresses"),
 		stored("compression.lz4.level", "", "1 or more", isInt(1), "lz4 level when the broker compresses"),
@@ -394,14 +403,15 @@ func topicSettings() []Setting {
 		compacted("max.compaction.lag.ms", "ms", "1 or more", isInt(1), "the longest a record may stay uncompacted"),
 		func() Setting {
 			s := t("max.message.bytes", "bytes", "0 or more", isInt(0), Applied, "produce handler (MESSAGE_TOO_LARGE)", "refuse a record batch larger than this")
-			s.DefaultNote = "no limit below the 100 MiB request cap"
-			s.KafkaDefault = "1048588"
+			s.Default = func(c config.Config) string { return strconv.FormatInt(c.MessageMaxBytes, 10) }
 			return s
 		}(),
 		stored("message.downconversion.enable", "", "true or false", isBool, "convert records for old consumers"),
 		stored("message.format.version", "", "", nil, "on-disk message format (ignored since Kafka 4.0)"),
-		stored("message.timestamp.after.max.ms", "ms", "0 or more", isInt(0), "refuse a record stamped too far ahead"),
-		stored("message.timestamp.before.max.ms", "ms", "0 or more", isInt(0), "refuse a record stamped too far behind"),
+		def(t("message.timestamp.after.max.ms", "ms", "0 or more", isInt(0), Applied, "produce handler (INVALID_TIMESTAMP)", "refuse a CreateTime record stamped further ahead of the broker's clock than this"),
+			func(config.Config) string { return "3600000" }),
+		def(t("message.timestamp.before.max.ms", "ms", "0 or more", isInt(0), Applied, "produce handler (INVALID_TIMESTAMP)", "refuse a CreateTime record stamped further behind the broker's clock than this"),
+			func(config.Config) string { return "9223372036854775807" }),
 		stored("message.timestamp.difference.max.ms", "ms", "0 or more", isInt(0), "refuse a record stamped too far from the broker's clock"),
 		def(choice(t("message.timestamp.type", "", "", oneOf("CreateTime", "LogAppendTime"), Applied, "produce handler", "whose clock stamps a record"),
 			"CreateTime", "LogAppendTime"), func(config.Config) string { return "CreateTime" }),
@@ -462,6 +472,7 @@ func brokerSettings() []Setting {
 		d("log.segment.bytes", "segment-bytes", "segment-bytes", "bytes", func(c config.Config) string { return strconv.FormatInt(c.SegmentBytes, 10) }, "segment size"),
 		d("log.index.interval.bytes", "index-interval-bytes", "index-interval-bytes", "bytes", func(c config.Config) string { return strconv.FormatInt(c.IndexIntervalBytes, 10) }, "bytes of log per sparse index entry"),
 		d("num.partitions", "default-partitions", "default-partitions", "partitions", func(c config.Config) string { return strconv.Itoa(c.DefaultPartitions) }, "partitions of an auto-created topic"),
+		d("message.max.bytes", "message-max-bytes", "message-max-bytes", "bytes", func(c config.Config) string { return strconv.FormatInt(c.MessageMaxBytes, 10) }, "largest record batch a topic accepts unless it sets max.message.bytes"),
 		d("auto.create.topics.enable", "auto-create-topics", "auto-create-topics", "", func(c config.Config) string { return strconv.FormatBool(c.AutoCreateTopics) }, "create an unknown topic on first reference"),
 		{Name: "allow.everyone.if.no.acl.found", Kind: Broker, Wire: true, Effect: StartupOnly, Source: Doc, Flag: "acl-default", Key: "acl-default",
 			Enforcer: "authorizer", Meaning: "what a resource with no ACL allows",

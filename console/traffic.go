@@ -29,8 +29,13 @@ import (
 // TrafficSource is what the broker remembers of its clients' requests and of what its
 // consumer groups did.
 type TrafficSource interface {
-	// Events are the requests matching f, latest activity first, at most limit.
+	// Events are the requests matching f, newest first by when they began, at most limit
+	// (0: all of them).
 	Events(f TrafficFilter, limit int) []TrafficEvent
+	// Query is Events with what matched in all: one walk of what the recorder holds,
+	// which copies only the rows it returns. A page that lists the newest rows and
+	// counts the rest asks this once.
+	Query(f TrafficFilter, limit int) TrafficResult
 	// Row is one request by its id, while the recorder still holds it.
 	Row(id string) (TrafficEvent, bool)
 	// NewSince counts the requests matching f that began after t: what a paused page
@@ -62,6 +67,21 @@ type TrafficFilter struct {
 	// Kind is produce, fetch, groups or admin.
 	Kind       string
 	ErrorsOnly bool
+	// Any is the page's one search field: a row whose client, software, address,
+	// principal, request, topics, group, transactional id or error contains it. It is
+	// not part of a filter's address (the page carries it as q).
+	Any string
+}
+
+// TrafficResult is the rows a query found and what matched in all.
+type TrafficResult struct {
+	Rows []TrafficEvent
+	// Total is how many rows matched, whatever the limit; Requests how many requests
+	// they stand for; Held how many requests everything the recorder holds stands for.
+	Total, Requests, Held int
+	// Newest is when the newest matching row began; Oldest when the oldest matching
+	// row's first request did.
+	Newest, Oldest time.Time
 }
 
 // TrafficEvent is one row: a request, or a run of identical idle ones folded together.
@@ -264,9 +284,12 @@ func (v trafficView) empty() bool {
 }
 
 // source is the filter the recorder is asked: the kind chip is its own filter, except
-// "errors", which is the recorder's errors-only.
+// "errors", which is the recorder's errors-only, and the one search field is its Any.
+// The recorder does all of the narrowing, so it can count what matched without
+// handing over the rows.
 func (v trafficView) source() TrafficFilter {
 	f := v.TrafficFilter
+	f.Any = v.Q
 	switch v.Kind {
 	case "errors":
 		f.ErrorsOnly = true
@@ -279,23 +302,6 @@ func (v trafficView) source() TrafficFilter {
 // trafficKinds are the board's segmented control, in its order.
 var trafficKinds = []struct{ Key, Label string }{
 	{"", "all"}, {"errors", "errors"}, {"produce", "produce"}, {"fetch", "fetch"}, {"groups", "groups"}, {"admin", "admin"},
-}
-
-// matches is the board's one field: any of the client, its software, the address, the
-// request, a topic or the group contains what was typed.
-func (v trafficView) matches(e TrafficEvent) bool {
-	if v.Q == "" {
-		return true
-	}
-	q := strings.ToLower(v.Q)
-	hay := []string{e.ClientID, e.Software, e.Remote, e.API, e.Group, e.ViaGroup, e.TxnID, e.Principal, e.Error}
-	hay = append(hay, e.Topics...)
-	for _, h := range hay {
-		if strings.Contains(strings.ToLower(h), q) {
-			return true
-		}
-	}
-	return false
 }
 
 // query is the filter as a URL query (without the leading "?").
@@ -527,8 +533,11 @@ type clientRow struct {
 	// NeedsALook marks a client the page raises: refused several times in a row, or
 	// most of what it asked was refused.
 	NeedsALook bool
-	Groups     string
-	Metrics    bool
+	// LookHead and LookNote say why, when it does (lookWords): the callout's sentence
+	// after the client's name, and the line under it in the connected-clients list.
+	LookHead, LookNote string
+	Groups             string
+	Metrics            bool
 	// Conns says how many connections the client has open (a client is its client id:
 	// one app often holds several connections, and the page counts apps). Members are
 	// those connections, oldest first, and Keys the inspector keys of them, so that a
@@ -614,6 +623,7 @@ func (c *Console) groupClients(cls []TrafficClient, now time.Time) []clientRow {
 		for _, mem := range members {
 			cr.NeedsALook = cr.NeedsALook || mem.NeedsALook
 		}
+		cr.LookHead, cr.LookNote = lookWords(m, len(conns))
 		cr.Conns, cr.More, cr.Members, cr.Keys = len(conns), len(conns)-1, members, strings.Join(keys, " ")
 		out = append(out, cr)
 	}
@@ -640,6 +650,27 @@ func needsALook(c TrafficClient) bool {
 	return c.Streak >= 3 || (c.Err5m >= 3 && c.Req5m > 0 && c.Err5m*2 >= c.Req5m)
 }
 
+// lookWords says why a client needs a look, as the callout's sentence (after the
+// client's name) and as the line under it in the connected-clients list. The board
+// (Traf-06) draws the streak: "has been refused 4 times in a row", "last 4 requests
+// refused". A client raised by the five-minute rule alone has no such streak (its
+// latest request may have gone well, and the streak is then 0), so it is told by the
+// count the rule read. conns is how many connections the client is: a streak is one
+// connection's, the count is all of them.
+func lookWords(c TrafficClient, conns int) (head, note string) {
+	if c.Streak >= 3 {
+		head = fmt.Sprintf("has been refused %d times in a row", c.Streak)
+		note = fmt.Sprintf("last %d requests refused", c.Streak)
+		if conns > 1 {
+			head += fmt.Sprintf(" on one of its %d connections", conns)
+			note += " on one connection"
+		}
+		return head, note
+	}
+	return fmt.Sprintf("was refused %d of its %d requests in the last five minutes", c.Err5m, c.Req5m),
+		fmt.Sprintf("%d of %d requests refused in the last 5 minutes", c.Err5m, c.Req5m)
+}
+
 func (c *Console) clientRow(cl TrafficClient, now time.Time) clientRow {
 	cr := clientRow{TrafficClient: cl, Who: cl.ClientID, Age: spanText(now.Sub(cl.Opened)), Idle: spanText(now.Sub(cl.Last))}
 	if cr.Who == "" {
@@ -660,6 +691,7 @@ func (c *Console) clientRow(cl TrafficClient, now time.Time) clientRow {
 	does = append(does, cl.Groups...)
 	cr.Doing = strings.Join(does, " · ")
 	cr.NeedsALook = needsALook(cl)
+	cr.LookHead, cr.LookNote = lookWords(cl, 1)
 	switch {
 	case cl.Req5m == 0:
 		cr.Rate, cr.RateTon = "—", "mut"
@@ -692,22 +724,16 @@ func (c *Console) clientRow(cl TrafficClient, now time.Time) clientRow {
 // requests the broker keeps in memory, the oldest of which is so old. short is the
 // words beside the number, long is what the tooltip says.
 func (c *Console) ringText(now time.Time) (short, long string) {
-	events := c.traffic.Events(TrafficFilter{}, 0)
+	held := c.traffic.Query(TrafficFilter{}, 1) // how far back it reaches; the rows are not wanted.
 	kept := "the recent requests the broker keeps in memory"
 	if n := c.traffic.Capacity(); n > 0 {
 		kept = "the last " + groupDigits(int64(n)) + " requests the broker keeps in memory"
 	}
-	if len(events) == 0 {
+	if held.Total == 0 {
 		return "from recent requests; none are kept yet",
 			"Written by is counted from " + kept + ", and none are kept yet. It does not survive a restart."
 	}
-	oldest := events[0].First
-	for _, e := range events {
-		if e.First.Before(oldest) {
-			oldest = e.First
-		}
-	}
-	age := spanText(now.Sub(oldest))
+	age := spanText(now.Sub(held.Oldest))
 	return "from recent requests, the oldest " + age + " old",
 		"Written by is counted from " + kept + ". It reaches back " + age + ": a client that wrote earlier, or whose requests have been pushed out, is not listed. It does not survive a restart."
 }
@@ -776,23 +802,14 @@ func (c *Console) trafficData(r *http.Request) map[string]any {
 	// The rows: everything the recorder holds that the page's filter lets through,
 	// newest first; the table shows the first trafficRows of them, and the heading says
 	// how many matched.
-	all := c.traffic.Events(TrafficFilter{}, 0)
-	events := c.traffic.Events(v.source(), 0)
-	totalReq := 0
-	for _, e := range all {
-		totalReq += max(e.Count, 1)
-	}
+	//
+	// One question to the recorder, which hands over the rows shown and counts the rest
+	// where they lie. (This asked for every row it held, twice, to count them here: two
+	// copies of the whole ring under the lock every client's request waits on, each poll.)
+	res := c.traffic.Query(v.source(), trafficRows)
+	totalReq, matchedRows, matchedReq := res.Held, res.Total, res.Requests
 	var rows []trafficRow
-	matchedRows, matchedReq := 0, 0
-	for _, e := range events {
-		if !v.matches(e) {
-			continue
-		}
-		matchedRows++
-		matchedReq += max(e.Count, 1)
-		if len(rows) >= trafficRows {
-			continue
-		}
+	for _, e := range res.Rows {
 		row := c.trafficRow(e)
 		if open[e.Conn] {
 			row.ConnKey = strconv.FormatUint(e.Conn, 10)
@@ -931,13 +948,13 @@ func (c *Console) trafficKindsData(data map[string]any, v trafficView) {
 }
 
 // attention is the line under the clients table that names the client needing a look
-// (Traf-06): who, how many refusals in a row, and what the error means.
+// (Traf-06): who, why it is raised (lookWords), and what the error means.
 func (c *Console) attention(rows []clientRow) map[string]any {
 	for _, r := range rows {
 		if !r.NeedsALook {
 			continue
 		}
-		a := map[string]any{"Who": r.Who, "Streak": r.Streak, "Err": r.LastError, "URL": c.prefix + "/traffic?kind=errors&" + TrafficFilter{Client: r.Who}.query()}
+		a := map[string]any{"Who": r.Who, "Head": r.LookHead, "Err": r.LastError, "URL": c.prefix + "/traffic?kind=errors&" + TrafficFilter{Client: r.Who}.query()}
 		a["Why"] = refusalWhy(r.LastError)
 		return a
 	}

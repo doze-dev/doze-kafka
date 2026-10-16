@@ -15,7 +15,7 @@ func TestRequestsCountsEveryRecordedRequestFoldedOnesToo(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		r.Request(obs(1, "app", kmsg.Heartbeat, time.Duration(i)*time.Second, idle("g")))
 	}
-	r.Request(obs(1, "doze-kafka-console", kmsg.Fetch, 0)) // not recorded.
+	r.Request(obs(1, "doze-kafka-console", kmsg.Fetch, 0, own)) // the console's own: not recorded.
 	if got := r.Requests(); got != 5 {
 		t.Errorf("requests = %d, want 5", got)
 	}
@@ -106,7 +106,7 @@ func TestConsoleClientIsLeftOutOfClients(t *testing.T) {
 	r := New(10, nil)
 	r.ConnOpened(1, "a")
 	r.ConnOpened(2, "b")
-	r.Request(obs(1, "doze-kafka-console-fetch", kmsg.Fetch, 0))
+	r.Request(obs(1, "doze-kafka-console-fetch", kmsg.Fetch, 0, own))
 	r.Request(obs(2, "app", kmsg.Fetch, 0))
 	if cs := r.Clients(); len(cs) != 1 || cs[0].ClientID != "app" {
 		t.Errorf("clients = %+v", cs)

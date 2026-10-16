@@ -3,7 +3,7 @@
 doze-kafka serves a small web console beside the broker. It is on by default at
 **http://kafka.&lt;name&gt;.doze** (port-less, through the shared front door; the start-up
 summary prints the address). Under `--listen` there is no name and it is on
-`127.0.0.1:9093`. Turn it off with
+`127.0.0.1:9093` (a free loopback port when `--listen` is on port 0). Turn it off with
 `--console=false`; move it with `--console-addr`.
 
 It is a development tool, not an operations product. It answers the questions you
@@ -191,7 +191,9 @@ to paste and how to check it.
 ## The wire dock and neighbours
 
 A topic or group page ends with the requests that touched it, live, with the same
-pause control as the tape. Under a topic's title one sentence says who writes it, who
+pause control as the tape. It shows the newest eight; **Older** pages back through the
+rest in place (the older page keeps refreshing as itself) and **Newest** returns, and
+"Traffic page" opens Traffic filtered to that topic or group. Under a topic's title one sentence says who writes it, who
 reads it and which schema subject describes it ("Written by checkout-api, read by
 g-order-validator, schema subject orders-value"), each name a link.
 
@@ -217,7 +219,9 @@ matter on the page you are on.
 | `Esc` | Close a dialog or the inspector, or clear the filter |
 
 Single keys act only when you are not typing in a field, with no modifier held, and
-no dialog open.
+no dialog open. The list of keys is a dialog too: while it is open only `Esc` and `?`
+(close it), `Tab` and `⌘K` (the palette instead) do anything. The inspector is not a
+dialog; it is part of the page, and the page's keys work beside it.
 
 ## The palette
 
@@ -248,10 +252,16 @@ Times are shown in your browser's zone, with the zone and the UTC instant on hov
   addresses, `*.doze`, and anything you add with `--console-allow-host` — and
   refuses state-changing requests from other origins. That keeps a web page open in
   your browser from reaching it through DNS rebinding or a forged form.
-- `DOZE_KAFKA_CONSOLE_PREFIX` mounts it somewhere other than `/_console` (behind a
-  reverse proxy, or to prove in a test that nothing assumes the default).
-- It is plain HTTP with no login of its own. Bind it beyond loopback only on a
-  network you trust.
+- `--console-prefix` (`console-prefix` in the file) mounts it somewhere other than
+  `/_console`, behind a reverse proxy; `/` serves it at the root of its port.
+  `DOZE_KAFKA_CONSOLE_PREFIX` does the same when neither is set (the test suites use it
+  to show nothing assumes the default).
+- It is plain HTTP with no login of its own, and with SASL on it acts on the broker as
+  a super user. It listens on loopback. With SASL or TLS on, a `--console-addr` beyond
+  loopback is refused at start-up unless `--console-unprotected` accepts it; what to
+  put in front of it instead is in
+  [What SASL and TLS cover](auth-and-tls.md#what-sasl-and-tls-cover). Without either,
+  bind it beyond loopback only on a network you trust.
 
 ## Errors
 

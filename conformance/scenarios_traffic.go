@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"encoding/binary"
 	"math"
+	"slices"
 	"time"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
@@ -20,8 +21,13 @@ func init() {
 	Scenarios = append(Scenarios,
 		Scenario{Name: "telemetry-empty-subscription", Run: telemetryEmptySubscription, Known: knownTelemetryEmpty},
 		Scenario{Name: "telemetry-throttle", Run: telemetryThrottle, Known: knownTelemetryThrottle},
-		Scenario{Name: "telemetry-interval", Run: telemetryInterval, NoReplay: noClientMetrics},
-		Scenario{Name: "telemetry-instance-binding-spaced", Run: telemetryInstanceBindingSpaced, NoReplay: noClientMetrics, Users: telemetryUsers, Admin: "admin"},
+		Scenario{Name: "telemetry-interval", Run: telemetryInterval, Known: knownTelemetryInterval},
+		Scenario{Name: "telemetry-subscription-change", Run: telemetrySubscriptionChange, NoReplay: noClientMetrics},
+		Scenario{Name: "telemetry-instance-binding-spaced", Run: telemetryInstanceBindingSpaced, Known: knownTelemetrySpaced, Users: telemetryUsers, Admin: "admin"},
+		Scenario{Name: "telemetry-terminating", Run: telemetryTerminating, Known: knownTelemetryTerminating},
+		Scenario{Name: "telemetry-ask-again", Run: telemetryAskAgain, Known: knownTelemetryAskAgain},
+		Scenario{Name: "telemetry-no-console", Run: telemetryNoConsole, Known: knownTelemetryNoConsole,
+			Doze: func(c *config.Config) { c.Console = false }},
 		Scenario{Name: "telemetry-errors", Run: telemetryErrors, Known: knownTelemetryErrors},
 		Scenario{Name: "telemetry-broker-restart", Run: telemetryBrokerRestart, Known: knownTelemetryRestart},
 		Scenario{Name: "telemetry-instance-binding", Run: telemetryInstanceBinding, Known: knownTelemetryBinding, Users: telemetryUsers, Admin: "admin"},
@@ -37,12 +43,21 @@ func init() {
 	)
 }
 
-// noClientMetrics is why a scenario that defines a CLIENT_METRICS resource is
-// recorded and not replayed: doze-kafka has no such resource and a fixed
-// subscription (docs/limitations.md), so nothing after the definition could be
-// compared. The rules it shows are the ones the replayed scenarios and the unit
-// tests of internal/telemetry pin.
-const noClientMetrics = "doze-kafka has no CLIENT_METRICS resource"
+// noClientMetrics is why the one scenario that changes a CLIENT_METRICS resource
+// under a client is recorded and not replayed: doze-kafka has no such resource and a
+// fixed subscription (docs/limitations.md), so a subscription cannot change here.
+//
+// The scenarios that only need Kafka to use an interval are replayed: they define a
+// CLIENT_METRICS resource with the five seconds doze-kafka always uses, as their
+// first step (which doze-kafka refuses, a written-down difference), and from then on
+// both brokers apply the same interval to the same requests in real time.
+const noClientMetrics = "doze-kafka has no CLIENT_METRICS resource, so a subscription cannot change"
+
+// dozeInterval is doze-kafka's push interval, which the replayed scenarios give Kafka.
+const dozeInterval = 5 * time.Second
+
+// past is a wait of a whole interval and a little.
+const past = dozeInterval + 300*time.Millisecond
 
 var telemetryUsers = map[string]string{"admin": "admin-secret", "alice": "alice-secret", "bob": "bob-secret"}
 
@@ -51,8 +66,22 @@ var telemetryUsers = map[string]string{"admin": "admin-secret", "alice": "alice-
 // seconds, where Kafka with nothing configured subscribes it to nothing every five
 // minutes with deltas.
 const (
-	limSubscription = "A subscription is the same for every client: the standard metric set, every five seconds, cumulative."
+	limSubscription    = "A subscription is the same for every client: the standard metric set, every five seconds, cumulative."
+	limNoClientMetrics = "Setting one with `IncrementalAlterConfigs` is refused `INVALID_REQUEST`"
+	limNoConsole       = "a broker without a console closes the connection of a client that sends them"
 )
+
+// knownDefined is the difference of a scenario that defines the five-second
+// CLIENT_METRICS resource first: doze-kafka refuses the definition, and what it
+// subscribes a client to differs only in the temporality (the metrics and the
+// interval are then the same as Kafka's).
+func knownDefined(subscribeSteps ...string) []Known {
+	out := []Known{{Step: "define-interval-5s", Path: "Resources[0]", Limitation: limNoClientMetrics}}
+	for _, s := range subscribeSteps {
+		out = append(out, Known{Step: s, Path: "DeltaTemporality", Limitation: limSubscription})
+	}
+	return out
+}
 
 func knownSubscription(stepPrefix string) []Known {
 	return []Known{
@@ -63,22 +92,26 @@ func knownSubscription(stepPrefix string) []Known {
 }
 
 var (
-	knownTelemetryEmpty     = knownSubscription("subscribe-new")
-	knownTelemetryThrottle  = knownSubscription("subscribe")
-	knownTelemetryErrors    = knownSubscription("subscribe")
-	knownTelemetryRestart   = knownSubscription("subscribe")
-	knownTelemetryBinding   = knownSubscription("alice-1-subscribes")
+	knownTelemetryEmpty    = knownSubscription("subscribe-new")
+	knownTelemetryThrottle = knownSubscription("subscribe")
+	knownTelemetryErrors   = knownSubscription("subscribe")
+	knownTelemetryRestart  = append(knownSubscription("subscribe"), knownSubscription("second-instance-asks-first")...)
+	knownTelemetryBinding  = knownSubscription("alice-1-subscribes")
+	// With the five-second resource defined, Kafka's subscription is doze-kafka's but
+	// for the temporality.
+	knownTelemetryInterval    = knownDefined("subscribe*")
+	knownTelemetrySpaced      = knownDefined("*")
+	knownTelemetryTerminating = knownDefined("subscribe-*")
+	// Every subscription request that is answered differs in what it subscribes to.
+	knownTelemetryAskAgain = slices.Concat(knownSubscription("subscribe"),
+		knownSubscription("wrong-subscription-subscribe-at-once"), knownSubscription("unsupported-compression-subscribe-at-once"),
+		knownSubscription("terminating-subscribe-at-once"), knownSubscription("twice-subscribe-at-once"))
+	// A broker without a console does not serve the two calls at all.
+	knownTelemetryNoConsole = []Known{{Step: "*", Path: "", Limitation: limNoConsole}}
 	knownTelemetryACL       = knownSubscription("subscribe")
 	knownClassicJoin        []Known
 	knownClassicGenerations []Known
-	knownProduceMixed       = []Known{
-		{Step: "unknown-partition-then-too-large", Path: "Topics[1].Partitions[0].ErrorMessage", Limitation: limMessages},
-		{Step: "too-large-then-unknown-partition", Path: "Topics[1].Partitions[0].ErrorMessage", Limitation: limMessages},
-		{Step: "unknown-topic-first", Path: "Topics[0].Partitions[0].ErrorMessage", Limitation: limMessages},
-		{Step: "unknown-topic-first", Path: "Topics[1].Partitions[0].ErrorMessage", Limitation: limMessages},
-		{Step: "corrupt-first", Path: "Topics[0].Partitions[0].ErrorMessage", Limitation: limMessages},
-		{Step: "corrupt-first", Path: "Topics[1].Partitions[0].ErrorMessage", Limitation: limMessages},
-	}
+	knownProduceMixed       []Known
 )
 
 // --- KIP-714 helpers ---
@@ -176,66 +209,196 @@ func telemetryThrottle(e *Env) {
 	e.push("push-unknown-instance-zero-subscription", stranger, 0, 0, body, false)
 }
 
-// telemetryInterval is the timing of the throttle, with a CLIENT_METRICS
-// resource that sets a one-second interval. It is recorded and not replayed:
-// this broker has no such resource, and its interval is five seconds.
+// telemetryInterval is the timing of the throttle, in real time against the five
+// seconds doze-kafka uses (Kafka is given the same with a CLIENT_METRICS resource),
+// so it is replayed. Each question is asked of an instance of its own where that
+// saves a wait.
 func telemetryInterval(e *Env) {
+	body := otlpGauge("org.apache.kafka.consumer.fetch-rate", 1)
+	setClientMetrics(e, "define-interval-5s", "5000")
+
+	// Pushes: half an interval and nine tenths of one are early, a whole one is not,
+	// and the early ones do not postpone it.
+	sub := e.subscribe("subscribe", [16]byte{})
+	id, sid := sub.ClientInstanceID, sub.SubscriptionID
+	began := time.Now()
+	since := func(d time.Duration) { time.Sleep(time.Until(began.Add(d))) }
+	e.push("push-first", id, sid, 0, body, false)
+	// Meanwhile, a second instance asks the same of subscription requests.
+	sub2 := e.subscribe("subscribe-second-instance", [16]byte{})
+	id2 := sub2.ClientInstanceID
+	since(dozeInterval / 2)
+	e.push("push-at-half-interval", id, sid, 0, body, false)
+	e.subscribe("subscribe-again-at-half-interval", id2)
+	since(dozeInterval * 9 / 10)
+	e.push("push-at-nine-tenths", id, sid, 0, body, false)
+	e.subscribe("subscribe-again-at-nine-tenths", id2)
+	since(past)
+	e.push("push-after-interval-early-ones-between", id, sid, 0, body, false)
+	// Do a push and a subscription request share the clock?
+	e.subscribe("subscribe-right-after-push", id)
+	e.subscribe("subscribe-after-interval-early-ones-between", id2)
+	e.push("push-right-after-subscribe", id2, sub2.SubscriptionID, 0, body, false)
+	e.push("push-again-right-after", id2, sub2.SubscriptionID, 0, body, false)
+
+	// A push some time after a subscription, and inside the interval of the push
+	// before the subscription.
+	began = time.Now()
+	since(past)
+	e.subscribe("subscribe-after-an-interval", id)
+	since(past + 1500*time.Millisecond)
+	e.push("push-1-5s-after-subscribe", id, sid, 0, body, false)
+	since(past + 3*time.Second)
+	e.subscribe("subscribe-1-5s-after-that-push", id)
+	e.push("push-after-refused-subscribe", id, sid, 0, body, false)
+}
+
+// telemetrySubscriptionChange is a subscription changing under a client that is
+// pushing: a CLIENT_METRICS resource is defined, a client subscribes and pushes, the
+// resource is changed. Recorded and not replayed (noClientMetrics).
+func telemetrySubscriptionChange(e *Env) {
 	body := otlpGauge("org.apache.kafka.consumer.fetch-rate", 1)
 	setClientMetrics(e, "define-interval-1s", "1000")
 	sub := e.subscribe("subscribe", [16]byte{})
-	id, sid := sub.ClientInstanceID, sub.SubscriptionID
-	e.push("push-first", id, sid, 0, body, false)
-	time.Sleep(500 * time.Millisecond)
-	e.push("push-at-half-interval", id, sid, 0, body, false)
-	time.Sleep(1100 * time.Millisecond)
-	e.push("push-after-interval", id, sid, 0, body, false)
-	time.Sleep(900 * time.Millisecond)
-	e.push("push-at-nine-tenths", id, sid, 0, body, false)
-	time.Sleep(1100 * time.Millisecond)
-	e.push("push-again-after-interval", id, sid, 0, body, false)
-
-	time.Sleep(1100 * time.Millisecond)
-	e.subscribe("subscribe-again-after-interval", id)
-	time.Sleep(500 * time.Millisecond)
-	e.subscribe("subscribe-again-at-half-interval", id)
-	time.Sleep(1100 * time.Millisecond)
-	s2 := e.subscribe("subscribe-again-after-another-interval", id)
-	e.push("push-straight-after-subscribe", id, s2.SubscriptionID, 0, body, false)
-
-	// Does a push that was refused for coming early postpone the next one?
-	time.Sleep(1100 * time.Millisecond)
-	e.push("push-accepted-for-timing", id, s2.SubscriptionID, 0, body, false)
-	time.Sleep(600 * time.Millisecond)
-	e.push("push-early-0-6", id, s2.SubscriptionID, 0, body, false)
-	time.Sleep(600 * time.Millisecond)
-	e.push("push-1-2-after-accepted-0-6-after-early", id, s2.SubscriptionID, 0, body, false)
-	// The same for a subscription request.
-	time.Sleep(1100 * time.Millisecond)
-	e.subscribe("subscribe-accepted-for-timing", id)
-	time.Sleep(600 * time.Millisecond)
-	e.subscribe("subscribe-early-0-6", id)
-	time.Sleep(600 * time.Millisecond)
-	e.subscribe("subscribe-1-2-after-accepted-0-6-after-early", id)
-	// Do a push and a subscription request share the clock?
-	time.Sleep(1100 * time.Millisecond)
-	e.push("push-then-subscribe-push", id, s2.SubscriptionID, 0, body, false)
-	e.subscribe("subscribe-right-after-push", id)
-	time.Sleep(1100 * time.Millisecond)
-	e.subscribe("subscribe-then-push-subscribe", id)
-	e.push("push-right-after-subscribe", id, s2.SubscriptionID, 0, body, false)
-	time.Sleep(1100 * time.Millisecond)
-	e.subscribe("subscribe-for-immediate-push", id)
-	time.Sleep(300 * time.Millisecond)
-	e.push("push-300ms-after-subscribe", id, s2.SubscriptionID, 0, body, false)
-
-	// The subscription changes under a client that is pushing.
+	id := sub.ClientInstanceID
+	e.push("push-first", id, sub.SubscriptionID, 0, body, false)
 	time.Sleep(1100 * time.Millisecond)
 	setClientMetrics(e, "change-interval-2s", "2000")
-	e.push("push-old-subscription-after-change", id, s2.SubscriptionID, 0, body, false)
-	s3 := e.subscribe("subscribe-after-change", id)
+	e.push("push-old-subscription-after-change", id, sub.SubscriptionID, 0, body, false)
+	// Straight after the refused push: is the request throttled as after a push taken?
+	s3 := e.subscribe("subscribe-right-after-refused-push", id)
 	e.push("push-new-subscription-at-once", id, s3.SubscriptionID, 0, body, false)
 	time.Sleep(2100 * time.Millisecond)
 	e.push("push-new-subscription-after-interval", id, s3.SubscriptionID, 0, body, false)
+	// The same with a wait, then a push with the old id again, then a push at once:
+	// did the refused one set the clock?
+	time.Sleep(2100 * time.Millisecond)
+	e.push("push-old-subscription-again", id, sub.SubscriptionID, 0, body, false)
+	e.push("push-new-subscription-right-after-refused", id, s3.SubscriptionID, 0, body, false)
+}
+
+// --- a terminating push, and what follows it ---
+
+// telemetryTerminating asks what a broker remembers of a client that said it was
+// closing: each question of a fresh instance, so that only one of them needs a wait.
+func telemetryTerminating(e *Env) {
+	body := otlpGauge("org.apache.kafka.consumer.fetch-rate", 1)
+	setClientMetrics(e, "define-interval-5s", "5000")
+	fresh := func(label string) (id [16]byte, sid int32) {
+		s := e.subscribe("subscribe-"+label, [16]byte{})
+		return s.ClientInstanceID, s.SubscriptionID
+	}
+
+	// An instance for the timed question, started first: a push, a terminating push
+	// inside its interval, the refused push, and a push an interval after the first
+	// (and so inside the interval of the terminating one).
+	tid, tsid := fresh("timed")
+	began := time.Now()
+	e.push("timed-push", tid, tsid, 0, body, false)
+
+	// Terminating pushes in a row.
+	id, sid := fresh("in-a-row")
+	e.push("in-a-row-terminating-1", id, sid, 0, body, true)
+	e.push("in-a-row-terminating-2", id, sid, 0, body, true)
+	e.push("in-a-row-terminating-3", id, sid, 0, body, true)
+	e.push("in-a-row-push-after", id, sid, 0, body, false)
+	e.push("in-a-row-push-after-again", id, sid, 0, body, false)
+
+	// A terminating push that was itself refused, then another, then a push.
+	id, sid = fresh("refused-117")
+	e.push("refused-117-terminating-wrong-subscription", id, sid+1, 0, body, true)
+	e.push("refused-117-terminating-again", id, sid, 0, body, true)
+	e.push("refused-117-push-after", id, sid, 0, body, false)
+	id, sid = fresh("refused-76")
+	e.push("refused-76-terminating-unsupported-compression", id, sid, 9, body, true)
+	e.push("refused-76-terminating-again", id, sid, 0, body, true)
+	id, sid = fresh("refused-then-push")
+	e.push("refused-then-push-terminating-wrong-subscription", id, sid+1, 0, body, true)
+	e.push("refused-then-push-push", id, sid, 0, body, false)
+	e.push("refused-then-push-push-again", id, sid, 0, body, false)
+
+	// An instance the broker has never seen.
+	var stranger [16]byte
+	stranger[0], stranger[15] = 0x7e, 0x11
+	e.push("never-seen-terminating", stranger, 1, 0, body, true)
+	e.push("never-seen-push-after", stranger, 1, 0, body, false)
+
+	// A terminating push after an ordinary one, at once; the refused push; then a
+	// terminating one again (the refused push was not terminating), and another.
+	id, sid = fresh("after-push")
+	e.push("after-push-push", id, sid, 0, body, false)
+	e.push("after-push-terminating-at-once", id, sid, 0, body, true)
+	e.push("after-push-push-refused", id, sid, 0, body, false)
+	e.push("after-push-terminating-after-refused-push", id, sid, 0, body, true)
+	e.push("after-push-terminating-once-more", id, sid, 0, body, true)
+
+	// A subscription request does not clear it.
+	id, sid = fresh("subscribe-between")
+	e.push("subscribe-between-terminating", id, sid, 0, body, true)
+	e.subscribe("subscribe-between-subscribe", id)
+	e.push("subscribe-between-push-after", id, sid, 0, body, false)
+
+	// The timed instance: 3 s after its push a terminating one, the refused push, and
+	// at 5.5 s (2.5 s after the terminating one) a push.
+	time.Sleep(time.Until(began.Add(3 * time.Second)))
+	e.push("timed-terminating-at-3s", tid, tsid, 0, body, true)
+	e.push("timed-push-refused", tid, tsid, 0, body, false)
+	// Terminating pushes in a row, spaced by an interval.
+	sid2, ssid2 := fresh("spaced")
+	e.push("spaced-terminating-1", sid2, ssid2, 0, body, true)
+	e.push("spaced-terminating-2", sid2, ssid2, 0, body, true)
+	time.Sleep(time.Until(began.Add(dozeInterval + 500*time.Millisecond)))
+	e.push("timed-push-at-5-5s", tid, tsid, 0, body, false)
+	time.Sleep(time.Until(began.Add(3*time.Second + past)))
+	e.push("spaced-terminating-3-after-an-interval", sid2, ssid2, 0, body, true)
+	e.push("spaced-terminating-4", sid2, ssid2, 0, body, true)
+}
+
+// telemetryAskAgain is the subscription request a client sends after a push was
+// refused for its subscription id or its compression type: the refusal tells it to
+// ask again, so is the request throttled as one straight after a push is?
+func telemetryAskAgain(e *Env) {
+	body := otlpGauge("org.apache.kafka.consumer.fetch-rate", 1)
+	for _, c := range []struct {
+		label       string
+		sub         int32
+		compression int8
+	}{{"wrong-subscription", 1, 0}, {"unsupported-compression", 0, 9}} {
+		s := e.subscribe("subscribe-"+c.label, [16]byte{})
+		id := s.ClientInstanceID
+		e.push(c.label+"-push", id, s.SubscriptionID+c.sub, c.compression, body, false)
+		e.subscribe(c.label+"-subscribe-at-once", id)
+		e.push(c.label+"-push-at-once", id, s.SubscriptionID, 0, body, false)
+		e.subscribe(c.label+"-subscribe-after-early-push", id)
+		e.subscribe(c.label+"-subscribe-again", id)
+	}
+	// The same after a push that was taken, for comparison, and after a refused
+	// terminating one.
+	s := e.subscribe("subscribe-taken", [16]byte{})
+	e.push("taken-push", s.ClientInstanceID, s.SubscriptionID, 0, body, false)
+	e.subscribe("taken-subscribe-at-once", s.ClientInstanceID)
+	s = e.subscribe("subscribe-terminating", [16]byte{})
+	e.push("terminating-wrong-subscription-push", s.ClientInstanceID, s.SubscriptionID+1, 0, body, true)
+	e.subscribe("terminating-subscribe-at-once", s.ClientInstanceID)
+	e.push("terminating-push-refused", s.ClientInstanceID, s.SubscriptionID, 0, body, false)
+	e.subscribe("terminating-subscribe-after-refused-push", s.ClientInstanceID)
+	// Is it once? Two subscription requests at once after the refused push.
+	s = e.subscribe("subscribe-twice", [16]byte{})
+	e.push("twice-wrong-subscription-push", s.ClientInstanceID, s.SubscriptionID+1, 0, body, false)
+	e.subscribe("twice-subscribe-at-once", s.ClientInstanceID)
+	e.subscribe("twice-subscribe-at-once-again", s.ClientInstanceID)
+}
+
+// telemetryNoConsole sends the two calls to a broker that does not advertise them:
+// Apache Kafka with nothing configured, and doze-kafka without its console.
+func telemetryNoConsole(e *Env) {
+	body := otlpGauge("org.apache.kafka.consumer.fetch-rate", 1)
+	// Nothing here depends on an answer: doze-kafka gives none.
+	e.subscribe("subscribe-not-advertised", [16]byte{})
+	var stranger [16]byte
+	stranger[0], stranger[15] = 0x3c, 0xc3
+	e.push("push-not-advertised", stranger, 0, 0, body, false)
+	e.push("push-not-advertised-no-instance", [16]byte{}, 0, 0, body, false)
 }
 
 // setClientMetrics defines (or changes) the CLIENT_METRICS resource "conformance"
@@ -302,7 +465,10 @@ func telemetryBrokerRestart(e *Env) {
 	body := otlpGauge("org.apache.kafka.consumer.fetch-rate", 1)
 	s := e.subscribe("subscribe", [16]byte{})
 	e.push("push-before-restart", s.ClientInstanceID, s.SubscriptionID, 0, body, false)
+	// A second client, which after the restart asks before it pushes.
+	other := e.subscribe("subscribe-second-instance", [16]byte{})
 	e.Restart("restart")
+	e.subscribe("second-instance-asks-first-after-restart", other.ClientInstanceID)
 	e.push("push-old-subscription-after-restart", s.ClientInstanceID, s.SubscriptionID, 0, body, false)
 	again := e.subscribe("subscribe-with-old-instance-id-after-restart", s.ClientInstanceID)
 	e.push("push-new-subscription", s.ClientInstanceID, again.SubscriptionID, 0, body, false)
@@ -339,9 +505,10 @@ func telemetryInstanceBinding(e *Env) {
 	e.push("alice-1-pushes-her-own", c.ClientInstanceID, c.SubscriptionID, 0, body, false)
 }
 
-// telemetryInstanceBindingSpaced is the same with a 100 ms interval and a pause
-// before each request, so that no answer is the throttle: what is left is whose
-// instance it is. Recorded, not replayed (this broker has no CLIENT_METRICS).
+// telemetryInstanceBindingSpaced is the same with a wait of an interval wherever
+// the throttle would otherwise be the answer: what is left is whose instance it is.
+// The interval is doze-kafka's five seconds on both brokers, so it is replayed; a
+// second instance (k) is worked on while the first (a) waits.
 func telemetryInstanceBindingSpaced(e *Env) {
 	body := otlpGauge("org.apache.kafka.consumer.fetch-rate", 1)
 	e.Open("admin", "admin", telemetryUsers["admin"])
@@ -349,20 +516,24 @@ func telemetryInstanceBindingSpaced(e *Env) {
 	e.Open("alice-2", "alice", telemetryUsers["alice"])
 	e.Open("bob", "bob", telemetryUsers["bob"])
 	e.Use("admin")
-	setClientMetrics(e, "define-interval-100ms", "100")
-	pause := func() { time.Sleep(300 * time.Millisecond) }
+	setClientMetrics(e, "define-interval-5s", "5000")
+	pause := func() { time.Sleep(past) }
 
 	e.Use("alice-1")
 	a := e.subscribe("alice-1-subscribes", [16]byte{})
-	pause()
 	e.Use("alice-2")
 	e.push("alice-2-pushes-alice-1s-instance", a.ClientInstanceID, a.SubscriptionID, 0, body, false)
+	// A subscription request between a terminating push and the next push (k).
+	k := e.subscribe("subscribe-before-terminating", [16]byte{})
+	e.push("terminating-for-subscribe-test", k.ClientInstanceID, k.SubscriptionID, 0, body, true)
 	pause()
 	e.Use("bob")
 	e.push("bob-pushes-alices-instance", a.ClientInstanceID, a.SubscriptionID, 0, body, false)
+	e.subscribe("subscribe-an-interval-after-terminating", k.ClientInstanceID)
+	e.push("push-after-that-subscribe", k.ClientInstanceID, k.SubscriptionID, 0, body, false)
+	e.push("push-once-more", k.ClientInstanceID, k.SubscriptionID, 0, body, false)
 	pause()
 	d := e.subscribe("bob-subscribes-with-alices-instance-id", a.ClientInstanceID)
-	pause()
 	e.push("bob-pushes-the-id-he-was-given", d.ClientInstanceID, d.SubscriptionID, 0, body, false)
 	pause()
 	e.Use("alice-1")
@@ -370,12 +541,9 @@ func telemetryInstanceBindingSpaced(e *Env) {
 	pause()
 	e.Use("alice-2")
 	f := e.subscribe("alice-2-subscribes-with-alice-1s-instance-id", a.ClientInstanceID)
-	pause()
 	e.push("alice-2-pushes-what-she-was-given", a.ClientInstanceID, f.SubscriptionID, 0, body, false)
-	pause()
 	e.Use("alice-1")
 	e.push("alice-1-pushes-terminating", a.ClientInstanceID, f.SubscriptionID, 0, body, true)
-	pause()
 	e.Use("alice-2")
 	e.push("alice-2-pushes-after-terminating", a.ClientInstanceID, f.SubscriptionID, 0, body, false)
 	pause()
@@ -384,28 +552,13 @@ func telemetryInstanceBindingSpaced(e *Env) {
 	e.push("pushes-after-terminating-wrong-subscription", a.ClientInstanceID, f.SubscriptionID+1, 0, body, false)
 	pause()
 	g := e.subscribe("subscribes-after-terminating", a.ClientInstanceID)
-	pause()
 	e.push("pushes-after-subscribing-again", a.ClientInstanceID, g.SubscriptionID, 0, body, false)
-	pause()
 	e.push("pushes-terminating-again", a.ClientInstanceID, g.SubscriptionID, 0, body, true)
-	pause()
 	e.push("pushes-terminating-first", a.ClientInstanceID, g.SubscriptionID, 0, body, true)
-	// A subscription request between a terminating push and the next push.
-	pause()
-	k := e.subscribe("subscribe-before-terminating", [16]byte{})
-	pause()
-	e.push("terminating-for-subscribe-test", k.ClientInstanceID, k.SubscriptionID, 0, body, true)
-	pause()
-	e.subscribe("subscribe-right-after-terminating", k.ClientInstanceID)
-	pause()
-	e.push("push-after-that-subscribe", k.ClientInstanceID, k.SubscriptionID, 0, body, false)
-	pause()
-	e.push("push-once-more", k.ClientInstanceID, k.SubscriptionID, 0, body, false)
 
-	// The refusals in order, each from a fresh instance with the interval out of
-	// the way: which one a push that has several of them is answered.
+	// The refusals in order, each from a fresh instance (whose first push is never
+	// early): which one a push that has several of them is answered.
 	fresh := func(label string) *kmsg.GetTelemetrySubscriptionsResponse {
-		pause()
 		return e.subscribe(label, [16]byte{})
 	}
 	big := make([]byte, 1<<20+1)

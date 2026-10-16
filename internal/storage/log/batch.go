@@ -144,21 +144,6 @@ func parseHeader(b []byte) (batchInfo, bool) {
 	}, true
 }
 
-// LargestBatch is the size in bytes of the largest record batch in a Produce
-// payload that has already passed ValidateBatches.
-func LargestBatch(records []byte) int64 {
-	var most int64
-	for pos := 0; pos < len(records); {
-		info, ok := parseHeader(records[pos:])
-		if !ok || info.totalBytes <= 0 {
-			break
-		}
-		most = max(most, info.totalBytes)
-		pos += int(info.totalBytes)
-	}
-	return most
-}
-
 // StampLogAppendTime marks every batch in a validated Produce payload as carrying
 // the broker's time rather than the producer's: the timestamp-type bit is set and
 // the batch's maximum timestamp becomes nowMs, which is what a reader then takes

@@ -23,6 +23,7 @@
 package traffic
 
 import (
+	"cmp"
 	"slices"
 	"strconv"
 	"strings"
@@ -33,12 +34,6 @@ import (
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 	"github.com/doze-dev/doze-kafka/internal/protocol"
 )
-
-// ConsoleClientIDs are the client ids of the console's own Kafka clients, whose
-// requests are left out: the page that shows traffic would otherwise be mostly its
-// own polling. They are exact: an app that begins its client id the same way is an
-// app (TRF-21).
-var ConsoleClientIDs = []string{"doze-kafka-console", "doze-kafka-console-fetch", "doze-kafka-console-trace"}
 
 // collapseWindow is how long a repeated request may keep folding into one row. A
 // consumer's heartbeat every three seconds is one row for as long as the consumer
@@ -180,7 +175,6 @@ type row struct {
 	Event
 	prev, next *row
 	foldKey    string
-	lastReq    uint64
 }
 
 // Client is a live connection that has sent a request.
@@ -235,6 +229,9 @@ type Filter struct {
 	// Conn matches one connection.
 	Conn       uint64
 	ErrorsOnly bool
+	// Any is the page's one search field: it matches a row whose client, software,
+	// address, principal, request, topics, group, transactional id or error contains it.
+	Any string
 }
 
 // Query is a Filter with a limit.
@@ -246,11 +243,16 @@ type Query struct {
 // Result is the rows a query found, with how many matched in all.
 type Result struct {
 	Rows []Event
-	// Total is how many rows matched the filter, whatever the limit.
-	Total int
+	// Total is how many rows matched the filter, whatever the limit, and Requests how
+	// many requests those rows stand for (a folded row is one row and many requests).
+	Total, Requests int
+	// Held is how many requests all the rows the recorder holds stand for, whatever the
+	// filter: the M of "N of M requests match".
+	Held int
 	// Newest is the start time of the newest matching row; the cursor a paused page
-	// holds on to.
-	Newest time.Time
+	// holds on to. Oldest is when the oldest matching row's first request began: how far
+	// back what is held reaches.
+	Newest, Oldest time.Time
 }
 
 // counters is a ring of fixed-width buckets of request and error counts.
@@ -315,13 +317,19 @@ type groupLog struct {
 
 // Recorder is the bounded store. The zero value is not usable; use New.
 type Recorder struct {
-	mu      sync.Mutex
+	// mu is taken by every connection after every request (Request) and by every page
+	// that reads. What is done under it is what all of them wait for: nothing that
+	// grows with what a client sent (see Request), and readers share it.
+	mu      sync.RWMutex
 	resolve func([16]byte) string
-	now     func() time.Time
-	epoch   string
+	// describe is protocol.DescribeFactsNamed; a test replaces it to see where it runs.
+	describe func(kmsg.Request, kmsg.Response, func([16]byte) string) protocol.Facts
+	now      func() time.Time
+	epoch    string
 
 	seq  uint64 // orders rows and group events.
 	reqs uint64 // requests recorded, folded ones included.
+	held uint64 // requests the rows now held stand for.
 
 	byID       map[string]*row
 	head, tail *row // most recently active first.
@@ -342,13 +350,11 @@ func New(capacity int, resolve func([16]byte) string) *Recorder {
 		capacity = 1
 	}
 	return &Recorder{
-		resolve: resolve, limit: capacity, now: time.Now,
+		resolve: resolve, describe: protocol.DescribeFactsNamed, limit: capacity, now: time.Now,
 		epoch: strconv.FormatInt(time.Now().Unix(), 36),
 		byID:  map[string]*row{}, conns: map[uint64]*conn{}, groups: map[string]*groupLog{},
 	}
 }
-
-func isConsole(clientID string) bool { return slices.Contains(ConsoleClientIDs, clientID) }
 
 // ConnOpened implements protocol.Observer.
 func (r *Recorder) ConnOpened(id uint64, remote string) {
@@ -390,38 +396,140 @@ func (r *Recorder) pushFront(x *row) {
 	}
 }
 
-// Request implements protocol.Observer.
-func (r *Recorder) Request(o protocol.Observation) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+// prepared is what a request says about itself that needs no lock to work out: its
+// strings clipped, its topic ids named, its error classed.
+type prepared struct {
+	remote, clientID, software, principal string
+	group, txnID, detail, closed, errName string
+	api                                   string
+	topics                                []string
+	more                                  int
+	class                                 protocol.Class
+	isErr                                 bool
+}
 
+// prepare does the work of a request that does not need the recorder's state. It runs
+// before the lock is taken: clipping copies strings, and naming a topic id asks the
+// broker's metadata, which has a lock of its own.
+func (r *Recorder) prepare(o *protocol.Observation) prepared {
+	p := prepared{
+		remote: clip(o.Remote, MaxRemote), clientID: clip(o.ClientID, MaxName), software: clip(o.Software, MaxName),
+		principal: clip(o.Principal, MaxName), group: clip(o.Group, MaxName), txnID: clip(o.TxnID, MaxName),
+		detail: clip(o.Detail, MaxText), closed: clip(o.Closed, MaxText),
+		api: protocol.APIName(o.API), class: o.Class,
+	}
+	if p.class == "" && o.ErrorCode != 0 {
+		p.class = protocol.Classify(o.API, o.ErrorCode)
+	}
+	p.isErr = p.class.IsError() || o.Closed != ""
+	p.errName = protocol.ErrorName(o.ErrorCode)
+	if o.Closed != "" {
+		p.errName = "CONNECTION_CLOSED"
+		if p.class == "" {
+			p.class = protocol.ClassFailed
+		}
+	}
+	topics := o.Topics
+	if len(o.TopicIDs) > 0 && r.resolve != nil {
+		topics = slices.Clone(o.Topics)
+		for _, id := range o.TopicIDs {
+			if n := r.resolve(id); n != "" && !slices.Contains(topics, n) {
+				topics = append(topics, n)
+			}
+		}
+	}
+	p.topics, p.more = clipTopics(topics)
+	return p
+}
+
+// Request implements protocol.Observer.
+//
+// Every connection calls it after every request, so what it does with the lock held is
+// what every connection waits for: finding the connection, counting, and putting one
+// row on the list. Describing the request (prepare, and the partitions and decoded
+// fields of DescribeFacts) is done without it.
+func (r *Recorder) Request(o protocol.Observation) {
+	// The process's own requests (the console beside the broker, polling) are not
+	// traffic. Which they are is said by the connection (protocol.Adopt), in memory:
+	// nothing a client sends, its client id least of all, makes a request one of them.
+	if o.Own {
+		return
+	}
+	p := r.prepare(&o)
+
+	// A request that moved nothing may fold into the row before it, and then it needs no
+	// description at all (a heartbeat every three seconds from every consumer). Whether
+	// it folds is only known under the lock, so such a request is described after the
+	// lock has said it starts a row, with the lock let go. Every other request is
+	// described now.
+	mayFold := o.Idle && p.errName == ""
+	var facts protocol.Facts
+	described := o.Req == nil
+	if !mayFold && !described {
+		facts, described = r.describe(o.Req, o.Resp, r.resolve), true
+	}
+
+	r.mu.Lock()
 	c := r.conns[o.Conn]
 	if c == nil {
-		c = &conn{Client: Client{Conn: o.Conn, Remote: clip(o.Remote, MaxRemote), Opened: o.Start}, recent: map[string]*row{}}
+		c = &conn{Client: Client{Conn: o.Conn, Remote: p.remote, Opened: o.Start}, recent: map[string]*row{}}
 		r.conns[o.Conn] = c
 	}
+	r.count(c, &o, &p)
+	ev := Event{
+		First: o.Start, Time: o.Start, Count: 1, Conn: o.Conn, Remote: c.Remote,
+		ClientID: c.ClientID, Software: c.Software, Principal: c.Principal,
+		API: p.api, Key: int16(o.API), Version: o.Version, Kind: o.Kind, Correlation: o.Correlation,
+		Topics: p.topics, TopicsMore: p.more, Group: p.group, TxnID: p.txnID, Detail: p.detail,
+		Error: p.errName, ErrorCode: o.ErrorCode, Class: p.class, Closed: p.closed,
+		Idle: o.Idle, Duration: o.Duration, ReqBytes: o.ReqBytes, RespBytes: o.RespBytes,
+	}
+	// A fetch does not say which group it belongs to; the connection knows.
+	if ev.Group == "" && ev.TxnID == "" && o.Kind == "fetch" && len(c.Groups) > 0 {
+		ev.ViaGroup = c.Groups[len(c.Groups)-1]
+	}
+	key := foldKey(&ev)
+	if mayFold && r.fold(c, key, &ev) {
+		r.mu.Unlock()
+		return
+	}
+	if !described {
+		r.mu.Unlock()
+		facts = r.describe(o.Req, o.Resp, r.resolve)
+		r.mu.Lock()
+		// A connection's requests come one at a time, so nothing of this connection
+		// changed meanwhile; if something did (a caller that is not a connection), the
+		// row it made is the one to fold into.
+		if r.fold(c, key, &ev) {
+			r.mu.Unlock()
+			return
+		}
+	}
+	ev.Facts = facts
+	r.insert(c, key, ev)
+	r.mu.Unlock()
+}
+
+// count notes a request against its connection and the counters. The lock is held.
+func (r *Recorder) count(c *conn, o *protocol.Observation, p *prepared) {
 	c.seen = true
-	if o.ClientID != "" {
-		c.ClientID = clip(o.ClientID, MaxName)
+	if p.clientID != "" {
+		c.ClientID = p.clientID
 	}
-	if o.Software != "" {
-		c.Software = clip(o.Software, MaxName)
+	if p.software != "" {
+		c.Software = p.software
 	}
-	c.Principal = clip(o.Principal, MaxName)
+	c.Principal = p.principal
 	c.Last = o.Start
 	c.Requests++
-	group := clip(o.Group, MaxName)
-	if group != "" && !slices.Contains(c.Groups, group) {
-		c.Groups = append(c.Groups, group)
+	if p.group != "" && !slices.Contains(c.Groups, p.group) {
+		c.Groups = append(c.Groups, p.group)
 		if len(c.Groups) > 4 {
 			c.Groups = c.Groups[1:]
 		}
 	}
-	if isConsole(c.ClientID) {
-		return
-	}
-	if o.TxnID != "" {
-		c.TxnID = clip(o.TxnID, MaxName)
+	if p.txnID != "" {
+		c.TxnID = p.txnID
 	}
 	switch o.Kind {
 	case "produce":
@@ -432,101 +540,70 @@ func (r *Recorder) Request(o protocol.Observation) {
 	if o.API == kmsg.GetTelemetrySubscriptions {
 		c.AskedTelemetry = true
 	}
-	if o.Class == "" && o.ErrorCode != 0 {
-		o.Class = protocol.Classify(o.API, o.ErrorCode)
-	}
-	isErr := o.Class.IsError() || o.Closed != ""
-	c.counts.add(o.Start, isErr)
-	r.all.add(o.Start, isErr)
+	c.counts.add(o.Start, p.isErr)
+	r.all.add(o.Start, p.isErr)
 	r.reqs++
-	if isErr {
+	if p.isErr {
 		c.Streak++
-		c.LastError = protocol.ErrorName(o.ErrorCode)
-		if o.Closed != "" {
-			c.LastError = "CONNECTION_CLOSED"
-		}
+		c.LastError = p.errName
 	} else {
 		c.Streak, c.LastError = 0, ""
 	}
+}
 
-	topics := slices.Clone(o.Topics)
-	for _, id := range o.TopicIDs {
-		if r.resolve != nil {
-			if n := r.resolve(id); n != "" && !slices.Contains(topics, n) {
-				topics = append(topics, n)
-			}
-		}
+// fold adds the request to the row its connection is folding requests like it into,
+// and reports whether there was one. The lock is held.
+func (r *Recorder) fold(c *conn, key string, ev *Event) bool {
+	prev := c.recent[key]
+	if prev == nil || ev.Time.Sub(prev.Time) >= collapseWindow {
+		return false
 	}
-	topics, more := clipTopics(topics)
-	detail := o.Detail
-	errName := protocol.ErrorName(o.ErrorCode)
-	if o.Closed != "" {
-		errName = "CONNECTION_CLOSED"
+	if len(prev.Ticks) == 0 {
+		// The row's first request is a tick too, so the strip shows all of them.
+		prev.Ticks = append(prev.Ticks, Tick{At: prev.First, Duration: prev.Duration, Class: prev.Class})
 	}
-	ev := Event{
-		First: o.Start, Time: o.Start, Count: 1, Conn: o.Conn, Remote: c.Remote,
-		ClientID: c.ClientID, Software: c.Software, Principal: c.Principal,
-		API: protocol.APIName(o.API), Key: int16(o.API), Version: o.Version, Kind: o.Kind, Correlation: o.Correlation,
-		Topics: topics, TopicsMore: more, Group: group, TxnID: clip(o.TxnID, MaxName), Detail: clip(detail, MaxText),
-		Error: errName, ErrorCode: o.ErrorCode, Class: o.Class, Closed: clip(o.Closed, MaxText),
-		Idle: o.Idle, Duration: o.Duration, ReqBytes: o.ReqBytes, RespBytes: o.RespBytes,
-	}
-	if o.Closed != "" {
-		ev.Class = protocol.ClassFailed
-		if o.Class != "" {
-			ev.Class = o.Class
-		}
-	}
-	// A fetch does not say which group it belongs to; the connection knows.
-	if ev.Group == "" && ev.TxnID == "" && o.Kind == "fetch" && len(c.Groups) > 0 {
-		ev.ViaGroup = c.Groups[len(c.Groups)-1]
-	}
-
 	r.seq++
-	if ev.Idle && ev.Error == "" {
-		key := foldKey(ev)
-		if prev := c.recent[key]; prev != nil && o.Start.Sub(prev.Time) < collapseWindow {
-			if len(prev.Ticks) == 0 {
-				// The row's first request is a tick too, so the strip shows all of them.
-				prev.Ticks = append(prev.Ticks, Tick{At: prev.First, Duration: prev.Duration, Class: prev.Class})
-			}
-			prev.Count++
-			prev.Time, prev.Seq, prev.lastReq = o.Start, r.seq, r.reqs
-			prev.Duration, prev.ReqBytes, prev.RespBytes = o.Duration, o.ReqBytes, o.RespBytes
-			prev.Detail = ev.Detail
-			prev.Correlation = o.Correlation
-			if len(prev.Ticks) >= MaxTicks {
-				copy(prev.Ticks, prev.Ticks[1:])
-				prev.Ticks = prev.Ticks[:MaxTicks-1]
-			}
-			prev.Ticks = append(prev.Ticks, Tick{At: o.Start, Duration: o.Duration, Class: o.Class})
-			r.unlink(prev)
-			r.pushFront(prev)
-			return
-		}
+	r.held++
+	prev.Count++
+	prev.Time, prev.Seq = ev.Time, r.seq
+	prev.Duration, prev.ReqBytes, prev.RespBytes = ev.Duration, ev.ReqBytes, ev.RespBytes
+	prev.Detail = ev.Detail
+	prev.Correlation = ev.Correlation
+	if len(prev.Ticks) >= MaxTicks {
+		copy(prev.Ticks, prev.Ticks[1:])
+		prev.Ticks = prev.Ticks[:MaxTicks-1]
 	}
+	prev.Ticks = append(prev.Ticks, Tick{At: ev.Time, Duration: ev.Duration, Class: ev.Class})
+	r.unlink(prev)
+	r.pushFront(prev)
+	return true
+}
+
+// insert puts a new row at the front, dropping the least recently active one when the
+// recorder is full. The lock is held.
+func (r *Recorder) insert(c *conn, key string, ev Event) {
+	r.seq++
 	ev.Seq = r.seq
 	ev.ID = r.epoch + "." + strconv.FormatUint(r.seq, 36)
-	if o.Req != nil {
-		ev.Facts = protocol.DescribeFacts(o.Req, o.Resp)
-	}
-	stored := &row{Event: ev, foldKey: foldKey(ev), lastReq: r.reqs}
+	stored := &row{Event: ev, foldKey: key}
 	if len(r.byID) >= r.limit && r.tail != nil {
 		old := r.tail
 		r.unlink(old)
 		delete(r.byID, old.ID)
+		r.held -= uint64(max(old.Count, 1))
 		if oc := r.conns[old.Conn]; oc != nil && oc.recent[old.foldKey] == old {
 			delete(oc.recent, old.foldKey)
 		}
 	}
 	r.byID[ev.ID] = stored
+	r.held++
 	r.pushFront(stored)
 	if ev.Idle && ev.Error == "" {
-		c.recent[stored.foldKey] = stored
+		c.recent[key] = stored
 	}
 }
 
-func foldKey(e Event) string {
+func foldKey(e *Event) string {
 	return e.API + "\x00" + strings.Join(e.Topics, ",") + "\x00" + strconv.Itoa(e.TopicsMore) + "\x00" + e.Group + "\x00" + e.TxnID
 }
 
@@ -536,41 +613,79 @@ func (r *Recorder) copyRow(x *row) Event {
 	return e
 }
 
+// newer orders rows as the page lists them: by when they began, the later first, and
+// by latest activity among those that began together.
+func newer(a, b *Event) bool {
+	if !a.Time.Equal(b.Time) {
+		return a.Time.After(b.Time)
+	}
+	return a.Seq > b.Seq
+}
+
 // Query returns the rows matching the filter, newest first by when they began (the
-// column the page shows), at most Limit, and how many matched in all.
+// column the page shows), at most Limit, and what matched in all.
+//
+// It reads under the lock every connection's requests wait on, so it copies only the
+// rows it returns: with a limit, the newest Limit of them are picked out by pointer
+// while the list is walked and copied at the end. (It copied every matching row, 3.5 MB
+// for a full recorder, and cut the copy afterwards, several times a poll.) Readers
+// share the lock with each other.
 func (r *Recorder) Query(q Query) Result {
-	r.mu.Lock()
-	var out []Event
-	total := 0
-	var newest time.Time
+	var res Result
+	f := q.Filter.lowered()
+	r.mu.RLock()
+	res.Held = int(r.held)
+	var top []*row
+	if q.Limit > 0 {
+		top = make([]*row, 0, min(q.Limit, len(r.byID)))
+	}
 	for x := r.head; x != nil; x = x.next {
-		if !q.matches(x.Event) {
+		if !f.matches(&x.Event) {
 			continue
 		}
-		total++
-		if x.Time.After(newest) {
-			newest = x.Time
+		res.Total++
+		res.Requests += max(x.Count, 1)
+		if x.Time.After(res.Newest) {
+			res.Newest = x.Time
 		}
-		out = append(out, r.copyRow(x))
-	}
-	r.mu.Unlock()
-	slices.SortFunc(out, func(a, b Event) int {
+		if res.Oldest.IsZero() || x.First.Before(res.Oldest) {
+			res.Oldest = x.First
+		}
 		switch {
-		case a.Time.After(b.Time):
-			return -1
-		case a.Time.Before(b.Time):
-			return 1
-		case a.Seq > b.Seq:
-			return -1
-		case a.Seq < b.Seq:
-			return 1
+		case q.Limit <= 0 || len(top) < q.Limit:
+			top = append(top, x)
+		case newer(&x.Event, &top[len(top)-1].Event):
+			top[len(top)-1] = x
+		default:
+			continue
 		}
-		return 0
-	})
-	if q.Limit > 0 && len(out) > q.Limit {
-		out = out[:q.Limit]
+		if q.Limit > 0 {
+			// The list is by latest activity, which is nearly by start, so a row seldom
+			// moves far from the end it was put at.
+			for i := len(top) - 1; i > 0 && newer(&top[i].Event, &top[i-1].Event); i-- {
+				top[i], top[i-1] = top[i-1], top[i]
+			}
+		}
 	}
-	return Result{Rows: out, Total: total, Newest: newest}
+	res.Rows = make([]Event, len(top))
+	if q.Limit <= 0 {
+		// Everything was asked for. The pointers are put in order, which is quick (they
+		// are nearly in it) and moves eight bytes where sorting the copies moved a row.
+		slices.SortFunc(top, func(a, b *row) int {
+			if newer(&a.Event, &b.Event) {
+				return -1
+			}
+			return 1 // two rows never share a sequence number.
+		})
+	}
+	for i, x := range top {
+		res.Rows[i] = r.copyRow(x)
+	}
+	r.mu.RUnlock()
+	if len(res.Rows) == 0 {
+		res.Rows = nil
+	}
+	return res
 }
 
 // Events returns the rows matching f, newest first, at most limit.
@@ -580,8 +695,8 @@ func (r *Recorder) Events(f Filter, limit int) []Event {
 
 // Row returns one row by its ID; ok is false once it has aged out.
 func (r *Recorder) Row(id string) (Event, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	x := r.byID[id]
 	if x == nil {
 		return Event{}, false
@@ -592,8 +707,8 @@ func (r *Recorder) Row(id string) (Event, bool) {
 // RowBySeq finds a row by the sequence number it last had, for an address that
 // predates ids.
 func (r *Recorder) RowBySeq(seq uint64) (Event, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	for x := r.head; x != nil; x = x.next {
 		if x.Seq == seq {
 			return r.copyRow(x), true
@@ -606,13 +721,14 @@ func (r *Recorder) RowBySeq(seq uint64) (Event, bool) {
 // page says it has missed. A folded row counts the repeats it kept ticks for, so when
 // the ticks do not reach back to t the count is a lower bound, and atLeast says so.
 func (r *Recorder) NewSince(f Filter, t time.Time) (n int, atLeast bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	f = f.lowered()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	for x := r.head; x != nil; x = x.next {
 		if !x.Time.After(t) {
 			continue // the list is by activity, not by start: keep looking.
 		}
-		if !f.matches(x.Event) {
+		if !f.matches(&x.Event) {
 			continue
 		}
 		if x.Count == 1 || len(x.Ticks) == 0 {
@@ -633,7 +749,46 @@ func (r *Recorder) NewSince(f Filter, t time.Time) (n int, atLeast bool) {
 	return n, atLeast
 }
 
-func (f Filter) matches(e Event) bool {
+// lowered is the filter with its substring fields in lower case, done once for a walk
+// of the list rather than once a row.
+func (f Filter) lowered() Filter {
+	f.Client, f.API, f.Any = strings.ToLower(f.Client), strings.ToLower(f.API), strings.ToLower(f.Any)
+	return f
+}
+
+// containsFold reports whether s contains lower, which is already in lower case,
+// whatever the case of s. It allocates nothing for the plain names this is asked about
+// (a walk of the list asks it thousands of times with the lock held).
+func containsFold(s, lower string) bool {
+	if lower == "" {
+		return true
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] >= utf8.RuneSelf {
+			return strings.Contains(strings.ToLower(s), lower)
+		}
+	}
+	for i := 0; i+len(lower) <= len(s); i++ {
+		j := 0
+		for ; j < len(lower); j++ {
+			c := s[i+j]
+			if 'A' <= c && c <= 'Z' {
+				c += 'a' - 'A'
+			}
+			if c != lower[j] {
+				break
+			}
+		}
+		if j == len(lower) {
+			return true
+		}
+	}
+	return false
+}
+
+// matches reports whether a row passes the filter, which must be lowered. The row is
+// read where it lies: this runs for every row with the lock held.
+func (f *Filter) matches(e *Event) bool {
 	if f.ErrorsOnly && !e.IsError() {
 		return false
 	}
@@ -643,7 +798,7 @@ func (f Filter) matches(e Event) bool {
 	if f.Conn != 0 && e.Conn != f.Conn {
 		return false
 	}
-	if f.API != "" && !strings.Contains(strings.ToLower(e.API), strings.ToLower(f.API)) {
+	if f.API != "" && !containsFold(e.API, f.API) {
 		return false
 	}
 	if f.Topic != "" && !slices.Contains(e.Topics, f.Topic) {
@@ -652,28 +807,41 @@ func (f Filter) matches(e Event) bool {
 	if f.Group != "" && e.Group != f.Group && e.ViaGroup != f.Group {
 		return false
 	}
-	if f.Client != "" {
-		q := strings.ToLower(f.Client)
-		if !strings.Contains(strings.ToLower(e.ClientID), q) &&
-			!strings.Contains(strings.ToLower(e.Software), q) &&
-			!strings.Contains(strings.ToLower(e.Remote), q) {
-			return false
-		}
+	if f.Client != "" && !containsFold(e.ClientID, f.Client) && !containsFold(e.Software, f.Client) && !containsFold(e.Remote, f.Client) {
+		return false
+	}
+	if f.Any != "" && !f.any(e) {
+		return false
 	}
 	return true
 }
 
-func (q Query) matches(e Event) bool { return q.Filter.matches(e) }
+// any is the page's one search field: the client, its software, the address, the
+// principal, the request, a topic, the group or transactional id, or the error
+// contains what was typed.
+func (f *Filter) any(e *Event) bool {
+	for _, s := range [...]string{e.ClientID, e.Software, e.Remote, e.API, e.Group, e.ViaGroup, e.TxnID, e.Principal, e.Error} {
+		if containsFold(s, f.Any) {
+			return true
+		}
+	}
+	for _, s := range e.Topics {
+		if containsFold(s, f.Any) {
+			return true
+		}
+	}
+	return false
+}
 
 // Clients returns the open connections that have sent a request, oldest first. The
 // console's own are left out.
 func (r *Recorder) Clients() []Client {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	now := r.now()
 	out := make([]Client, 0, len(r.conns))
 	for _, c := range r.conns {
-		if !c.seen || isConsole(c.ClientID) {
+		if !c.seen {
 			continue
 		}
 		cc := c.Client
@@ -682,15 +850,7 @@ func (r *Recorder) Clients() []Client {
 		cc.Req5m, cc.Err5m = c.counts.sum(now, 5*time.Minute)
 		out = append(out, cc)
 	}
-	slices.SortFunc(out, func(a, b Client) int {
-		switch {
-		case a.Conn < b.Conn:
-			return -1
-		case a.Conn > b.Conn:
-			return 1
-		}
-		return 0
-	})
+	slices.SortFunc(out, func(a, b Client) int { return cmp.Compare(a.Conn, b.Conn) })
 	return out
 }
 
@@ -703,16 +863,16 @@ type Window struct {
 // nearest five seconds), folded repeats counted one by one. Errors are the answers that
 // are refused, denied, not implemented or failed: expected flow is not one.
 func (r *Recorder) Last(d time.Duration) Window {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	t, e := r.all.sum(r.now(), d)
 	return Window{Requests: t, Errors: e}
 }
 
 // Requests is how many requests the recorder has seen since it started.
 func (r *Recorder) Requests() uint64 {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return r.reqs
 }
 
@@ -741,8 +901,8 @@ type ClientCount struct {
 // Refusals groups the error rows the recorder holds by what they said, most often
 // first (ties: newest first).
 func (r *Recorder) Refusals() []Refusal {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	by := map[string]*Refusal{}
 	per := map[string]map[string]int{}
 	for x := r.head; x != nil; x = x.next {
@@ -827,8 +987,8 @@ func (r *Recorder) GroupEvent(group, kind, member string, generation int32, deta
 
 // GroupEvents returns the events of one group, oldest first, at most the latest limit.
 func (r *Recorder) GroupEvents(group string, limit int) []GroupEvent {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	g := r.groups[group]
 	if g == nil {
 		return nil

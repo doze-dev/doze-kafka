@@ -2,6 +2,7 @@ package console
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"fmt"
 	"net"
@@ -37,37 +38,78 @@ type backend struct {
 	rrctr map[string]int // topic -> next partition, for auto-partition round robin
 }
 
-// seedOpts is a client's dial target: a TCP seed, or — for a "unix://" Addr,
+// dialOpts is how a client reaches the broker: a TCP seed, or — for a "unix://" Addr,
 // the embedded (doze module) topology — a placeholder seed plus a dialer to
 // the broker's own socket. Unix matters there: a TCP dial would go through the
 // supervisor's proxy, where an idle console client counts as a live connection
 // and pins the instance awake forever. EVERY client build must go through this
 // (the tape's short-lived fetch consumer included), or a unix Addr leaks into
-// SeedBrokers and fails host:port parsing.
-func seedOpts(addr string) []kgo.Opt {
-	if path, ok := strings.CutPrefix(addr, "unix://"); ok {
-		return []kgo.Opt{
+// SeedBrokers and fails host:port parsing, and a connection is made that OnDial
+// was never told about.
+//
+// With OnDial set the console dials for itself, so that the hook sees each
+// connection after it is made and before anything is sent on it (TLS included).
+func dialOpts(opts Options) []kgo.Opt {
+	if path, ok := strings.CutPrefix(opts.Addr, "unix://"); ok {
+		out := []kgo.Opt{
 			kgo.SeedBrokers("kafka.local:9092"), // placeholder; the dialer ignores it
 			kgo.Dialer(func(ctx context.Context, _, _ string) (net.Conn, error) {
 				var d net.Dialer
 				return d.DialContext(ctx, "unix", path)
 			}),
 		}
+		if opts.TLSConfig != nil {
+			out = append(out, kgo.DialTLSConfig(opts.TLSConfig))
+		}
+		return out
 	}
-	return []kgo.Opt{kgo.SeedBrokers(addr)}
+	out := []kgo.Opt{kgo.SeedBrokers(opts.Addr)}
+	switch {
+	case opts.OnDial != nil:
+		out = append(out, kgo.Dialer(func(ctx context.Context, network, host string) (net.Conn, error) {
+			d := net.Dialer{Timeout: 10 * time.Second} // franz-go's own default.
+			conn, err := d.DialContext(ctx, network, host)
+			if err != nil {
+				return nil, err
+			}
+			// What the hook answers does not decide whether the connection is used: a
+			// connection it could not claim works like any other.
+			_ = opts.OnDial(ctx, conn)
+			if opts.TLSConfig == nil {
+				return conn, nil
+			}
+			cfg := opts.TLSConfig.Clone()
+			if cfg.ServerName == "" {
+				if name, _, err := net.SplitHostPort(host); err == nil {
+					cfg.ServerName = name
+				}
+			}
+			secure := tls.Client(conn, cfg)
+			if err := secure.HandshakeContext(ctx); err != nil {
+				conn.Close()
+				return nil, err
+			}
+			return secure, nil
+		}))
+	case opts.TLSConfig != nil:
+		out = append(out, kgo.DialTLSConfig(opts.TLSConfig))
+	}
+	return out
 }
 
-// displayAddr is the bootstrap address pages show clients: DisplayAddr when
-// set (the embedded topology, where the dial addr is a unix socket apps can't
-// use), the dial addr otherwise.
-// The client ids of the console's own Kafka clients. The traffic recorder leaves exactly
-// these out (cmd/doze-kafka checks that its list is this one).
+// The client ids of the console's own Kafka clients. They are names, for a person
+// reading a group's members or a broker's log; nothing is decided by them. What the
+// Traffic page leaves out is what came over the console's own connections, which the
+// process marks itself (Options.OnDial).
 const (
 	ClientID      = "doze-kafka-console"
 	ClientIDFetch = "doze-kafka-console-fetch"
 	ClientIDTrace = "doze-kafka-console-trace"
 )
 
+// displayAddr is the bootstrap address pages show clients: DisplayAddr when
+// set (the embedded topology, where the dial addr is a unix socket apps can't
+// use), the dial addr otherwise.
 func (b *backend) displayAddr() string {
 	if b.opts.DisplayAddr != "" {
 		return b.opts.DisplayAddr
@@ -81,16 +123,13 @@ func newBackend(opts Options) (*backend, error) {
 	if opts.Addr == "" {
 		return nil, fmt.Errorf("console: Addr is required")
 	}
-	base := append([]kgo.Opt{kgo.ClientID(ClientID)}, seedOpts(opts.Addr)...)
+	base := append([]kgo.Opt{kgo.ClientID(ClientID)}, dialOpts(opts)...)
 	if opts.SASLUser != "" {
 		mech, err := saslMechanism(opts.SASLMechanism, opts.SASLUser, opts.SASLPass)
 		if err != nil {
 			return nil, err
 		}
 		base = append(base, kgo.SASL(mech))
-	}
-	if opts.TLSConfig != nil {
-		base = append(base, kgo.DialTLSConfig(opts.TLSConfig))
 	}
 
 	cl, err := kgo.NewClient(base...)
@@ -616,7 +655,7 @@ func (b *backend) fetchWindow(ctx context.Context, topic string, partition int32
 	if committed {
 		iso = kgo.ReadCommitted()
 	}
-	kopts := append(seedOpts(b.addr), kgo.ClientID(ClientIDFetch),
+	kopts := append(dialOpts(b.opts), kgo.ClientID(ClientIDFetch),
 		kgo.ConsumePartitions(map[string]map[int32]kgo.Offset{topic: {partition: kgo.NewOffset().At(fromOffset)}}),
 		kgo.FetchMaxBytes(4<<20), kgo.FetchIsolationLevel(iso),
 	)
@@ -626,9 +665,6 @@ func (b *backend) fetchWindow(ctx context.Context, topic string, partition int32
 			return nil, err
 		}
 		kopts = append(kopts, kgo.SASL(mech))
-	}
-	if b.opts.TLSConfig != nil {
-		kopts = append(kopts, kgo.DialTLSConfig(b.opts.TLSConfig))
 	}
 	cl, err := kgo.NewClient(kopts...)
 	if err != nil {
@@ -686,7 +722,7 @@ func (b *backend) fetchWindow(ctx context.Context, topic string, partition int32
 // given, as the console's other short-lived readers are: no group, no commits. The
 // caller closes it.
 func (b *backend) newReader(assign map[string]map[int32]kgo.Offset) (*kgo.Client, error) {
-	kopts := append(seedOpts(b.addr), kgo.ClientID(ClientIDTrace),
+	kopts := append(dialOpts(b.opts), kgo.ClientID(ClientIDTrace),
 		kgo.ConsumePartitions(assign), kgo.FetchMaxBytes(8<<20), kgo.FetchIsolationLevel(kgo.ReadUncommitted()))
 	if b.opts.SASLUser != "" {
 		mech, err := saslMechanism(b.opts.SASLMechanism, b.opts.SASLUser, b.opts.SASLPass)
@@ -694,9 +730,6 @@ func (b *backend) newReader(assign map[string]map[int32]kgo.Offset) (*kgo.Client
 			return nil, err
 		}
 		kopts = append(kopts, kgo.SASL(mech))
-	}
-	if b.opts.TLSConfig != nil {
-		kopts = append(kopts, kgo.DialTLSConfig(b.opts.TLSConfig))
 	}
 	return kgo.NewClient(kopts...)
 }

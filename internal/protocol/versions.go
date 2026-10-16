@@ -104,7 +104,7 @@ var APIs = []API{
 	{Key: kmsg.DescribeGroups, Versions: [4]Offered{v(0, 1), v(0, 3), v(0, 5), v(0, 5)}, Summary: sumGroups},
 	{Key: kmsg.ListGroups, Versions: [4]Offered{v(0, 2), v(0, 2), v(0, 4), v(0, 5)}, Summary: sumNothing},
 	{Key: kmsg.SASLHandshake, Versions: [4]Offered{v(1, 1), v(1, 1), v(1, 1), v(1, 1)}, When: WhenSASL, Summary: sumNothing},
-	{Key: kmsg.ApiVersions, Versions: [4]Offered{v(0, 1), v(0, 2), v(0, 3), v(0, 3)}, Summary: sumApiVersions},
+	{Key: kmsg.ApiVersions, Versions: [4]Offered{v(0, 1), v(0, 2), v(0, 3), v(0, 4)}, Summary: sumApiVersions},
 	{Key: kmsg.CreateTopics, Versions: [4]Offered{v(0, 2), v(0, 3), v(0, 7), v(0, 7)}, Summary: sumCreateTopics},
 	{Key: kmsg.DeleteTopics, Versions: [4]Offered{v(0, 1), v(0, 3), v(0, 5), v(0, 6)}, Summary: sumDeleteTopics},
 	{Key: kmsg.DeleteRecords, Versions: [4]Offered{v(0, 0), v(0, 1), v(0, 2), v(0, 2)}, Summary: sumDeleteRecords},

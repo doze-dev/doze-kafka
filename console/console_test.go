@@ -379,7 +379,10 @@ func TestAPIPaletteAndCounts(t *testing.T) {
 // crucially the tape's short-lived FetchWindow consumer (a raw unix path once
 // leaked into its SeedBrokers and failed host:port parsing).
 func TestUnixSocketConsole(t *testing.T) {
-	dir, err := os.MkdirTemp("/tmp", "kcon") // short path: unix sockets cap ~104 bytes
+	// /tmp rather than t.TempDir(): a unix socket's path is capped near 104 bytes,
+	// and the test temp directory (/var/folders/... on macOS) is longer than that.
+	// Removed by the cleanup below.
+	dir, err := os.MkdirTemp("/tmp", "kcon")
 	if err != nil {
 		t.Fatal(err)
 	}

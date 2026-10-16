@@ -163,14 +163,28 @@ func TestGettingStartedRunsAsWrittenAndPrintsWhatItShows(t *testing.T) {
 				if b == nil {
 					t.Fatalf("getting-started.md:%d: a banner block before the broker is started", blk.line)
 				}
+				// The block is what a terminal shows: log lines (stderr) around the
+				// summary (stdout). The summary is compared exactly; each log line must
+				// be among the lines logged, in order.
 				var got []string
 				for _, l := range splitLines(b.stdout.String()) {
 					if !strings.HasPrefix(strings.TrimSpace(l), "config ") { // the test's port file
 						got = append(got, l)
 					}
 				}
-				for _, d := range compareExact(blk.lines, got) {
+				var summary, logLines []string
+				for _, l := range blk.lines {
+					if logTime.MatchString(l) || strings.HasPrefix(strings.TrimSpace(l), "level=") {
+						logLines = append(logLines, l)
+					} else {
+						summary = append(summary, l)
+					}
+				}
+				for _, d := range compareExact(summary, got) {
 					t.Errorf("getting-started.md:%d (the start-up summary): %s", blk.line, d)
+				}
+				for _, d := range compareIncluded(logLines, splitLines(b.stderr.String())) {
+					t.Errorf("getting-started.md:%d (the start-up log): %s", blk.line, d)
 				}
 			case "consume":
 				if lastConsume == "" {

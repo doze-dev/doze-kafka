@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/doze-dev/doze-kafka/console"
 	"github.com/doze-dev/doze-kafka/internal/traffic"
 )
 
@@ -41,10 +42,16 @@ func TestObservabilityGuideStatesTheRecordersBounds(t *testing.T) {
 			t.Errorf("observability.md does not state the %s bound as %q", what, want)
 		}
 	}
-	for _, id := range traffic.ConsoleClientIDs {
+	// The console's client ids are named, as names: the guide must not say (as it did)
+	// that a client using one is not listed, because that is no longer how the
+	// console is known (cmd/doze-kafka: TestTrafficLeavesOutTheConsoleAndNobodyElse).
+	for _, id := range []string{console.ClientID, console.ClientIDFetch, console.ClientIDTrace} {
 		if !strings.Contains(doc, "`"+id+"`") {
 			t.Errorf("observability.md does not name the console's own client id %s", id)
 		}
+	}
+	if strings.Contains(doc, "is not listed; an app") || !strings.Contains(doc, "is listed like any") {
+		t.Error("observability.md does not say that a client named like the console is listed like any other")
 	}
 	// The folding rules are written down: the ten-minute window is the code's.
 	if !strings.Contains(doc, "less than ten minutes ago") {

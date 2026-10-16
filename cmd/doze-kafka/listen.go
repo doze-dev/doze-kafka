@@ -193,7 +193,21 @@ func registryURL(cfg config.Config) string {
 		if cfg.SchemaRegistryAddr == "" {
 			return ""
 		}
-		return httpURL(cfg.SchemaRegistryAddr)
+		return urlFor(registryScheme(cfg), cfg.SchemaRegistryAddr)
+	}
+	if cfg.RegistryTLS() {
+		if cfg.SchemaRegistryAddr != "" {
+			return urlFor("https", cfg.SchemaRegistryAddr)
+		}
+		// Over TLS it is on the broker's own host, port 8081 (see run): the name, or
+		// the address a running instance published where the name does not resolve
+		// here, or nothing answers at it.
+		host := qualifiedHost(cfg.InstanceName())
+		if ip, _, _ := registered(host); ip != "" &&
+			(!resolvesHere(machineLookup, host, ip) || !nameReachable(host, registryPort)) {
+			host = ip
+		}
+		return "https://" + net.JoinHostPort(host, strconv.Itoa(registryPort))
 	}
 	host := names.Qualified("schema", cfg.InstanceName()).Host
 	if u := publishedURL(host); u != "" {
@@ -223,7 +237,7 @@ func instanceAddress(cfg config.Config) (bootstrap, console string) {
 		}
 		cc := ""
 		if cfg.Console && cfg.ConsoleAddr != "" {
-			cc = "http://" + cfg.ConsoleAddr
+			cc = httpURL(cfg.ConsoleAddr)
 		}
 		return net.JoinHostPort(advertised, port), cc
 	}

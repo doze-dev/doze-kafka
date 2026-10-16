@@ -115,6 +115,66 @@ approximation of a locked-down cluster:
 
 Clients use `SASL_SSL` as their security protocol.
 
+## What SASL and TLS cover
+
+doze-kafka has up to three listeners, and the two settings do not reach them alike:
+
+| Listener | With `--tls-cert` and `--tls-key` | With `--sasl-mechanisms` |
+|---|---|---|
+| Kafka | TLS | Every connection logs in. |
+| Schema registry | HTTPS, with the same certificate. `--schema-registry-tls=false` keeps it plain HTTP. | HTTP basic authentication, with the same users and passwords. |
+| Web console, and `/healthz` on its port | Plain HTTP. | No login. |
+
+**The schema registry** follows the broker. Given a certificate it serves
+`https://` and nothing else on its port (a plain-HTTP request is answered
+`400 Bad Request`, with the body `Client sent an HTTP request to an HTTPS server.`), and the start-up summary and
+`doze-kafka env` print the `https://` URL. A client trusts the certificate the way it
+does for the broker:
+
+```sh
+curl --cacert cert.pem -u alice:s3cret https://127.0.0.1:8081/subjects
+```
+
+The certificate has to name the host in that URL, as it has to name the host clients
+bootstrap on. Under a `.doze` name the TLS registry is at
+`https://kafka.<name>.doze:8081`, the broker's own host, and not at
+`http://schema.<name>.doze`: the shared front door that makes that name port-less
+speaks plain HTTP. `--schema-registry-tls=false` is for a proxy that terminates TLS
+itself; with it, a registry on an address other machines can reach is reported as a
+warning at start-up, because with SASL its requests carry the passwords in the clear.
+
+**The console** has no login of its own and is always plain HTTP. With SASL on it logs
+in to the broker as a user of its own, `__console`, with a random password made at
+start-up, and that user is a super user: no ACL refuses it. So anyone who can open the
+console can read every topic and delete anything, whatever SASL and ACLs say. What
+stands in front of it is where it listens and two checks:
+
+- It listens on loopback: the name's own loopback address by default, `127.0.0.1:9093`
+  under `--listen`.
+- It answers only requests whose `Host` is `localhost`, an IP address, a `*.doze`
+  name or a name given with `--console-allow-host`, and refuses a state-changing
+  request from another origin (both `403`). These stop a web page in your browser from
+  reaching it; they are not authentication, and a client on the network can send any
+  `Host` it likes.
+
+With SASL or TLS on, a `--console-addr` that is not loopback (`:9093`, `0.0.0.0:9093`,
+a LAN address, a host name other than `localhost`) is **refused at start-up**, exit
+code 2. It is refused rather than warned about because turning either on says who may
+reach the broker and how, and an open console on the network undoes it without anyone
+having asked for that. Before serving it elsewhere, do one of:
+
+1. Keep it on loopback and put a reverse proxy that authenticates (and terminates TLS)
+   in front of it; `--console-prefix` mounts it under a path and
+   `--console-allow-host` names the host the proxy forwards.
+2. Reach it through an SSH tunnel (`ssh -L 9093:127.0.0.1:9093 host`).
+3. Turn it off: `--console=false`.
+4. Accept it: `--console-unprotected`. This is the answer inside a container, where the
+   process must listen on `0.0.0.0` for a published port to reach it; publish that port
+   on the host's loopback only (`-p 127.0.0.1:9093:9093`). The broker logs a warning
+   saying what is open every time it starts this way.
+
+Without SASL and TLS nothing is refused: the Kafka port is as open as the console is.
+
 ## What's not here
 
 No Kerberos/GSSAPI, no OAUTHBEARER, and no delegation tokens. Authorization is by ACL,

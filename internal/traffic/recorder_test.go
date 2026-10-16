@@ -120,24 +120,6 @@ func TestGroupFilterIncludesItsMembersFetches(t *testing.T) {
 	}
 }
 
-func TestOnlyTheConsolesOwnIdsAreLeftOut(t *testing.T) {
-	r := New(50, nil)
-	for i, id := range append([]string{"doze-kafka-console-demo", "doze-kafka-console2"}, ConsoleClientIDs...) {
-		r.ConnOpened(uint64(i), "x")
-		r.Request(obs(uint64(i), id, kmsg.Metadata, time.Duration(i)*time.Second))
-	}
-	var left []string
-	for _, e := range r.Events(Filter{}, 0) {
-		left = append(left, e.ClientID)
-	}
-	if len(left) != 2 {
-		t.Errorf("rows from %v, want the two apps whose ids only begin the same way", left)
-	}
-	if len(r.Clients()) != 2 {
-		t.Errorf("%d clients, want 2", len(r.Clients()))
-	}
-}
-
 // What a paused page says it missed is counted from a time, not a position: rows move
 // when they fold.
 func TestNewSinceCountsRequestsAfterACursor(t *testing.T) {
@@ -215,7 +197,7 @@ func TestCountersPerConnectionAndWindow(t *testing.T) {
 	r.Request(obs(1, "app", kmsg.Produce, at(20*time.Second), refuse))
 	r.Request(obs(1, "app", kmsg.JoinGroup, at(10*time.Second), expected)) // expected flow is not an error.
 	r.Request(obs(2, "other", kmsg.Fetch, at(5*time.Second)))
-	r.Request(obs(3, "doze-kafka-console", kmsg.Fetch, at(5*time.Second))) // not counted.
+	r.Request(obs(3, "doze-kafka-console", kmsg.Fetch, at(5*time.Second), own)) // the console's own: not counted.
 
 	minute := r.Last(time.Minute)
 	if minute.Requests != 13 || minute.Errors != 1 {

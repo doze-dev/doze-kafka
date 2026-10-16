@@ -84,6 +84,13 @@ func (t *txnState) observe(batch []byte, baseOffset int64) {
 		return
 	}
 	pid := int64(binary.BigEndian.Uint64(batch[batchProducerIDOff:]))
+	if pid < 0 {
+		// The transactional bit on a batch with no producer id: Kafka stores it (when
+		// the request names a transactional id) and no transaction is opened by it,
+		// there being nobody to end one. Counted as open, it held every
+		// read-committed consumer at this offset for good.
+		return
+	}
 	if attrs&batchControlBit != 0 {
 		first, open := t.ongoing[pid]
 		delete(t.ongoing, pid)

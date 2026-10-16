@@ -4,13 +4,18 @@
      one here), and it shows the shell's "not updating" state when its poll cannot be
      answered. A row opens the request in the inspector. It is the page's own row in
      the grid, under the page and beside the inspector. */}}
+{{/* The dock pages by its cursor (A4): Older is the rows after the last one shown,
+     Newest goes back to the head. Both replace the dock, which then polls the page it
+     shows. */}}
+{{define "dock_pager"}}{{if .DockNewest}}<button type="button" class="btn ghost sm" data-dock-newest hx-get="{{.DockNewest}}" hx-target="#wire-dock" hx-select="unset" hx-swap="outerHTML">Newest</button>{{end}}{{if .DockOlder}}<button type="button" class="btn ghost sm" data-dock-older hx-get="{{.DockOlder}}" hx-target="#wire-dock" hx-select="unset" hx-swap="outerHTML">Older</button>{{end}}{{end}}
+
 {{define "wire_dock"}}
 {{if .HasDock}}
-<section class="dock" id="wire-dock" aria-label="The wire: requests for {{.DockFilter.Topic}}{{.DockFilter.Group}}{{.DockFilter.Subject}}" data-live="{{.Prefix}}/dock?{{.DockQuery}}{{if .DockToggle}}&amp;t=1{{end}}" data-hash="{{.DockHash}}" data-live-ms="3000">
+<section class="dock" id="wire-dock" aria-label="The wire: requests for {{.DockFilter.Topic}}{{.DockFilter.Group}}{{.DockFilter.Subject}}" data-live="{{.DockLive}}" data-hash="{{.DockHash}}" data-live-ms="3000">
   <div class="dh"><span class="b">The wire, underneath</span>
     {{if .DockToggle}}<button type="button" class="livetoggle" data-live-toggle aria-pressed="false" title="Pause live updates"><span class="livedot" aria-hidden="true"></span><span class="livetoggle-l">Live</span></button>
     {{else}}<span class="pill ok"><span class="dot" aria-hidden="true"></span>live</span>{{end}}
-    <span class="note">requests that touched {{if .DockFilter.Topic}}{{.DockFilter.Topic}}{{else if .DockFilter.Group}}{{.DockFilter.Group}}{{else}}{{.DockFilter.Subject}}{{end}}</span>
+    <span class="note">{{if .DockPaged}}older requests{{else}}requests{{end}} that touched {{if .DockFilter.Topic}}{{.DockFilter.Topic}}{{else if .DockFilter.Group}}{{.DockFilter.Group}}{{else}}{{.DockFilter.Subject}}{{end}}</span>
   </div>
   {{if not .DockKnown}}
   <div class="note dock-more">The registry's own requests are not recorded yet, so there is nothing to show for a subject here.</div>
@@ -26,7 +31,9 @@
       <span class="m ra">{{.Took}}</span>
     </div>{{end}}
   </div>
-  {{if .DockMore}}<div class="note dock-more">Older requests are on the <a href="{{.Prefix}}/traffic?{{.DockQuery}}">Traffic page</a>.</div>{{end}}
+  {{if or .DockMore .DockPaged}}<div class="note dock-more">{{template "dock_pager" .}}{{if and .DockMore .DockTraffic}} <span>Older requests are on the <a href="{{.DockTraffic}}">Traffic page</a>.</span>{{end}}</div>{{end}}
+  {{else if .DockPaged}}
+  <div class="note dock-more">{{template "dock_pager" .}} <span>Nothing older is kept.</span></div>
   {{else}}
   <div class="note dock-more">No request has touched this since the broker started.</div>
   {{end}}

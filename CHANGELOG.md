@@ -20,8 +20,7 @@ here that contains "server API"; `task api` fails without it.
 - `--zone` (and `zone` in the config file): `--zone=false` keeps the instance out of the
   shared `.doze` zone (no name, no front door), the same as `DOZE_ZONE=off`.
 
-- Console: a third theme (high contrast) beside light and dark; one key map for the
-  whole console, with a help overlay generated from it (`?`), and the palette's actions
+- Console: one key map for the whole console, with a help overlay generated from it (`?`), and the palette's actions
   (themes, rail, pause, help) beside its search; destructive actions (delete a topic,
   delete records, reset or delete a group's offsets) confirm in a sentence built from
   what the action will do on this broker (partitions, records, the groups that lose
@@ -43,10 +42,181 @@ here that contains "server API"; `task api` fails without it.
   and is now refused. Both were found by fuzz targets added for the trace-header parser
   and the Host check.
 
+- Console: Traffic holds a client's long names (client id, software, group, transactional
+  id, a 249-character topic) in its columns, cut with an ellipsis and whole in the title
+  and the inspector. A client with 90-character names made the clients table 3,675 px
+  wide, the inspector scroll sideways and a group's pill push its controls off the page;
+  at a phone's width the requests' cards lost their time and request to the client id.
+  Between 641 and 1179 px the clients table leaves out principal, opened and last request.
+
+- Console: the wire dock at the foot of a topic or group page pages back through the
+  requests it holds (Older, Newest); it showed the newest eight and no more.
+
+- Console: with the list of keys (`?`) open, the page's keys are off. They used to act
+  on the page behind it: `p` paused the live view, `j` and `k` moved the cursor, `c`
+  and the `g` chords left the page.
+
+- Console: a topic's message tape draws its own marks again (8 px, the recent ones
+  inked). The Traffic inspector's fold tick had the same class name and redrew them as
+  4 px of ink. The cards of the create forms are 12 px apart, as on the boards.
+
+- Console: a client flagged because most of its requests in five minutes were refused is
+  told so ("was refused 3 of its 5 requests in the last five minutes"). The page said
+  "has been refused 0 times in a row" whenever its latest request had gone well. A streak
+  on one of a client's several connections says it is one connection's.
+
+- Console: the wire dock's "Traffic page" link lands on that topic's or group's requests
+  (it carried `topic%3dorders`, which is no filter, and showed everything). The Older,
+  Newer and Latest links of a topic's committed-only view keep the view; they wrote
+  `from=0%26committed%3d1`. A subject's dock no longer links to a Traffic page that has
+  no filter for a subject.
+
+- Produce reads every batch before storing it, as Apache Kafka does, on every kind of
+  topic and every Produce version (recorded against `apache/kafka:4.3.1`:
+  `produce-validation`, `produce-inflated-size`). Batches Kafka refuses used to be
+  acknowledged and stored on any topic that did not compact: a records section that is
+  not the codec it names (now UNKNOWN_SERVER_ERROR, as Kafka answers), a header claiming
+  more or fewer records than it holds (it advanced the log by the claimed count), two
+  batches for one partition, an empty record set, a base offset other than 0, a producer
+  id with sequence -1 (INVALID_RECORD); a transactional batch with no transactional id
+  (TRANSACTIONAL_ID_AUTHORIZATION_FAILED); a timestamp outside
+  `message.timestamp.before.max.ms` / `after.max.ms`, now applied, or a client-set
+  LogAppendTime bit (INVALID_TIMESTAMP). Refusals Kafka also made now carry Kafka's code
+  (INVALID_RECORD where this said CORRUPT_MESSAGE for a zero-count batch, a legacy magic, a
+  control batch or a short record set), base offset -1 and Kafka's message or none.
+  **A topic with no `max.message.bytes` is now held to the broker's `message.max.bytes`,
+  Kafka's default of 1048588** (`--message-max-bytes`, `message-max-bytes` in the file):
+  a batch over 1 MB was accepted here and refused by every production broker. A topic
+  whose `compression.type` is not the batch's stores it re-written in its codec and holds
+  that size to the limit. A batch inflating past 64 MiB, a zstd window past 8 MiB and a
+  compressed record whose length disagrees with its fields are refused here and kept by
+  Kafka (`docs/limitations.md`). A log from an earlier version holding an unreadable batch
+  still opens: compaction and timestamp lookups go past it instead of failing for good.
+  A retry of an idempotent batch is answered with the timestamp it was stored with.
+- Security: an Avro value is checked against its schema before the Avro decoder sees it.
+  The console decodes registry-framed record values, which any producer can write, with
+  `hamba/avro`, which is archived and has three open advisories against its decoder
+  (GO-2026-5046, 5047, 5048; no fixed release). 328 bytes naming 64 arrays of a million
+  nulls made the console allocate 5 GiB, and a registered `fixed` of 512 MiB allocated
+  2 GiB for a seven-byte value. Every length and count is now checked first: the arrays
+  and maps of one value hold at most 1,048,576 elements between them, nothing nests more
+  than 1,024 deep, and nothing claims more bytes than are there. A truncated value is no
+  longer shown as if it had decoded. `go tool task vuln` (govulncheck, in CI on every push
+  and daily) fails on any reachable vulnerability that is not accepted with a guarding
+  test in `testdata/vulncheck-accepted.txt`; it found five more in the doze module's
+  dependencies, fixed by upgrades (`golang.org/x/net` 0.60.0, `google.golang.org/grpc`
+  1.83.2).
+- `go tool task check` runs every benchmark once (`bench:smoke`).
+
+- The doze module's console (the one `doze` starts beside a `kafka` instance) has the
+  Traffic page and the clients' own metrics, as the `doze-kafka` command's console has.
+  Its broker was built as one with no console, so nothing was recorded, `/traffic` was a
+  404 and the client-telemetry APIs (71, 72) were not offered. A module instance started
+  with no console address still keeps and offers neither, and neither does a broker built
+  with `server.New`.
+
+- CreateTopics: a request for many topics no longer compares each name with every topic
+  (twice: the handler listed them all and the store looked at them all, so a batch was
+  quadratic); both ask an index kept by the metadata store. Which names collide is now
+  exactly Apache Kafka's, from a recording of 4.3.1 (`createtopics-collisions`): a name is
+  held against the topics that existed before the request and not against the others in
+  it, so `a.b` and `a_b` sent in one request are both created, where this broker used to
+  refuse the second with `INVALID_TOPIC_EXCEPTION`. A name that collides with an existing
+  topic is still refused, with or without `validate_only`, and names that differ only in
+  letter case are refused everywhere.
+
+- Embedding (`server/`): nothing outlives a failure. A `Serve` that cannot bind closes the
+  `AlsoListen` listeners too (they stayed bound and accepting); a `New` that fails closes
+  what it had opened, the lock on the data directory included (a broken record in the
+  metadata database left the directory "in use" by a broker that did not exist).
+  `Close` on a server that is serving now stops it, as cancelling its context does, and
+  returns once `Serve` has drained and closed storage; before, it closed storage under
+  the connections still using it. `Ready()` is closed by `Close` as well, so waiting on it
+  never hangs, and what it means is read from `Addr()`: not nil, the listener is bound;
+  nil, the server ended without ever binding. `ServeListener` owns the listener it is
+  given and closes it when it returns, except when the call is refused. No change to the
+  exported surface.
+
+- With `--listen` on port 0 the console and the schema registry take free loopback
+  ports too, so the documented throwaway broker runs twice at once (the second one
+  failed on 8081). A fixed `--listen` keeps `127.0.0.1:9093` and `127.0.0.1:8081`.
+- The start-up summary's last-but-one line is an `env` command that gives this
+  broker: under `--listen` it carries the bound addresses (`eval "$(doze-kafka env
+  --listen 127.0.0.1:… --config '')"`), where the bare `doze-kafka env` printed the
+  `.doze` name. `doze-kafka env` accepts `--sasl-mechanisms` without `--sasl-user`.
+- `--zone=false` (`zone = false`, `DOZE_ZONE=off`) without `--listen` is a configuration
+  error, one line and exit 2, in every command; it used to fail after start-up began,
+  exit 1, and `doctor` and `env` reported a name that was not served.
+- `config print` prints every setting at its effective value, `console-prefix` and
+  `acl-default` included, and `meta-db` as a comment while it follows `data-dir`.
+  `DOZE_KAFKA_CONSOLE_PREFIX` is now validated like the flag.
+- `--console-prefix` (`console-prefix`, or `DOZE_KAFKA_CONSOLE_PREFIX`) serves the console
+  under another path, for a reverse proxy; `/` serves it at the root of its port.
+- Console: the home page is Traffic, or the first-run page on a broker with nothing in
+  it that has heard from no client (it was Topics); `/connect` is new and says how to
+  connect an app; `/trace` without an id is a page with a field for one (it was a 400);
+  the rail is grouped Observe, Data, Broker; the inspector, in the page's flow, replaces
+  the drawer; a high-contrast theme joins light and dark, and the palette no longer has
+  theme rows (the top bar's switch does it).
+- Protocol answers: CreateTopics refuses a manual assignment with a replication factor
+  or partition count set (`INVALID_REQUEST`) and a malformed one, such as a repeated or
+  missing partition, an empty replica list or an unknown broker
+  (`INVALID_REPLICA_ASSIGNMENT`); FindCoordinator answers `INVALID_REQUEST` for an
+  unknown key type; OffsetCommit answers `OFFSET_METADATA_TOO_LARGE` for metadata above
+  4096 bytes; `cleanup.policy` accepts a repeated value, as Kafka's list validator does.
+- Go 1.27 is required to build doze-kafka or embed it (`go.mod` says `go 1.27.0`).
+- The schema registry is served over TLS when the broker is: with `--tls-cert` and
+  `--tls-key` it answers `https://` with the same certificate (it stayed plain HTTP
+  before, so `schema.registry.url=https://...` failed and basic-auth passwords crossed in
+  the clear beside an encrypted broker). The summary and `doze-kafka env` print the
+  `https://` URL; by name that is `https://kafka.<name>.doze:8081`.
+  `--schema-registry-tls=false` (`schema-registry-tls`) keeps it plain HTTP, with a
+  warning at start-up when it is then reachable from other machines. **If you run with
+  a certificate, change `http://` to `https://` in your registry URL.**
+- With SASL or TLS on, a console address beyond loopback is refused at start-up (exit
+  2): the console has no login, is plain HTTP and acts as a super user.
+  `--console-unprotected` (`console-unprotected`) accepts it, with a warning.
+  [What SASL and TLS cover](docs/auth-and-tls.md#what-sasl-and-tls-cover) says what
+  each setting reaches.
+
 - Console: every button reads weight 400 whether it is a button or a link drawn as one (the
   boards draw them all as buttons). A request that took under a millisecond shows its
   measured time (`42 µs`, `0.4 ms`) rather than the design boards' `0 ms`: a broker
   answering from memory does that constantly, and `0 ms` says nothing was measured (AD6).
+
+- Traffic inspector: "Result per partition" pairs each partition with its own answer. A
+  fetch of several topics used to give every topic the result of the last topic that had
+  a partition of the same number (a refused `b-0` read as a refused `a-0`, with its
+  record count and bytes). A fetch that names its topics by id (v13) now lists each
+  partition under its topic's name; they were blank. ListOffsets, OffsetFetch,
+  TxnOffsetCommit, DeleteRecords and OffsetDelete list their partitions and results too.
+- Traffic recorder: a request naming thousands of partitions no longer stalls every
+  other connection. Describing a request was quadratic in its partitions (48 ms for a
+  4,000-partition fetch) and ran under the recorder's one lock, which every connection
+  takes after every request; it now costs the same whatever the request names (about
+  16 µs) and runs outside the lock. A Traffic page poll copies the rows it draws (about
+  110 KB) where it copied everything held, twice (3.5 MB each time), under that lock.
+  The paused page's "N new requests" now honours the search field as the table does.
+- `ApiVersions` answers as Apache Kafka 4.3.1 does, from recordings of it
+  (`conformance/recordings/apiversions-*.json`). From v3, a client software name or
+  version that is empty, or is not letters and digits with dots and dashes only between
+  them, is `INVALID_REQUEST` with no APIs listed (it was answered 0 and the whole list;
+  a client that sends ApiVersions v3 by hand with no name is now refused, as it is by
+  Kafka). A version of ApiVersions that is not served is answered `UNSUPPORTED_VERSION`
+  with one row, ApiVersions itself (it was the whole table). ApiVersions is offered to
+  v4 when emulating Kafka 4.
+- Traffic leaves out the console and nobody else. The console was known by its client
+  id, so a client that called itself `doze-kafka-console` (or `-fetch`, `-trace`) had
+  no rows and was not among the connected clients. The console is now known by its
+  connections, which the broker process marks in memory when it opens them to itself;
+  a client id is only a name, and a client using one of the console's is listed.
+- What a client can make the broker keep is bounded. A client's software name and
+  version are kept to 128 bytes (300 connections each sending a 1 MiB name held 500 MB).
+  A group id, group instance id, rack id, client-chosen member id, protocol name,
+  subscribed topic name or pattern, or transactional id longer than 4,096 bytes is
+  refused, and so is a SCRAM first message that long (Kafka has no such bounds:
+  `docs/limitations.md`). A group id with a NUL byte is refused by a classic JoinGroup
+  as it already was by a commit.
 
 - Client telemetry answers as Apache Kafka 4.3.1 does, from recordings of it
   (`conformance/recordings/telemetry-*.json`, `client-telemetry.json`): a push before the
@@ -60,6 +230,16 @@ here that contains "server API"; `task api` fails without it.
   Kafka's JSON specification of the request ("TransactionalId", "TopicData") and no
   longer the client library's. A Produce partition that does not exist answers a base
   offset of -1.
+- Client telemetry, two more answers made Kafka's (`telemetry-terminating.json`,
+  `telemetry-ask-again.json`): every push is `INVALID_REQUEST` while the push before it
+  said it was terminating, whatever became of that one (the third terminating push in a
+  row was taken; a push after a refused terminating one was throttled), and a
+  terminating push inside the interval no longer sets the push clock; the subscription
+  request a client sends after a push refused `UNKNOWN_SUBSCRIPTION_ID` or
+  `UNSUPPORTED_COMPRESSION_TYPE` is answered, once, where it was
+  `THROTTLING_QUOTA_EXCEEDED`. Setting a `CLIENT_METRICS` resource is refused, and a
+  broker without a console closes the connection of a client that sends the two calls;
+  both are in `docs/limitations.md`.
 
 - Groups: classic and consumer-protocol members can share a group id, as on Kafka 4 with
   its default migration policy (a rolling upgrade or downgrade of an application, one

@@ -66,7 +66,7 @@ var Units = []Unit{
 	{Name: "internal/broker:data", Dir: "internal/broker", Shards: 1, Only: []string{
 		"produce", "fetch", "idempotency", "listoffsets", "deleterecords", "producerid", "txn", "txnapis"}},
 	{Name: "internal/broker:admin", Dir: "internal/broker", Shards: 1, Only: []string{
-		"topics", "topicconfig", "topiclimits", "configs", "alterconfigs", "createpartitions", "metadata", "apiversions", "telemetry"}},
+		"topics", "topicconfig", "topiclimits", "configs", "alterconfigs", "createpartitions", "metadata", "apiversions", "telemetry", "bounds"}},
 	{Name: "internal/broker:auth", Dir: "internal/broker", Shards: 1, Only: []string{
 		"auth", "authorizer", "acls", "scram", "broker"}},
 }

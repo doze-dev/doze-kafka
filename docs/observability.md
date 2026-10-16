@@ -6,6 +6,15 @@ written to disk, the oldest rows are dropped when the record is full, and a rest
 starts it empty. A broker run without the console (`--console=false`, or embedded in
 a Go test) keeps none of it, advertises no client telemetry and pays nothing for it.
 
+The rule is the same wherever a broker is started: **the record and the two
+client-telemetry APIs (71 and 72) exist exactly when a console is attached.** The
+`doze-kafka` command attaches one unless told `--console=false`. The doze module's
+embedded broker (`module/`, what `doze` runs for a `kafka` instance) attaches one when
+it is given an address for it, which is whenever doze gives the instance an endpoint,
+and that console has the same Traffic page and client metrics as the command's; an
+instance started with no console address keeps and offers neither. `server.New` never
+does: an embedder has no console to attach.
+
 ## Traffic: what did my app just do?
 
 **Traffic** in the console's rail is a live tail of the requests clients have made,
@@ -78,17 +87,22 @@ seconds. *N of M requests match* counts requests among those the recorder keeps.
 - **Clients** (`?view=clients`): who is connected, their software, principal and address,
   requests a minute, groups and error rate. A client is flagged when it was refused three
   times in a row, or when three or more of its requests in five minutes make up at least
-  half of what it asked.
+  half of what it asked. The page says which: "refused 4 times in a row", or "refused 3
+  of its 5 requests in the last five minutes" for a client whose latest request went
+  well.
 - **Pause** stops the table (`p`). The broker is not paused: the page counts the requests
   it has missed since the newest row it shows, and says so.
 - **A group filter** shows the group's rebalances in order, with the requests that
   belong to each nested under it, and the generations table.
 - **When the broker is lost** the rows stay, dimmed, under a line that says when they
   were last known; the console asks again every five seconds.
-- **The console is left out.** Its own requests would otherwise fill the page that
-  shows traffic. A client whose id is exactly `doze-kafka-console`,
-  `doze-kafka-console-fetch` or `doze-kafka-console-trace` is not listed; an app that
-  merely begins that way is.
+- **The console is left out, and nobody else.** Its own requests would otherwise fill
+  the page that shows traffic. They are known by their connections: the console runs in
+  the broker's process, and the process marks, in memory, the connections it opened to
+  itself. Nothing a client sends decides it. The console's clients call themselves
+  `doze-kafka-console`, `doze-kafka-console-fetch` and `doze-kafka-console-trace`, and
+  those are only names: a client of yours that uses one of them is listed like any
+  other (it used to be invisible).
 - **Version negotiation is not an error.** A client newer than the broker is told
   `UNSUPPORTED_VERSION` by `ApiVersions` and asks again at a version it can use.
 
@@ -114,6 +128,15 @@ who can open the console), the topics, group and transactional id, a join reason
 timings and error names. It holds **no record bytes, no header value and no secret**:
 the decoded fields give byte strings as their length, a batch as "1 batch, 2 records,
 412 B", and hide the value of a configuration whose name says it is a secret.
+
+**What recording costs a client.** Every connection tells the recorder about every
+request it finishes, and the recorder has one lock. What is done with it held does not
+grow with what the client sent: the connection is found, the request is counted, and
+one row goes on the list. Describing the request (the partitions kept and their
+results, the decoded fields, the names of topics sent as ids) is done before the lock is
+taken, and costs the same for 4,000 partitions as for the 16 that are kept. A request
+that folds into the row before it is not described at all. A page that reads takes the
+lock for reading, alongside other pages, and copies only the rows it draws.
 
 ## Group timeline: why does my consumer keep rebalancing?
 

@@ -90,7 +90,7 @@ func (pp *partitionProducers) loadFrom(plog *log.Partition) error {
 		return err
 	}
 	for _, h := range history {
-		pp.record(h.ProducerID, h.Epoch, h.FirstSeq, h.LastSeq, h.BaseOffset)
+		pp.record(h.ProducerID, h.Epoch, h.FirstSeq, h.LastSeq, h.BaseOffset, h.MaxTimestamp)
 	}
 	pp.loaded = true
 	return nil
@@ -117,12 +117,14 @@ const (
 type batchSeq struct {
 	firstSeq, lastSeq int32
 	baseOffset        int64
+	maxTimestamp      int64 // the batch's, as stored: what a retry of it is answered with.
 }
 
 // verdict is the outcome of checking a batch against a producer's sequence history.
 type verdict struct {
-	kind   verdictKind
-	offset int64 // for a duplicate: the batch's original base offset.
+	kind      verdictKind
+	offset    int64 // for a duplicate: the batch's original base offset.
+	timestamp int64 // for a duplicate: the batch's maximum timestamp, as stored.
 }
 
 type verdictKind int
@@ -180,7 +182,7 @@ func (pp *partitionProducers) check(pid int64, epoch int16, firstSeq, lastSeq in
 	// believed were written.
 	for _, b := range st.recent {
 		if b.firstSeq == firstSeq && b.lastSeq == lastSeq {
-			return verdict{kind: seqDuplicate, offset: b.baseOffset}
+			return verdict{kind: seqDuplicate, offset: b.baseOffset, timestamp: b.maxTimestamp}
 		}
 	}
 	if lastSeq < st.recent[0].firstSeq && firstSeq <= lastSeq {
@@ -191,13 +193,13 @@ func (pp *partitionProducers) check(pid int64, epoch int16, firstSeq, lastSeq in
 
 // record remembers an accepted batch's sequence range and assigned offset (caller
 // holds pp.mu).
-func (pp *partitionProducers) record(pid int64, epoch int16, firstSeq, lastSeq int32, baseOffset int64) {
+func (pp *partitionProducers) record(pid int64, epoch int16, firstSeq, lastSeq int32, baseOffset, maxTimestamp int64) {
 	st := pp.producers[pid]
 	if st == nil || epoch > st.epoch {
 		st = &producerSequence{epoch: epoch}
 		pp.producers[pid] = st
 	}
-	st.recent = append(st.recent, batchSeq{firstSeq, lastSeq, baseOffset})
+	st.recent = append(st.recent, batchSeq{firstSeq, lastSeq, baseOffset, maxTimestamp})
 	if len(st.recent) > maxTrackedBatches {
 		st.recent = st.recent[len(st.recent)-maxTrackedBatches:]
 	}

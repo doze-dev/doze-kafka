@@ -47,18 +47,27 @@ fsync-interval = "500ms"
 # KIP-848 group session timeout: evict a member after this long without a heartbeat.
 consumer-session-timeout = "45s"
 
+# How long a group's committed offsets are kept once nothing is reading them, as
+# Kafka's offsets.retention.minutes (7 days). "0s" keeps them for ever.
+offsets-retention = "168h"
+
 # --- topics --------------------------------------------------------------------
 
 auto-create-topics = true # create unknown topics on first reference.
+
+# Largest record batch a topic accepts unless it sets max.message.bytes, as Kafka's
+# message.max.bytes. A batch over it is refused MESSAGE_TOO_LARGE.
+message-max-bytes = 1048588
 default-partitions = 1    # partition count for auto-created topics.
 max-partitions = 1000     # most partitions one topic may have; each is a directory and open files.
 
 # --- console -------------------------------------------------------------------
 
 console = true                   # serve the web console.
-# console-addr = "127.0.0.1:9093" # unset: beside the broker on the name's address (9093), or 127.0.0.1:9093 under listen.
+# console-addr = "127.0.0.1:9093" # unset: beside the broker on the name's address (9093), or 127.0.0.1:9093 under listen (a free port when listen is on port 0).
 # console-prefix = "/_console"          # the URL path the console is served under.
 # console-allow-host = ["devbox.lan"] # extra Host names the console answers to.
+console-unprotected = false             # true: serve the console beyond loopback although SASL or TLS is on (it has no login).
 # trace-header = "x-request-id"         # a record header holding a trace id; the console follows it beside traceparent and B3.
 
 client-telemetry = true                 # accept the metrics clients push about themselves (KIP-714); the console shows them.
@@ -67,7 +76,8 @@ zone = true                              # join the shared .doze zone (names and
 # --- schema registry ----------------------------------------------------------
 
 schema-registry = true                  # serve the built-in Confluent-compatible schema registry.
-# schema-registry-addr = "127.0.0.1:8081" # unset: beside the broker on the name's address (8081), or 127.0.0.1:8081 under listen.
+# schema-registry-addr = "127.0.0.1:8081" # unset: beside the broker on the name's address (8081), or 127.0.0.1:8081 under listen (a free port when listen is on port 0).
+schema-registry-tls = true              # with [tls] set, serve the registry over https with the same certificate; false keeps it http.
 
 # --- process -------------------------------------------------------------------
 
@@ -97,8 +107,9 @@ log-format = "text"              # text or json.
 # alice = "s3cret"
 # bob   = "hunter2"
 
-# TLS encrypts the listener. Both cert and key are required together, and the
-# files must exist. TLS and SASL are independent — use either, both, or neither.
+# TLS encrypts the Kafka listener and the schema registry (not the console).
+# Both cert and key are required together, and the files must exist. TLS and
+# SASL are independent — use either, both, or neither.
 # [tls]
 # cert = "./certs/server.pem"
 # key  = "./certs/server-key.pem"

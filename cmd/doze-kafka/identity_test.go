@@ -31,13 +31,7 @@ func TestSecondIdentity(t *testing.T) {
 	if testing.Short() {
 		t.Skip("links the binary and boots it")
 	}
-	bin := filepath.Join(t.TempDir(), "doze-kafka")
-	if runtime.GOOS == "windows" {
-		bin += ".exe"
-	}
-	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
-		t.Fatalf("build: %v\n%s", err, out)
-	}
+	bin := binary(t)
 	cert, key := selfSigned(t)
 	dataDir := filepath.Join(t.TempDir(), "data dir with a space")
 	flags := []string{"--data-dir", dataDir, "--console-prefix", "/ops/kafka-ui",
@@ -72,7 +66,7 @@ func TestSecondIdentity(t *testing.T) {
 	}
 
 	for round := 1; round <= 2; round++ { // the second round is a restart over the same directory.
-		out, stop := startBinary(t, bin, flags...)
+		out, stop := startStoppable(t, bin, flags...)
 		waitFor(t, "the summary", func() bool { return strings.Contains(out.String(), "doze-kafka is up") })
 		text := out.String()
 		if !strings.Contains(text, "SASL SCRAM-SHA-512") || !strings.Contains(text, "TLS") || !strings.Contains(text, dataDir) {
@@ -128,10 +122,10 @@ func TestSecondIdentity(t *testing.T) {
 	}
 }
 
-// startBinary runs the built binary with the flags (on an address and free ports, as
+// startStoppable runs the built binary with the flags (on an address and free ports, as
 // start does for run()) and returns its stdout, and a stop that is Ctrl-C and the
 // exit status.
-func startBinary(t *testing.T, bin string, flags ...string) (out *safeBuf, stop func() error) {
+func startStoppable(t *testing.T, bin string, flags ...string) (out *safeBuf, stop func() error) {
 	t.Helper()
 	dir := t.TempDir()
 	args := append([]string{"--listen", "127.0.0.1:0", "--console-addr", "127.0.0.1:0", "--schema-registry-addr", "127.0.0.1:0"}, flags...)

@@ -33,10 +33,13 @@ everything under the current directory in `./data`: the partition logs, and
 ./doze-kafka
 ```
 
-You'll see it come up, with everything you need to connect:
+You'll see it come up, with everything you need to connect (the `time=` and `level=`
+lines are the log, on stderr; the block between them is the summary, on stdout):
 
 <!-- output: banner -->
 ```text
+time=2026-10-16T16:12:14.687+01:00 level=INFO msg=doze-kafka version=dev kafka_compat=4
+
   doze-kafka is up.
 
     kafka     kafka.project.doze:9092
@@ -47,16 +50,24 @@ You'll see it come up, with everything you need to connect:
 
     eval "$(doze-kafka env)" point this shell at it
     doze-kafka doctor        when something looks wrong
+
+time=2026-10-16T16:12:14.721+01:00 level=INFO msg=listening addr=127.0.0.2:9092
 ```
 
 The first time, if `.doze` names are not set up on the machine, it asks once
-(`Set it up now? [Y/n]`, one `sudo`, per machine rather than per project). With no
-terminal to ask on it prints the command to run and exits rather than waiting on a
-password. `doze-kafka --listen 127.0.0.1:9092` skips names entirely.
+(`Set it up now? [Y/n]`, one `sudo`, per machine rather than per project). It asks
+only when both its input and its error output are a terminal, and only Enter, `y` or
+`yes` runs `sudo`. Started any other way (a service manager, CI, `nohup`,
+`</dev/null`, a pipe) it prints the command to run and exits 1 rather than waiting
+on a password; it never runs `sudo` there. `doze-kafka --listen 127.0.0.1:9092` skips names entirely.
 
 That's it — there's a Kafka broker at that name, and a web console at the URL on the
-next line ([Console](console.md)). Run `eval "$(doze-kafka env)"` in the client
-terminal so the commands below find it. Leave it running in this terminal;
+next line ([Console](console.md)). Run the `eval "$(doze-kafka env ...)"` line the
+summary ends with, in the client terminal, so the commands below find it. By name it is
+`eval "$(doze-kafka env)"`, run in the project directory; under `--listen` the summary
+spells out the flags that give this broker's addresses (`env` reads only its own flags
+and `doze-kafka.toml`, not a running broker), for example
+`eval "$(doze-kafka env --listen 127.0.0.1:9092 --console-addr 127.0.0.1:9093 --schema-registry-addr 127.0.0.1:8081 --config '')"`. Leave it running in this terminal;
 open another for the client.
 
 ## Produce and consume

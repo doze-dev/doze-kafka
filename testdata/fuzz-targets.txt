@@ -31,6 +31,7 @@
 ./internal/storage/log FuzzDecompress
 ./internal/storage/log FuzzCheckRecords
 ./internal/storage/log FuzzScanLog
+./internal/storage/log FuzzCheckProduce
 # Stored ACL identity.
 ./internal/storage/meta FuzzACLKey
 # Pre-authentication bytes, ACL filters, topic config values, the group state machine.

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"html/template"
 	"io"
 	"net"
 	"net/http"
@@ -61,11 +60,7 @@ func (c *Console) fail(w http.ResponseWriter, r *http.Request, err error) {
 
 // refuse writes a Refusal as the small fragment for a control that failed.
 func (c *Console) refuse(w http.ResponseWriter, f Refusal) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(f.Status)
-	if err := c.templates().ExecuteTemplate(w, "refusal", f.data(nil)); err != nil {
-		io.WriteString(w, template.HTMLEscapeString(f.Message))
-	}
+	c.execute(w, f.Status, "refusal", f.data(nil), false)
 }
 
 // failResource is fail for a page about one named thing. When that thing does not
@@ -104,12 +99,8 @@ func (c *Console) renderError(w http.ResponseWriter, r *http.Request, f Refusal,
 	// Tells the client this is a page to show, not an error to toast: htmx does not
 	// swap a 4xx/5xx response unless told to (see the beforeSwap handler).
 	w.Header().Set("X-Doze-Page", "error")
-	w.WriteHeader(f.Status)
 	c.shellData(r, data)
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := c.templates().ExecuteTemplate(w, "error_page", data); err != nil {
-		io.WriteString(w, template.HTMLEscapeString(f.Message))
-	}
+	c.execute(w, f.Status, "error_page", data, true)
 }
 
 // suggest returns up to three existing names close to the one asked for: those

@@ -3,6 +3,7 @@ package console
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -62,13 +63,19 @@ type codecEntry struct {
 	at      time.Time
 }
 
-func newRegistryClient(base, user, pass string) *registryClient {
+func newRegistryClient(base, user, pass string, tlsCfg *tls.Config) *registryClient {
 	if base == "" {
 		return nil
 	}
+	hc := &http.Client{Timeout: 10 * time.Second}
+	if tlsCfg != nil {
+		tr := http.DefaultTransport.(*http.Transport).Clone()
+		tr.TLSClientConfig = tlsCfg
+		hc.Transport = tr
+	}
 	return &registryClient{
 		base: strings.TrimRight(base, "/"), user: user, pass: pass,
-		hc:     &http.Client{Timeout: 10 * time.Second},
+		hc:     hc,
 		codecs: map[int]*codecEntry{},
 	}
 }

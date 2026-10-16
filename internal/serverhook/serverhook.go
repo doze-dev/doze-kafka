@@ -20,6 +20,10 @@ var (
 	// New builds a *server.Server from a resolved config (internal/embed wraps it with
 	// the type). It is not part of the embedding API because config.Config is internal.
 	New func(cfg config.Config, logger *slog.Logger) (any, error)
+	// NewWithConsole builds a *server.Server from a server.Options (the argument) for a
+	// caller that will attach a console to it: the server keeps the traffic record and
+	// the client-metrics store, which server.New leaves out.
+	NewWithConsole func(opts any) (any, error)
 	// Traffic returns the server's request recorder, or nil when no console runs.
 	// The argument is a *server.Server.
 	Traffic func(srv any) *traffic.Recorder

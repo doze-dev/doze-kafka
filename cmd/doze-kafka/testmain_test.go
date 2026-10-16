@@ -33,5 +33,8 @@ func TestMain(m *testing.M) {
 	os.Setenv(names.EnvHome, home)
 	code := m.Run()
 	os.RemoveAll(home)
+	if binDir != "" {
+		os.RemoveAll(binDir)
+	}
 	os.Exit(code)
 }

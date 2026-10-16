@@ -7,7 +7,8 @@ belong.
 ## The inner loop
 
 ```sh
-go tool task check        # the gate: gofmt, go vet, Windows cross-vet, the whole suite with -race
+go tool task check        # the gate: gofmt, go vet, Windows cross-vet, the whole suite with -race, every benchmark once
+go tool task vuln         # govulncheck (needs the network); CI runs it on every push and daily
 go tool task test:unit    # ~seconds: storage, codec, handlers; no sockets (-short)
 go test ./internal/broker -run TestThing -count=1     # one test
 go tool task dev          # run the broker with the console read live from disk
@@ -114,7 +115,8 @@ front-end libraries are vendored (`console/static/VERSIONS`).
 Guards keep it consistent, and they fail with instructions: every template class
 must be styled, every `var(--x)` defined, font sizes come from the `--fs-*` tokens, and
 inline styles are on a ratchet (`console/cssguard_test.go`); every text colour holds
-4.5:1 on every surface in both themes (`TestThemeContrast`). Every GET route must render
+4.5:1 on every surface in all three themes, light, dark and high contrast
+(`TestEveryTextAndBackgroundPairHoldsItsContrastInAllThreeThemes`). Every GET route must render
 (also with the broker down) and every POST must refuse a foreign origin and fail with a
 4xx (`console/surfaces_test.go`); both read the route table from `console.go`, so a new
 route is covered automatically.

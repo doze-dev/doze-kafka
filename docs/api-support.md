@@ -76,7 +76,7 @@ the highest version both sides support; a request outside them is not served.
 | DescribeGroups | 15 | 0–1 | 0–3 | 0–5 | 0–5 |
 | ListGroups | 16 | 0–2 | 0–2 | 0–4 | 0–5 |
 | SASLHandshake | 17 | 1–1 | 1–1 | 1–1 | 1–1 | only when SASL is configured
-| ApiVersions | 18 | 0–1 | 0–2 | 0–3 | 0–3 |
+| ApiVersions | 18 | 0–1 | 0–2 | 0–3 | 0–4 |
 | CreateTopics | 19 | 0–2 | 0–3 | 0–7 | 0–7 |
 | DeleteTopics | 20 | 0–1 | 0–3 | 0–5 | 0–6 |
 | DeleteRecords | 21 | 0–0 | 0–1 | 0–2 | 0–2 |
@@ -223,9 +223,22 @@ configs) are listed in [Limitations](limitations.md), not here.
 
 ## Not implemented (by design)
 
-`OffsetForLeaderEpoch`, `DescribeLogDirs`, quota APIs, and
-the client-metrics/telemetry APIs. The broker serves exactly what it advertises: a
+`OffsetForLeaderEpoch`, `DescribeLogDirs`, the quota APIs, and the `CLIENT_METRICS`
+config resource (client telemetry itself, APIs 71 and 72, is implemented: see the
+table above). The broker serves exactly what it advertises: a
 request for an API it does not have, or at a version outside the advertised range,
-gets no response and its connection is closed, rather than being left to hang (the one
-exception is `ApiVersions` itself, where an unknown version is answered with the
-supported range, as Kafka does). See [Limitations](limitations.md).
+gets no response and its connection is closed, rather than being left to hang. See
+[Limitations](limitations.md).
+
+The one exception is `ApiVersions` itself, the request a client sends before it knows
+what the broker speaks. Both of its special answers are Apache Kafka's, recorded
+against 4.3.1 (`conformance/recordings/apiversions-*.json`):
+
+- **A version of `ApiVersions` that is not served** is answered in the v0 form with
+  `UNSUPPORTED_VERSION` and one row, the versions of `ApiVersions` itself (0 to 4 when
+  emulating Kafka 4). The client asks again at one of those and is given the list.
+- **A client software name or version Kafka does not take** (from v3: empty, or not
+  letters and digits with dots and dashes only between them) is answered
+  `INVALID_REQUEST` with no rows, and the connection stays open. Kafka refuses none for
+  its length; the broker keeps the first 128 bytes of a name and version, for the
+  Traffic page.

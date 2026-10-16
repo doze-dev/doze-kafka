@@ -12,12 +12,7 @@ func init() {
 	Scenarios = append(Scenarios,
 		Scenario{Name: "joingroup-session-timeout", Run: joinGroupSessionTimeout},
 		Scenario{Name: "produce-acks-zero", Run: produceAcksZero},
-		Scenario{Name: "produce-decompressed-size", Run: produceDecompressedSize, Known: []Known{
-			// A refusal's text is doze-kafka's own; Kafka's response carries none.
-			{Step: "keep-uncompressed-over", Path: "Topics[0].Partitions[0].ErrorMessage", Limitation: limMessages},
-			{Step: "keep-gzip-compressed-over", Path: "Topics[0].Partitions[0].ErrorMessage", Limitation: limMessages},
-			{Step: "plain-gzip-small-inflates-50k", Path: "Topics[0].Partitions[0].ErrorMessage", Limitation: limMessages},
-		}},
+		Scenario{Name: "produce-decompressed-size", Run: produceDecompressedSize},
 	)
 }
 

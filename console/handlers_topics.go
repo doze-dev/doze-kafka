@@ -902,11 +902,6 @@ func (c *Console) tapeData(ctx context.Context, topic, topicID string, partition
 	for i, v := range rows {
 		desc[len(rows)-1-i] = v
 	}
-	committedQ := ""
-	if committedOnly {
-		committedQ = "&committed=1"
-	}
-
 	return map[string]any{
 		"PartitionRange": partitionRange(partitionCount),
 		"Bounds":         bounds,
@@ -928,7 +923,6 @@ func (c *Console) tapeData(ctx context.Context, topic, topicID string, partition
 		"HL":             hl,
 		"HasTxn":         hasTxn,
 		"CommittedOnly":  committedOnly,
-		"CommittedQ":     committedQ,
 	}, nil
 }
 

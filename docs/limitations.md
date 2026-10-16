@@ -34,21 +34,30 @@ implement it.
   retry, it takes the log directory offline; doze-kafka does the same for the one
   partition, answering `KAFKA_STORAGE_ERROR` to every write (and every `acks=all`
   acknowledgement) until a restart, when recovery decides from what is really on disk.
-- **A compressed batch is looked inside only as far as a topic needs, and one that
-  inflates past 64 MiB is refused.** Kafka holds a produced batch to
-  `max.message.bytes` as it arrived (a batch of a few hundred bytes that inflates to
-  50 KB is accepted under a 2000 byte limit), and holds a topic with
-  `compression.type=uncompressed` to the size it inflates to; both are recorded
-  (`conformance/recordings/produce-decompressed-size.json`) and doze-kafka answers
-  `MESSAGE_TOO_LARGE` for the same cases. Kafka has no other bound on what a batch
-  inflates to; this broker, which holds the records of a batch to compact it, refuses a
-  batch that inflates past 64 MiB (or a zstd frame that declares a window past 8 MiB)
-  with the same `MESSAGE_TOO_LARGE`, wherever it has to look inside the batch (a
-  compacted topic, an uncompressed topic, a timestamp lookup). The look is a stream:
-  what is held is a window and a buffer, not the payload. Other topics store the batch
-  as it came, as Kafka does with `compression.type=producer`, and a topic whose
-  `compression.type` names a codec is not re-compressed on the way in, so the
-  re-compressed size Kafka checks is not what is checked here.
+- **Every produced batch is read whole before it is stored, as Kafka reads it, and
+  three kinds of batch Kafka stores are refused here.** Each partition's records must
+  be exactly one version 2 batch whose header, checksum, record count and every record
+  (through whatever codec it is compressed with) check out; what Kafka refuses is
+  refused with Kafka's code on every kind of topic and every Produce version, and
+  nothing refused is stored (recorded against `apache/kafka:4.3.1`:
+  `conformance/recordings/produce-validation.json`). A batch is held to
+  `max.message.bytes`, or the broker's `message.max.bytes` (`--message-max-bytes`,
+  Kafka's default of 1048588) when the topic sets none, as it arrived, and as the topic
+  stores it when the topic's `compression.type` is not the batch's. The read is one
+  streaming pass that holds a decompressor's window and a buffer, never the payload.
+  Stricter than Kafka, because this broker's readers (and every consumer) could not
+  read what Kafka keeps, or would have to allocate without bound to try:
+  a compressed record whose length disagrees with its own fields is INVALID_RECORD
+  (Kafka stores it on a topic that keeps the producer's codec, and the read-back in the
+  recording shows it cannot be consumed); a batch that inflates past 64 MiB is
+  MESSAGE_TOO_LARGE (Kafka accepted 65 MiB, 70 MiB and a single 70 MiB record on every
+  topic whose limit the compressed size is under:
+  `conformance/recordings/produce-inflated-size.json`); and a zstd frame declaring a
+  window past 8 MiB is MESSAGE_TOO_LARGE, because a decoder allocates the window it is
+  told before reading a byte (Kafka takes 16 MiB and 128 MiB, and refuses 256 MiB with
+  UNKNOWN_SERVER_ERROR as this does). A batch stored by an earlier version that cannot
+  be read is kept, and skipped by the readers that look inside (timestamp lookups and
+  the cleaner use its header), so such a log still opens and serves.
 - **A consumer-protocol member is asked to heartbeat every second**, where Kafka's
   `group.consumer.heartbeat.interval.ms` is 5 seconds: rebalances settle in a couple of
   seconds on a development machine instead of ten.
@@ -74,13 +83,27 @@ implement it.
   `group.min.session.timeout.ms` and `group.max.session.timeout.ms` do (recorded:
   `conformance/recordings/joingroup-session-timeout.json`). The bounds are not
   settable here; a broker run with different bounds would differ.
+- **A name longer than 4,096 bytes is refused.** A group id (`INVALID_GROUP_ID`), and a
+  group instance id, a rack id, a member id a client chose (4,160 bytes, so a static
+  member can come back with the id it was given), a protocol type or name, a subscribed
+  topic name or pattern, and a transactional id (`INVALID_REQUEST`). The first message
+  of a SCRAM login is held to 4,096 bytes too (`SASL_AUTHENTICATION_FAILED`). Kafka has
+  no such bounds: it takes a name as long as its request size allows (100 MB by
+  default). These names are kept, in memory and some on disk, for as long as the group,
+  the member or the transaction is, and a single request could otherwise leave a
+  megabyte behind in each; no client sends a name near the bound. A client id may be
+  32,767 bytes, the most its place in the request header can say, and a member's is
+  kept whole.
 
 ## Client telemetry and the Traffic page
 
 - **No `CLIENT_METRICS` resource.** Real Kafka subscribes a client (KIP-714) to nothing
   until an operator defines one and runs a plugin to take the metrics; the resource can be
-  set with `IncrementalAlterConfigs` and read back. Here the resource is not kept: the
-  setting round-trips nowhere and nothing is exported.
+  set with `IncrementalAlterConfigs` and read back. Here there is no such resource.
+  Setting one with `IncrementalAlterConfigs` is refused `INVALID_REQUEST` (Kafka answers
+  0; recorded as the first step of `conformance/recordings/telemetry-interval.json`),
+  a subscription therefore never changes under a client (what Kafka does when one
+  does is `telemetry-subscription-change.json`, evidence only), and nothing is exported.
 - **A subscription is the same for every client: the standard metric set, every five seconds, cumulative.**
   Kafka with nothing configured answers a client's subscription request with no metrics, an
   interval of five minutes and delta temporality, so that a client pushes nothing (recorded:
@@ -93,8 +116,15 @@ implement it.
   `ApiVersions` only when a broker plugin that implements `ClientTelemetry` is configured,
   and until then a client never subscribes (recorded:
   `conformance/recordings/client-telemetry.json`). The point of the page is that clients do.
+  A Kafka that does not advertise the two calls still answers them when they are sent;
+  a broker without a console closes the connection of a client that sends them, as it
+  does for any API it does not advertise (recorded:
+  `conformance/recordings/telemetry-no-console.json`). No client sends a call a broker
+  did not advertise, so this is seen only by a hand-written request.
 - **Answered as Kafka does, recorded.** A push before its interval has passed, a second
-  subscription request within it, the push after a terminating one, a push for an
+  subscription request within it, the pushes after a terminating one (every push is
+  refused while the push before it said it was terminating, whatever became of that
+  one), a push for an
   instance the broker has not seen (it is made, and a push that holds the subscription id
   it would have given is taken, which is what a client finds after a restart), a push from
   another connection or principal, an unsupported compression type, a payload over
@@ -105,6 +135,27 @@ implement it.
 - **Memory only.** The Traffic page keeps the last 2,000 requests and 200 events per
   group, and a restart empties it: it is the last few minutes of a laptop's traffic, not
   an audit log.
+
+## Listeners and security
+
+- **The console has no login, and TLS does not cover it.** `--tls-cert` and `--tls-key`
+  encrypt the Kafka listener and the schema registry; the console and `/healthz` stay
+  plain HTTP. `--sasl-mechanisms` makes Kafka clients log in and the registry ask for
+  the same users as HTTP basic authentication; the console asks for nothing and reaches
+  the broker as a super user of its own. It listens on loopback, and with SASL or TLS on
+  it refuses to start on any other address unless `--console-unprotected` is given.
+  See [What SASL and TLS cover](auth-and-tls.md#what-sasl-and-tls-cover).
+- **Under a fixed `--listen` the console and registry take fixed ports.** They are
+  `127.0.0.1:9093` and `127.0.0.1:8081` unless `--console-addr` and
+  `--schema-registry-addr` say otherwise, so two brokers each given their own
+  `--listen` port still collide there. A `--listen` on port 0 gives both free ports.
+- **`doze-kafka env` does not ask a running broker.** It prints what its own flags and
+  `doze-kafka.toml` describe. Under `--listen` the start-up summary prints the `env`
+  command, with flags, that gives that broker's addresses; a bare `doze-kafka env` is
+  right only by name, or when the file holds the same settings.
+- **The registry has users, not permissions.** With SASL on, any of the broker's users
+  can read and change every subject: ACLs are about Kafka resources and do not reach
+  the registry.
 
 ## Deliberately out of scope
 
@@ -157,7 +208,11 @@ implement it.
 - **Topic names that differ only in letter case are refused.** Kafka lets `Orders` and
   `orders` live side by side; here the second is `INVALID_TOPIC_EXCEPTION`, because
   partition directories are named after topics and the macOS and Windows file systems
-  do not tell the two apart. (Kafka's own rule, that `a.b` and `a_b` collide, applies too.)
+  do not tell the two apart, and that holds for two such names in one request as well.
+  (Kafka's own rule, that `a.b` and `a_b` collide, applies too, and as Kafka applies it:
+  a name is held against the topics that existed before the request, so `a.b` and `a_b`
+  sent in one `CreateTopics` request are both created. Recorded:
+  `conformance/recordings/createtopics-collisions.json`.)
 - **Validation messages are doze-kafka's own words.** For a refused topic name, partition
   count, topic config value and a broker config change, the error code is Kafka's and the
   `error_message` text is this broker's (it names what to do about it). A Produce batch

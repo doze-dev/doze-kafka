@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"strings"
 	"testing"
+	"time"
 )
 
 func hexBytes(t *testing.T, s string) []byte {
@@ -152,25 +153,52 @@ func TestDecodeRefusesWhatIsNotWireFormat(t *testing.T) {
 
 func FuzzDecode(f *testing.F) {
 	f.Add(hexString("000000000102"), []byte{0, 0, 0, 0, 1, 2})
+	// A block that claims 2^63-1 elements, one that claims -2^63, nulls by the million.
+	f.Add("", []byte{0, 0, 0, 0, 1, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01})
+	f.Add("", []byte{0, 0, 0, 0, 1, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01, 0, 0})
+	f.Add("", []byte{0, 0, 0, 0, 1, 0x80, 0x80, 0x80, 0x01, 0x80, 0x80, 0x80, 0x01, 0, 0})
 	f.Fuzz(func(t *testing.T, _ string, value []byte) {
 		for _, c := range fuzzCodecs {
+			// Whatever the bytes, a value is decoded or refused in the time and
+			// memory its size is worth: a hang or a blow-up here is the finding.
+			start := time.Now()
 			c.Decode(value)
+			if took := time.Since(start); took > 5*time.Second {
+				t.Fatalf("decoding %d bytes took %s", len(value), took)
+			}
 		}
 	})
 }
 
 func hexString(s string) string { return s }
 
+// fuzzAvroSchemas are the shapes the Avro decoder has to be kept from trusting: arrays
+// and maps (of things that weigh nothing, too), inside one another, a fixed, a schema
+// that refers to itself.
+var fuzzAvroSchemas = []string{
+	`{"type":"record","name":"R","fields":[{"name":"a","type":["null","string"]},{"name":"b","type":{"type":"array","items":"long"}}]}`,
+	`{"type":"record","name":"M","fields":[{"name":"m","type":{"type":"map","values":{"type":"array","items":"null"}}},{"name":"y","type":"bytes"}]}`,
+	`{"type":"array","items":{"type":"array","items":{"type":"record","name":"E","fields":[]}}}`,
+	`{"type":"record","name":"Tree","fields":[{"name":"v","type":{"type":"fixed","name":"F","size":3}},{"name":"kids","type":{"type":"array","items":"Tree"}},{"name":"next","type":["null","Tree"]}]}`,
+	`{"type":"map","values":{"type":"map","values":["null","double",{"type":"enum","name":"K","symbols":["A","B"]}]}}`,
+}
+
 var fuzzCodecs = func() []*Codec {
-	var out []*Codec
-	for _, x := range []struct{ typ, s string }{
-		{TypeAvro, `{"type":"record","name":"R","fields":[{"name":"a","type":["null","string"]},{"name":"b","type":{"type":"array","items":"long"}}]}`},
+	type schema struct{ typ, s string }
+	all := []schema{
 		{TypeProtobuf, `syntax = "proto3"; message A { int32 x = 1; repeated string s = 2; } message B { A a = 1; }`},
 		{TypeJSON, `{"type":"object"}`},
-	} {
-		if c, err := NewCodec(x.typ, x.s, nil); err == nil {
-			out = append(out, c)
+	}
+	for _, s := range fuzzAvroSchemas {
+		all = append(all, schema{TypeAvro, s})
+	}
+	var out []*Codec
+	for _, x := range all {
+		c, err := NewCodec(x.typ, x.s, nil)
+		if err != nil {
+			panic(err)
 		}
+		out = append(out, c)
 	}
 	return out
 }()

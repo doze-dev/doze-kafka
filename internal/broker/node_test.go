@@ -38,15 +38,12 @@ type node struct {
 	DataDir string
 	MetaDB  string
 
-	version   int
 	sub       bool
 	bin       string
 	fsync     string // -fsync-interval for a subprocess.
 	pprofAddr string
 	stderrLog string // where a subprocess's stderr goes, when it is kept.
 	env       []string
-	flags     []string
-	cfgEdit   func(*config.Config)
 
 	mu     sync.Mutex
 	stop   func()        // in-process: stops the running broker.
@@ -58,8 +55,8 @@ type node struct {
 
 type nodeOpt func(*node)
 
-// nodeVersion sets the Kafka major version the node emulates (default 4).
-func nodeVersion(v int) nodeOpt { return func(n *node) { n.version = v } }
+// nodeKafkaVersion is the Kafka major version every node emulates.
+const nodeKafkaVersion = 4
 
 // nodeSubprocess runs the built binary instead of the broker in this process.
 func nodeSubprocess() nodeOpt { return func(n *node) { n.sub = true } }
@@ -79,12 +76,6 @@ func nodeStderr(path string) nodeOpt { return func(n *node) { n.stderrLog = path
 // nodeEnv adds environment variables (KEY=VALUE) to a subprocess.
 func nodeEnv(kv ...string) nodeOpt { return func(n *node) { n.env = append(n.env, kv...) } }
 
-// nodeFlags adds command-line flags to a subprocess.
-func nodeFlags(f ...string) nodeOpt { return func(n *node) { n.flags = append(n.flags, f...) } }
-
-// nodeConfig edits the config of an in-process node before every start.
-func nodeConfig(f func(*config.Config)) nodeOpt { return func(n *node) { n.cfgEdit = f } }
-
 // nodeBinary uses an already built binary (subprocess nodes).
 func nodeBinary(bin string) nodeOpt { return func(n *node) { n.bin = bin } }
 
@@ -93,7 +84,7 @@ func nodeBinary(bin string) nodeOpt { return func(n *node) { n.bin = bin } }
 func startNode(t *testing.T, opts ...nodeOpt) *node {
 	t.Helper()
 	skipShort(t)
-	n := &node{t: t, version: 4, fsync: "200ms"}
+	n := &node{t: t, fsync: "200ms"}
 	for _, o := range opts {
 		o(n)
 	}
@@ -127,13 +118,10 @@ func (n *node) Start() {
 		n.launch()
 	} else {
 		cfg := config.Default()
-		cfg.Version = n.version
+		cfg.Version = nodeKafkaVersion
 		cfg.ListenAddr = n.Addr
 		cfg.DataDir = n.DataDir
 		cfg.MetaDB = n.MetaDB
-		if n.cfgEdit != nil {
-			n.cfgEdit(&cfg)
-		}
 		_, stop := boot(n.t, cfg)
 		n.mu.Lock()
 		n.stop = stop
@@ -146,15 +134,11 @@ func (n *node) Start() {
 
 func (n *node) launch() {
 	args := []string{"-listen", n.Addr, "-data-dir", n.DataDir, "-meta-db", n.MetaDB,
-		"-fsync-interval", n.fsync, "-kafka-version", strconv.Itoa(n.version), "-console=false",
-		// The registry's default address is a fixed port (8081): on a machine running
-		// anything else there the node exited at once ("address already in use") and
-		// the test failed dialling a broker that had never stayed up.
-		"-schema-registry=false"}
+		"-fsync-interval", n.fsync, "-kafka-version", strconv.Itoa(nodeKafkaVersion), "-console=false",
+		"-schema-registry=false"} // a crash test needs neither, and a fixed port taken by anything else on the machine would stop the broker starting
 	if n.pprofAddr != "" {
 		args = append(args, "-pprof-addr", n.pprofAddr)
 	}
-	args = append(args, n.flags...)
 	cmd := exec.Command(n.bin, args...)
 	cmd.Env = append(os.Environ(), n.env...)
 	cmd.Stdout = io.Discard

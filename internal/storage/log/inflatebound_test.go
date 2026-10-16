@@ -101,7 +101,7 @@ func TestCheckRecordsStopsAtTheCeilingForEveryCodecAndTheTopicLimit(t *testing.T
 	if err := CheckRecords(bombBatch(t, codecGzip, 0, 1000), RecordCheck{MaxStored: 2000}); err != nil {
 		t.Errorf("1 KB inflated under a 2000 byte topic: %v", err)
 	}
-	// An uncompressed batch is its own stored size: LargestBatch's business, not this.
+	// An uncompressed batch is its own stored size: the produce check's business (CheckProduce), not this.
 	if err := CheckRecords(makeBatch(1, EncodeRecords(sampleRecords()[:1])), RecordCheck{MaxStored: 10}); err != nil {
 		t.Errorf("an uncompressed batch: %v", err)
 	}
