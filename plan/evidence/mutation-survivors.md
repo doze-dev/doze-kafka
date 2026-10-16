@@ -19,6 +19,7 @@ that execute the line without failing.
 | `cmd/doze-kafka` | 303 | 201 | 45 | 21 | 3 | 33 | 0 | 69 | 102 | 30.9 s | 15 min | 3 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
 | `console` | 2283 | 1285 | 598 | 96 | 19 | 285 | 0 | 713 | 215 | 39.4 s | 126 min | 4 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
 | `internal/broker:admin` | 168 | 125 | 37 | 1 | 0 | 5 | 0 | 38 | 252 | 215.0 s | 51 min | 3 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
+| `internal/broker:auth` | 163 | 125 | 15 | 8 | 0 | 15 | 0 | 23 | 252 | 214.0 s | 15 min | 3 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
 | `internal/broker:data` | 350 | 213 | 102 | 25 | 5 | 5 | 0 | 132 | 252 | 213.5 s | 88 min | 3 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
 | `internal/broker:groups` | 576 | 386 | 131 | 18 | 7 | 34 | 0 | 156 | 252 | 248.6 s | 151 min | 3 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
 | `internal/config` | 206 | 197 | 4 | 0 | 0 | 5 | 0 | 4 | 24 | 0.5 s | 2 min | 3 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
@@ -29,7 +30,7 @@ that execute the line without failing.
 | `internal/telemetry` | 162 | 121 | 33 | 2 | 0 | 6 | 0 | 35 | 32 | 0.1 s | 37 s | 3 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
 | `internal/traffic` | 237 | 184 | 39 | 1 | 1 | 12 | 0 | 41 | 50 | 0.1 s | 3 min | 3 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
 | `schemaregistry` | 792 | 560 | 102 | 36 | 0 | 94 | 0 | 138 | 34 | 2.7 s | 14 min | 3 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
-| **all** | 6891 | 4412 | 1540 | 277 | 54 | 608 | 0 | 1871 | | | 504 min | | | | |
+| **all** | 7054 | 4537 | 1555 | 285 | 54 | 623 | 0 | 1894 | | | 519 min | | | | |
 
 ## cmd/doze-kafka
 
@@ -825,6 +826,37 @@ No test executes these lines. By declaration:
 No test executes these lines. By declaration:
 
 - `internal/broker/topics.go` `(*Broker).maybeAutoCreate`: 1 (lines 257)
+
+## internal/broker:auth
+
+### Lived (15)
+
+| Where | Change | Line | What lets it live |
+|---|---|---|---|
+| `internal/broker/acls.go:236:16` | < became <= | `return a.rt < b.rt` | *open:* no test puts the two sides equal and asserts which way the comparison goes; reached by TestACLsRoundTripWithFilters |
+| `internal/broker/acls.go:239:18` | < became <= | `return a.name < b.name` | *open:* no test puts the two sides equal and asserts which way the comparison goes; reached by TestCreateACLsRejectsEntriesThatAreNotConcrete, TestACLsRoundTripWithFilters |
+| `internal/broker/acls.go:235:11` | != became == | `if a.rt != b.rt {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestCreateACLsRejectsEntriesThatAreNotConcrete, TestACLsRoundTripWithFilters |
+| `internal/broker/acls.go:236:16` | < became >= | `return a.rt < b.rt` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestACLsRoundTripWithFilters |
+| `internal/broker/acls.go:238:13` | != became == | `if a.name != b.name {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestCreateACLsRejectsEntriesThatAreNotConcrete, TestACLsRoundTripWithFilters |
+| `internal/broker/acls.go:239:18` | < became >= | `return a.name < b.name` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestCreateACLsRejectsEntriesThatAreNotConcrete, TestACLsRoundTripWithFilters |
+| `internal/broker/authorizer.go:188:42` | == became != | `(acl.Operation == op \|\| acl.Operation == opAll) && principalMatches(acl.Principal, principal) && hostMatches(acl.Host, host) {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestIdempotentWriteIsImpliedByWritingSomewhere, TestDefaultDenyClosesWhatNoACLAllows |
+| `internal/broker/authorizer.go:83:58` | == became != | `return stored == opRead \|\| stored == opWrite \|\| stored == opDelete \|\| stored == opAlter` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestAuthorizerFollowsKafkasRules, TestCreatedACLsTakeEffect, TestDefaultDenyClosesWhatNoACLAllows (and 1 more) |
+| `internal/broker/authorizer.go:83:80` | == became != | `return stored == opRead \|\| stored == opWrite \|\| stored == opDelete \|\| stored == opAlter` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestAuthorizerFollowsKafkasRules, TestCreatedACLsTakeEffect, TestDefaultDenyClosesWhatNoACLAllows (and 1 more) |
+| `internal/broker/broker.go:273:45` | > became >= | `if t, ok := a.(*net.TCPAddr); ok && t.Port > 0 {` | *open:* no test puts the two sides equal and asserts which way the comparison goes; reached by TestCreateACLsRejectsEntriesThatAreNotConcrete, TestACLsRoundTripWithFilters, TestACLsPersistAndAreEnforcedAfterARestart (and 173 more) |
+| `internal/broker/broker.go:285:32` | > became >= | `if p := b.boundPort.Load(); p > 0 {` | *open:* no test puts the two sides equal and asserts which way the comparison goes; reached by TestACLsPersistAndAreEnforcedAfterARestart, TestMetadataBelowV4AutoCreates, TestListOffsetsV0ReturnsAnOffset (and 133 more) |
+| `internal/broker/scram.go:95:13` | > became >= | `if len(in) > maxSCRAMFirstBytes {` | *open:* no test puts the two sides equal and asserts which way the comparison goes; reached by TestAuth_ScramSHA256RoundTrip, TestAuth_ScramSHA512RoundTrip, TestAuth_WrongPasswordRejected (and 4 more) |
+| `internal/broker/scram.go:103:8` | < became <= | `if i1 < 0 {` | *open:* no test puts the two sides equal and asserts which way the comparison goes; reached by TestAuth_ScramSHA256RoundTrip, TestAuth_ScramSHA512RoundTrip, TestAuth_WrongPasswordRejected (and 3 more) |
+| `internal/broker/scram.go:114:41` | != became == | `if flag := s[:i1]; flag != "n" && flag != "y" {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestAuth_ScramSHA256RoundTrip, TestAuth_ScramSHA512RoundTrip, TestAuth_WrongPasswordRejected (and 3 more) |
+| `internal/broker/scram.go:211:16` | >= became > | `if len(part) >= 2 && part[1] == '=' {` | *open:* no test puts the two sides equal and asserts which way the comparison goes; reached by TestAuth_ScramSHA256RoundTrip, TestAuth_ScramSHA512RoundTrip, TestAuth_WrongPasswordRejected (and 4 more) |
+
+### Not covered (8)
+
+No test executes these lines. By declaration:
+
+- `internal/broker/acls.go` `(*Broker).handleDeleteACLs`: 1 (lines 302)
+- `internal/broker/acls.go` `(*Broker).handleDescribeACLs`: 2 (lines 241)
+- `internal/broker/broker.go` `(*Broker).advertisedPort`: 4 (lines 289, 288, 289)
+- `internal/broker/broker.go` `(*Broker).storageFaultError`: 1 (lines 246)
 
 ## internal/broker:data
 
