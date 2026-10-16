@@ -19,15 +19,34 @@ implement it.
   caveat on volatile-cache hardware); with `acks=1` a power loss can lose the last
   sub-second (see [storage & durability](storage-and-durability.md)). But a lost
   *disk* is a lost broker either way — there is no replica.
-- **A failed disk refuses writes; it does not take the broker down.** When the data
-  directory's disk is full or failing, every request that writes answers
-  `KAFKA_STORAGE_ERROR` (retriable), as Apache Kafka does (recorded against
-  `apache/kafka:4.3.1`: `conformance/recordings/full-disk.json`), at `acks=1` and at
-  `acks=all`; at `acks=0`, which has no response to carry it, the connection is closed.
-  Reads, Metadata and group traffic keep working, and freeing space lets writes resume
-  without a restart. Kafka goes further: with its only log directory failed the broker
-  shuts down within a minute (the recordings' last step, `broker-after-the-refusal`); this one stays
-  up, which is kinder to a development machine and not what a production broker does.
+- **A failed disk refuses writes; it does not take the broker down.** What each write
+  API answers when the data volume has no room is recorded against `apache/kafka:4.3.1`
+  (`conformance/recordings/full-disk*.json`, one broker per API) and replayed against
+  doze-kafka with the fault seam standing in for the volume
+  (`go test -tags faultinject ./conformance -run TestReplayFullDisk`). Produce answers
+  `KAFKA_STORAGE_ERROR` at `acks=1` and at `acks=all`, with no offsets and no message,
+  as Kafka does; at `acks=0`, which has no response to carry it, the connection is
+  closed. OffsetCommit, InitProducerId with a transactional id, AddPartitionsToTxn,
+  AddOffsetsToTxn, TxnOffsetCommit and EndTxn answer `NOT_COORDINATOR`, as Kafka does
+  when the append to its offsets or transaction log fails: the client looks the
+  coordinator up again and retries. Reads, Metadata and group traffic keep working, and
+  freeing space lets writes resume without a restart. Where this differs from the
+  recordings:
+  - Kafka goes further: with its only log directory failed the broker shuts down (each
+    recording's last step finds it gone); this one stays up, which is kinder to a
+    development machine and not what a production broker does.
+  - CreateTopics, DeleteTopics, CreatePartitions, IncrementalAlterConfigs and
+    DeleteRecords answer `KAFKA_STORAGE_ERROR`. Kafka answered them with success in the
+    recordings because its controller keeps the cluster metadata in a log of its own,
+    which the recordings had to put on another volume (on the full one the broker shut
+    down before it answered anything); this broker keeps its topic registry, and the log
+    start a DeleteRecords moves, on the data volume, so a full one refuses them.
+  - DeleteGroups and OffsetDelete answer `KAFKA_STORAGE_ERROR` where Kafka answers
+    `NOT_COORDINATOR`, and a consumer-protocol join (ConsumerGroupHeartbeat), which this
+    broker keeps in memory and does not write, succeeds where Kafka answers
+    `NOT_COORDINATOR`.
+  - Metadata that would create a topic answers `UNKNOWN_TOPIC_OR_PARTITION`, as Kafka
+    does.
 - **After a failed `fsync` the partition refuses writes until the broker restarts.**
   On Linux a failed `fsync` can drop the unflushed pages and clear the error, so a
   retry that "succeeds" proves nothing about the bytes that were lost. Kafka does not

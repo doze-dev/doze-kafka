@@ -83,7 +83,7 @@ func TestDeleteBeforeSurvivesReopeningAndIsInTheClosedBounds(t *testing.T) {
 	end := p.LogEndOffset()
 	p.close()
 
-	if s, e, err := boundsFromDisk(dir); err != nil || s != 5 || e != end {
+	if s, e, err := boundsFromDisk(dir, true); err != nil || s != 5 || e != end {
 		t.Errorf("closed bounds = %d..%d, %v, want 5..%d", s, e, err, end)
 	}
 	p = openSmall(t, dir)

@@ -241,6 +241,19 @@ func (b *Broker) storageFault(op string, err error, attrs ...any) int16 {
 	return kerr.UnknownServerError.Code
 }
 
+// coordinatorFault is storageFault for a write of the group coordinator's own
+// state (a committed offset). Apache Kafka keeps that state in a log, and when the
+// append to it fails the client is told NOT_COORDINATOR, not KAFKA_STORAGE_ERROR
+// (recorded: full-disk-offset-commit, on a volume with no room): it looks the
+// coordinator up again and retries, where a consumer that is handed
+// KAFKA_STORAGE_ERROR on a commit has no rule for it.
+func (b *Broker) coordinatorFault(op string, err error, attrs ...any) int16 {
+	if b.storageFault(op, err, attrs...) == kerr.KafkaStorageError.Code {
+		return kerr.NotCoordinator.Code
+	}
+	return kerr.UnknownServerError.Code
+}
+
 // storageFaultError is storageFault for the handlers that answer with a *kerr.Error.
 func (b *Broker) storageFaultError(op string, err error, attrs ...any) *kerr.Error {
 	if b.storageFault(op, err, attrs...) == kerr.KafkaStorageError.Code {

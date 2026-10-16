@@ -147,6 +147,8 @@ tasks:
     desc: 'Replay the recorded Apache Kafka scenarios (conformance/recordings) against doze-kafka; no Docker'
     cmds:
       - go test ./conformance -count=1 -v -run 'TestReplay|TestKnown'
+      # The full-volume scenarios, with the fault seam standing in for the volume.
+      - go test -tags faultinject ./conformance -count=1 -v -run TestReplayFullDisk
 
   conformance:record:
     desc: 'Record the scenarios against apache/kafka:4.3.1 in Docker and rewrite conformance/recordings. One scenario: task conformance:record -- -only=listoffsets'

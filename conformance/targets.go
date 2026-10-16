@@ -168,6 +168,11 @@ func startKafka(image string, diskMiB int, extra []string, probeUser, probePass 
 	}
 	// A later -e of the same name wins, so a scenario's settings replace the defaults.
 	for _, kv := range extra {
+		// A scenario that adds a listener of its own has to have it advertised too,
+		// and the advertised list carries the port chosen above.
+		if strings.HasPrefix(kv, "KAFKA_LISTENERS=") && strings.Contains(kv, "INTERNAL://") {
+			args = append(args, "-e", fmt.Sprintf("KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:%d,INTERNAL://localhost:9094", port))
+		}
 		args = append(args, "-e", kv)
 	}
 	for _, m := range mounts {
@@ -210,6 +215,13 @@ func (t *dockerTarget) Restart() error {
 		return fmt.Errorf("docker restart: %v: %s", err, out)
 	}
 	return t.wait()
+}
+
+// Exec runs a command in the broker's container (Execer): a script fills the
+// volume the log directory is on from beside the broker.
+func (t *dockerTarget) Exec(args ...string) (string, error) {
+	out, err := exec.Command("docker", append([]string{"exec", "-u", "root", t.name}, args...)...).CombinedOutput()
+	return string(out), err
 }
 
 func (t *dockerTarget) Close() { exec.Command("docker", "rm", "-f", t.name).Run() }

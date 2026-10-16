@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
@@ -194,8 +193,10 @@ func TestProduceFsyncFailureIsReportedNotAcknowledged(t *testing.T) {
 	if p.ErrorCode != kerr.KafkaStorageError.Code {
 		t.Fatalf("acks=all with a failing fsync: error code %d, want KAFKA_STORAGE_ERROR (%d)", p.ErrorCode, kerr.KafkaStorageError.Code)
 	}
-	if p.ErrorMessage == nil || !strings.Contains(*p.ErrorMessage, "input/output error") {
-		t.Errorf("the failure should say why, got %v", p.ErrorMessage)
+	// As Kafka answers it (recorded: full-disk): no offsets and no message; the
+	// cause is in the broker's log.
+	if p.ErrorMessage != nil || p.BaseOffset != -1 || p.LogStartOffset != -1 {
+		t.Errorf("the refusal: message %v, base offset %d, log start %d; want nil, -1, -1", p.ErrorMessage, p.BaseOffset, p.LogStartOffset)
 	}
 
 	// acks=1 never promised durability, so it must not fail on a sync it never makes.

@@ -16,10 +16,18 @@ import (
 // The points. (The packages that hit them spell the names out, because they
 // must compile without this package.)
 const (
-	LogWrite  = "log.write"
-	LogSync   = "log.sync"
-	LogFsync  = "log.fsync"
-	MetaWrite = "meta.write"
+	LogWrite     = "log.write"
+	LogSync      = "log.sync"
+	LogFsync     = "log.fsync"
+	LogDirSync   = "log.dirsync"
+	LogRename    = "log.rename"
+	LogCreate    = "log.create"
+	LogRemove    = "log.remove"
+	LogTruncate  = "log.truncate"
+	LogMkdir     = "log.mkdir"
+	LogFileWrite = "log.file.write"
+	LogRead      = "log.read"
+	MetaWrite    = "meta.write"
 )
 
 // Fault is what a point does when it is hit.

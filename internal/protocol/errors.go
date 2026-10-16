@@ -128,6 +128,7 @@ var errorTable = []errorRow{
 	// The broker.
 	{kerr.UnknownServerError, ClassFailed, "The broker failed in a way it has no name for.", "Look at the broker's log at this time."},
 	{kerr.KafkaStorageError, ClassFailed, "The broker could not write or read its data directory. A write refused with this may already be in the log: when the sync after the append failed, a consumer can read the batch although the producer was told no offset.", "A retry of a non-idempotent producer can store it twice. Check the disk: space, permissions, a lock. The Cluster page shows the data directory."},
+	{kerr.NotCoordinator, ClassFailed, "The coordinator could not write its state (a full or failing disk), and answers as Kafka does when the append to its offsets or transaction log fails: look the coordinator up again and retry.", "Retry; free space on the data directory's disk if it persists."},
 	{kerr.CoordinatorNotAvailable, ClassFailed, "The group or transaction coordinator is not ready.", "Retry; if it persists, check the broker's log."},
 	{kerr.UnsupportedVersion, ClassNotImplemented, "The client asked for a version of an API this broker does not offer.", "Use a client that negotiates versions with ApiVersions, or a newer broker profile."},
 	{kerr.UnsupportedCompressionType, ClassNotImplemented, "A compression type this broker does not take for this purpose.", "Use gzip, snappy, lz4, zstd or none."},

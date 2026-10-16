@@ -111,7 +111,7 @@ func (p *Partition) ensureTxn() error {
 		return nil
 	}
 	p.txn = txnState{ongoing: map[int64]int64{}}
-	if _, err := os.Stat(filepath.Join(p.dir, txnMarkerFile)); err == nil {
+	if hasTxnMarker(p.dir) {
 		for _, s := range p.segments {
 			for pos := int64(0); pos+batchFullHeaderBytes <= s.sizeBytes; {
 				// A control batch's one record follows the header; a data batch's
@@ -152,25 +152,42 @@ func (t *txnState) dropBelow(start int64) {
 }
 
 // markTransactional records, durably, that this partition holds transactional
-// batches, so that a later open knows to scan for them.
+// batches, so that a later open knows to scan for them. It must be on disk before
+// the first such batch is in the log: without the file a restart builds no
+// transaction state, and a read-committed consumer is handed the records of
+// open and aborted transactions as if they had committed.
+//
+// The file is empty: its name is the mark, so what has to reach the disk is the
+// directory entry, and flushing the file itself would flush nothing. "On disk" is
+// something this process has to have seen to: a file that is merely there may be
+// left from an attempt whose directory flush failed, or from a process that was
+// killed before it flushed, so the first transactional append after every open
+// flushes the directory unless the partition was vouched for. The caller holds mu.
 func (p *Partition) markTransactional() error {
-	path := filepath.Join(p.dir, txnMarkerFile)
-	if _, err := os.Stat(path); err == nil {
+	if p.txnMarked {
 		return nil
 	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o644)
+	f, created, err := fsOpenFile(filepath.Join(p.dir, txnMarkerFile), os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
-		return err
-	}
-	if err := f.Sync(); err != nil {
-		f.Close()
 		return err
 	}
 	if err := f.Close(); err != nil {
 		return err
 	}
-	syncDir(p.dir)
+	if created {
+		p.dirSeq++
+	}
+	if err := p.syncDirLocked(); err != nil {
+		return err
+	}
+	p.txnMarked = true
 	return nil
+}
+
+// hasTxnMarker reports whether the partition has ever held a transactional batch.
+func hasTxnMarker(dir string) bool {
+	_, err := os.Stat(filepath.Join(dir, txnMarkerFile))
+	return err == nil
 }
 
 // LastStableOffset is the offset below which every transaction has been decided: the

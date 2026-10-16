@@ -313,6 +313,18 @@ here that contains "server API"; `task api` fails without it.
   `doctor`, `--help`, `config print`, and a restart over the same data; a surface it did
   not reach fails it.
 
+- Durability: an idempotent `acks=all` retry after the broker was killed and restarted
+  is fsynced before it is acknowledged, and a roll after a restart flushes the segment
+  it seals; after an unclean stop nothing read back is taken to be on disk until it has
+  been flushed (a clean stop writes `data/clean-shutdown`). EndTxn is answered only
+  with every marker on disk, and the opposite decision of a decided transaction is
+  answered as Kafka answers it (`CONCURRENT_TRANSACTIONS`, then `INVALID_TXN_STATE`)
+  instead of being acknowledged. On a full or failing disk OffsetCommit and the
+  transaction APIs answer `NOT_COORDINATOR`, as Kafka does, and a refused Produce
+  answers -1 offsets and no message. A cleaning pass that fails part-way leaves the log
+  readable without a restart. A multi-batch produce whose write fails part-way leaves
+  nothing in the log.
+
 - Console: every button reads weight 400 whether it is a button or a link drawn as one (the
   boards draw them all as buttons). A request that took under a millisecond shows its
   measured time (`42 µs`, `0.4 ms`) rather than the design boards' `0 ms`: a broker
