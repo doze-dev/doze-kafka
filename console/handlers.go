@@ -114,8 +114,21 @@ func (c *Console) apiPalette(w http.ResponseWriter, r *http.Request) {
 	if c.reg != nil {
 		out = append(out, paletteEntry{S: "schemas", N: "Register schema", U: newSchemaPath(c.prefix), K: "action"})
 		if subjects, err := c.reg.Subjects(ctx); err == nil {
+			// Sy-05: "Avro · v1-3 · BACKWARD", the versions it has and the level in force.
+			// Each takes the registry a request or two, so they are told only where it
+			// holds a few subjects (as a group's lag is): the palette is opened often.
+			few := len(subjects) <= 25
 			for _, s := range subjects {
-				out = append(out, paletteEntry{S: "schemas", N: s.Name, U: c.schemaURL(s.Name), K: "schema", D: fmt.Sprintf("%s · v%d", s.TypeLabel, s.Latest)})
+				d := fmt.Sprintf("%s · v%d", s.TypeLabel, s.Latest)
+				if few {
+					if vs, err := c.reg.Versions(ctx, s.Name); err == nil && len(vs) > 1 {
+						d = fmt.Sprintf("%s · v%d-%d", s.TypeLabel, vs[0], vs[len(vs)-1])
+					}
+					if level, _, err := c.reg.Compat(ctx, s.Name); err == nil && level != "" {
+						d += " · " + level
+					}
+				}
+				out = append(out, paletteEntry{S: "schemas", N: s.Name, U: c.schemaURL(s.Name), K: "schema", D: d})
 			}
 		}
 	}
