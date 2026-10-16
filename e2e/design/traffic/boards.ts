@@ -21,6 +21,7 @@ export type Board = {
   phase?: 'empty' | 'traffic' | 'lost';
 };
 
+const listened = new WeakSet<Page>();
 const M = '.app > .body > main';
 const I = '.app > .body > .insp';
 const L = '#detail';
@@ -295,12 +296,13 @@ export const BOARDS: Board[] = [
     id: 'Traf-08', file: 'Traf-08-Paused',
     state: async (page, base, ledger) => {
       polls.length = 0;
-      page.on('request', (r) => {
+      if (!listened.has(page)) page.on('request', (r) => {
         if (!r.url().includes('/traffic/new')) return;
         const q: { sent: number; got?: number; n: number; atLeast: boolean } = { sent: Date.now(), n: NaN, atLeast: false };
         r.response().then(async (res) => { const j = await res?.json(); q.n = j?.n; q.atLeast = !!j?.atLeast; q.got = Date.now(); }).catch(() => {});
         polls.push(q);
       });
+      listened.add(page);
       await page.goto(`${base}traffic`);
       await openRow(page, ledger, 'depot-router', 'OffsetCommit', false);
       await page.locator('#detail .h1').click();

@@ -90,30 +90,21 @@ test.afterAll(async () => {
 // the filter's "N of M" are drawn when the page is, the rest on each poll), so a poll that
 // lands between the render and the read puts parts of two renders in one reading. The
 // poll is answered "nothing changed" (204, the console's own answer when the hash is the
-// same) until the gate asks for a render of its own (rerender). A page that is to lose the
+// same); a new render is the page opened again (readSettled). A page that is to lose the
 // broker (Traf-10) keeps polling: that is how it finds out.
-const thawed = new WeakSet<Page>();
 async function livePage(theme: Theme, width: number, frozen = true): Promise<Page> {
   const ctx = await browser.newContext({ viewport: { width, height: 900 }, colorScheme: theme });
   const page = await ctx.newPage();
-  if (frozen) await page.route(/\/traffic\/live(\?|$)/, (route) => (thawed.has(page) ? route.continue() : route.fulfill({ status: 204 })));
+  if (frozen) await page.route(/\/traffic\/live(\?|$)/, (route) => route.fulfill({ status: 204 }));
   return page;
-}
-
-/** Lets the page's next poll through and waits for the render it brings. */
-async function rerender(page: Page) {
-  const hash = await page.locator('#traffic-live').getAttribute('data-hash').catch(() => null);
-  thawed.add(page);
-  await page.waitForFunction((h) => { const el = document.getElementById('traffic-live'); return !el || el.getAttribute('data-hash') !== h; }, hash, { timeout: 8000 }).catch(() => {});
-  thawed.delete(page);
 }
 
 // Reads the page and checks its data against the ledger. A count the ledger cannot settle
 // (a request began within a few milliseconds of an edge of the window counted) is read
-// again on a render of the page's own, and one that passed on a render is not asked of
+// again on a render of the page's own (the board's state, made again), and one that passed on a render is not asked of
 // the next; a count that differs from a ledger that has no doubt about it on three renders
 // in a row is the page's, and so is any other difference.
-async function readSettled(page: Page, board: Board, sels: string[], frozen: boolean) {
+async function readSettled(page: Page, board: Board, sels: string[], renew?: () => Promise<void>) {
   const truthSels = board.truths.flatMap((t) => TRUTHS[t].sels);
   const strikes = new Map<string, number>();
   const failed = new Set<string>();
@@ -147,7 +138,7 @@ async function readSettled(page: Page, board: Board, sels: string[], frozen: boo
     }
     if (!again && !waiting.length) return { snap, problems };
     last = again || waiting.map((e) => e.msg).join('; ');
-    if (waiting.length && frozen) await rerender(page);
+    if (waiting.length && renew) await renew();
     else await page.waitForTimeout(700);
   }
   throw new Error(`${board.id}: the page could not be read off an edge in 30 tries (${last})`);
@@ -176,7 +167,11 @@ test('the Traffic pages are the boards, element by element, at 1440 in light and
         // Lost: the page has noticed (its first poll after the stop failed).
         if (want === 'lost') await page.locator('html[data-connection-lost]').waitFor({ timeout: 15_000 });
         await page.waitForTimeout(600);
-        const { snap, problems } = await readSettled(page, board, sels.live, want !== 'lost');
+        const { snap, problems } = await readSettled(page, board, sels.live, want === 'lost' ? undefined : async () => {
+          await board.state(page, base, ledger);
+          await page.evaluate(() => document.fonts.ready);
+          await page.waitForTimeout(300);
+        });
         await page.context().close();
 
         const where = { board: board.id, theme, width };
