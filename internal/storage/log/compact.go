@@ -145,6 +145,9 @@ type CleanResult struct {
 	// Complete is false when the key map filled before the end of the sealed log, so
 	// more of it is left for the next pass.
 	Complete bool
+	// Unreadable is how many batches the pass kept as they were because their records
+	// cannot be read (a log written before produce read every record).
+	Unreadable int64
 }
 
 const (
@@ -248,7 +251,11 @@ func keysOf(s *Segment, aborted abortedSet) (map[uint64]int64, error) {
 		}
 		recs, err := DecodeRecords(batch)
 		if err != nil {
-			return err
+			// A batch that cannot be read (a log from before produce read every
+			// record can hold one): its keys are not known, so it replaces nothing,
+			// and cleanSegment keeps it as it is. One such batch used to stop the
+			// partition from ever being cleaned again.
+			return nil
 		}
 		for _, r := range recs {
 			if r.Key != nil {
@@ -367,6 +374,7 @@ func (p *Partition) Compact(pol CompactionPolicy, now time.Time) (CleanResult, e
 		p.forgetAborted(stats.droppedMarkers)
 		res.RecordsRemoved += stats.records
 		res.MarkersRemoved += stats.markers
+		res.Unreadable += stats.unreadable
 		switch {
 		case stats.removedFile:
 			res.SegmentsRemoved++
@@ -433,6 +441,7 @@ type segmentStats struct {
 	// droppedMarkers are the offsets of the markers this segment lost.
 	droppedMarkers   []int64
 	records, markers int64
+	unreadable       int64 // batches kept as they were: their records cannot be read.
 	bytesAfter       int64
 	rewritten        bool
 	removedFile      bool
@@ -477,7 +486,13 @@ func (p *Partition) rewriteSegment(s *Segment, first bool, c rewriteCtx) (segmen
 		default:
 			recs, err := DecodeRecords(batch)
 			if err != nil {
-				return err
+				// Unreadable: kept whole, where it is (see keysOf).
+				stats.unreadable++
+				out = batch
+				if attrs&batchTransactionalBit != 0 {
+					c.retained[pid]++ // its transaction's marker stays with it.
+				}
+				break
 			}
 			transactional := attrs&batchTransactionalBit != 0
 			abortedBatch := transactional && c.aborted.covers(pid, info.baseOffset)

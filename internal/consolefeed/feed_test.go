@@ -1,4 +1,4 @@
-package main
+package consolefeed
 
 import (
 	"testing"
@@ -37,7 +37,7 @@ func TestTheConsoleSeesWhatTheRecorderHolds(t *testing.T) {
 	rec.GroupEvent("g", "rebalance", "m", 1, "a member joined", 1, "a member joined")
 	rec.GroupEvent("g", "generation", "m", 2, "1 member", 1, "")
 
-	src := trafficFor(rec)
+	src := Traffic(rec)
 	evs := src.Events(console.TrafficFilter{}, 0)
 	if len(evs) != 2 {
 		t.Fatalf("%d rows", len(evs))
@@ -95,7 +95,7 @@ func TestClientMetricsAreMappedWithTheirConnection(t *testing.T) {
 		Resource: map[string]string{"k": "v"},
 		Metrics:  []telemetry.Metric{{Name: "org.apache.kafka.producer.x", Kind: telemetry.Gauge, Points: []telemetry.Point{{Time: time.Now(), Value: 2}}}},
 	}, false)
-	src := clientMetricsFor(store)
+	src := ClientMetrics(store)
 	all := src.Instances()
 	if len(all) != 1 || all[0].Conn != 7 || len(all[0].Series) != 1 || all[0].Series[0].Samples[0].V != 2 || all[0].Resource["k"] != "v" {
 		t.Fatalf("instances = %+v", all)
@@ -118,5 +118,16 @@ func TestClientMetricsAreMappedWithTheirConnection(t *testing.T) {
 	}
 	if _, ok := by.ByID("00000000-0000-0000-0000-000000000000"); ok {
 		t.Error("an unknown id found an instance")
+	}
+}
+
+// With no recorder and no store there is nothing to show, and the console is given
+// nil for each: it then leaves the Traffic section out.
+func TestNothingToFeedIsNil(t *testing.T) {
+	if Traffic(nil) != nil {
+		t.Error("a server with no recorder offers a traffic source")
+	}
+	if ClientMetrics(nil) != nil {
+		t.Error("a server with no store offers client metrics")
 	}
 }

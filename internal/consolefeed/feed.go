@@ -1,4 +1,9 @@
-package main
+// Package consolefeed is what a console is given to show a broker's traffic and its
+// clients' own metrics: the recorder and the telemetry store of a server.Server, as
+// the console's types. The console is a client of the broker and does not import its
+// internals; whoever starts one beside a broker in the same process (the doze-kafka
+// command, and the doze module's embedded broker) joins the two with this.
+package consolefeed
 
 import (
 	"encoding/hex"
@@ -20,9 +25,9 @@ type trafficSource struct {
 	started time.Time
 }
 
-// trafficFor is the console's view of the recorder, or nil when there is none (a
+// Traffic is the console's view of the recorder, or nil when there is none (a
 // server without a console keeps no record).
-func trafficFor(rec *traffic.Recorder) console.TrafficSource {
+func Traffic(rec *traffic.Recorder) console.TrafficSource {
 	if rec == nil {
 		return nil
 	}
@@ -150,8 +155,8 @@ func (s trafficSource) Story(group string) console.TrafficStory {
 // clientMetricsSource gives the console what clients have reported about themselves.
 type clientMetricsSource struct{ store *telemetry.Store }
 
-// clientMetricsFor is the console's view of the store, or nil when client telemetry is off.
-func clientMetricsFor(store *telemetry.Store) console.ClientMetricsSource {
+// ClientMetrics is the console's view of the store, or nil when client telemetry is off.
+func ClientMetrics(store *telemetry.Store) console.ClientMetricsSource {
 	if store == nil {
 		return nil
 	}

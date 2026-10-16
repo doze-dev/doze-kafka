@@ -97,7 +97,9 @@ again, run a Confluent registry beside doze-kafka and
 
 How each type is compared:
 
-- **Avro** with the resolution rules of the Avro specification (`hamba/avro`), which agree
+- **Avro** with the resolution rules of the Avro specification (`hamba/avro`; see
+  [Avro payloads and the decoder](#avro-payloads-and-the-decoder) for what is done about
+  its open advisories), which agree
   with Confluent's on every recorded pair.
 - **JSON Schema** by Confluent's own method: not a proof about documents but a keyword by
   keyword comparison that names each change ("maxLength decreased", "property added to an
@@ -122,6 +124,43 @@ Deliberately, and each is pinned by a test:
 | Protobuf a parser would reject | its parser is lenient: an `extend` of a type that was never imported, a method named like a message | rejected as invalid (422) |
 | Verbose compatibility reasons | its checker's wording | the same shape; the three trailing lines (`oldSchemaVersion`, `oldSchema`, `validateFields`/`compatibility`) are identical, the reasons are worded by this implementation |
 | Avro with `normalize=true` | Avro's normalizer | key order and namespaces as Avro writes them, custom attributes sorted |
+
+## Avro payloads and the decoder
+
+The registry's REST API never decodes Avro binary: it parses schema text and compares
+schemas. The one place Avro bytes are decoded is the console's message view, which
+shows a registry-framed record value as JSON. Those bytes are whatever a producer
+wrote, and the schema is whatever somebody registered.
+
+The decoder is `hamba/avro` v2.31.0. That project is archived, v2.31.0 is its last
+release, and three advisories are open against its decoder with no fixed version:
+[GO-2026-5046](https://pkg.go.dev/vuln/GO-2026-5046) (a block that claims up to 2^63
+elements is looped over), [GO-2026-5047](https://pkg.go.dev/vuln/GO-2026-5047)
+(lengths and counts that overflow) and
+[GO-2026-5048](https://pkg.go.dev/vuln/GO-2026-5048) (maps that grow without a bound).
+So the decoder is never given bytes it would have to trust. Every value is first
+walked against its schema (`schemaregistry/avroguard.go`), reading only lengths and
+counts, and is refused, and shown as the bytes it is, unless:
+
+- every length and count is non-negative and fits the bytes that are left;
+- the arrays and maps of the whole value hold at most 1,048,576 elements between them,
+  however they are nested (an element can weigh nothing, so the size of the payload
+  bounds nothing: before this, 328 bytes naming 64 arrays of a million nulls allocated
+  5 GiB);
+- nothing is nested more than 1,024 deep;
+- the value ends inside the bytes there are.
+
+`TestHostileAvroIsRefusedBeforeTheDecoderSeesIt` holds each advisory's input to a few
+megabytes and a few seconds, and `FuzzDecode` fuzzes the pair. What remains exposed:
+a value that passes the walk is decoded by the archived library, so a defect in it that
+a well-formed value can trigger, and that nobody has reported, is not covered; and a
+value at the limits costs what a million elements cost (tens of megabytes, for as long
+as the page takes to render). The fixes for the three advisories exist in a fork
+(`github.com/iskorotkov/avro/v2`, v2.33.0 and later); moving to it changes who
+publishes a parser of untrusted bytes, and has not been done. `go tool task vuln`
+(`scripts/vulncheck`, in CI on every push and daily) lists the three as accepted with
+the test that guards them, and fails the day one of them has a fixed version, or any
+other reachable vulnerability appears.
 
 ## Troubleshooting
 

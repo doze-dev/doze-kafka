@@ -71,15 +71,17 @@ func (c *cursor) byte() byte {
 	return v
 }
 
-// bytes reads n bytes; n == -1 is a null value and returns nil.
+// bytes reads n bytes; a negative n is a null value and returns nil. (A client
+// writes -1; Kafka reads any negative length as null and stores it, so one can be in
+// a log: recorded, produce-validation, key-length-minus-2.)
 func (c *cursor) bytes(n int64) []byte {
 	if c.err != nil {
 		return nil
 	}
-	if n == -1 {
+	if n < 0 {
 		return nil
 	}
-	if n < 0 || n > int64(len(c.b)) {
+	if n > int64(len(c.b)) {
 		c.fail("a length runs past the record")
 		return nil
 	}
@@ -125,7 +127,11 @@ func DecodeRecords(batch []byte) ([]Record, error) {
 			rc.fail("a header count runs past the record")
 		}
 		for j := int64(0); j < n && rc.err == nil; j++ {
-			k := rc.bytes(rc.varint())
+			kn := rc.varint()
+			if kn < 0 {
+				rc.fail("a header has no key")
+			}
+			k := rc.bytes(kn)
 			v := rc.bytes(rc.varint())
 			r.Headers = append(r.Headers, RecordHeader{Key: string(k), Value: v})
 		}

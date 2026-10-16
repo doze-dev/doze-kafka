@@ -101,7 +101,10 @@ func BenchmarkInitProducerID(b *testing.B) {
 	req := kmsg.NewPtrInitProducerIDRequest()
 	req.SetVersion(3)
 	req.TransactionTimeoutMillis = 60000
-	body := req.AppendTo(nil)
+	// v3 is flexible, and what a handler is given as the body of a flexible request
+	// begins with the request header's tagged fields (none: one zero byte). Without it
+	// the request did not decode and the benchmark failed before measuring anything.
+	body := req.AppendTo([]byte{0})
 	b.ResetTimer()
 	for range b.N {
 		call(b, typed(br.handleInitProducerID), protocol.APIKey(kmsg.InitProducerID), 3, body)

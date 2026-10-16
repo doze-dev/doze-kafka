@@ -11,13 +11,17 @@ import (
 )
 
 // idempotentBatch builds a minimal but header-valid record batch v2 stamped with
-// the idempotent-producer fields. The body is opaque (the broker stores batches
-// verbatim), which lets a test forge an exact retry; the CRC is sealed last, as a
-// real producer does, because the broker rejects a batch that does not check out.
+// the idempotent-producer fields, holding as many eight-byte records as it says (the
+// broker reads them: a batch that claims records it does not hold is refused). A
+// test can forge an exact retry with it; the CRC is sealed last, as a real producer
+// does, because the broker rejects a batch that does not check out.
 func idempotentBatch(pid int64, epoch int16, baseSeq, records int32) []byte {
-	const bodyLen = 8
+	bodyLen := 8 * int(records)
 	total := 61 + bodyLen
 	b := make([]byte, total)
+	for i := int32(0); i < records; i++ {
+		copy(b[61+8*i:], []byte{0x0e, 0, 0, byte(i << 1), 0x01, 0x02, 'v', 0}) // no key, the value "v", offset delta i.
+	}
 	binary.BigEndian.PutUint32(b[8:], uint32(total-12))   // batchLength (bytes after this field)
 	b[16] = 2                                             // magic = v2
 	binary.BigEndian.PutUint32(b[23:], uint32(records-1)) // lastOffsetDelta

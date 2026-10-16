@@ -65,9 +65,11 @@ func NewCodec(typ, text string, refs []Ref) (*Codec, error) {
 // Type is AVRO, JSON or PROTOBUF.
 func (c *Codec) Type() string { return c.p.Type() }
 
-// avroLimits bounds what a decoder may allocate for one value. A record's bytes name
-// their own array lengths, so without a bound a few bytes ask for gigabytes.
-var avroLimits = avro.Config{MaxByteSliceSize: 8 << 20, MaxSliceAllocSize: 1 << 20}.Freeze()
+// avroLimits bounds what a decoder may allocate for one string and one array. A
+// record's bytes name their own lengths, so without a bound a few bytes ask for
+// gigabytes. It is not the whole bound (the limit on an array is per array, and there
+// is none on a map): checkAvro, which every value passes first, is.
+var avroLimits = avro.Config{MaxByteSliceSize: 8 << 20, MaxSliceAllocSize: maxAvroItems}.Freeze()
 
 // Decode turns a whole record value (header included) into JSON text.
 func (c *Codec) Decode(value []byte) (out string, err error) {
@@ -84,6 +86,11 @@ func (c *Codec) Decode(value []byte) (out string, err error) {
 	body := value[5:]
 	switch p := c.p.(type) {
 	case *avroSchema:
+		// Before the decoder sees a byte: it trusts counts and lengths that these
+		// bytes, which anyone may have produced, are free to lie about (avroguard.go).
+		if err := checkAvro(p.schema, body); err != nil {
+			return "", err
+		}
 		var v any
 		if err := avroLimits.Unmarshal(p.schema, body, &v); err != nil {
 			return "", err

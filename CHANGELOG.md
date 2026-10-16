@@ -35,6 +35,72 @@ here that contains "server API"; `task api` fails without it.
   `from=0%26committed%3d1`. A subject's dock no longer links to a Traffic page that has
   no filter for a subject.
 
+- Produce reads every batch before storing it, as Apache Kafka does, on every kind of
+  topic and every Produce version (recorded against `apache/kafka:4.3.1`:
+  `produce-validation`, `produce-inflated-size`). Batches Kafka refuses used to be
+  acknowledged and stored on any topic that did not compact: a records section that is
+  not the codec it names (now UNKNOWN_SERVER_ERROR, as Kafka answers), a header claiming
+  more or fewer records than it holds (it advanced the log by the claimed count), two
+  batches for one partition, an empty record set, a base offset other than 0, a producer
+  id with sequence -1 (INVALID_RECORD); a transactional batch with no transactional id
+  (TRANSACTIONAL_ID_AUTHORIZATION_FAILED); a timestamp outside
+  `message.timestamp.before.max.ms` / `after.max.ms`, now applied, or a client-set
+  LogAppendTime bit (INVALID_TIMESTAMP). Refusals Kafka also made now carry Kafka's code
+  (INVALID_RECORD where this said CORRUPT_MESSAGE for a zero-count batch, a legacy magic, a
+  control batch or a short record set), base offset -1 and Kafka's message or none.
+  **A topic with no `max.message.bytes` is now held to the broker's `message.max.bytes`,
+  Kafka's default of 1048588** (`--message-max-bytes`, `message-max-bytes` in the file):
+  a batch over 1 MB was accepted here and refused by every production broker. A topic
+  whose `compression.type` is not the batch's stores it re-written in its codec and holds
+  that size to the limit. A batch inflating past 64 MiB, a zstd window past 8 MiB and a
+  compressed record whose length disagrees with its fields are refused here and kept by
+  Kafka (`docs/limitations.md`). A log from an earlier version holding an unreadable batch
+  still opens: compaction and timestamp lookups go past it instead of failing for good.
+  A retry of an idempotent batch is answered with the timestamp it was stored with.
+- Security: an Avro value is checked against its schema before the Avro decoder sees it.
+  The console decodes registry-framed record values, which any producer can write, with
+  `hamba/avro`, which is archived and has three open advisories against its decoder
+  (GO-2026-5046, 5047, 5048; no fixed release). 328 bytes naming 64 arrays of a million
+  nulls made the console allocate 5 GiB, and a registered `fixed` of 512 MiB allocated
+  2 GiB for a seven-byte value. Every length and count is now checked first: the arrays
+  and maps of one value hold at most 1,048,576 elements between them, nothing nests more
+  than 1,024 deep, and nothing claims more bytes than are there. A truncated value is no
+  longer shown as if it had decoded. `go tool task vuln` (govulncheck, in CI on every push
+  and daily) fails on any reachable vulnerability that is not accepted with a guarding
+  test in `testdata/vulncheck-accepted.txt`; it found five more in the doze module's
+  dependencies, fixed by upgrades (`golang.org/x/net` 0.60.0, `google.golang.org/grpc`
+  1.83.2).
+- `go tool task check` runs every benchmark once (`bench:smoke`).
+
+- The doze module's console (the one `doze` starts beside a `kafka` instance) has the
+  Traffic page and the clients' own metrics, as the `doze-kafka` command's console has.
+  Its broker was built as one with no console, so nothing was recorded, `/traffic` was a
+  404 and the client-telemetry APIs (71, 72) were not offered. A module instance started
+  with no console address still keeps and offers neither, and neither does a broker built
+  with `server.New`.
+
+- CreateTopics: a request for many topics no longer compares each name with every topic
+  (twice: the handler listed them all and the store looked at them all, so a batch was
+  quadratic); both ask an index kept by the metadata store. Which names collide is now
+  exactly Apache Kafka's, from a recording of 4.3.1 (`createtopics-collisions`): a name is
+  held against the topics that existed before the request and not against the others in
+  it, so `a.b` and `a_b` sent in one request are both created, where this broker used to
+  refuse the second with `INVALID_TOPIC_EXCEPTION`. A name that collides with an existing
+  topic is still refused, with or without `validate_only`, and names that differ only in
+  letter case are refused everywhere.
+
+- Embedding (`server/`): nothing outlives a failure. A `Serve` that cannot bind closes the
+  `AlsoListen` listeners too (they stayed bound and accepting); a `New` that fails closes
+  what it had opened, the lock on the data directory included (a broken record in the
+  metadata database left the directory "in use" by a broker that did not exist).
+  `Close` on a server that is serving now stops it, as cancelling its context does, and
+  returns once `Serve` has drained and closed storage; before, it closed storage under
+  the connections still using it. `Ready()` is closed by `Close` as well, so waiting on it
+  never hangs, and what it means is read from `Addr()`: not nil, the listener is bound;
+  nil, the server ended without ever binding. `ServeListener` owns the listener it is
+  given and closes it when it returns, except when the call is refused. No change to the
+  exported surface.
+
 - Console: every button reads weight 400 whether it is a button or a link drawn as one (the
   boards draw them all as buttons). A request that took under a millisecond shows its
   measured time (`42 µs`, `0.4 ms`) rather than the design boards' `0 ms`: a broker

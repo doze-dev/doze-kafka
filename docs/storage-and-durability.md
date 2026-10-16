@@ -21,12 +21,22 @@ file is still used, with a notice, until you move it in.)
 
 ## How messages are stored
 
-When a client produces, doze-kafka assigns offsets and appends the record batch to
-the active segment **exactly as it arrived on the wire** — it never decodes or
-re-encodes your payload. That's why compression (gzip, snappy, lz4, zstd) just works:
-the compressed batch is stored verbatim and handed back byte-for-byte to the consumer,
-which decompresses it. It also means the on-disk format is doze-kafka's own; it is not
-byte-compatible with Apache Kafka's segment files, and doesn't need to be.
+When a client produces, doze-kafka reads the batch before it stores it, as Apache Kafka
+does: its header, its checksum and every record, through whatever codec it is
+compressed with, in one streaming pass that never holds the inflated records. A batch
+that does not check out is refused with Kafka's error and nothing of it is stored (see
+[limitations](limitations.md) for the three cases refused here that Kafka keeps). A
+batch that passes is appended to the active segment **as it arrived**, compressed as the
+producer compressed it, and handed back byte-for-byte to the consumer; only the header's
+maximum timestamp is set to the latest of the records', as Kafka sets it. Where a topic's
+`compression.type` names a codec other than the batch's (or `uncompressed`), the batch is
+written out again in the topic's codec, as Kafka does. The on-disk format is doze-kafka's
+own; it is not byte-compatible with Apache Kafka's segment files, and doesn't need to be.
+
+A log written by an earlier version can hold a batch whose records cannot be read
+(those versions stored what they did not read). Such a partition still opens and
+serves: the cleaner keeps the batch as it is and logs that it did, and timestamp
+lookups go by its header.
 
 A segment rolls to a new file once it passes `--segment-bytes` (default 128 MiB). A
 sparse index records a position every `--index-interval-bytes` (default 4 KiB) so a

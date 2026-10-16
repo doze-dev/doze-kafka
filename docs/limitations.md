@@ -34,21 +34,30 @@ implement it.
   retry, it takes the log directory offline; doze-kafka does the same for the one
   partition, answering `KAFKA_STORAGE_ERROR` to every write (and every `acks=all`
   acknowledgement) until a restart, when recovery decides from what is really on disk.
-- **A compressed batch is looked inside only as far as a topic needs, and one that
-  inflates past 64 MiB is refused.** Kafka holds a produced batch to
-  `max.message.bytes` as it arrived (a batch of a few hundred bytes that inflates to
-  50 KB is accepted under a 2000 byte limit), and holds a topic with
-  `compression.type=uncompressed` to the size it inflates to; both are recorded
-  (`conformance/recordings/produce-decompressed-size.json`) and doze-kafka answers
-  `MESSAGE_TOO_LARGE` for the same cases. Kafka has no other bound on what a batch
-  inflates to; this broker, which holds the records of a batch to compact it, refuses a
-  batch that inflates past 64 MiB (or a zstd frame that declares a window past 8 MiB)
-  with the same `MESSAGE_TOO_LARGE`, wherever it has to look inside the batch (a
-  compacted topic, an uncompressed topic, a timestamp lookup). The look is a stream:
-  what is held is a window and a buffer, not the payload. Other topics store the batch
-  as it came, as Kafka does with `compression.type=producer`, and a topic whose
-  `compression.type` names a codec is not re-compressed on the way in, so the
-  re-compressed size Kafka checks is not what is checked here.
+- **Every produced batch is read whole before it is stored, as Kafka reads it, and
+  three kinds of batch Kafka stores are refused here.** Each partition's records must
+  be exactly one version 2 batch whose header, checksum, record count and every record
+  (through whatever codec it is compressed with) check out; what Kafka refuses is
+  refused with Kafka's code on every kind of topic and every Produce version, and
+  nothing refused is stored (recorded against `apache/kafka:4.3.1`:
+  `conformance/recordings/produce-validation.json`). A batch is held to
+  `max.message.bytes`, or the broker's `message.max.bytes` (`--message-max-bytes`,
+  Kafka's default of 1048588) when the topic sets none, as it arrived, and as the topic
+  stores it when the topic's `compression.type` is not the batch's. The read is one
+  streaming pass that holds a decompressor's window and a buffer, never the payload.
+  Stricter than Kafka, because this broker's readers (and every consumer) could not
+  read what Kafka keeps, or would have to allocate without bound to try:
+  a compressed record whose length disagrees with its own fields is INVALID_RECORD
+  (Kafka stores it on a topic that keeps the producer's codec, and the read-back in the
+  recording shows it cannot be consumed); a batch that inflates past 64 MiB is
+  MESSAGE_TOO_LARGE (Kafka accepted 65 MiB, 70 MiB and a single 70 MiB record on every
+  topic whose limit the compressed size is under:
+  `conformance/recordings/produce-inflated-size.json`); and a zstd frame declaring a
+  window past 8 MiB is MESSAGE_TOO_LARGE, because a decoder allocates the window it is
+  told before reading a byte (Kafka takes 16 MiB and 128 MiB, and refuses 256 MiB with
+  UNKNOWN_SERVER_ERROR as this does). A batch stored by an earlier version that cannot
+  be read is kept, and skipped by the readers that look inside (timestamp lookups and
+  the cleaner use its header), so such a log still opens and serves.
 - **A consumer-protocol member is asked to heartbeat every second**, where Kafka's
   `group.consumer.heartbeat.interval.ms` is 5 seconds: rebalances settle in a couple of
   seconds on a development machine instead of ten.
@@ -178,7 +187,11 @@ implement it.
 - **Topic names that differ only in letter case are refused.** Kafka lets `Orders` and
   `orders` live side by side; here the second is `INVALID_TOPIC_EXCEPTION`, because
   partition directories are named after topics and the macOS and Windows file systems
-  do not tell the two apart. (Kafka's own rule, that `a.b` and `a_b` collide, applies too.)
+  do not tell the two apart, and that holds for two such names in one request as well.
+  (Kafka's own rule, that `a.b` and `a_b` collide, applies too, and as Kafka applies it:
+  a name is held against the topics that existed before the request, so `a.b` and `a_b`
+  sent in one `CreateTopics` request are both created. Recorded:
+  `conformance/recordings/createtopics-collisions.json`.)
 - **Validation messages are doze-kafka's own words.** For a refused topic name, partition
   count, topic config value and a broker config change, the error code is Kafka's and the
   `error_message` text is this broker's (it names what to do about it). A Produce batch

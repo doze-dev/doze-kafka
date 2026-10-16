@@ -6,6 +6,15 @@ written to disk, the oldest rows are dropped when the record is full, and a rest
 starts it empty. A broker run without the console (`--console=false`, or embedded in
 a Go test) keeps none of it, advertises no client telemetry and pays nothing for it.
 
+The rule is the same wherever a broker is started: **the record and the two
+client-telemetry APIs (71 and 72) exist exactly when a console is attached.** The
+`doze-kafka` command attaches one unless told `--console=false`. The doze module's
+embedded broker (`module/`, what `doze` runs for a `kafka` instance) attaches one when
+it is given an address for it, which is whenever doze gives the instance an endpoint,
+and that console has the same Traffic page and client metrics as the command's; an
+instance started with no console address keeps and offers neither. `server.New` never
+does: an embedder has no console to attach.
+
 ## Traffic: what did my app just do?
 
 **Traffic** in the console's rail is a live tail of the requests clients have made,
