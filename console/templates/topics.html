@@ -98,9 +98,9 @@
     <form class="form-page" id="create-topic" hx-post="{{newTopicURL}}" hx-disabled-elt="find button[type=submit]">
       <div class="card form-sec"><div class="panel-h"><h2>General</h2></div><div class="form-b">
         <div class="field" x-data='{taken: {{.TakenJSON}}, v: {{.PrefillJSON}}}'>
-          <label for="f-name">Topic name <span class="hint">letters, digits, <span class="mono">.</span> <span class="mono">_</span> <span class="mono">-</span> and at most 249 characters</span></label>
-          <input class="input mono" id="f-name" name="name" value="{{.Prefill}}" placeholder="orders.created" required maxlength="249" autocomplete="off" autofocus x-model="v" :aria-invalid="taken.includes(v) ? 'true' : null" aria-describedby="f-name-taken">
-          <p class="teach bad" id="f-name-taken" x-show="taken.includes(v)" x-cloak role="status"><span class="m" x-text="v"></span> already exists on this broker. The broker would answer TOPIC_ALREADY_EXISTS and change nothing.</p>
+          <label for="f-name">Topic name <span class="hint">{{topicNameRule}}</span></label>
+          <input class="input mono" id="f-name" name="name" value="{{.Prefill}}" placeholder="orders.created" required maxlength="{{topicNameMax}}" autocomplete="off" autofocus x-model="v" :aria-invalid="taken.includes(v) ? 'true' : null" aria-describedby="f-name-taken">
+          <p class="teach bad" id="f-name-taken" x-show="taken.includes(v)" x-cloak role="status"><span class="m" x-text="v"></span> {{takenRule}}</p>
         </div>
         <div class="field narrow"><label for="f-partitions">Partitions</label><input class="input mono" id="f-partitions" name="partitions" type="number" min="1"{{if .MaxParts}} max="{{.MaxParts}}"{{end}} value="1" required aria-describedby="f-partitions-teach"><p class="teach" id="f-partitions-teach">{{teach "broker" "max-partitions"}}</p></div>
         <div class="field narrow"><label for="f-replication">Replication factor</label><input class="input mono" id="f-replication" name="replication" type="number" value="1" disabled aria-describedby="f-replication-teach"><p class="teach" id="f-replication-teach">{{teach "broker" "replication-factor"}}</p></div>
@@ -209,9 +209,7 @@
             <div class="field w-acks">
               <span class="lbl" id="l-acks">Acknowledgment</span>
               <div class="seg" role="group" aria-labelledby="l-acks">
-                <button type="button" :class="acks==='1'&&'on'" :aria-pressed="acks==='1'" @click="acks='1'" aria-label="acks 1: the broker confirms the write">1</button>
-                <button type="button" :class="acks==='0'&&'on'" :aria-pressed="acks==='0'" @click="acks='0'" aria-label="acks 0: no confirmation">0</button>
-                <button type="button" :class="acks==='all'&&'on'" :aria-pressed="acks==='all'" @click="acks='all'" aria-label="acks all: confirmed after it is on disk">all</button>
+                {{range acksChoices}}<button type="button" :class="acks==='{{.Value}}'&&'on'" :aria-pressed="acks==='{{.Value}}'" @click="acks='{{.Value}}'" aria-label="{{.Aria}}">{{.Value}}</button>{{end}}
                 <input type="hidden" name="acks" :value="acks">
               </div>
             </div>
@@ -244,7 +242,7 @@
           </div>
           <div class="err form-err" data-err-slot hidden role="alert"></div>
           <div class="dock-foot">
-            <span class="ackscaption" x-text="acks==='0' ? 'Fire-and-forget — the broker sends no response at all.' : acks==='all' ? 'Fsynced to disk before acknowledging. Slower, durable.' : 'Written to the page cache before acknowledging.'"></span>
+            {{range acksChoices}}<span class="ackscaption" x-show="acks==='{{.Value}}'">{{.Say}}</span>{{end}}
             <button class="btn pri" type="submit">{{icon "send"}} Send message</button>
           </div>
         </form>

@@ -325,8 +325,9 @@ func (c *Console) schemaCheck(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var re *regError
 		if errors.As(err, &re) && re.Status == http.StatusUnprocessableEntity {
-			// A schema that does not parse is an answer to this question, not a failure.
-			c.partial(w, "schema_check", map[string]any{"Invalid": re.Message})
+			// A schema that does not parse is an answer to this question, not a failure:
+			// the registry's refusal (42201), said as one (A2), in the check's place.
+			c.partial(w, "schema_check", map[string]any{"Invalid": refusalFor(err).data(nil)})
 			return
 		}
 		c.fail(w, r, err)
@@ -491,7 +492,7 @@ func (c *Console) composerSchemas(r *http.Request, topic string, data map[string
 	}
 	data["SchemaSubjects"] = names
 	for _, n := range names {
-		if n == topic+"-value" {
+		if n == topic+valueSubjectSuffix {
 			data["DefaultSubject"] = n
 		}
 	}

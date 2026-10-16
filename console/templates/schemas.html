@@ -74,7 +74,7 @@
     <div class="row sb ce idband"><div class="col"><h1 class="h1">Register schema</h1><span class="note">The first version of a subject. The registry checks that the text parses.</span></div></div>
     <form class="form-page" hx-post="{{newSchemaURL ""}}" hx-disabled-elt="find button[type=submit]">
       <div class="card form-sec"><div class="panel-h"><h2>Subject</h2></div><div class="form-b">
-        <div class="field"><label for="f-subject">Subject <span class="hint">a topic's value schema is <span class="mono">&lt;topic&gt;-value</span></span></label><input class="input mono" id="f-subject" name="subject" value="{{.Subject}}" placeholder="orders-value" required autocomplete="off" autofocus></div>
+        <div class="field"><label for="f-subject">Subject <span class="hint">{{subjectNameRule}}</span></label><input class="input mono" id="f-subject" name="subject" value="{{.Subject}}" placeholder="orders-value" required autocomplete="off" autofocus></div>
         <div class="field narrow"><label for="f-type">Language</label>
           <select class="input" id="f-type" name="type">{{range .Types}}<option value="{{.}}">{{.}}</option>{{end}}</select></div>
         <div class="field"><label for="f-schema">Schema</label><textarea class="input mono schema-text" id="f-schema" name="schema" rows="14" required spellcheck="false" placeholder='{"type":"record","name":"Order","fields":[{"name":"id","type":"long"}]}'></textarea></div>
@@ -182,7 +182,7 @@
 {{template "shell_bottom" .}}{{end}}
 
 {{define "schema_check"}}
-{{if .Invalid}}<div class="callout bad" role="alert"><span class="b">Not a valid schema.</span><span class="note">{{.Invalid}}</span></div>
+{{if .Invalid}}{{template "refusal" .Invalid}}
 {{else if .OK}}<div class="callout ok" role="status"><span class="b">Compatible.</span><span class="note">This schema may be registered under the {{.Level}} rule.</span></div>
 {{else}}<div class="callout bad" role="alert"><span class="b">Not compatible with the {{.Level}} rule.</span>
   <ul class="reasons">{{range .Reasons}}<li class="mono">{{.}}</li>{{end}}</ul></div>

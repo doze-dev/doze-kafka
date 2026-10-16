@@ -60,7 +60,8 @@ test('trying a schema says whether it may be registered, and why not', async ({ 
 
   await editor.fill(`{"type":"record"`);
   await page.getByRole('button', { name: 'Check compatibility' }).click();
-  await expect(result).toContainText('Not a valid schema');
+  // The registry's refusal of a schema it cannot read, said as one (A2): its kind and code.
+  await expect(result.locator('[data-refusal-kind="refused"][data-refusal-source="registry"][data-refusal-name="42201"]')).toBeVisible();
 
   await editor.fill(AVRO(`,{"name":"email","type":["null","string"],"default":null}`));
   await page.getByRole('button', { name: 'Check compatibility' }).click();

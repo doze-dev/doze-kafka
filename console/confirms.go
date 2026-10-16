@@ -492,7 +492,7 @@ func (c *Console) topicFacts(ctx context.Context, name string, partitions int) c
 	}
 	if c.reg != nil {
 		for _, s := range c.reg.SubjectNames(ctx) {
-			if s == name+"-key" || s == name+"-value" {
+			if s == name+"-key" || s == name+valueSubjectSuffix {
 				f.Subjects = append(f.Subjects, s)
 			}
 		}

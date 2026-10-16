@@ -154,7 +154,9 @@ func TestSchemaCheckSaysWhyNot(t *testing.T) {
 	if !strings.Contains(bad, "Not compatible") || !strings.Contains(bad, "email") {
 		t.Errorf("an incompatible schema: %s", bad)
 	}
-	if got := check(`{"type":"record"`); !strings.Contains(got, "Not a valid schema") {
+	// A schema that does not parse is the registry's refusal (42201), said as one (A2:
+	// its kind, its source, its name), in the check's own place.
+	if got := check(`{"type":"record"`); !strings.Contains(got, `data-refusal-kind="refused" data-refusal-source="registry" data-refusal-name="42201"`) {
 		t.Errorf("a broken schema: %s", got)
 	}
 	// Registering the incompatible one is refused with the registry's reason.
