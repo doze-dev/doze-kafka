@@ -18,6 +18,7 @@ that execute the line without failing.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | `cmd/doze-kafka` | 303 | 201 | 45 | 21 | 3 | 33 | 0 | 69 | 102 | 30.9 s | 15 min | 3 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
 | `console` | 2283 | 1285 | 598 | 96 | 19 | 285 | 0 | 713 | 215 | 39.4 s | 126 min | 4 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
+| `internal/broker:admin` | 168 | 125 | 37 | 1 | 0 | 5 | 0 | 38 | 252 | 215.0 s | 51 min | 3 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
 | `internal/broker:data` | 350 | 213 | 102 | 25 | 5 | 5 | 0 | 132 | 252 | 213.5 s | 88 min | 3 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
 | `internal/broker:groups` | 576 | 386 | 131 | 18 | 7 | 34 | 0 | 156 | 252 | 248.6 s | 151 min | 3 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
 | `internal/config` | 206 | 197 | 4 | 0 | 0 | 5 | 0 | 4 | 24 | 0.5 s | 2 min | 3 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
@@ -28,7 +29,7 @@ that execute the line without failing.
 | `internal/telemetry` | 162 | 121 | 33 | 2 | 0 | 6 | 0 | 35 | 32 | 0.1 s | 37 s | 3 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
 | `internal/traffic` | 237 | 184 | 39 | 1 | 1 | 12 | 0 | 41 | 50 | 0.1 s | 3 min | 3 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
 | `schemaregistry` | 792 | 560 | 102 | 36 | 0 | 94 | 0 | 138 | 34 | 2.7 s | 14 min | 3 | darwin/arm64 | `31f2e5a` | 2026-10-16 |
-| **all** | 6723 | 4287 | 1503 | 276 | 54 | 603 | 0 | 1833 | | | 453 min | | | | |
+| **all** | 6891 | 4412 | 1540 | 277 | 54 | 608 | 0 | 1871 | | | 504 min | | | | |
 
 ## cmd/doze-kafka
 
@@ -774,6 +775,56 @@ No test executes these lines. By declaration:
 - `console/traffic_story.go` `(*Console).storyView`: 6 (lines 242, 259, 244)
 - `console/traffic_story.go` `(*Console).touched`: 2 (lines 173, 172)
 - `console/traffic_story.go` `pluralOf`: 1 (lines 267)
+
+## internal/broker:admin
+
+### Lived (37)
+
+| Where | Change | Line | What lets it live |
+|---|---|---|---|
+| `internal/broker/alterconfigs.go:90:25` | == became != | `case res.ResourceType == kmsg.ConfigResourceTypeBroker && !b.canCluster(req.Conn, opAlterConfigs):` | *open:* the tests that reach the line assert nothing that depends on which branch is taken |
+| `internal/broker/alterconfigs.go:106:25` | == became != | `case res.ResourceType == kmsg.ConfigResourceTypeBroker:` | *open:* the tests that reach the line assert nothing that depends on which branch is taken |
+| `internal/broker/alterconfigs.go:130:25` | == became != | `case res.ResourceType == kmsg.ConfigResourceTypeBroker && !b.canCluster(req.Conn, opAlterConfigs):` | *open:* the tests that reach the line assert nothing that depends on which branch is taken |
+| `internal/broker/alterconfigs.go:203:59` | < became <= | `case c.Op == kmsg.IncrementalAlterConfigOpAppend && at < 0:` | *open:* no test puts the two sides equal and asserts which way the comparison goes |
+| `internal/broker/configs.go:111:26` | == became != | `c.IsDefault = e.source == kmsg.ConfigSourceDefaultConfig` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestCreateTopicsNeverListsEveryTopic, TestCreateTopicsCollisionsWithinARequestAndAcrossRequests, TestTopicCreationAndOffsetListingDoNotOpenPartitions (and 115 more) |
+| `internal/broker/configs.go:112:25` | == became != | `c.ReadOnly = e.source == kmsg.ConfigSourceStaticBrokerConfig // broker config isn't alterable at runtime.` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestCreateTopicsNeverListsEveryTopic, TestCreateTopicsCollisionsWithinARequestAndAcrossRequests, TestTopicCreationAndOffsetListingDoNotOpenPartitions (and 115 more) |
+| `internal/broker/createpartitions.go:77:143` | - became + | `return kerr.InvalidReplicaAssignment, fmt.Sprintf("the assignment names %d new partitions, the request adds %d", len(t.Assignment), t.Count-cur.Partitions)` | *open:* no test asserts the value this expression computes; reached by TestCreatePartitionsSemantics |
+| `internal/broker/createpartitions.go:68:15` | < became <= | `case t.Count < cur.Partitions:` | *open:* no test puts the two sides equal and asserts which way the comparison goes |
+| `internal/broker/createpartitions.go:70:20` | > became >= | `case int(t.Count) > b.cfg.MaxPartitions:` | *open:* no test puts the two sides equal and asserts which way the comparison goes |
+| `internal/broker/metadata.go:90:64` | < became <= | `allow := mr.AllowAutoTopicCreation \|\| req.Header.APIVersion < 4` | *open:* no test puts the two sides equal and asserts which way the comparison goes; reached by TestMetadataBelowV4AutoCreates, TestGroupAdmin_OffsetDeleteRemovesAnOffsetWhoseTopicIsGone, TestPersistence_EverythingTheBrokerKeepsSurvivesARestart (and 1 more) |
+| `internal/broker/metadata.go:135:13` | == became != | `return err == nil && ok` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestTopicNames_TraversalIsRefusedOnTheWire |
+| `internal/broker/topiclimits.go:31:98` | * became / | `return log.RetentionPolicy{MaxBytes: cfg.RetentionBytes, MaxAge: time.Duration(cfg.RetentionMs) * time.Millisecond}` | *open:* no test asserts the value this expression computes; reached by TestCreateTopicsNeverListsEveryTopic, TestCreateTopicsCollisionsWithinARequestAndAcrossRequests, TestTopicCreationAndOffsetListingDoNotOpenPartitions (and 178 more) |
+| `internal/broker/topiclimits.go:52:10` | < became <= | `case n < 0:` | *open:* no test puts the two sides equal and asserts which way the comparison goes |
+| `internal/broker/topiclimits.go:65:10` | < became <= | `case n < 0:` | *open:* no test puts the two sides equal and asserts which way the comparison goes |
+| `internal/broker/topiclimits.go:73:44` | > became >= | `if n, ok := num("segment.bytes"); ok && n > 0 {` | *open:* no test puts the two sides equal and asserts which way the comparison goes; reached by TestCreateTopicsNeverListsEveryTopic, TestCreateTopicsCollisionsWithinARequestAndAcrossRequests, TestTopicCreationAndOffsetListingDoNotOpenPartitions (and 116 more) |
+| `internal/broker/topiclimits.go:109:65` | * became / | `pol := log.CompactionPolicy{Enabled: true, DeleteRetention: 24 * time.Hour}` | *open:* no test asserts the value this expression computes; reached by TestCreateTopicsValidatesWhatItStores, TestCreateTopicsReturnsTheTopicsConfigs, TestACompactedTopicKeepsTheLatestValueOfEachKey (and 10 more) |
+| `internal/broker/topiclimits.go:113:95` | > became >= | `if v, err := strconv.ParseInt(topicConfig["min.compaction.lag.ms"], 10, 64); err == nil && v > 0 {` | *open:* no test puts the two sides equal and asserts which way the comparison goes; reached by TestCreateTopicsValidatesWhatItStores, TestCreateTopicsReturnsTheTopicsConfigs, TestACompactedTopicKeepsTheLatestValueOfEachKey (and 10 more) |
+| `internal/broker/topiclimits.go:116:95` | > became >= | `if v, err := strconv.ParseInt(topicConfig["max.compaction.lag.ms"], 10, 64); err == nil && v > 0 {` | *open:* no test puts the two sides equal and asserts which way the comparison goes; reached by TestCreateTopicsValidatesWhatItStores, TestCreateTopicsReturnsTheTopicsConfigs, TestACompactedTopicKeepsTheLatestValueOfEachKey (and 10 more) |
+| `internal/broker/topiclimits.go:119:93` | >= became > | `if v, err := strconv.ParseInt(topicConfig["delete.retention.ms"], 10, 64); err == nil && v >= 0 {` | *open:* no test puts the two sides equal and asserts which way the comparison goes; reached by TestCreateTopicsValidatesWhatItStores, TestCreateTopicsReturnsTheTopicsConfigs, TestACompactedTopicKeepsTheLatestValueOfEachKey (and 10 more) |
+| `internal/broker/topiclimits.go:110:85` | == became != | `if v, err := strconv.ParseFloat(topicConfig["min.cleanable.dirty.ratio"], 64); err == nil {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestCreateTopicsValidatesWhatItStores, TestCreateTopicsReturnsTheTopicsConfigs, TestACompactedTopicKeepsTheLatestValueOfEachKey (and 10 more) |
+| `internal/broker/topiclimits.go:113:83` | == became != | `if v, err := strconv.ParseInt(topicConfig["min.compaction.lag.ms"], 10, 64); err == nil && v > 0 {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestCreateTopicsValidatesWhatItStores, TestCreateTopicsReturnsTheTopicsConfigs, TestACompactedTopicKeepsTheLatestValueOfEachKey (and 10 more) |
+| `internal/broker/topiclimits.go:113:95` | > became <= | `if v, err := strconv.ParseInt(topicConfig["min.compaction.lag.ms"], 10, 64); err == nil && v > 0 {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestCreateTopicsValidatesWhatItStores, TestCreateTopicsReturnsTheTopicsConfigs, TestACompactedTopicKeepsTheLatestValueOfEachKey (and 10 more) |
+| `internal/broker/topiclimits.go:116:83` | == became != | `if v, err := strconv.ParseInt(topicConfig["max.compaction.lag.ms"], 10, 64); err == nil && v > 0 {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestCreateTopicsValidatesWhatItStores, TestCreateTopicsReturnsTheTopicsConfigs, TestACompactedTopicKeepsTheLatestValueOfEachKey (and 10 more) |
+| `internal/broker/topiclimits.go:116:95` | > became <= | `if v, err := strconv.ParseInt(topicConfig["max.compaction.lag.ms"], 10, 64); err == nil && v > 0 {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestCreateTopicsValidatesWhatItStores, TestCreateTopicsReturnsTheTopicsConfigs, TestACompactedTopicKeepsTheLatestValueOfEachKey (and 10 more) |
+| `internal/broker/topiclimits.go:88:7` | > became >= | `if n > settings.MaxRetentionMs {` | *open:* no test puts the two sides equal and asserts which way the comparison goes; reached by TestCreateTopicsValidatesWhatItStores, TestAdmin_DescribeConfigs, TestATombstoneIsKeptThenRemoved (and 7 more) |
+| `internal/broker/topics.go:154:54` | < became <= | `if t.ReplicationFactor == 0 \|\| t.ReplicationFactor < -1 {` | *open:* no test puts the two sides equal and asserts which way the comparison goes; reached by TestCreateTopicsNeverListsEveryTopic, TestCreateTopicsCollisionsWithinARequestAndAcrossRequests, TestTopicCreationAndOffsetListingDoNotOpenPartitions (and 114 more) |
+| `internal/broker/topics.go:125:24` | < became >= | `for p := int32(0); p < int32(len(t.ReplicaAssignment)); p++ {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestOracle_CreateTopicsManualAssignment |
+| `internal/broker/topics.go:154:56` | - became + | `if t.ReplicationFactor == 0 \|\| t.ReplicationFactor < -1 {` | *open:* no test asserts the sign of this value; reached by TestCreateTopicsNeverListsEveryTopic, TestCreateTopicsCollisionsWithinARequestAndAcrossRequests, TestTopicCreationAndOffsetListingDoNotOpenPartitions (and 114 more) |
+| `internal/broker/topics.go:321:11` | != became == | `if name != "" {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestDeletingATopicForgetsItsProducerState, TestAdmin_DeleteTopics, TestEveryServedAPIIsAuthorized (and 8 more) |
+| `internal/broker/topics.go:338:62` | != became == | `if err := b.logs.RemoveTopic(name, topic.Partitions); err != nil {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestDeletingATopicForgetsItsProducerState, TestAdmin_DeleteTopics, TestFetchWithAnErrorAnswersImmediately (and 6 more) |
+| `internal/broker/topics.go:281:14` | > became >= | `} else if n > 0 {` | *open:* no test puts the two sides equal and asserts which way the comparison goes; reached by TestCreateTopicsNeverListsEveryTopic, TestCreateTopicsCollisionsWithinARequestAndAcrossRequests, TestTopicCreationAndOffsetListingDoNotOpenPartitions (and 116 more) |
+| `internal/broker/topics.go:279:56` | != became == | `if n, err := b.logs.RemoveStrayTopicDirs(t.Name); err != nil {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestCreateTopicsNeverListsEveryTopic, TestCreateTopicsCollisionsWithinARequestAndAcrossRequests, TestTopicCreationAndOffsetListingDoNotOpenPartitions (and 116 more) |
+| `internal/broker/topics.go:281:14` | > became <= | `} else if n > 0 {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestCreateTopicsNeverListsEveryTopic, TestCreateTopicsCollisionsWithinARequestAndAcrossRequests, TestTopicCreationAndOffsetListingDoNotOpenPartitions (and 116 more) |
+| `internal/broker/topics.go:285:47` | != became == | `if derr := b.meta.DeleteTopic(t.Name); derr != nil {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestTopicNames_FailedCreateLeavesNothingBehind |
+| `internal/broker/topics.go:288:61` | != became == | `if rerr := b.logs.RemoveTopic(t.Name, t.Partitions); rerr != nil {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestTopicNames_FailedCreateLeavesNothingBehind |
+| `internal/broker/topics.go:256:9` | != became == | `if err != nil {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestMetadataBelowV4AutoCreates |
+| `internal/broker/topics.go:262:40` | != became == | `if err := b.materialize(created); err != nil {` | *open:* the tests that reach the line assert nothing that depends on which branch is taken; reached by TestMetadataBelowV4AutoCreates |
+
+### Not covered (1)
+
+No test executes these lines. By declaration:
+
+- `internal/broker/topics.go` `(*Broker).maybeAutoCreate`: 1 (lines 257)
 
 ## internal/broker:data
 
