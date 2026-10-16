@@ -1,0 +1,392 @@
+{
+  "scenario": "endtxn-while-preparing",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": [
+              {
+                "Name": "min.insync.replicas",
+                "Value": "2"
+              }
+            ],
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "stuck"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [
+              {
+                "IsSensitive": false,
+                "Name": "min.insync.replicas",
+                "ReadOnly": false,
+                "Source": 1,
+                "Value": "2"
+              }
+            ],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "stuck",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "find-coordinator",
+      "api": "FindCoordinator",
+      "version": 4,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": [
+          "tx-p"
+        ],
+        "CoordinatorType": 1
+      },
+      "response": {
+        "Coordinators": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "tx-p",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          }
+        ],
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "p-init",
+      "api": "InitProducerID",
+      "version": 3,
+      "request": {
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "TransactionTimeoutMillis": 60000,
+        "TransactionalID": "tx-p"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "p-add",
+      "api": "AddPartitionsToTxn",
+      "version": 3,
+      "request": {
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "Topics": [
+          {
+            "Partitions": [
+              0
+            ],
+            "Topic": "stuck"
+          }
+        ],
+        "TransactionalID": "tx-p",
+        "Transactions": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "stuck"
+          }
+        ],
+        "Transactions": null
+      }
+    },
+    {
+      "label": "p-commit",
+      "api": "EndTxn",
+      "version": 3,
+      "request": {
+        "Commit": true,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "TransactionalID": "tx-p"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "p-state",
+      "api": "DescribeTransactions",
+      "version": 0,
+      "request": {
+        "TransactionalIDs": [
+          "tx-p"
+        ]
+      },
+      "response": {
+        "State": "PrepareCommit"
+      }
+    },
+    {
+      "label": "p-commit-again",
+      "api": "EndTxn",
+      "version": 3,
+      "request": {
+        "Commit": true,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "TransactionalID": "tx-p"
+      },
+      "response": {
+        "ErrorCode": 51,
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "p-abort-while-committing",
+      "api": "EndTxn",
+      "version": 3,
+      "request": {
+        "Commit": false,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "TransactionalID": "tx-p"
+      },
+      "response": {
+        "ErrorCode": 51,
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "p-add-while-committing",
+      "api": "AddPartitionsToTxn",
+      "version": 3,
+      "request": {
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:1\u003e",
+        "Topics": [
+          {
+            "Partitions": [
+              0
+            ],
+            "Topic": "stuck"
+          }
+        ],
+        "TransactionalID": "tx-p",
+        "Transactions": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 51,
+                "Partition": 0
+              }
+            ],
+            "Topic": "stuck"
+          }
+        ],
+        "Transactions": null
+      }
+    },
+    {
+      "label": "p-init-while-committing",
+      "api": "InitProducerID",
+      "version": 3,
+      "request": {
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "TransactionTimeoutMillis": 60000,
+        "TransactionalID": "tx-p"
+      },
+      "response": {
+        "ErrorCode": 51,
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "p-state-after",
+      "api": "DescribeTransactions",
+      "version": 0,
+      "request": {
+        "TransactionalIDs": [
+          "tx-p"
+        ]
+      },
+      "response": {
+        "State": "PrepareCommit"
+      }
+    },
+    {
+      "label": "q-init",
+      "api": "InitProducerID",
+      "version": 3,
+      "request": {
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "TransactionTimeoutMillis": 60000,
+        "TransactionalID": "tx-q"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:2\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "q-add",
+      "api": "AddPartitionsToTxn",
+      "version": 3,
+      "request": {
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:2\u003e",
+        "Topics": [
+          {
+            "Partitions": [
+              0
+            ],
+            "Topic": "stuck"
+          }
+        ],
+        "TransactionalID": "tx-q",
+        "Transactions": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "stuck"
+          }
+        ],
+        "Transactions": null
+      }
+    },
+    {
+      "label": "q-abort",
+      "api": "EndTxn",
+      "version": 3,
+      "request": {
+        "Commit": false,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:2\u003e",
+        "TransactionalID": "tx-q"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "q-state",
+      "api": "DescribeTransactions",
+      "version": 0,
+      "request": {
+        "TransactionalIDs": [
+          "tx-q"
+        ]
+      },
+      "response": {
+        "State": "PrepareAbort"
+      }
+    },
+    {
+      "label": "q-abort-again",
+      "api": "EndTxn",
+      "version": 3,
+      "request": {
+        "Commit": false,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:2\u003e",
+        "TransactionalID": "tx-q"
+      },
+      "response": {
+        "ErrorCode": 51,
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "q-commit-while-aborting",
+      "api": "EndTxn",
+      "version": 3,
+      "request": {
+        "Commit": true,
+        "ProducerEpoch": 0,
+        "ProducerID": "\u003cproducer:2\u003e",
+        "TransactionalID": "tx-q"
+      },
+      "response": {
+        "ErrorCode": 51,
+        "ProducerEpoch": -1,
+        "ProducerID": -1,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "q-state-after",
+      "api": "DescribeTransactions",
+      "version": 0,
+      "request": {
+        "TransactionalIDs": [
+          "tx-q"
+        ]
+      },
+      "response": {
+        "State": "PrepareAbort"
+      }
+    }
+  ]
+}

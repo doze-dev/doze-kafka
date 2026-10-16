@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"slices"
 	"sync"
 	"time"
 
@@ -58,6 +59,10 @@ const (
 type txnEntry struct {
 	mu  sync.RWMutex
 	rec meta.TxnRecord
+
+	// finishFailure is the last reason the transaction's decision could not be
+	// carried out, so that it is logged once and not on every attempt.
+	finishFailure string
 }
 
 type txnManager struct {
@@ -102,15 +107,34 @@ func (m *txnManager) all() []*txnEntry {
 
 func nowMs() int64 { return time.Now().UnixMilli() }
 
-// persist writes the entry's state. Callers hold e.mu for writing.
-func (b *Broker) persistTxn(e *txnEntry) int16 {
-	e.rec.UpdatedMs = nowMs()
-	if err := b.meta.PutTxn(e.rec); err != nil {
+// updateTxn changes an entry: change is applied to a copy of its record, the copy
+// is stored, and only then does the entry take it. The entry in memory therefore
+// never says more than the store does: a write that fails leaves both as they
+// were, where it used to leave the entry ahead (a state, an epoch or a partition
+// the store had never heard of, acted on until the next restart took it back).
+// Callers hold e.mu for writing.
+func (b *Broker) updateTxn(e *txnEntry, change func(rec *meta.TxnRecord)) int16 {
+	next := e.rec
+	next.Partitions = slices.Clone(e.rec.Partitions)
+	next.Groups = slices.Clone(e.rec.Groups)
+	next.Offsets = slices.Clone(e.rec.Offsets)
+	change(&next)
+	next.UpdatedMs = nowMs()
+	if err := b.meta.PutTxn(next); err != nil {
 		b.log.Error("transactions: could not store the state of a transaction", "transactional_id", e.rec.ID, "err", err)
-		return kerr.CoordinatorNotAvailable.Code
+		return txnStoreUnavailable
 	}
+	e.rec = next
 	return 0
 }
+
+// txnStoreUnavailable is what a transaction API answers when the coordinator
+// could not write its state: NOT_COORDINATOR, which is what Apache Kafka answers
+// on InitProducerId, AddPartitionsToTxn, AddOffsetsToTxn, TxnOffsetCommit and
+// EndTxn when the append to its transaction log fails (recorded: the
+// full-disk-* scenarios). A client looks the coordinator up again and retries.
+// It is not KAFKA_STORAGE_ERROR, which Kafka answers on Produce only.
+const txnStoreUnavailable = int16(16)
 
 // owns checks that a request's producer id and epoch are the ones that own the
 // transactional id. A lower epoch has been fenced by a newer producer.
@@ -138,12 +162,12 @@ func (e *txnEntry) canAdd() int16 {
 	return 0
 }
 
-// begin moves a settled entry to Ongoing, starting a transaction.
-func (e *txnEntry) begin() {
-	if e.rec.State != txnOngoing {
-		e.rec.State = txnOngoing
-		e.rec.StartedMs = nowMs()
-		e.rec.Partitions, e.rec.Groups, e.rec.Offsets = nil, nil, nil
+// beginTxn moves a settled record to Ongoing, starting a transaction.
+func beginTxn(rec *meta.TxnRecord) {
+	if rec.State != txnOngoing {
+		rec.State = txnOngoing
+		rec.StartedMs = nowMs()
+		rec.Partitions, rec.Groups, rec.Offsets = nil, nil, nil
 	}
 }
 
@@ -157,36 +181,39 @@ func (b *Broker) initTxnProducer(id string, timeoutMs int32) (pid int64, epoch i
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	pid, epoch = e.rec.ProducerID, e.rec.Epoch
 	switch e.rec.State {
 	case "":
 		first, err := b.nextProducerID()
 		if err != nil {
 			b.log.Error("transactions: could not allocate a producer id", "err", err)
-			return -1, -1, kerr.CoordinatorNotAvailable.Code
+			return -1, -1, txnStoreUnavailable
 		}
-		e.rec.ProducerID, e.rec.Epoch = first, -1 // bumped to 0 below.
+		pid, epoch = first, -1 // bumped to 0 below.
 	case txnOngoing, txnPrepareAbort:
 		// The previous owner's transaction is aborted; its markers carry the new epoch.
 		if c := b.abortFencing(e); c != 0 {
 			return -1, -1, c
 		}
+		pid, epoch = e.rec.ProducerID, e.rec.Epoch
 	case txnPrepareCommit:
 		if c := b.finishTxn(e, true); c != 0 {
 			return -1, -1, c
 		}
 	}
-	if e.rec.Epoch >= math.MaxInt16-1 {
+	if epoch >= math.MaxInt16-1 {
 		// Epochs are exhausted: a new producer id, and epoch 0 again.
 		first, err := b.nextProducerID()
 		if err != nil {
-			return -1, -1, kerr.CoordinatorNotAvailable.Code
+			return -1, -1, txnStoreUnavailable
 		}
-		e.rec.ProducerID, e.rec.Epoch = first, -1
+		pid, epoch = first, -1
 	}
-	e.rec.Epoch++
-	e.rec.State, e.rec.TimeoutMs = txnEmpty, timeoutMs
-	e.rec.Partitions, e.rec.Groups, e.rec.Offsets = nil, nil, nil
-	if c := b.persistTxn(e); c != 0 {
+	if c := b.updateTxn(e, func(rec *meta.TxnRecord) {
+		rec.ProducerID, rec.Epoch = pid, epoch+1
+		rec.State, rec.TimeoutMs = txnEmpty, timeoutMs
+		rec.Partitions, rec.Groups, rec.Offsets = nil, nil, nil
+	}); c != 0 {
 		return -1, -1, c
 	}
 	return e.rec.ProducerID, e.rec.Epoch, 0
@@ -196,46 +223,66 @@ func (b *Broker) initTxnProducer(id string, timeoutMs int32) (pid int64, epoch i
 // first, so the markers (and whatever the old producer tries next) carry the new one.
 // Callers hold e.mu for writing.
 func (b *Broker) abortFencing(e *txnEntry) int16 {
-	if e.rec.Epoch < math.MaxInt16 {
-		e.rec.Epoch++
-	}
-	e.rec.State = txnPrepareAbort
-	if c := b.persistTxn(e); c != 0 {
+	if c := b.updateTxn(e, func(rec *meta.TxnRecord) {
+		if rec.Epoch < math.MaxInt16 {
+			rec.Epoch++
+		}
+		rec.State = txnPrepareAbort
+	}); c != 0 {
 		return c
 	}
 	return b.finishTxn(e, false)
 }
 
-// finishTxn writes the markers for a transaction whose decision is already stored
-// (PrepareCommit or PrepareAbort), applies a commit's offsets, and records the
-// Complete state. Safe to repeat. Callers hold e.mu for writing.
+// finishTxn carries out a transaction whose decision is already stored
+// (PrepareCommit or PrepareAbort): it writes the markers, applies a commit's
+// offsets, and records the Complete state. Safe to repeat. Callers hold e.mu for
+// writing.
+//
+// It answers 0, and the transaction is recorded Complete, only when every marker
+// is on disk. Every partition of the transaction is flushed, whether or not this
+// call wrote its marker: a marker that an earlier attempt appended and could not
+// flush (the flush failed, or the broker was killed first) is in the log already,
+// so this attempt writes nothing there, and that is no reason to believe it is on
+// disk. A commit that was answered and recorded on the strength of one was a
+// committed transaction that a power cut took back: its records in the log, no
+// marker after them, invisible to every read-committed consumer for good.
+//
+// When it cannot finish, the decision stands and the answer is
+// CONCURRENT_TRANSACTIONS, which is what Apache Kafka answers while a decided
+// transaction's markers are still being written (recorded:
+// endtxn-while-preparing): the client asks again, and the coordinator keeps
+// trying on its own (RunTransactions) and after a restart (RecoverTransactions).
 func (b *Broker) finishTxn(e *txnEntry, commit bool) int16 {
 	now := nowMs()
-	var written []meta.TxnPartition
+	fail := func(msg string, err error, attrs ...any) int16 {
+		// Once per failure, not once per attempt: the coordinator retries twice a second.
+		if text := msg + ": " + err.Error(); e.finishFailure != text {
+			e.finishFailure = text
+			b.log.Error("transactions: "+msg+"; the decision stands and will be carried out when it can be",
+				append([]any{"transactional_id", e.rec.ID, "commit", commit, "err", err}, attrs...)...)
+		}
+		return kerr.ConcurrentTransactions.Code
+	}
+	var present []meta.TxnPartition
 	for _, tp := range e.rec.Partitions {
 		plog, err := b.logs.ExistingPartition(tp.Topic, tp.Partition)
 		if errors.Is(err, log.ErrNoSuchPartition) {
 			continue // the topic was deleted: there is nothing to end there.
 		}
 		if err != nil {
-			b.log.Error("transactions: could not open a partition to end a transaction", "transactional_id", e.rec.ID, "topic", tp.Topic, "partition", tp.Partition, "err", err)
-			return kerr.CoordinatorNotAvailable.Code
+			return fail("could not open a partition to end a transaction", err, "topic", tp.Topic, "partition", tp.Partition)
 		}
-		_, wrote, err := plog.AppendMarker(e.rec.ProducerID, e.rec.Epoch, commit, 0, now)
-		if err != nil {
-			b.log.Error("transactions: could not write a transaction marker", "transactional_id", e.rec.ID, "topic", tp.Topic, "partition", tp.Partition, "err", err)
-			return kerr.CoordinatorNotAvailable.Code
+		if _, _, err := plog.AppendMarker(e.rec.ProducerID, e.rec.Epoch, commit, 0, now); err != nil {
+			return fail("could not write a transaction marker", err, "topic", tp.Topic, "partition", tp.Partition)
 		}
-		if wrote {
-			written = append(written, tp)
-		}
+		present = append(present, tp)
 	}
 	// A marker is the decision readers act on, so it is on disk before the transaction
-	// is called complete.
-	for _, tp := range written {
+	// is called complete: every partition, not only those this call wrote to.
+	for _, tp := range present {
 		if err := b.logs.SyncPartition(tp.Topic, tp.Partition); err != nil {
-			b.log.Error("transactions: could not flush a transaction marker", "transactional_id", e.rec.ID, "topic", tp.Topic, "partition", tp.Partition, "err", err)
-			return kerr.CoordinatorNotAvailable.Code
+			return fail("could not flush a transaction marker", err, "topic", tp.Topic, "partition", tp.Partition)
 		}
 		b.produce.signal(tp.Topic) // fetchers waiting on the last stable offset can go.
 	}
@@ -246,19 +293,46 @@ func (b *Broker) finishTxn(e *txnEntry, commit bool) int16 {
 		}
 		for group, commits := range byGroup {
 			if err := b.meta.CommitOffsets(group, commits); err != nil {
-				b.log.Error("transactions: could not apply a transaction's offsets", "transactional_id", e.rec.ID, "group", group, "err", err)
-				return kerr.CoordinatorNotAvailable.Code
+				return fail("could not apply a transaction's offsets", err, "group", group)
 			}
 		}
-		e.rec.State = txnCompleteCommit
-	} else {
-		e.rec.State = txnCompleteAbort
 	}
-	e.rec.Partitions, e.rec.Groups, e.rec.Offsets = nil, nil, nil
-	return b.persistTxn(e)
+	if c := b.updateTxn(e, func(rec *meta.TxnRecord) {
+		rec.State = txnCompleteAbort
+		if commit {
+			rec.State = txnCompleteCommit
+		}
+		rec.Partitions, rec.Groups, rec.Offsets = nil, nil, nil
+	}); c != 0 {
+		return kerr.ConcurrentTransactions.Code
+	}
+	e.finishFailure = ""
+	return 0
 }
 
 // endTxn is EndTxn: the producer's decision to commit or abort.
+//
+// A decision, once stored, is never changed and never answered as its opposite.
+// What Apache Kafka 4.3.1 answers (recorded: endtxn-decisions for the settled
+// states, endtxn-while-preparing for a transaction whose markers cannot be
+// written):
+//
+//	state            the same decision          the other decision
+//	Ongoing          carried out                carried out
+//	PrepareCommit    CONCURRENT_TRANSACTIONS    CONCURRENT_TRANSACTIONS
+//	PrepareAbort     CONCURRENT_TRANSACTIONS    CONCURRENT_TRANSACTIONS
+//	CompleteCommit   success                    INVALID_TXN_STATE
+//	CompleteAbort    success                    INVALID_TXN_STATE
+//	Empty            INVALID_TXN_STATE          INVALID_TXN_STATE
+//
+// Kafka's coordinator answers EndTxn once the decision is stored and writes the
+// markers afterwards; whatever arrives in between is told CONCURRENT_TRANSACTIONS
+// (ask again), and once the markers are written the table's last rows apply. This
+// coordinator writes the markers before it answers, so a client finds a Prepare
+// state only when writing them failed. An EndTxn that arrives then makes the
+// coordinator try again to carry out the decision that was stored, whichever
+// decision the request names, and is answered from the state that leaves: the
+// row for Complete if it is finished, CONCURRENT_TRANSACTIONS if it is not.
 func (b *Broker) endTxn(id string, pid int64, epoch int16, commit bool) int16 {
 	e := b.txns.get(id)
 	if e == nil {
@@ -271,17 +345,24 @@ func (b *Broker) endTxn(id string, pid int64, epoch int16, commit bool) int16 {
 	}
 	switch e.rec.State {
 	case txnOngoing:
-		e.rec.State = txnPrepareAbort
-		if commit {
-			e.rec.State = txnPrepareCommit
-		}
-		if c := b.persistTxn(e); c != 0 {
+		if c := b.updateTxn(e, func(rec *meta.TxnRecord) {
+			rec.State = txnPrepareAbort
+			if commit {
+				rec.State = txnPrepareCommit
+			}
+		}); c != 0 {
 			return c
 		}
 		return b.finishTxn(e, commit)
 	case txnPrepareCommit, txnPrepareAbort:
-		// A repeat of an end that did not finish; the decision stands.
-		return b.finishTxn(e, e.rec.State == txnPrepareCommit)
+		decided := e.rec.State == txnPrepareCommit
+		if c := b.finishTxn(e, decided); c != 0 {
+			return c
+		}
+		if commit != decided {
+			return kerr.InvalidTxnState.Code // the other decision was made, and has been carried out.
+		}
+		return 0
 	case txnCompleteCommit:
 		if commit {
 			return 0 // a retry of an end that succeeded.
@@ -310,7 +391,7 @@ func (b *Broker) RecoverTransactions() {
 		case txnPrepareAbort:
 			code = b.finishTxn(e, false)
 		case txnOngoing:
-			code = b.persistTxn(e) // stamps the time: the timeout counts from the restart.
+			code = b.updateTxn(e, func(*meta.TxnRecord) {}) // stamps the time: the timeout counts from the restart.
 		}
 		if code != 0 {
 			b.log.Error("transactions: could not finish a transaction left from before the restart", "transactional_id", e.rec.ID, "code", code)
@@ -337,7 +418,24 @@ func (b *Broker) RunTransactions(ctx context.Context) {
 		for _, e := range b.txns.all() {
 			e.mu.RLock()
 			expired := e.rec.State == txnOngoing && now-e.rec.UpdatedMs > int64(e.rec.TimeoutMs)
+			decided := e.rec.State == txnPrepareCommit || e.rec.State == txnPrepareAbort
 			e.mu.RUnlock()
+			if decided {
+				// A decision that could not be carried out when it was made (a marker
+				// that could not be written or flushed) is carried out as soon as it
+				// can be, whether or not the producer ever asks again: until it is,
+				// the partitions' last stable offset stands still and every
+				// read-committed consumer of them waits.
+				e.mu.Lock()
+				switch e.rec.State {
+				case txnPrepareCommit:
+					b.finishTxn(e, true)
+				case txnPrepareAbort:
+					b.finishTxn(e, false)
+				}
+				e.mu.Unlock()
+				continue
+			}
 			if !expired {
 				continue
 			}
