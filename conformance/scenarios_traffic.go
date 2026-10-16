@@ -72,6 +72,9 @@ var (
 	knownClassicJoin        []Known
 	knownClassicGenerations []Known
 	knownProduceMixed       = []Known{
+		// Kafka lists the answer's topics and partitions in hash-map order,
+		// doze-kafka in the request's; a client matches them by name and number.
+		{Step: "*", Path: orderPath, Limitation: "A Produce answer lists its topics and partitions in the order of the request"},
 		{Step: "unknown-partition-then-too-large", Path: "Topics[1].Partitions[0].ErrorMessage", Limitation: limMessages},
 		{Step: "too-large-then-unknown-partition", Path: "Topics[1].Partitions[0].ErrorMessage", Limitation: limMessages},
 		{Step: "unknown-topic-first", Path: "Topics[0].Partitions[0].ErrorMessage", Limitation: limMessages},

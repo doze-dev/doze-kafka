@@ -78,3 +78,24 @@ func TestUnknownTagsAndNestedVersionsReachTheRecording(t *testing.T) {
 		t.Errorf("a nested Version was dropped: %v", got)
 	}
 }
+
+// A Produce answer is recorded in the broker's order: Compare reports an order
+// that differs as "(order)" and the content apart from it, and a content
+// difference still shows whatever the order.
+func TestProduceOrderIsComparedApartFromContent(t *testing.T) {
+	part := func(topic string, p, code int) map[string]any {
+		return map[string]any{"Topic": topic, "Partitions": []any{map[string]any{"Partition": p, "ErrorCode": code}}}
+	}
+	step := func(topics ...any) Step {
+		return Step{Label: "p", API: "Produce", Response: map[string]any{"Topics": topics}}
+	}
+	kafka := Recording{Steps: []Step{step(part("b", 0, 0), part("a", 0, 10))}}
+	diffs := Compare(kafka, []Step{step(part("a", 0, 10), part("b", 0, 0))})
+	if len(diffs) != 1 || len(diffs[0].Diffs) != 1 || diffs[0].Diffs[0].Path != orderPath {
+		t.Fatalf("the same content in another order: %+v, want one (order) difference", diffs)
+	}
+	diffs = Compare(kafka, []Step{step(part("b", 0, 0), part("a", 0, 2))})
+	if len(diffs) != 1 || len(diffs[0].Diffs) != 1 || diffs[0].Diffs[0].Path == orderPath {
+		t.Fatalf("another code in the same order: %+v, want one content difference", diffs)
+	}
+}

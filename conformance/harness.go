@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -326,7 +327,6 @@ func (e *Env) do(label string, req kmsg.Request, version int16, done func(kmsg.R
 			e.steps = append(e.steps, step)
 			return req.ResponseKind()
 		}
-		sortProduceResponse(resp)
 		nresp, err := e.norm.normalize(resp)
 		if err != nil {
 			e.fail("%s: %v", label, err)
@@ -345,20 +345,66 @@ func (e *Env) do(label string, req kmsg.Request, version int16, done func(kmsg.R
 	return resp
 }
 
-// sortProduceResponse puts a Produce response's topics and partitions in name
-// and number order. Apache Kafka answers them in the order of a hash map, not
-// the order of the request (recorded: produce-mixed-partition-errors), which is
-// nothing a client can rely on, so the order is not what is compared.
-func sortProduceResponse(r kmsg.Response) {
-	p, ok := r.(*kmsg.ProduceResponse)
+// A Produce response is recorded in the order the broker gave it. Apache Kafka
+// answers its topics and partitions in the order of a hash map, not the order
+// of the request (recorded: produce-mixed-partition-errors). Compare therefore
+// compares the content in name and number order and the order on its own, as the
+// path "(order)", so that a scenario where the two brokers order differently
+// says so with a Known entry and a reason, and a difference in content still shows.
+const orderPath = "(order)"
+
+// partitionNumber is a normalised partition's number (a json.Number when made,
+// a float64 when loaded from a recording).
+func partitionNumber(p any) float64 {
+	m, _ := p.(map[string]any)
+	f, _ := strconv.ParseFloat(fmt.Sprint(m["Partition"]), 64)
+	return f
+}
+
+// produceOrder is the topic/partition order of a normalised Produce response, and
+// a copy of it with topics and partitions in name and number order.
+func produceOrder(resp any) (order []string, sorted any) {
+	m, ok := resp.(map[string]any)
 	if !ok {
-		return
+		return nil, resp
 	}
-	sort.SliceStable(p.Topics, func(i, j int) bool { return p.Topics[i].Topic < p.Topics[j].Topic })
-	for i := range p.Topics {
-		ps := p.Topics[i].Partitions
-		sort.SliceStable(ps, func(a, b int) bool { return ps[a].Partition < ps[b].Partition })
+	ts, ok := m["Topics"].([]any)
+	if !ok {
+		return nil, resp
 	}
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	topics := make([]any, len(ts))
+	for i, t := range ts {
+		tm, ok := t.(map[string]any)
+		if !ok {
+			return nil, resp
+		}
+		cp := make(map[string]any, len(tm))
+		for k, v := range tm {
+			cp[k] = v
+		}
+		ps, _ := tm["Partitions"].([]any)
+		parts := append([]any(nil), ps...)
+		for _, p := range ps {
+			pm, _ := p.(map[string]any)
+			order = append(order, fmt.Sprintf("%v/%v", tm["Topic"], pm["Partition"]))
+		}
+		sort.SliceStable(parts, func(a, b int) bool {
+			return partitionNumber(parts[a]) < partitionNumber(parts[b])
+		})
+		if ps != nil {
+			cp["Partitions"] = parts
+		}
+		topics[i] = cp
+	}
+	sort.SliceStable(topics, func(a, b int) bool {
+		return fmt.Sprint(topics[a].(map[string]any)["Topic"]) < fmt.Sprint(topics[b].(map[string]any)["Topic"])
+	})
+	out["Topics"] = topics
+	return order, out
 }
 
 // onlyRequestedConfigs trims a CreateTopics response's echo of every topic
@@ -605,7 +651,16 @@ func Compare(want Recording, got []Step) []StepDiff {
 		// The request is compared too: a script edited after its recording must be
 		// recorded again, not quietly replayed as something else.
 		diff("request", w.Request, g.Request, &ds)
-		diff("", w.Response, g.Response, &ds)
+		wr, gr := w.Response, g.Response
+		if w.API == "Produce" {
+			wo, ws := produceOrder(wr)
+			gO, gs := produceOrder(gr)
+			if strings.Join(wo, " ") != strings.Join(gO, " ") {
+				ds = append(ds, Diff{Path: orderPath, Want: strings.Join(wo, " "), Got: strings.Join(gO, " ")})
+			}
+			wr, gr = ws, gs
+		}
+		diff("", wr, gr, &ds)
 		if len(ds) > 0 {
 			out = append(out, StepDiff{Step: w.Label, Diffs: ds})
 		}
