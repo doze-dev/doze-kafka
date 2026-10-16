@@ -1,5 +1,6 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
+import { removeDir } from './cleanup';
 import { join, resolve } from 'node:path';
 import { PREFIX } from './playwright.config';
 
@@ -28,7 +29,7 @@ export class OwnBroker {
   async start(): Promise<void> {
     mkdirSync(join(this.root, 'e2e', '.tmp', 'bin'), { recursive: true });
     execFileSync('go', ['build', '-o', this.bin, './cmd/doze-kafka'], { cwd: this.root, env: { ...process.env, GOWORK: 'off' } });
-    rmSync(this.data, { recursive: true, force: true });
+    removeDir(this.data);
     mkdirSync(this.data, { recursive: true });
     await this.up();
   }

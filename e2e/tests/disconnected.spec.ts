@@ -1,5 +1,6 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
+import { removeDir } from '../cleanup';
 import { join, resolve } from 'node:path';
 import { test, expect } from '../fixtures/console';
 import { createRequire } from 'node:module';
@@ -55,7 +56,7 @@ test.describe.configure({ mode: 'serial' });
 test.beforeAll(async () => {
   mkdirSync(join(ROOT, 'e2e', '.tmp', 'bin'), { recursive: true });
   execFileSync('go', ['build', '-o', BIN, './cmd/doze-kafka'], { cwd: ROOT, env: { ...process.env, GOWORK: 'off' } });
-  rmSync(DATA, { recursive: true, force: true });
+  removeDir(DATA);
   mkdirSync(DATA, { recursive: true });
   await up();
 });

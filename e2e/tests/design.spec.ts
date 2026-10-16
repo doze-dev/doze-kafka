@@ -1,7 +1,8 @@
 import { test, expect } from '../fixtures/console';
 import type { Page } from '@playwright/test';
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
+import { stopAndRemove } from '../cleanup';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -165,8 +166,7 @@ test('Sy-08 at 320 with a 60-character console prefix: an address is never broke
     const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(over, 'the page does not scroll sideways').toBeLessThanOrEqual(0);
   } finally {
-    child?.kill('SIGTERM');
-    rmSync(dir, { recursive: true, force: true });
+    await stopAndRemove(child, dir);
   }
 });
 
@@ -246,9 +246,7 @@ test('a fresh empty broker lands on "Your broker is up", with the three steps', 
     await page.goto(base);
     await expect(page.locator('h1')).not.toHaveText('Your broker is up');
   } finally {
-    child?.kill('SIGTERM');
-    await new Promise((r) => setTimeout(r, 300));
-    rmSync(dir, { recursive: true, force: true });
+    await stopAndRemove(child, dir);
   }
 });
 

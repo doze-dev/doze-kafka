@@ -7,7 +7,7 @@ import { ALLOW } from './allow';
 // The gate bites: a one-pixel change the board does not have, and a count the broker
 // does not hold, are both reported. Each is planted in the live page after it loads
 // (the console is not touched), and the test passes only if the gate fails it. Runs
-// with every `task test:design`, so a change to lib/ that blunts the comparison fails.
+// with every `task design`, so a change to lib/ that blunts the comparison fails.
 
 async function plant1px(page: Page) {
   await page.addStyleTag({ content: '.list .li { height: 31px !important; }' });

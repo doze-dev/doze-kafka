@@ -418,7 +418,7 @@ Screenshots of the live console beside the design's boards, for the review that
   off the board and off the live page by the same function (e2e/evidence/measure.ts).
 - The verdict is the one in \`plan/00-foundation.md\`, "Deviations from the boards";
   this run does not change it. For Stage 0 (Sy-01 to Sy-08, the section homes and
-  Tp-24) the verdict is the design gate's (\`e2e/design\`, \`go tool task test:design\`):
+  Tp-24) the verdict is the design gate's (\`e2e/design\`, \`go tool task design\`):
   it compares every probed element of the board and the console, in light and dark,
   and holds each difference to its reason in an allow-list. The differences listed
   below are this run's coarser measure (a few fixed sizes and colours per page),

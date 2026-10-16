@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { raw } from './measure';
 
 // The comparison itself. A probe names one element on each side (a selector for the
 // board, one for the live page, and which visible match); both are measured by the
@@ -59,38 +60,29 @@ export type Allowed = {
 
 export type Diff = { el: string; prop: Prop | 'presence'; board: string; live: string };
 
-/** Measures the nth visible element matching sel. */
+/** Measures the nth visible element matching sel (this gate's view of `measure.ts`). */
 export async function measure(page: Page, sel: string, nth = 0, origin?: { sel: string; nth: number }): Promise<Measured> {
-  return page.evaluate(({ sel, nth, origin }) => {
-    const vis = Array.from(document.querySelectorAll<HTMLElement>(sel)).filter((e) => {
-      const b = e.getBoundingClientRect();
-      return b.width > 0 && b.height > 0 && getComputedStyle(e).visibility !== 'hidden';
-    });
-    const el = vis[nth];
-    if (!el) return null;
-    const cs = getComputedStyle(el);
-    const b = el.getBoundingClientRect();
-    let ox = 0, oy = 0;
-    if (origin) {
-      const o = Array.from(document.querySelectorAll<HTMLElement>(origin.sel)).filter((e) => e.getBoundingClientRect().width > 0)[origin.nth];
-      if (o) { const ob = o.getBoundingClientRect(); ox = ob.x; oy = ob.y; }
-    }
-    const r = (n: number) => String(Math.round(n * 10) / 10);
-    const fam = cs.fontFamily.split(',')[0].replace(/["']/g, '').replace(/ Variable$/, '').trim();
-    const bw = [cs.borderTopWidth, cs.borderRightWidth, cs.borderBottomWidth, cs.borderLeftWidth].map(parseFloat);
-    const bc = [cs.borderTopColor, cs.borderRightColor, cs.borderBottomColor, cs.borderLeftColor];
-    return {
-      x: r(b.x - ox), y: r(b.y - oy), w: r(b.width), h: r(b.height),
-      font: `${fam} ${cs.fontWeight} ${cs.fontSize}/${cs.lineHeight}`,
-      ls: cs.letterSpacing, tt: cs.textTransform, color: cs.color, bg: cs.backgroundColor,
-      padding: cs.padding, margin: cs.margin, gap: `${cs.rowGap} ${cs.columnGap}`,
-      border: bw.map((w, i) => (w ? `${w} ${bc[i]}` : '0')).join(' | '),
-      radius: cs.borderRadius, display: cs.display,
-      tracks: cs.display.includes('grid') ? cs.gridTemplateColumns : '',
-      opacity: cs.opacity, deco: cs.textDecorationLine,
-      text: (el.innerText || '').replace(/\s+/g, ' ').trim(),
-    };
-  }, { sel, nth, origin });
+  const all = await raw(page, origin ? [sel, origin.sel] : [sel]);
+  const r = all[sel].filter((e) => e.box)[nth];
+  if (!r) return null;
+  let ox = 0, oy = 0;
+  if (origin) {
+    const o = all[origin.sel].filter((e) => e.w > 0)[origin.nth];
+    if (o) { ox = o.rx; oy = o.ry; }
+  }
+  const tenth = (n: number) => String(Math.round(n * 10) / 10);
+  const bw = r.bw.map(parseFloat);
+  return {
+    x: tenth(r.rx - ox), y: tenth(r.ry - oy), w: String(r.w), h: String(r.h),
+    font: `${r.family} ${r.weight} ${r.size}/${r.lineHeight}`,
+    ls: r.ls, tt: r.tt, color: r.color, bg: r.bg,
+    padding: r.padding, margin: r.margin, gap: `${r.rowGap} ${r.columnGap}`,
+    border: bw.map((w, i) => (w ? `${w} ${r.bc[i]}` : '0')).join(' | '),
+    radius: r.radius, display: r.display,
+    tracks: r.display.includes('grid') ? r.gridCols : '',
+    opacity: r.opacity, deco: r.deco,
+    text: r.inner,
+  };
 }
 
 /** The differences between the two pages over a list of probes. */

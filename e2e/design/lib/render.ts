@@ -8,7 +8,9 @@ import type { Browser, Page } from '@playwright/test';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const BOARDS_DIR = resolve(HERE, '..', 'boards');
-const FONTS = resolve(HERE, '..', '..', '..', 'console', 'static', 'fonts');
+/** The repository's root. */
+export const ROOT = resolve(HERE, '..', '..', '..');
+const FONTS = resolve(ROOT, 'console', 'static', 'fonts');
 
 export type Theme = 'light' | 'dark' | 'contrast';
 export type Size = 1440 | 960 | 390;

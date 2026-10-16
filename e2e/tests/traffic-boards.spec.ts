@@ -11,7 +11,7 @@ const HOLD_TOPIC = 'trf-hold-topic';
 
 // What the Traffic boards do, as against what they draw. What they draw (every element's
 // geometry, type, colour and copy, and the data against a ledger of real clients) is
-// tests/design-traffic.spec.ts, the design gate; this file is the behaviour the gate
+// design/traffic/traffic.spec.ts, the design gate; this file is the behaviour the gate
 // cannot see: what a key, a click, a poll, a pause or a narrow screen does to the page.
 // Consumers that stay in their groups (one classic, two of KIP-848's protocol), and one
 // that reports its own metrics, are the traffic.
