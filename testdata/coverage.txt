@@ -1,37 +1,37 @@
-cmd/doze-kafka 85.1 darwin
-cmd/doze-kafka 85.9 linux
-conformance 90.3 darwin
-conformance 90.3 linux
-console 89 darwin
-console 89 linux
+cmd/doze-kafka 84.8 darwin
+cmd/doze-kafka 85.5 linux
+conformance 91.8 darwin
+conformance 91.8 linux
+console 89.1 darwin
+console 89.2 linux
 e2e/seed 78.7 darwin
 e2e/seed 78.7 linux
 internal/broker 90.4 darwin
 internal/broker 90.4 linux
-internal/config 65.8 darwin
-internal/config 65.8 linux
-internal/consolefeed 100 darwin
-internal/consolefeed 100 linux
+internal/config 66.3 darwin
+internal/config 66.3 linux
+internal/consolefeed 97.5 darwin
+internal/consolefeed 97.5 linux
 internal/embed 100 darwin
 internal/embed 100 linux
 internal/hostguard 100 darwin
 internal/hostguard 100 linux
-internal/protocol 83.5 darwin
-internal/protocol 83.5 linux
+internal/protocol 91.2 darwin
+internal/protocol 91.3 linux
 internal/protocol/observe.go 94.4
 internal/protocol/summary.go 89.7
-internal/settings 78.9 darwin
-internal/settings 78.9 linux
-internal/storage/log 86.4 darwin
-internal/storage/log 86.4 linux
-internal/storage/meta 82.4 darwin
-internal/storage/meta 82.4 linux
+internal/settings 78 darwin
+internal/settings 78 linux
+internal/storage/log 84 darwin
+internal/storage/log 84 linux
+internal/storage/meta 83.3 darwin
+internal/storage/meta 83.3 linux
 internal/telemetry 98.8 darwin
 internal/telemetry 98.8 linux
-internal/traffic 98.8 darwin
-internal/traffic 98.8 linux
-schemaregistry 89 darwin
-schemaregistry 89 linux
+internal/traffic 99.6 darwin
+internal/traffic 99.6 linux
+schemaregistry 90 darwin
+schemaregistry 90 linux
 scripts/apisurface 82.5 darwin
 scripts/apisurface 82.5 linux
 scripts/coverage 86.8 darwin
@@ -42,8 +42,10 @@ scripts/lightness 81.7 darwin
 scripts/lightness 81.7 linux
 scripts/mutate 73.7 darwin
 scripts/mutate 74.5 linux
-server 86.2 darwin
-server 86.2 linux
+scripts/vulncheck 61.8 darwin
+scripts/vulncheck 61.8 linux
+server 94.6 darwin
+server 94.6 linux
 # Floors lowered in this file's history, each with what is known of why (written
 # 2026-10-16 from the commits; the gate fails on a lowered floor with no line here).
 # lowered: 2026-10-11 internal/storage/log 81 -> 80.2: aad280e called 80.2 the stable value with no measurement in the commit; the cause, found later, was the maintenance loop's one-second tick landing inside other tests or not (internal/storage/log/maintain_tick_test.go now reaches those lines on purpose)
@@ -67,3 +69,11 @@ server 86.2 linux
 # no-tests: e2e/routes: prints console/routes.go as JSON for the route gate, which fails on a route the table has and the suite did not reach
 # no-tests: internal/kmsg: the vendored, generated Kafka message codec (franz-go's kmsg, PATCHES.md says what was changed); it is exercised through every protocol and broker test and left out of the coverage profile on purpose
 # no-tests: internal/kmsg/internal/kbin: kmsg's binary reader and writer, vendored with it; the same
+# lowered: 2026-10-16 cmd/doze-kafka@darwin 85.1 -> 84.8: the merge of main (62fc8bc) brought the CLI and config-print changes (18c7cd5, caf265e, 9e520a0, f68e29c) with branches no test in this package reaches on macOS
+# lowered: 2026-10-16 internal/consolefeed@darwin 100 -> 97.5: measured 97.5 in this package's own run on macOS after the merge; e66da06 wrote 100 with no platform and no run recorded
+# lowered: 2026-10-16 internal/settings@darwin 78.9 -> 78: the merge of main brought settings rows (message.max.bytes, timestamp bounds, 9b90f55; compression.type as applied, 94d8def) whose paths no settings test reaches
+# lowered: 2026-10-16 internal/storage/log@darwin 86.4 -> 84: the merge of main brought CheckProduce and the streamed codecs (9b90f55, produce.go and records.go) with refusal branches no test reaches; the code is another worker's
+# lowered: 2026-10-16 cmd/doze-kafka@linux 85.9 -> 85.5: the merge of main (62fc8bc) brought the CLI and config-print changes (18c7cd5, caf265e, 9e520a0, f68e29c) with branches no test in this package reaches on Linux
+# lowered: 2026-10-16 internal/consolefeed@linux 100 -> 97.5: measured 97.5 in this package's own run on Linux after the merge; e66da06 wrote 100 with no platform and no run recorded
+# lowered: 2026-10-16 internal/settings@linux 78.9 -> 78: the merge of main brought settings rows (message.max.bytes, timestamp bounds, 9b90f55; compression.type as applied, 94d8def) whose paths no settings test reaches
+# lowered: 2026-10-16 internal/storage/log@linux 86.4 -> 84: the merge of main brought CheckProduce and the streamed codecs (9b90f55, produce.go and records.go) with refusal branches no test reaches; the code is another worker's
