@@ -6,12 +6,13 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
-- Console: the design gate (`go tool task test:design`, part of `test:e2e`) renders
-  each board of the shell and the section homes from its own source and compares it
-  with the live console element by element, in light and dark at 1440 and at the
-  boards' 960 and 390; every difference is on an allow-list with its reason, and the
-  numbers on the homes are held to what the broker and the registry hold. It is shown
-  to bite on every run (a planted pixel and a planted count are both reported).
+- Console: the design gate (`go tool task design`, run once by `test:e2e`) renders
+  each board of the shell, the section homes and Traffic from its own source and
+  compares it with the live console element by element, in light and dark at 1440 and
+  at the shell boards' 960 and 390; every difference is on an allow-list with its
+  reason, and the numbers on the homes are held to what the broker and the registry
+  hold. The shell and homes gates are shown to bite on every run (a planted pixel and a
+  planted count are both reported). One library serves the three gates.
 
 - Console: the topic page is the boards'. Closed, the composer is a key, a value and
   Send (it was a title bar); the neighbours are wells in ink; the wire is its head and
@@ -61,8 +62,15 @@ here that contains "server API"; `task api` fails without it.
   under a millisecond read `0.4 ms`, where the boards print `0 ms` (the exact value is in
   the title). Esc clears the filter; the keys strip follows each state; the rows are one
   tab stop of a grid; the inspector announces what it holds; a request's decoded fields
-  are written in the specification's snake case. The keys strip is a region, and the
-  phone's brand link keeps its name.
+  are written in the specification's snake case. The keys strip is the page's footer
+  landmark, and the phone's brand link keeps its name.
+
+- Console: `/` on Traffic focuses its filter (the strip said so, and the key found no
+  field); stale rows while the broker is lost are muted (the page's muted ink at full
+  opacity), not faded to the board's .55, which put their text under 4.5:1, so the
+  accessibility sweep now checks them too; a page whose regions poll together (a group's
+  page and its wire dock) no longer queues one poll behind another, and a poll that
+  failed while queued was an uncaught error in the browser's console.
 
 - Console: Traffic holds a client's long names (client id, software, group, transactional
   id, a 249-character topic) in its columns, cut with an ellipsis and whole in the title

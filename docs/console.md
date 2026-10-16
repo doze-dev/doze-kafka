@@ -288,7 +288,7 @@ the console's own, with the broker's own explanation where it gave one.
 The console asks the broker every five seconds whether it is there. When it is not,
 the pill at the top right turns red and says **not reachable** beside its address
 (the time of the last answer is its tooltip), with one Retry (`r`); what was on screen
-stays, dimmed, and comes back by itself when the broker does. A topic or group that does not
+stays, muted, and comes back by itself when the broker does. A topic or group that does not
 exist gives a real 404 page with near-miss suggestions ("did you mean `orders`?").
 
 Every destructive action confirms, and the confirm says what goes with it, measured

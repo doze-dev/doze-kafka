@@ -50,7 +50,7 @@
      },
      "main": {
       "w": 996,
-      "h": 828,
+      "h": 765,
       "font": "13px/20px 400",
       "color": "rgb(23, 25, 28)",
       "radius": "0px",
@@ -87,12 +87,12 @@
       "padding": "0px 12px",
       "background": "rgb(247, 247, 244)",
       "columns": [
-       180.1,
+       120,
        80,
-       261.9,
+       354,
+       80,
        84,
-       100,
-       96,
+       84,
        44
       ]
      },
@@ -105,17 +105,26 @@
       "padding": "0px 12px",
       "background": "rgba(0, 0, 0, 0)",
       "columns": [
-       180.1,
+       120,
        80,
-       261.9,
+       354,
+       80,
        84,
-       100,
-       96,
+       84,
        44
       ]
      },
+     "open row": null,
      "tab": null,
-     "primary button": null,
+     "primary button": {
+      "w": 89.7,
+      "h": 28,
+      "font": "13px/20px 500",
+      "color": "rgb(255, 255, 255)",
+      "radius": "4px",
+      "padding": "0px 11px",
+      "background": "rgb(23, 25, 28)"
+     },
      "pill": {
       "w": 136,
       "h": 20,
@@ -187,7 +196,7 @@
      },
      "main": {
       "w": 996,
-      "h": 828,
+      "h": 765,
       "font": "13px/20px 400",
       "color": "rgb(233, 234, 235)",
       "radius": "0px",
@@ -224,12 +233,12 @@
       "padding": "0px 12px",
       "background": "rgb(21, 24, 26)",
       "columns": [
-       180.1,
+       120,
        80,
-       261.9,
+       354,
+       80,
        84,
-       100,
-       96,
+       84,
        44
       ]
      },
@@ -242,17 +251,26 @@
       "padding": "0px 12px",
       "background": "rgba(0, 0, 0, 0)",
       "columns": [
-       180.1,
+       120,
        80,
-       261.9,
+       354,
+       80,
        84,
-       100,
-       96,
+       84,
        44
       ]
      },
+     "open row": null,
      "tab": null,
-     "primary button": null,
+     "primary button": {
+      "w": 89.7,
+      "h": 28,
+      "font": "13px/20px 500",
+      "color": "rgb(25, 28, 31)",
+      "radius": "4px",
+      "padding": "0px 11px",
+      "background": "rgb(233, 234, 235)"
+     },
      "pill": {
       "w": 136,
       "h": 20,
@@ -502,7 +520,7 @@
       "family": "IBM Plex Sans"
      },
      "table header row": {
-      "w": 630,
+      "w": 550,
       "h": 26,
       "font": "10px/16px 600",
       "color": "rgb(86, 91, 99)",
@@ -511,11 +529,11 @@
       "background": "rgb(247, 247, 244)",
       "columns": [
        130,
-       462
+       382
       ]
      },
      "first table row": {
-      "w": 630,
+      "w": 550,
       "h": 28,
       "font": "13px/20px 400",
       "color": "rgb(86, 91, 99)",
@@ -524,9 +542,10 @@
       "background": "rgba(0, 0, 0, 0)",
       "columns": [
        130,
-       462
+       382
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": {
       "w": 116.5,
@@ -629,7 +648,7 @@
       "family": "IBM Plex Sans"
      },
      "table header row": {
-      "w": 630,
+      "w": 550,
       "h": 26,
       "font": "10px/16px 600",
       "color": "rgb(163, 169, 176)",
@@ -638,11 +657,11 @@
       "background": "rgb(21, 24, 26)",
       "columns": [
        130,
-       462
+       382
       ]
      },
      "first table row": {
-      "w": 630,
+      "w": 550,
       "h": 28,
       "font": "13px/20px 400",
       "color": "rgb(163, 169, 176)",
@@ -651,9 +670,10 @@
       "background": "rgba(0, 0, 0, 0)",
       "columns": [
        130,
-       462
+       382
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": {
       "w": 116.5,
@@ -895,11 +915,11 @@
       "padding": "0px 12px",
       "background": "rgb(247, 247, 244)",
       "columns": [
-       181,
-       110,
-       110,
-       70,
-       195,
+       194.5,
+       96,
+       86,
+       80,
+       209.5,
        86,
        110
       ]
@@ -913,15 +933,16 @@
       "padding": "0px 12px",
       "background": "rgba(0, 0, 0, 0)",
       "columns": [
-       181,
-       110,
-       110,
-       70,
-       195,
+       194.5,
+       96,
+       86,
+       80,
+       209.5,
        86,
        110
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": null,
      "pill": {
@@ -1040,11 +1061,11 @@
       "padding": "0px 12px",
       "background": "rgb(21, 24, 26)",
       "columns": [
-       181,
-       110,
-       110,
-       70,
-       195,
+       194.5,
+       96,
+       86,
+       80,
+       209.5,
        86,
        110
       ]
@@ -1058,15 +1079,16 @@
       "padding": "0px 12px",
       "background": "rgba(0, 0, 0, 0)",
       "columns": [
-       181,
-       110,
-       110,
-       70,
-       195,
+       194.5,
+       96,
+       86,
+       80,
+       209.5,
        86,
        110
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": null,
      "pill": {
@@ -1361,6 +1383,7 @@
        52
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": null,
      "pill": {
@@ -1506,6 +1529,7 @@
        52
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": null,
      "pill": {
@@ -1594,32 +1618,27 @@
      "table header row": null,
      "first table row": {
       "w": 364,
-      "h": 103,
-      "font": "11px/20px 400",
-      "color": "rgb(86, 91, 99)",
+      "h": 57,
+      "font": "12px/20px 600",
+      "color": "rgb(23, 25, 28)",
       "radius": "0px",
-      "padding": "8px 10px",
+      "padding": "8px 12px",
       "background": "rgba(0, 0, 0, 0)",
       "columns": [
-       156,
-       150,
-       156,
-       156,
-       344,
-       180,
-       180
+       340
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": null,
      "pill": {
-      "w": 46.7,
-      "h": 20,
+      "w": 7,
+      "h": 7,
       "font": "12px/20px 400",
-      "color": "rgb(22, 107, 63)",
+      "color": "rgb(23, 25, 28)",
       "radius": "3px",
-      "padding": "0px 7px",
-      "background": "rgb(227, 241, 232)"
+      "padding": "0px",
+      "background": "rgba(0, 0, 0, 0)"
      },
      "callout": null,
      "segment": {
@@ -1690,32 +1709,27 @@
      "table header row": null,
      "first table row": {
       "w": 364,
-      "h": 103,
-      "font": "11px/20px 400",
-      "color": "rgb(163, 169, 176)",
+      "h": 57,
+      "font": "12px/20px 600",
+      "color": "rgb(233, 234, 235)",
       "radius": "0px",
-      "padding": "8px 10px",
+      "padding": "8px 12px",
       "background": "rgba(0, 0, 0, 0)",
       "columns": [
-       289.8,
-       46.2,
-       289.8,
-       289.8,
-       344,
-       46.2,
-       46.2
+       340
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": null,
      "pill": {
-      "w": 46.7,
-      "h": 20,
+      "w": 7,
+      "h": 7,
       "font": "12px/20px 400",
-      "color": "rgb(95, 202, 143)",
+      "color": "rgb(233, 234, 235)",
       "radius": "3px",
-      "padding": "0px 7px",
-      "background": "rgb(23, 48, 31)"
+      "padding": "0px",
+      "background": "rgba(0, 0, 0, 0)"
      },
      "callout": null,
      "segment": {
@@ -1965,12 +1979,12 @@
       "padding": "0px 12px",
       "background": "rgb(247, 247, 244)",
       "columns": [
-       262.8,
-       90,
+       245,
+       70,
        70,
        80,
-       160,
-       197.2
+       150,
+       245
       ]
      },
      "first table row": {
@@ -1982,19 +1996,20 @@
       "padding": "0px 12px",
       "background": "rgba(0, 0, 0, 0)",
       "columns": [
-       262.8,
-       90,
+       245,
+       70,
        70,
        80,
-       160,
-       197.2
+       150,
+       245
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": {
-      "w": 120.8,
+      "w": 122.6,
       "h": 28,
-      "font": "13px/20px 400",
+      "font": "13px/20px 500",
       "color": "rgb(255, 255, 255)",
       "radius": "4px",
       "padding": "0px 11px",
@@ -2108,12 +2123,12 @@
       "padding": "0px 12px",
       "background": "rgb(21, 24, 26)",
       "columns": [
-       262.8,
-       90,
+       245,
+       70,
        70,
        80,
-       160,
-       197.2
+       150,
+       245
       ]
      },
      "first table row": {
@@ -2125,19 +2140,20 @@
       "padding": "0px 12px",
       "background": "rgba(0, 0, 0, 0)",
       "columns": [
-       262.8,
-       90,
+       245,
+       70,
        70,
        80,
-       160,
-       197.2
+       150,
+       245
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": {
-      "w": 120.8,
+      "w": 122.6,
       "h": 28,
-      "font": "13px/20px 400",
+      "font": "13px/20px 500",
       "color": "rgb(25, 28, 31)",
       "radius": "4px",
       "padding": "0px 11px",
@@ -2361,7 +2377,7 @@
      },
      "main": {
       "w": 576,
-      "h": 660,
+      "h": 725,
       "font": "13px/20px 400",
       "color": "rgb(23, 25, 28)",
       "radius": "0px",
@@ -2421,6 +2437,22 @@
       "radius": "0px",
       "padding": "0px",
       "background": "rgba(0, 0, 0, 0)",
+      "columns": [
+       45,
+       86,
+       134,
+       188,
+       81
+      ]
+     },
+     "open row": {
+      "w": 534,
+      "h": 28,
+      "font": "12px/20px 400",
+      "color": "rgb(23, 25, 28)",
+      "radius": "0px",
+      "padding": "0px",
+      "background": "rgb(233, 232, 226)",
       "columns": [
        45,
        86,
@@ -2518,7 +2550,7 @@
      },
      "main": {
       "w": 576,
-      "h": 660,
+      "h": 725,
       "font": "13px/20px 400",
       "color": "rgb(233, 234, 235)",
       "radius": "0px",
@@ -2578,6 +2610,22 @@
       "radius": "0px",
       "padding": "0px",
       "background": "rgba(0, 0, 0, 0)",
+      "columns": [
+       45,
+       86,
+       134,
+       188,
+       81
+      ]
+     },
+     "open row": {
+      "w": 534,
+      "h": 28,
+      "font": "12px/20px 400",
+      "color": "rgb(233, 234, 235)",
+      "radius": "0px",
+      "padding": "0px",
+      "background": "rgb(38, 42, 47)",
       "columns": [
        45,
        86,
@@ -2836,7 +2884,7 @@
      },
      "main": {
       "w": 576,
-      "h": 660,
+      "h": 725,
       "font": "13px/20px 400",
       "color": "rgb(23, 25, 28)",
       "radius": "0px",
@@ -2896,6 +2944,22 @@
       "radius": "0px",
       "padding": "0px",
       "background": "rgba(0, 0, 0, 0)",
+      "columns": [
+       45,
+       86,
+       134,
+       188,
+       81
+      ]
+     },
+     "open row": {
+      "w": 534,
+      "h": 28,
+      "font": "12px/20px 400",
+      "color": "rgb(23, 25, 28)",
+      "radius": "0px",
+      "padding": "0px",
+      "background": "rgb(233, 232, 226)",
       "columns": [
        45,
        86,
@@ -2993,7 +3057,7 @@
      },
      "main": {
       "w": 576,
-      "h": 660,
+      "h": 725,
       "font": "13px/20px 400",
       "color": "rgb(233, 234, 235)",
       "radius": "0px",
@@ -3053,6 +3117,22 @@
       "radius": "0px",
       "padding": "0px",
       "background": "rgba(0, 0, 0, 0)",
+      "columns": [
+       45,
+       86,
+       134,
+       188,
+       81
+      ]
+     },
+     "open row": {
+      "w": 534,
+      "h": 28,
+      "font": "12px/20px 400",
+      "color": "rgb(233, 234, 235)",
+      "radius": "0px",
+      "padding": "0px",
+      "background": "rgb(38, 42, 47)",
       "columns": [
        45,
        86,
@@ -3303,7 +3383,7 @@
      "list": null,
      "main": {
       "w": 912,
-      "h": 137,
+      "h": 373,
       "font": "13px/20px 400",
       "color": "rgb(23, 25, 28)",
       "radius": "0px",
@@ -3313,7 +3393,7 @@
      },
      "inspector": {
       "w": 880,
-      "h": 315,
+      "h": 160,
       "font": "13px/20px 400",
       "color": "rgb(23, 25, 28)",
       "radius": "4px",
@@ -3363,6 +3443,22 @@
       "radius": "0px",
       "padding": "0px",
       "background": "rgba(0, 0, 0, 0)",
+      "columns": [
+       45,
+       86,
+       134,
+       532,
+       81
+      ]
+     },
+     "open row": {
+      "w": 878,
+      "h": 28,
+      "font": "12px/20px 400",
+      "color": "rgb(23, 25, 28)",
+      "radius": "0px",
+      "padding": "0px",
+      "background": "rgb(233, 232, 226)",
       "columns": [
        45,
        86,
@@ -3452,7 +3548,7 @@
      "list": null,
      "main": {
       "w": 912,
-      "h": 137,
+      "h": 373,
       "font": "13px/20px 400",
       "color": "rgb(233, 234, 235)",
       "radius": "0px",
@@ -3462,7 +3558,7 @@
      },
      "inspector": {
       "w": 880,
-      "h": 315,
+      "h": 160,
       "font": "13px/20px 400",
       "color": "rgb(233, 234, 235)",
       "radius": "4px",
@@ -3512,6 +3608,22 @@
       "radius": "0px",
       "padding": "0px",
       "background": "rgba(0, 0, 0, 0)",
+      "columns": [
+       45,
+       86,
+       134,
+       532,
+       81
+      ]
+     },
+     "open row": {
+      "w": 878,
+      "h": 28,
+      "font": "12px/20px 400",
+      "color": "rgb(233, 234, 235)",
+      "radius": "0px",
+      "padding": "0px",
+      "background": "rgb(38, 42, 47)",
       "columns": [
        45,
        86,
@@ -3730,7 +3842,7 @@
      "list": null,
      "main": {
       "w": 390,
-      "h": 632,
+      "h": 800,
       "font": "13px/20px 400",
       "color": "rgb(23, 25, 28)",
       "radius": "0px",
@@ -3750,8 +3862,8 @@
      "keys strip": null,
      "h1": {
       "w": 366,
-      "h": 20,
-      "font": "15px/20px 600",
+      "h": 24,
+      "font": "15px/24px 600",
       "color": "rgb(23, 25, 28)",
       "radius": "0px",
       "padding": "0px",
@@ -3760,19 +3872,35 @@
      },
      "table header row": null,
      "first table row": {
-      "w": 364,
-      "h": 135,
+      "w": 366,
+      "h": 88,
       "font": "12px/20px 400",
       "color": "rgb(23, 25, 28)",
-      "radius": "0px",
-      "padding": "8px 10px",
-      "background": "rgba(0, 0, 0, 0)",
+      "radius": "4px",
+      "padding": "9px 12px",
+      "background": "rgb(255, 255, 255)",
       "columns": [
-       45,
+       0,
        50.4,
-       285.6,
-       344,
-       344
+       281.6,
+       340,
+       340
+      ]
+     },
+     "open row": {
+      "w": 366,
+      "h": 88,
+      "font": "12px/20px 400",
+      "color": "rgb(23, 25, 28)",
+      "radius": "4px",
+      "padding": "9px 12px",
+      "background": "rgb(255, 255, 255)",
+      "columns": [
+       0,
+       43.2,
+       288.8,
+       340,
+       340
       ]
      },
      "tab": {
@@ -3794,13 +3922,13 @@
       "background": "rgb(23, 25, 28)"
      },
      "pill": {
-      "w": 46.7,
-      "h": 20,
+      "w": 7,
+      "h": 7,
       "font": "12px/20px 400",
-      "color": "rgb(22, 107, 63)",
+      "color": "rgb(23, 25, 28)",
       "radius": "3px",
-      "padding": "0px 7px",
-      "background": "rgb(227, 241, 232)"
+      "padding": "0px",
+      "background": "rgba(0, 0, 0, 0)"
      },
      "callout": null,
      "segment": {
@@ -3848,7 +3976,7 @@
      "list": null,
      "main": {
       "w": 390,
-      "h": 632,
+      "h": 800,
       "font": "13px/20px 400",
       "color": "rgb(233, 234, 235)",
       "radius": "0px",
@@ -3868,8 +3996,8 @@
      "keys strip": null,
      "h1": {
       "w": 366,
-      "h": 20,
-      "font": "15px/20px 600",
+      "h": 24,
+      "font": "15px/24px 600",
       "color": "rgb(233, 234, 235)",
       "radius": "0px",
       "padding": "0px",
@@ -3878,19 +4006,35 @@
      },
      "table header row": null,
      "first table row": {
-      "w": 364,
-      "h": 135,
+      "w": 366,
+      "h": 88,
       "font": "12px/20px 400",
       "color": "rgb(233, 234, 235)",
-      "radius": "0px",
-      "padding": "8px 10px",
-      "background": "rgba(0, 0, 0, 0)",
+      "radius": "4px",
+      "padding": "9px 12px",
+      "background": "rgb(25, 28, 31)",
       "columns": [
-       45,
+       0,
        50.4,
-       285.6,
-       344,
-       344
+       281.6,
+       340,
+       340
+      ]
+     },
+     "open row": {
+      "w": 366,
+      "h": 88,
+      "font": "12px/20px 400",
+      "color": "rgb(233, 234, 235)",
+      "radius": "4px",
+      "padding": "9px 12px",
+      "background": "rgb(25, 28, 31)",
+      "columns": [
+       0,
+       43.2,
+       288.8,
+       340,
+       340
       ]
      },
      "tab": {
@@ -3912,13 +4056,13 @@
       "background": "rgb(233, 234, 235)"
      },
      "pill": {
-      "w": 46.7,
-      "h": 20,
+      "w": 7,
+      "h": 7,
       "font": "12px/20px 400",
-      "color": "rgb(95, 202, 143)",
+      "color": "rgb(233, 234, 235)",
       "radius": "3px",
-      "padding": "0px 7px",
-      "background": "rgb(23, 48, 31)"
+      "padding": "0px",
+      "background": "rgba(0, 0, 0, 0)"
      },
      "callout": null,
      "segment": {
@@ -4063,7 +4207,7 @@
      },
      "main": {
       "w": 996,
-      "h": 660,
+      "h": 725,
       "font": "13px/20px 400",
       "color": "rgb(23, 25, 28)",
       "radius": "0px",
@@ -4123,6 +4267,7 @@
        81
       ]
      },
+     "open row": null,
      "tab": {
       "w": 80.8,
       "h": 30,
@@ -4154,7 +4299,7 @@
      "segment": null,
      "dialog": {
       "w": 640,
-      "h": 800,
+      "h": 222,
       "font": "13px/20px 400",
       "color": "rgb(23, 25, 28)",
       "radius": "6px",
@@ -4212,7 +4357,7 @@
      },
      "main": {
       "w": 996,
-      "h": 660,
+      "h": 725,
       "font": "13px/20px 400",
       "color": "rgb(233, 234, 235)",
       "radius": "0px",
@@ -4272,6 +4417,7 @@
        81
       ]
      },
+     "open row": null,
      "tab": {
       "w": 80.8,
       "h": 30,
@@ -4303,7 +4449,7 @@
      "segment": null,
      "dialog": {
       "w": 640,
-      "h": 800,
+      "h": 222,
       "font": "13px/20px 400",
       "color": "rgb(233, 234, 235)",
       "radius": "6px",
@@ -4576,6 +4722,7 @@
        52
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": null,
      "pill": {
@@ -4607,7 +4754,7 @@
      },
      "dialog": {
       "w": 900,
-      "h": 496,
+      "h": 536,
       "font": "13px/20px 400",
       "color": "rgb(23, 25, 28)",
       "radius": "6px",
@@ -4729,6 +4876,7 @@
        52
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": null,
      "pill": {
@@ -4760,7 +4908,7 @@
      },
      "dialog": {
       "w": 900,
-      "h": 496,
+      "h": 536,
       "font": "13px/20px 400",
       "color": "rgb(233, 234, 235)",
       "radius": "6px",
@@ -4984,13 +5132,14 @@
       "padding": "0px 12px",
       "background": "rgb(247, 247, 244)",
       "columns": [
-       192,
-       74,
-       84,
-       96,
-       156,
        76,
-       168
+       70,
+       80,
+       78,
+       76,
+       150,
+       72,
+       230
       ]
      },
      "first table row": {
@@ -5002,20 +5151,22 @@
       "padding": "0px 12px",
       "background": "rgba(0, 0, 0, 0)",
       "columns": [
-       192,
-       74,
-       84,
-       96,
-       156,
        76,
-       168
+       70,
+       80,
+       78,
+       76,
+       150,
+       72,
+       230
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": {
-      "w": 94.7,
+      "w": 96.2,
       "h": 28,
-      "font": "13px/20px 400",
+      "font": "13px/20px 500",
       "color": "rgb(255, 255, 255)",
       "radius": "4px",
       "padding": "0px 11px",
@@ -5129,13 +5280,14 @@
       "padding": "0px 12px",
       "background": "rgb(21, 24, 26)",
       "columns": [
-       192,
-       74,
-       84,
-       96,
-       156,
        76,
-       168
+       70,
+       80,
+       78,
+       76,
+       150,
+       72,
+       230
       ]
      },
      "first table row": {
@@ -5147,20 +5299,22 @@
       "padding": "0px 12px",
       "background": "rgba(0, 0, 0, 0)",
       "columns": [
-       192,
-       74,
-       84,
-       96,
-       156,
        76,
-       168
+       70,
+       80,
+       78,
+       76,
+       150,
+       72,
+       230
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": {
-      "w": 94.7,
+      "w": 96.2,
       "h": 28,
-      "font": "13px/20px 400",
+      "font": "13px/20px 500",
       "color": "rgb(25, 28, 31)",
       "radius": "4px",
       "padding": "0px 11px",
@@ -5274,13 +5428,14 @@
       "padding": "0px 12px",
       "background": "rgb(13, 13, 13)",
       "columns": [
-       192,
-       74,
-       84,
-       96,
-       156,
        76,
-       168
+       70,
+       80,
+       78,
+       76,
+       150,
+       72,
+       230
       ]
      },
      "first table row": {
@@ -5292,20 +5447,22 @@
       "padding": "0px 12px",
       "background": "rgba(0, 0, 0, 0)",
       "columns": [
-       192,
-       74,
-       84,
-       96,
-       156,
        76,
-       168
+       70,
+       80,
+       78,
+       76,
+       150,
+       72,
+       230
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": {
-      "w": 96.7,
+      "w": 96.2,
       "h": 28,
-      "font": "13px/20px 400",
+      "font": "13px/20px 500",
       "color": "rgb(0, 0, 0)",
       "radius": "4px",
       "padding": "0px 11px",
@@ -5531,11 +5688,12 @@
      },
      "table header row": null,
      "first table row": null,
+     "open row": null,
      "tab": null,
      "primary button": {
-      "w": 118.3,
+      "w": 120.2,
       "h": 28,
-      "font": "13px/20px 400",
+      "font": "13px/20px 500",
       "color": "rgb(255, 255, 255)",
       "radius": "4px",
       "padding": "0px 11px",
@@ -5626,11 +5784,12 @@
      },
      "table header row": null,
      "first table row": null,
+     "open row": null,
      "tab": null,
      "primary button": {
-      "w": 118.3,
+      "w": 120.2,
       "h": 28,
-      "font": "13px/20px 400",
+      "font": "13px/20px 500",
       "color": "rgb(25, 28, 31)",
       "radius": "4px",
       "padding": "0px 11px",
@@ -5705,24 +5864,25 @@
      },
      "table header row": null,
      "first table row": null,
+     "open row": null,
      "tab": null,
      "primary button": {
-      "w": 118.3,
+      "w": 120.2,
       "h": 28,
-      "font": "13px/20px 400",
+      "font": "13px/20px 500",
       "color": "rgb(255, 255, 255)",
       "radius": "4px",
       "padding": "0px 11px",
       "background": "rgb(23, 25, 28)"
      },
      "pill": {
-      "w": 69,
-      "h": 20,
+      "w": 7,
+      "h": 7,
       "font": "12px/20px 400",
-      "color": "rgb(22, 107, 63)",
+      "color": "rgb(23, 25, 28)",
       "radius": "3px",
-      "padding": "0px 7px",
-      "background": "rgb(227, 241, 232)"
+      "padding": "0px",
+      "background": "rgba(0, 0, 0, 0)"
      },
      "callout": null,
      "segment": null,
@@ -5784,24 +5944,25 @@
      },
      "table header row": null,
      "first table row": null,
+     "open row": null,
      "tab": null,
      "primary button": {
-      "w": 118.3,
+      "w": 120.2,
       "h": 28,
-      "font": "13px/20px 400",
+      "font": "13px/20px 500",
       "color": "rgb(25, 28, 31)",
       "radius": "4px",
       "padding": "0px 11px",
       "background": "rgb(233, 234, 235)"
      },
      "pill": {
-      "w": 69,
-      "h": 20,
+      "w": 7,
+      "h": 7,
       "font": "12px/20px 400",
-      "color": "rgb(95, 202, 143)",
+      "color": "rgb(233, 234, 235)",
       "radius": "3px",
-      "padding": "0px 7px",
-      "background": "rgb(23, 48, 31)"
+      "padding": "0px",
+      "background": "rgba(0, 0, 0, 0)"
      },
      "callout": null,
      "segment": null,
@@ -5984,8 +6145,39 @@
       "background": "rgba(0, 0, 0, 0)",
       "family": "IBM Plex Sans"
      },
-     "table header row": null,
-     "first table row": null,
+     "table header row": {
+      "w": 954,
+      "h": 26,
+      "font": "10px/16px 600",
+      "color": "rgb(86, 91, 99)",
+      "radius": "0px",
+      "padding": "0px 12px",
+      "background": "rgb(247, 247, 244)",
+      "columns": [
+       92,
+       311,
+       70,
+       311,
+       90
+      ]
+     },
+     "first table row": {
+      "w": 954,
+      "h": 28,
+      "font": "12px/20px 400",
+      "color": "rgb(23, 25, 28)",
+      "radius": "0px",
+      "padding": "0px 12px",
+      "background": "rgba(0, 0, 0, 0)",
+      "columns": [
+       92,
+       311,
+       70,
+       311,
+       90
+      ]
+     },
+     "open row": null,
      "tab": null,
      "primary button": {
       "w": 62.4,
@@ -6095,8 +6287,39 @@
       "background": "rgba(0, 0, 0, 0)",
       "family": "IBM Plex Sans"
      },
-     "table header row": null,
-     "first table row": null,
+     "table header row": {
+      "w": 954,
+      "h": 26,
+      "font": "10px/16px 600",
+      "color": "rgb(163, 169, 176)",
+      "radius": "0px",
+      "padding": "0px 12px",
+      "background": "rgb(21, 24, 26)",
+      "columns": [
+       92,
+       311,
+       70,
+       311,
+       90
+      ]
+     },
+     "first table row": {
+      "w": 954,
+      "h": 28,
+      "font": "12px/20px 400",
+      "color": "rgb(233, 234, 235)",
+      "radius": "0px",
+      "padding": "0px 12px",
+      "background": "rgba(0, 0, 0, 0)",
+      "columns": [
+       92,
+       311,
+       70,
+       311,
+       90
+      ]
+     },
+     "open row": null,
      "tab": null,
      "primary button": {
       "w": 62.4,
@@ -6323,7 +6546,7 @@
      },
      "main": {
       "w": 996,
-      "h": 660,
+      "h": 725,
       "font": "13px/20px 400",
       "color": "rgb(23, 25, 28)",
       "radius": "0px",
@@ -6383,6 +6606,7 @@
        81
       ]
      },
+     "open row": null,
      "tab": {
       "w": 80.8,
       "h": 30,
@@ -6413,8 +6637,8 @@
      "callout": null,
      "segment": null,
      "dialog": {
-      "w": 440,
-      "h": 215,
+      "w": 470,
+      "h": 325,
       "font": "13px/20px 400",
       "color": "rgb(23, 25, 28)",
       "radius": "6px",
@@ -6472,7 +6696,7 @@
      },
      "main": {
       "w": 996,
-      "h": 660,
+      "h": 725,
       "font": "13px/20px 400",
       "color": "rgb(233, 234, 235)",
       "radius": "0px",
@@ -6532,6 +6756,7 @@
        81
       ]
      },
+     "open row": null,
      "tab": {
       "w": 80.8,
       "h": 30,
@@ -6562,8 +6787,8 @@
      "callout": null,
      "segment": null,
      "dialog": {
-      "w": 440,
-      "h": 215,
+      "w": 470,
+      "h": 325,
       "font": "13px/20px 400",
       "color": "rgb(233, 234, 235)",
       "radius": "6px",
@@ -6811,13 +7036,14 @@
       "padding": "0px 12px",
       "background": "rgb(247, 247, 244)",
       "columns": [
-       192,
-       74,
-       84,
-       96,
-       156,
        76,
-       168
+       70,
+       80,
+       78,
+       76,
+       150,
+       72,
+       230
       ]
      },
      "first table row": {
@@ -6829,20 +7055,22 @@
       "padding": "0px 12px",
       "background": "rgba(0, 0, 0, 0)",
       "columns": [
-       192,
-       74,
-       84,
-       96,
-       156,
        76,
-       168
+       70,
+       80,
+       78,
+       76,
+       150,
+       72,
+       230
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": {
-      "w": 94.7,
+      "w": 96.2,
       "h": 28,
-      "font": "13px/20px 400",
+      "font": "13px/20px 500",
       "color": "rgb(255, 255, 255)",
       "radius": "4px",
       "padding": "0px 11px",
@@ -6956,13 +7184,14 @@
       "padding": "0px 12px",
       "background": "rgb(21, 24, 26)",
       "columns": [
-       192,
-       74,
-       84,
-       96,
-       156,
        76,
-       168
+       70,
+       80,
+       78,
+       76,
+       150,
+       72,
+       230
       ]
      },
      "first table row": {
@@ -6974,20 +7203,22 @@
       "padding": "0px 12px",
       "background": "rgba(0, 0, 0, 0)",
       "columns": [
-       192,
-       74,
-       84,
-       96,
-       156,
        76,
-       168
+       70,
+       80,
+       78,
+       76,
+       150,
+       72,
+       230
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": {
-      "w": 94.7,
+      "w": 96.2,
       "h": 28,
-      "font": "13px/20px 400",
+      "font": "13px/20px 500",
       "color": "rgb(25, 28, 31)",
       "radius": "4px",
       "padding": "0px 11px",
@@ -7279,6 +7510,7 @@
        52
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": null,
      "pill": {
@@ -7416,6 +7648,7 @@
        52
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": null,
      "pill": {
@@ -7694,6 +7927,7 @@
        52
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": null,
      "pill": {
@@ -7839,6 +8073,7 @@
        52
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": null,
      "pill": {
@@ -8133,6 +8368,24 @@
        52
       ]
      },
+     "open row": {
+      "w": 802,
+      "h": 28,
+      "font": "12px/20px 400",
+      "color": "rgb(23, 25, 28)",
+      "radius": "0px",
+      "padding": "0px 12px",
+      "background": "rgb(233, 232, 226)",
+      "columns": [
+       92,
+       103,
+       130,
+       96,
+       103,
+       118,
+       52
+      ]
+     },
      "tab": null,
      "primary button": null,
      "pill": {
@@ -8253,6 +8506,24 @@
       ]
      },
      "first table row": {
+      "w": 802,
+      "h": 28,
+      "font": "12px/20px 400",
+      "color": "rgb(233, 234, 235)",
+      "radius": "0px",
+      "padding": "0px 12px",
+      "background": "rgb(38, 42, 47)",
+      "columns": [
+       92,
+       103,
+       130,
+       96,
+       103,
+       118,
+       52
+      ]
+     },
+     "open row": {
       "w": 802,
       "h": 28,
       "font": "12px/20px 400",
@@ -8548,6 +8819,24 @@
        52
       ]
      },
+     "open row": {
+      "w": 802,
+      "h": 28,
+      "font": "12px/20px 400",
+      "color": "rgb(23, 25, 28)",
+      "radius": "0px",
+      "padding": "0px 12px",
+      "background": "rgb(233, 232, 226)",
+      "columns": [
+       92,
+       103,
+       130,
+       96,
+       103,
+       118,
+       52
+      ]
+     },
      "tab": null,
      "primary button": null,
      "pill": {
@@ -8676,6 +8965,24 @@
       ]
      },
      "first table row": {
+      "w": 802,
+      "h": 28,
+      "font": "12px/20px 400",
+      "color": "rgb(233, 234, 235)",
+      "radius": "0px",
+      "padding": "0px 12px",
+      "background": "rgb(38, 42, 47)",
+      "columns": [
+       92,
+       103,
+       130,
+       96,
+       103,
+       118,
+       52
+      ]
+     },
+     "open row": {
       "w": 802,
       "h": 28,
       "font": "12px/20px 400",
@@ -8983,6 +9290,7 @@
        86
       ]
      },
+     "open row": null,
      "tab": {
       "w": 77.2,
       "h": 30,
@@ -9116,6 +9424,7 @@
        86
       ]
      },
+     "open row": null,
      "tab": {
       "w": 77.2,
       "h": 30,
@@ -9196,24 +9505,17 @@
      "table header row": null,
      "first table row": {
       "w": 364,
-      "h": 59,
+      "h": 57,
       "font": "12px/20px 600",
       "color": "rgb(23, 25, 28)",
       "radius": "0px",
-      "padding": "8px 10px",
+      "padding": "8px 12px",
       "background": "rgba(0, 0, 0, 0)",
       "columns": [
-       264,
-       264,
-       0,
-       0,
-       0,
-       0,
-       72,
-       0,
-       72
+       340
       ]
      },
+     "open row": null,
      "tab": {
       "w": 77.2,
       "h": 30,
@@ -9225,13 +9527,13 @@
      },
      "primary button": null,
      "pill": {
-      "w": 46.7,
-      "h": 20,
+      "w": 7,
+      "h": 7,
       "font": "12px/20px 400",
-      "color": "rgb(22, 107, 63)",
+      "color": "rgb(23, 25, 28)",
       "radius": "3px",
-      "padding": "0px 7px",
-      "background": "rgb(227, 241, 232)"
+      "padding": "0px",
+      "background": "rgba(0, 0, 0, 0)"
      },
      "callout": null,
      "segment": null,
@@ -9294,24 +9596,17 @@
      "table header row": null,
      "first table row": {
       "w": 364,
-      "h": 59,
+      "h": 57,
       "font": "12px/20px 600",
       "color": "rgb(233, 234, 235)",
       "radius": "0px",
-      "padding": "8px 10px",
+      "padding": "8px 12px",
       "background": "rgba(0, 0, 0, 0)",
       "columns": [
-       264,
-       264,
-       0,
-       0,
-       0,
-       0,
-       72,
-       0,
-       72
+       340
       ]
      },
+     "open row": null,
      "tab": {
       "w": 77.2,
       "h": 30,
@@ -9323,13 +9618,13 @@
      },
      "primary button": null,
      "pill": {
-      "w": 46.7,
-      "h": 20,
+      "w": 7,
+      "h": 7,
       "font": "12px/20px 400",
-      "color": "rgb(95, 202, 143)",
+      "color": "rgb(233, 234, 235)",
       "radius": "3px",
-      "padding": "0px 7px",
-      "background": "rgb(23, 48, 31)"
+      "padding": "0px",
+      "background": "rgba(0, 0, 0, 0)"
      },
      "callout": null,
      "segment": null,
@@ -9598,6 +9893,26 @@
        70
       ]
      },
+     "open row": {
+      "w": 802,
+      "h": 28,
+      "font": "12px/20px 600",
+      "color": "rgb(23, 25, 28)",
+      "radius": "0px",
+      "padding": "0px 12px",
+      "background": "rgb(233, 232, 226)",
+      "columns": [
+       150,
+       446,
+       0,
+       0,
+       0,
+       0,
+       70,
+       0,
+       70
+      ]
+     },
      "tab": {
       "w": 77.2,
       "h": 30,
@@ -9720,6 +10035,26 @@
       ]
      },
      "first table row": {
+      "w": 802,
+      "h": 28,
+      "font": "12px/20px 600",
+      "color": "rgb(233, 234, 235)",
+      "radius": "0px",
+      "padding": "0px 12px",
+      "background": "rgb(38, 42, 47)",
+      "columns": [
+       150,
+       446,
+       0,
+       0,
+       0,
+       0,
+       70,
+       0,
+       70
+      ]
+     },
+     "open row": {
       "w": 802,
       "h": 28,
       "font": "12px/20px 600",
@@ -10011,6 +10346,7 @@
        52
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": {
       "w": 61.8,
@@ -10164,6 +10500,7 @@
        52
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": {
       "w": 61.8,
@@ -10432,6 +10769,7 @@
      },
      "table header row": null,
      "first table row": null,
+     "open row": null,
      "tab": null,
      "primary button": {
       "w": 134.4,
@@ -10527,6 +10865,7 @@
      },
      "table header row": null,
      "first table row": null,
+     "open row": null,
      "tab": null,
      "primary button": {
       "w": 134.4,
@@ -10749,6 +11088,7 @@
        417.6
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": {
       "w": 82.9,
@@ -10888,6 +11228,7 @@
        417.6
       ]
      },
+     "open row": null,
      "tab": null,
      "primary button": {
       "w": 82.9,
@@ -11188,6 +11529,26 @@
        70
       ]
      },
+     "open row": {
+      "w": 802,
+      "h": 28,
+      "font": "12px/20px 600",
+      "color": "rgb(23, 25, 28)",
+      "radius": "0px",
+      "padding": "0px 12px",
+      "background": "rgb(233, 232, 226)",
+      "columns": [
+       150,
+       446,
+       0,
+       0,
+       0,
+       0,
+       70,
+       0,
+       70
+      ]
+     },
      "tab": {
       "w": 77.2,
       "h": 30,
@@ -11325,6 +11686,26 @@
       "radius": "0px",
       "padding": "0px 12px",
       "background": "rgba(0, 0, 0, 0)",
+      "columns": [
+       150,
+       446,
+       0,
+       0,
+       0,
+       0,
+       70,
+       0,
+       70
+      ]
+     },
+     "open row": {
+      "w": 802,
+      "h": 28,
+      "font": "12px/20px 600",
+      "color": "rgb(233, 234, 235)",
+      "radius": "0px",
+      "padding": "0px 12px",
+      "background": "rgb(38, 42, 47)",
       "columns": [
        150,
        446,
@@ -11623,6 +12004,23 @@
        56
       ]
      },
+     "open row": {
+      "w": 802,
+      "h": 28,
+      "font": "12px/20px 400",
+      "color": "rgb(23, 25, 28)",
+      "radius": "0px",
+      "padding": "0px 12px",
+      "background": "rgb(246, 236, 214)",
+      "columns": [
+       92,
+       150,
+       130,
+       162,
+       118,
+       56
+      ]
+     },
      "tab": null,
      "primary button": null,
      "pill": {
@@ -11750,6 +12148,23 @@
       ]
      },
      "first table row": {
+      "w": 802,
+      "h": 28,
+      "font": "12px/20px 400",
+      "color": "rgb(233, 234, 235)",
+      "radius": "0px",
+      "padding": "0px 12px",
+      "background": "rgb(51, 41, 15)",
+      "columns": [
+       92,
+       150,
+       130,
+       162,
+       118,
+       56
+      ]
+     },
+     "open row": {
       "w": 802,
       "h": 28,
       "font": "12px/20px 400",
