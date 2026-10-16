@@ -9,6 +9,8 @@ test('the rail lists Traffic, and the page shows what the seed asked, who asked 
   await page.locator('.rail a.nav', { hasText: 'Traffic' }).click();
   await expect(page).toHaveURL(/\/traffic$/);
   await expect(page.locator('.rail a.nav.on')).toHaveText(/Traffic/);
+  // The newest 200 rows are whoever else is asking at the moment: the seed's are found by its name.
+  await page.goto('traffic?client=doze-seed');
   const table = page.locator('#traffic-table');
   const produce = table.locator('.tf-rows > .r[data-row]', { hasText: 'Produce' }).filter({ hasText: 'seed-orders' }).first();
   await expect(produce).toContainText('doze-seed');
@@ -16,7 +18,8 @@ test('the rail lists Traffic, and the page shows what the seed asked, who asked 
   // The refused request carries the broker's own name for the error.
   await expect(table.locator('.tf-rows > .r[data-row]', { hasText: 'CreateTopics' }).filter({ hasText: 'TOPIC_ALREADY_EXISTS' })).toHaveCount(1);
   // The console's own polling is not in its own traffic.
-  await expect(table.locator('.tf-rows > .r[data-row]', { hasText: 'doze-kafka-console' })).toHaveCount(0);
+  await page.goto('traffic?client=doze-kafka-console');
+  await expect(page.locator('#traffic-table .tf-rows > .r[data-row]')).toHaveCount(0);
 });
 
 test('the filters narrow the tail, and the narrowing survives a refresh of it', async ({ page }) => {
