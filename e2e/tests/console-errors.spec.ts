@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/console';
 import { PAGES, STATES } from '../pages';
+import { PREFIX } from '../playwright.config';
 
 // A7 and A12's quieter half: no page or state of the console logs an error, throws,
 // or has a request of its own refused. Every page of the route table and every state
@@ -53,7 +54,7 @@ test('the forms log nothing when they are used', async ({ page, createTopic, uni
   });
   // Create a topic with a name Kafka refuses, then one it takes.
   await page.goto('new/topic');
-  expected = 'POST /_console/new/topic';
+  expected = `POST ${PREFIX}/new/topic`;
   await page.locator('#f-name').fill('bad name!');
   await page.getByRole('button', { name: 'Create topic' }).click();
   await expect(page.locator('[data-err-slot]')).toContainText('invalid topic name');
