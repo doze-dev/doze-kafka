@@ -75,7 +75,7 @@ async function effect(page: Page, path: string, h: Hint) {
       return;
     case 'filter':
       await press(page, ['/']);
-      await expect(page.locator('input[data-filter-target]:focus'), where).toHaveCount(1);
+      await expect(page.locator('input[data-filter-target]:focus, input[data-traffic-filter]:focus'), where).toHaveCount(1);
       return;
     case 'trace id':
       await press(page, ['/']);
@@ -149,6 +149,11 @@ async function effect(page: Page, path: string, h: Hint) {
     case 'errors only':
       await press(page, ['e']);
       await expect(page, where).toHaveURL(/kind=errors/);
+      return;
+    case 'requests':
+      // The clients view's way back to the requests (Traf-06 draws g c too; g c is Cluster).
+      await press(page, h.keys);
+      await expect(page, where).toHaveURL(/\/traffic(\?(?!.*view=clients).*)?$/);
       return;
     case 'topics': case 'groups': case 'schemas': case 'cluster': case 'traffic': case 'access':
       await press(page, h.keys);

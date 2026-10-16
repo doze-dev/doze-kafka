@@ -64,6 +64,6 @@ export const STATES: [string, string, (p: Page, width: number) => Promise<void>]
   ['the More menu', 'topics/seed-orders', async (p) => { await p.locator('main [data-more]').click(); await expect(p.locator('main .menu')).toBeVisible(); }],
   ['a confirm', 'topics/seed-orders', async (p) => { await p.locator('main [data-more]').click(); await p.locator('main .menu button', { hasText: 'Purge' }).click(); await expect(p.locator('#confirm')).toBeVisible(); }],
   ['the open composer', 'topics/seed-orders', async (p) => { await p.locator('#compose-head').click(); await expect(p.locator('#compose-body')).toBeVisible(); }],
-  ['a request in the inspector', 'traffic', async (p) => { await p.locator('#traffic-rows tr[data-inspector-open], main tr[data-inspector-open]').first().click(); await expect(p.locator('#inspector-title')).toBeVisible(); }],
+  ['a request in the inspector', 'traffic', async (p) => { await p.locator('#traffic-table .tf-rows > .r[data-row], #traffic-rows tr[data-inspector-open], main tr[data-inspector-open]').first().click(); await expect(p.locator('#inspector-title')).toBeVisible(); }],
   ['the phone\'s menu', 'topics', async (p, width) => { if (width > 640) return; await p.locator('#menu-btn').click(); await expect(p.locator('nav.rail')).toBeVisible(); }],
 ];

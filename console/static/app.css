@@ -1453,7 +1453,11 @@ html[data-connection-lost] .up-only { display: none; }
 html[data-connection-lost] #traffic-controls [data-live-state], html[data-connection-lost] #traffic-controls [data-live-toggle] { display: none; }
 html[data-paused] #traffic-controls [data-live-state] { background: var(--warnbg); color: var(--warn); }
 /* The rows are what is old: the header and the frozen line are not dimmed (Traf-10). */
-html[data-connection-lost] .tf-live .tf-rows { opacity: .55; }
+/* Stale rows are muted, not faded: Traf-10 draws them at .55 opacity, which puts their text
+   under 4.5:1; the text takes the muted ink (4.5:1 or more on the card in every theme) and
+   the rows keep their own fills and rules. The same treatment as an aborted transaction's rows. */
+html[data-connection-lost] .tf-live .tf-rows,
+html[data-connection-lost] .tf-live .tf-rows * { color: var(--mut); }
 html[data-connection-lost] .tf-live[data-live].disconnected::after { display: none; }
 /* What is counted from the broker is not known while it is lost, so it is not drawn. */
 html[data-connection-lost] #detail.tf #traffic-summary,

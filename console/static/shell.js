@@ -943,7 +943,7 @@
     // the table or of the list. A page with neither has no / (its strip does not name
     // one); it was the palette, which ⌘K already is.
     filter: function (e) {
-      var f = document.querySelector("main [data-slash]") || document.querySelector("main input[data-filter-target]") || document.querySelector(".list input[data-filter-target]");
+      var f = document.querySelector("main [data-slash]") || document.querySelector("main [data-traffic-filter]") || document.querySelector("main input[data-filter-target]") || document.querySelector(".list input[data-filter-target]");
       if (!f || !visible(f)) return false;
       f.focus();
       e.preventDefault();
@@ -1615,6 +1615,20 @@
     if (e.target.closest("[data-live-toggle]")) setPaused(!livePaused);
   });
   var liveTimers = [];
+  // The element a region's poll is sent from: an empty one of its own, so that no poll
+  // waits behind another region's in htmx's queue for the same source.
+  var pollSources = {};
+  function pollSource(id) {
+    var el = pollSources[id];
+    if (!el || !el.isConnected) {
+      el = document.createElement("span");
+      el.hidden = true;
+      el.setAttribute("data-poll-source", id);
+      document.body.appendChild(el);
+      pollSources[id] = el;
+    }
+    return el;
+  }
   function setupLive() {
     liveTimers.forEach(clearInterval);
     liveTimers = [];
@@ -1649,7 +1663,10 @@
         // A failed poll is reported by the responseError / sendError handlers (as
         // the "not updating" state); the rejection itself is not news.
         htmx.ajax("GET", url + (url.indexOf("?") >= 0 ? "&" : "?") + "h=" + encodeURIComponent(cur.getAttribute("data-hash") || ""), {
-          target: "#" + id, swap: "outerHTML",
+          // Each region polls from a source of its own: with none, htmx makes the page body
+          // the source of every poll and queues one behind another, and a queued request
+          // that fails (the broker gone, two regions polling) is a promise nobody holds.
+          source: pollSource(id), target: "#" + id, swap: "outerHTML",
         }).then(done, done);
       }, every));
     });

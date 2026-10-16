@@ -4,17 +4,31 @@ import { removeDir } from '../cleanup';
 import { join, resolve } from 'node:path';
 import { test, expect } from '../fixtures/console';
 import { createRequire } from 'node:module';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { PREFIX } from '../playwright.config';
 
 const AXE = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
 /** Every violation axe finds but the minor ones, of the page as it is now. */
-async function axeProblems(page: Page, dimmedRows = false): Promise<string[]> {
+async function axeProblems(page: Page): Promise<string[]> {
   await page.addScriptTag({ path: AXE });
-  // The frozen rows are dimmed to .55 as Traf-10 draws them (plan/00-foundation.md): those rows are left out of this one sweep (every other state checks rows).
-  const res = await page.evaluate(async (dimmed) => (window as any).axe.run(dimmed ? { exclude: [['#traffic-table .tf-rows']] } : document, { resultTypes: ['violations'] }), dimmedRows);
+  // Nothing is left out: the frozen rows are muted (not faded to .55 as Traf-10 draws them: plan/00-foundation.md), and are swept like every other state's.
+  const res = await page.evaluate(async () => (window as any).axe.run(document, { resultTypes: ['violations'] }));
   return (res.violations as any[]).filter((v) => v.impact !== 'minor')
     .map((v) => `${v.impact} ${v.id}: ${v.help} e.g. ${v.nodes.slice(0, 3).map((n: any) => n.target.join(' ')).join(' | ')}`);
+}
+
+/** Every piece of text in the row is in the muted ink (the colour of .mut), none faded. */
+async function expectMuted(row: Locator) {
+  const bad = await row.evaluate((r) => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--mut)';
+    document.body.appendChild(probe);
+    const want = getComputedStyle(probe).color;
+    probe.remove();
+    return Array.from(r.querySelectorAll('*')).concat([r]).filter((e) => (e.textContent || '').trim() && !e.children.length)
+      .filter((e) => getComputedStyle(e).color !== want || getComputedStyle(e).opacity !== '1').map((e) => `${e.className}: ${getComputedStyle(e).color}`);
+  });
+  expect(bad, 'the stale row\'s text is the muted ink, unfaded').toEqual([]);
 }
 
 // The console when the broker is not there. This spec runs its own broker (its own
@@ -224,7 +238,13 @@ test('Traffic when the broker is lost: the pill, the callout, the frozen line, R
   await expect(page.locator('header.topbar #pill-retry')).toHaveCount(0);
   expect((await page.locator('header.topbar #palette-open').boundingBox())!.width).toBe(420);
   await expect(page.locator('.tf-frozen')).toContainText('Nothing newer than this line is known.');
-  expect(await axeProblems(page, true), 'the lost page, accessible').toEqual([]);
+  expect(await axeProblems(page), 'the lost page, accessible').toEqual([]);
+  // The muted rows hold in every theme (the page is lost, so the theme is switched in place).
+  for (const theme of ['dark', 'contrast']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+    expect(await axeProblems(page), `the lost page, accessible, in ${theme}`).toEqual([]);
+  }
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
   // Traf-10 draws it as the row under the header, not above it.
   const below = await page.evaluate(() => {
     const head = document.querySelector('#traffic-table .r.h > span')!.getBoundingClientRect();
@@ -234,8 +254,9 @@ test('Traffic when the broker is lost: the pill, the callout, the frozen line, R
   });
   expect(below.frozenTop).toBeGreaterThanOrEqual(below.headBottom - 1);
   expect(below.firstTop).toBeGreaterThanOrEqual(below.frozenBottom - 1);
-  // The rows are dimmed, and only the rows: the header and the frozen line are not.
-  await expect(page.locator('#traffic-table .tf-rows')).toHaveCSS('opacity', '0.55');
+  // The rows are muted, and only the rows: the header and the frozen line are not. Muted, not faded: the board's .55 opacity puts the text under 4.5:1.
+  await expect(page.locator('#traffic-table .tf-rows')).toHaveCSS('opacity', '1');
+  await expectMuted(page.locator('#traffic-table .tf-rows > .r[data-row]').first());
   await expect(page.locator('#traffic-table')).toHaveCSS('opacity', '1');
   await expect(page.locator('#traffic-table .r.h')).toHaveCSS('opacity', '1');
   await expect(page.locator('.tf-frozen')).toHaveCSS('opacity', '1');
@@ -334,7 +355,8 @@ test('Traf-06 and Traf-10: the Clients view draws the frozen line under its head
     expect(below.frozenTop).toBeGreaterThanOrEqual(below.headBottom - 1);
     expect(below.firstTop).toBeGreaterThanOrEqual(below.frozenBottom - 1);
     await expect(line).toHaveCSS('opacity', '1');
-    await expect(table.locator('.tf-rows')).toHaveCSS('opacity', '0.55');
+    await expect(table.locator('.tf-rows')).toHaveCSS('opacity', '1');
+    await expectMuted(table.locator('.tf-rows > .r[data-row]').first());
   } finally {
     hold.kill('SIGTERM');
     await up();
