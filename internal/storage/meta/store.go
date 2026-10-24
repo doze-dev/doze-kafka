@@ -996,12 +996,14 @@ func (s *boltStore) AdoptGroupsWithOffsets(session time.Duration) (int, error) {
 	err := s.update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucketMeta)
 		var last []byte
+		first := true // bytes.Equal treats nil and empty alike, so "" needs its own state.
 		c := tx.Bucket(bucketOffsets).Cursor()
 		for k, _ := c.First(); k != nil; k, _ = c.Next() {
 			i := bytes.IndexByte(k, 0)
-			if i < 0 || bytes.Equal(k[:i], last) {
+			if i < 0 || (!first && bytes.Equal(k[:i], last)) {
 				continue
 			}
+			first = false
 			last = append(last[:0], k[:i]...)
 			if b.Get(emptySinceKey(string(last))) != nil {
 				continue

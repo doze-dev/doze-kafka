@@ -182,3 +182,20 @@ func TestAdoptGroupsWithOffsetsRunsOnce(t *testing.T) {
 		t.Errorf("after the second run: %v", got)
 	}
 }
+
+// ValidateGroupID accepts "", so a group "" with committed offsets is adopted like any other.
+func TestAdoptGroupsWithOffsetsAdoptsTheEmptyGroupID(t *testing.T) {
+	s := openStore(t)
+	if _, err := s.CreateTopic("t", 1, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CommitOffset("", "t", 0, 1, ""); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := s.AdoptGroupsWithOffsets(45 * time.Second); err != nil || n != 1 {
+		t.Fatalf("adopted %d, %v", n, err)
+	}
+	if got, _ := s.GroupLiveness(); !got[""].Live {
+		t.Errorf("group \"\" was not adopted: %v", got)
+	}
+}
