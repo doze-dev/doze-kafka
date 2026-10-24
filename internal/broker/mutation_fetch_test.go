@@ -197,3 +197,37 @@ func TestFetchSessionsAreRefusedOnlyWhenContinued(t *testing.T) {
 		}
 	}
 }
+
+// A fetch past the end of the log is OFFSET_OUT_OF_RANGE with no offsets and empty
+// (not null) records; at the end it is an empty success that names the offsets
+// (claim: api V7).
+func TestFetchBeyondTheEndAnswersWithNoOffsets(t *testing.T) {
+	addr := startBroker(t, 4)
+	cl := newClient(t, addr)
+	ctx := context.Background()
+	mustCreateTopic(t, ctx, cl, "one", 1)
+	produceNoise(t, addr, "one", 0, 2, 100)
+
+	fetch := func(offset int64) kmsg.FetchResponseTopicPartition {
+		t.Helper()
+		resp, err := fetchReq("one", 0, 1, 1<<20, map[int32][2]int64{0: {offset, 1 << 20}}).RequestWith(ctx, nameFetchClient(t, addr))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp.Topics[0].Partitions[0]
+	}
+	for _, offset := range []int64{3, 1000, -1} {
+		p := fetch(offset)
+		if p.ErrorCode != 1 || p.HighWatermark != -1 || p.LastStableOffset != -1 || p.LogStartOffset != -1 || len(p.AbortedTransactions) != 0 || p.RecordBatches == nil || len(p.RecordBatches) != 0 {
+			t.Errorf("offset %d: %+v, want OFFSET_OUT_OF_RANGE with -1 offsets and empty records", offset, p)
+		}
+	}
+	p := fetch(2)
+	if p.ErrorCode != 0 || p.HighWatermark != 2 || p.LastStableOffset != 2 || p.LogStartOffset != 0 || len(p.RecordBatches) != 0 {
+		t.Errorf("at the end: %+v, want an empty success with high watermark 2, last stable offset 2, log start 0", p)
+	}
+	p = fetch(0)
+	if p.ErrorCode != 0 || p.HighWatermark != 2 || len(p.RecordBatches) == 0 {
+		t.Errorf("from the start: %+v", p)
+	}
+}

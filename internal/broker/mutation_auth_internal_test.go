@@ -280,3 +280,82 @@ func TestSCRAMClientFirstSizeBoundary(t *testing.T) {
 		t.Errorf("the reason %q does not name the bound", refusal.why)
 	}
 }
+
+// A PLAIN response is held to the checks in the order the plainStep comment gives, and
+// an authorization id is accepted only when empty or the user's own name.
+func TestPlainResponseIsCheckedInOrderAndAuthzidIsTheUser(t *testing.T) {
+	cfg := config.Default()
+	cfg.SASLMechanisms = []string{config.SASLPlain}
+	cfg.Credentials = map[string]string{"alice": "pw", "bob": "pw2"}
+	a, err := newAuthenticator(cfg)
+	if err != nil || a == nil {
+		t.Fatalf("authenticator: %v", err)
+	}
+	for _, tc := range []struct {
+		name string
+		in   string
+		user string // "" = refused.
+		wire string
+	}{
+		{"no authorization id", "\x00alice\x00pw", "alice", ""},
+		{"the user as its own authorization id", "alice\x00alice\x00pw", "alice", ""},
+		{"another user as the authorization id", "bob\x00alice\x00pw", "", msgAuthzidDiffers},
+		{"another authorization id with the wrong password", "bob\x00alice\x00nope", "", msgPlainBadCredentials},
+		{"an unknown user", "\x00nobody\x00pw", "", msgPlainBadCredentials},
+		{"another user's password", "\x00alice\x00pw2", "", msgPlainBadCredentials},
+		{"no user", "\x00\x00pw", "", msgPlainNoUser},
+		{"no password", "\x00alice\x00", "", msgPlainNoPassword},
+		{"two parts", "alice\x00pw", "", msgPlainTokens(2)},
+		{"four parts", "a\x00b\x00c\x00d", "", msgPlainTokens(4)},
+		{"nothing at all", "", "", msgPlainTokens(1)},
+	} {
+		user, refusal := a.plainStep([]byte(tc.in))
+		if tc.user == "" {
+			if refusal == nil || refusal.wire != tc.wire || user != "" {
+				t.Errorf("%s: user %q refusal %+v, want a refusal saying %q", tc.name, user, refusal, tc.wire)
+			}
+			continue
+		}
+		if refusal != nil || user != tc.user {
+			t.Errorf("%s: user %q refusal %+v, want %q", tc.name, user, refusal, tc.user)
+		}
+	}
+}
+
+// The edges of the client-first grammar (RFC 5802 5.1): a nonce is printable ASCII
+// without a comma, from "!" to "~"; an extension is one ASCII letter, "=", and a
+// value.
+func TestSCRAMClientFirstGrammarEdges(t *testing.T) {
+	a := scramAuthenticator(t, map[string]string{"alice": "pw"})
+	for _, tc := range []struct {
+		name string
+		msg  string
+		ok   bool
+	}{
+		{"the first printable character in a nonce", "n,,n=alice,r=!abc", true},
+		{"the last printable character in a nonce", "n,,n=alice,r=abc~", true},
+		{"a space in a nonce", "n,,n=alice,r=a bc", false},
+		{"DEL in a nonce", "n,,n=alice,r=abc\x7f", false},
+		{"a control character in a nonce", "n,,n=alice,r=abc\x1f", false},
+		{"a comma ends the nonce and leaves a malformed extension", "n,,n=alice,r=a,bc", false},
+		{"the shortest extension", "n,,n=alice,r=abc,x=y", true},
+		{"an extension with no value", "n,,n=alice,r=abc,x=", false},
+		{"an extension of a lower-case a", "n,,n=alice,r=abc,a=1", true},
+		{"an extension of a lower-case z", "n,,n=alice,r=abc,z=1", true},
+		{"an extension of an upper-case A", "n,,n=alice,r=abc,A=1", true},
+		{"an extension of an upper-case Z", "n,,n=alice,r=abc,Z=1", true},
+		{"an extension named by the character before a", "n,,n=alice,r=abc,`=1", false},
+		{"an extension named by the character after z", "n,,n=alice,r=abc,{=1", false},
+		{"an extension named by the character before A", "n,,n=alice,r=abc,@=1", false},
+		{"an extension named by the character after Z", "n,,n=alice,r=abc,[=1", false},
+		{"an extension named by a digit", "n,,n=alice,r=abc,0=1", false},
+	} {
+		_, conv, refusal := a.scramFirst(config.SASLScramSHA256, []byte(tc.msg))
+		if tc.ok && (refusal != nil || conv == nil || conv.user != "alice") {
+			t.Errorf("%s: %q was refused: %+v", tc.name, tc.msg, refusal)
+		}
+		if !tc.ok && refusal == nil {
+			t.Errorf("%s: %q was accepted", tc.name, tc.msg)
+		}
+	}
+}
