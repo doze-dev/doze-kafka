@@ -264,3 +264,62 @@ func TestListOffsetsRefusesThePartitionPastTheLast(t *testing.T) {
 		t.Errorf("an unknown topic: code %d", p.ErrorCode)
 	}
 }
+
+// deleteRecordsAt asks for the log of topic/partition to be cut before offset.
+func deleteRecordsAt(t *testing.T, b *Broker, topic string, partition int32, offset int64) kmsg.DeleteRecordsResponseTopicPartition {
+	t.Helper()
+	req := kmsg.NewPtrDeleteRecordsRequest()
+	req.SetVersion(1)
+	req.TimeoutMillis = 1000
+	rt := kmsg.NewDeleteRecordsRequestTopic()
+	rt.Topic = topic
+	rp := kmsg.NewDeleteRecordsRequestTopicPartition()
+	rp.Partition, rp.Offset = partition, offset
+	rt.Partitions = append(rt.Partitions, rp)
+	req.Topics = append(req.Topics, rt)
+	out, err := typed(b.handleDeleteRecords)(context.Background(), &protocol.Request{
+		Header: protocol.RequestHeader{APIKey: protocol.APIKey(kmsg.DeleteRecords), APIVersion: 1, CorrelationID: 1},
+		Body:   req.AppendTo(nil),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp := kmsg.NewPtrDeleteRecordsResponse()
+	resp.SetVersion(1)
+	if err := resp.ReadFrom(out[4:]); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return resp.Topics[0].Partitions[0]
+}
+
+// DeleteRecords answers the new low watermark, and -1 wherever it did not move one.
+func TestDeleteRecordsAnswersTheLowWatermarkOrMinusOne(t *testing.T) {
+	var failSync bool
+	b, _ := newTestBroker(t, &failSync)
+	for range 3 {
+		if p := produceTo(t, b, "t", 0, 1, plainBatch()); p.ErrorCode != 0 {
+			t.Fatal(p.ErrorCode)
+		}
+	}
+	for _, tc := range []struct {
+		name      string
+		topic     string
+		partition int32
+		offset    int64
+		code      int16
+		low       int64
+	}{
+		{"a partition past the last", "t", 1, 1, kerr.UnknownTopicOrPartition.Code, -1},
+		{"a negative partition", "t", -1, 1, kerr.UnknownTopicOrPartition.Code, -1},
+		{"an unknown topic", "nosuch", 0, 1, kerr.UnknownTopicOrPartition.Code, -1},
+		{"past the log end", "t", 0, 4, kerr.OffsetOutOfRange.Code, -1},
+		{"to offset 2", "t", 0, 2, 0, 2},
+		{"below the start is not an error", "t", 0, 1, 0, 2},
+		{"to the high watermark", "t", 0, -1, 0, 3},
+	} {
+		p := deleteRecordsAt(t, b, tc.topic, tc.partition, tc.offset)
+		if p.ErrorCode != tc.code || p.LowWatermark != tc.low {
+			t.Errorf("%s: code %d low watermark %d, want %d and %d", tc.name, p.ErrorCode, p.LowWatermark, tc.code, tc.low)
+		}
+	}
+}
