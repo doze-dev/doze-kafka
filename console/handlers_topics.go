@@ -982,8 +982,7 @@ func committedParam(r *http.Request) bool { return r.URL.Query().Get("committed"
 
 // txnStatus works out which records in [from, to) belong to a transaction that has not
 // committed, and which offsets are markers. hasTxn says the partition has transactions
-// worth a toggle. It costs one request for the last stable offset, and a second read only
-// when the window has a marker or reaches the open part of the log.
+// worth a toggle. It costs a request for the last stable offset and a read of the committed view.
 func (c *Console) txnStatus(ctx context.Context, topic string, partition int32, from, to, latest int64, msgs []Message) (status map[int64]string, markers map[int64]bool, hasTxn bool) {
 	status, markers = map[int64]string{}, map[int64]bool{}
 	if len(msgs) == 0 {
@@ -1003,18 +1002,25 @@ func (c *Console) txnStatus(ctx context.Context, topic string, partition int32, 
 		lso = latest // an older broker, or one that cannot say: nothing is open.
 	}
 	hasTxn = len(markers) > 0 || lso < latest
+	// The committed view is read every time: an aborted record whose marker lies past the
+	// window shows no sign of it in the window itself.
+	committed := map[int64]bool{}
+	if cm, err := c.be.FetchWindowCommitted(ctx, topic, partition, from, int(to-from)); err == nil {
+		for _, m := range cm {
+			committed[m.Offset] = true
+		}
+	} else {
+		committed = nil // cannot tell aborted from committed; mark only what is open.
+	}
+	if committed != nil {
+		for _, m := range msgs {
+			if m.Offset < lso && !committed[m.Offset] {
+				hasTxn = true
+			}
+		}
+	}
 	if !hasTxn {
 		return
-	}
-	committed := map[int64]bool{}
-	if len(markers) > 0 || lso < to {
-		if cm, err := c.be.FetchWindowCommitted(ctx, topic, partition, from, int(to-from)); err == nil {
-			for _, m := range cm {
-				committed[m.Offset] = true
-			}
-		} else {
-			committed = nil // cannot tell aborted from committed; mark only what is open.
-		}
 	}
 	for _, m := range msgs {
 		switch {

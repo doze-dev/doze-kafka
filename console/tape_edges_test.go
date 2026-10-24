@@ -192,9 +192,6 @@ func TestTapeMarksTransactions(t *testing.T) {
 
 // A record whose transaction aborted is marked aborted wherever the window falls.
 func TestTapeMarksAnAbortedRecordWhoseMarkerIsOutsideTheWindow(t *testing.T) {
-	t.Skip("BUG, reported not fixed (production code is out of scope for this task): txnStatus reads the committed view only " +
-		"when the window holds a marker or reaches the open part of the log, so an aborted record whose abort marker is " +
-		"the first offset past the window is shown as an ordinary record. Remove this line when it is fixed.")
 	c, addr := newTestConsoleAddr(t)
 	ctx := context.Background()
 	cl := rawClient(t, addr)
