@@ -33,7 +33,7 @@ func TestNearestTopic(t *testing.T) {
 		want string
 		ok   bool
 	}{
-		{"ordres", "orders", true},   // two edits of six letters
+		{"ordres", "orders", true}, // two edits of six letters
 		{"orders", "", false},
 		{"paymnts", "payments", true},
 		{"zzzzzz", "", false},

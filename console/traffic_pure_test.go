@@ -78,7 +78,9 @@ func TestResultWordsAndQueryEscaping(t *testing.T) {
 }
 
 func TestTrafficViewFromAndItsQuery(t *testing.T) {
-	view := func(q string) trafficView { return trafficViewFrom(httptest.NewRequest("GET", "/_console/traffic?"+q, nil)) }
+	view := func(q string) trafficView {
+		return trafficViewFrom(httptest.NewRequest("GET", "/_console/traffic?"+q, nil))
+	}
 	v := view("")
 	if !v.empty() || v.View != "requests" || v.Kind != "" || v.Flat || v.query() != "" || v.source() != (TrafficFilter{}) {
 		t.Errorf("empty: %+v", v)
@@ -175,8 +177,8 @@ func TestClientRowRatesAndWhatItDoes(t *testing.T) {
 		return c.clientRow(cl, now)
 	}
 	for _, tc := range []struct {
-		err, req   int
-		rate, ton  string
+		err, req  int
+		rate, ton string
 	}{{0, 0, "—", "mut"}, {0, 20, "0 %", "ok"}, {1, 20, "5.0 %", ""}, {1, 11, "9.1 %", ""}, {1, 10, "10 %", "warn"}, {3, 20, "15 %", "warn"}, {1, 8, "13 %", "warn"}, {1, 7, "14 %", "warn"}, {5, 5, "100 %", "warn"}} {
 		r := row(TrafficClient{Err5m: tc.err, Req5m: tc.req})
 		if r.Rate != tc.rate || r.RateTon != tc.ton {
