@@ -3,8 +3,10 @@ package broker
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -692,5 +694,140 @@ func TestRunTransactionsAbortsTheExpiredAndFinishesTheDecided(t *testing.T) {
 	time.Sleep(2 * txnCheckEvery)
 	if s, e := state("fresh"); s != txnOngoing || e != epochs["fresh"] {
 		t.Errorf("a transaction within its timeout: %s at epoch %d, want Ongoing at epoch %d", s, e, epochs["fresh"])
+	}
+}
+
+// logSink collects what a broker logs.
+type logSink struct {
+	mu sync.Mutex
+	sb strings.Builder
+}
+
+func (s *logSink) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.sb.Write(p)
+}
+
+func (s *logSink) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.sb.String()
+}
+
+// captureLogs makes the broker log, at every level, to the sink returned.
+func captureLogs(b *Broker) *logSink {
+	s := &logSink{}
+	b.log = slog.New(slog.NewTextHandler(s, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	return s
+}
+
+// A decision that cannot be carried out is logged when it first fails and again only
+// when the reason changes: the coordinator retries twice a second.
+func TestAFailedFinishIsLoggedOnceNotOnEveryAttempt(t *testing.T) {
+	b, _, failSync, _ := newTxnRig(t)
+	logs := captureLogs(b)
+	pid, epoch := owner(t, b, "tx")
+	e := b.txns.get("tx")
+	e.mu.Lock()
+	e.rec.State = txnOngoing
+	e.rec.Partitions = []meta.TxnPartition{{Topic: "t", Partition: 0}}
+	e.mu.Unlock()
+	dirty(t, b)
+	*failSync = true
+	for range 3 {
+		if code := endTxnCall(t, b, "tx", pid, epoch, true); code != kerr.ConcurrentTransactions.Code {
+			t.Fatalf("EndTxn: %d", code)
+		}
+	}
+	const line = "could not flush a transaction marker"
+	if n := strings.Count(logs.String(), line); n != 1 {
+		t.Errorf("the failure was logged %d times in 3 attempts, want once:\n%s", n, logs.String())
+	}
+	*failSync = false
+	if code := endTxnCall(t, b, "tx", pid, epoch, true); code != 0 {
+		t.Fatalf("EndTxn once the flush works: %d", code)
+	}
+	// Once it has worked a new failure is news again.
+	e.mu.Lock()
+	e.rec.State = txnOngoing
+	e.rec.Partitions = []meta.TxnPartition{{Topic: "t", Partition: 0}}
+	e.mu.Unlock()
+	dirty(t, b)
+	*failSync = true
+	endTxnCall(t, b, "tx", pid, epoch, true)
+	if n := strings.Count(logs.String(), line); n != 2 {
+		t.Errorf("a failure after a success was logged %d times in all, want 2", n)
+	}
+}
+
+func TestRecoveryLogsWhatItCouldNotFinishAndWhatItDid(t *testing.T) {
+	b, _, failSync, _ := newTxnRig(t)
+	logs := captureLogs(b)
+	owner(t, b, "tx")
+	e := b.txns.get("tx")
+	set := func(state string) {
+		e.mu.Lock()
+		e.rec.State = state
+		e.rec.Partitions = []meta.TxnPartition{{Topic: "t", Partition: 0}}
+		e.mu.Unlock()
+	}
+	const failed, finished = "could not finish a transaction left from before the restart", "finished after a restart"
+
+	set(txnPrepareCommit)
+	dirty(t, b)
+	*failSync = true
+	b.RecoverTransactions()
+	if s := logs.String(); !strings.Contains(s, failed) || strings.Contains(s, finished) {
+		t.Errorf("a decision that could not be finished:\n%s", s)
+	}
+	*failSync = false
+	b.RecoverTransactions()
+	if s := logs.String(); !strings.Contains(s, finished) {
+		t.Errorf("a decision that was finished:\n%s", s)
+	}
+	for _, state := range []string{txnOngoing, txnEmpty} {
+		set(state)
+		before := logs.String()
+		b.RecoverTransactions()
+		if got := strings.TrimPrefix(logs.String(), before); strings.Contains(got, failed) || strings.Contains(got, finished) {
+			t.Errorf("a transaction left %s was logged as finished or failed:\n%s", state, got)
+		}
+	}
+	// A decided abort is finished and logged as the commit was.
+	set(txnPrepareAbort)
+	before := logs.String()
+	b.RecoverTransactions()
+	if got := strings.TrimPrefix(logs.String(), before); !strings.Contains(got, finished) || !strings.Contains(got, "CompleteAbort") {
+		t.Errorf("a decided abort that was finished:\n%s", got)
+	}
+}
+
+func TestATimedOutTransactionThatCannotBeAbortedIsLogged(t *testing.T) {
+	b, rig, _, _ := newTxnRig(t)
+	logs := captureLogs(b)
+	owner(t, b, "tx")
+	e := b.txns.get("tx")
+	e.mu.Lock()
+	e.rec.State, e.rec.UpdatedMs, e.rec.TimeoutMs = txnOngoing, nowMs()-10_000, 1000
+	e.mu.Unlock()
+	rig.putErr = errStore
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { b.RunTransactions(ctx); close(done) }()
+	defer func() { cancel(); <-done }()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) && !strings.Contains(logs.String(), "could not abort a timed-out transaction") {
+		time.Sleep(50 * time.Millisecond)
+	}
+	if s := logs.String(); !strings.Contains(s, "aborting a transaction that timed out") || !strings.Contains(s, "could not abort a timed-out transaction") {
+		t.Errorf("the timed-out transaction's abort failed without a log:\n%s", s)
+	}
+	e.mu.RLock()
+	state := e.rec.State
+	e.mu.RUnlock()
+	if state != txnOngoing {
+		t.Errorf("state %s after an abort that could not be stored, want Ongoing", state)
 	}
 }

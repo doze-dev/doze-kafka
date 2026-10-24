@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"testing"
+	"time"
 
 	"github.com/twmb/franz-go/pkg/kerr"
 
@@ -321,5 +322,60 @@ func TestDeleteRecordsAnswersTheLowWatermarkOrMinusOne(t *testing.T) {
 		if p.ErrorCode != tc.code || p.LowWatermark != tc.low {
 			t.Errorf("%s: code %d low watermark %d, want %d and %d", tc.name, p.ErrorCode, p.LowWatermark, tc.code, tc.low)
 		}
+	}
+}
+
+// A topic that stamps log append time answers every stored batch with the broker's
+// clock; a retry is answered with the time of the batch it repeats; a refusal has none.
+func TestProduceToALogAppendTimeTopic(t *testing.T) {
+	var failSync bool
+	b, _ := newTestBroker(t, &failSync)
+	if _, err := b.meta.CreateTopic("lat", 1, map[string]string{"message.timestamp.type": "LogAppendTime"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.logs.EnsurePartitionDirs("lat", 1); err != nil {
+		t.Fatal(err)
+	}
+	before := time.Now().UnixMilli()
+	first := produceTo(t, b, "lat", 0, 1, idemBatch(5, 0, 0, 1, 0))
+	after := time.Now().UnixMilli()
+	if first.ErrorCode != 0 || first.BaseOffset != 0 || first.LogAppendTime < before || first.LogAppendTime > after {
+		t.Fatalf("a first batch: %+v, want offset 0 and an append time between %d and %d", first, before, after)
+	}
+	time.Sleep(5 * time.Millisecond)
+	retry := produceTo(t, b, "lat", 0, 1, idemBatch(5, 0, 0, 1, 0))
+	if retry.ErrorCode != 0 || retry.BaseOffset != 0 || retry.LogAppendTime != first.LogAppendTime {
+		t.Errorf("a retry: %+v, want offset 0 and the first batch's append time %d", retry, first.LogAppendTime)
+	}
+	gap := produceTo(t, b, "lat", 0, 1, idemBatch(5, 0, 9, 1, 0))
+	if gap.ErrorCode != kerr.OutOfOrderSequenceNumber.Code || gap.LogAppendTime != -1 || gap.BaseOffset != -1 {
+		t.Errorf("a gap: %+v, want OUT_OF_ORDER_SEQUENCE_NUMBER with no offset and no time", gap)
+	}
+	plain := produceTo(t, b, "lat", 0, 1, plainBatch())
+	if plain.ErrorCode != 0 || plain.LogAppendTime < before {
+		t.Errorf("a plain batch: %+v, want the broker's clock", plain)
+	}
+}
+
+// A batch larger than the broker's message.max.bytes is refused, and a limit of 0 is
+// the default.
+func TestProduceHoldsABatchToMessageMaxBytes(t *testing.T) {
+	var failSync bool
+	b, _ := newTestBroker(t, &failSync)
+	big := idemBatch(-1, 0, 0, 20, 0) // 221 bytes.
+	if p := produceTo(t, b, "t", 0, 1, big); p.ErrorCode != 0 {
+		t.Fatalf("with the default limit: code %d", p.ErrorCode)
+	}
+	b.cfg.MessageMaxBytes = int64(len(big)) - 1
+	if p := produceTo(t, b, "t", 0, 1, big); p.ErrorCode != kerr.MessageTooLarge.Code || p.BaseOffset != -1 {
+		t.Errorf("one byte over the limit: %+v, want MESSAGE_TOO_LARGE", p)
+	}
+	b.cfg.MessageMaxBytes = int64(len(big))
+	if p := produceTo(t, b, "t", 0, 1, big); p.ErrorCode != 0 {
+		t.Errorf("exactly at the limit: code %d", p.ErrorCode)
+	}
+	b.cfg.MessageMaxBytes = 0
+	if p := produceTo(t, b, "t", 0, 1, big); p.ErrorCode != 0 {
+		t.Errorf("a limit of 0: code %d, want the default limit", p.ErrorCode)
 	}
 }
