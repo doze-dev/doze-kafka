@@ -18,7 +18,7 @@ import (
 
 func TestDefaultsAreTheDocumentedValues(t *testing.T) {
 	d := Default()
-	if d.FsyncInterval != 500*time.Millisecond || d.OffsetsRetention != 168*time.Hour || d.ConsumerSessionTimeout != 45*time.Second {
+	if d.FsyncInterval != 500*time.Millisecond || d.OffsetsRetention != 168*time.Hour || d.ConsumerSessionTimeout != 45*time.Second || d.GroupInitialRebalanceDelay != 200*time.Millisecond {
 		t.Errorf("fsync %s, offsets retention %s, session %s", d.FsyncInterval, d.OffsetsRetention, d.ConsumerSessionTimeout)
 	}
 	want := ""
@@ -58,6 +58,8 @@ func TestValidateAtEachBoundary(t *testing.T) {
 		{"advertised port", func(c *Config) { c.AdvertisedPort = 65535 }, func(c *Config) { c.AdvertisedPort = 65536 }, "advertised-port"},
 		{"advertised port low", func(c *Config) { c.AdvertisedPort = 0 }, func(c *Config) { c.AdvertisedPort = -1 }, "advertised-port"},
 		{"offsets retention", func(c *Config) { c.OffsetsRetention = 0 }, func(c *Config) { c.OffsetsRetention = -1 }, "offsets-retention"},
+		{"initial rebalance delay", func(c *Config) { c.GroupInitialRebalanceDelay = 0 }, func(c *Config) { c.GroupInitialRebalanceDelay = -1 }, "group-initial-rebalance-delay"},
+		{"assignment interval", func(c *Config) { c.ConsumerAssignmentInterval = 0 }, func(c *Config) { c.ConsumerAssignmentInterval = -1 }, "assignment interval"},
 		{"session timeout", func(c *Config) { c.ConsumerSessionTimeout = 1 }, func(c *Config) { c.ConsumerSessionTimeout = 0 }, "consumer-session-timeout"},
 		{"super user", func(c *Config) { c.ACLSuperUsers = []string{"User:a"} }, func(c *Config) { c.ACLSuperUsers = []string{"User:"} }, "Type:name"},
 		{"super user type", func(c *Config) { c.ACLSuperUsers = []string{"U:a"} }, func(c *Config) { c.ACLSuperUsers = []string{":a"} }, "Type:name"},
