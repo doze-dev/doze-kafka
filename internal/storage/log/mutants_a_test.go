@@ -254,7 +254,9 @@ func TestMutA_WalkRecordsEdges(t *testing.T) {
 		func(b []byte) error {
 			return walkRecords(b, 1<<20, false, func(int, recordHead) bool { t.Error("visited"); return true })
 		},
-		func(b []byte) error { return batchRecords(b, func(int64, int64) bool { t.Error("visited"); return true }) },
+		func(b []byte) error {
+			return batchRecords(b, func(int64, int64) bool { t.Error("visited"); return true })
+		},
 	} {
 		if err := f(makeBatchZero(codecNone)); err != nil {
 			t.Errorf("zero records: %v", err)

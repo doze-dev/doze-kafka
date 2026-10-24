@@ -762,8 +762,8 @@ func TestMutA_ReadReturnsWholeBatchesWithinMaxBytes(t *testing.T) {
 		want      []int64
 	}{
 		{0, 1 << 20, []int64{0, 3, 6, 9, 12}},
-		{3, 1 << 20, []int64{3, 6, 9, 12}},   // an offset that is a batch's end belongs to the next.
-		{4, 1 << 20, []int64{3, 6, 9, 12}},   // inside a batch: that batch.
+		{3, 1 << 20, []int64{3, 6, 9, 12}},    // an offset that is a batch's end belongs to the next.
+		{4, 1 << 20, []int64{3, 6, 9, 12}},    // inside a batch: that batch.
 		{2, 1 << 20, []int64{0, 3, 6, 9, 12}}, // last record of the first.
 		{0, 2 * size, []int64{0, 3}},          // exactly two batches' worth.
 		{0, 2*size + 1, []int64{0, 3}},
