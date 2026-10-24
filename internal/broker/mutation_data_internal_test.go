@@ -3,6 +3,7 @@ package broker
 import (
 	"context"
 	"encoding/binary"
+	"math"
 	"testing"
 	"time"
 
@@ -377,5 +378,202 @@ func TestProduceHoldsABatchToMessageMaxBytes(t *testing.T) {
 	b.cfg.MessageMaxBytes = 0
 	if p := produceTo(t, b, "t", 0, 1, big); p.ErrorCode != 0 {
 		t.Errorf("a limit of 0: code %d, want the default limit", p.ErrorCode)
+	}
+}
+
+// produceRaw sends one batch at acks and returns what the handler returned.
+func produceRaw(t *testing.T, b *Broker, acks int16, topic string, partition int32, records []byte) ([]byte, error) {
+	t.Helper()
+	req := kmsg.NewPtrProduceRequest()
+	req.SetVersion(8)
+	req.Acks = acks
+	req.TimeoutMillis = 1000
+	pt := kmsg.NewProduceRequestTopic()
+	pt.Topic = topic
+	pp := kmsg.NewProduceRequestTopicPartition()
+	pp.Partition, pp.Records = partition, records
+	pt.Partitions = append(pt.Partitions, pp)
+	req.Topics = append(req.Topics, pt)
+	return b.handleProduce(context.Background(), &protocol.Request{
+		Header: protocol.RequestHeader{APIKey: protocol.APIKey(kmsg.Produce), APIVersion: 8, CorrelationID: 1},
+		Body:   req.AppendTo(nil),
+	})
+}
+
+// acks other than -1, 0 and 1 are refused on every partition with no offset; those
+// three are taken.
+func TestProduceRefusesAcksOutsideTheThree(t *testing.T) {
+	var failSync bool
+	b, _ := newTestBroker(t, &failSync)
+	for _, acks := range []int16{-2, 2, 5} {
+		out, err := produceRaw(t, b, acks, "t", 0, plainBatch())
+		if err != nil {
+			t.Fatalf("acks %d: %v", acks, err)
+		}
+		resp := kmsg.NewPtrProduceResponse()
+		resp.SetVersion(8)
+		if err := resp.ReadFrom(out[4:]); err != nil {
+			t.Fatal(err)
+		}
+		if p := resp.Topics[0].Partitions[0]; p.ErrorCode != kerr.InvalidRequiredAcks.Code || p.BaseOffset != -1 {
+			t.Errorf("acks %d: code %d base offset %d, want INVALID_REQUIRED_ACKS and -1", acks, p.ErrorCode, p.BaseOffset)
+		}
+	}
+	for _, acks := range []int16{-1, 1} {
+		if p := produceTo(t, b, "t", 0, acks, plainBatch()); p.ErrorCode != 0 {
+			t.Errorf("acks %d: code %d", acks, p.ErrorCode)
+		}
+	}
+}
+
+// With acks=0 there is no answer to carry an error, so an error drops the connection;
+// success is silent.
+func TestProduceWithAcksZeroDropsTheConnectionOnAnyPartitionsError(t *testing.T) {
+	var failSync bool
+	b, _ := newTestBroker(t, &failSync)
+	if out, err := produceRaw(t, b, 0, "t", 0, plainBatch()); out != nil || err != nil {
+		t.Errorf("a stored batch: %v %v, want nothing at all", out, err)
+	}
+	for _, tc := range []struct {
+		name      string
+		topic     string
+		partition int32
+	}{{"an unknown partition", "t", 3}, {"an unknown topic", "nosuch", 0}} {
+		if out, err := produceRaw(t, b, 0, tc.topic, tc.partition, plainBatch()); err == nil {
+			t.Errorf("%s: answered %v, want the connection dropped", tc.name, out)
+		}
+	}
+}
+
+func TestProduceToATopicTheCallerMayNotWriteHasNoOffset(t *testing.T) {
+	var failSync bool
+	b, _ := newTestBroker(t, &failSync)
+	denyUnlessAllowed(b)
+	p := produceTo(t, b, "t", 0, 1, plainBatch())
+	if p.ErrorCode != kerr.TopicAuthorizationFailed.Code || p.BaseOffset != -1 {
+		t.Errorf("no right to write: code %d base offset %d, want TOPIC_AUTHORIZATION_FAILED and -1", p.ErrorCode, p.BaseOffset)
+	}
+}
+
+// acks=all fsyncs a partition when the answer rests on bytes an earlier request wrote
+// without syncing: a retry of a batch is acknowledged as durable only if it is.
+func TestADuplicateRetryAtAcksAllIsMadeDurableToo(t *testing.T) {
+	var failSync bool
+	b, logs := newTestBroker(t, &failSync)
+	batch := idemBatch(5, 0, 0, 1, 0)
+	if p := produceTo(t, b, "t", 0, 1, batch); p.ErrorCode != 0 || p.BaseOffset != 0 {
+		t.Fatalf("first: %+v", p)
+	}
+	before := logs.SyncOps()
+	if p := produceTo(t, b, "t", 0, -1, batch); p.ErrorCode != 0 || p.BaseOffset != 0 {
+		t.Fatalf("retry: %+v", p)
+	}
+	if got := logs.SyncOps(); got != before+1 {
+		t.Errorf("the retry synced %d times, want once", got-before)
+	}
+	// And when the disk says no, the retry is not acknowledged.
+	if p := produceTo(t, b, "t", 0, 1, idemBatch(5, 0, 1, 1, 0)); p.ErrorCode != 0 {
+		t.Fatal(p.ErrorCode)
+	}
+	failSync = true
+	p := produceTo(t, b, "t", 0, -1, idemBatch(5, 0, 1, 1, 0))
+	if p.ErrorCode != kerr.KafkaStorageError.Code || p.BaseOffset != -1 || p.LogAppendTime != -1 || p.LogStartOffset != -1 || p.ErrorMessage != nil {
+		t.Errorf("a retry whose sync fails: %+v, want KAFKA_STORAGE_ERROR with -1s and no message", p)
+	}
+	// A refused batch has nothing to make durable.
+	failSync = false
+	before = logs.SyncOps()
+	if p := produceTo(t, b, "t", 0, -1, idemBatch(5, 0, 40, 1, 0)); p.ErrorCode != kerr.OutOfOrderSequenceNumber.Code {
+		t.Fatalf("a gap: %d", p.ErrorCode)
+	}
+	if got := logs.SyncOps(); got != before {
+		t.Errorf("a refused batch synced %d times, want none", got-before)
+	}
+}
+
+// A topic's max.message.bytes replaces the broker's; one that is not a number is
+// ignored.
+func TestProduceHoldsABatchToTheTopicsMaxMessageBytes(t *testing.T) {
+	var failSync bool
+	b, _ := newTestBroker(t, &failSync)
+	big := idemBatch(-1, 0, 0, 20, 0) // 221 bytes.
+	for name, value := range map[string]string{"small": "100", "exact": "221", "junk": "lots"} {
+		if _, err := b.meta.CreateTopic(name, 1, map[string]string{"max.message.bytes": value}); err != nil {
+			t.Fatal(err)
+		}
+		if err := b.logs.EnsurePartitionDirs(name, 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tc := range []struct {
+		topic string
+		code  int16
+	}{{"small", kerr.MessageTooLarge.Code}, {"exact", 0}, {"junk", 0}} {
+		if p := produceTo(t, b, tc.topic, 0, 1, big); p.ErrorCode != tc.code {
+			t.Errorf("topic %s: code %d, want %d", tc.topic, p.ErrorCode, tc.code)
+		}
+	}
+}
+
+// After a restart the tracker is empty and a retry of a batch that was stored is
+// recognised from the log, not appended twice.
+func TestAPartitionsProducersAreRelearnedFromTheLogAfterARestart(t *testing.T) {
+	var failSync bool
+	b, logs := newTestBroker(t, &failSync)
+	batch := idemBatch(5, 0, 0, 3, 0)
+	if p := produceTo(t, b, "t", 0, 1, batch); p.ErrorCode != 0 || p.BaseOffset != 0 {
+		t.Fatalf("first: %+v", p)
+	}
+	b.idem = newIdempotency()
+	p := produceTo(t, b, "t", 0, 1, batch)
+	if p.ErrorCode != 0 || p.BaseOffset != 0 {
+		t.Errorf("the retry after a restart: %+v, want success at the original offset 0", p)
+	}
+	part, _ := logs.Partition("t", 0)
+	if end := part.LogEndOffset(); end != 3 {
+		t.Errorf("the log ends at %d, want 3: the retry was appended again", end)
+	}
+	if p := produceTo(t, b, "t", 0, 1, idemBatch(5, 0, 3, 1, 0)); p.ErrorCode != 0 || p.BaseOffset != 3 {
+		t.Errorf("the next sequence after a restart: %+v, want offset 3", p)
+	}
+}
+
+func TestLastSequenceOfABatchWrapsAt31Bits(t *testing.T) {
+	for _, tc := range []struct{ first, count, want int32 }{
+		{0, 1, 0}, {5, 3, 7}, {0, 100, 99},
+		{math.MaxInt32, 1, math.MaxInt32}, {math.MaxInt32, 2, 0}, {math.MaxInt32 - 1, 4, 1},
+	} {
+		if got := lastSeqOf(tc.first, tc.count); got != tc.want {
+			t.Errorf("a batch of %d from %d ends at %d, want %d", tc.count, tc.first, got, tc.want)
+		}
+	}
+}
+
+// ListOffsets holds a request's leader epoch to the one a single node has, and its
+// isolation level and timestamp to what it answers.
+func TestListOffsetsRefusesWhatItCannotAnswer(t *testing.T) {
+	var failSync bool
+	b, _ := newTestBroker(t, &failSync)
+	for _, tc := range []struct {
+		name      string
+		version   int16
+		isolation int8
+		epoch     int32
+		ts        int64
+		code      int16
+	}{
+		{"the epoch there is", 5, 0, 0, listOffsetsLatest, 0},
+		{"no epoch", 5, 0, -1, listOffsetsLatest, 0},
+		{"an epoch from the future", 5, 0, 1, listOffsetsLatest, kerr.UnknownLeaderEpoch.Code},
+		{"read-committed", 5, 1, -1, listOffsetsLatest, 0},
+		{"an isolation level nothing has", 5, 2, -1, listOffsetsLatest, kerr.UnknownServerError.Code},
+		{"max timestamp before v7", 6, 0, -1, listOffsetsMaxTime, kerr.UnsupportedVersion.Code},
+		{"max timestamp from v7", 7, 0, -1, listOffsetsMaxTime, 0},
+		{"a timestamp below max-timestamp", 7, 0, -1, -4, kerr.UnsupportedVersion.Code},
+		{"the earliest", 7, 0, -1, listOffsetsEarliest, 0},
+	} {
+		if p := listOffsetsAt(t, b, tc.version, tc.isolation, "t", 0, tc.ts, tc.epoch); p.ErrorCode != tc.code {
+			t.Errorf("%s: code %d, want %d", tc.name, p.ErrorCode, tc.code)
+		}
 	}
 }
