@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/twmb/franz-go/pkg/kerr"
 
+	"github.com/doze-dev/doze-kafka/internal/kmsg"
+	"github.com/doze-dev/doze-kafka/internal/protocol"
 	"github.com/doze-dev/doze-kafka/internal/storage/log"
 )
 
@@ -137,5 +140,59 @@ func TestNotifierWakesOnlyThoseWatchingTheTopic(t *testing.T) {
 	n.signal("x")
 	if pending(d) {
 		t.Error("a subscription to no topic was woken")
+	}
+}
+
+// ApiVersions is answered with the list at every version the broker serves, the
+// lowest and the highest included, and a version outside them is answered in the v0
+// form with the one row a client can retry from.
+func TestApiVersionsIsServedAtItsWholeRange(t *testing.T) {
+	var failSync bool
+	b, _ := newTestBroker(t, &failSync)
+	served, ok := b.profile.RangeFor(kmsg.ApiVersions)
+	if !ok {
+		t.Fatal("ApiVersions is not served")
+	}
+	ask := func(version int16) *kmsg.ApiVersionsResponse {
+		t.Helper()
+		req := &protocol.Request{Header: protocol.RequestHeader{APIKey: protocol.APIKey(kmsg.ApiVersions), APIVersion: version, CorrelationID: 1}, Conn: &protocol.Conn{}}
+		if version >= 3 {
+			q := kmsg.NewPtrApiVersionsRequest()
+			q.SetVersion(version)
+			q.ClientSoftwareName, q.ClientSoftwareVersion = "doze-test", "1.0"
+			req.Body = q.AppendTo([]byte{0})
+		}
+		out, err := b.handleAPIVersions(context.Background(), req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp := kmsg.NewPtrApiVersionsResponse()
+		if version < served.Min || version > served.Max {
+			resp.SetVersion(0)
+		} else {
+			resp.SetVersion(version)
+		}
+		// An ApiVersions response has no header tags, whatever its version.
+		if err := resp.ReadFrom(out[4:]); err != nil {
+			t.Fatalf("v%d: decode: %v", version, err)
+		}
+		return resp
+	}
+	for v := served.Min; v <= served.Max; v++ {
+		if r := ask(v); r.ErrorCode != 0 || len(r.ApiKeys) < 10 {
+			t.Errorf("v%d: code %d with %d rows, want the list", v, r.ErrorCode, len(r.ApiKeys))
+		}
+	}
+	for _, v := range []int16{served.Max + 1, served.Max + 7} {
+		r := ask(v)
+		if r.ErrorCode != kerr.UnsupportedVersion.Code || len(r.ApiKeys) != 1 || r.ApiKeys[0].ApiKey != int16(kmsg.ApiVersions) ||
+			r.ApiKeys[0].MinVersion != served.Min || r.ApiKeys[0].MaxVersion != served.Max {
+			t.Errorf("v%d: %+v, want UNSUPPORTED_VERSION and the one row for ApiVersions itself", v, r)
+		}
+	}
+	if served.Min > 0 {
+		if r := ask(served.Min - 1); r.ErrorCode != kerr.UnsupportedVersion.Code {
+			t.Errorf("below the lowest: code %d", r.ErrorCode)
+		}
 	}
 }
