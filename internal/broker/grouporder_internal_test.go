@@ -3,6 +3,7 @@ package broker
 import (
 	"slices"
 	"testing"
+	"time"
 )
 
 // The orders Kafka answered in (conformance/recordings/describe-groups-order.json).
@@ -23,7 +24,9 @@ func TestInKafkaGroupOrderIsKafkas(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		if got := inKafkaGroupOrder(c.in); !slices.Equal(got, c.want) {
+		var got []string
+		within(t, 5*time.Second, "inKafkaGroupOrder", func() { got = inKafkaGroupOrder(c.in) })
+		if !slices.Equal(got, c.want) {
 			t.Errorf("%v: got %v, want %v", c.in, got, c.want)
 		}
 	}
