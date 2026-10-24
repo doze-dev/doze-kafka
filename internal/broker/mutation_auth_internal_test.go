@@ -131,19 +131,27 @@ func newACLRig(t *testing.T) (*Broker, *aclRig) {
 	return b, rig
 }
 
-func callFlexible[Q kmsg.Request, R kmsg.Response](t *testing.T, h func(context.Context, *protocol.Request, Q, R) error, key kmsg.Request, version int16) R {
+// callAPI sends q through its handler at a version, as the connection would, and
+// returns the decoded answer.
+func callAPI[Q kmsg.Request, R kmsg.Response](t *testing.T, h func(context.Context, *protocol.Request, Q, R) error, q Q, version int16) R {
 	t.Helper()
-	key.SetVersion(version)
+	q.SetVersion(version)
+	body := q.AppendTo(nil)
+	skip := 4 // the correlation id.
+	if q.IsFlexible() {
+		body = q.AppendTo([]byte{0}) // the header's tagged fields come first.
+		skip = 5
+	}
 	out, err := typed(h)(context.Background(), &protocol.Request{
-		Header: protocol.RequestHeader{APIKey: protocol.APIKey(key.Key()), APIVersion: version, CorrelationID: 1},
-		Body:   key.AppendTo([]byte{0}),
+		Header: protocol.RequestHeader{APIKey: protocol.APIKey(q.Key()), APIVersion: version, CorrelationID: 1},
+		Body:   body,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp := key.ResponseKind()
+	resp := q.ResponseKind()
 	resp.SetVersion(version)
-	if err := resp.ReadFrom(out[5:]); err != nil {
+	if err := resp.ReadFrom(out[skip:]); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	return resp.(R)
@@ -170,7 +178,7 @@ func TestDescribeACLsListsResourcesInOrder(t *testing.T) {
 	req := kmsg.NewPtrDescribeACLsRequest()
 	req.ResourceType, req.ResourcePatternType = kmsg.ACLResourceTypeAny, kmsg.ACLResourcePatternTypeAny
 	req.Operation, req.PermissionType = kmsg.ACLOperationAny, kmsg.ACLPermissionTypeAny
-	resp := callFlexible(t, b.handleDescribeACLs, req, 2)
+	resp := callAPI(t, b.handleDescribeACLs, req, 2)
 	var got []string
 	for _, r := range resp.Resources {
 		got = append(got, strings.Join([]string{r.ResourceType.String(), r.ResourceName, r.ResourcePatternType.String()}, "/"))
@@ -199,7 +207,7 @@ func TestDeleteACLsWhoseRemovalFailsSaysSoPerFilter(t *testing.T) {
 	req.Filters = []kmsg.DeleteACLsRequestFilter{good, bad}
 
 	rig.removeErr = &fs.PathError{Op: "write", Path: "meta.db", Err: errors.New("no space left on device")}
-	resp := callFlexible(t, b.handleDeleteACLs, req, 2)
+	resp := callAPI(t, b.handleDeleteACLs, req, 2)
 	if len(resp.Results) != 2 {
 		t.Fatalf("%d results", len(resp.Results))
 	}
@@ -215,14 +223,14 @@ func TestDeleteACLsWhoseRemovalFailsSaysSoPerFilter(t *testing.T) {
 
 	// A failure that is not the disk's is the server's.
 	rig.removeErr = errors.New("bookkeeping")
-	resp = callFlexible(t, b.handleDeleteACLs, req, 2)
+	resp = callAPI(t, b.handleDeleteACLs, req, 2)
 	if c := resp.Results[0].ErrorCode; c != kerr.UnknownServerError.Code {
 		t.Errorf("a failure that is not I/O: code %d, want UNKNOWN_SERVER_ERROR", c)
 	}
 
 	// With the store well, the same request deletes and reports the entry.
 	rig.removeErr = nil
-	resp = callFlexible(t, b.handleDeleteACLs, req, 2)
+	resp = callAPI(t, b.handleDeleteACLs, req, 2)
 	if r := resp.Results[0]; r.ErrorCode != 0 || len(r.MatchingACLs) != 1 {
 		t.Errorf("the good filter: code %d with %d matches, want 0 and 1", r.ErrorCode, len(r.MatchingACLs))
 	}
@@ -246,7 +254,7 @@ func TestCreatePartitionsTellsADiskFaultFromAnotherFailure(t *testing.T) {
 		rt.Topic, rt.Count = "grow", 2
 		req.Topics = append(req.Topics, rt)
 		req.TimeoutMillis = 5000
-		resp := callFlexible(t, b.handleCreatePartitions, req, 3)
+		resp := callAPI(t, b.handleCreatePartitions, req, 3)
 		if len(resp.Topics) != 1 || resp.Topics[0].ErrorCode != tc.want {
 			t.Errorf("%v: %+v, want code %d", tc.err, resp.Topics, tc.want)
 		}
