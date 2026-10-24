@@ -359,3 +359,39 @@ func TestSCRAMClientFirstGrammarEdges(t *testing.T) {
 		}
 	}
 }
+
+// A SCRAM proof of the wrong length ends the connection with no answer at all, where
+// every other refusal is answered and the connection closes after it (claim: auth
+// A14, A2).
+func TestASilentSCRAMRefusalClosesTheConnectionWithNoAnswer(t *testing.T) {
+	var failSync bool
+	b, _ := newTestBroker(t, &failSync)
+	b.auth = scramAuthenticator(t, map[string]string{"alice": "pw"})
+	step := func(conn *protocol.Conn, msg string) (*kmsg.SASLAuthenticateResponse, error) {
+		resp := kmsg.NewPtrSASLAuthenticateResponse()
+		ar := kmsg.NewPtrSASLAuthenticateRequest()
+		ar.SASLAuthBytes = []byte(msg)
+		return resp, b.handleSASLAuthenticate(context.Background(), &protocol.Request{Conn: conn}, ar, resp)
+	}
+	open := func() *protocol.Conn {
+		conn := &protocol.Conn{}
+		conn.SetSASLMechanism(config.SASLScramSHA256)
+		resp, err := step(conn, "n,,n=alice,r=clientnonce")
+		if err != nil || resp.ErrorCode != 0 || len(resp.SASLAuthBytes) == 0 {
+			t.Fatalf("client-first: %v %+v", err, resp)
+		}
+		return conn
+	}
+
+	// A proof of the wrong length: no answer, the connection is closed with the reason.
+	_, err := step(open(), "c=biws,r=clientnonce,p=AAAA")
+	var closing *protocol.CloseError
+	if !errors.As(err, &closing) || !strings.Contains(closing.Reason, "authentication failed (scram: proof length mismatch)") || closing.Class != protocol.ClassDenied {
+		t.Errorf("a short proof: %v, want the connection closed as denied, naming the proof's length", err)
+	}
+	// Any other refusal is an answer.
+	resp, err := step(open(), "c=biws,r=clientnonce,p=!!!")
+	if err != nil || resp.ErrorCode != kerr.SaslAuthenticationFailed.Code || resp.ErrorMessage == nil || *resp.ErrorMessage != msgScramRefused(config.SASLScramSHA256) {
+		t.Errorf("a proof that is not base64: %v %+v, want SASL_AUTHENTICATION_FAILED with Kafka's words", err, resp)
+	}
+}
