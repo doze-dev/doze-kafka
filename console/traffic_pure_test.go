@@ -37,7 +37,7 @@ func TestDurationTexts(t *testing.T) {
 	}
 	for d, want := range map[time.Duration]string{
 		-5 * time.Second: "0 s", 0: "0 s", 9 * time.Second: "9 s", 59 * time.Second: "59 s", time.Minute: "1 m 00 s", 250 * time.Second: "4 m 10 s",
-		time.Hour + 2*time.Minute: "1 h 02 m", 47 * time.Hour: "47 h 00 m", 48 * time.Hour: "2 d 00 h", 77 * time.Hour: "3 d 05 h",
+		time.Hour: "1 h 00 m", time.Hour + 2*time.Minute: "1 h 02 m", 47 * time.Hour: "47 h 00 m", 48 * time.Hour: "2 d 00 h", 77 * time.Hour: "3 d 05 h",
 	} {
 		if got := spanBoard(d); got != want {
 			t.Errorf("spanBoard(%v) = %q, want %q", d, got, want)

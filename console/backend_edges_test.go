@@ -248,8 +248,8 @@ func TestFetchWindowWaitsForRecordsBeforeAMarkerOnly(t *testing.T) {
 	if err != nil || len(ms) != 2 || string(ms[0].Value) != "kept" || string(ms[1].Value) != "aborted" {
 		t.Fatalf("uncommitted view: %v %v", ms, err)
 	}
-	if d < txnTail-20*time.Millisecond || d > 3*time.Second {
-		t.Errorf("a window ending in a marker took %v, want about %v", d, txnTail)
+	if d < 380*time.Millisecond || d > 3*time.Second {
+		t.Errorf("a window ending in a marker took %v, want about 400ms", d)
 	}
 	ms, err = c.be.FetchWindowCommitted(ctx, "mk", 0, 0, 4)
 	if err != nil || len(ms) != 1 || string(ms[0].Value) != "kept" {

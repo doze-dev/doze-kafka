@@ -69,7 +69,7 @@ func TestInspectMemberAndTransaction(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw := req(t, c, "GET", "/_console/inspect/transaction?key=txn-1", nil).Body.String()
-	if !strings.Contains(raw, `/_console/topics/my-topic`) || !strings.Contains(readable(raw), "my-topic-1") || !strings.Contains(readable(raw), "Ongoing") {
+	if !strings.Contains(raw, `href="/_console/topics/my-topic"`) || strings.Contains(raw, `/_console/topics/my-topic-1`) || !strings.Contains(readable(raw), "my-topic-1") || !strings.Contains(readable(raw), "Ongoing") {
 		t.Errorf("transaction page:\n%s", readable(raw))
 	}
 	if gone := get("transaction", "txn-gone"); !strings.Contains(gone, "This transaction has ended") {
