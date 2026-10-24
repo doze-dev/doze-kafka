@@ -161,3 +161,106 @@ func TestProduceRefusalsCarryWhatKafkaCarries(t *testing.T) {
 		}
 	}
 }
+
+// listOffsetsAt sends one ListOffsets entry through the handler at a version and
+// returns the partition's answer.
+func listOffsetsAt(t *testing.T, b *Broker, version int16, isolation int8, topic string, partition int32, timestamp int64, leaderEpoch int32) kmsg.ListOffsetsResponseTopicPartition {
+	t.Helper()
+	req := kmsg.NewPtrListOffsetsRequest()
+	req.SetVersion(version)
+	req.ReplicaID, req.IsolationLevel = -1, isolation
+	rt := kmsg.NewListOffsetsRequestTopic()
+	rt.Topic = topic
+	rp := kmsg.NewListOffsetsRequestTopicPartition()
+	rp.Partition, rp.Timestamp, rp.CurrentLeaderEpoch = partition, timestamp, leaderEpoch
+	rt.Partitions = append(rt.Partitions, rp)
+	req.Topics = append(req.Topics, rt)
+	body := req.AppendTo(nil)
+	if req.IsFlexible() {
+		body = req.AppendTo([]byte{0})
+	}
+	out, err := typed(b.handleListOffsets)(context.Background(), &protocol.Request{
+		Header: protocol.RequestHeader{APIKey: protocol.APIKey(kmsg.ListOffsets), APIVersion: version, CorrelationID: 1},
+		Body:   body,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp := kmsg.NewPtrListOffsetsResponse()
+	resp.SetVersion(version)
+	skip := 4
+	if resp.IsFlexible() {
+		skip = 5
+	}
+	if err := resp.ReadFrom(out[skip:]); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return resp.Topics[0].Partitions[0]
+}
+
+// ListOffsets by time: the first record at or after the timestamp, with its time and
+// the leader epoch it was found under; nothing found is -1 (the log end for v0, which
+// has no way to say none), with no time and no epoch. Records of plainBatch carry
+// timestamp 0.
+func TestListOffsetsByTimeAnswersWhatItFoundOrNothing(t *testing.T) {
+	var failSync bool
+	b, logs := newTestBroker(t, &failSync)
+
+	// An empty partition has nothing at any time, and asking opens nothing: an open
+	// partition holds descriptors for the life of the broker. Its latest is offset 0
+	// under epoch 0.
+	empty := listOffsetsAt(t, b, 5, 0, "t", 0, 1, -1)
+	if empty.ErrorCode != 0 || empty.Offset != -1 || empty.Timestamp != -1 || empty.LeaderEpoch != -1 {
+		t.Errorf("by time, nothing stored: %+v, want offset -1, time -1, epoch -1", empty)
+	}
+	if n := logs.OpenPartitions(); n != 0 {
+		t.Errorf("a by-time lookup in an empty partition opened %d partitions", n)
+	}
+	if latest := listOffsetsAt(t, b, 5, 0, "t", 0, listOffsetsLatest, -1); latest.Offset != 0 || latest.LeaderEpoch != 0 {
+		t.Errorf("latest of an empty partition: offset %d epoch %d, want 0 and 0", latest.Offset, latest.LeaderEpoch)
+	}
+
+	for range 2 {
+		if p := produceTo(t, b, "t", 0, 1, plainBatch()); p.ErrorCode != 0 {
+			t.Fatal(p.ErrorCode)
+		}
+	}
+	found := listOffsetsAt(t, b, 5, 0, "t", 0, 0, -1)
+	if found.ErrorCode != 0 || found.Offset != 0 || found.Timestamp != 0 || found.LeaderEpoch != 0 {
+		t.Errorf("by time 0: %+v, want offset 0, time 0, epoch 0", found)
+	}
+	none := listOffsetsAt(t, b, 5, 0, "t", 0, 1, -1)
+	if none.ErrorCode != 0 || none.Offset != -1 || none.Timestamp != -1 || none.LeaderEpoch != -1 {
+		t.Errorf("by time after every record: %+v, want offset -1, time -1, epoch -1", none)
+	}
+	v0 := listOffsetsAt(t, b, 0, 0, "t", 0, 1, -1)
+	if v0.ErrorCode != 0 || len(v0.OldStyleOffsets) != 1 || v0.OldStyleOffsets[0] != 2 {
+		t.Errorf("v0 by time after every record: %+v, want the log end 2 as its one offset", v0)
+	}
+	v0found := listOffsetsAt(t, b, 0, 0, "t", 0, 0, -1)
+	if len(v0found.OldStyleOffsets) != 1 || v0found.OldStyleOffsets[0] != 0 {
+		t.Errorf("v0 by time 0: %+v, want offset 0", v0found)
+	}
+}
+
+// Every partition-addressed API answers UNKNOWN_TOPIC_OR_PARTITION for the first
+// partition past the last and for a negative one, and serves the last.
+func TestListOffsetsRefusesThePartitionPastTheLast(t *testing.T) {
+	var failSync bool
+	b, _ := newTestBroker(t, &failSync)
+	for _, tc := range []struct {
+		partition int32
+		code      int16
+	}{
+		{0, 0},
+		{1, kerr.UnknownTopicOrPartition.Code},
+		{-1, kerr.UnknownTopicOrPartition.Code},
+	} {
+		if p := listOffsetsAt(t, b, 5, 0, "t", tc.partition, listOffsetsLatest, -1); p.ErrorCode != tc.code {
+			t.Errorf("partition %d: code %d, want %d", tc.partition, p.ErrorCode, tc.code)
+		}
+	}
+	if p := listOffsetsAt(t, b, 5, 0, "nosuch", 0, listOffsetsLatest, -1); p.ErrorCode != kerr.UnknownTopicOrPartition.Code {
+		t.Errorf("an unknown topic: code %d", p.ErrorCode)
+	}
+}
