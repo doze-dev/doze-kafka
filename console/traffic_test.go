@@ -532,3 +532,19 @@ func TestMetricRankPutsWhatAnswersIsThisClientHealthyFirst(t *testing.T) {
 		t.Error("a non-zero retry rate does not come first")
 	}
 }
+
+// The refused count and the "N of M" figure are outside the polled region, so the poll
+// carries them out of band; drawn once they would go stale.
+func TestTrafficLiveRefreshesTheRefusedAndMatchCounts(t *testing.T) {
+	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic() })
+	page := req(t, c, "GET", "/_console/traffic?kind=errors&client=billing", nil).Body.String()
+	if !strings.Contains(page, `id="refused-count"`) || !strings.Contains(page, `id="match-count"`) {
+		t.Fatalf("the page lacks the counts: %s", page)
+	}
+	live := req(t, c, "GET", "/_console/traffic/live?kind=errors&client=billing", nil).Body.String()
+	for _, id := range []string{"refused-count", "match-count"} {
+		if !strings.Contains(live, `id="`+id+`" hx-swap-oob="true"`) {
+			t.Errorf("the live answer does not refresh #%s", id)
+		}
+	}
+}
