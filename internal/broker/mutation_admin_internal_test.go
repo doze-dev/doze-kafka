@@ -403,3 +403,16 @@ func TestMetadataReachesATopicRegisteredBeforeNamesWereChecked(t *testing.T) {
 		t.Errorf("a name that would be refused: code %d, want INVALID_TOPIC_EXCEPTION", got.ErrorCode)
 	}
 }
+
+// The broker's partition limit is a count a topic may reach.
+func TestCreateTopicsHoldsAPartitionCountToTheBrokersLimit(t *testing.T) {
+	b, _, _ := newAdminBroker(t)
+	b.cfg.MaxPartitions = 3
+	if got := createOne(t, b, newTopic("at-the-limit", 3, 1)); got.ErrorCode != 0 || got.NumPartitions != 3 {
+		t.Errorf("exactly the limit: code %d with %d partitions", got.ErrorCode, got.NumPartitions)
+	}
+	got := createOne(t, b, newTopic("past-the-limit", 4, 1))
+	if got.ErrorCode != kerr.InvalidPartitions.Code || got.ErrorMessage == nil || !strings.Contains(*got.ErrorMessage, "4 partitions is above this broker's limit of 3") {
+		t.Errorf("one past the limit: code %d message %v", got.ErrorCode, got.ErrorMessage)
+	}
+}
