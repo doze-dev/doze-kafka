@@ -3,12 +3,10 @@
 package main
 
 import (
-	"errors"
 	"io"
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -17,38 +15,33 @@ import (
 	"time"
 )
 
-// runBinary starts the binary and returns what it printed and the code it ended with, ending it
-// with SIGTERM after stop returns true for what it has printed (or never, when stop is nil).
+// runBinary runs the command line as main does, in this process (so that the code it runs
+// is the code these tests are measured on), and returns what it printed and the code it
+// ended with. It ends the run with SIGTERM, which realMain stops on, once stop returns true
+// for what has been printed; with a nil stop it waits for the run to end by itself. dir is
+// the working directory, and env is KEY=value pairs set for the run.
 func runBinary(t *testing.T, dir string, env []string, stop func(stdout, stderr string) bool, args ...string) (stdout, stderr string, code int) {
 	t.Helper()
-	cmd := exec.Command(binary(t), args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), env...)
-	var out, errs lockedBuf
-	cmd.Stdout, cmd.Stderr = &out, &errs
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
+	t.Chdir(dir)
+	for _, kv := range env {
+		k, v, _ := strings.Cut(kv, "=")
+		t.Setenv(k, v)
 	}
-	exited := make(chan error, 1)
-	go func() { exited <- cmd.Wait() }()
-	t.Cleanup(func() { cmd.Process.Kill() })
+	var out, errs lockedBuf
+	exited := make(chan int, 1)
+	go func() { exited <- realMain(args, &out, &errs) }()
 	deadline := time.After(30 * time.Second)
 	for {
 		select {
-		case err := <-exited:
-			code = 0
-			var ee *exec.ExitError
-			if errors.As(err, &ee) {
-				code = ee.ExitCode()
-			}
+		case code := <-exited:
 			return out.String(), errs.String(), code
 		case <-deadline:
-			cmd.Process.Kill()
+			syscall.Kill(os.Getpid(), syscall.SIGTERM)
 			t.Fatalf("did not end.\nstdout: %s\nstderr: %s", out.String(), errs.String())
 		case <-time.After(25 * time.Millisecond):
 			if stop != nil && stop(out.String(), errs.String()) {
 				stop = nil
-				cmd.Process.Signal(syscall.SIGTERM)
+				syscall.Kill(os.Getpid(), syscall.SIGTERM)
 			}
 		}
 	}
