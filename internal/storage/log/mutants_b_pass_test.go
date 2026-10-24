@@ -323,7 +323,7 @@ func TestB_ARewrittenSegmentsIndexFollowsTheInterval(t *testing.T) {
 		t.Fatalf("result = %+v", res)
 	}
 	want := []indexEntry{{1, 0}, {2, one}, {3, 2 * one}}
-	if got := readIndexFile(t, filepath.Join(p.dir, segmentName(0)+".index")); !reflect.DeepEqual(got, want) {
+	if got := readIndexFileB(t, filepath.Join(p.dir, segmentName(0)+".index")); !reflect.DeepEqual(got, want) {
 		t.Errorf("index on disk = %v, want %v", got, want)
 	}
 	if got := p.segments[0].index.entries; !reflect.DeepEqual(got, want) {

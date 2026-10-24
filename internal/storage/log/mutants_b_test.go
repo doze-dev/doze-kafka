@@ -39,7 +39,7 @@ func rawSegment(t *testing.T, dir string, base int64, tail []byte, batches ...[]
 	return s
 }
 
-func readIndexFile(t *testing.T, path string) []indexEntry {
+func readIndexFileB(t *testing.T, path string) []indexEntry {
 	t.Helper()
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -231,7 +231,7 @@ func TestB_RebuildIndexFromTheLog(t *testing.T) {
 	}
 	check := func(what string, want []indexEntry) {
 		t.Helper()
-		if got := readIndexFile(t, base+".index"); !(len(got) == 0 && len(want) == 0) && !reflect.DeepEqual(got, want) {
+		if got := readIndexFileB(t, base+".index"); !(len(got) == 0 && len(want) == 0) && !reflect.DeepEqual(got, want) {
 			t.Errorf("%s: index = %v, want %v", what, got, want)
 		}
 	}
@@ -316,7 +316,7 @@ func TestB_RecoverSwapsHandlesEveryMarkerAndLeftover(t *testing.T) {
 	}
 	for _, base := range []int64{0, 10} {
 		want := []indexEntry{{base, 0}}
-		if got := readIndexFile(t, filepath.Join(dir, segmentName(base)+".index")); !reflect.DeepEqual(got, want) {
+		if got := readIndexFileB(t, filepath.Join(dir, segmentName(base)+".index")); !reflect.DeepEqual(got, want) {
 			t.Errorf("index of %d = %v, want %v", base, got, want)
 		}
 	}
