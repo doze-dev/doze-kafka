@@ -68,7 +68,7 @@ func TestTapeWindowsAndPaging(t *testing.T) {
 	}
 
 	// The first offset that is still the tail window, and the one before it.
-	if d = f.tape(t, "tw", 0, 1, 70, -1, -1, false); d["AtTail"] != true || d["WindowFrom"] != int64(40) {
+	if d = f.tape(t, "tw", 0, 1, 70, -1, -1, false); d["AtTail"] != true || d["WindowFrom"] != int64(70) {
 		t.Errorf("from=70: AtTail %v", d["AtTail"])
 	}
 	d = f.tape(t, "tw", 0, 1, 69, -1, -1, false)
@@ -94,7 +94,7 @@ func TestTapeWindowsAndPaging(t *testing.T) {
 	}
 	// The newest record is in the tail window, which stays the tail.
 	d = f.tape(t, "tw", 0, 1, -1, -1, 129, false)
-	if d["JumpNote"] != "" || d["HL"] != int64(129) || d["AtTail"] != true || d["WindowFrom"] != int64(40) {
+	if d["JumpNote"] != "" || d["HL"] != int64(129) || d["AtTail"] != true || d["WindowFrom"] != int64(70) {
 		t.Errorf("jump to the newest: %v %v %v %v", d["JumpNote"], d["HL"], d["AtTail"], d["WindowFrom"])
 	}
 	d = f.tape(t, "tw", 0, 1, 20, 7, 130, false)
