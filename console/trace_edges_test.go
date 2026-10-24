@@ -207,7 +207,9 @@ func TestStartTraceKeepsReusesAndForgetsJobs(t *testing.T) {
 	c := newTestConsole(t)
 	now := time.Now()
 	at := now.Add(-time.Minute)
-	key := func(trace string) string { return fmt.Sprintf("%s|%d|%d|%s|%d", trace, at.UnixMilli(), time.Minute, "", 0) }
+	key := func(trace string) string {
+		return fmt.Sprintf("%s|%d|%d|%s|%d", trace, at.UnixMilli(), time.Minute, "", 0)
+	}
 	seed := func(id, k string, started, finished time.Time) *traceJob {
 		j := &traceJob{id: id, key: k, started: started, finished: finished, phase: "done"}
 		c.traces.mu.Lock()
