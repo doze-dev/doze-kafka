@@ -513,9 +513,9 @@ func TestClassicReplacingAStaticMemberAnswersTheJoinTheOldOneHadParked(t *testin
 	}
 }
 
-// A join that is superseded by a retry of the same member is answered UNKNOWN_MEMBER_ID
-// (claim: groups-requests G4) with generation -1.
-func TestClassicARetriedJoinReleasesTheOneItReplaces(t *testing.T) {
+// A join that is superseded by a retry of the same member is never answered, as Kafka
+// does not (claim: groups G4): the retry takes the member's place and is the one answered.
+func TestClassicARetriedJoinLeavesTheOneItReplacesUnanswered(t *testing.T) {
 	noDelay(t)
 	gm := newGroupManager(nil, nil)
 	ids, _ := cmStable(t, gm, "q", "", "")
@@ -526,9 +526,15 @@ func TestClassicARetriedJoinReleasesTheOneItReplaces(t *testing.T) {
 		cmLocked(gm, func() { parked = gm.groups["q"].members[ids[0]].awaitingJoin })
 		return parked
 	})
-	cmJoinAsync(ctx, gm, cmReq("q", ids[0], nil, 3))
-	res := cmWait(t, first, "the superseded join")
-	if res.errorCode != kerr.UnknownMemberID.Code || res.generation != -1 {
-		t.Errorf("the superseded join: %+v, want UNKNOWN_MEMBER_ID and generation -1", res)
+	second := cmJoinAsync(ctx, gm, cmReq("q", ids[0], nil, 3))
+	time.Sleep(100 * time.Millisecond)
+	cmJoinAsync(ctx, gm, cmReq("q", ids[1], nil, 3)) // the other member completes the rebalance.
+	if res := cmWait(t, second, "the retried join"); res.errorCode != 0 {
+		t.Errorf("the retried join: %+v, want 0", res)
+	}
+	select {
+	case j := <-first:
+		t.Errorf("the superseded join was answered: %+v", j.res)
+	case <-time.After(300 * time.Millisecond):
 	}
 }
