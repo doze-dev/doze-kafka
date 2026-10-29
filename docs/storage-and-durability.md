@@ -151,7 +151,9 @@ after a crash as before; the extra flush is paid by its first sync (measured wit
 partitions on a loaded macOS machine: listening in about 15 ms either way, the first
 touch of all of them in under a second, and the first `acks=all` to each one 11 to 58
 seconds against 11 to 18 before, `F_FULLFSYNC` of each segment and directory being the
-cost; later ones as before). This is exercised by a chaos harness (`go tool task
+cost; later ones as before. On a quiet machine, three restarts of each kind: 31, 13 and
+13 seconds after `kill -9`, against 17, 14 and 15 after a clean stop, with the broker
+answering in 0.06 s in every case). This is exercised by a chaos harness (`go tool task
 chaos`) that `SIGKILL`s and restarts the broker under sustained load, and by the
 power-cut model below, which `SIGKILL` cannot be.
 
