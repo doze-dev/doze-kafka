@@ -34,7 +34,7 @@
         "ClientInstanceID": "\u003cinstance:2\u003e",
         "CompressionType": 0,
         "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
-        "SubscriptionID": "\u003csubscription:2\u003e",
+        "SubscriptionID": 0,
         "Terminating": false
       },
       "response": {
@@ -50,7 +50,7 @@
         "ClientInstanceID": "\u003czero-id\u003e",
         "CompressionType": 0,
         "Metrics": "ClwKIwohCgtjbGllbnRfcmFjaxISChBkb3plLWNvbmZvcm1hbmNlEjUSMwokb3JnLmFwYWNoZS5rYWZrYS5jb25zdW1lci5mZXRjaC1yYXRlKgsKCREAAAAAAADwPw==",
-        "SubscriptionID": "\u003csubscription:2\u003e",
+        "SubscriptionID": 0,
         "Terminating": false
       },
       "response": {

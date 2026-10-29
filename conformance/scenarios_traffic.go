@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"math"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
@@ -414,6 +415,22 @@ func setClientMetrics(e *Env, label, intervalMs string) {
 	}
 	req.Resources = append(req.Resources, res)
 	e.Do(label, req, 1)
+	if !e.settles {
+		return
+	}
+	// Kafka applies the resource to its subscriptions after it has answered, so a
+	// subscription asked for at once may still be the default one (300000 ms, nothing
+	// requested, or the old interval). Wait until it carries the interval: what the
+	// next step finds is then the same on every run.
+	want, err := strconv.Atoi(intervalMs)
+	if err != nil {
+		e.fail("%s: interval %q: %v", label, intervalMs, err)
+		return
+	}
+	e.Await("the client metrics resource "+strconv.Quote(label)+" is in force", getSubscription([16]byte{}), 0, func(r kmsg.Response) bool {
+		g := r.(*kmsg.GetTelemetrySubscriptionsResponse)
+		return g.ErrorCode == 0 && int(g.PushIntervalMillis) == want && len(g.RequestedMetrics) > 0
+	})
 }
 
 // --- R3: the refusals ---
