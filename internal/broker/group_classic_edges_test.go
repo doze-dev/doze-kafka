@@ -426,8 +426,10 @@ func TestGroupClassic_ParkedJoinsAreReleased(t *testing.T) {
 	first := joinAsync(ctx, B, g, idb, testSessionMs, testRebalanceMsDefault) // parks.
 	time.Sleep(200 * time.Millisecond)
 	second := joinAsync(ctx, B2, g, idb, testSessionMs, testRebalanceMsDefault) // the client retried.
-	if o := await(t, first, 3*time.Second, "superseded join"); o.err != nil || o.resp.ErrorCode != codeUnknownMember {
-		t.Fatalf("the superseded join = %+v %v, want UNKNOWN_MEMBER_ID", o.resp, o.err)
+	select { // Kafka never answers it (claim: groups G4).
+	case o := <-first:
+		t.Fatalf("the superseded join was answered: %+v %v", o.resp, o.err)
+	case <-time.After(500 * time.Millisecond):
 	}
 
 	time.Sleep(100 * time.Millisecond)
