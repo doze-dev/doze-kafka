@@ -216,3 +216,29 @@ var fuzzCodecsOnce = sync.OnceValues(func() ([]*Codec, error) {
 	}
 	return out, nil
 })
+
+// A union value as the decoder shows it, {"double": 0}, is accepted back by the encoder:
+// a message read in the console can be sent as it stands (found by FuzzEncode).
+func TestAUnionValueAsDecodedEncodesAgain(t *testing.T) {
+	c, err := NewCodec(TypeAvro, `["null","double",{"type":"enum","name":"K","symbols":["A","B"]},{"type":"record","name":"P","fields":[{"name":"double","type":"long"}]}]`, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, doc := range []string{`{"double":0}`, `{"K":"B"}`, `0`, `"A"`, `{"P":{"double":7}}`, `{"double":7}`} {
+		out, err := c.Encode(7, doc)
+		if err != nil {
+			t.Fatalf("%s: %v", doc, err)
+		}
+		back, err := c.Decode(out)
+		if err != nil {
+			t.Fatalf("%s: %v", doc, err)
+		}
+		if _, err := c.Encode(7, back); err != nil {
+			t.Errorf("%s reads back as %s, which does not encode: %v", doc, back, err)
+		}
+	}
+	out, _ := c.Encode(7, `{"double":3}`)
+	if back, _ := c.Decode(out); !strings.Contains(back, `"double":3`) {
+		t.Errorf("the tagged double 3 reads back as %s", back)
+	}
+}

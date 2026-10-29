@@ -325,6 +325,23 @@ func jsonToAvro(s avro.Schema, v any) (any, error) {
 			}
 			return nil, errors.New("null is not one of the union's branches")
 		}
+		// The tagged form, {"double": 0}, is what the decoder shows for a union value
+		// and Avro's own JSON encoding: a message read in the console can be sent as it
+		// stands. A one-key object that names no branch, or whose value its branch does
+		// not take, is tried as the untagged value below.
+		if m, ok := v.(map[string]any); ok && len(m) == 1 {
+			for _, br := range sc.Types() {
+				inner, named := m[unionBranchName(br)]
+				if !named || br.Type() == avro.Null {
+					continue
+				}
+				if native, err := jsonToAvro(br, inner); err == nil {
+					if _, merr := avro.Marshal(br, native); merr == nil {
+						return map[string]any{unionBranchName(br): native}, nil
+					}
+				}
+			}
+		}
 		var errs []string
 		for _, br := range sc.Types() {
 			if br.Type() == avro.Null {
