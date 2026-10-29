@@ -15,12 +15,15 @@ export class OwnBroker {
   private readonly root = resolve(process.cwd(), '..');
   private readonly bin: string;
   private readonly data: string;
+  /** The instance name: the console labels the broker with it, unless it is the default, so it is set, not taken from the directory the repository is checked out in. */
+  private readonly instance: string;
   private proc?: ChildProcess;
 
   constructor(name: string, offset: number) {
     this.port = Number(process.env.E2E_PORT ?? 14092) + offset;
     this.console = `http://127.0.0.1:${this.port + 1}${PREFIX}/`;
     this.kafka = `127.0.0.1:${this.port}`;
+    this.instance = `e2e-${name}`;
     this.bin = join(this.root, 'e2e', '.tmp', 'bin', `doze-kafka-${name}-${this.port}`);
     this.data = join(this.root, 'e2e', '.tmp', `data ${name} ${this.port}`);
   }
@@ -37,7 +40,7 @@ export class OwnBroker {
   /** Starts it over the data directory it has. */
   async up(): Promise<void> {
     const p = this.port;
-    this.proc = spawn(this.bin, ['--listen', `127.0.0.1:${p}`, '--console-addr', `127.0.0.1:${p + 1}`, '--schema-registry-addr', `127.0.0.1:${p + 2}`, '--data-dir', this.data],
+    this.proc = spawn(this.bin, ['--listen', `127.0.0.1:${p}`, '--console-addr', `127.0.0.1:${p + 1}`, '--schema-registry-addr', `127.0.0.1:${p + 2}`, '--data-dir', this.data, '--name', this.instance],
       { cwd: this.root, env: { ...process.env, DOZE_ZONE: 'off', DOZE_KAFKA_CONSOLE_PREFIX: PREFIX }, stdio: 'ignore' });
     for (let i = 0; i < 150; i++) {
       try {
