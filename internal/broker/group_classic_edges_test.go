@@ -426,7 +426,7 @@ func TestGroupClassic_ParkedJoinsAreReleased(t *testing.T) {
 	first := joinAsync(ctx, B, g, idb, testSessionMs, testRebalanceMsDefault) // parks.
 	time.Sleep(200 * time.Millisecond)
 	second := joinAsync(ctx, B2, g, idb, testSessionMs, testRebalanceMsDefault) // the client retried.
-	select { // Kafka never answers it (claim: groups G4).
+	select {                                                                    // Kafka never answers it (claim: groups G4).
 	case o := <-first:
 		t.Fatalf("the superseded join was answered: %+v %v", o.resp, o.err)
 	case <-time.After(500 * time.Millisecond):
