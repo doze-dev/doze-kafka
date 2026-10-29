@@ -68,6 +68,10 @@ type Run struct {
 }
 
 // Count is how many mutants have a status.
+// unmutatedCap bounds a run of the unmutated suite. The broker suite takes about 13 minutes
+// on a busy machine, so the old ten minutes failed the baseline check there.
+const unmutatedCap = 60 * time.Minute
+
 func (r *Run) Count(s Status) int {
 	n := 0
 	for _, m := range r.Mutants {
@@ -154,8 +158,8 @@ func (e *Engine) Run(ctx context.Context) (*Run, error) {
 				bases[i].err = fmt.Errorf("the unmutated package does not build: %v\n%s", err, msg)
 				return
 			}
-			// No mutant's time is known yet: the unmutated run gets ten minutes.
-			bases[i].out = e.test(ctx, trees[i], testBin, nil, 10*time.Minute, "")
+			// No mutant's time is known yet: the unmutated run gets unmutatedCap.
+			bases[i].out = e.test(ctx, trees[i], testBin, nil, unmutatedCap, "")
 		}(i)
 	}
 	wg.Wait()
@@ -183,7 +187,7 @@ func (e *Engine) Run(ctx context.Context) (*Run, error) {
 	}
 	run.Tests = len(names)
 	fullProf := filepath.Join(tmp, "full.cov")
-	if o := e.test(ctx, trees[0], coverBin, nil, 10*time.Minute, fullProf); o.status != Lived {
+	if o := e.test(ctx, trees[0], coverBin, nil, unmutatedCap, fullProf); o.status != Lived {
 		return nil, fmt.Errorf("%s: the unmutated tests do not pass with coverage on (%s %s)\n%s", e.Dir, o.status, o.detail, o.tail)
 	}
 	cov, err := readProfile(fullProf)
@@ -459,7 +463,7 @@ func (e *Engine) coverEachTest(ctx context.Context, trees []string, tmp string, 
 			}
 			for i := range ch {
 				prof := filepath.Join(tmp, fmt.Sprintf("t%d.cov", i))
-				o := e.test(ctx, trees[w], coverBin, []string{names[i]}, 10*time.Minute, prof)
+				o := e.test(ctx, trees[w], coverBin, []string{names[i]}, unmutatedCap, prof)
 				if o.status != Lived {
 					errs[i] = fmt.Errorf("%s: %s does not pass when it is run on its own, unmutated (%s). A mutant is run against the tests that reach it, so each must pass alone; fix the test, or run the unit whole (MUTATE_WHOLE=1).\n%s", e.Dir, names[i], o.status+" "+Status(o.detail), o.tail)
 					continue
