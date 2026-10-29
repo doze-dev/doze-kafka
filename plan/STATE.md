@@ -22,7 +22,7 @@ Local main is ahead of origin and unpushed. Stages 0 to 2 fixed and merged after
 3. Soak and SIGKILL chaos run, several hours.
 4. Fresh-install check from `docs/getting-started.md` on a clean directory; one green GitHub CI run.
 5. Browser check of the Traffic counts fix (Playwright).
-6. Small items: re-measure 5,000-partition start-up after an unclean stop (11 to 58 s, noisy); G1/G3 `doze` claims cited from memory (`conformance/claims/groups-requests.md`); `conformance/claims_test.go:13` says 4.0.0; Traf-10 contrast (muted ink applied, owner to confirm); TxnOffsetCommit from outside the group; DeleteGroups/OffsetDelete full-disk codes; `RecoverTransactions` logs a completed transaction at Debug; other repos' CHANGELOG lines and doze `go mod tidy`.
+6. Small items: re-measure 5,000-partition start-up after an unclean stop (11 to 58 s, noisy); `conformance/claims_test.go:13` says 4.0.0; Traf-10 contrast (muted ink applied, owner to confirm); TxnOffsetCommit from outside the group; DeleteGroups/OffsetDelete full-disk codes; `RecoverTransactions` logs a completed transaction at Debug; other repos' CHANGELOG lines and doze `go mod tidy`.
 
 ## Decisions (owner, 2026-10-24 to 28)
 - Stop extending mutation testing; the remaining survivors stay listed with reasons.

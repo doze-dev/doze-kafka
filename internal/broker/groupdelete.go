@@ -22,7 +22,7 @@ func (b *Broker) groupIsActive(id string) bool {
 
 // handleDeleteGroups removes empty groups. A group with live members is refused
 // (NON_EMPTY_GROUP), an unknown one is GROUP_ID_NOT_FOUND, as on Kafka
-// (claim: groups-requests G1).
+// (claim: groups G1).
 func (b *Broker) handleDeleteGroups(ctx context.Context, req *protocol.Request, dr *kmsg.DeleteGroupsRequest, resp *kmsg.DeleteGroupsResponse) error {
 	for _, id := range inKafkaGroupOrder(dr.Groups) {
 		rg := kmsg.NewDeleteGroupsResponseGroup()
@@ -108,7 +108,7 @@ func (b *Broker) handleOffsetDelete(ctx context.Context, req *protocol.Request, 
 				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
 			default:
 				// Including an offset whose topic is gone. Kafka answers
-				// UNKNOWN_TOPIC_OR_PARTITION there (claim: groups-requests G2), but it also never keeps such an
+				// UNKNOWN_TOPIC_OR_PARTITION there (claim: groups G2), but it also drops such an
 				// offset; a data directory from an earlier version of this broker
 				// can hold one, and refusing left no way to remove it short of
 				// deleting the whole group.

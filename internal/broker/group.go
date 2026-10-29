@@ -325,7 +325,7 @@ func (gm *groupManager) forget(group string) bool {
 // with a fresh id and must retry (KIP-394) — but only from JoinGroup v4, the
 // first version that knows the code. An older client would not know what to do
 // with it, so it is given an id and joined in one step, as Kafka does
-// (claim: groups-requests G3).
+// (claim: groups G3).
 func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who clientRef) (joinResult, error) {
 	refuse := func(code int16) (joinResult, error) {
 		return joinResult{errorCode: int16(code), memberID: r.MemberID, generation: -1}, nil
@@ -450,10 +450,10 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 		gm.redeem(r.Group, r.MemberID)
 		gm.emit(g, "joined", m.id, "client "+who.clientID, "")
 	}
-	// A retried JoinGroup replaces one still parked: the old request's client is
-	// waiting on an answer that this one supersedes, so release it (Kafka answers
-	// it UNKNOWN_MEMBER_ID; claim: groups-requests G4) instead of leaving its goroutine blocked.
-	m.failPendingJoin()
+	// A retried JoinGroup replaces one still parked, and Kafka never answers the old
+	// one (claim: groups G4): its callback is dropped. It is forgotten here; its
+	// goroutine waits on a channel nothing writes to until its connection closes.
+	m.awaitingJoin = false
 	m.client = who
 	m.instanceID = r.InstanceID
 	if static {

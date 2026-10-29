@@ -1,0 +1,1084 @@
+{
+  "scenario": "group-requests-answers",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "ga"
+          },
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "ga-gone"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "ga",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          },
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "ga-gone",
+            "TopicID": "\u003ctopic-id:2\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "find-coordinators",
+      "api": "FindCoordinator",
+      "version": 4,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": [
+          "ga-del",
+          "ga-off",
+          "ga-j0",
+          "ga-j1",
+          "ga-j2",
+          "ga-j3",
+          "ga-j4",
+          "ga-park"
+        ],
+        "CoordinatorType": 0
+      },
+      "response": {
+        "Coordinators": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "ga-del",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "ga-off",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "ga-j0",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "ga-j1",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "ga-j2",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "ga-j3",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "ga-j4",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "ga-park",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          }
+        ],
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "del-join-needs-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ga-del",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJnYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "del-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ga-del",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJnYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:1\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJnYf////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "del-groups-v0",
+      "api": "DeleteGroups",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "ga-del",
+          "ga-never"
+        ]
+      },
+      "response": {
+        "Groups": [
+          {
+            "ErrorCode": 68,
+            "ErrorMessage": null,
+            "Group": "ga-del"
+          },
+          {
+            "ErrorCode": 69,
+            "ErrorMessage": null,
+            "Group": "ga-never"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "del-groups-v1",
+      "api": "DeleteGroups",
+      "version": 1,
+      "request": {
+        "Groups": [
+          "ga-del",
+          "ga-never"
+        ]
+      },
+      "response": {
+        "Groups": [
+          {
+            "ErrorCode": 68,
+            "ErrorMessage": null,
+            "Group": "ga-del"
+          },
+          {
+            "ErrorCode": 69,
+            "ErrorMessage": null,
+            "Group": "ga-never"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "del-groups-v2",
+      "api": "DeleteGroups",
+      "version": 2,
+      "request": {
+        "Groups": [
+          "ga-del",
+          "ga-never"
+        ]
+      },
+      "response": {
+        "Groups": [
+          {
+            "ErrorCode": 68,
+            "ErrorMessage": null,
+            "Group": "ga-del"
+          },
+          {
+            "ErrorCode": 69,
+            "ErrorMessage": null,
+            "Group": "ga-never"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "off-commit",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": -1,
+        "Group": "ga-off",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 5,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ga-gone",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ga-gone",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "off-commit-kept",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": -1,
+        "Group": "ga-off",
+        "InstanceID": null,
+        "MemberID": "",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 6,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "ga",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ga",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "off-fetch",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "ga-off",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ga-gone",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "ga-off",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": 5,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ga-gone",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "off-delete-topic",
+      "api": "DeleteTopics",
+      "version": 3,
+      "request": {
+        "TimeoutMillis": 15000,
+        "TopicNames": [
+          "ga-gone"
+        ],
+        "Topics": null
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Topic": "ga-gone",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "off-offset-delete",
+      "api": "OffsetDelete",
+      "version": 0,
+      "request": {
+        "Group": "ga-off",
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "Partition": 0
+              }
+            ],
+            "Topic": "ga-gone"
+          }
+        ]
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 3,
+                "Partition": 0
+              }
+            ],
+            "Topic": "ga-gone"
+          }
+        ]
+      }
+    },
+    {
+      "label": "off-fetch-after",
+      "api": "OffsetFetch",
+      "version": 8,
+      "request": {
+        "Group": "",
+        "Groups": [
+          {
+            "Group": "ga-off",
+            "MemberEpoch": -1,
+            "MemberID": null,
+            "Topics": [
+              {
+                "Partitions": [
+                  0
+                ],
+                "Topic": "ga-gone",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "RequireStable": false,
+        "Topics": null
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Groups": [
+          {
+            "ErrorCode": 0,
+            "Group": "ga-off",
+            "Topics": [
+              {
+                "Partitions": [
+                  {
+                    "ErrorCode": 0,
+                    "LeaderEpoch": -1,
+                    "Metadata": "",
+                    "Offset": -1,
+                    "Partition": 0
+                  }
+                ],
+                "Topic": "ga-gone",
+                "TopicID": "\u003czero-id\u003e"
+              }
+            ]
+          }
+        ],
+        "ThrottleMillis": 0,
+        "Topics": null
+      }
+    },
+    {
+      "label": "off-describe",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ga-off"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ga-off",
+            "Members": null,
+            "Protocol": "",
+            "ProtocolType": "",
+            "State": "Empty"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-v0",
+      "api": "JoinGroup",
+      "version": 0,
+      "request": {
+        "Group": "ga-j0",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJnYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:2\u003e",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:2\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJnYf////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-v0-describe",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ga-j0"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ga-j0",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:2\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "CompletingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-v1",
+      "api": "JoinGroup",
+      "version": 1,
+      "request": {
+        "Group": "ga-j1",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJnYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:3\u003e",
+        "MemberID": "\u003cmember:3\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:3\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJnYf////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-v1-describe",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ga-j1"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ga-j1",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:3\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "CompletingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-v2",
+      "api": "JoinGroup",
+      "version": 2,
+      "request": {
+        "Group": "ga-j2",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJnYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:4\u003e",
+        "MemberID": "\u003cmember:4\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:4\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJnYf////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-v2-describe",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ga-j2"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ga-j2",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:4\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "CompletingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-v3",
+      "api": "JoinGroup",
+      "version": 3,
+      "request": {
+        "Group": "ga-j3",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJnYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:5\u003e",
+        "MemberID": "\u003cmember:5\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:5\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJnYf////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-v3-describe",
+      "api": "DescribeGroups",
+      "version": 5,
+      "request": {
+        "Groups": [
+          "ga-j3"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AuthorizedOperations": -2147483648,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "ga-j3",
+            "Members": [
+              {
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberAssignment": "",
+                "MemberID": "\u003cmember:5\u003e",
+                "ProtocolMetadata": ""
+              }
+            ],
+            "Protocol": "",
+            "ProtocolType": "consumer",
+            "State": "CompletingRebalance"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "join-v4",
+      "api": "JoinGroup",
+      "version": 4,
+      "request": {
+        "Group": "ga-j4",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJnYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:6\u003e",
+        "Members": null,
+        "Protocol": "",
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "park-a-join-needs-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ga-park",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJnYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:7\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "park-a-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ga-park",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:7\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJnYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:7\u003e",
+        "MemberID": "\u003cmember:7\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:7\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJnYf////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "park-a-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "ga-park",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAJnYQAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:7\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:7\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJnYQAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "park-b-join-needs-id",
+      "conn": "b",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ga-park",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJnYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:8\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "park-a-rejoin",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ga-park",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:7\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJnYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "\u003cmember:7\u003e",
+        "MemberID": "\u003cmember:7\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:7\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJnYf////8="
+          },
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:8\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJnYf////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "park-b-join-again",
+      "conn": "c",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "ga-park",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:8\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJnYf////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "\u003cmember:7\u003e",
+        "MemberID": "\u003cmember:8\u003e",
+        "Members": null,
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}
