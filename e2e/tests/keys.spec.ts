@@ -191,7 +191,16 @@ test('behind the key sheet a topic ignores p, ], [, j, k and ⌘↵; esc closes 
   await page.keyboard.press('p');
   await expect(page.locator('html')).toHaveAttribute('data-dock', 'open');
   await setEditor('{"behind":"the sheet"}');
+  // The composer takes focus from an animation frame, and a ? typed into a field is text,
+  // so the sheet stays shut (rightly): wait for the focus to land, take it away, let two
+  // frames pass, and hold that it stayed away.
+  await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest('#compose-panel'))).toBe(true);
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
+  await expect.poll(() => page.evaluate(() => {
+    const a = document.activeElement as HTMLElement | null;
+    return !!a && a !== document.body && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
+  })).toBe(false);
   await openSheet(page);
   await inert(page, ['Meta+Enter'], async () => {});
   await inert(page, ['Control+Enter'], async () => {});
