@@ -24,6 +24,7 @@ func init() {
 	Scenarios = append(Scenarios,
 		Scenario{Name: "endtxn-decisions", Run: endTxnDecisions, KafkaEnv: brokerReachesItself},
 		Scenario{Name: "endtxn-while-preparing", Run: endTxnWhilePreparing, KafkaEnv: brokerReachesItself,
+			Frozen:   "min.insync.replicas=2 on one broker does not keep the markers from being written (Apache Kafka 4.3.1 accepts acks=all there), so a transaction is in Prepare for the milliseconds the markers take and a recording catches that on some runs and not on others",
 			NoReplay: "doze-kafka writes a transaction's markers before it answers EndTxn, so a client never finds it in PrepareCommit or PrepareAbort unless a write failed; what it answers then is held by TestEndTxnAnswersTheOppositeDecisionAsKafkaDoes"},
 	)
 	for _, s := range diskFullScenarios {

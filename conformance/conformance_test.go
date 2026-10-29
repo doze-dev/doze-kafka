@@ -29,6 +29,10 @@ func TestRecord(t *testing.T) {
 		if *only != "" && s.Name != *only {
 			continue
 		}
+		if s.Frozen != "" {
+			t.Run(s.Name, func(t *testing.T) { t.Skipf("frozen, not recorded again: %s", s.Frozen) })
+			continue
+		}
 		t.Run(s.Name, func(t *testing.T) {
 			target, err := StartKafkaFor(s)
 			if err != nil {

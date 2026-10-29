@@ -69,6 +69,11 @@ type Scenario struct {
 	// NoReplay, when it says why, makes the scenario evidence only: it is
 	// recorded against Apache Kafka and not replayed against doze-kafka.
 	NoReplay string
+	// Frozen, when it says why, keeps the recording as one observation: the scenario is
+	// still replayed against doze-kafka, but the recorder does not run it again, because
+	// what Apache Kafka answers differs from run to run and conformance:stable would
+	// fail on it for ever. A claim that cites it says the same.
+	Frozen string
 	// Doze changes the replay broker's configuration for the scenario, to do
 	// what KafkaEnv did to the real one.
 	Doze func(*config.Config)
