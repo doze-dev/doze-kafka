@@ -227,8 +227,12 @@ func TestRandomBytesNeverCostMoreThanTheyWeigh(t *testing.T) {
 	for _, s := range fuzzAvroSchemas {
 		codecs = append(codecs, mustCodec(t, TypeAvro, s))
 	}
+	values := 4000
+	if raceOn {
+		values = 400
+	}
 	start := time.Now()
-	for range 4000 {
+	for range values {
 		body := make([]byte, rng.Intn(24))
 		rng.Read(body)
 		for _, c := range codecs {
@@ -236,6 +240,6 @@ func TestRandomBytesNeverCostMoreThanTheyWeigh(t *testing.T) {
 		}
 	}
 	if took := time.Since(start); took > 20*time.Second {
-		t.Errorf("4000 short random values against %d schemas took %s", len(codecs), took)
+		t.Errorf("%d short random values against %d schemas took %s", values, len(codecs), took)
 	}
 }
