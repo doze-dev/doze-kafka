@@ -91,7 +91,9 @@ test('a client is selected, closed, refreshed and left with Back', async ({ page
 test('Enter on the client link inside a request inspector opens the client', async ({ page }) => {
   // The client's own requests (the page lists the newest 200 of everyone's).
   await page.goto('traffic?client=inspect-hold');
-  await page.locator('#traffic-table .tf-rows > .r[data-row]').first().click();
+  // Not the newest row: after a few seconds that is a folded run of heartbeats, whose
+  // inspector is the fold's and names no client link. SyncGroup is one request, once.
+  await page.locator('#traffic-table .tf-rows > .r[data-row]', { hasText: 'SyncGroup' }).first().click();
   await expect(page.locator('#inspector [data-inspector-kind]')).toHaveAttribute('data-inspector-kind', 'request');
   const link = page.locator('#inspector a[data-inspector-open]', { hasText: 'inspect-hold' }).first();
   await expect(link).toBeVisible();

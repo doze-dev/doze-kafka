@@ -1,5 +1,8 @@
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { test, expect } from '../fixtures/console';
 import type { Page } from '@playwright/test';
+import { kafkaAddr } from '../addr';
+import { BASE_URL } from '../playwright.config';
 
 // A10: every key in every page's strip does what the strip says, on that page. The
 // strip is read from the page (it is keys.go's, drawn by the server), and each hint it
@@ -7,6 +10,26 @@ import type { Page } from '@playwright/test';
 // know fails: a new hint comes with the effect that proves it.
 
 test.use({ permissions: ['clipboard-read', 'clipboard-write'] });
+
+// The Clients view has rows only while a client is connected, and j on it moves over
+// them. This spec keeps a consumer of its own connected, so the keys are pressed on a
+// page with something to move over, whatever other files are running (it used to rely
+// on inspector.spec.ts's, and failed on a runner where the two did not overlap).
+let hold: ChildProcess | undefined;
+const HOLD_TOPIC = 'strip-hold-topic';
+
+test.beforeAll(async () => {
+  await fetch(new URL('new/topic', BASE_URL), { method: 'POST', body: new URLSearchParams({ name: HOLD_TOPIC, partitions: '1' }) });
+  execFileSync('go', ['build', '-o', `e2e/.tmp/bin/hold-strip-${process.pid}`, './e2e/hold'], { cwd: '..', env: { ...process.env, GOWORK: 'off' } });
+  hold = spawn(`e2e/.tmp/bin/hold-strip-${process.pid}`, [kafkaAddr(), 'strip-hold', 'strip-hold-group', HOLD_TOPIC], { cwd: '..', stdio: ['ignore', 'pipe', 'inherit'] });
+  await new Promise<void>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('the held consumer never joined its group')), 20_000);
+    hold!.stdout!.on('data', (b) => { if (String(b).includes('ready')) { clearTimeout(t); resolve(); } });
+    hold!.on('exit', () => reject(new Error('the held consumer exited')));
+  });
+});
+
+test.afterAll(() => { hold?.kill('SIGTERM'); });
 
 const PAGES = [
   '', 'topics', 'topics/seed-orders', 'topics/seed-orders?tab=partitions', 'topics/seed-orders?tab=config',
@@ -54,6 +77,9 @@ async function effect(page: Page, path: string, h: Hint) {
   const where = `${path}: ${h.keys.join(' ')} ${h.label}`;
   switch (h.label) {
     case 'move': {
+      // A list fills its rows from a poll: a j typed before they are there moves nothing,
+      // and the cursor never comes. Wait for a row, as the page's own user would.
+      await expect(page.locator('main tr[data-inspector-open], main a.r[href], main [data-row], .list .li[href]').first(), `${where}: a row to move to`).toBeAttached();
       await press(page, ['j']);
       const first = await page.locator('.cursor').evaluate((e) => e.outerHTML.slice(0, 200));
       const rows = await page.evaluate(() => document.querySelectorAll('.cursor').length);
