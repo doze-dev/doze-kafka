@@ -51,7 +51,17 @@ async function hints(page: Page): Promise<Hint[]> {
 async function fresh(page: Page, path: string) {
   await page.goto(path);
   await page.evaluate(() => document.fonts.ready);
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  // A form focuses its first field when it loads (a late focus, after the script is up), and
+  // a key pressed then is typed into it. Take focus away until it has stayed away for three
+  // looks 100 ms apart, so the keys that follow go to the page.
+  await page.evaluate(async () => {
+    let calm = 0;
+    for (let i = 0; i < 30 && calm < 3; i++) {
+      const a = document.activeElement as HTMLElement | null;
+      if (a && a !== document.body) { a.blur(); calm = 0; } else calm++;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  });
 }
 
 async function press(page: Page, keys: string[]) {
