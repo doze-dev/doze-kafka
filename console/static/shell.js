@@ -824,7 +824,9 @@
     if (rows.length) return rows;
     return Array.prototype.filter.call(document.querySelectorAll(".list .li[href]"), visible);
   }
-  function resetListCursor() { cursorEl = null; }
+  // A swap forgets the row only when it took the row away. Forgetting it on every swap
+  // (a background poll is one) left the mark on screen and made Enter do nothing.
+  function resetListCursor() { if (cursorEl && !document.contains(cursorEl)) cursorEl = null; }
   function moveCursor(d) {
     var rows = listRows();
     if (!rows.length) return;

@@ -242,3 +242,23 @@ test('behind a confirm no key of the sheet acts, the sheet itself included', asy
   await page.keyboard.press('Escape');
   await expect(page.locator('#confirm')).toBeHidden();
 });
+
+// A poll lands between j and Enter: the row j chose is still there and still marked, so
+// Enter opens it. (The shell forgot the row on every swap, and Enter then did nothing
+// while the mark stayed on screen; found as a flake on a loaded runner.)
+test('Enter opens the row j chose even when a poll swaps something else in between', async ({ page }) => {
+  await page.goto('topics');
+  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  const before = page.url();
+  await page.keyboard.press('j');
+  await expect(page.locator('.cursor')).toHaveCount(1);
+  // A swap that leaves the rows alone, as the page's own polls do.
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    document.addEventListener('htmx:afterSwap', () => resolve(), { once: true });
+    (window as any).htmx.ajax('GET', location.href, { target: '#toasts', swap: 'none' });
+  }));
+  await expect(page.locator('.cursor')).toHaveCount(1);
+  await page.keyboard.press('Enter');
+  await expect.poll(() => page.url() !== before, { message: 'Enter opens the chosen row after a swap' }).toBe(true);
+});
