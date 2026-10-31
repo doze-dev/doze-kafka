@@ -13,8 +13,9 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // browser's own requests and for the `request` fixture.
 
 export const SEEN_DIR = join(HERE, '.tmp', 'routes-seen');
-// The console's prefix: /_console, or what the second identity mounted it under.
-const PREFIX = process.env.E2E_CONSOLE_URL ? new URL(process.env.E2E_CONSOLE_URL).pathname.replace(/\/$/, '') : '/_console';
+// The console's prefix, as the config decides it for each way of running the suite:
+// /_console, /ops/kafka-ui under E2E_IDENTITY=1, or the external console's own.
+import { PREFIX } from './playwright.config';
 
 type Row = { method: string; path: string; mutates: boolean; test: string; note: string };
 

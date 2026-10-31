@@ -225,6 +225,9 @@ test('a fresh empty broker lands on "Your broker is up", with the three steps', 
     // Tp-02: the create form has the replication factor, the shell command that follows it, and what happens next.
     await page.goto(base);
     await page.getByRole('link', { name: 'Or create it here' }).click();
+    // The form focuses its name field once the swap has settled; a fill before that is typed
+    // into whichever field has focus, and the 3 meant for partitions went into the name.
+    await expect(page.locator('#f-name')).toBeFocused();
     await expect(page.locator('#f-replication')).toBeDisabled();
     await expect(page.locator('#f-replication-teach')).toContainText('Always 1. This is one broker with no followers to copy to.');
     await expect(page.locator('#f-partitions-teach')).toContainText(/^1 to \d+\. This is the broker's cap\. Partitions can be added later and never removed/);

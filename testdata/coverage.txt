@@ -41,7 +41,7 @@ scripts/internal/githist 83.3 linux
 scripts/lightness 81.7 darwin
 scripts/lightness 81.7 linux
 scripts/mutate 73.7 darwin
-scripts/mutate 74.5 linux
+scripts/mutate 73.7 linux
 scripts/vulncheck 61.8 darwin
 scripts/vulncheck 61.8 linux
 server 93.9 darwin
@@ -92,3 +92,4 @@ server 93.9 linux
 # lowered: 2026-10-16 internal/protocol@linux 91.3 -> 89.1: measured on the tree merged with main 3ca2610, which brought 478 lines added outside tests (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
 # lowered: 2026-10-16 internal/storage/meta@linux 83.3 -> 82.5: measured on the tree merged with main 3ca2610, which brought 237 lines added outside tests (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
 # lowered: 2026-10-16 server@linux 94.6 -> 93.9: measured on the tree merged with main 3ca2610, which brought 17 lines added (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-31 scripts/mutate@linux 74.5 -> 73.7: GitHub's ubuntu runner measures 73.7% (CI run 41208576650, the same as darwin), where the 74.5% was recorded in a golang:1.27 container on a Mac; the 0.8 points are statements of scripts/mutate that its tests reach in that container and not on the runner, and which ones has not been found
