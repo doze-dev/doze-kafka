@@ -6,11 +6,16 @@ name: Mutation
 # fails on any lived, uncovered, timed-out or setup-failed mutant that
 # testdata/mutation.json does not list, and on a listed one that is now killed.
 #
-# - pull requests: the units whose files the PR changed (`mutate matrix <base>`);
 # - weekly and on demand: every unit, each split into the shards `mutate list`
 #   shows, one job per shard.
+# - pull requests: off for now. The check fails on a baseline entry that is now
+#   killed, and testdata/mutation.json is partly stale (the 2026-10 survivor
+#   campaign killed mutants it still lists, and the baseline was recorded on
+#   darwin/arm64); a PR would wait on hours of re-recording. To turn it back on,
+#   re-record the baseline (`task mutate:record`, on the platform CI runs) and add
+#   `pull_request:` below: it then runs the units whose files the PR changed
+#   (`mutate matrix <base>`).
 on:
-  pull_request:
   schedule:
     - cron: "0 3 * * 0" # Sundays 03:00 UTC
   workflow_dispatch:
