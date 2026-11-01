@@ -166,12 +166,12 @@ test('behind the key sheet a list page ignores j, k, Enter, /, c and every g cho
 });
 
 test('behind the key sheet a topic ignores p, ], [, j, k and ⌘↵; esc closes the sheet before the panel', async ({ page, setEditor }) => {
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   await page.locator('#msg-5').click();
   await expect(page.locator('#inspector-title')).toHaveAttribute('data-offset', '5');
   await openSheet(page);
   const still = async () => {
-    await expect(page).toHaveURL(/\/topics\/seed-orders\?open=5$/);
+    await expect(page).toHaveURL(/\/topics\/seed-orders\?partition=0&open=5$/);
     await expect(page.locator('html')).not.toHaveAttribute('data-dock', 'open');
     await expect(page.locator('.cursor')).toHaveCount(0);
     await expect(page.locator('#inspector-title')).toHaveAttribute('data-offset', '5');
@@ -225,7 +225,7 @@ test('⌘K from the key sheet swaps it for the palette: one thing is open at a t
 });
 
 test('behind a confirm no key of the sheet acts, the sheet itself included', async ({ page }) => {
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   await page.getByRole('button', { name: 'More actions' }).click();
   await page.getByRole('button', { name: 'Delete' }).first().click();
   await expect(page.locator('#confirm')).toBeVisible();
@@ -235,7 +235,7 @@ test('behind a confirm no key of the sheet acts, the sheet itself included', asy
     await expect(page.locator('#confirm'), `after ${keys.join(' ')}`).toBeVisible();
     await expect(page.locator('#help'), `after ${keys.join(' ')}`).toBeHidden();
     await expect(page.locator('#palette'), `after ${keys.join(' ')}`).toBeHidden();
-    await expect(page).toHaveURL(/\/topics\/seed-orders$/);
+    await expect(page).toHaveURL(/\/topics\/seed-orders\?partition=0$/);
     await expect(page.locator('html')).not.toHaveAttribute('data-dock', 'open');
     await expect(page.locator('.cursor')).toHaveCount(0);
   }

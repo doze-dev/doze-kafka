@@ -80,7 +80,7 @@ const SY04: Probe[] = [
   { el: 'card', board: 'li.card', live: NEWEST, nth: 1, free: { y: BELOW_TAPE } },
   { el: 'card key', board: 'li.card .m.b', live: `${NEWEST} .cell-key`, nth: 1, free: { y: BELOW_TAPE, w: TEXT_W } },
   { el: 'card value', board: 'li.card > .m.mut', live: `${NEWEST} .cell-val`, nth: 1, free: { y: BELOW_TAPE } },
-  { el: 'card age', board: 'li.card > .note', live: `${NEWEST} .cell-age`, nth: 1, free: { y: BELOW_TAPE, w: TEXT_W } },
+  { el: 'card age', board: 'li.card > .note', live: `${NEWEST} .cell-time`, nth: 1, free: { y: BELOW_TAPE, w: TEXT_W } },
   { el: 'scrim', board: '.scrim', live: '.insp-scrim, #inspector-scrim' },
   { el: 'sheet', board: 'section.modal', live: 'aside.insp:not([hidden])' },
   { el: 'grab', board: 'section.modal > div:first-child', live: 'aside.insp .grab, aside.insp .insp-grab' },

@@ -11,7 +11,7 @@ const row = (page: any, offset: number) => page.locator(`#msg-${offset}`);
 const settled = (page: any) => page.waitForFunction(() => !document.querySelector('.htmx-added, .htmx-swapping, .htmx-settling'));
 
 test('a record opens in the inspector, with its place in the URL, and Esc closes it', async ({ page }) => {
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   await row(page, 5).click();
   await expect(page.locator('#inspector-title')).toHaveAttribute('data-offset', '5');
   await expect(page.locator('#inspector')).toContainText('ord_8905');
@@ -42,7 +42,7 @@ test('a link with ?open= reopens the record; Older and Newer step through the lo
 });
 
 test('a inspector that cannot load says why, and still closes', async ({ page }) => {
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   await page.route('**/message?*', (r) => r.fulfill({ status: 502, body: 'The console could not get an answer from the broker.' }));
   await row(page, 5).click();
   await expect(page.locator('#inspector [role="alert"]')).toContainText('could not get an answer');
@@ -52,7 +52,7 @@ test('a inspector that cannot load says why, and still closes', async ({ page })
 });
 
 test('binary, empty and null values are labelled, with hex and base64 to read', async ({ page }) => {
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   await expect(row(page, 42).locator('.cell-val')).toHaveClass(/binary/);
   await expect(row(page, 41).locator('.cell-val')).toHaveClass(/tomb/);
   await expect(row(page, 40).locator('.cell-key')).toContainText('no key');
@@ -67,7 +67,7 @@ test('binary, empty and null values are labelled, with hex and base64 to read', 
 });
 
 test('a very long key wraps inside the inspector instead of widening it', async ({ page }) => {
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   await row(page, 43).click();
   await expect(page.locator('#inspector-title')).toHaveAttribute('data-offset', '43');
   const box = await page.evaluate(() => { const d = document.getElementById('inspector')!; return { scroll: d.scrollWidth, client: d.clientWidth }; });
@@ -96,7 +96,7 @@ test('Send again produces an exact copy; Edit a copy fills the composer', async 
 
 test('"go to offset" lands on the record, scrolled into view', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 600 });
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   await page.locator('#jump-to').fill('3');
   await page.locator('form.jump', { has: page.locator('#jump-to') }).locator('.jump-go').click();
   await expect(page.locator('tr[data-hl]')).toHaveAttribute('id', 'msg-3');
@@ -111,7 +111,7 @@ test('"go to offset" lands on the record, scrolled into view', async ({ page }) 
 });
 
 test('search finds text in keys, values and headers, and says how far it read', async ({ page }) => {
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   await page.locator('#find-q').fill('ORD_8912');
   await page.locator('.find button[type=submit]').click();
   await expect(page.locator('tr[id^="hit-"]')).toHaveCount(1);
@@ -127,12 +127,12 @@ test('search finds text in keys, values and headers, and says how far it read', 
 });
 
 test('searching all partitions shows where each match is, and a match opens its own record', async ({ page }) => {
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   await page.locator('#find-q').fill('gold');
   await page.locator('#find-all').check();
   await page.locator('.find button[type=submit]').click();
   await expect(page.locator('.jumpnote')).toContainText('across 3 partitions'); // the results have arrived.
-  const partitions = await page.locator('tr[id^="hit-"] td:first-child').allInnerTexts();
+  const partitions = await page.locator('tr[id^="hit-"] td.col-p').allInnerTexts();
   expect(new Set(partitions.map((p) => p.trim()))).toEqual(new Set(['0', '1', '2']));
   await expect(page.locator('#tape-and-table[data-live]')).toHaveCount(0); // a search is not the live tail.
   await page.locator('tr[id^="hit-1-"]').first().click();

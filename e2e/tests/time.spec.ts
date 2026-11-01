@@ -24,15 +24,15 @@ test.describe('a browser far ahead of UTC', () => {
     await expect(row).toContainText('late');
     // The table's Age (Sy-01) counts from the instant; the moment itself, in the browser's
     // zone (UTC+13 in March: 23:59 + 13h) and in UTC, is its hover.
-    const t = row.locator('.cell-age time.when');
+    const t = row.locator('.cell-time time.when').first();
     await expect(t).toHaveAttribute('datetime', '2026-03-14T23:59:07.000Z');
     await expect(t).toHaveAttribute('title', /2026-03-15 12:59:07\.000 Pacific\/Auckland \(UTC\+13:00\) · 2026-03-14 23:59:07\.000 UTC/);
     // The inspector shows the date, which is the 15th here.
     await row.click();
     await expect(page.locator('#inspector time.when')).toHaveText('2026-03-15 12:59:07');
     // Relative times are computed in the browser, not left as the server wrote them.
-    await expect(t).toHaveAttribute('data-style', 'since');
-    await expect(t).toHaveText(/^\d+d \d\dh$/);
+    const since = row.locator('.cell-time time.when[data-style="since"]'); // Tp-05: the clock time, then how long ago.
+    await expect(since).toHaveText(/^\d+d \d\dh$/);
   });
 });
 

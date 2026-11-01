@@ -107,8 +107,8 @@ func TestTheNeighboursSentenceRendersFromTheGraph(t *testing.T) {
 	page := req(t, c, "GET", "/_console/topics/orders", nil).Body.String()
 	sentence := between(page, `id="neighbours"`, `<nav class="tabs"`)
 	for _, want := range []string{
-		"written by", `href="/_console/traffic?client=billing"`, ">billing</span>",
-		"read by", `href="/_console/groups/g-order-validator"`,
+		"Written by", `href="/_console/traffic?client=billing"`, ">billing</span>",
+		"Read by", `href="/_console/groups/g-order-validator"`,
 		`hx-get="/_console/inspect/subject?key=orders-value"`, `data-inspector-open`, `href="/_console/schemas/orders-value"`,
 	} {
 		if !strings.Contains(sentence, want) {

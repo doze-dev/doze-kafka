@@ -330,7 +330,7 @@ test('a topic page is the board: one sentence, one action and ···, neighbours
   await expect(head.locator('h1')).toHaveText('seed-orders');
   // One solid primary button, and the destructive actions are under ···.
   await expect(head.locator('.btn.pri')).toHaveCount(1);
-  await expect(head.locator('.btn.pri')).toHaveText('Produce a message');
+  await expect(head.locator('.btn.pri')).toHaveText('Produce');
   await expect(page.getByRole('button', { name: 'Delete', exact: true })).toBeHidden();
   await page.getByRole('button', { name: 'More actions' }).click();
   await expect(page.getByRole('button', { name: 'Purge' })).toBeVisible();
@@ -339,10 +339,10 @@ test('a topic page is the board: one sentence, one action and ···, neighbours
   await expect(page.getByRole('button', { name: 'Delete', exact: true })).toBeHidden();
   // Facts: a sentence, not a strip of boxes.
   const facts = page.locator('#topic-facts');
-  await expect(facts).toHaveText(/^3 partitions, [\d,]+ messages?, .*\.$/);
-  expect(await facts.evaluate((el) => el.tagName)).toBe('P');
+  await expect(facts).toHaveText(/^3 partitions·[\d,]+ messages?.*·retention .*·.*compacted/);
+  expect(await facts.evaluate((el) => el.tagName)).toBe('DIV');
   // Neighbours: linked wells.
-  await expect(page.locator('#neighbours a.well').first()).toBeVisible();
+  await expect(page.locator('#neighbours a').first()).toBeVisible();
   // Tabs, in the board's order.
   await expect(page.locator('main .tabs .tab')).toHaveText([/^Messages/, /^Partitions/, /^Readers/, /^Config/]);
   await expect(page.locator('main .tabs .tab.on')).toHaveText(/^Messages/);
@@ -742,29 +742,28 @@ test('every .btn is weight 400, <button> or <a>; the links the boards draw as li
   await expect(page.locator('main a.btn', { hasText: 'Connect an app' }).first()).toHaveCSS('font-weight', '500');
 });
 
-test('Sy-01: the record table is P, Offset, Key, Value, Age, in rows of 28 with the offset a plain 12 px mono', async ({ page }) => {
+test('Sy-01: the record table is Offset, P, Time, Key, Value, Hdr, in rows of 28 with the offset a plain 12 px mono', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('topics/seed-orders?partition=0');
   const table = page.locator('#messages-table');
-  await expect(table.locator('thead th')).toHaveText(['P', 'Offset', 'Key', 'Value', 'Age']);
+  await expect(table.locator('thead th')).toHaveText(['Offset', 'P', 'Time', 'Key', 'Value', 'Hdr']);
   const row = table.locator('tbody tr[id^="msg-"]').first();
   expect((await row.boundingBox())!.height).toBe(28);
   const off = row.locator('.cell-offset');
   await expect(off).toHaveCSS('font-family', /Plex Mono/);
   await expect(off).toHaveCSS('font-size', '12px');
   await expect(off).toHaveCSS('font-weight', '400');
-  // The board's columns: 26 62 120 1fr 62 with 14 px between (the offset is 72: the
-  // board's 62 holds 4,789, not 1,234,567).
+  // Tp-05's columns: 66 24 112 124 1fr 36 with 14 px between.
   const tracks = await table.locator('thead th').evaluateAll((ths) => ths.map((th) => {
     const cs = getComputedStyle(th);
     return Math.round(th.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
   }));
-  expect([tracks[0], tracks[1], tracks[2], tracks[4]]).toEqual([26, 72, 120, 62]);
+  expect([tracks[0], tracks[1], tracks[2], tracks[3], tracks[5]]).toEqual([66, 24, 112, 124, 36]);
   // Nothing a record has is out of reach: the age says the moment on hover, and the
   // headers and the timestamp are the inspector's.
-  await expect(row.locator('.cell-age time')).toHaveAttribute('title', /\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3} UTC$/);
-  const withHeaders = table.locator('tbody tr[id^="msg-"] .cell-val[title*="header"]').first();
-  await expect(withHeaders).toHaveAttribute('title', /\d+ headers?$/);
+  await expect(row.locator('.cell-time time').first()).toHaveAttribute('title', /\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3} UTC$/);
+  const withHeaders = table.locator('tbody tr[id^="msg-"]', { has: page.locator('.cell-hdr', { hasNotText: /^0$/ }) }).first();
+  await expect(withHeaders.locator('.cell-hdr')).toHaveText(/^[1-9]\d*$/); // the number of headers the record carries.
   await withHeaders.click();
   await expect(page.locator('#inspector')).toContainText('Headers ·');
   await expect(page.locator('#inspector')).toContainText('Timestamp');
@@ -867,7 +866,7 @@ test('Cl-Home: the compacted partitions are counted from the topics\' own cleanu
 // is the one that was meant.
 test('the message tape draws its own marks, which the inspector\'s fold ticks do not restyle', async ({ page }) => {
   await useTheme(page, 'light');
-  await page.goto('topics/seed-orders?tab=messages');
+  await page.goto('topics/seed-orders?tab=messages&partition=0');
   const strip = page.locator('.tape-strip');
   await expect(strip.locator('.tick').first()).toBeVisible();
   // An older record's mark: the input colour (the line token), 8 px, rounded on top.

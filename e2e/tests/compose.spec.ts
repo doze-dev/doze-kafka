@@ -96,7 +96,7 @@ test('the composer stays open across a change of partition and closes on another
 test('an open composer never covers the messages', async ({ page }) => {
   for (const height of [900, 700, 560]) {
     await page.setViewportSize({ width: 1280, height });
-    await page.goto('topics/seed-orders');
+    await page.goto('topics/seed-orders?partition=0');
     await page.locator('#compose-head').click();
     const r = await page.evaluate(() => {
       const wb = document.querySelector('main.workbench')!;
@@ -118,7 +118,6 @@ test('sending to another partition keeps the view and says where it went', async
   await page.getByRole('button', { name: 'Send message' }).click();
   const toast = await waitForToast();
   expect(toast).toContain('partition 2');
-  expect(toast).toContain('you are viewing partition 0');
-  await expect(page.locator('.ptab.on')).toContainText('P0');
-  await expect(page.locator('.secrow .cap')).toContainText('partition 0');
+  await expect(page.locator('.ptab.on')).toContainText('All'); // the default view is every partition, merged.
+  await expect(page.locator('.secrow .cap')).toContainText('all partitions');
 });

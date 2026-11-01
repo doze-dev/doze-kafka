@@ -6,6 +6,7 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Console, topic page (Tp-05): a topic of several partitions opens on every partition merged, newest first (the newest 30 of each, and the page says when that is less than the topic holds); the tape has a lane for each partition on a time axis; the records have Offset, P, Time, Key, Value and Hdr columns; the facts are a row (partitions, messages and size on disk, retention, cleanup policy, last write); the neighbours are one well; the button reads "Produce"; Try it has a partition and an acks choice. A partition's own page is `?partition=N`.
 - Console, messages tape: a gap in the offsets is drawn as a transaction marker only where a control batch is; an offset compaction removed is no longer called a marker. An empty (not null) key is hashed to a partition like any key, and the composer can send one ("empty key, not null"; "Edit a copy" keeps it).
 - Console, create topic: the page is drawn to the design (Tp-01 to Tp-04). The settings open from "Set…" (the name and partitions you typed carry over, and the page can be opened with them in its address), the form offers `cleanup.policy`, a refusal is shown as the design draws it with the broker's own wording, and an empty broker's Topics page is the design's.
 - Names: a by-name address is printed only when something answers at it. The start-up

@@ -4,7 +4,7 @@ test('a topic is created with its partitions and shows them', async ({ page, cre
   const name = uniqueName('made');
   await createTopic(name, 3);
   await expect(page.locator('#topic-facts')).toContainText('3 partitions');
-  await expect(page.locator('.ptab')).toHaveCount(3);
+  await expect(page.locator('.ptab')).toHaveCount(4); // All, then one for each partition.
   await expect(page.locator('.list .li.on')).toHaveAttribute('data-name', name);
   await expect(page.locator('#flashbar')).toContainText('Topic created');
   expect(page.url()).not.toContain('flash='); // the one-shot banner is not left in the address bar to replay.
@@ -83,7 +83,7 @@ test('Purge empties a topic but keeps its settings; Delete removes it', async ({
   await expect(page.locator('#confirm-yes')).toHaveText('Purge 1 record');
   await confirmDialog('accept');
   await expect(page.locator('.tape-empty')).toBeVisible();
-  await expect(page.locator('#topic-facts')).toContainText('kept 3 d'); // a purge used to drop the topic's own settings.
+  await expect(page.locator('#topic-facts')).toContainText('retention 3 d'); // a purge used to drop the topic's own settings.
   await page.getByRole('button', { name: 'More actions' }).click();
   await page.getByRole('button', { name: 'Delete' }).first().click();
   await confirmDialog('accept');
@@ -92,7 +92,7 @@ test('Purge empties a topic but keeps its settings; Delete removes it', async ({
 });
 
 test('moving between topics keeps the list where it was, and nothing moves after it appears', async ({ page }) => {
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   await page.evaluate(() => {
     (window as any).__shifts = [];
     new PerformanceObserver((l) => { for (const e of l.getEntries() as any[]) if (!e.hadRecentInput) (window as any).__shifts.push(e.value); }).observe({ type: 'layout-shift' });
@@ -117,7 +117,7 @@ test('moving between topics keeps the list where it was, and nothing moves after
 test('partitions are added after a warning, the tabs grow, and a bad number is explained in place', async ({ page, createTopic, uniqueName, confirmDialog }) => {
   const name = uniqueName('grow');
   await createTopic(name, 2);
-  await expect(page.locator('.ptab')).toHaveCount(2);
+  await expect(page.locator('.ptab')).toHaveCount(3);
 
   await page.getByRole('link', { name: /Partitions/ }).click();
   await page.locator('#topic-addparts summary').click();
@@ -137,11 +137,11 @@ test('partitions are added after a warning, the tabs grow, and a bad number is e
   await confirmDialog('accept');
   await expect(page.locator('#flashbar')).toContainText('Topic now has 4 partitions');
   await expect(page.locator('#topic-facts')).toContainText('4 partitions');
-  await expect(page.locator('.ptab')).toHaveCount(4);
+  await expect(page.locator('.ptab')).toHaveCount(5);
 });
 
 test('go to time lands on the first message at or after it, and explains an empty or bad answer', async ({ page }) => {
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   await page.locator('#jump-at').fill('1d');
   await page.locator('form.jump', { has: page.locator('#jump-at') }).getByRole('button', { name: 'Go' }).click();
   await expect(page.locator('.jumpnote')).toContainText('first message at or after');

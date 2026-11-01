@@ -95,3 +95,40 @@ export const NONE: Probe[] = [
   { el: 'none create', board: 'main > .card .btn.pri', live: '#topics-none .btn.pri', text: true, free: { y: 'it follows the paragraph above, whose text is this broker\'s' } },
   { el: 'none code', board: 'main > .card pre.code', live: '#topics-none pre.code', free: { y: 'it follows the paragraph above', w: 'its lines carry this broker\'s address', h: 'its lines carry this broker\'s address' } },
 ];
+
+// ---------- Tp-05 and Tp-06: the topic page ----------
+import { TOPIC_COMMON } from '../lib/topic';
+
+const BELOW = 'it is below the neighbours, whose note says where Written by comes from (the board draws none), and the seed\'s own topic list and rows';
+const T_ROWS = 'its height is its rows, and the rows are the seed\'s';
+/** Tp-05's body, under the shared parts of the topic page (list, band, tabs, dock). */
+export const TOPIC_BODY: Probe[] = [
+  { el: 'facts', board: 'main > .row.ce.g8.wrap', live: '#topic-facts' },
+  { el: 'facts item', board: 'main > .row.ce.g8.wrap > .m', live: '#topic-facts > .m', nth: 0, free: { w: TEXT_W } },
+  { el: 'facts sep', board: 'main > .row.ce.g8.wrap > .mut', live: '#topic-facts > .mut', free: { x: TEXT_W } },
+  { el: 'neighbours', board: 'main > .well.row', live: '#neighbours', free: { w: 'it is as wide as the page' } },
+  { el: 'neighbour label', board: 'main > .well > .note', live: '#neighbours > .note', text: true, free: { x: TEXT_W, w: TEXT_W } },
+  { el: 'neighbour', board: 'main > .well > a.row', live: '#neighbours > a.row', free: { x: TEXT_W, w: TEXT_W } },
+  { el: 'neighbour chip', board: 'main > .well > a.row .sv', live: '#neighbours > a.row .sv', free: { x: TEXT_W } },
+  { el: 'tape head', board: 'main > .card[style*="padding: 8px 12px 6px"] > .row.sb.ce', live: '.tp-tape-h', free: { y: BELOW } },
+  { el: 'tape cap', board: 'main > .card[style*="padding: 8px 12px 6px"] .cap', live: '.tp-tape .cap', text: true, free: { y: BELOW } },
+  { el: 'tape note', board: 'main > .card[style*="padding: 8px 12px 6px"] .row.ce.g8 .note', live: '.tp-tape .tp-tape-h .note', text: true, free: { y: BELOW } },
+  { el: 'tape lane', board: 'main > .card[style*="padding: 8px 12px 6px"] > .row.ce.g8:nth-of-type(2)', live: '.tp-tape > .row:nth-of-type(2)', free: { y: BELOW } },
+  { el: 'tape lane label', board: 'main > .card[style*="padding: 8px 12px 6px"] > .row.ce.g8:nth-of-type(2) > .m', live: '.tp-tape > .row:nth-of-type(2) .tp-lane-p', text: true, free: { y: BELOW } },
+  { el: 'tape lane track', board: 'main > .card[style*="padding: 8px 12px 6px"] > .row.ce.g8:nth-of-type(2) > .grow', live: '.tp-tape > .row:nth-of-type(2) .tp-lane', free: { y: BELOW } },
+  { el: 'tape lane count', board: 'main > .card[style*="padding: 8px 12px 6px"] > .row.ce.g8:nth-of-type(2) > .ra', live: '.tp-tape > .row:nth-of-type(2) .tp-lane-n', free: { w: TEXT_W }, free: { y: BELOW } },
+  { el: 'tape axis', board: 'main > .card[style*="padding: 8px 12px 6px"] > .row.ce.g8:last-child .grow', live: '.tp-axis', free: { y: BELOW } },
+  { el: 'tape card', board: 'main > .card[style*="padding: 8px 12px 6px"]', live: '.tape-panel', free: { h: T_ROWS, y: BELOW } },
+  { el: 'records', board: 'main > .card[style*="--c"]', live: '.tbl-wrap', free: { h: T_ROWS, y: 'it follows the tape' } },
+];
+const TBL = 'main > .card[style*="--c"]';
+const COLS = ['offset', 'p', 'time', 'key', 'value', 'hdr'];
+export const TOPIC_TABLE: Probe[] = [
+  { el: 'records head', board: `${TBL} > .r.h`, live: '#messages-table thead tr', free: { y: BELOW } },
+  ...COLS.map((c, i): Probe => ({ el: `head ${c}`, board: `${TBL} > .r.h > span`, live: '#messages-table thead th', nth: i, text: true, free: { y: BELOW } })),
+  { el: 'record', board: `${TBL} > .r:not(.h):not([style])`, live: '#messages-table tbody tr[id]', free: { y: T_ROWS } },
+  ...COLS.map((c, i): Probe => ({ el: `cell ${c}`, board: `${TBL} > .r:not(.h):not([style]) > span`, live: '#messages-table tbody tr[id] > td', nth: i, free: { y: T_ROWS } })),
+  { el: 'table foot', board: `${TBL} > .r[style]`, live: '.tbl-foot', free: { y: T_ROWS } },
+  { el: 'table foot note', board: `${TBL} > .r[style] > .note`, live: '.tbl-foot > span:first-child', free: { y: T_ROWS, w: TEXT_W } },
+];
+export { TOPIC_COMMON };

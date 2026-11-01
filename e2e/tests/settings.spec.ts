@@ -11,7 +11,7 @@ test('a topic is created with its own retention, shown and marked as the topic\'
   await page.locator('[id="cfg-segment.bytes"]').fill('64MB');
   await page.locator('#create-topic').getByRole('button', { name: 'Create topic' }).click();
   await expect(page.locator('.idband h1')).toHaveText(name);
-  await expect(page.locator('#topic-facts')).toContainText('kept 7 d');
+  await expect(page.locator('#topic-facts')).toContainText('retention 7 d');
   await page.getByRole('link', { name: 'Config' }).click();
   await expect(page.locator('[id="cfg-retention.ms"]')).toHaveValue('7d');
   await expect(page.locator('[id="cfg-segment.bytes"]')).toHaveValue('64MB');
@@ -44,7 +44,7 @@ test('a topic that is not compacted says nothing about compaction, and the other
   const name = uniqueName('compact');
   await request.post('new/topic', { form: { name, partitions: '1' } });
   await page.goto(`topics/${name}?tab=config`);
-  await expect(page.locator('#topic-facts')).not.toContainText('compacted');
+  await expect(page.locator('#topic-facts')).toContainText('delete, not compacted');
   await expect(page.locator('#topic-config-others')).toContainText('index.interval.bytes'); // cleanup.policy is a field of the form above, not one of the others.
   await expect(page.locator('#topic-config-others .pill').first()).toHaveText('default');
   await expect(page.locator('#topic-config')).toContainText('Other Kafka topic settings are stored and reported, and change nothing here.');

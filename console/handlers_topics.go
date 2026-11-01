@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -306,6 +307,10 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 		c.render(w, r, "topic_detail", data)
 		return
 	}
+	if mergedParam(r, detail.Partitions) && r.URL.Query().Get("jump") == "" && r.URL.Query().Get("at") == "" && r.URL.Query().Get("open") == "" && r.URL.Query().Get("hl") == "" && fromParam(r) < 0 && !committedParam(r) {
+		partition = allPartitions
+		data["Partition"] = partition
+	}
 	jump := jumpParam(r)
 	atJump, atNote, atAsked, err := c.atParam(r, name, partition)
 	if err != nil {
@@ -344,6 +349,21 @@ type topicFactsView struct {
 	HasNewest  bool
 	Subject    string
 	SubjectURL string
+	Size       string // the topic's segments on disk, when the console was told where they are.
+	HasSize    bool
+	Policy     string // cleanup.policy as the topic has it.
+}
+
+// PolicyText is the cleanup policy as the board's facts row says it.
+func (f topicFactsView) PolicyText() string {
+	p := f.Policy
+	if p == "" {
+		p = "delete"
+	}
+	if f.Compact {
+		return p + ", compacted"
+	}
+	return p + ", not compacted"
 }
 
 func (c *Console) topicSummary(ctx context.Context, d *TopicDetail, bounds []PartitionBound) topicFactsView {
@@ -359,6 +379,7 @@ func (c *Console) topicSummary(ctx context.Context, d *TopicDetail, bounds []Par
 		}
 	}
 	f.Compact = strings.Contains(policy, "compact")
+	f.Policy = policy
 	switch {
 	case f.Compact && !strings.Contains(policy, "delete"):
 		f.Retention = "per key"
@@ -379,6 +400,9 @@ func (c *Console) boundsFacts(ctx context.Context, topic string, bounds []Partit
 		if b.Count() > 0 && b.Newest.After(f.Newest) {
 			f.Newest, f.HasNewest, newestIn = b.Newest, true, i
 		}
+	}
+	if d, ok := c.topicDisk(topic, len(bounds)); ok {
+		f.Size, f.HasSize = diskSize(d.LogBytes), true
 	}
 	// The schema is the newest record's, read from its bytes: a value a registry-aware
 	// serializer wrote carries the schema's id. A subject named like the topic says
@@ -547,6 +571,9 @@ func (c *Console) topicTape(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	partition := partitionParam(r, count)
+	if mergedParam(r, count) && !committedParam(r) {
+		partition = allPartitions
+	}
 
 	bounds, err := c.be.PartitionBounds(ctx, name, count)
 	if err != nil {
@@ -617,10 +644,14 @@ func (c *Console) topicProduce(w http.ResponseWriter, r *http.Request) {
 	viewing := result.Partition
 	if n, err := strconv.ParseInt(r.FormValue("partition_ctx"), 10, 32); err == nil && n >= 0 && n < int64(count) {
 		viewing = int32(n)
+	} else if r.FormValue("partition_ctx") == "all" && count > 1 {
+		viewing = allPartitions
 	}
 	switch {
 	case !result.Confirmed:
 		toast(w, "Sent — no confirmation requested (acks=0)")
+	case viewing == allPartitions:
+		toast(w, "Sent to partition "+strconv.Itoa(int(result.Partition))+" · offset "+strconv.FormatInt(result.Offset, 10))
 	case result.Partition != viewing:
 		toast(w, "Sent to partition "+strconv.Itoa(int(result.Partition))+" · offset "+strconv.FormatInt(result.Offset, 10)+" (you are viewing partition "+strconv.Itoa(int(viewing))+")")
 	default:
@@ -811,6 +842,17 @@ func previewOnly(b []byte) bytesView {
 }
 
 // partitionParam reads ?partition=, clamped to [0, count).
+// allPartitions is the view that merges every partition's newest records (Tp-05's
+// default): the tape's partition when none was asked for and the topic has more than one.
+const allPartitions int32 = -1
+
+// mergedParam says the request wants the merged view: a topic with several partitions
+// and no partition named (or "all").
+func mergedParam(r *http.Request, count int32) bool {
+	v := r.URL.Query().Get("partition")
+	return count > 1 && (v == "" || v == "all")
+}
+
 func partitionParam(r *http.Request, count int32) int32 {
 	n, err := strconv.Atoi(r.URL.Query().Get("partition"))
 	if err != nil || n < 0 || int32(n) >= count {
@@ -909,6 +951,9 @@ func (c *Console) tapeData(ctx context.Context, topic, topicID string, partition
 	bounds, err := c.be.PartitionBounds(ctx, topic, partitionCount)
 	if err != nil {
 		return nil, err
+	}
+	if partition == allPartitions {
+		return c.tapeAllData(ctx, topic, topicID, partitionCount, bounds)
 	}
 	earliest, latest := bounds[partition].Earliest, bounds[partition].Latest
 
@@ -1113,4 +1158,144 @@ func safeFilename(s string) string {
 		}
 		return '_'
 	}, s)
+}
+
+// mergedPerPartition and mergedRows bound the merged view: it reads the newest records
+// of each partition and shows the newest of all of those. The page says when that is
+// less than the topic holds.
+const (
+	mergedPerPartition = 30
+	mergedMaxParts     = 12
+)
+
+// tapeAllData is tapeData for the view across every partition: the newest records of
+// each, merged by timestamp, newest first. It is bounded (mergedPerPartition records
+// from each of the first mergedMaxParts partitions) and says so in MergedNote.
+func (c *Console) tapeAllData(ctx context.Context, topic, topicID string, partitionCount int32, bounds []PartitionBound) (map[string]any, error) {
+	parts := min(partitionCount, mergedMaxParts)
+	var all []Message
+	capped := false
+	var total, latestSum int64
+	for p := int32(0); p < parts; p++ {
+		b := bounds[p]
+		total += b.Count()
+		latestSum += b.Latest
+		from := max(b.Earliest, b.Latest-mergedPerPartition)
+		capped = capped || from > b.Earliest
+		if b.Latest <= from {
+			continue
+		}
+		msgs, err := c.be.FetchWindow(ctx, topic, p, from, int(b.Latest-from))
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, msgs...)
+	}
+	sort.SliceStable(all, func(i, j int) bool {
+		if !all[i].Timestamp.Equal(all[j].Timestamp) {
+			return all[i].Timestamp.After(all[j].Timestamp)
+		}
+		if all[i].Partition != all[j].Partition {
+			return all[i].Partition < all[j].Partition
+		}
+		return all[i].Offset > all[j].Offset
+	})
+	if len(all) > tapeWindow {
+		all = all[:tapeWindow]
+		capped = true
+	}
+	rows := make([]msgView, len(all))
+	for i, m := range all {
+		rows[i] = c.msgView(ctx, topic, m)
+	}
+	asc := make([]msgView, len(rows))
+	for i, v := range rows {
+		asc[len(rows)-1-i] = v
+	}
+	for i := range asc {
+		asc[i].Hot = i >= len(asc)-3
+	}
+	note := fmt.Sprintf("%s shown, newest first across partitions", num(int64(len(rows))))
+	if capped {
+		note += fmt.Sprintf("; the newest %d of each partition were read, so older records are on the partitions' own pages", mergedPerPartition)
+	}
+	if partitionCount > parts {
+		note += fmt.Sprintf("; the topic has %d partitions and the first %d were read", partitionCount, parts)
+	}
+	lanes, axis := mergedLanes(partitionCount, bounds, asc)
+	var ends []string
+	for _, b := range bounds {
+		ends = append(ends, fmt.Sprintf("p%d %s", b.Partition, num(b.Latest)))
+	}
+	return map[string]any{
+		"PartitionRange": partitionRange(partitionCount),
+		"Bounds":         bounds,
+		"PartSelect":     partitionCount > maxPartitionTabs,
+		"Messages":       asc,
+		"Rows":           rows,
+		"Earliest":       int64(0),
+		"Latest":         latestSum,
+		"Count":          total,
+		"Hash":           boundsHash(topicID, bounds),
+		"AtTail":         true,
+		"WindowFrom":     int64(0),
+		"WindowLast":     int64(0),
+		"HL":             int64(-1),
+		"Merged":         true,
+		"MergedNote":     note,
+		"LogEnds":        strings.Join(ends, " · "),
+		"Lanes":          lanes,
+		"Axis":           axis,
+	}, nil
+}
+
+// laneTick is one record on a partition's lane: how far along the time axis, and how
+// tall (its size on a log scale).
+type laneTick struct {
+	Pct float64
+	H   int
+}
+
+// tapeLane is one partition's row of the merged tape.
+type tapeLane struct {
+	Partition int32
+	Count     int64
+	Ticks     []laneTick
+}
+
+// mergedLanes lays the records the merged view read on a time axis from the oldest of
+// them to now, one lane per partition, as Tp-05 draws the tape. The axis is four
+// moments: three evenly spaced from the oldest record, then now.
+func mergedLanes(partitionCount int32, bounds []PartitionBound, asc []msgView) ([]tapeLane, []time.Time) {
+	parts := min(partitionCount, mergedMaxParts)
+	lanes := make([]tapeLane, parts)
+	for i := range lanes {
+		lanes[i] = tapeLane{Partition: int32(i), Count: bounds[i].Count()}
+	}
+	if len(asc) == 0 {
+		return lanes, nil
+	}
+	t0 := asc[0].Timestamp
+	for _, v := range asc {
+		if v.Timestamp.Before(t0) {
+			t0 = v.Timestamp
+		}
+	}
+	t1 := time.Now()
+	span := t1.Sub(t0)
+	if span <= 0 {
+		span = time.Millisecond
+	}
+	for _, v := range asc {
+		if int(v.Partition) >= len(lanes) {
+			continue
+		}
+		pct := float64(v.Timestamp.Sub(t0)) / float64(span) * 100
+		lanes[v.Partition].Ticks = append(lanes[v.Partition].Ticks, laneTick{Pct: min(pct, 99.5), H: v.TickHeight})
+	}
+	axis := make([]time.Time, 3)
+	for i := range axis {
+		axis[i] = t0.Add(time.Duration(int64(span) * int64(i) / 3))
+	}
+	return lanes, axis
 }

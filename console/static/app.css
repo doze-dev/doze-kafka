@@ -799,10 +799,13 @@ table.msg-table td, table.msg-table th { padding-left: 7px; padding-right: 7px; 
 table.msg-table td:first-child, table.msg-table th:first-child { padding-left: 12px; }
 table.msg-table td:last-child, table.msg-table th:last-child { padding-right: 12px; }
 table.msg-table td { padding-bottom: 3px; font-size: var(--fs-sm); }
-table.msg-table .col-p { width: 45px; }          /* 26 + 12 + 7 */
-table.msg-table th:nth-child(2) { width: 86px; } /* 72 + 14: the board's 62 holds 4,789, not 1,234,567 */
-table.msg-table th:nth-child(3) { width: 134px; } /* 120 + 14 */
-table.msg-table th:nth-child(5) { width: 81px; }  /* 62 + 7 + 12 */
+/* Tp-05's tracks: Offset, P, Time, Key, Value, Hdr. */
+table.msg-table th:nth-child(1) { width: 85px; } /* 66 + 12 + 7: the board's 66, which holds 4,811 */
+table.msg-table th:nth-child(2) { width: 38px; }  /* 24 + 14 */
+table.msg-table th:nth-child(3) { width: 126px; } /* 112 + 14 */
+table.msg-table th:nth-child(4) { width: 138px; } /* 124 + 14 */
+table.msg-table th:nth-child(6) { width: 55px; }  /* 36 + 7 + 12 */
+.cell-time { font-family: var(--mono); font-size: var(--fs-sm); white-space: nowrap; }
 table.msg-table td { overflow: hidden; text-overflow: ellipsis; }
 .cell-key { font-family: var(--mono); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cell-key.none { color: var(--muted-foreground); font-style: italic; font-family: var(--sans); }
@@ -820,7 +823,8 @@ table.msg-table td { overflow: hidden; text-overflow: ellipsis; }
 
 .pager { display: inline-flex; align-items: center; gap: 12px; }
 .pagelink { color: var(--foreground); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
-.tbl-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 12px; font-size: var(--fs-xs); color: var(--muted-foreground); border-top: 1px solid var(--border); background: var(--muted); white-space: nowrap; }
+.tbl-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 0 12px; min-height: 24px; font-size: var(--fs-md); color: var(--ink); border-top: 1px solid var(--line2); white-space: nowrap; } /* Tp-05's last row: notes, not a band */
+.tbl-foot .note, .tbl-foot .pager { font-size: var(--fs-sm); color: var(--mut); }
 
 /* ---------- inspector / palette / confirm (all .overlay, shown via [hidden]) ---------- */
 .overlay { position: fixed; inset: 0; background: var(--scrim); z-index: 40; display: grid; place-items: start center; padding: 12vh 16px 16px; }
@@ -1117,9 +1121,9 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .tbl-wrap table.tbl td.cell-key { grid-column: 1; grid-row: 1; font-weight: 600; max-width: none; }
   .tbl-wrap table.tbl td.cell-offset { grid-column: 2; grid-row: 1; text-align: right; color: var(--mut); }
   .tbl-wrap table.tbl td.cell-val { grid-column: 1 / -1; grid-row: 2; }
-  .tbl-wrap table.tbl td.cell-age { display: block; grid-column: 1 / -1; grid-row: 3; text-align: left; color: var(--mut); font-family: var(--sans); font-size: var(--fs-sm); }
-  .tbl-wrap table.tbl td.cell-age::after { content: " ago"; }
-  .tbl-wrap table.tbl td.cell-age:has(time[data-now])::after { content: none; }
+  .tbl-wrap table.tbl td.cell-time { display: block; grid-column: 1 / -1; grid-row: 3; text-align: left; color: var(--mut); font-family: var(--sans); font-size: var(--fs-sm); }
+  .tbl-wrap table.tbl td.cell-time::after { content: ""; }
+  .tbl-wrap table.tbl tbody tr:not(.txnmark) td.cell-hdr { display: none; }
   .tbl-wrap table.tbl tbody tr:not(.txnmark) td.col-p { display: none; } /* (the cell rule above is more specific than a bare td.col-p) */
   /* Sy-04's cards: each record its own bordered card, the open one ringed in ink. */
   .tbl-wrap:has(#messages-table) { border: 0; background: none; overflow: visible; }
@@ -1531,3 +1535,15 @@ html[data-paused] #inspector[data-traffic-kept] .tf-kept { display: block; }
 .tp-none { margin-top: 40px; align-self: center; width: 640px; max-width: 100%; padding: 28px 32px; gap: 14px; }
 .tp-list-none { padding: 18px 14px; }
 .tp-settings { margin: 0; }
+
+/* ---------- Topics: the topic page (Tp-05, Tp-06) ---------- */
+.tp-contents { display: contents; }
+.tp-neighbours { padding: 5px 10px; }
+.tryit .quick .quick-part { width: 128px; flex: none; }
+
+.tp-tape { padding: 8px 12px 6px; display: flex; flex-direction: column; gap: 12px; }
+.tp-tape-h { margin-bottom: -8px; }
+.tp-lane-p { width: 20px; flex: none; } .tp-lane-n { width: 76px; flex: none; }
+.tp-lane { position: relative; height: 24px; border-bottom: 1px solid var(--line); }
+.tp-lane .tick { position: absolute; bottom: 0; width: 3px; border-radius: 1px; background: var(--ink); }
+.tp-axis { font-size: var(--fs-xs); }

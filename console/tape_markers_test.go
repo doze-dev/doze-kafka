@@ -81,3 +81,32 @@ func TestTheComposerCanSendAnEmptyKey(t *testing.T) {
 		t.Errorf("a key that is typed wins over the box: %q", in.Key)
 	}
 }
+
+// Tp-05: with no partition named, a topic of several partitions shows the newest
+// records of all of them, merged, newest first, and says how many and from where.
+func TestTheTapeDefaultsToEveryPartitionMergedNewestFirst(t *testing.T) {
+	c := newTestConsole(t)
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"merged"}, "partitions": {"3"}})
+	for i, p := range []int{1, 0, 2, 1} {
+		rec := req(t, c, "POST", "/_console/topics/merged/produce", url.Values{"partition": {itoa(p)}, "key": {"k" + itoa(i)}, "value": {"v" + itoa(i)}})
+		if rec.Code != 200 {
+			t.Fatalf("produce %d: %d %s", i, rec.Code, rec.Body)
+		}
+	}
+	page := req(t, c, "GET", "/_console/topics/merged", nil).Body.String()
+	for _, want := range []string{"Messages · all partitions", "4 shown, newest first across partitions", "log end p0 1 · p1 2 · p2 1", `id="hit-1-1"`, `id="hit-0-0"`, `id="hit-2-0"`, `id="hit-1-0"`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the page lacks %q", want)
+		}
+	}
+	// Within a partition the newer offset is first (the order across partitions is the
+	// records' timestamps, which a test cannot choose).
+	if strings.Index(page, `id="hit-1-1"`) > strings.Index(page, `id="hit-1-0"`) {
+		t.Error("partition 1's offset 0 came before its offset 1")
+	}
+	// A partition named is that partition alone, as before.
+	one := req(t, c, "GET", "/_console/topics/merged?partition=1", nil).Body.String()
+	if strings.Contains(one, "Messages · all partitions") || !strings.Contains(one, `id="msg-1"`) {
+		t.Error("a named partition did not show that partition's own tape")
+	}
+}

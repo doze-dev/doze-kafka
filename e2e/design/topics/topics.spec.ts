@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { BASE_URL } from '../../playwright.config';
 import { livePage, runBoard } from '../lib/gate';
-import { CREATE, SETTINGS, REFUSED, NONE } from './boards';
+import { CREATE, SETTINGS, REFUSED, NONE, TOPIC_BODY, TOPIC_COMMON, TOPIC_TABLE } from './boards';
+import { TOPIC } from '../lib/topic';
 import { OwnBroker } from '../../ownbroker';
 import { openLive } from '../lib/render';
+import { SHELL } from '../lib/probes';
 import { ALLOW } from './allow';
 
 const NAME = 'harbour.checkout.invoices';
@@ -42,4 +44,10 @@ test.describe('on an empty broker', () => {
     const out = await runBoard(browser, { id: 'Tp-01', file: 'Tp-01-None', live: async (b, place) => openLive(b, empty.console + 'topics', place.size, place.theme), probes: NONE, allow: ALLOW });
     expect(out.text, out.text).toBe('');
   });
+});
+
+test('Tp-05 matches the topic page', async ({ browser }) => {
+  test.setTimeout(120_000);
+  const out = await runBoard(browser, { id: 'Tp-05', file: 'Tp-05-Messages', live: livePage(BASE_URL, `topics/${TOPIC}`), probes: [...SHELL, ...TOPIC_COMMON, ...TOPIC_BODY, ...TOPIC_TABLE], allow: ALLOW });
+  expect(out.text, out.text).toBe('');
 });

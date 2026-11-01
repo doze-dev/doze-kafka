@@ -121,7 +121,7 @@ The comparison and data checks are:
 | `shell/dialogs.spec.ts` | Sy-05's palette, Sy-06's shortcuts, light and dark | |
 | `shell/themes.spec.ts` | Sy-07's switch; its specimens in light, dark and high contrast | every token, every printed ratio, the selection outline |
 | `shell/firstrun.spec.ts` | Sy-08 on an empty broker of its own, light and dark | |
-| `topics/topics.spec.ts` | Tp-01 (an empty broker of its own), Tp-02, Tp-03, Tp-04 (the create form, with its settings, refused) at 1440, light and dark | |
+| `topics/topics.spec.ts` | Tp-01 (an empty broker of its own), Tp-02, Tp-03, Tp-04 (the create form, with its settings, refused) and Tp-05 (the topic page, merged across partitions) at 1440, light and dark | |
 | `traffic/traffic.spec.ts` | Main and Traf-02 to Traf-12 at 1440, light and dark, in one run of the world (an empty broker, the scenario's traffic, then the broker stopped) | every count, client, time, size, offset and metric, against the clients' ledger |
 
 ## Checking that the Traffic gate bites

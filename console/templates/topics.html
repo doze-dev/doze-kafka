@@ -159,6 +159,11 @@
 {{/* One topic (Sy-01): its name and one action; the facts as a sentence; its
      neighbours as links; tabs; what the tab holds; try it; and, under the page, the
      wire. */}}
+{{/* Tp-05's neighbours: one well, "Written by", "Read by" and "Schema" each with their
+     links and a chip for what kind of thing it is. Where the broker does not know a
+     side (no traffic recorder, so no writers), the sentence under it says so. */}}
+{{define "topic_neighbours"}}{{if .Neighbours}}<div class="well row ce g12 wrap tp-neighbours" id="neighbours">{{range $i, $c := .Neighbours}}{{if $i}}<span class="mut">·</span>{{end}}<span class="note">{{$c.Verb}}</span>{{range $c.Links}}<a class="row ce g4" href="{{.URL}}"{{if .Open}} data-inspector-open hx-get="{{.Open}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"{{end}}>{{if eq .Kind "group"}}<span class="sv sm c-gr" aria-hidden="true">GR</span>{{else if eq .Kind "topic"}}<span class="sv sm c-tp" aria-hidden="true">TP</span>{{else if eq .Kind "subject"}}<span class="sv sm c-sc" aria-hidden="true">SC</span>{{else}}<span class="sv sm c-tr" aria-hidden="true">TR</span>{{end}}<span class="m">{{.Name}}</span></a>{{end}}{{end}}</div>{{if .NeighboursNote}}<div class="note nbnote" id="neighbours-note">{{.NeighboursNote}}</div>{{end}}{{end}}{{end}}
+
 {{define "topic_detail"}}{{template "shell_top" .}}
   {{template "topic_lp" (dict "List" .List "Sel" .Topic.Name)}}
   <main class="main workbench gap8" id="detail">
@@ -167,7 +172,7 @@
     <div class="row sb ce idband">
       <h1 class="h1 m">{{.Topic.Name}}</h1>
       <div class="row g8 ce idband-acts">
-        <button type="button" class="btn pri" id="produce-open" data-compose-open>Produce a message</button>
+        <button type="button" class="btn pri" id="produce-open" data-compose-open>Produce</button>
         <div class="more"><button type="button" class="btn" aria-label="More actions" title="More actions" aria-expanded="false" data-more>···</button>
           <div class="menu" role="group" aria-label="More actions" hidden>
             <button class="btn" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/purge" data-confirm-url="{{confirmURL "topic.purge" "name" .Topic.Name}}" data-confirm-title="{{(index .Confirm "topic.purge").Title}}" data-confirm-verb="{{(index .Confirm "topic.purge").Verb}}" hx-confirm="{{(index .Confirm "topic.purge").Text}}">{{icon "eraser"}} Purge</button>
@@ -178,10 +183,10 @@
     </div>
 
     {{with .Facts}}
-    <p class="facts-line" id="topic-facts">{{.Partitions}} partition{{if ne .Partitions 1}}s{{end}}, {{template "facts_messages" .}}{{if eq .Retention "no time limit"}}, kept with no time limit{{else if .Retention}}, kept <span class="m">{{.Retention}}</span>{{end}}{{if .Compact}}, compacted{{end}}{{template "facts_newest" .}}.</p>
+    <div class="row ce g8 wrap" id="topic-facts"><span class="m">{{.Partitions}} partition{{if ne .Partitions 1}}s{{end}}</span><span class="mut">·</span>{{template "facts_messages" .}}<span class="mut">·</span><span class="m">retention {{if .Retention}}{{.Retention}}{{else}}not known{{end}}</span><span class="mut">·</span><span class="m">{{.PolicyText}}</span>{{template "facts_newest" .}}</div>
     {{end}}
 
-    {{template "neighbours" .}}
+    {{template "topic_neighbours" .}}
 
     <nav class="tabs" aria-label="Topic views">
       {{range .Tabs}}<a class="tab {{if .On}}on{{end}}" href="{{.URL}}"{{if .On}} aria-current="page"{{end}}>{{.Label}}{{if .Count}} <span class="m mut">{{.Count}}</span>{{end}}</a>{{end}}
@@ -206,18 +211,20 @@
       {{/* Sy-01 part 7 (and Tp-05's Try it row): closed, the composer is still a key, a
            value and Send. The partition is chosen by the key and acks is 1, as the open
            form's defaults; p or the bar opens the whole form. */}}
-      <form class="quick" id="compose-quick" hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" {{if eq .Tab "messages"}}hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML"{{else}}hx-swap="none"{{end}} @htmx:after-request="if($event.detail.xhr.status < 400){$el.reset()}" x-data>
-        <input type="hidden" name="partition_ctx" value="{{.Partition}}">
-        <div class="row g8">
+      <form class="quick" id="compose-quick" x-data="{acks:'1'}" hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" {{if eq .Tab "messages"}}hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML"{{else}}hx-swap="none"{{end}} @htmx:after-request="if($event.detail.xhr.status < 400){$el.reset();acks='1'}" x-data>
+        <input type="hidden" name="partition_ctx" value="{{if .Merged}}all{{else}}{{.Partition}}{{end}}">
+        <div class="row g8 ce">
+          <select class="inp m quick-part" name="partition" aria-label="Partition"><option value="auto">Auto (by key)</option>{{range $i := .PartitionRange}}<option value="{{$i}}">P{{$i}}</option>{{end}}</select>
           <input class="inp m quick-key" name="key" aria-label="Key (optional)" placeholder="key" autocomplete="off">
           <input class="inp m grow" name="value" aria-label="Value" placeholder='{"orderId": "ord_8901"}' autocomplete="off">
+          <span class="seg" role="group" aria-label="Acknowledgment">{{range acksChoices}}<button type="button" :class="acks==='{{.Value}}'&&'on'" :aria-pressed="acks==='{{.Value}}'" @click="acks='{{.Value}}'" aria-label="{{.Aria}}">{{if eq .Value "1"}}acks {{end}}{{.Value}}</button>{{end}}<input type="hidden" name="acks" :value="acks"></span>
           <button class="btn pri" type="submit">Send</button>
         </div>
         <div class="err form-err" data-err-slot hidden role="alert"></div>
       </form>
       <div class="dock-form" id="compose-body">
         <form hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" {{if eq .Tab "messages"}}hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML"{{else}}hx-swap="none"{{end}} x-data="{hdrs:[], acks:'1', keyEmpty:false, keyB64:false, valB64:false, tomb:false}" x-effect="window.dozeEditor && dozeEditor.setValidate($refs.value, !(valB64 || tomb), tomb ? 'null value — nothing is sent' : (valB64 ? 'base64 — sent as raw bytes' : ''))" @htmx:after-request="if($event.detail.xhr.status < 400){window.dozeEditor?dozeEditor.set($refs.value,''):$refs.value.value='';$refs.key.value='';hdrs=[];keyEmpty=false;keyB64=false;valB64=false;tomb=false}">
-          <input type="hidden" name="partition_ctx" value="{{.Partition}}">
+          <input type="hidden" name="partition_ctx" value="{{if .Merged}}all{{else}}{{.Partition}}{{end}}">
           <div class="crow">
             <div class="field w-part">
               <label for="f-partition">Partition</label>
@@ -281,56 +288,75 @@
 
 {{/* The parts of the facts sentence that move as records arrive. The tape's answer
      carries them out of band (FactsLive), so the sentence moves with the tape. */}}
-{{define "facts_messages"}}<span id="facts-messages"><span class="m">{{num .Messages}}</span> message{{if ne .Messages 1}}s{{end}}</span>{{end}}
-{{define "facts_messages_oob"}}<span id="facts-messages" hx-swap-oob="true"><span class="m">{{num .Messages}}</span> message{{if ne .Messages 1}}s{{end}}</span>{{end}}
-{{define "facts_newest"}}<span id="facts-newest">{{template "facts_newest_in" .}}</span>{{end}}
-{{define "facts_newest_oob"}}<span id="facts-newest" hx-swap-oob="true">{{template "facts_newest_in" .}}</span>{{end}}
-{{define "facts_newest_in"}}{{if .HasNewest}}, newest <span class="m">{{when .Newest "clock"}}</span>{{if .SchemaType}}, {{if eq .SchemaType "Avro"}}an{{else}}a{{end}} {{.SchemaType}} value with schema <a class="m" href="{{.SubjectURL}}">{{.Subject}}</a> <span class="m">v{{.SchemaVer}}</span>{{end}}{{end}}{{end}}
+{{define "facts_messages"}}<span class="m" id="facts-messages">{{template "facts_messages_in" .}}</span>{{end}}
+{{define "facts_messages_oob"}}<span class="m" id="facts-messages" hx-swap-oob="true">{{template "facts_messages_in" .}}</span>{{end}}
+{{define "facts_messages_in"}}{{num .Messages}} message{{if ne .Messages 1}}s{{end}}{{if .HasSize}}, {{.Size}}{{end}}{{end}}
+{{define "facts_newest"}}<span id="facts-newest" class="tp-contents">{{template "facts_newest_in" .}}</span>{{end}}
+{{define "facts_newest_oob"}}<span id="facts-newest" class="tp-contents" hx-swap-oob="true">{{template "facts_newest_in" .}}</span>{{end}}
+{{define "facts_newest_in"}}{{if .HasNewest}}<span class="mut">·</span><span class="m">last write {{when .Newest "clock"}}, {{when .Newest "since"}} ago</span>{{if .SchemaType}}<span class="mut">·</span><span class="m">{{if eq .SchemaType "Avro"}}an{{else}}a{{end}} {{.SchemaType}} value with schema <a class="m" href="{{.SubjectURL}}">{{.Subject}}</a> <span class="m">v{{.SchemaVer}}</span></span>{{end}}{{end}}{{end}}
+
+{{/* The partition choice: tabs, or a select for many partitions. */}}
+{{define "tape_parts"}}
+    {{if .PartSelect}}
+    <label class="psel-wrap"><span class="sr-only">Partition</span>
+      <select class="input psel" onchange="location.href=this.value">
+        <option value="{{topicURL $.Topic.Name}}" {{if $.Merged}}selected{{end}}>All partitions</option>
+        {{range .Bounds}}<option value="{{topicURL $.Topic.Name}}?partition={{.Partition}}" {{if eq .Partition $.Partition}}selected{{end}}>P{{.Partition}} · {{.Count}} record{{if ne .Count 1}}s{{end}}</option>{{end}}
+      </select></label>
+    {{else}}
+    <div class="ptabs" role="group" aria-label="Partitions">
+      {{if gt (len .Bounds) 1}}<a class="ptab {{if .Merged}}on{{end}}" href="{{topicURL $.Topic.Name}}" title="the newest records of every partition, merged, newest first"{{if .Merged}} aria-current="true"{{end}}>All</a>{{end}}
+      {{range .Bounds}}<a class="ptab {{if eq .Partition $.Partition}}on{{end}}" href="{{topicURL $.Topic.Name}}?partition={{.Partition}}" title="partition {{.Partition}} · {{.Count}} record{{if ne .Count 1}}s{{end}} · offsets {{.Earliest}}–{{.Latest}}" {{if eq .Partition $.Partition}}aria-current="true"{{end}}>P{{.Partition}}{{if gt .Count 0}}<span class="pc">{{.Count}}</span>{{end}}</a>{{end}}
+    </div>
+    {{end}}
+{{end}}
 
 {{/* tape_and_table is the live-polled unit: the tick strip + message table
      together, so a new message appearing updates both from one partial. With
      .Search set it shows what a search found instead, and does not poll. */}}
 {{define "tape_and_table"}}
-<div class="tapetable" id="tape-and-table" {{if not .Search}}data-msg-base="{{topicURL .Topic.Name}}/message?partition={{.Partition}}" {{if .AtTail}}data-live="{{topicURL .Topic.Name}}/tape?partition={{.Partition}}{{if .CommittedOnly}}&amp;committed=1{{end}}" data-hash="{{.Hash}}" data-live-ms="2500"{{end}}{{end}}>
+<div class="tapetable" id="tape-and-table" {{if not .Search}}data-msg-base="{{topicURL .Topic.Name}}/message?partition={{if .Merged}}all{{else}}{{.Partition}}{{end}}" {{if .AtTail}}data-live="{{topicURL .Topic.Name}}/tape?partition={{if .Merged}}all{{else}}{{.Partition}}{{end}}{{if .CommittedOnly}}&amp;committed=1{{end}}" data-hash="{{.Hash}}" data-live-ms="2500"{{end}}{{end}}>
   {{if not .Search}}
+  {{if .Merged}}
+  <div class="tape-panel tp-tape">
+    <div class="row sb ce tp-tape-h"><span class="row ce g8"><span class="cap">The tape</span><span class="note">each mark is one record on disk, taller is bigger</span></span>
+      <span class="row ce g8"><button type="button" class="livetoggle" data-live-toggle aria-pressed="false" title="Pause live updates"><span class="livedot" aria-hidden="true"></span><span class="livetoggle-l">Live</span></button><span class="m mut" title="Where the next message will be written, on each partition">log end {{.LogEnds}}</span></span></div>
+    {{range .Lanes}}<div class="row ce g8"><span class="m mut tp-lane-p">p{{.Partition}}</span><div class="grow tp-lane">{{range .Ticks}}<i class="tick" style="left:{{printf "%.2f" .Pct}}%;height:{{.H}}px"></i>{{end}}</div><span class="m mut ra tp-lane-n">{{num .Count}} rec</span></div>
+    {{end}}{{if .Axis}}<div class="row ce g8"><span class="tp-lane-p"></span><div class="grow row sb m mut tp-axis">{{range .Axis}}<span>{{when . "clock"}}</span>{{end}}<span>now</span></div><span class="tp-lane-n"></span></div>{{end}}
+  </div>
+  {{else}}
   <div class="tape-panel">
   <div class="tape-head">
     <span class="cap">The tape</span>
-    {{if .PartSelect}}
-    <label class="psel-wrap"><span class="sr-only">Partition</span>
-      <select class="input psel" onchange="location.href=this.value">
-        {{range .Bounds}}<option value="{{topicURL $.Topic.Name}}?partition={{.Partition}}" {{if eq .Partition $.Partition}}selected{{end}}>P{{.Partition}} · {{.Count}} record{{if ne .Count 1}}s{{end}}</option>{{end}}
-      </select></label>
-    {{else}}
-    <div class="ptabs" role="group" aria-label="Partitions">
-      {{range .Bounds}}<a class="ptab {{if eq .Partition $.Partition}}on{{end}}" href="{{topicURL $.Topic.Name}}?partition={{.Partition}}" title="partition {{.Partition}} · {{.Count}} record{{if ne .Count 1}}s{{end}} · offsets {{.Earliest}}–{{.Latest}}" {{if eq .Partition $.Partition}}aria-current="true"{{end}}>P{{.Partition}}{{if gt .Count 0}}<span class="pc">{{.Count}}</span>{{end}}</a>{{end}}
-    </div>
-    {{end}}
+    {{template "tape_parts" .}}
     <div class="tape-head-spacer"></div>
     {{if .AtTail}}<button type="button" class="livetoggle" data-live-toggle aria-pressed="false" title="Pause live updates"><span class="livedot" aria-hidden="true"></span><span class="livetoggle-l">Live</span></button>{{else}}<span class="pinned mono">pinned to history</span>{{end}}
-    <div class="counter" title="The log-end offset: where the next message will be written"><span class="lbl">log end</span><span class="mono">{{printf "%07d" .Latest}}</span></div>
+    {{if .Merged}}<div class="counter" title="Where the next message will be written, on each partition"><span class="lbl">log end</span><span class="mono">{{.LogEnds}}</span></div>{{else}}<div class="counter" title="The log-end offset: where the next message will be written"><span class="lbl">log end</span><span class="mono">{{printf "%07d" .Latest}}</span></div>{{end}}
   </div>
   <div class="tape-strip">
-    {{if .Messages}}{{range .Messages}}<button type="button" tabindex="-1" class="tick {{if .Hot}}hot{{end}}" style="height:{{.TickHeight}}px" aria-label="Scroll to offset {{.Offset}}" title="offset {{.Offset}}{{if not .Key.Null}} · {{.Key.Preview}}{{end}} · {{.Value.SizeText}}" onclick="document.getElementById('msg-{{.Offset}}')?.scrollIntoView({block:'center',behavior:'smooth'})"></button>{{end}}
+    {{if .Messages}}{{range .Messages}}<button type="button" tabindex="-1" class="tick {{if .Hot}}hot{{end}}" style="height:{{.TickHeight}}px" aria-label="Scroll to offset {{.Offset}}" title="offset {{.Offset}}{{if not .Key.Null}} · {{.Key.Preview}}{{end}} · {{.Value.SizeText}}" onclick="document.getElementById('{{if $.Merged}}hit-{{.Partition}}-{{end}}{{if not $.Merged}}msg-{{end}}{{.Offset}}')?.scrollIntoView({block:'center',behavior:'smooth'})"></button>{{end}}
     {{else}}<div class="tape-empty">No messages on this partition yet.</div>{{end}}
   </div>
   <div class="tape-foot">
-    <span>{{if .Messages}}offsets <b class="mono">{{.WindowFrom}}</b> – <b class="mono">{{.WindowLast}}</b> · {{end}}each mark is one record on disk, taller is bigger, newest on the right</span>
+    <span>{{if and .Messages (not .Merged)}}offsets <b class="mono">{{.WindowFrom}}</b> – <b class="mono">{{.WindowLast}}</b> · {{end}}each mark is one record on disk, taller is bigger, newest on the right</span>
     <span class="mono" title="The offsets currently retained on this partition. A compacted topic and a transaction marker leave gaps, so this can be more than the number of records.">{{.Count}} record{{if ne .Count 1}}s{{end}}</span>
   </div>
   </div>
   {{end}}
+  {{end}}
 
   <div class="secrow">
-    <span class="cap">{{if .Search}}{{if .Search.Query}}Search{{else}}Latest{{end}} · {{if .Search.All}}all partitions{{else}}partition {{.Partition}}{{end}}{{else}}Messages · partition {{.Partition}}{{end}}</span>
+    <span class="cap">{{if .Search}}{{if .Search.Query}}Search{{else}}Latest{{end}} · {{if .Search.All}}all partitions{{else}}partition {{.Partition}}{{end}}{{else if .Merged}}Messages · all partitions{{else}}Messages · partition {{.Partition}}{{end}}</span>
+    {{if and .Merged (not .Search)}}{{template "tape_parts" .}}{{end}}
     <form class="find" method="get" action="{{topicURL .Topic.Name}}" role="search">
-      <input type="hidden" name="partition" value="{{.Partition}}">
+      <input type="hidden" name="partition" value="{{if .Merged}}0{{else}}{{.Partition}}{{end}}">
       <input class="input" id="find-q" name="q" type="search" placeholder="Search keys, values, headers" aria-label="Search this topic's records" autocomplete="off" data-filter-target="" {{if .Search}}value="{{.Search.Query}}"{{end}}>
-      <label class="chk" title="Search every partition's newest records, and show them together"><input type="checkbox" id="find-all" name="all" value="1" {{if and .Search .Search.All}}checked{{end}}> all partitions</label>
+      <label class="chk" title="Search every partition's newest records, and show them together"><input type="checkbox" id="find-all" name="all" value="1" {{if or .Merged (and .Search .Search.All)}}checked{{end}}> all partitions</label>
       <button type="submit" class="btn sm jump-go">Search</button>
       {{if .Search}}<a class="btn sm jump-go" href="{{.Search.ClearURL}}">Clear</a>{{end}}
     </form>
-    {{if not .Search}}
+    {{if .Merged}}<span class="note">Pick a partition above to go to an offset or a time.</span>{{end}}
+    {{if and (not .Search) (not .Merged)}}
     <form class="jump" method="get" action="{{topicURL .Topic.Name}}">
       <input type="hidden" name="partition" value="{{.Partition}}">
       <label for="jump-to">go to offset</label>
@@ -353,31 +379,33 @@
          and the inspector's Timestamp, the headers are the inspector's (their number is
          the value's tooltip), so nothing a record has is out of reach. */}}
     <table class="tbl msg-table" id="messages-table">
-      <thead><tr><th class="col-p">P</th><th>Offset</th><th>Key</th><th>Value</th><th class="num">Age</th></tr></thead>
+      <thead><tr><th class="num">Offset</th><th class="col-p">P</th><th>Time</th><th>Key</th><th>Value</th><th class="num">Hdr</th></tr></thead>
       <tbody>
         {{range .Rows}}
         {{if .Marker}}
         <tr class="txnmark" id="mark-{{.Offset}}">
-          <td class="m col-p">{{.Partition}}</td><td class="cell-offset">{{.Offset}}</td>
-          <td colspan="3" class="txnmark-l"title="A commit or abort ends a transaction here. It takes an offset and is not a record.">transaction marker</td>
+          <td class="cell-offset num">{{.Offset}}</td><td class="m col-p">{{.Partition}}</td>
+          <td colspan="4" class="txnmark-l"title="A commit or abort ends a transaction here. It takes an offset and is not a record.">transaction marker</td>
         </tr>
         {{else}}
-        <tr id="{{if $.Search}}hit-{{.Partition}}-{{.Offset}}{{else}}msg-{{.Offset}}{{end}}" class="{{if and (not $.Search) (eq .Offset $.HL)}}hl{{end}}{{if .Txn}} txn-{{.Txn}}{{end}}" {{if and (not $.Search) (eq .Offset $.HL)}}data-hl{{end}} tabindex="0" role="button" data-inspector-open{{if not $.Search}} data-open-keys="{{.Offset}}"{{end}} hx-get="{{topicURL $.Topic.Name}}/message?partition={{.Partition}}&offset={{.Offset}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
+        <tr id="{{if or $.Search $.Merged}}hit-{{.Partition}}-{{.Offset}}{{else}}msg-{{.Offset}}{{end}}" class="{{if and (not $.Search) (eq .Offset $.HL)}}hl{{end}}{{if .Txn}} txn-{{.Txn}}{{end}}" {{if and (not $.Search) (eq .Offset $.HL)}}data-hl{{end}} tabindex="0" role="button" data-inspector-open{{if not (or $.Search $.Merged)}} data-open-keys="{{.Offset}}"{{end}} hx-get="{{topicURL $.Topic.Name}}/message?partition={{.Partition}}&offset={{.Offset}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
+          <td class="cell-offset num"><span class="p-inline">p{{.Partition}} · </span>{{num .Offset}}</td>
           <td class="m col-p">{{.Partition}}</td>
-          <td class="cell-offset"><span class="p-inline">p{{.Partition}} · </span>{{num .Offset}}</td>
+          <td class="cell-time m">{{when .Timestamp "clock"}} <span class="mut">· {{when .Timestamp "since"}}</span></td>
           <td class="cell-key {{if or .Key.Null .Key.Empty}}none{{end}}" title="{{if .Key.Null}}null key{{else}}{{.Key.Preview}} · {{.Key.SizeText}}{{end}}">{{if .Key.Null}}no key{{else}}{{.Key.Preview}}{{end}}</td>
-          <td class="cell-val {{if .Value.Binary}}binary{{end}} {{if .Value.Null}}tomb{{end}}" title="{{.Value.SizeText}}{{if .Headers}} · {{len .Headers}} header{{if ne (len .Headers) 1}}s{{end}}{{end}}">{{if .Txn}}<span class="txnbadge txnbadge-{{.Txn}}" title="{{if eq .Txn "open"}}Part of a transaction that has not ended; a read-committed consumer cannot see it yet.{{else}}Part of a transaction that aborted; a read-committed consumer never sees it.{{end}}">{{.Txn}}</span> {{end}}{{if or .Value.Binary .Value.Null .Value.Empty}}<span class="vspecial">{{.Value.Preview}}</span>{{else}}{{jsonTint .Value.Preview}}{{end}}</td>
-          <td class="cell-age num mut">{{when .Timestamp "since"}}</td>
+          <td class="cell-val {{if .Value.Binary}}binary{{end}} {{if .Value.Null}}tomb{{end}}" title="{{.Value.SizeText}}">{{if .Txn}}<span class="txnbadge txnbadge-{{.Txn}}" title="{{if eq .Txn "open"}}Part of a transaction that has not ended; a read-committed consumer cannot see it yet.{{else}}Part of a transaction that aborted; a read-committed consumer never sees it.{{end}}">{{.Txn}}</span> {{end}}{{if or .Value.Binary .Value.Null .Value.Empty}}<span class="vspecial">{{.Value.Preview}}</span>{{else}}{{jsonTint .Value.Preview}}{{end}}</td>
+          <td class="cell-hdr num m">{{len .Headers}}</td>
         </tr>
         {{end}}
         {{else}}
-        <tr><td colspan="5" class="empty">{{if .Search}}{{if .Search.Query}}Nothing in the records that were read contains “{{.Search.Query}}”.{{else}}No records.{{end}}{{else if gt .Earliest 0}}{{t "messages.retention" .Earliest}}{{else}}{{t "messages.none"}}{{end}}</td></tr>
+        <tr><td colspan="6" class="empty">{{if .Search}}{{if .Search.Query}}Nothing in the records that were read contains “{{.Search.Query}}”.{{else}}No records.{{end}}{{else if gt .Earliest 0}}{{t "messages.retention" .Earliest}}{{else}}{{t "messages.none"}}{{end}}</td></tr>
         {{end}}
       </tbody>
     </table>
     <div class="tbl-foot">
-      <span>{{if .Rows}}{{len .Rows}} shown{{else}}No messages{{end}}</span>
-      {{if not .Search}}
+      <span class="note">{{if .Merged}}{{.MergedNote}}{{else if .Rows}}{{len .Rows}} shown{{else}}No messages{{end}}</span>
+      {{if .Merged}}<span class="pager"><span title="Where the next message will be written, on each partition">log end {{.LogEnds}}</span></span>
+      {{else if not .Search}}
       <span class="pager">
         {{if .HasOlder}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.OlderFrom}}{{if .CommittedOnly}}&amp;committed=1{{end}}">← Older</a>{{end}}
         {{if .HasNewer}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.NewerFrom}}{{if .CommittedOnly}}&amp;committed=1{{end}}">Newer</a><a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}{{if .CommittedOnly}}&amp;committed=1{{end}}">Latest →</a>{{end}}
