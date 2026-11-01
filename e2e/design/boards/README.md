@@ -21,6 +21,9 @@ here is byte-identical in both (the hashes are in `SHA256SUMS`).
   (read at 1792149264-d921). Tp-05, Tp-06 and Tp-14 were read at 1792149264-d921 only. The Traffic boards (Main,
   Traf-02 to Traf-12) were copied from the same artifact's `project/` folder, unmodified;
   the artifact version they were read at was not recorded.
+  The Groups boards Gr-04 to Gr-18 were read at 1792149264-d921, each verified by its
+  sha256 from the artifact's file list (Gr-15 differs from its siblings by one
+  `style="position: relative"` on `.app`, for its two dialogs).
 
 A board is a static page: it links `./support.js` (the design runtime, which these
 boards do not need: they have no holes to fill; the gate serves an empty file in its
