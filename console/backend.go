@@ -808,7 +808,7 @@ func (b *backend) PickPartition(topic string, key []byte, partitionCount int32) 
 	if partitionCount <= 1 {
 		return 0
 	}
-	if len(key) > 0 {
+	if key != nil { // an empty key is a key: it is hashed (TOP-12); only no key is spread.
 		tp := keyPartitioner.ForTopic(topic)
 		return int32(tp.Partition(&kgo.Record{Key: key}, int(partitionCount)))
 	}

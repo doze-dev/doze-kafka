@@ -1018,10 +1018,10 @@ func (c *Console) txnStatus(ctx context.Context, topic string, partition int32, 
 	for _, m := range msgs {
 		have[m.Offset] = true
 	}
-	for off := from; off < to; off++ {
-		if !have[off] {
-			markers[off] = true
-		}
+	// A gap is a marker only where a control batch is (TOP-14); one that compaction
+	// left is a gap. When the broker cannot say, nothing is called a marker.
+	if spans, err := c.be.ControlSpans(ctx, topic, partition, from, to); err == nil {
+		markers = markersIn(from, to, have, spans)
 	}
 	lso, err := c.be.StableOffset(ctx, topic, partition)
 	if err != nil {

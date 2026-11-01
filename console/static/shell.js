@@ -427,6 +427,7 @@
     if (ta && window.dozeEditor) dozeEditor.set(ta, val); else if (ta) ta.value = val;
     if (st) {
       st.keyB64 = b.getAttribute("data-key-enc") === "base64";
+      st.keyEmpty = b.getAttribute("data-key-empty") === "1";
       st.valB64 = b.getAttribute("data-value-enc") === "base64";
       st.tomb = b.getAttribute("data-tombstone") === "1";
       try {

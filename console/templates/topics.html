@@ -216,7 +216,7 @@
         <div class="err form-err" data-err-slot hidden role="alert"></div>
       </form>
       <div class="dock-form" id="compose-body">
-        <form hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" {{if eq .Tab "messages"}}hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML"{{else}}hx-swap="none"{{end}} x-data="{hdrs:[], acks:'1', keyB64:false, valB64:false, tomb:false}" x-effect="window.dozeEditor && dozeEditor.setValidate($refs.value, !(valB64 || tomb), tomb ? 'null value — nothing is sent' : (valB64 ? 'base64 — sent as raw bytes' : ''))" @htmx:after-request="if($event.detail.xhr.status < 400){window.dozeEditor?dozeEditor.set($refs.value,''):$refs.value.value='';$refs.key.value='';hdrs=[];keyB64=false;valB64=false;tomb=false}">
+        <form hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" {{if eq .Tab "messages"}}hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML"{{else}}hx-swap="none"{{end}} x-data="{hdrs:[], acks:'1', keyEmpty:false, keyB64:false, valB64:false, tomb:false}" x-effect="window.dozeEditor && dozeEditor.setValidate($refs.value, !(valB64 || tomb), tomb ? 'null value — nothing is sent' : (valB64 ? 'base64 — sent as raw bytes' : ''))" @htmx:after-request="if($event.detail.xhr.status < 400){window.dozeEditor?dozeEditor.set($refs.value,''):$refs.value.value='';$refs.key.value='';hdrs=[];keyEmpty=false;keyB64=false;valB64=false;tomb=false}">
           <input type="hidden" name="partition_ctx" value="{{.Partition}}">
           <div class="crow">
             <div class="field w-part">
@@ -231,6 +231,7 @@
                 <button type="button" class="b64tog" :class="keyB64&&'on'" :aria-pressed="keyB64" @click="keyB64=!keyB64" aria-label="b64 key: the key is base64" title="The key is base64 for binary bytes">b64</button></span>
               <input class="input mono" id="f-key" name="key" x-ref="key" placeholder="e.g. ord_8901" autocomplete="off">
               <input type="hidden" name="key_enc" :value="keyB64 ? 'base64' : 'text'">
+              <label class="note"><input type="checkbox" name="key_empty" value="1" x-model="keyEmpty"> empty key, not null</label>
             </div>
             <div class="field w-acks">
               <span class="lbl" id="l-acks">Acknowledgment</span>
@@ -593,7 +594,7 @@
       title="Produce an exact copy of this record (same key, value and headers, byte for byte) to partition {{.Partition}}">Send again</button>
     {{if .CanEdit}}
     <button type="button" class="btn" id="inspector-edit"
-      data-key="{{.EditKey}}" data-key-enc="{{.EditKeyEnc}}" data-value="{{.EditValue}}" data-value-enc="{{.EditValueEnc}}"
+      data-key="{{.EditKey}}" data-key-enc="{{.EditKeyEnc}}" data-key-empty="{{if .Key.Empty}}1{{end}}" data-value="{{.EditValue}}" data-value-enc="{{.EditValueEnc}}"
       data-headers="{{.EditHeaders}}" data-schema="{{.EditSchema}}" data-partition="{{.Partition}}" data-tombstone="{{if .Value.Null}}1{{end}}"
       title="Open the composer with this record's contents, to change and send">Edit a copy…</button>
     {{else}}

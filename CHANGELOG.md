@@ -6,6 +6,7 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Console, messages tape: a gap in the offsets is drawn as a transaction marker only where a control batch is; an offset compaction removed is no longer called a marker. An empty (not null) key is hashed to a partition like any key, and the composer can send one ("empty key, not null"; "Edit a copy" keeps it).
 - Console, create topic: the page is drawn to the design (Tp-01 to Tp-04). The settings open from "Set…" (the name and partitions you typed carry over, and the page can be opened with them in its address), the form offers `cleanup.policy`, a refusal is shown as the design draws it with the broker's own wording, and an empty broker's Topics page is the design's.
 - Names: a by-name address is printed only when something answers at it. The start-up
   summary, `doze-kafka env` and the console and registry URLs used to give the name

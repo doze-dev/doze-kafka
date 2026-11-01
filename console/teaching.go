@@ -84,6 +84,7 @@ var formFields = map[string]formField{
 	"partition_ctx":  {Not: "the partition the page is showing, carried through a form"},
 	"key":            {Not: "a record's key"},
 	"key_enc":        {Not: "how a record's key is encoded"},
+	"key_empty":      {Not: "whether a record's key is empty and not null"},
 	"value":          {Not: "a record's value"},
 	"value_enc":      {Not: "how a record's value is encoded"},
 	"tombstone":      {Not: "whether a record's value is null"},
