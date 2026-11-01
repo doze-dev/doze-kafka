@@ -351,7 +351,7 @@ func TestEveryDestructiveRouteHasAConfirm(t *testing.T) {
 	for _, f := range tmpls {
 		b, _ := os.ReadFile(f)
 		for _, m := range lit.FindAllStringSubmatch(string(b), -1) {
-			if !strings.HasPrefix(m[1], "{{") {
+			if !strings.HasPrefix(m[1], "{{") && m[1] != "unset" { // "unset" is htmx's opt-out of an inherited confirm (a preview typed into inside a confirmed form), not a sentence.
 				t.Errorf("%s has a confirm sentence typed into the template: %q (it comes from confirmTable)", f, m[1])
 			}
 		}

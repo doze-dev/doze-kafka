@@ -1642,7 +1642,7 @@
     trafficSync();
   }
   document.addEventListener("click", function (e) {
-    if (e.target.closest("[data-live-toggle]")) setPaused(!livePaused);
+    if (e.target.closest("[data-live-toggle], [data-topic-resume]")) setPaused(!livePaused);
   });
   var liveTimers = [];
   // The element a region's poll is sent from: an empty one of its own, so that no poll

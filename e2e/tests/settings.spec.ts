@@ -33,7 +33,7 @@ test('settings are changed from the topic page, and a refusal is explained besid
 
   await page.locator('[id="cfg-segment.bytes"]').fill('10');
   await page.locator('#topic-config').getByRole('button', { name: 'Save settings' }).click();
-  await expect(page.locator('#topic-config [data-err-slot]')).toContainText('minimum of 1024');
+  await expect(page.locator('#topic-config [data-err-slot]').first()).toContainText('minimum of 1024');
   await expect(page.locator('[id="cfg-segment.bytes"]')).toHaveValue('10');
   await page.reload();
   await expect(page.locator('[id="cfg-retention.ms"]')).toHaveValue('12h'); // the refused change did not undo the earlier one.

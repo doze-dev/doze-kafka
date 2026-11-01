@@ -119,7 +119,7 @@ func TestSearchThatMatchesNothingSaysOnlyTheSearchFoundNothing(t *testing.T) {
 	produceTo(t, c, "sx", 0, 3)
 	body := page(t, c, "/_console/topics/sx?partition=0&q=HRB-2099")
 	needs(t, body, `id="search-empty"`, "Nothing in the records that were read contains", "HRB-2099", "The topic is not empty, and nothing was deleted: only this search matched nothing",
-		"matched as text, ignoring case", "Clear search")
+		"matched as text, ignoring case", "Show all records")
 }
 
 // Tp-29: a topic that is not there gets the nearest names with their sizes, the count of
@@ -284,4 +284,20 @@ func TestReadersNameAnIdleGroupWithLag(t *testing.T) {
 
 func kgoRecord(topic string, partition int32, value string) *kgo.Record {
 	return &kgo.Record{Topic: topic, Partition: partition, Value: []byte(value)}
+}
+
+// Tp-25: with the ACLs readable, the card names the rule that decided, from the checker.
+func TestRefusedClientNamesTheDenyThatDecided(t *testing.T) {
+	c := newTestConsole(t)
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"harbour.den"}, "partitions": {"1"}})
+	if err := c.be.CreateACL(context.Background(), ACLRow{Resource: "topic", Name: "*", Pattern: "literal", Principal: "User:*", Host: "*", Operation: "all", Permission: "allow"}); err != nil {
+		t.Skipf("this broker takes no ACLs: %v", err)
+	}
+	if err := c.be.CreateACL(context.Background(), ACLRow{Resource: "topic", Name: "harbour.", Pattern: "prefixed", Principal: "User:loyalty", Host: "*", Operation: "write", Permission: "deny"}); err != nil {
+		t.Skipf("this broker takes no ACLs: %v", err)
+	}
+	c.traffic = &fakeTraffic{events: []TrafficEvent{{ID: "r1", Time: time.Now(), Remote: "127.0.0.1:55127", ClientID: "loyalty-etl", Principal: "User:loyalty",
+		API: "Produce", Version: 9, Topics: []string{"harbour.den"}, Error: "TOPIC_AUTHORIZATION_FAILED", Class: "denied", Count: 1}}}
+	body := page(t, c, "/_console/topics/harbour.den")
+	needs(t, body, `id="topic-denied-rule"`, "Which rule decided", "deny User:loyalty write topic harbour. (prefixed)", "decided this one")
 }

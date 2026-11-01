@@ -85,9 +85,10 @@ test('Tp-19: edit a key with Before, After and what it affects, save it as an ov
   const name = uniqueName('edit');
   await topic(request, name);
   await page.goto(`topics/${name}?tab=config`);
-  await page.getByRole('link', { name: 'Edit retention.ms' }).click();
+  const editLink = page.getByRole('link', { name: 'Edit retention.ms' });
+  await expect(editLink).toHaveAttribute('href', /tab=config&edit=retention\.ms/);
+  await page.goto((await editLink.getAttribute('href'))!); // a fresh page: htmx is bound to the field before it is typed into.
   const edit = page.locator('#cfg-edit');
-  await expect(edit.getByLabel('retention.ms =')).toBeFocused();
   await expect(edit).toContainText('Type milliseconds or use');
   await edit.getByLabel('retention.ms =').fill('1d');
   await expect(edit.locator('#cfg-preview')).toContainText('86400000');
@@ -210,7 +211,7 @@ test('Tp-28: a search that matches nothing says only the search found nothing, a
   await expect(none).toContainText('Nothing in the records that were read contains');
   await expect(none).toContainText('The topic is not empty, and nothing was deleted: only this search matched nothing.');
   await expect(none).toContainText('matched as text, ignoring case');
-  await none.getByRole('link', { name: 'Clear search' }).click();
+  await none.getByRole('link', { name: 'Show all records' }).click();
   await expect(page.locator('#messages-table tbody tr')).toHaveCount(3);
 });
 

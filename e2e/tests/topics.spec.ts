@@ -138,7 +138,7 @@ test('partitions are added after a warning, the tabs grow, and a bad number is e
   await confirmDialog('accept');
   await expect(page.locator('#flashbar')).toContainText('Topic now has 4 partitions');
   await expect(page.locator('#topic-facts')).toContainText('4 partitions');
-  await expect(page.locator('.ptab')).toHaveCount(5);
+  await expect(page.locator('#partitions-table a.r')).toHaveCount(4); // the Partitions tab stays open, with the new ones in it.
 });
 
 test('go to time lands on the first message at or after it, and explains an empty or bad answer', async ({ page }) => {
