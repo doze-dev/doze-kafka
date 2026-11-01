@@ -233,7 +233,7 @@ kafka-console-consumer.sh --bootstrap-server {{.Bootstrap}} \
 {{if .Forever}}<div class="note" id="expiry-note">This broker keeps committed offsets for ever: <span class="m">offsets-retention</span> is 0, so nothing here expires.</div>
 {{else if .None}}<div class="note" id="expiry-note">Committed offsets expire <span class="m">{{.Retention}}</span> after they are no longer wanted (<span class="m">offsets.retention.minutes</span>), but none of this group's does as things stand: a group with members keeps the offsets of the topics they read.</div>
 {{else}}<div class="callout" id="expiry-note"><span class="row sb ce wrap"><span class="b">Offsets are kept for now</span><span class="m warn">expire {{when .At "datetime"}} · {{.In}}</span></span>
-  {{if .Used}}<div class="row ce g8"><span class="note">Empty since {{when .EmptySince "datetime"}}</span><span class="lane grow"><div style="width: {{.Pct}}%"></div></span><span class="note">{{.Used}} of {{.Of}} used</span></div>{{end}}
+  {{if .Used}}<div class="row ce g8"><span class="note">Empty since {{when .EmptySince "datetime"}}</span><progress class="gr-used grow" value="{{.Pct}}" max="100"></progress><span class="note">{{.Used}} of {{.Of}} used</span></div>{{end}}
   <span class="note">The broker keeps an empty group's committed offsets for <span class="m">{{.Retention}}</span> (<span class="m">offsets.retention.minutes</span>), counted from the moment the group became empty; a group that never had a member counts each offset from its own commit. After that they are deleted and the group disappears from this list. A consumer that joins before then resumes from these offsets; after, from <span class="m">auto.offset.reset</span>. The broker checks every {{.Interval}}, so this is the earliest it can happen; {{.Count}} offset{{if ne .Count 1}}s{{end}} of this group will expire.</span></div>{{end}}
 {{end}}{{end}}
 
@@ -320,7 +320,7 @@ kafka-console-consumer.sh --bootstrap-server {{.Bootstrap}} \
 {{if .ClassicFacts}}
 <div class="card pad col g6" id="classic-facts">
   <span class="h2">The group</span>
-  <div class="kv" style="--c:160px 1fr">
+  <div class="kv kv-group">
     <span>Protocol</span><span>classic <span class="note">JoinGroup, SyncGroup, Heartbeat</span></span>
     <span>Generation</span><span class="m">{{.ClassicFacts.Generation}}</span>
     <span>Protocol type</span><span class="m">{{.ClassicFacts.ProtocolType}}</span>

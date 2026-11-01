@@ -6,6 +6,25 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Groups, the functional boards (Gr-04, 05, 09 to 14, 16 to 18): the Timeline says how long a
+  member was silent before it expired, that it said goodbye, and how long a rebalance waited;
+  has the filters all / rebalances / members / problems, "rebalanced N times in the last hour"
+  and, for a group rebalancing over and over, the pill "rebalancing every N s" with the gaps
+  between expiries. Each group keeps its own 200 events, so a noisy group does not push out a
+  quiet one (GRP-24). A group in PreparingRebalance shows who has rejoined and the time left of
+  the rebalance timeout (there is no cap on it; GRP-25), a consumer-protocol group its target
+  and current assignment per member (the coordinator's record; GRP-20), a classic group its
+  generation, protocol, leader and timeouts. A group with members and no commits lists the
+  partitions it owns with "no commit yet" instead of a lag; an offset past the log end gets the
+  arithmetic for resetting; a leftover offset of a deleted topic says what Kafka does (drops it a
+  moment later; claim G2). Records past the last stable offset are named with the open
+  transaction holding them (the console says it cannot tell the group's isolation level;
+  GRP-18). A refused group names the operation its API needs, not Read for everything
+  (GRP-21). The offsets-retention countdown is the broker's own: `broker.OffsetExpiry` gives
+  the time each offset expires by the rules of the sweep (GRP-19). OffsetDelete of a group with
+  members now refuses only the topics a member is subscribed to (GRP-4, recorded:
+  `offset-delete-subscribed`, claim G7); the group snapshot gained the rebalance deadline, who
+  has rejoined, and per-member state and assignments.
 - Groups: the Offsets tab is the reset form (Gr-06): earliest, latest, a timestamp (the first
   record at or after it, per partition, by ListOffsets) or specific offsets, for all topics or
   one, with a preview (committed now, after, lag after; `POST /groups/{id}/reset/preview`, which
