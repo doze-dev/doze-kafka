@@ -70,7 +70,19 @@ export const MEMBERS: Probe[] = [
   { el: 'members card', board: 'main .card', live: '#members-table', free: { h: DATA_ROWS } },
   { el: 'members head', board: 'main .card .r.h', live: '#members-table .r.h' },
   { el: 'members row', board: 'main .card .r:not(.h)', live: '#members-table .r:not(.h)' },
-  { el: 'inspector', board: 'aside.insp', live: '#inspector-panel aside.insp, aside.insp' },
+  { el: 'inspector', board: 'aside.insp', live: '#inspector-panel' },
+  { el: 'inspector head', board: 'aside.insp .hd', live: '#inspector .inspector-h' },
+  { el: 'inspector body', board: 'aside.insp .bd', live: '#inspector .inspector-b' },
+  { el: 'inspector kv', board: 'aside.insp .kv', live: '#inspector .kv' },
+  { el: 'inspector kv key', board: 'aside.insp .kv > span', live: '#inspector .kv > span', text: true },
+  { el: 'inspector kv value', board: 'aside.insp .kv > span', live: '#inspector .kv > span', nth: 1, liveNth: 1, free: { w: TEXT_W } },
+  { el: 'inspector subscription cap', board: 'aside.insp .bd > .col .cap', live: '#inspector .memberb > .col .cap', text: true },
+  { el: 'inspector subscription', board: 'aside.insp pre.code', live: '#inspector pre.code', free: { text: 'the board offers range and cooperative-sticky and a topics line; the broker holds the protocol names only, and the page says what it does not hold', w: TEXT_W, h: TEXT_H } },
+  { el: 'inspector assignment cap', board: 'aside.insp .bd > .col .cap', live: '#inspector .memberb > .col .cap', nth: 1, text: true },
+  { el: 'inspector assignment', board: 'aside.insp .well.row', live: '#inspector .well.row' },
+  { el: 'inspector lag', board: 'aside.insp .bd > .col:nth-of-type(2) > .note', live: '#inspector .memberb > .col:nth-of-type(2) > .note' },
+  { el: 'inspector buttons', board: 'aside.insp .bd > .row.g8', live: '#inspector .memberb > .row.g8' },
+  { el: 'inspector button', board: 'aside.insp .bd > .row.g8 .btn', live: '#inspector .memberb > .row.g8 .btn', text: true },
 ];
 
 export { SHELL };

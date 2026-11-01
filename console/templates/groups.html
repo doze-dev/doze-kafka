@@ -123,6 +123,13 @@ kafka-console-consumer.sh --bootstrap-server {{.Bootstrap}} \
 {{/* group_live is the polled unit: the title, the sentence, the neighbours, the tabs
      and what the tab holds. A form in it names its tab (hx-vals), so what it answers
      with is the same tab. */}}
+{{/* The group's neighbours (Gr-02): a bare well with its cap, each name a link, and the way
+     into a trace. */}}
+{{define "group_neighbours"}}<div class="well row ce g16 wrap nbwell" id="neighbours"><span class="cap">Neighbours</span>
+{{range $c := .Neighbours}}{{range $c.Links}}<a class="row ce g6" href="{{.URL}}"{{if .Open}} data-inspector-open hx-get="{{.Open}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"{{end}}>{{if eq .Kind "topic"}}<span class="sv sm c-tp" aria-hidden="true">TP</span>{{else if eq .Kind "subject"}}<span class="sv sm c-sc" aria-hidden="true">SC</span>{{else if eq .Kind "group"}}<span class="sv sm c-gr" aria-hidden="true">GR</span>{{else}}<span class="sv sm c-tr" aria-hidden="true">TR</span>{{end}}<span class="note">{{lower $c.Verb}}</span><span class="m">{{.Name}}</span></a>{{end}}{{end}}
+<a class="row ce g6" href="{{.Prefix}}/trace"><span class="sv sm c-tc" aria-hidden="true">TC</span><span class="note">follow</span><span class="m">a trace id</span></a>
+</div>{{end}}
+
 {{define "group_live"}}
 <div class="stack" id="group-live" data-live="{{groupURL .Group.ID}}/live?tab={{.Tab}}" data-hash="{{.Hash}}" data-live-ms="3000">
     <div class="row sb ce idband">
@@ -144,9 +151,9 @@ kafka-console-consumer.sh --bootstrap-server {{.Bootstrap}} \
       </div>
     </div>
 
-    <p class="facts-line" id="group-facts">{{if .Members}}{{len .Members}} member{{if ne (len .Members) 1}}s{{end}}{{if .Generation}} on generation <span class="m">{{.Generation}}</span>{{end}}{{else}}No members{{end}}{{if .Offsets}}, {{if .Members}}reading{{else}}holding offsets on{{end}} <span class="m">{{len .Offsets}}</span> partition{{if ne (len .Offsets) 1}}s{{end}} of {{len .Topics}} topic{{if ne (len .Topics) 1}}s{{end}}, {{if .AnyAhead}}ahead of the log end somewhere{{if gt .TotalLag 0}} and <span class="m warn">{{num .TotalLag}}</span> records behind elsewhere{{end}}{{else if eq .TotalLag 0}}<span class="m ok">caught up</span>{{else}}<span class="m warn">{{num .TotalLag}}</span> record{{if ne .TotalLag 1}}s{{end}} behind in total{{if .Largest}} (the largest is <span class="m">{{.Largest.Topic}} p{{.Largest.Partition}}</span> at <span class="m">{{num .Largest.Lag}}</span>){{end}}{{end}}{{else if .Members}}, with no committed offset yet{{end}}.</p>
+    <div class="note" id="group-facts">{{if eq .Tab "members"}}{{template "group_facts_members" .}}{{else}}{{template "group_facts_lag" .}}{{end}}</div>
 
-    {{template "neighbours" .}}
+    {{template "group_neighbours" .}}
 
     <nav class="tabs" aria-label="Group views">
       {{range .Tabs}}<a class="tab {{if .On}}on{{end}}" href="{{.URL}}"{{if .On}} aria-current="page"{{end}}>{{.Label}}{{if .Count}} <span class="m mut">{{.Count}}</span>{{end}}</a>{{end}}
@@ -159,10 +166,18 @@ kafka-console-consumer.sh --bootstrap-server {{.Bootstrap}} \
 </div>
 {{end}}
 
+{{/* The sentence under the title. The generation is the coordinator's (the snapshot), and
+     nothing here is a client's setting: how often a client commits is its own. */}}
+{{define "group_facts_lag"}}{{if .Members}}{{len .Members}} member{{if ne (len .Members) 1}}s{{end}}{{if .Generation}} on {{.GenLabel}} <span class="m">{{.Generation}}</span>{{end}}{{else}}No members{{end}}{{if .Offsets}}, {{if .Members}}reading{{else}}holding offsets on{{end}} <span class="m">{{len .Offsets}}</span> partition{{if ne (len .Offsets) 1}}s{{end}} of {{len .Topics}} topic{{if ne (len .Topics) 1}}s{{end}}, {{if .AnyAhead}}ahead of the log end somewhere{{if gt .TotalLag 0}} and <span class="m warn">{{num .TotalLag}}</span> records behind elsewhere{{end}}{{else if eq .TotalLag 0}}<span class="m ok">caught up</span>{{else}}<span class="m warn">{{num .TotalLag}}</span> record{{if ne .TotalLag 1}}s{{end}} behind in total{{if .Largest}} (the largest is <span class="m">{{if gt (len .Topics) 1}}{{.Largest.Topic}} {{end}}p{{.Largest.Partition}}</span> at <span class="m">{{num .Largest.Lag}}</span>){{end}}{{end}}{{else if .Members}}, with no committed offset yet{{end}}.{{end}}
+
+{{/* Members: the leader and the timeouts are what the coordinator holds (GRP-22). A
+     consumer-protocol group has neither, and the sentence says so. */}}
+{{define "group_facts_members"}}{{if .Members}}{{len .Members}} member{{if ne (len .Members) 1}}s{{end}}{{if .Generation}} on {{.GenLabel}} <span class="m">{{.Generation}}</span>{{end}}{{else}}No members{{end}}{{if .Facts.Unavailable}}. This console cannot see the broker's group memory, so the leader and the timeouts are not shown.{{else if .Facts.Leader}}; the leader is <span class="m">{{.Facts.Leader}}</span>{{if .Facts.Session}}. Session timeout <span class="m">{{.Facts.Session}}</span>, rebalance timeout <span class="m">{{.Facts.Rebalance}}</span>{{end}}.{{else if .Members}}; {{if eq .Group.Protocol "848"}}the consumer protocol has no leader and no per-member timeouts: the broker assigns{{else}}none of them is the leader yet{{end}}.{{else}}.{{end}}{{end}}
+
 {{/* Gr-02, Lag: where each partition stands, and how far behind. */}}
 {{define "group_lag"}}
 {{if .Offsets}}
-<div class="card" id="lag-table" style="--c: minmax(0, 1.5fr) minmax(0, 1fr) 90px 90px minmax(0, 1fr) 70px">
+<div class="card" id="lag-table">
   <div class="r h"><span>Topic · partition</span><span>Owner</span><span class="ra">Committed</span><span class="ra">Log end</span><span>Lag</span><span class="ra"></span></div>
   {{range .Offsets}}
   <div class="r">
@@ -178,7 +193,7 @@ kafka-console-consumer.sh --bootstrap-server {{.Bootstrap}} \
   {{end}}
   <div class="r totalrow"><span class="b">Total</span><span></span><span class="m ra">{{num .TotalCommitted}}</span><span class="m ra">{{num .TotalLogEnd}}</span><span class="note">lag is log end minus committed</span><span class="m ra b {{if gt .TotalLag 0}}warn{{else}}ok{{end}}">{{num .TotalLag}}</span></div>
 </div>
-<div class="row ce g8"><span class="pill ok"><span class="dot" aria-hidden="true"></span>live</span><span class="note">refreshes every 3 s. A bar is that partition's lag against the log, not a rate. Lag is not a number the broker reports: it is <b>log end &minus; committed</b>, worked out here the way <span class="m">kafka-consumer-groups.sh</span> does.</span></div>
+<div class="row ce g8"><span class="pill ok"><span class="dot" aria-hidden="true"></span>live</span><span class="note" title="Lag is not a number the broker reports: it is log end minus committed, worked out here the way kafka-consumer-groups.sh does.">refreshes every 3 s. A bar is that partition's lag against the log, not a rate.</span></div>
 {{else if .Members}}
 <div class="callout"><span class="b">No committed offsets yet</span><span class="note">This group has members but has not committed any offsets, so there is no lag to show. Offsets appear after a consumer's first commit (with <span class="m">enable.auto.commit</span> that is a few seconds after it starts polling).</span></div>
 {{else}}
@@ -214,15 +229,16 @@ kafka-console-consumer.sh --bootstrap-server {{.Bootstrap}} \
 {{/* Gr-03, Members. */}}
 {{define "group_members"}}
 {{if .Members}}
-<div class="card" id="members-table" style="--c: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.6fr)">
-  <div class="r h"><span>Member</span><span>Client</span><span>Host</span><span>Assigned</span></div>
+<div class="card" id="members-table">
+  <div class="r h"><span>Member</span><span>Client</span><span>Host</span><span>Assigned</span><span class="ra">Heartbeat</span></div>
   {{range .Members}}
-  <div class="r" id="mb-{{.ID}}" tabindex="0" role="button" data-inspector-open
+  <div class="r" id="mb-{{.ID}}" tabindex="0" role="button" data-row data-inspector-open data-open-keys="member:{{.Key}}"
       hx-get="{{$.Prefix}}/inspect/member?key={{memberKey $.Group.ID .ID}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
-    <span class="m b" title="{{.ID}}">{{.Label}}{{if and .ClientID (ne .Label .ID)}} <span class="mut">· {{.ID}}</span>{{end}}</span>
-    <span class="m">{{if .ClientID}}{{.ClientID}}{{else}}<span class="mut">—</span>{{end}}</span>
-    <span class="m">{{if .Host}}{{.Host}}{{else}}<span class="mut">—</span>{{end}}</span>
+    <span class="m b el" title="{{.ID}}">{{.ID}}{{if .Leader}} <span class="tag">leader</span>{{end}}</span>
+    <span class="m el">{{if .ClientID}}{{.ClientID}}{{else}}<span class="mut">—</span>{{end}}</span>
+    <span class="m el">{{if .Addr}}{{.Addr}}{{else if .Host}}{{.Host}}{{else}}<span class="mut">—</span>{{end}}</span>
     <span class="m el">{{range $i, $a := .Assigned}}{{if $i}} · {{end}}{{$a.Topic}}:{{$a.Parts}}{{end}}{{if not .Assigned}}<span class="mut">none yet</span>{{end}}</span>
+    <span class="m ra {{if .HeartbeatOK}}ok{{end}}"{{if not .Heartbeat.IsZero}} title="{{whenText .Heartbeat "clockms"}}"{{end}}>{{if .HeartbeatAgo}}{{.HeartbeatAgo}}{{else}}<span class="mut">—</span>{{end}}</span>
   </div>
   {{end}}
 </div>

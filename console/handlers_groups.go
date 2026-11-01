@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // groups is the Groups home (Gr-Home): every group, how far behind each is, and which
@@ -107,6 +108,58 @@ type memberView struct {
 	Host     string
 	Label    string // the name a person would recognise: the client.id, else a short member id.
 	Assigned []assignView
+	// From the coordinator's snapshot (GRP-22); empty where the broker holds nothing:
+	// a consumer-protocol (KIP-848) member has no protocols, session timeout or leader.
+	Key          string // the inspector's key for it (?open=member:<key>).
+	Snap         bool
+	Addr         string // host:port of its connection.
+	Leader       bool
+	Software     string
+	Principal    string
+	Protocols    []string
+	Session      string // "45 s", or "" when the member has none.
+	Rebalance    string
+	Joined       time.Time
+	Heartbeat    time.Time
+	HeartbeatAgo string // "2 s ago".
+	HeartbeatOK  bool   // inside its session timeout.
+}
+
+// secondsText writes a timeout the way the boards do: "45 s".
+func secondsText(d time.Duration) string {
+	if d <= 0 {
+		return ""
+	}
+	if d%time.Second == 0 {
+		return fmt.Sprintf("%d s", int(d/time.Second))
+	}
+	return fmt.Sprintf("%.1f s", d.Seconds())
+}
+
+// ageText is how long ago, to the second under a minute: "2 s ago".
+func ageText(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	d := time.Since(t)
+	switch {
+	case d < time.Second:
+		return "0 s ago"
+	case d < time.Minute:
+		return fmt.Sprintf("%d s ago", int(d/time.Second))
+	}
+	return agoText(d)
+}
+
+// snapshotMember fills a member from the coordinator's memory, if it holds it.
+func (mv *memberView) snapshotMember(s MemberSnapshot) {
+	mv.Snap = true
+	mv.Addr, mv.Leader, mv.Software, mv.Principal = s.Addr, s.Leader, s.Software, s.Principal
+	mv.Protocols = s.Protocols
+	mv.Session, mv.Rebalance = secondsText(s.SessionTimeout), secondsText(s.RebalanceTimeout)
+	mv.Joined, mv.Heartbeat = s.Joined, s.LastHeartbeat
+	mv.HeartbeatAgo = ageText(s.LastHeartbeat)
+	mv.HeartbeatOK = s.SessionTimeout > 0 && !s.LastHeartbeat.IsZero() && time.Since(s.LastHeartbeat) < s.SessionTimeout
 }
 
 type assignView struct {
@@ -170,12 +223,23 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 	default:
 		tab = "lag"
 	}
-	owner := map[string]string{} // "topic/partition" -> member label.
+	insp := c.inspectGroup(id)
+	snap := map[string]MemberSnapshot{}
+	if insp.State == InspectOK {
+		for _, ms := range insp.Group.Members {
+			snap[ms.ID] = ms
+		}
+	}
+	owner := map[string]string{} // "topic/partition" -> member id.
 	members := make([]memberView, 0, len(detail.Members))
 	for _, m := range detail.Members {
 		mv := memberView{ID: m.ID, ClientID: m.ClientID, Host: m.Host, Label: m.ClientID}
 		if mv.Label == "" {
 			mv.Label = shortID(m.ID)
+		}
+		mv.Key = joinKey(id, m.ID)
+		if ms, ok := snap[m.ID]; ok {
+			mv.snapshotMember(ms)
 		}
 		topics := make([]string, 0, len(m.Assigned))
 		for t := range m.Assigned {
@@ -185,7 +249,7 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 		for _, t := range topics {
 			mv.Assigned = append(mv.Assigned, assignView{Topic: t, TopicURL: c.topicURL(t), Parts: partRanges(m.Assigned[t])})
 			for _, p := range m.Assigned[t] {
-				owner[fmt.Sprintf("%s/%d", t, p)] = mv.Label
+				owner[fmt.Sprintf("%s/%d", t, p)] = mv.ID
 			}
 		}
 		members = append(members, mv)
@@ -244,7 +308,7 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 	h := fnv.New64a()
 	fmt.Fprint(h, detail.State, "|")
 	for _, m := range members {
-		fmt.Fprint(h, m.ID, m.ClientID, m.Host, m.Assigned, ";")
+		fmt.Fprint(h, m.ID, m.ClientID, m.Host, m.Addr, m.Assigned, m.HeartbeatAgo, ";")
 	}
 	for _, o := range rows {
 		// Everything a row shows: a record trimmed by retention, a topic deleted,
@@ -256,8 +320,16 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 		fmt.Fprint(h, e.Seq, ";")
 	}
 
+	// The generation is what the coordinator holds now (the snapshot); only a console
+	// that cannot see the coordinator falls back to the last one its recorder saw.
 	var generation int32
-	if c.traffic != nil {
+	genLabel := "generation"
+	if insp.State == InspectOK {
+		generation = insp.Group.Generation
+		if generation == 0 && insp.Group.Epoch > 0 {
+			generation, genLabel = insp.Group.Epoch, "epoch"
+		}
+	} else if c.traffic != nil {
 		evs := c.traffic.GroupEvents(id, 0)
 		for i := len(evs) - 1; i >= 0; i-- {
 			if evs[i].Generation > 0 {
@@ -293,14 +365,15 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 
 	out := map[string]any{
 		"Timeline": timeline, "HasTimeline": c.traffic != nil, "Group": detail, "Members": members, "Offsets": rows, "TotalLag": totalLag, "AnyAhead": anyAhead,
-		"TotalCommitted": totalCommitted, "TotalLogEnd": totalLogEnd, "Generation": generation,
+		"TotalCommitted": totalCommitted, "TotalLogEnd": totalLogEnd, "Generation": generation, "GenLabel": genLabel,
+		"Facts":     groupFacts(insp, members),
 		"Topics":    topics,
 		"Try":       tryRow(rows),
 		"Confirm":   groupConfirms(id, rows),
 		"CanAct":    detail.State == "Empty" && len(detail.Members) == 0,
 		"NoCommits": len(offsets) == 0,
 		"Hash":      fmt.Sprintf("%x", h.Sum64()),
-		"Tab":       tab, "Tabs": tabs, "View": "group",
+		"Tab":       tab, "Tabs": tabs, "View": groupView(tab),
 		"Neighbours": c.neighbourClauses(g, NodeGroup, id),
 	}
 	if largest != nil {
@@ -477,4 +550,67 @@ func offsetTopics(rows []groupLagRow) []string {
 		}
 	}
 	return out
+}
+
+// groupFacts is what the Members tab's sentence says beyond the member count: the
+// leader and the timeouts, from the coordinator's memory. A field the broker does not
+// hold for the group is not here (a consumer-protocol group has no leader and no
+// per-member timeouts) and the sentence says so.
+type groupFactsView struct {
+	Leader      string
+	Session     string
+	Rebalance   string
+	NoLeader    bool // a consumer-protocol group, or a classic one with no leader yet.
+	Unavailable bool // this console cannot see the coordinator.
+}
+
+func groupFacts(insp GroupInspection, members []memberView) groupFactsView {
+	switch insp.State {
+	case InspectUnavailable:
+		return groupFactsView{Unavailable: true}
+	case InspectNone:
+		return groupFactsView{NoLeader: true}
+	}
+	f := groupFactsView{NoLeader: true}
+	var sess, reb []time.Duration
+	for _, ms := range insp.Group.Members {
+		if ms.Leader {
+			f.Leader, f.NoLeader = ms.ID, false
+		}
+		if ms.SessionTimeout > 0 {
+			sess = append(sess, ms.SessionTimeout)
+		}
+		if ms.RebalanceTimeout > 0 {
+			reb = append(reb, ms.RebalanceTimeout)
+		}
+	}
+	f.Session, f.Rebalance = spanOf(sess), spanOf(reb)
+	return f
+}
+
+// spanOf is "45 s" when the members agree and "10 s to 45 s" when they do not.
+func spanOf(ds []time.Duration) string {
+	if len(ds) == 0 {
+		return ""
+	}
+	lo, hi := ds[0], ds[0]
+	for _, d := range ds {
+		lo, hi = min(lo, d), max(hi, d)
+	}
+	if lo == hi {
+		return secondsText(lo)
+	}
+	return secondsText(lo) + " to " + secondsText(hi)
+}
+
+// groupView names the page's kind for its keys strip: the Lag and Members tabs have
+// the strips Gr-02 and Gr-03 draw; the others keep the group's own.
+func groupView(tab string) string {
+	switch tab {
+	case "lag":
+		return "group_lag"
+	case "members":
+		return "group_members"
+	}
+	return "group"
 }

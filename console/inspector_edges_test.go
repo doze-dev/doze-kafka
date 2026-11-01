@@ -45,7 +45,7 @@ func TestInspectMemberAndTransaction(t *testing.T) {
 		return readable(rec.Body.String())
 	}
 	body := get("member", joinKey("mg", member))
-	for _, want := range []string{"member-client", "my-topic", "0–1", "Stable", "classic"} {
+	for _, want := range []string{"member-client", "my-topic", "0–1", "Last heartbeat", "Session timeout"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("member page lacks %q:\n%s", want, body)
 		}

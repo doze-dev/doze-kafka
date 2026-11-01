@@ -1013,6 +1013,10 @@
     // ] and [ move along the page's tabs.
     "tab-next": function () { return stepTab(1); },
     "tab-prev": function () { return stepTab(-1); },
+    // 1 to 4: the page's tabs by number (a group: Lag, Members, Timeline, Offsets).
+    "tab-n": function (e) { return groupsTabN(e.key); },
+    // r: a group's Reset offsets, the button of its title row.
+    "reset-offsets": function () { return groupsResetOffsets(); },
     // Esc closes the panel; with none open it clears the page's own filter.
     close: function (e) {
       if (inspectorIsOpen()) { closeInspector(); e.preventDefault(); return; }
@@ -1899,3 +1903,16 @@
       .then(function (t) { if (t.indexOf('id="groups-summary"') >= 0) location.reload(); }).catch(function () {});
   }, 3000);
 })();
+
+// Groups: 1 to 4 open the group's tabs by number; r follows its Reset offsets button.
+function groupsTabN(key) {
+  var tabs = Array.prototype.filter.call(document.querySelectorAll("#group-live nav.tabs a.tab"), function (t) { return t.offsetParent !== null; });
+  var to = tabs[parseInt(key, 10) - 1];
+  if (!to) return false;
+  to.click();
+}
+function groupsResetOffsets() {
+  var b = document.querySelector("#group-live .idband-acts a.btn.pri");
+  if (!b) return false;
+  b.click();
+}

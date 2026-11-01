@@ -6,6 +6,12 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Groups: the group page's Lag and Members tabs follow Gr-02 and Gr-03. The sentence under the
+  title takes the generation, the leader and the timeouts from the coordinator's memory (a
+  consumer-protocol group says it has no leader and no per-member timeouts, and the console says
+  when it cannot see that memory); the Owner column names members by id; the Members tab shows host
+  with port, leader and heartbeat age; a member's inspector shows host:port, software, timeouts,
+  heartbeat, joined and the offered protocols. Keys 1-4 open the tabs and r resets offsets.
 - Names: a by-name address is printed only when something answers at it. The start-up
   summary, `doze-kafka env` and the console and registry URLs used to give the name
   whenever it resolved on the machine; on a Mac a name can go on resolving after the
