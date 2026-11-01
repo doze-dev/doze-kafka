@@ -19,6 +19,8 @@ here is byte-identical in both (the hashes are in `SHA256SUMS`).
   offset). Tp-05, Tp-06 and Tp-14 were read at 1792149264-d921 only. The Traffic boards (Main,
   Traf-02 to Traf-12) were copied from the same artifact's `project/` folder, unmodified;
 
+Topic-page boards Tp-19 to Tp-22 (message, compose, partitions, config and the empty states) were read at 1792149264-d921 only, copied unchanged.
+
 Topic-page boards Tp-15 to Tp-18 (message, compose, partitions, config and the empty states) were read at 1792149264-d921 only, copied unchanged.
 
 Topic-page boards Tp-07 to Tp-13 (message, compose, partitions, config and the empty states) were read at 1792149264-d921 only, copied unchanged.
