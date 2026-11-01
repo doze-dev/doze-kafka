@@ -12,7 +12,7 @@ const DOT = 'the dot is inside the broker pill, whose address is read to a scree
 
 // ---------- data: the seed's world is not the boards' sample ----------
 const TOPIC_COUNT = 'the count is the seed\'s 14 topics; the board\'s sample has 7';
-const DATA_DIR = 'it names this broker\'s data directory (data-14192 in the gate\'s run); the board\'s is ./data';
+const DATA_DIR = 'it names this broker\'s data directory (data-<port> in the gate\'s run); the board\'s is ./data';
 const REGISTRY_ADDR = 'it names the registry\'s address, the gate\'s port; the board\'s is 127.0.0.1:8081';
 const GROUP_STATE = 'the state is the seed\'s: its first group is Empty (grey) where the board\'s sample is Stable (green)';
 const GROUP_LAG = 'the lag is the seed\'s: its first group is 39 records behind (warn) where the board\'s sample is 0 (ink)';
@@ -63,7 +63,7 @@ export const ALLOW: Allowed[] = [
   { board: 'Tp-Home', el: 'list item', prop: 'y', board_value: "89", live_value: "134", at: ['1440-dark', '1440-light'], reason: AD1_FILTER },
   { board: 'Tp-Home', el: 'list name', prop: 'y', board_value: "93.5", live_value: "138.5", at: ['1440-dark', '1440-light'], reason: AD1_FILTER },
   { board: 'Tp-Home', el: 'list number', prop: 'y', board_value: "93.5", live_value: "138.5", at: ['1440-dark', '1440-light'], reason: AD1_FILTER },
-  { board: 'Tp-Home', el: 'foot note', prop: 'text', board_value: "Size is what is on disk under ./data. Retention shows the topic's own setting, or the broker default.", live_value: "Size is what is on disk under data-14192. Retention shows the topic's own setting, or the broker default.", at: ['1440-dark', '1440-light'], reason: DATA_DIR },
+  { board: 'Tp-Home', el: 'foot note', prop: 'text', board_value: "Size is what is on disk under ./data. Retention shows the topic's own setting, or the broker default.", live_value: `Size is what is on disk under data-${process.env.E2E_PORT ?? '14192'}. Retention shows the topic's own setting, or the broker default.`, at: ['1440-dark', '1440-light'], reason: DATA_DIR },
   { board: 'Gr-Home', el: 'list item', prop: 'y', board_value: "76", live_value: "121", at: ['1440-dark', '1440-light'], reason: AD1_FILTER },
   { board: 'Gr-Home', el: 'list item', prop: 'deco', board_value: "underline", live_value: "none", at: ['1440-dark', '1440-light'], reason: LIST_UNDERLINE },
   { board: 'Gr-Home', el: 'list name', prop: 'y', board_value: "87", live_value: "132", at: ['1440-dark', '1440-light'], reason: AD1_FILTER },
@@ -78,7 +78,7 @@ export const ALLOW: Allowed[] = [
   { board: 'Sc-Home', el: 'list item', prop: 'deco', board_value: "underline", live_value: "none", at: ['1440-dark', '1440-light'], reason: LIST_UNDERLINE },
   { board: 'Sc-Home', el: 'h1', prop: 'w', board_value: "724.3", live_value: "731.5", at: ['1440-dark', '1440-light'], reason: HOME_MORE },
   { board: 'Sc-Home', el: 'h1 note', prop: 'w', board_value: "724.3", live_value: "731.5", at: ['1440-dark', '1440-light'], reason: HOME_MORE },
-  { board: 'Sc-Home', el: 'h1 note', prop: 'text', board_value: "The built-in registry at 127.0.0.1:8081. Confluent's REST API, so stock serializers work with only schema.registry.url changed.", live_value: "The built-in registry at 127.0.0.1:14194. Confluent's REST API, so stock serializers work with only schema.registry.url changed.", at: ['1440-dark', '1440-light'], reason: REGISTRY_ADDR },
+  { board: 'Sc-Home', el: 'h1 note', prop: 'text', board_value: "The built-in registry at 127.0.0.1:8081. Confluent's REST API, so stock serializers work with only schema.registry.url changed.", live_value: `The built-in registry at 127.0.0.1:${Number(process.env.E2E_PORT ?? 14192) + 2}. Confluent's REST API, so stock serializers work with only schema.registry.url changed.`, at: ['1440-dark', '1440-light'], reason: REGISTRY_ADDR },
   { board: 'Sc-Home', el: 'more button', prop: 'presence', board_value: "present", live_value: "absent", at: ['1440-dark', '1440-light'], reason: HOME_MORE },
   { board: 'Sc-Home', el: 'row', prop: 'bg', board_value: "rgb(233, 232, 226)", live_value: "rgba(0, 0, 0, 0)", at: ['1440-light'], reason: SAMPLE_SELECTED },
   { board: 'Sc-Home', el: 'pill in main', prop: 'presence', board_value: "present", live_value: "absent", at: ['1440-dark', '1440-light'], reason: REGISTRY_DOCK },
