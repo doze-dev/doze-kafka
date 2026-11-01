@@ -334,7 +334,11 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 	var denied *deniedView
 	if tab == "lag" {
 		held = heldBackOf(c, ctx, rows, now)
-		expiry = c.expiryOf(id, len(rows) > 0, now)
+		// Only an Empty group counts down: for one with members the answer is "nothing
+		// expires for the topics they read", and Gr-02 draws the lag card without a note.
+		if len(members) == 0 {
+			expiry = c.expiryOf(id, len(rows) > 0, now)
+		}
 		denied = c.deniedOf(ctx, id, now)
 	}
 

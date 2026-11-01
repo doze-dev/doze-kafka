@@ -258,6 +258,27 @@ func TestOffsetsRetentionCountdownIsOnlyWhatTheBrokerReports(t *testing.T) {
 	if body := page(); !strings.Contains(body, "none of this group's does as things stand") {
 		t.Errorf("nothing expiring is not said:\n%s", body)
 	}
+	// With a member the lag tab has no note about retention at all (Gr-02 draws none).
+	cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.ClientID("reader"), kgo.ConsumerGroup("idle"), kgo.ConsumeTopics("orders"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cl.Close()
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+		defer cancel()
+		cl.PollFetches(ctx)
+	}()
+	for deadline := time.Now().Add(8 * time.Second); ; time.Sleep(50 * time.Millisecond) {
+		if d, err := c.be.DescribeGroup(context.Background(), "idle"); err == nil && len(d.Members) == 1 {
+			break
+		} else if time.Now().After(deadline) {
+			t.Fatal("the member never showed")
+		}
+	}
+	if body := page(); strings.Contains(body, "expire") {
+		t.Errorf("a group with a member shows a retention note:\n%s", body)
+	}
 }
 
 func TestExpiryTexts(t *testing.T) {
