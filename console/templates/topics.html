@@ -379,7 +379,7 @@
          and the inspector's Timestamp, the headers are the inspector's (their number is
          the value's tooltip), so nothing a record has is out of reach. */}}
     <table class="tbl msg-table" id="messages-table">
-      <thead><tr><th class="num">Offset</th><th class="col-p">P</th><th>Time</th><th>Key</th><th>Value</th><th class="num">Hdr</th></tr></thead>
+      <thead><tr><th class="num">Offset</th><th class="col-p">P</th><th class="col-time">Time</th><th>Key</th><th>Value</th><th class="num col-hdr">Hdr</th></tr></thead>
       <tbody>
         {{range .Rows}}
         {{if .Marker}}
@@ -575,28 +575,31 @@
      with it. The header (kind, title, Older, Newer, Close) is the inspector contract
      in inspector.html. */}}
 {{define "inspector_message"}}
-<div class="inspector-b">
-  <div class="kv" style="--c: 84px 1fr">
-    <span>Timestamp</span><span class="m">{{when .Msg.Timestamp "datetime"}}</span>
-    <span>Key</span><span class="m">
-      {{if .Key.Null}}<span class="mut">null</span>{{else if .Key.Empty}}<span class="mut">"" (empty)</span>
-      {{else if .Key.Binary}}{{.Key.Preview}} <button type="button" class="copy-btn" data-copy="{{.Key.B64}}" title="Copy as base64" aria-label="Copy as base64">{{icon "copy"}}</button>
-      {{else}}{{template "kvcopy" .Key.Text}}{{end}}
-      {{if and (not .Key.Null) (not .Key.Empty)}}<span class="sz">{{.Key.SizeText}}</span>{{end}}</span>
+<div class="inspector-b tp-msg" x-data="{menu: false}" @click.outside="menu = false">
+  <div class="kv tp-fields">
+    <span>Timestamp</span><span class="m">{{when .Msg.Timestamp "datetimems"}} <span class="mut">· {{when .Msg.Timestamp "ago"}}</span></span>
+    <span>Type</span><span class="m">{{.TimestampType}}</span>
+    <span>Key</span><span class="m">{{if .Key.Null}}<span class="mut">null</span>{{else if .Key.Empty}}<span class="mut">"" (empty)</span>{{else if .Key.Binary}}{{.Key.Preview}}{{else}}{{.Key.Text}}{{end}}{{if and (not .Key.Null) (not .Key.Empty)}} <span class="mut">· {{.Key.SizeText}}</span>{{end}}</span>
+    <span>Sizes</span><span class="m">value {{if .Value.Null}}null{{else}}{{.Value.SizeText}}{{end}} · headers {{if .Headers}}{{.HeadersSize}}{{else}}none{{end}}</span>
+    <span>Written by</span><span class="m">{{if .Writer.Known}}{{.Writer.Client}}{{if .Writer.Tx}} <span class="mut">· tx {{.Writer.Tx}}</span>{{end}}{{else}}<span class="mut" title="{{.Writer.Why}}">not known</span>{{end}}</span>
     {{with .Value.Schema}}<span>Schema</span><span class="m">{{.TypeLabel}} · schema {{.ID}}{{if .Subject}} · {{if .URL}}<a href="{{.URL}}">{{.Subject}} v{{.Version}}</a>{{else}}{{.Subject}}{{end}}{{end}}</span>{{end}}
-    {{with .Trace}}<span>Trace</span><span class="m" title="{{.Kind}}">{{.ID}}</span>{{end}}
   </div>
 
-  <div x-data="{f: '{{if .Value.Binary}}hex{{else}}text{{end}}'}" class="col g8">
+  {{if .Trace}}<div class="row ce g8"><a class="btn w5" id="inspector-trace" href="{{.TraceURL}}">Follow this message</a><span class="note">traces it from produce to every fetch and commit</span></div>
+  {{else}}<div class="note">It carries no trace id, so there is nothing to follow.</div>{{end}}
+
+  <div class="col g4"><span class="cap">Headers{{if .Headers}} · {{len .Headers}}{{end}}</span>
+  {{if .Headers}}<div class="kv m hdrkv">{{range .Headers}}<span>{{.Key}}</span><span class="el">{{if .V.Null}}<span class="mut">null</span>{{else if .V.Empty}}<span class="mut">""</span>{{else if .V.Binary}}{{.V.Preview}}{{else}}{{.V.Text}}{{end}}</span>{{end}}</div>
+  {{else}}<div class="note">No headers on this record.</div>{{end}}</div>
+
+  <div x-data="{f: '{{if .Value.Binary}}hex{{else}}text{{end}}'}" class="col g4 tp-val">
     <div class="row sb ce">
       <span class="cap">Value · {{if or .Value.Null .Value.Empty}}<span class="sz">{{if .Value.Null}}null — a tombstone{{else}}empty{{end}}</span>{{else}}<span class="sz">{{.Value.SizeText}}{{if .Value.Binary}} · binary{{else if .Value.Pretty}} · JSON{{end}}</span>{{end}}</span>
-      {{if not (or .Value.Null .Value.Empty)}}<span class="row ce g6">
-      <span class="seg fmt" role="group" aria-label="Value format">
+      {{if not (or .Value.Null .Value.Empty)}}<span class="seg fmt" role="group" aria-label="Value format">
         {{if not .Value.Binary}}<button type="button" :class="f==='text'&&'on'" :aria-pressed="f==='text'" @click="f='text'">Text</button>{{end}}
         <button type="button" :class="f==='hex'&&'on'" :aria-pressed="f==='hex'" @click="f='hex'">Hex</button>
         {{if .Value.B64}}<button type="button" :class="f==='b64'&&'on'" :aria-pressed="f==='b64'" @click="f='b64'">Base64</button>{{end}}
-      </span>
-      {{if .Value.B64}}<button type="button" class="copy-btn" data-copy="{{.Value.B64}}" title="Copy as base64" aria-label="Copy as base64">{{icon "copy"}}</button>{{end}}</span>{{end}}
+      </span>{{end}}
     </div>
     {{if or .Value.Null .Value.Empty}}
     <div class="valuebox dim">{{if .Value.Null}}This record has a null value.{{else}}This record has an empty value.{{end}}</div>
@@ -608,15 +611,10 @@
     {{end}}
   </div>
 
-  <span class="cap">Headers{{if .Headers}} · {{len .Headers}}{{end}}</span>
-  {{if .Headers}}<div class="hdrlist">{{range .Headers}}<div class="hdrpair"><span class="hk">{{.Key}}</span><span class="dim">=</span><span class="hv">{{if .V.Null}}<span class="dim">null</span>{{else if .V.Empty}}<span class="dim">""</span>{{else if .V.Binary}}{{.V.Preview}}{{else}}{{.V.Text}}{{end}}</span></div>{{end}}</div>
-  {{else}}<div class="note">No headers on this record.</div>{{end}}
-
   {{with .Value.Schema}}<div class="callout ok"><span class="b">Decoded with schema {{if .Subject}}{{.Subject}} {{end}}{{if .Version}}v{{.Version}}{{end}}</span><span class="note">The record carries schema id {{.ID}}; its bytes were read with that schema.</span></div>{{end}}
 
-  <div class="inspector-acts">
-    {{with .Trace}}<a class="btn pri" id="inspector-trace" href="{{$.TraceURL}}">Follow this trace</a>{{end}}
-    <button type="button" class="btn" data-close-inspector-on-success
+  <div class="row g8 ce inspector-acts">
+    <button type="button" class="btn w5" data-close-inspector-on-success
       hx-post="{{topicURL .Topic}}/resend" hx-vals='{"partition":"{{.Partition}}","offset":"{{.Msg.Offset}}"}'
       hx-target="#tape-and-table" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
       title="Produce an exact copy of this record (same key, value and headers, byte for byte) to partition {{.Partition}}">Send again</button>
@@ -628,7 +626,16 @@
     {{else}}
     <span class="sz">Too large to edit in the browser.</span>
     {{end}}
-    {{if not (or .Value.Null .Value.Empty)}}<a class="btn" href="{{topicURL .Topic}}/message/raw?partition={{.Partition}}&offset={{.Msg.Offset}}&field=value" download hx-boost="false">Download value</a>{{end}}
+    <button type="button" class="btn" id="inspector-copy" aria-haspopup="menu" :aria-expanded="menu" @click="menu = !menu">Copy ▾</button>
+  </div>
+  <div class="card col tp-copymenu" role="menu" aria-label="Copy" x-show="menu" x-cloak @keydown.escape.stop="menu = false">
+    {{if not (or .Key.Null .Key.Empty)}}{{if .Key.Binary}}{{if .Key.B64}}<button type="button" class="btn ghost sb" role="menuitem" data-copy="{{.Key.B64}}">Copy key as base64</button>{{end}}
+    {{else if not .Key.Truncated}}<button type="button" class="btn ghost sb" role="menuitem" data-copy="{{.Key.Text}}">Copy key<span class="m el">{{.Key.Text}}</span></button>{{end}}{{end}}
+    {{if and (not (or .Value.Null .Value.Empty .Value.Binary .Value.Truncated)) .Value.Text}}<button type="button" class="btn ghost" role="menuitem" data-copy="{{.Value.Text}}">{{if .Value.Pretty}}Copy value as JSON{{else}}Copy value{{end}}</button>{{end}}
+    {{if and .Value.B64 (not (or .Value.Null .Value.Empty))}}<button type="button" class="btn ghost" role="menuitem" data-copy="{{.Value.B64}}">Copy value as base64</button>{{end}}
+    {{if not (or .Value.Null .Value.Empty)}}<a class="btn ghost sb" role="menuitem" href="{{topicURL .Topic}}/message/raw?partition={{.Partition}}&offset={{.Msg.Offset}}&field=value" download hx-boost="false">Download value ({{.Value.SizeText}})</a>{{end}}
+    {{if .Producer.Cmd}}<button type="button" class="btn ghost" role="menuitem" data-copy="{{.Producer.Cmd}}">Copy as kafka-console-producer</button>
+    {{else}}<button type="button" class="btn ghost" role="menuitem" disabled title="{{.Producer.Why}}">Copy as kafka-console-producer</button>{{end}}
   </div>
 </div>
 {{end}}

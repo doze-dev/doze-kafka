@@ -380,7 +380,6 @@ span.num {
 .insp {
   width: 400px; background: var(--card); border-left: 1px solid var(--line); display: flex; flex-direction: column; overflow-y: auto; min-height: 0;
 }
-.insp[data-kind="message"] { width: 420px; }
 .insp-default, .insp-sel { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 .insp .hd .h2 { min-width: 0; overflow-wrap: anywhere; } /* a 249-character topic in a heading breaks in the panel */
 .mw0 { min-width: 0; }
@@ -1054,7 +1053,9 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .nbnote { display: none; } /* how the neighbours are counted waits for the wide page */
   .neighbours { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
   .neighbours a.well { flex: none; }
-  .insp[data-kind="message"] .insp-sel .inspector-b > :not(:first-child):not(:nth-child(2)) { grid-column: 1 / -1; }
+  .insp[data-kind="message"] .insp-sel .inspector-b > :not(.tp-fields):not(.tp-val) { grid-column: 1 / -1; }
+  .insp[data-kind="message"] .insp-sel .inspector-b > .tp-fields { grid-column: 1; grid-row: 1; }
+  .insp[data-kind="message"] .insp-sel .inspector-b > .tp-val { grid-column: 2; grid-row: 1; } /* Sy-03: the fields and the value side by side */
   .tape-strip, .tape-foot { display: none; }
   .backrow { display: flex; }
   /* Sy-03's back is a.btn.sm, a link drawn as a button: 500, "‹ Topics" one run of text. */
@@ -1547,3 +1548,32 @@ html[data-paused] #inspector[data-traffic-kept] .tf-kept { display: block; }
 .tp-lane { position: relative; height: 24px; border-bottom: 1px solid var(--line); }
 .tp-lane .tick { position: absolute; bottom: 0; width: 3px; border-radius: 1px; background: var(--ink); }
 .tp-axis { font-size: var(--fs-xs); }
+
+/* ---------- Topics: the message inspector (Tp-06) ----------
+   400 px. Its head is the board's: the kind and the small step and close controls on
+   one row, the title under it, the topic under that. The fields are 82 px and the rest;
+   the Copy menu is a card in flow under the actions. With it open the table gives up its
+   Time and Hdr columns (they are the inspector's Timestamp and Headers). */
+@media (min-width: 1101px) {
+  .inspector-h[data-inspector-kind="message"] { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: center; }
+  .inspector-h[data-inspector-kind="message"] > div:first-child { display: contents; }
+  .inspector-h[data-inspector-kind="message"] .cap { grid-column: 1; grid-row: 1; justify-self: start; }
+  .inspector-h[data-inspector-kind="message"] .inspector-nav { grid-column: 2; grid-row: 1; gap: 4px; }
+  .inspector-h[data-inspector-kind="message"] #inspector-title { grid-column: 1 / -1; grid-row: 2; }
+  .inspector-h[data-inspector-kind="message"] .inspector-sub { grid-column: 1 / -1; grid-row: 3; }
+  body:has(#inspector:not([hidden])) #messages-table :is(th.col-time, td.cell-time, th.col-hdr, td.cell-hdr) { display: none; }
+  /* Tp-06's tracks: 54 (which holds 4,811 in the room it has), 20, 90, and the rest; each is its track plus the cell's padding. */
+  body:has(#inspector:not([hidden])) table.msg-table th:nth-child(1) { width: 73px; }
+  body:has(#inspector:not([hidden])) table.msg-table th:nth-child(2) { width: 34px; }
+  body:has(#inspector:not([hidden])) table.msg-table th:nth-child(4) { width: 104px; }
+}
+@media (max-width: 1100px) { .insp-sel .insp-close .close-x { display: none; } } /* the word closes it there (Sy-03, Sy-04) */
+.tp-msg > .tp-fields { --c: 82px 1fr; }
+.tp-msg > .inspector-acts { margin-top: 0; }
+.tp-msg .seg.fmt { margin-left: 0; }
+.hdrkv { --c: 100px 1fr; row-gap: 2px; }
+.hdrkv > :nth-child(even) { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tp-copymenu { width: 250px; margin-left: 100px; box-shadow: 0 8px 24px rgba(0, 0, 0, .14); }
+.tp-copymenu .btn { justify-content: flex-start; border-radius: 0; }
+.tp-copymenu .btn.sb { justify-content: space-between; }
+.tp-copymenu .btn:disabled { opacity: .5; cursor: default; }

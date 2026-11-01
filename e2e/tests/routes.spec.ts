@@ -13,6 +13,7 @@ test('a group page refreshes its live region on its own', async ({ page }) => {
 
 test("a record's value downloads from the inspector, byte for byte", async ({ page }) => {
   await page.goto('topics/seed-orders?partition=0&open=5');
+  await page.locator('#inspector-copy').click(); // the download is in the Copy menu (Tp-06).
   const link = page.locator('#inspector a[href*="/message/raw"]');
   await expect(link).toBeVisible();
   const [download] = await Promise.all([page.waitForEvent('download'), link.click()]);

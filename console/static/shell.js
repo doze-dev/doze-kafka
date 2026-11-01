@@ -1453,6 +1453,7 @@
     switch (style) {
       case "clockms": return clock + "." + pad(d.getMilliseconds(), 3);
       case "datetime": return date + " " + clock;
+      case "datetimems": return date + " " + clock + "." + pad(d.getMilliseconds(), 3);
       case "date": return date;
     }
     return clock;
@@ -1480,7 +1481,7 @@
     else if (style === "since") el.textContent = spanText(Date.now() - ms);
     // "just now" takes no "ago" after it where a page adds one (a phone's card).
     if (style === "since") el.toggleAttribute("data-now", el.textContent === "just now");
-    else el.textContent = local(ms, style);
+    else if (style !== "ago") el.textContent = local(ms, style);
     // On hover: the moment in this browser's zone, then the same instant in UTC.
     var utc = new Date(ms).toISOString().replace("T", " ").replace("Z", " UTC");
     el.title = local(ms, "datetime") + "." + pad(d.getMilliseconds(), 3) + " " + (zoneName() ? zoneName() + " " : "") + "(" + offsetText(d) + ") · " + utc;

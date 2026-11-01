@@ -602,6 +602,9 @@ type Message struct {
 	Key       []byte
 	Value     []byte
 	Headers   []MessageHeader
+	// TimestampType is how the broker stamped the record: 0 CreateTime (the producer's
+	// clock), 1 LogAppendTime (the broker's), -1 none.
+	TimestampType int8
 }
 
 // MessageHeader is one record header.
@@ -703,7 +706,7 @@ func (b *backend) fetchWindow(ctx context.Context, topic string, partition int32
 			}
 			out = append(out, Message{
 				Offset: r.Offset, Partition: r.Partition, Timestamp: r.Timestamp,
-				Key: r.Key, Value: r.Value, Headers: hdrs,
+				Key: r.Key, Value: r.Value, Headers: hdrs, TimestampType: r.Attrs.TimestampType(),
 			})
 			reached = reached || r.Offset >= end-1
 		})

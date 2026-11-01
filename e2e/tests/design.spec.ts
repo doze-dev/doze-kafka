@@ -274,7 +274,7 @@ test('the inspector is in flow: it takes room from the page, covers nothing, and
   const box = await panel.boundingBox();
   expect(after!.width).toBeLessThan(before!.width); // it took room from the page,
   expect(after!.x + after!.width).toBeLessThanOrEqual(box!.x + 1); // and does not overlap it,
-  expect(box!.width).toBe(420); // at the width Sy-02 draws it,
+  expect(box!.width).toBe(400); // at the width Tp-06 draws it,
   expect(await panel.evaluate((el) => getComputedStyle(el).position)).not.toMatch(/fixed|absolute/);
   // Nothing is drawn over the content: no overlay, no scrim, no dialog.
   await expect(page.locator('#inspector-overlay, .scrim')).toHaveCount(0);
@@ -284,7 +284,7 @@ test('the inspector is in flow: it takes room from the page, covers nothing, and
   await expect(panel.locator('.inspector-h .cap')).toHaveText('Message');
   await expect(panel.locator('.kv').first()).toContainText('Key');
   await expect(panel.locator('pre.code').first()).toBeVisible();
-  await expect(panel.getByRole('link', { name: 'Follow this trace' })).toBeVisible();
+  await expect(panel.getByRole('link', { name: 'Follow this message' })).toBeVisible();
   // Esc puts the page back as it was.
   await page.keyboard.press('Escape');
   await expect(panel).toBeHidden();

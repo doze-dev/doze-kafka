@@ -79,7 +79,7 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   its groups' committed offsets, so a group that had read everything carries on with
   the next record. **Delete** removes the topic. Both ask first, naming the action.
 
-- **Follow this trace**, in the inspector of a record that carries a trace id
+- **Follow this message**, in the inspector of a record that carries a trace id
   (`traceparent`, B3, or the header named by `--trace-header`): every record of the
   same trace in every topic, in order, with the groups that have read each. See
   [Observability](observability.md).
@@ -178,6 +178,21 @@ the same: a title, a body and a close control. With nothing selected it says wha
 can select here. The selection is in the address (`?open=`), so a refresh or a shared
 link reopens it, Back returns to the previous selection (or to none), and `Esc`
 closes it and puts focus back on the row.
+
+A record's inspector (400 px) names its timestamp (to the millisecond, with how long
+ago) and how the broker stamped it (CreateTime or LogAppendTime), its key and size, the
+size of its value and of its headers (the bytes of their keys and values), and who
+**wrote it**: the client the Traffic recorder saw send the Produce request that holds
+it, with its transactional id when it had one. The recorder keeps only the last
+requests, and leaves out the console's own connections, so an older record, or one the
+console wrote itself, says "not known" (it is never guessed). The value has a
+Text / Hex / Base64 switch; **Send again**, **Edit a copy…** and **Copy** are under it.
+The Copy menu copies the key, the value (as JSON, when it is) or its base64, downloads
+the value, and writes the `kafka-console-producer.sh` command that produces the record,
+only where that tool can say it exactly (text without tabs or line breaks, a key that is
+not empty, a value that is not null, plain headers; it chooses the partition itself, by
+the key): otherwise the item is off and its hover says why. With the inspector open the
+records table gives up its Time and Hdr columns.
 
 ## Pages and tabs
 

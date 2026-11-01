@@ -712,6 +712,13 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 		"EditValue": editField(valueV), "EditValueEnc": resendEnc(valueV),
 		"EditHeaders": resendHeaders(hdrs),
 		"CanEdit":     (valueV.Null || valueV.Empty || valueV.B64 != "") && (keyV.Null || keyV.Empty || keyV.B64 != ""),
+		// Tp-06's fields: how the record was stamped, what its parts weigh, who wrote it
+		// (from the recorder, where it holds the request; otherwise it says so) and the
+		// Copy menu.
+		"TimestampType": timestampTypeText(m.TimestampType),
+		"HeadersSize":   humanBytes(headersBytes(m.Headers)),
+		"Writer":        c.recordWriter(name, partition, m.Offset),
+		"Producer":      producerCommand(c.be.displayAddr(), name, keyV, valueV, m.Headers),
 	}
 	if ref := traceOf(m.Headers, c.traceHeader); ref != nil {
 		data["Trace"], data["TraceURL"] = ref, c.traceURL(ref.ID, m.Timestamp, name, partition, m.Offset, "")
@@ -726,6 +733,7 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 	// in the address; the page says which by whether it carries a message base.
 	nav := func(label, glyph, word string, off int64) inspectorNav {
 		n := inspectorNav{Label: label, Glyph: glyph, Disabled: off < 0}
+		n.Text = map[string]string{"chevron-up": "↑", "chevron-down": "↓"}[glyph]
 		if off >= 0 {
 			n.Title = fmt.Sprintf("%s (offset %d)", word, off)
 			n.URL = fmt.Sprintf("%s/message?partition=%d&offset=%d", c.topicURL(name), partition, off)
@@ -736,7 +744,7 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	c.inspect(w, inspectorView{
 		Kind: KindMessage, Key: strconv.FormatInt(m.Offset, 10),
-		Title: fmt.Sprintf("P%d · offset %d", partition, m.Offset), Sub: name,
+		Title: fmt.Sprintf("P%d · offset %s", partition, groupDigits(m.Offset)), Sub: name,
 		Nav:  []inspectorNav{nav("Older record", "chevron-up", "Older", older), nav("Newer record", "chevron-down", "Newer", newer)},
 		Body: data,
 	})
@@ -1298,4 +1306,124 @@ func mergedLanes(partitionCount int32, bounds []PartitionBound, asc []msgView) (
 		axis[i] = t0.Add(time.Duration(int64(span) * int64(i) / 3))
 	}
 	return lanes, axis
+}
+
+// timestampTypeText names how the broker stamped a record (the batch's attributes).
+func timestampTypeText(t int8) string {
+	switch t {
+	case 0:
+		return "CreateTime"
+	case 1:
+		return "LogAppendTime"
+	}
+	return "none"
+}
+
+// headersBytes is the bytes of a record's headers: their keys and values.
+func headersBytes(hs []MessageHeader) int {
+	n := 0
+	for _, h := range hs {
+		n += len(h.Key) + len(h.Value)
+	}
+	return n
+}
+
+// writerView is who wrote a record, as far as the recorder knows.
+type writerView struct {
+	Known  bool
+	Client string
+	Tx     string
+	// Why is what the page says when it is not known.
+	Why string
+}
+
+// recordWriter finds the Produce request that wrote a record in the traffic ledger:
+// the request that named the topic and partition and was answered with a base offset
+// at or before the record's, and as many records as reach it. The recorder keeps the
+// last requests only, so an older record has no writer here, and the page says so; it
+// never guesses one. A transactional id is the request's own.
+func (c *Console) recordWriter(topic string, partition int32, offset int64) writerView {
+	if c.traffic == nil {
+		return writerView{Why: "the traffic recorder is off"}
+	}
+	for _, e := range c.traffic.Events(TrafficFilter{Topic: topic, API: "Produce"}, 0) {
+		if e.API != "Produce" {
+			continue
+		}
+		for _, p := range e.Facts.Partitions {
+			if p.Topic != topic || p.Partition != partition || !p.HasOffset || p.ErrorCode != 0 {
+				continue
+			}
+			if offset < p.Offset || offset >= p.Offset+int64(max(p.Records, 1)) {
+				continue
+			}
+			who := e.ClientID
+			if who == "" {
+				who = e.Remote
+			}
+			return writerView{Known: true, Client: who, Tx: e.TxnID}
+		}
+	}
+	return writerView{Why: "this record's request is not in the recorder: it is older than the last requests the broker keeps, or it came over the console's own connection"}
+}
+
+// producerView is the "Copy as kafka-console-producer" item: the command, or why this
+// record cannot be said with that tool.
+type producerView struct {
+	Cmd string
+	Why string
+}
+
+// producerCommand writes the command that produces a record like this one with Kafka's
+// console producer, when the tool can say it exactly: text without tabs or line breaks
+// (its line format uses them), a key that is not empty (the tool cannot tell an empty
+// key from a null one), a value that is present, and headers that are plain text. The
+// tool chooses the partition itself, by the key. Anything else is refused with the
+// reason, never approximated.
+func producerCommand(addr, topic string, key, val bytesView, hs []MessageHeader) producerView {
+	plain := func(s string, extra string) bool {
+		return !strings.ContainsAny(s, "\t\r\n\x00"+extra)
+	}
+	switch {
+	case val.Null:
+		return producerView{Why: "a null value (a tombstone) cannot be typed into the console producer"}
+	case val.Empty:
+		return producerView{Why: "the console producer cannot tell an empty value from none"}
+	case val.Binary || val.Truncated:
+		return producerView{Why: "the value is binary or too large to type on a command line"}
+	case key.Empty:
+		return producerView{Why: "the console producer cannot send an empty key (it reads it as none)"}
+	case key.Binary || key.Truncated:
+		return producerView{Why: "the key is binary or too large to type on a command line"}
+	}
+	value, k := val.Raw, key.Raw
+	if val.Schema != nil {
+		return producerView{Why: "the value was read through a schema; the console producer would send its JSON as plain text, not the record's bytes"}
+	}
+	if val.Raw == "" || (!key.Null && key.Raw == "") {
+		return producerView{Why: "the key or value is too large to type on a command line"}
+	}
+	if !plain(value, "") || !plain(k, "") {
+		return producerView{Why: "the key or value holds a tab or a line break, which the console producer's lines use"}
+	}
+	var hdr []string
+	for _, h := range hs {
+		hv := newBytesView(h.Value, h.Value == nil)
+		if hv.Null || hv.Empty || hv.Binary || !plain(h.Key, ",:") || !plain(hv.Raw, ",") || h.Key == "" {
+			return producerView{Why: "a header is empty, binary or holds a comma, colon, tab or line break, which the console producer's header syntax uses"}
+		}
+		hdr = append(hdr, h.Key+":"+hv.Raw)
+	}
+	line := k + "\t" + value
+	props := " --property parse.key=true"
+	if key.Null {
+		line, props = value, ""
+	}
+	if len(hdr) > 0 {
+		line = strings.Join(hdr, ",") + "\t" + line
+		props += " --property parse.headers=true"
+	}
+	esc := strings.NewReplacer("\\", "\\\\", "%", "%%", "\t", "\\t")
+	quote := func(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
+	return producerView{Cmd: "printf " + quote(esc.Replace(line)+`\n`) + " | kafka-console-producer.sh --bootstrap-server " + quote(addr) + " --topic " + quote(topic) + props}
 }

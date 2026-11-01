@@ -116,7 +116,7 @@ export const TOPIC_BODY: Probe[] = [
   { el: 'tape lane', board: 'main > .card[style*="padding: 8px 12px 6px"] > .row.ce.g8:nth-of-type(2)', live: '.tp-tape > .row:nth-of-type(2)', free: { y: BELOW } },
   { el: 'tape lane label', board: 'main > .card[style*="padding: 8px 12px 6px"] > .row.ce.g8:nth-of-type(2) > .m', live: '.tp-tape > .row:nth-of-type(2) .tp-lane-p', text: true, free: { y: BELOW } },
   { el: 'tape lane track', board: 'main > .card[style*="padding: 8px 12px 6px"] > .row.ce.g8:nth-of-type(2) > .grow', live: '.tp-tape > .row:nth-of-type(2) .tp-lane', free: { y: BELOW } },
-  { el: 'tape lane count', board: 'main > .card[style*="padding: 8px 12px 6px"] > .row.ce.g8:nth-of-type(2) > .ra', live: '.tp-tape > .row:nth-of-type(2) .tp-lane-n', free: { w: TEXT_W }, free: { y: BELOW } },
+  { el: 'tape lane count', board: 'main > .card[style*="padding: 8px 12px 6px"] > .row.ce.g8:nth-of-type(2) > .ra', live: '.tp-tape > .row:nth-of-type(2) .tp-lane-n', free: { w: TEXT_W, y: BELOW } },
   { el: 'tape axis', board: 'main > .card[style*="padding: 8px 12px 6px"] > .row.ce.g8:last-child .grow', live: '.tp-axis', free: { y: BELOW } },
   { el: 'tape card', board: 'main > .card[style*="padding: 8px 12px 6px"]', live: '.tape-panel', free: { h: T_ROWS, y: BELOW } },
   { el: 'records', board: 'main > .card[style*="--c"]', live: '.tbl-wrap', free: { h: T_ROWS, y: 'it follows the tape' } },
@@ -132,3 +132,53 @@ export const TOPIC_TABLE: Probe[] = [
   { el: 'table foot note', board: `${TBL} > .r[style] > .note`, live: '.tbl-foot > span:first-child', free: { y: T_ROWS, w: TEXT_W } },
 ];
 export { TOPIC_COMMON };
+
+// ---------- Tp-06: the message inspector ----------
+const I = '#inspector';
+const VALUE_H = 'its height is the record\'s value, which is the seed\'s';
+const INSP_FACT = 'its text is the broker\'s: the record\'s time, key and writer, not the board\'s sample';
+const M = (n: number, board: string, live: string, extra: Partial<Probe> = {}): Probe => ({ el: `x${n}`, board, live, ...extra });
+const FIELDS = ['timestamp', 'type', 'key', 'sizes', 'written by'];
+/** Tp-06's part of the page (the inspector, the table beside it); the shared parts come from TOPIC_COMMON. */
+export const MESSAGE_PANEL: Probe[] = [
+  { el: 'ins head', board: '.insp .hd', live: `${I} .inspector-h` },
+  { el: 'ins cap', board: '.insp .hd .cap', live: `${I} .inspector-h .cap`, text: true },
+  { el: 'ins controls', board: '.insp .hd > .row > .row.g4', live: `${I} .inspector-nav` },
+  ...['older', 'newer', 'close'].map((n, i): Probe => ({ el: `ins ${n}`, board: '.insp .hd .btn.sm.ghost', live: `${I} .inspector-nav .btn`, nth: i, text: true })),
+  { el: 'ins title', board: '.insp .hd .h2', live: '#inspector-title', free: { w: TEXT_W } },
+  { el: 'ins sub', board: '.insp .hd .m.mut', live: `${I} .inspector-sub`, free: { w: TEXT_W } },
+  { el: 'ins body', board: '.insp .bd', live: `${I} .inspector-b` },
+  { el: 'ins fields', board: '.insp .bd > .kv', live: `${I} .tp-fields`, free: { h: 'the page\'s record may carry a schema row, which the board\'s does not' } },
+  ...FIELDS.flatMap((f, i): Probe[] => [
+    { el: `ins field ${f}`, board: '.insp .bd > .kv > span:not(.m)', live: `${I} .tp-fields > span:not(.m)`, nth: i, text: true },
+    { el: `ins value ${f}`, board: '.insp .bd > .kv > .m', live: `${I} .tp-fields > .m`, nth: i, free: { w: INSP_FACT } },
+  ]),
+  { el: 'ins follow row', board: '.insp .bd > .row.ce.g8', live: `${I} .tp-msg > .row.ce.g8:not(.inspector-acts)` },
+  { el: 'ins follow', board: '.insp .bd > .row.ce.g8 .btn', live: `${I} #inspector-trace`, text: true },
+  { el: 'ins follow note', board: '.insp .bd > .row.ce.g8 .note', live: `${I} .tp-msg > .row.ce.g8 .note`, text: true },
+  { el: 'ins headers', board: '.insp .bd > .col.g4', live: `${I} .tp-msg > .col.g4`, free: { h: 'its rows are the record\'s headers' } },
+  { el: 'ins headers cap', board: '.insp .bd > .col.g4 .cap', live: `${I} .tp-msg > .col.g4 .cap`, text: true, free: { y: INSP_FACT } },
+  { el: 'ins headers list', board: '.insp .bd > .col.g4 .kv', live: `${I} .hdrkv`, free: { h: 'its rows are the record\'s headers', y: INSP_FACT } },
+  { el: 'ins header key', board: '.insp .bd > .col.g4 .kv > span', live: `${I} .hdrkv > span`, free: { y: INSP_FACT } },
+  { el: 'ins header value', board: '.insp .bd > .col.g4 .kv > span', live: `${I} .hdrkv > span`, nth: 1, free: { y: INSP_FACT } },
+  { el: 'ins value col', board: '.insp .bd > .col.g4', live: `${I} .tp-msg > .col.g4`, nth: 1, free: { h: VALUE_H, y: INSP_FACT } },
+  { el: 'ins value head', board: '.insp .bd > .col.g4:nth-of-type(2) > .row.sb', live: `${I} .tp-msg > .col.g4:nth-of-type(2) > .row.sb`, free: { y: INSP_FACT } },
+  { el: 'ins value cap', board: '.insp .bd > .col.g4:nth-of-type(2) .cap', live: `${I} .tp-msg > .col.g4:nth-of-type(2) .cap`, text: true, free: { y: INSP_FACT, w: INSP_FACT } },
+  { el: 'ins switch', board: '.insp .seg', live: `${I} .seg`, free: { y: INSP_FACT } },
+  ...['text', 'hex', 'base64'].map((n, i): Probe => ({ el: `ins switch ${n}`, board: '.insp .seg > *', live: `${I} .seg > *`, nth: i, text: true, free: { y: INSP_FACT } })),
+  { el: 'ins code', board: '.insp pre.code', live: `${I} pre.code:not([style*="none"])`, free: { h: VALUE_H, y: INSP_FACT } },
+  { el: 'ins actions', board: '.insp .bd > .row.g8.ce:nth-child(5)', live: `${I} .inspector-acts`, free: { y: VALUE_H } },
+  ...['send again', 'edit a copy', 'copy'].map((n, i): Probe => ({ el: `ins ${n}`, board: '.insp .bd > .row.g8.ce:nth-child(5) > *', live: `${I} .inspector-acts > .btn`, nth: i, text: true, free: { y: VALUE_H } })),
+  { el: 'ins menu', board: '.insp .bd > .card.col', live: `${I} .tp-copymenu`, free: { y: VALUE_H } },
+  ...[0, 1, 2, 3, 4].map((i): Probe => ({ el: `ins menu item ${i}`, board: '.insp .bd > .card.col > *', live: `${I} .tp-copymenu > *`, nth: i, text: true, free: { y: VALUE_H } })),
+];
+const REC = 'main > .card[style*="--c"]';
+const CELLS6 = ['offset', 'p', 'key', 'value'];
+/** The records beside the open inspector: Offset, P, Key and Value (Time and Hdr are the inspector's). */
+export const MESSAGE_TABLE: Probe[] = [
+  { el: 'records', board: REC, live: '.tbl-wrap', free: { h: T_ROWS, y: 'it follows the tape' } },
+  { el: 'records head', board: `${REC} > .r.h`, live: '#messages-table thead tr', free: { y: BELOW } },
+  ...CELLS6.map((c, i): Probe => ({ el: `head ${c}`, board: `${REC} > .r.h > span`, live: '#messages-table thead th:not([style*="none"])', nth: i, text: true, free: { y: BELOW } })),
+  { el: 'record open', board: `${REC} > .r.on`, live: '#messages-table tbody tr.on', free: { y: T_ROWS } },
+  ...CELLS6.map((c, i): Probe => ({ el: `cell ${c}`, board: `${REC} > .r.on > span`, live: '#messages-table tbody tr.on > td', nth: i, free: { y: T_ROWS } })),
+];

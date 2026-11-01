@@ -3,7 +3,7 @@ import { BASE_URL } from '../../playwright.config';
 import { livePage, runBoard } from '../lib/gate';
 import { SHELL } from '../lib/probes';
 import { openBoard, openLive } from '../lib/render';
-import { dropMarkers, MESSAGE, openMessage, recordOpen, TOPIC, TOPIC_COMMON, TRACED } from '../lib/topic';
+import { dropMarkers, openMessage, recordOpen, TOPIC, TOPIC_COMMON, TRACED } from '../lib/topic';
 import { ALLOW } from './allow';
 
 // Sy-01 (the anatomy of a page) and Sy-02 (the same page in dark, a message open)
@@ -67,7 +67,7 @@ test('Sy-02 matches a live topic page in dark, a message open', async ({ browser
   const out = await runBoard(browser, {
     id: 'Sy-02', file: 'Sy-02-Dark', places: [{ size: 1440, theme: 'dark' }],
     live: livePage(BASE_URL, TRACED, recordOpen),
-    probes: [...SHELL, ...TOPIC_COMMON, ...MESSAGE], allow: ALLOW,
+    probes: [...SHELL, ...TOPIC_COMMON], allow: ALLOW, // the inspector's parts are Tp-06's now: the topics gate measures them against it
   });
   expect(out.text, out.text).toBe('');
 });

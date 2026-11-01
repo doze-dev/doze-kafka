@@ -12,8 +12,13 @@
     {{if or .InspSub (not .InspSubTime.IsZero)}}<span class="inspector-sub mono">{{if not .InspSubTime.IsZero}}{{when .InspSubTime "clockms"}}{{if .InspSub}} · {{end}}{{end}}{{.InspSub}}</span>{{end}}
   </div>
   <div class="inspector-nav">
+    {{if eq .InspKind "message"}}{{/* Tp-06: the controls are the board's small ghost buttons with their glyphs as text */}}
+    {{range .InspNav}}<button type="button" class="btn sm ghost insp-step" aria-label="{{.Label}}" title="{{.Title}}" {{if .Disabled}}disabled{{else}}hx-get="{{.URL}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"{{end}}>{{.Text}}</button>{{end}}
+    <button type="button" class="btn sm ghost insp-close" aria-label="Close inspector, esc" title="Close (esc)" data-inspector-close><span class="close-x" aria-hidden="true">×</span><span class="close-t" aria-hidden="true"><span class="close-esc">esc</span><span class="close-word">Close</span></span></button>
+    {{else}}
     {{range .InspNav}}<button type="button" class="icon-btn insp-step" aria-label="{{.Label}}" title="{{.Title}}" {{if .Disabled}}disabled{{else}}hx-get="{{.URL}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"{{end}}>{{icon .Glyph}}</button>{{end}}
     <button type="button" class="icon-btn insp-close" aria-label="Close, esc" title="Close (esc)" data-inspector-close>{{icon "x"}}<span class="close-t" aria-hidden="true"><span class="close-esc">esc</span><span class="close-word">Close</span></span></button>
+    {{end}}
   </div>
 </div>
 {{if .InspGone}}

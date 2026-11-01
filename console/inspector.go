@@ -52,6 +52,7 @@ type inspectorNav struct {
 	Label    string // aria-label: "Older record".
 	Title    string
 	Glyph    string
+	Text     string // the glyph as text, where the board draws it so (the message's ↑ and ↓).
 	URL      string // where the control fetches; empty means disabled.
 	Disabled bool
 }

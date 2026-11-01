@@ -29,7 +29,7 @@ test.describe('a browser far ahead of UTC', () => {
     await expect(t).toHaveAttribute('title', /2026-03-15 12:59:07\.000 Pacific\/Auckland \(UTC\+13:00\) · 2026-03-14 23:59:07\.000 UTC/);
     // The inspector shows the date, which is the 15th here.
     await row.click();
-    await expect(page.locator('#inspector time.when')).toHaveText('2026-03-15 12:59:07');
+    await expect(page.locator('#inspector time.when').first()).toHaveText('2026-03-15 12:59:07.000');
     // Relative times are computed in the browser, not left as the server wrote them.
     const since = row.locator('.cell-time time.when[data-style="since"]'); // Tp-05: the clock time, then how long ago.
     await expect(since).toHaveText(/^\d+d \d\dh$/);
@@ -45,8 +45,8 @@ test.describe('a browser behind UTC', () => {
     put(name, 'late');
     await page.goto(`topics/${name}`);
     await page.locator('tr[id^="msg-"]').first().click();
-    await expect(page.locator('#inspector time.when')).toHaveText('2026-03-14 16:59:07');
-    await expect(page.locator('#inspector time.when')).toHaveAttribute('title', /America\/Los_Angeles \(UTC-07:00\)/);
+    await expect(page.locator('#inspector time.when').first()).toHaveText('2026-03-14 16:59:07.000');
+    await expect(page.locator('#inspector time.when').first()).toHaveAttribute('title', /America\/Los_Angeles \(UTC-07:00\)/);
   });
 });
 

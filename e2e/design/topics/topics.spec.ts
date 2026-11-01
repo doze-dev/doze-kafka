@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { BASE_URL } from '../../playwright.config';
 import { livePage, runBoard } from '../lib/gate';
-import { CREATE, SETTINGS, REFUSED, NONE, TOPIC_BODY, TOPIC_COMMON, TOPIC_TABLE } from './boards';
-import { TOPIC } from '../lib/topic';
+import { CREATE, SETTINGS, REFUSED, NONE, TOPIC_BODY, TOPIC_COMMON, TOPIC_TABLE, MESSAGE_PANEL, MESSAGE_TABLE } from './boards';
+import { TOPIC, TRACED, recordOpen } from '../lib/topic';
 import { OwnBroker } from '../../ownbroker';
 import { openLive } from '../lib/render';
 import { SHELL } from '../lib/probes';
@@ -49,5 +49,15 @@ test.describe('on an empty broker', () => {
 test('Tp-05 matches the topic page', async ({ browser }) => {
   test.setTimeout(120_000);
   const out = await runBoard(browser, { id: 'Tp-05', file: 'Tp-05-Messages', live: livePage(BASE_URL, `topics/${TOPIC}`), probes: [...SHELL, ...TOPIC_COMMON, ...TOPIC_BODY, ...TOPIC_TABLE], allow: ALLOW });
+  expect(out.text, out.text).toBe('');
+});
+
+test('Tp-06 matches the message inspector', async ({ browser }) => {
+  test.setTimeout(120_000);
+  const out = await runBoard(browser, {
+    id: 'Tp-06', file: 'Tp-06-Message',
+    live: livePage(BASE_URL, TRACED, async (p) => { await recordOpen(p); await p.locator('#inspector-copy').click(); await p.locator('.tp-copymenu').waitFor(); await p.mouse.move(0, 0); }),
+    probes: [...SHELL, ...TOPIC_COMMON, ...TOPIC_BODY.slice(0, 7), ...MESSAGE_PANEL, ...MESSAGE_TABLE], allow: ALLOW,
+  });
   expect(out.text, out.text).toBe('');
 });

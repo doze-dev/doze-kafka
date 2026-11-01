@@ -98,7 +98,7 @@ func TestARecordsTimeIsAnInstantNotTheServersLocalText(t *testing.T) {
 		t.Errorf("the record's time is not an instant:\n%s", between(page, `cell-time`, `</td>`))
 	}
 	ins := req(t, c, "GET", "/_console/topics/clock/message?partition=0&offset=0", nil).Body.String()
-	if !strings.Contains(ins, `data-style="datetime"`) {
+	if !strings.Contains(ins, `data-style="datetimems"`) {
 		t.Error("the inspector's timestamp is not the formatter's")
 	}
 }
