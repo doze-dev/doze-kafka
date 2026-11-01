@@ -34,6 +34,9 @@ var (
 	// Groups returns the server's group inspector: a read-only snapshot of what the
 	// two group coordinators hold in memory (GRP-22). The argument is a *server.Server.
 	Groups func(srv any) broker.GroupInspector
+	// Logs returns the server's log inspector: what the log cleaner has done on a
+	// partition (TOP-28). The argument is a *server.Server.
+	Logs func(srv any) broker.LogInspector
 	// CheckOffsets applies the offsets retention of a *server.Server now, as its
 	// scheduled check does, and returns once it has.
 	CheckOffsets func(srv any)

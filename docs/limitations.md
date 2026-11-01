@@ -288,6 +288,11 @@ implement it.
 - **DescribeConfigs does not say a config's type** (`ConfigType` is UNKNOWN, 0); Kafka
   names it (`LIST` for `cleanup.policy`, `conformance/recordings/list-config-append.json`).
   Names, values and sources are Kafka's.
+- **DescribeConfigs of a topic lists the same 33 keys as Kafka** (`conformance/recordings/topic-config-keys.json`),
+  in name order where Kafka's is hash order, with three values that differ on purpose:
+  `retention.ms` (-1, keep for ever, where Kafka keeps 7 days), `segment.bytes` (128 MiB,
+  where Kafka's is 1 GiB) and `min.cleanable.dirty.ratio` (0, a rolled segment is cleaned at once,
+  where Kafka's is 0.5). `internal/broker/describeconfigs_all_test.go` compares the two.
 - **An empty cleanup.policy is refused** with `INVALID_CONFIG`. Kafka 4.3.1 takes it
   (SUBTRACT `delete` from an unset `cleanup.policy` leaves `""`, recorded in
   `list-config-append`), for a log that is neither deleted nor compacted; this broker's

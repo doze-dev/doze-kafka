@@ -64,6 +64,7 @@ type Partition struct {
 	cleanedTo     int64
 	cleanedLoaded bool
 	lastClean     CleanResult
+	cleanTotals   CleanTotals // what every pass since this partition was opened removed.
 
 	// Group commit. Every change that an acknowledgement can rest on (an append,
 	// and at open whatever was read back without being known durable) bumps

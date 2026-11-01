@@ -126,6 +126,7 @@ func init() {
 	serverhook.Traffic = func(srv any) *traffic.Recorder { return srv.(*Server).rec }
 	serverhook.ClientMetrics = func(srv any) *telemetry.Store { return srv.(*Server).b.Telemetry() }
 	serverhook.Groups = func(srv any) broker.GroupInspector { return srv.(*Server).b }
+	serverhook.Logs = func(srv any) broker.LogInspector { return srv.(*Server).b }
 	serverhook.CheckOffsets = func(srv any) { srv.(*Server).b.CheckOffsets() }
 }
 
