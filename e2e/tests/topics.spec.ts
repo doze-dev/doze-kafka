@@ -13,16 +13,16 @@ test('a topic is created with its partitions and shows them', async ({ page, cre
 test('a bad name or partition count is explained beside the form, and nothing is created', async ({ page }) => {
   await page.goto('new/topic');
   await page.locator('#f-name').fill('bad name!');
-  await page.getByRole('button', { name: 'Create topic' }).click();
+  await page.locator('#create-topic').getByRole('button', { name: 'Create topic' }).click();
   await expect(page.locator('[data-err-slot]')).toContainText('invalid topic name');
   await expect(page.locator('#f-name')).toHaveValue('bad name!'); // what was typed is still there.
   await page.locator('#f-name').fill('seed-orders');
-  await page.getByRole('button', { name: 'Create topic' }).click();
+  await page.locator('#create-topic').getByRole('button', { name: 'Create topic' }).click();
   await expect(page.locator('[data-err-slot]')).toContainText(`a topic named "seed-orders" already exists`);
   await page.locator('#f-name').fill('fine-name');
   await page.locator('#f-partitions').evaluate((el: HTMLInputElement) => { el.type = 'text'; });
   await page.locator('#f-partitions').fill('abc');
-  await page.getByRole('button', { name: 'Create topic' }).click();
+  await page.locator('#create-topic').getByRole('button', { name: 'Create topic' }).click();
   await expect(page.locator('[data-err-slot]')).toContainText('not a number of partitions');
   await page.goto('topics');
   await expect(page.locator('.list .li[data-name="fine-name"]')).toHaveCount(0);
@@ -188,7 +188,7 @@ test('transactions on the tape: aborted and open records are marked, markers are
 test('a refusal stays when the form\'s preview refreshes after it', async ({ page }) => {
   await page.goto('new/topic');
   await page.locator('#f-name').fill('bad name!');
-  await page.getByRole('button', { name: 'Create topic' }).click();
+  await page.locator('#create-topic').getByRole('button', { name: 'Create topic' }).click();
   await page.waitForTimeout(1200); // the preview's request (200 ms after typing) has come and gone.
   await expect(page.locator('[data-err-slot]')).toContainText('invalid topic name');
 });

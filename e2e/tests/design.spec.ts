@@ -216,8 +216,8 @@ test('a fresh empty broker lands on "Your broker is up", with the three steps', 
     await expect(page.locator('nav.rail a[href$="/traffic"] .n')).toHaveText('0 open');
     // Tp-01: the empty Topics page says nothing exists, what it is not, and the shell command.
     await page.goto(`${base}topics`);
-    await expect(page.locator('.list .list-note').first()).toContainText('No topics');
-    await expect(page.locator('.list .list-note').first()).toContainText('Nothing exists on this broker yet.');
+    await expect(page.locator('.list .tp-list-none')).toContainText('No topics');
+    await expect(page.locator('.list .tp-list-none')).toContainText('Nothing exists on this broker yet.');
     await expect(page.locator('#topics-none')).toContainText('This broker has no topics.');
     await expect(page.locator('#topics-none')).toContainText('This is not a filter and not a permissions problem.');
     await expect(page.locator('#topics-none pre.code')).toContainText(/kafka-topics\.sh --bootstrap-server 127\.0\.0\.1:\d+ \\\n\s+--create --topic orders\.created/);
@@ -236,15 +236,20 @@ test('a fresh empty broker lands on "Your broker is up", with the three steps', 
     for (const h of help) expect(h, 'help text').not.toMatch(/unit:|range:|; applied/);
     await expect(page.getByText('What happens next')).toBeVisible();
     await expect(page.locator('#shell-preview')).toContainText('--partitions 1 --replication-factor 1');
+    await page.waitForFunction(() => !!(document.querySelector('#create-topic') as any)?._x_dataStack); // the form's own script has set its fields up
     await page.locator('#f-name').fill('first-topic');
     await page.locator('#f-partitions').fill('3');
+    await page.getByRole('link', { name: 'Set…' }).click(); // Tp-03: the settings open, with what was typed carried over.
+    await expect(page).toHaveURL(/settings=1/);
+    await expect(page.locator('#f-name')).toHaveValue('first-topic');
+    await expect(page.locator('#f-partitions')).toHaveValue('3');
     await page.locator('#cfg-segment\\.bytes').fill('1MB');
     await expect(page.locator('#shell-preview')).toContainText('--create --topic first-topic');
     await expect(page.locator('#shell-preview')).toContainText('--partitions 3 --replication-factor 1');
     await expect(page.locator('#shell-preview')).toContainText('--config segment.bytes=1048576');
     // Creating a topic ends it.
     await page.locator('#f-name').fill('first-topic');
-    await page.getByRole('button', { name: 'Create topic' }).click();
+    await page.locator('#create-topic').getByRole('button', { name: 'Create topic' }).click();
     await expect(page).toHaveURL(/topics\/first-topic/);
     await page.goto(base);
     await expect(page.locator('h1')).not.toHaveText('Your broker is up');
@@ -890,8 +895,7 @@ test('the message tape draws its own marks, which the inspector\'s fold ticks do
 // Tp-02 stacks the form's cards 12 px apart.
 test('Tp-02: the create form\'s cards are 12 px apart', async ({ page }) => {
   await page.goto('new/topic');
-  const cards = page.locator('#create-topic .form-sec');
-  await expect(cards.first()).toHaveCSS('margin-bottom', '12px');
+  const cards = page.locator('#create-topic .tp-left > .card');
   const a = (await cards.nth(0).boundingBox())!;
   const b = (await cards.nth(1).boundingBox())!;
   expect(Math.round(b.y - (a.y + a.height))).toBe(12);

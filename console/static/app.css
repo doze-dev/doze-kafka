@@ -1519,3 +1519,15 @@ html[data-paused] #inspector[data-traffic-kept] .tf-kept { display: block; }
   .tf-filter > .grow, .tf-filter > .note { display: none; }
   .main.tf > .row.sb { flex-wrap: wrap; }
 }
+
+/* ---------- Topics: the create form (Tp-02, Tp-03, Tp-04) ---------- */
+.tp-left { width: 600px; flex: none; } .tp-left.open { width: 640px; }
+.tp-w150 { width: 150px; } .tp-w110 { width: 110px; }
+.tp-hint, .tp-light { font-weight: 400; }
+.tp-pt { padding-top: 22px; }
+.tp-create .inp[aria-invalid="true"] { border-color: var(--deny); }
+.tp-taken { margin: 0; }
+.tp-hide, .app a.tp-hide { text-decoration: none; }
+.tp-none { margin-top: 40px; align-self: center; width: 640px; max-width: 100%; padding: 28px 32px; gap: 14px; }
+.tp-list-none { padding: 18px 14px; }
+.tp-settings { margin: 0; }

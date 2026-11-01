@@ -126,16 +126,38 @@ func (c *Console) topicCreatePage(w http.ResponseWriter, r *http.Request) {
 	b, _ := json.Marshal(taken)
 	prefill := strings.TrimSpace(r.URL.Query().Get("name"))
 	pj, _ := json.Marshal(prefill)
+	// The page can be opened with what it holds filled in (the "Set…" link carries the
+	// name and partitions typed so far, and a link can carry settings): what is in the
+	// query is what the form shows, as typed.
+	cfg := newConfigView(nil)
+	for i := range cfg.Settings {
+		cfg.Settings[i].Own = strings.TrimSpace(r.URL.Query().Get(cfg.Settings[i].Key))
+	}
+	parts := strings.TrimSpace(r.URL.Query().Get("partitions"))
+	if parts == "" {
+		parts = "1"
+	}
+	command, _ := c.createShell(r)
 	c.render(w, r, "topic_create", map[string]any{
-		"List": list, "Page": "topics", "Title": "Create topic", "Config": newConfigView(nil),
+		"List": list, "Page": "topics", "Title": "Create topic", "Config": cfg,
 		"Taken": taken, "TakenJSON": string(b), "Prefill": prefill, "PrefillJSON": string(pj), "HasRegistry": c.reg != nil, "MaxParts": c.facts.MaxPartitions,
-		"Command": createCommand(c.connectFacts(r), "", "", nil),
+		"Parts": parts, "Open": r.URL.Query().Get("settings") == "1", "ConfigRows": settingRows(cfg.Settings),
+		"SetURL": c.prefix + "/new/topic?settings=1", "Command": command,
 	})
 }
 
-// topicShell is the shell command under the create form, rebuilt from what has been
-// typed so far. A value that does not parse yet leaves its --config out and says why.
-func (c *Console) topicShell(w http.ResponseWriter, r *http.Request) {
+// settingRows lays the settings out two to a row, as Tp-03 does.
+func settingRows(s []settingView) [][]settingView {
+	var rows [][]settingView
+	for i := 0; i < len(s); i += 2 {
+		rows = append(rows, s[i:min(i+2, len(s))])
+	}
+	return rows
+}
+
+// createShell is the kafka-topics.sh call for what the form holds (the form's fields
+// or the page's query), and the note that says why a value was left out of it.
+func (c *Console) createShell(r *http.Request) (string, string) {
 	set := map[string]string{}
 	note := ""
 	for _, ts := range topicSettings {
@@ -150,10 +172,14 @@ func (c *Console) topicShell(w http.ResponseWriter, r *http.Request) {
 		}
 		set[ts.Key] = v
 	}
-	c.partial(w, "shell_preview", map[string]any{
-		"Command": createCommand(c.connectFacts(r), strings.TrimSpace(r.FormValue("name")), strings.TrimSpace(r.FormValue("partitions")), set),
-		"Note":    note,
-	})
+	return createCommand(c.connectFacts(r), strings.TrimSpace(r.FormValue("name")), strings.TrimSpace(r.FormValue("partitions")), set), note
+}
+
+// topicShell is the shell command under the create form, rebuilt from what has been
+// typed so far. A value that does not parse yet leaves its --config out and says why.
+func (c *Console) topicShell(w http.ResponseWriter, r *http.Request) {
+	command, note := c.createShell(r)
+	c.partial(w, "shell_preview", map[string]any{"Command": command, "Note": note})
 }
 
 func (c *Console) topicCreate(w http.ResponseWriter, r *http.Request) {

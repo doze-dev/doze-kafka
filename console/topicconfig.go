@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -36,6 +37,8 @@ var topicSettings = []topicSetting{
 	{Key: "retention.bytes", Label: "Keep at most", Hint: "1GB, 500MB or unlimited", parse: parseSize, show: showSize, Always: true},
 	{Key: "segment.bytes", Label: "Segment size", Hint: "64MB or 1GB", parse: parseSegment, show: showSize, Always: true},
 	{Key: "max.message.bytes", Label: "Largest batch", Hint: "1MB or 64KB", parse: parseSegment, show: showSize},
+	{Key: "cleanup.policy", Label: "Old records", Hint: "", parse: parseChoice("delete", "compact"), show: func(v string) string { return v },
+		Options: []string{"delete", "compact"}},
 	{Key: "message.timestamp.type", Label: "Record time", Hint: "", parse: parseChoice("CreateTime", "LogAppendTime"), show: func(v string) string { return v },
 		Options: []string{"CreateTime", "LogAppendTime"}},
 }
@@ -183,6 +186,9 @@ func newConfigView(entries []ConfigEntry) configView {
 	}
 	var v configView
 	editable := map[string]bool{}
+	if e, ok := byKey["cleanup.policy"]; ok && strings.Contains(e.Value, "compact") {
+		v.Compact = true
+	}
 	for _, ts := range topicSettings {
 		editable[ts.Key] = true
 		e, ok := byKey[ts.Key]
@@ -193,15 +199,17 @@ func newConfigView(entries []ConfigEntry) configView {
 				sv.Own = strings.ReplaceAll(sv.Effective, " ", "")
 			}
 		}
+		// A value the choice does not list (cleanup.policy "compact,delete") stays
+		// selectable, so saving the form does not unset it.
+		if sv.Own != "" && len(sv.Options) > 0 && !slices.Contains(sv.Options, sv.Own) {
+			sv.Options = append(slices.Clone(sv.Options), sv.Own)
+		}
 		sv.Summary = ok && (ts.Always || e.Own)
 		v.Settings = append(v.Settings, sv)
 	}
 	for _, e := range entries {
 		if editable[e.Name] {
 			continue
-		}
-		if e.Name == "cleanup.policy" && strings.Contains(e.Value, "compact") {
-			v.Compact = true
 		}
 		v.Others = append(v.Others, e)
 	}

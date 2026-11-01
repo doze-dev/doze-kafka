@@ -844,7 +844,7 @@ func TestTopicSettingsAreTypedAndShownAsPeopleSayThem(t *testing.T) {
 
 func TestATopicCanBeCreatedWithItsOwnRetentionAndChangedLater(t *testing.T) {
 	c := newTestConsole(t)
-	form := req(t, c, "GET", "/_console/new/topic", nil).Body.String()
+	form := req(t, c, "GET", "/_console/new/topic?settings=1", nil).Body.String()
 	for _, name := range []string{`name="retention.ms"`, `name="retention.bytes"`, `name="segment.bytes"`} {
 		if !strings.Contains(form, name) {
 			t.Errorf("the create form has no field %s", name)

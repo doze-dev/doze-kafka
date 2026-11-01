@@ -307,6 +307,9 @@
     var elt = (e.detail.requestConfig && e.detail.requestConfig.elt) || e.detail.elt;
     var form = elt && elt.closest ? elt.closest("form") : null;
     var slot = form && form.querySelector("[data-err-slot]");
+    var xhr = e.detail.xhr;
+    // A form that takes the refusal as drawn (topicsRefusal) gets the server's markup.
+    if (slot && slot.hasAttribute("data-err-html") && xhr && /data-refusal-kind/.test(xhr.responseText || "")) { topicsRefusal(form, slot, xhr.responseText); return; }
     if (slot) { slot.textContent = msg; slot.hidden = false; return; }
     toast(msg.length > 140 ? msg.slice(0, 140) + "…" : msg, "err");
   }
@@ -1887,3 +1890,30 @@
     });
   });
 })();
+
+// ---------- topics: the create form's refusal (Tp-04) ----------
+// The server answers a refused create with its refusal partial (a template of ours,
+// every value escaped); it is shown as drawn, and the name field is marked when the
+// refusal is about the name.
+function topicsRefusal(form, slot, html) {
+  slot.innerHTML = html;
+  slot.hidden = false;
+  var r = slot.querySelector("[data-refusal-name]");
+  var name = r ? r.getAttribute("data-refusal-name") : "";
+  var field = form.querySelector("#f-name");
+  if (field && (name === "INVALID_TOPIC_EXCEPTION" || name === "TOPIC_ALREADY_EXISTS")) field.setAttribute("aria-invalid", "true");
+}
+
+// "Set…" opens the create form's settings (Tp-03) and carries over what has been typed:
+// it reads the fields as they are when it is clicked.
+document.addEventListener("click", function (e) {
+  var a = e.target && e.target.closest ? e.target.closest("a[data-tp-set]") : null;
+  if (!a) return;
+  var name = document.getElementById("f-name"), parts = document.getElementById("f-partitions");
+  var u = new URL(a.href, location.href);
+  if (name && name.value) u.searchParams.set("name", name.value);
+  if (parts && parts.value) u.searchParams.set("partitions", parts.value);
+  e.preventDefault();
+  e.stopPropagation();
+  location.assign(u.toString());
+}, true);

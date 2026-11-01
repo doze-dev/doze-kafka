@@ -159,7 +159,7 @@ test('the composer writes a record encoded with the topic\'s schema, and says wh
 
   await page.goto('new/topic');
   await page.locator('#f-name').fill(topic);
-  await page.getByRole('button', { name: 'Create topic' }).click();
+  await page.locator('#create-topic').getByRole('button', { name: 'Create topic' }).click();
   await expect(page.locator('.idband h1')).toHaveText(topic);
   // Nothing is written yet: a subject named like the topic says nothing about its records.
   await expect(page.locator('#topic-facts')).not.toContainText('schema');

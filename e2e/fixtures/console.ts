@@ -114,7 +114,7 @@ export const test = base.extend<Fixtures>({
       await page.goto('new/topic');
       await page.locator('#f-name').fill(name);
       await page.locator('#f-partitions').fill(String(partitions));
-      await page.getByRole('button', { name: 'Create topic' }).click();
+      await page.locator('#create-topic').getByRole('button', { name: 'Create topic' }).click();
       await expect(page.locator('.idband h1')).toHaveText(name);
     });
   },
