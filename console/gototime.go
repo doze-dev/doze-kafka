@@ -85,6 +85,9 @@ func (b *backend) OffsetAtTime(ctx context.Context, topic string, partition int3
 	return p.Offset, p.Offset >= 0, nil
 }
 
+// utcStamp writes a time the way a sentence that quotes one does: "2026-10-07 10:30:00 UTC".
+func utcStamp(t time.Time) string { return t.UTC().Format("2006-01-02 15:04:05") + " UTC" }
+
 // atParam resolves ?at= into the tape's jump: the offset to go to, and the note to
 // show. asked is false when the box was not used.
 func (c *Console) atParam(r *http.Request, topic string, partition int32) (jump int64, note string, asked bool, err error) {
@@ -100,7 +103,7 @@ func (c *Console) atParam(r *http.Request, topic string, partition int32) (jump 
 	if err != nil {
 		return -1, "", true, err
 	}
-	stamp := t.Format("2006-01-02 15:04:05 UTC")
+	stamp := utcStamp(t)
 	if !found {
 		return -1, fmt.Sprintf("No message on this partition is at or after %s — showing the latest.", stamp), true, nil
 	}

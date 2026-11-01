@@ -1534,3 +1534,20 @@ html[data-paused] #inspector[data-traffic-kept] .tf-kept { display: block; }
 #members-table { --c: 150px 110px 130px 1fr 70px; }
 .memberwell { padding: 7px 10px; }
 .memberb .code { margin: 0; }
+
+/* Gr-06 (the reset form and its preview), Gr-07 (the refusal and the way out), Gr-08, Gr-15. */
+.resetrow { align-items: flex-start; }
+.resetform { width: 380px; flex: none; }
+.resetmode { border: 0; padding: 0; margin: 0; min-width: 0; }
+.resetmode legend { padding: 0; }
+.resetform .rst-at { width: 190px; }
+#reset-table { --c: 84px 1fr 1fr 110px; }
+#reset-table .rst-off { width: 100%; max-width: 120px; text-align: right; }
+.stepr { align-items: flex-start; }
+.stepn { flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: var(--bg); display: inline-flex; align-items: center; justify-content: center; font-family: var(--mono); font-weight: 700; font-size: var(--fs-xs); line-height: 1; }
+#reset-result:empty { display: none; }
+#reset-result { display: flex; flex-direction: column; gap: 10px; }
+.confirm-notes { display: flex; flex-direction: column; gap: 12px; }
+.confirm-notes[hidden] { display: none; }
+.confirm-call { margin-right: auto; align-self: center; }
+.resetmode input[type=radio] { font: inherit; color: inherit; margin: 0; }

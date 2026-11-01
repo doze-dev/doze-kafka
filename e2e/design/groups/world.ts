@@ -21,11 +21,17 @@ export const TOPIC = 'harbour.depot.dispatch';
 export const GROUP = 'g-depot-router';
 export const FIRST = 12;
 export const MORE = 14;
+/** Gr-06's world: a group with offsets and nobody in it (gen idle). */
+export const IDLE_TOPIC = 'harbour.loyalty.points';
+export const IDLE_GROUP = 'g-loyalty-etl';
+export const IDLE_PARTS = 6;
 
 export type GroupsWorld = {
   world: World;
   /** Fills the broker: topics, the held group, the lag. */
   fill(): Promise<void>;
+  /** Gr-06: IDLE_PARTS partitions of IDLE_TOPIC, and IDLE_GROUP behind on each with nobody in it. */
+  idle(): Promise<{ ends: number[]; committed: number[] }>;
   /** Records the ledger says went to each partition of TOPIC. */
   produced(): number[];
   stop(): Promise<void>;
@@ -54,6 +60,15 @@ export async function startGroupsWorld(base: number, prefix: string): Promise<Gr
       await run('produce', 'depot-feed', [TOPIC, String(FIRST)]);
       await Promise.all([1, 2, 3].map(() => run('member', 'depot-router', [GROUP, TOPIC, 'classic'], { HOLD: '1'})));
       await run('produce', 'depot-feed-2', [TOPIC, String(MORE)]);
+    },
+    async idle() {
+      await run('idle', 'loyalty-etl', [IDLE_TOPIC, String(IDLE_PARTS), IDLE_GROUP]);
+      for (const f of readdirSync(ledger).filter((f) => f.startsWith('loyalty-etl'))) {
+        for (const line of readFileSync(join(ledger, f), 'utf8').split('\n')) {
+          if (line.includes('"what":"idle"')) return JSON.parse(line);
+        }
+      }
+      throw new Error('the idle client wrote no ledger line');
     },
     produced() {
       const per = [0, 0, 0];

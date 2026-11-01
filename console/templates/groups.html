@@ -151,7 +151,7 @@ kafka-console-consumer.sh --bootstrap-server {{.Bootstrap}} \
       </div>
     </div>
 
-    <div class="note" id="group-facts">{{if eq .Tab "members"}}{{template "group_facts_members" .}}{{else}}{{template "group_facts_lag" .}}{{end}}</div>
+    <div class="note" id="group-facts">{{if eq .Tab "members"}}{{template "group_facts_members" .}}{{else if eq .Tab "offsets"}}{{template "group_facts_offsets" .}}{{else}}{{template "group_facts_lag" .}}{{end}}</div>
 
     {{template "group_neighbours" .}}
 
@@ -248,29 +248,73 @@ kafka-console-consumer.sh --bootstrap-server {{.Bootstrap}} \
 {{end}}
 {{end}}
 
-{{/* Offsets: change what the group has committed. An active group is refused first,
-     as real Kafka refuses it, so every control is disabled while members are connected. */}}
-{{define "group_offsets"}}
-<div class="callout{{if .CanAct}}{{else}} warn{{end}}" id="reset">
-  <div class="row sb ce wrap g8">
-    <span class="b">Reset offsets</span>
-    <div class="row ce g8 wrap">
-      {{if gt (len .Topics) 1}}
-      <label class="scope"><span class="sr-only">Which offsets to reset</span>
-        <select class="input" id="reset-scope" name="topic" {{if not .CanAct}}disabled{{end}}>
-          <option value="">all topics</option>
-          {{range .Topics}}<option value="{{.}}">{{.}}</option>{{end}}
-        </select></label>
-      {{else}}{{/* One topic: no choice to offer, and the buttons still send the scope they include (all of them). */}}<input type="hidden" id="reset-scope" name="topic" value="">
-      {{end}}
-      <button type="button" class="btn" {{if not (and .CanAct .Offsets)}}disabled title="{{if .Members}}Stop the group's {{len .Members}} consumer{{if ne (len .Members) 1}}s{{end}} first{{else}}No committed offsets to reset{{end}}"{{end}}
-        hx-post="{{groupURL .Group.ID}}/reset" hx-include="#reset-scope" hx-vals='{"to":"earliest","tab":"offsets"}' data-confirm-url="{{confirmURL "group.reset.earliest" "group" .Group.ID}}" data-confirm-title="{{(index .Confirm "group.reset.earliest").Title}}" data-confirm-verb="{{(index .Confirm "group.reset.earliest").Verb}}" hx-confirm="{{(index .Confirm "group.reset.earliest").Text}}" hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this">{{icon "skip-back"}} Reset to earliest</button>
-      <button type="button" class="btn" {{if not (and .CanAct .Offsets)}}disabled{{end}}
-        hx-post="{{groupURL .Group.ID}}/reset" hx-include="#reset-scope" hx-vals='{"to":"latest","tab":"offsets"}' data-confirm-url="{{confirmURL "group.reset.latest" "group" .Group.ID}}" data-confirm-title="{{(index .Confirm "group.reset.latest").Title}}" data-confirm-verb="{{(index .Confirm "group.reset.latest").Verb}}" hx-confirm="{{(index .Confirm "group.reset.latest").Text}}" hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this">{{icon "skip-forward"}} Reset to latest</button>
-    </div>
-  </div>
-  <span class="note">{{if .CanAct}}No member is connected, so the offsets can be moved. The change applies at once and cannot be undone.{{else}}{{if .Members}}{{len .Members}} member{{if ne (len .Members) 1}}s are{{else}} is{{end}} connected: stop the group's consumers first.{{else}}The group is not empty.{{end}} Real Kafka refuses to move an active group's offsets, and so does this.{{end}}</span>
+{{/* The sentence on the Offsets tab (Gr-06, Gr-07, Gr-08): whether the offsets can be moved, and why. */}}
+{{define "group_facts_offsets"}}{{if .Members}}{{len .Members}} member{{if ne (len .Members) 1}}s{{end}}{{if .Generation}} on {{.GenLabel}} <span class="m">{{.Generation}}</span>{{end}}{{if .Offsets}}, {{if .AnyAhead}}ahead of the log end somewhere{{else if eq .TotalLag 0}}<span class="m ok">caught up</span>{{else}}<span class="m warn">{{num .TotalLag}}</span> record{{if ne .TotalLag 1}}s{{end}} behind{{end}}{{end}}. Offsets can only be changed while the group has no members.
+{{else if not .Offsets}}No members and no committed offsets: there is nothing to reset.
+{{else if .CanAct}}No members; offsets kept on <span class="m">{{len .Offsets}}</span> partition{{if ne (len .Offsets) 1}}s{{end}} of {{if eq (len .Topics) 1}}one topic{{else}}<span class="m">{{len .Topics}}</span> topics{{end}}, {{if .AnyAhead}}ahead of the log end somewhere{{else if eq .TotalLag 0}}<span class="m ok">caught up</span>{{else}}<span class="m warn">{{num .TotalLag}}</span> record{{if ne .TotalLag 1}}s{{end}} behind{{end}}. Resetting is allowed because the group is <span class="m">Empty</span>.
+{{else}}The group is <span class="m">{{.Group.State}}</span>: offsets can only be changed while it is Empty.{{end}}{{end}}
+
+{{/* Gr-07: the refusal, with the way out. The same block is the answer to a reset sent to a group
+     that gained a member since the page was drawn (a 400 the page swaps in, X-Doze-Refusal). */}}
+{{define "group_refused"}}
+{{template "refusal" (dict "Refusal" .Refusal)}}
+<div class="card pad col g12" id="reset-steps">
+  <span class="h2">What to do</span>
+  <div class="row g12 stepr"><span class="stepn">1</span><div class="col"><span class="b">Stop the {{.Steps.Count}} consumer{{if ne .Steps.Count 1}}s{{end}} that use{{if eq .Steps.Count 1}}s{{end}} this group</span><span class="note">{{if .Steps.SameApp}}All {{lower (countWord .Steps.Count)}} are the app <span class="m">{{index .Steps.Clients 0}}</span>{{else if .Steps.Clients}}{{range $i, $c := .Steps.Clients}}{{if $i}}, {{end}}<span class="m">{{$c}}</span>{{end}}{{end}}{{if .Steps.Addrs}}{{if .Steps.Clients}}: {{end}}{{range $i, $a := .Steps.Addrs}}{{if $i}}, {{end}}<span class="m">{{$a}}</span>{{end}}{{end}}{{if or .Steps.Clients .Steps.Addrs}}. {{end}}A consumer that closes cleanly sends LeaveGroup, which makes the group Empty at once.</span></div></div>
+  <div class="row g12 stepr"><span class="stepn">2</span><div class="col"><span class="b">Or wait for them to expire</span><span class="note">A consumer that just disappears is evicted after its session timeout{{if .Steps.Session}} of <span class="m">{{.Steps.Session}}</span>{{end}}. Watch it on the <a href="{{groupURL .Group.ID}}?tab=timeline">Timeline</a>.</span></div></div>
+  <div class="row g12 stepr"><span class="stepn">3</span><div class="col"><span class="b">Reset, then start them again</span><span class="note">They resume from the new offsets. This tab shows the reset form once the group is Empty.</span></div></div>
+  <div class="row ce g8"><a class="btn" href="{{groupURL .Group.ID}}?tab=members">Show the {{.Steps.Count}} member{{if ne .Steps.Count 1}}s{{end}}</a><a class="btn" href="{{groupURL .Group.ID}}?tab=timeline">Watch the timeline</a></div>
 </div>
+{{end}}
+
+{{/* Gr-06: the preview. Committed now, after the reset, lag after: from the plan the reset itself
+     writes, and it sends nothing. In "specific offsets" the After column is the inputs. */}}
+{{define "group_reset_preview"}}
+<div class="col g8 grow" id="reset-preview" aria-live="polite">
+  <div class="row sb ce"><span class="b">Preview</span><span class="note">committed now, then after the reset. Nothing has changed yet.</span></div>
+  <div class="card" id="reset-table">
+    <div class="r h"><span>Partition</span><span class="ra">Committed now</span><span class="ra">After reset</span><span class="ra">Lag after</span></div>
+    {{range .Preview.Rows}}
+    <div class="r"><span class="m el">{{if $.Preview.Multi}}{{.Topic}} · {{end}}{{.Partition}}</span><span class="m ra">{{num .Committed}}</span>
+      {{if $.Preview.Specific}}<span class="ra"><input class="inp m rst-off" name="{{.Field}}" form="reset-form" inputmode="numeric" autocomplete="off" value="{{.After}}" data-latest="{{.Latest}}" aria-label="New offset for {{if $.Preview.Multi}}{{.Topic}} {{end}}partition {{.Partition}}, from {{.Earliest}} to {{.Latest}}" title="From {{.Earliest}} (the oldest record) to {{.Latest}} (the end)"></span>
+      {{else}}<span class="m ra b" title="{{.Note}}">{{if .Changed}}{{num .Committed}} → {{num .After}}{{else}}{{num .After}}{{end}}{{if .Note}} <span class="mut">*</span>{{end}}</span>{{end}}
+      <span class="m ra {{if gt .LagAfter 0}}warn{{else}}ok{{end}}" data-lag-after>{{num .LagAfter}}</span></div>
+    {{end}}
+    <div class="r totalrow"><span class="b">Total</span><span></span><span></span><span class="m ra b {{if gt .Preview.LagAfter 0}}warn{{else}}ok{{end}}" data-lag-total>{{num .Preview.LagAfter}}</span></div>
+  </div>
+  <div class="note">{{segs .Preview.Sentence}}{{range .Preview.Rows}}{{if .Note}} <span class="mut">*</span> Partition {{.Partition}}: {{.Note}}.{{end}}{{end}}</div>
+</div>
+{{if .Swap}}<span id="reset-count" hx-swap-oob="true">{{.Preview.Count}}</span>{{end}}
+{{end}}
+
+{{/* Offsets: change what the group has committed. The reset form is Gr-06; a group with members
+     gets Gr-07's refusal in its place; one partition's offset is set or removed in its row (Gr-08). */}}
+{{define "group_offsets"}}
+<div id="reset-result">{{if .Refusal}}{{template "group_refused" .}}{{end}}</div>
+{{if .Reset}}
+{{$f := .Reset}}
+<div class="row g16 resetrow" x-data="{to:'earliest', held:false}" @input="held=true" @change="held=true" :data-hold-live="held ? '' : null">
+  <form class="card pad col g12 resetform" id="reset-form"
+        hx-post="{{groupURL .Group.ID}}/reset" hx-vals='{"tab":"offsets"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]"
+        data-confirm-url="{{confirmURL "group.reset" "group" .Group.ID}}" data-confirm-title="Reset offsets" data-confirm-verb="Reset offsets" hx-confirm="{{(index .Confirm "group.reset.earliest").Text}}">
+    <span class="h2">Reset offsets</span>
+    <fieldset class="col g8 resetmode">
+      <legend class="cap">Move every partition to</legend>
+      <label class="row ce g8"><input type="radio" name="to" value="earliest" x-model="to" checked> <span class="b">earliest</span><span class="note">the oldest retained record</span></label>
+      <label class="row ce g8"><input type="radio" name="to" value="latest" x-model="to"> <span class="b">latest</span><span class="note">the end of the log</span></label>
+      <label class="row ce g8"><input type="radio" name="to" value="timestamp" x-model="to"> <span class="b">a timestamp</span><input class="inp m rst-at" id="reset-at" name="at" value="{{$f.At}}" aria-label="Timestamp" autocomplete="off" spellcheck="false" @focus="to='timestamp'; $dispatch('change')"></label>
+      <label class="row ce g8"><input type="radio" name="to" value="offsets" x-model="to"> <span class="b">specific offsets</span><span class="note">edit one row at a time</span></label>
+    </fieldset>
+    <label class="col g4"><span class="cap">Topic</span>
+      <select class="inp m" name="topic" aria-label="Topic">{{range $f.Scopes}}<option value="{{.Topic}}"{{if eq .Topic $f.Topic}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
+    <div class="row ce g8"><button class="btn pri" type="submit"><span>Apply: reset <span id="reset-count">{{if $f.Preview}}{{$f.Preview.Count}}{{end}}</span></span></button><a class="btn w5" href="{{groupURL .Group.ID}}">Cancel</a></div>
+    <span class="note">Consumers that join later start from the new offsets. Nothing is deleted from the topic.</span>
+    <div class="err form-err" data-err-slot hidden role="alert"></div>
+  </form>
+  <span hidden hx-post="{{groupURL .Group.ID}}/reset/preview" hx-include="#reset-form" hx-trigger="change from:#reset-form, change from:.rst-off, input from:#reset-at delay:500ms" hx-target="#reset-preview" hx-select="unset" hx-swap="outerHTML"></span>
+  {{if $f.Preview}}{{template "group_reset_preview" (dict "Preview" $f.Preview "Group" .Group)}}{{else}}<div class="col g8 grow" id="reset-preview"><div class="callout"><span class="b">Nothing to preview</span><span class="note">{{$f.PreviewErr}}</span></div></div>{{end}}
+</div>
+{{end}}
 
 {{if .Offsets}}
 <div class="tbl-wrap" id="offsets-table">
@@ -293,7 +337,7 @@ kafka-console-consumer.sh --bootstrap-server {{.Bootstrap}} \
           <button type="button" class="btn sm danger" aria-label="Remove the offset for {{.Topic}} partition {{.Partition}}"
             hx-post="{{groupURL $.Group.ID}}/offset/delete" hx-vals='{"topic":"{{.Topic}}","partition":"{{.Partition}}","tab":"offsets"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
             data-confirm-url="{{confirmURL "group.offset.delete" "group" $.Group.ID "topic" .Topic "partition" .Partition}}" data-confirm-title="Remove offset" data-confirm-verb="Remove"
-            hx-confirm="{{(confirmOffset $.Group.ID .Topic .Partition .Committed).Text}}">Remove</button>
+            hx-confirm="{{(confirmOffset $.Group.ID .Topic .Partition .Committed (len $.Offsets)).Text}}">Remove</button>
         </div>
         {{if not .Deleted}}
         <form class="rowset" x-show="e" x-cloak @keydown.escape.stop="e=false" hx-post="{{groupURL $.Group.ID}}/offset" hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]">

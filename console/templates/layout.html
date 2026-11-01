@@ -116,7 +116,8 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
         <h2 class="h2" id="confirm-title">Are you sure?</h2>
         <p id="confirm-msg"></p>
         <div class="kv" id="confirm-rows" style="--c: 118px 1fr" hidden></div>
-        <div class="row g8 confirm-f">
+        <div class="confirm-notes" id="confirm-notes" hidden></div>
+        <div class="row g8 confirm-f"><span class="note confirm-call" id="confirm-call" hidden></span>
           <button type="button" class="btn" id="confirm-no">Cancel</button>
           <button type="button" class="btn danger" id="confirm-yes">Confirm</button>
         </div>

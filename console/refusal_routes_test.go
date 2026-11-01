@@ -103,6 +103,7 @@ func TestEveryRouteRefusesInTheOneVocabulary(t *testing.T) {
 		{"GET /groups/{id}", "a group that is not there", c, "GET", "/_console/groups/ghost", nil, true, nil, answer{404, refused, "console", ""}},
 		{"GET /groups/{id}/live", "the poll of a group that is not there", c, "GET", "/_console/groups/ghost/live", nil, true, nil, answer{404, refused, "console", ""}},
 		{"POST /groups/{id}/reset", "resetting a group that is not there", c, "POST", "/_console/groups/ghost/reset", form("to", "earliest"), true, nil, answer{404, refused, "console", ""}},
+		{"POST /groups/{id}/reset/preview", "previewing a reset of a group that is not there", c, "POST", "/_console/groups/ghost/reset/preview", form("to", "earliest"), true, nil, answer{404, refused, "console", ""}},
 		{"POST /groups/{id}/offset", "an offset that is not a number", c, "POST", "/_console/groups/ghost/offset", form("topic", "orders", "partition", "0", "offset", "x"), true, nil, answer{400, refused, "console", ""}},
 		{"POST /groups/{id}/offset/delete", "deleting an offset of a group that is not there", c, "POST", "/_console/groups/ghost/offset/delete", form("topic", "orders", "partition", "0"), true, nil, answer{404, refused, "kafka", "GROUP_ID_NOT_FOUND"}},
 		{"POST /groups/{id}/delete", "deleting a group that is not there", c, "POST", "/_console/groups/ghost/delete", nil, true, nil, answer{404, refused, "kafka", "GROUP_ID_NOT_FOUND"}},

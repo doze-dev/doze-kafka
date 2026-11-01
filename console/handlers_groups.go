@@ -2,6 +2,7 @@ package console
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"maps"
@@ -363,14 +364,16 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 	}
 	tabs := []tabLink{tl("lag", "Lag", ""), tl("members", "Members", strconv.Itoa(len(members))), tl("timeline", "Timeline", ""), tl("offsets", "Offsets", "")}
 
+	canAct := detail.State == "Empty" && len(detail.Members) == 0
+	facts := groupFacts(insp, members)
 	out := map[string]any{
 		"Timeline": timeline, "HasTimeline": c.traffic != nil, "Group": detail, "Members": members, "Offsets": rows, "TotalLag": totalLag, "AnyAhead": anyAhead,
 		"TotalCommitted": totalCommitted, "TotalLogEnd": totalLogEnd, "Generation": generation, "GenLabel": genLabel,
-		"Facts":     groupFacts(insp, members),
+		"Facts":     facts,
 		"Topics":    topics,
 		"Try":       tryRow(rows),
-		"Confirm":   groupConfirms(id, rows),
-		"CanAct":    detail.State == "Empty" && len(detail.Members) == 0,
+		"Confirm":   groupConfirms(id, rows, len(members)),
+		"CanAct":    canAct,
 		"NoCommits": len(offsets) == 0,
 		"Hash":      fmt.Sprintf("%x", h.Sum64()),
 		"Tab":       tab, "Tabs": tabs, "View": groupView(tab),
@@ -378,6 +381,16 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 	}
 	if largest != nil {
 		out["Largest"] = largest
+	}
+	if tab == "offsets" {
+		// Gr-06: the reset form and its preview; Gr-07: with members, the refusal and the way out.
+		switch {
+		case len(members) > 0:
+			out["Refusal"] = refusalFor(&groupNotEmpty{Group: id, Members: len(members)})
+			out["Steps"] = stepsOf(members, facts, detail.Protocol)
+		case canAct && len(rows) > 0:
+			out["Reset"] = c.resetFormOf(r, id, rows)
+		}
 	}
 	return out, nil
 }
@@ -411,16 +424,34 @@ func (c *Console) groupLive(w http.ResponseWriter, r *http.Request) {
 	c.partial(w, "group_live", data)
 }
 
-// groupReset moves an inactive group's committed offsets to the earliest or latest
-// position (all of them, or those on one topic) and re-renders the live region.
+// groupReset moves an inactive group's committed offsets: to the earliest or latest
+// position, to a time (the first record at or after it) or to the offsets typed in the
+// rows; all of them, or those on one topic. A group with members is refused (Gr-07).
 func (c *Console) groupReset(w http.ResponseWriter, r *http.Request) {
-	id, to, topic := groupFromSegment(r.PathValue("id")), r.FormValue("to"), r.FormValue("topic")
-	n, err := c.be.ResetGroupOffsets(r.Context(), id, to, topic)
+	id, topic := groupFromSegment(r.PathValue("id")), r.FormValue("topic")
+	spec, err := resetSpecOf(r)
 	if err != nil {
 		c.fail(w, r, err)
 		return
 	}
-	msg := fmt.Sprintf("Reset %d offset%s to %s", n, plural(n), to)
+	n, err := c.be.ApplyReset(r.Context(), id, spec)
+	var gne *groupNotEmpty
+	if errors.As(err, &gne) {
+		c.groupRefused(w, r, id, err)
+		return
+	}
+	if err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	what := spec.To
+	switch spec.To {
+	case "timestamp":
+		what = utcStamp(spec.At)
+	case "offsets":
+		what = "the offsets entered"
+	}
+	msg := fmt.Sprintf("Reset %d offset%s to %s", n, plural(n), what)
 	if topic != "" {
 		msg += " on " + topic
 	}

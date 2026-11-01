@@ -80,6 +80,7 @@ var formFields = map[string]formField{
 	// Not settings: what is being written, or which thing is being looked at.
 	"name":           {Not: "the name of the topic being created, or the resource an ACL or a check is about"},
 	"topic":          {Not: "which topic of a group an action is about"},
+	"to":             {Not: "where a reset moves the offsets to: earliest, latest, a time or specific offsets"},
 	"partition":      {Not: "which partition of a topic a request is for"},
 	"partition_ctx":  {Not: "the partition the page is showing, carried through a form"},
 	"key":            {Not: "a record's key"},

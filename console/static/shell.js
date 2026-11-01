@@ -326,6 +326,8 @@
     if (xhr && xhr.getResponseHeader("X-Doze-Page") === "error") {
       e.detail.shouldSwap = true;
       e.detail.isError = false;
+    } else if (xhr && xhr.getResponseHeader("X-Doze-Refusal") && !isLivePoll(e)) {
+      groupsRefusalSwap(e); // a refusal the page keeps in place (Gr-07), not a toast.
     } else if (xhr && xhr.status >= 400 && !isLivePoll(e) && !isInspectorRequest(e)) {
       // A refusal (A2: Kafka's 4xx) or a failure, from something the person did: it
       // is said where they are looking, and is the answer, not an error of the page's.
@@ -517,6 +519,21 @@
       rows.appendChild(l); rows.appendChild(v);
     });
     rows.hidden = !(say.rows && say.rows.length);
+    // Callouts under the sentence (Gr-15: what the call touches, and what it does not).
+    var notes = document.getElementById("confirm-notes"), call = document.getElementById("confirm-call");
+    if (notes) {
+      notes.textContent = "";
+      (say.notes || []).forEach(function (n) {
+        var box = document.createElement("div"), head = document.createElement("div"), b = document.createElement("span"), body = document.createElement("span");
+        box.className = "callout" + (n.deny ? " deny" : ""); box.setAttribute("role", "note");
+        head.className = "row ce g8"; b.className = "b"; b.textContent = n.head; head.appendChild(b);
+        if (n.name) { var nm = document.createElement("span"); nm.className = "m"; nm.textContent = n.name; head.appendChild(nm); }
+        body.className = "note"; segs(body, n.body);
+        box.appendChild(head); box.appendChild(body); notes.appendChild(box);
+      });
+      notes.hidden = !(say.notes && say.notes.length);
+    }
+    if (call) { call.textContent = say.call || ""; call.hidden = !say.call; }
     var yes = document.getElementById("confirm-yes"), no = document.getElementById("confirm-no");
     yes.textContent = say.verb || "Confirm";
     box.hidden = false;
@@ -1916,3 +1933,29 @@ function groupsResetOffsets() {
   if (!b) return false;
   b.click();
 }
+
+// Gr-07: a reset the console refused (the group has members) is drawn where the page keeps
+// its refusals, #reset-result, whether the form that asked was the page's or a preview.
+function groupsRefusalSwap(e) {
+  var slot = document.getElementById("reset-result");
+  if (!slot) return;
+  e.detail.shouldSwap = true;
+  e.detail.isError = false;
+  e.detail.target = slot;
+}
+
+// Gr-06, "specific offsets": the Lag after column follows what is typed, from the log end
+// each row carries; the broker's own numbers are in the page, the sum is the page's.
+document.addEventListener("input", function (e) {
+  var inp = e.target;
+  if (!inp.classList || !inp.classList.contains("rst-off")) return;
+  var row = inp.closest(".r"), cell = row && row.querySelector("[data-lag-after]");
+  var v = inp.value.trim(), n = /^\d+$/.test(v) ? parseInt(v, 10) : NaN, latest = parseInt(inp.getAttribute("data-latest"), 10);
+  if (cell && !isNaN(n) && !isNaN(latest)) {
+    cell.textContent = Math.max(0, latest - n).toLocaleString("en-US");
+    cell.className = "m ra " + (latest - n > 0 ? "warn" : "ok");
+  }
+  var total = 0, sum = document.querySelector("#reset-table [data-lag-total]");
+  document.querySelectorAll("#reset-table [data-lag-after]").forEach(function (c) { total += parseInt(c.textContent.replace(/,/g, ""), 10) || 0; });
+  if (sum) sum.textContent = total.toLocaleString("en-US");
+});

@@ -183,7 +183,7 @@ func TestResetAndDeleteAnInactiveGroup(t *testing.T) {
 	if offs, _ := c.be.GroupOffsets(context.Background(), "idle"); offs[0].Committed != 0 {
 		t.Fatalf("after reset to earliest the committed offset is %d, want 0", offs[0].Committed)
 	}
-	if code, body := post("/_console/groups/idle/reset", url.Values{"to": {"sideways"}}); code != 400 || !strings.Contains(body, "earliest or latest") {
+	if code, body := post("/_console/groups/idle/reset", url.Values{"to": {"sideways"}}); code != 400 || !strings.Contains(body, "specific offsets") {
 		t.Errorf("a bad target: %d %q", code, body)
 	}
 

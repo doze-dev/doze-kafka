@@ -186,7 +186,10 @@ func TestEveryConfirmIsTrueOfWhatTheActionDoes(t *testing.T) {
 		commitFor(t, addr, "gd", "gd1", map[int32]int64{0: 0, 1: 0})
 		commitFor(t, addr, "gd", "gd2", map[int32]int64{0: 0})
 		say := confirmOn(t, req(t, c, "GET", "/_console/groups/gd", nil).Body.String(), "/_console/groups/gd/delete")
-		n, topics := numberBefore(t, say, "committed offsets"), numberBefore(t, say, "topics")
+		n, topics := numberBefore(t, say, "committed offsets"), 0
+		if strings.Contains(say, "on gd1 and gd2.") {
+			topics = 2
+		}
 		if got := len(offsetsOf(t, c, "gd")); got != n || topics != 2 {
 			t.Errorf("says %d offsets on %d topics; the group holds %d: %s", n, topics, got, say)
 		}
@@ -207,22 +210,18 @@ func TestEveryConfirmIsTrueOfWhatTheActionDoes(t *testing.T) {
 		// Committed at 2, at the start (0), and at the end (6): moving to earliest changes two, to latest two.
 		commitFor(t, addr, group, topic, map[int32]int64{0: 2, 1: 0, 2: 6})
 		before := offsetsOf(t, c, group)
-		say := confirmOn(t, req(t, c, "GET", "/_console/groups/"+group+"?tab=offsets", nil).Body.String(), "/_console/groups/"+group+"/reset")
-		_ = say
-		var found string
-		for _, m := range regexp.MustCompile(`(?s)<button[^>]*>`).FindAllString(req(t, c, "GET", "/_console/groups/"+group+"?tab=offsets", nil).Body.String(), -1) {
-			if strings.Contains(m, `hx-vals='{"to":"`+to+`"`) {
-				found = html.UnescapeString(regexp.MustCompile(`hx-confirm="([^"]*)"`).FindStringSubmatch(m)[1])
-			}
+		// The form asks for the sentence of the mode it is on, measured when Apply is pressed.
+		rec := req(t, c, "GET", "/_console/confirm/group.reset?group="+group+"&to="+to, nil)
+		var live struct{ Text string }
+		if err := json.Unmarshal(rec.Body.Bytes(), &live); err != nil || live.Text == "" {
+			t.Fatalf("no confirm for reset to %s: %d %s", to, rec.Code, rec.Body)
 		}
-		if found == "" {
-			t.Fatalf("no confirm for reset to %s", to)
-		}
+		found := live.Text
 		moves, of := numberBefore(t, found, "offsets of its"), 0
 		if m := regexp.MustCompile(`of its (\d+)`).FindStringSubmatch(found); m != nil {
 			of, _ = strconv.Atoi(m[1])
 		}
-		rec := req(t, c, "POST", "/_console/groups/"+group+"/reset", url.Values{"to": {to}})
+		rec = req(t, c, "POST", "/_console/groups/"+group+"/reset", url.Values{"to": {to}})
 		if rec.Code != 200 {
 			t.Fatalf("reset: %d %s", rec.Code, rec.Body)
 		}
@@ -259,7 +258,7 @@ func TestEveryConfirmIsTrueOfWhatTheActionDoes(t *testing.T) {
 				say = html.UnescapeString(regexp.MustCompile(`hx-confirm="([^"]*)"`).FindStringSubmatch(m)[1])
 			}
 		}
-		if !strings.Contains(say, "od partition 0") || !strings.Contains(say, "it is at 3") {
+		if !strings.Contains(say, "od partition 0") || !strings.Contains(say, "read up to 3") || !strings.Contains(say, "The other 1 stay") {
 			t.Fatalf("the confirm does not name the offset it removes: %q", say)
 		}
 		if rec := req(t, c, "POST", "/_console/groups/od-g/offset/delete", url.Values{"topic": {"od"}, "partition": {"0"}}); rec.Code != 200 {
@@ -331,6 +330,9 @@ func TestEveryDestructiveRouteHasAConfirm(t *testing.T) {
 		}
 		b, _ := os.ReadFile(f)
 		for _, m := range destructive.FindAllString(string(b), -1) {
+			if strings.HasSuffix(m, "/reset/preview") {
+				continue // sends nothing: the preview of a reset, which has its confirm.
+			}
 			found[m] = true
 		}
 	}

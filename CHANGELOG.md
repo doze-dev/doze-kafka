@@ -6,6 +6,12 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Groups: the Offsets tab is the reset form (Gr-06): earliest, latest, a timestamp (the first
+  record at or after it, per partition, by ListOffsets) or specific offsets, for all topics or
+  one, with a preview (committed now, after, lag after; `POST /groups/{id}/reset/preview`, which
+  sends nothing). A group with members is refused with the way out (Gr-07), and the range of one
+  partition's offset is the console's own rule, said as such (GRP-15, GRP-16). Delete group and
+  Remove offset confirm with counts and consequences (Gr-15, GRP-32).
 - Groups: the group page's Lag and Members tabs follow Gr-02 and Gr-03. The sentence under the
   title takes the generation, the leader and the timeouts from the coordinator's memory (a
   consumer-protocol group says it has no leader and no per-member timeouts, and the console says

@@ -83,6 +83,13 @@ const (
 	SourceConsole  = "console"
 )
 
+// ruledError is a refusal by a rule of the console's own that says which rule: the
+// message is what was asked, the rule is why it is not done. It is an errBadInput.
+type ruledError struct{ msg, rule string }
+
+func (e *ruledError) Error() string        { return e.msg }
+func (e *ruledError) Is(target error) bool { return target == errBadInput }
+
 // kafkaRefusal is an error from the broker that kept its code and the broker's own
 // ErrorMessage (which a response carries beside the code and which a franz-go
 // producer discards). It unwraps to the *kerr.Error.
@@ -107,6 +114,8 @@ func refusalFor(err error) Refusal {
 	var kr *kafkaRefusal
 	var ke *kerr.Error
 	var re *regError
+	var gne *groupNotEmpty
+	var rule *ruledError
 	switch {
 	case errors.As(err, &re):
 		return registryRefusal(re, err)
@@ -117,6 +126,13 @@ func refusalFor(err error) Refusal {
 	case errors.Is(err, errNotFound):
 		return Refusal{Kind: Refused, Source: SourceConsole, Status: http.StatusNotFound, Heading: "Not found", NotFound: true,
 			Message: err.Error(), Rule: "There is no such page or thing."}
+	case errors.As(err, &gne):
+		return Refusal{Kind: Refused, Source: SourceConsole, Status: http.StatusBadRequest, Heading: "The group is not empty",
+			Message: fmt.Sprintf("The group has %d active member%s. Offsets can only be reset or changed while a group has no members.", gne.Members, plural(gne.Members)),
+			Rule: "A commit from outside the group is only accepted while it has no members, and a live member would overwrite the change with its next auto-commit. " +
+				"Kafka answers a classic group's member-less commit with UNKNOWN_MEMBER_ID (recorded); the console refuses before it sends one."}
+	case errors.As(err, &rule):
+		return Refusal{Kind: Refused, Source: SourceConsole, Status: http.StatusBadRequest, Heading: "Check the form", Message: rule.msg, Rule: rule.rule}
 	case errors.Is(err, errBadInput):
 		return Refusal{Kind: Refused, Source: SourceConsole, Status: http.StatusBadRequest, Heading: "Check the form",
 			Message: err.Error(), Rule: "Refused by the console: the request does not satisfy a rule of the form."}

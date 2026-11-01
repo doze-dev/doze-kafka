@@ -85,4 +85,36 @@ export const MEMBERS: Probe[] = [
   { el: 'inspector button', board: 'aside.insp .bd > .row.g8 .btn', live: '#inspector .memberb > .row.g8 .btn', text: true },
 ];
 
+/** Gr-06: the Offsets tab of an Empty group, the reset form and its preview. */
+export const RESET: Probe[] = [
+  { el: 'reset card', board: 'main .card.pad', live: '#reset-form' },
+  { el: 'reset title', board: 'main .card.pad > .h2', live: '#reset-form > .h2', text: true },
+  { el: 'mode fieldset', board: 'main .card.pad fieldset', live: '#reset-form fieldset' },
+  { el: 'mode legend', board: 'main .card.pad legend', live: '#reset-form legend', text: true },
+  { el: 'mode earliest', board: 'main .card.pad fieldset label', live: '#reset-form fieldset label', text: true },
+  { el: 'mode earliest radio', board: 'main .card.pad fieldset label input', live: '#reset-form fieldset label input' },
+  { el: 'mode latest', board: 'main .card.pad fieldset label', live: '#reset-form fieldset label', nth: 1, text: true },
+  { el: 'mode timestamp', board: 'main .card.pad fieldset label', live: '#reset-form fieldset label', nth: 2, text: true },
+  { el: 'timestamp field', board: 'main .card.pad fieldset input.inp', live: '#reset-at', free: { w: TEXT_W } },
+  { el: 'mode offsets', board: 'main .card.pad fieldset label', live: '#reset-form fieldset label', nth: 3, text: true },
+  { el: 'topic label', board: 'main .card.pad > label', live: '#reset-form > label' },
+  { el: 'topic cap', board: 'main .card.pad > label > .cap', live: '#reset-form > label > .cap', text: true },
+  { el: 'topic select', board: 'main .card.pad select', live: '#reset-form select', free: { w: TEXT_W } },
+  { el: 'apply row', board: 'main .card.pad > .row.ce.g8', live: '#reset-form > .row.ce.g8' },
+  { el: 'apply', board: 'main .card.pad .btn.pri', live: '#reset-form .btn.pri', text: true },
+  { el: 'cancel', board: 'main .card.pad .btn:not(.pri)', live: '#reset-form .btn:not(.pri)', text: true },
+  { el: 'reset note', board: 'main .card.pad > .note', live: '#reset-form > .note', text: true },
+  { el: 'preview', board: 'main .col.g8.grow', live: '#reset-preview', free: { h: DATA_ROWS } },
+  { el: 'preview head', board: 'main .col.g8.grow > .row.sb', live: '#reset-preview > .row.sb' },
+  { el: 'preview head word', board: 'main .col.g8.grow > .row.sb > .b', live: '#reset-preview > .row.sb > .b', text: true },
+  { el: 'preview head note', board: 'main .col.g8.grow > .row.sb > .note', live: '#reset-preview > .row.sb > .note', text: true },
+  { el: 'preview card', board: 'main .col.g8.grow > .card', live: '#reset-table', free: { h: DATA_ROWS } },
+  { el: 'preview head row', board: 'main .col.g8.grow > .card > .r.h', live: '#reset-table > .r.h' },
+  { el: 'preview head cell', board: 'main .col.g8.grow > .card > .r.h > span', live: '#reset-table > .r.h > span', text: true },
+  { el: 'preview row', board: 'main .col.g8.grow > .card > .r:not(.h)', live: '#reset-table > .r:not(.h):not(.totalrow)' },
+  { el: 'preview row cell', board: 'main .col.g8.grow > .card > .r:not(.h) > span', live: '#reset-table > .r:not(.h):not(.totalrow) > span', nth: 2, free: { w: TEXT_W } },
+  { el: 'preview total', board: 'main .col.g8.grow > .card > .r:last-child', live: '#reset-table > .r.totalrow' },
+  { el: 'preview sentence', board: 'main .col.g8.grow > .note', live: '#reset-preview > .note', free: { h: TEXT_H } },
+];
+
 export { SHELL };
