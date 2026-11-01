@@ -486,6 +486,10 @@ test('Sy-06: behind the key sheet Traffic ignores p, e, r, j, k, u, m and c; clo
   }
   await page.keyboard.press('Escape');
   await expect(page.locator('#help')).toBeHidden();
+  // The page clears data-connection-lost when a poll succeeds (every 2.5 s), and this test
+  // spends about two seconds on the keys above; set it again so the r that follows finds a
+  // lost connection however long they took.
+  await page.evaluate(() => document.documentElement.setAttribute('data-connection-lost', ''));
   await page.keyboard.press('r');
   expect(await keyClicks(page)).toEqual(['data-retry']);
   await page.evaluate(() => document.documentElement.removeAttribute('data-connection-lost'));
