@@ -5,7 +5,7 @@ import "testing"
 type fakeInspector map[string]GroupSnapshot
 
 func (f fakeInspector) InspectGroup(id string) (GroupSnapshot, bool) { g, ok := f[id]; return g, ok }
-func (f fakeInspector) InspectGroups() []GroupSnapshot                { return nil }
+func (f fakeInspector) InspectGroups() []GroupSnapshot               { return nil }
 
 func TestInspectGroupSaysWhenItCannotSee(t *testing.T) {
 	c := &Console{}
