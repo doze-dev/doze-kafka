@@ -23,7 +23,7 @@
 </div>
 {{if .InspGone}}
 <div class="inspector-b"><div class="note">{{.InspGoneMsg}} Close this and choose another.</div></div>
-{{else if eq .InspKind "message"}}{{template "inspector_message" .}}
+{{else if eq .InspKind "message"}}{{if .Resend}}{{template "inspector_resend" .}}{{else}}{{template "inspector_message" .}}{{end}}
 {{else if eq .InspKind "member"}}{{template "inspector_member" .}}
 {{else if eq .InspKind "subject"}}{{template "inspector_subject" .}}
 {{else if eq .InspKind "transaction"}}{{template "inspector_transaction" .}}

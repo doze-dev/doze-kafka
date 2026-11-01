@@ -415,27 +415,13 @@
     setDock(true);
     var form = panel.querySelector("#compose-body form");
     var st = window.Alpine ? Alpine.$data(form) : null;
-    var key = form.querySelector('input[name="key"]');
-    if (key) key.value = b.getAttribute("data-key") || "";
-    var sel = form.querySelector('select[name="partition"]');
-    if (sel) sel.value = b.getAttribute("data-partition");
-    // A record read through the registry is edited as JSON and sent encoded again.
-    var sp = form.querySelector('select[name="schema_subject"]');
-    if (sp) sp.value = b.getAttribute("data-schema") || "";
-    var ta = form.querySelector('textarea[name="value"]');
-    var val = b.getAttribute("data-value") || "";
-    if (ta && window.dozeEditor) dozeEditor.set(ta, val); else if (ta) ta.value = val;
-    if (st) {
-      st.keyB64 = b.getAttribute("data-key-enc") === "base64";
-      st.keyEmpty = b.getAttribute("data-key-empty") === "1";
-      st.valB64 = b.getAttribute("data-value-enc") === "base64";
-      st.tomb = b.getAttribute("data-tombstone") === "1";
-      try {
-        st.hdrs = JSON.parse(b.getAttribute("data-headers") || "[]").map(function (r) {
-          return { k: r.k, v: r.v, b64: !!r.b64 };
-        });
-      } catch (err) { st.hdrs = []; }
-    }
+    var hdrs = [];
+    try { hdrs = JSON.parse(b.getAttribute("data-headers") || "[]").map(function (r) { return { k: r.k, v: r.v, b64: !!r.b64 }; }); } catch (err) { hdrs = []; }
+    if (st) st.fill({
+      key: b.getAttribute("data-key") || "", keyB64: b.getAttribute("data-key-enc") === "base64", keyEmpty: b.getAttribute("data-key-empty") === "1",
+      value: b.getAttribute("data-value") || "", valB64: b.getAttribute("data-value-enc") === "base64", tombstone: b.getAttribute("data-tombstone") === "1",
+      hdrs: hdrs, subject: b.getAttribute("data-schema") || "", partition: parseInt(b.getAttribute("data-partition"), 10) || 0,
+    });
     focusComposer();
   });
 

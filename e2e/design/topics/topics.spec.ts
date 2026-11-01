@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { BASE_URL } from '../../playwright.config';
 import { livePage, runBoard } from '../lib/gate';
-import { CREATE, SETTINGS, REFUSED, NONE, TOPIC_BODY, TOPIC_COMMON, TOPIC_TABLE, MESSAGE_PANEL, MESSAGE_TABLE } from './boards';
+import { CREATE, SETTINGS, REFUSED, NONE, TOPIC_BODY, TOPIC_COMMON, TOPIC_TABLE, MESSAGE_PANEL, MESSAGE_TABLE, COMPOSE } from './boards';
 import { TOPIC, TRACED, recordOpen } from '../lib/topic';
 import { OwnBroker } from '../../ownbroker';
 import { openLive } from '../lib/render';
@@ -58,6 +58,27 @@ test('Tp-06 matches the message inspector', async ({ browser }) => {
     id: 'Tp-06', file: 'Tp-06-Message',
     live: livePage(BASE_URL, TRACED, async (p) => { await recordOpen(p); await p.locator('#inspector-copy').click(); await p.locator('.tp-copymenu').waitFor(); await p.mouse.move(0, 0); }),
     probes: [...SHELL, ...TOPIC_COMMON, ...TOPIC_BODY.slice(0, 7), ...MESSAGE_PANEL, ...MESSAGE_TABLE], allow: ALLOW,
+  });
+  expect(out.text, out.text).toBe('');
+});
+
+test('Tp-10 matches the composer', async ({ browser }) => {
+  test.setTimeout(120_000);
+  const out = await runBoard(browser, {
+    id: 'Tp-10', file: 'Tp-10-Compose',
+    live: livePage(BASE_URL, `topics/${TOPIC}`, async (p) => {
+      await p.locator('#compose-head').click();
+      await p.locator('#f-key').fill('HRB-2026-04812');
+      await p.locator('#f-value').fill('{"orderId":"HRB-2026-04812","lines":2,"total":44.10,"currency":"EUR"}');
+      for (const [k, v] of [['traceparent', '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01'], ['source', 'console']]) {
+        await p.getByRole('button', { name: '+ Add header' }).click();
+        await p.getByLabel('Header key').last().fill(k);
+        await p.getByLabel('Header value', { exact: true }).last().fill(v);
+      }
+      await expect(p.locator('.tp-cp-sent')).toContainText('by key');
+      await p.mouse.move(0, 0);
+    }),
+    probes: [...SHELL, ...COMPOSE], allow: ALLOW,
   });
   expect(out.text, out.text).toBe('');
 });

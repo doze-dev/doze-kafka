@@ -476,6 +476,7 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 		"keyGroups":       keyGroups,
 		"dialogHints":     dialogHints,
 		"acksChoices":     acksChoices,
+		"clientID":        func() string { return ClientID },
 		"topicNameRule":   topicNameRule,
 		"topicNameMax":    topicNameMax,
 		"takenRule":       takenRule,

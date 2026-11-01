@@ -182,3 +182,63 @@ export const MESSAGE_TABLE: Probe[] = [
   { el: 'record open', board: `${REC} > .r.on`, live: '#messages-table tbody tr.on', free: { y: T_ROWS } },
   ...CELLS6.map((c, i): Probe => ({ el: `cell ${c}`, board: `${REC} > .r.on > span`, live: '#messages-table tbody tr.on > td', nth: i, free: { y: T_ROWS } })),
 ];
+
+// ---------- Tp-10: the composer ----------
+const CARD = 'main > .card[style*="flex: 1"]';
+const HEAD = `${CARD} > .row.sb.ce:first-child`;
+const LB = `${CARD} > .row.g16 > .col.g12:first-child`;
+const RB = `${CARD} > .row.g16 > .col.g12.grow`;
+const AT_FOOT10 = 'it sits at the page\'s foot under the records, which fill the page, as the card does on every topic page; the board draws three sample records above it';
+const COMPOSE_Y = 'the composer is below the page\'s records, so every y in it is lower than the board\'s by their height; the console\'s card is as tall as its content';
+const CY = { y: COMPOSE_Y } as const;
+/** Tp-10: the open composer, every part of it, in the state the board draws: a key, a JSON value, two headers, acks 1. */
+export const COMPOSE: Probe[] = [
+  { el: 'composer', board: CARD, live: '#compose-panel', free: { y: AT_FOOT10, h: 'the board\'s card fills the space under three records; the console\'s is its content' } },
+  { el: 'c head', board: HEAD, live: '#compose-head', free: CY },
+  { el: 'c head title', board: `${HEAD} .h2`, live: '#compose-head .h2', text: true, free: CY },
+  { el: 'c head topic', board: `${HEAD} .m.mut`, live: '#compose-head .open-only .m', free: { ...CY, w: TEXT_W } },
+  { el: 'c head note', board: `${HEAD} .note`, live: '#compose-head .open-only .note', text: true, free: CY },
+  { el: 'c fold', board: `${HEAD} .btn.sm.ghost`, live: '#compose-head .btn.sm', text: true, free: CY },
+  { el: 'c body', board: `${CARD} > .row.g16`, live: '.tp-cp-body', free: { ...CY, h: 'its height is its taller column' } },
+  { el: 'c left', board: LB, live: '.tp-cp-left', free: { ...CY, h: 'its height is its fields, which carry the console\'s own extras (the schema picker, the empty-key switch)' } },
+  { el: 'c part col', board: `${LB} > .row.g12 > .col.g4:first-child`, live: '.tp-cp-part', free: { ...CY, h: 'its note is the sentence for this topic\'s partitions' } },
+  { el: 'c part label', board: '#l-part', live: '#l-part', text: true, free: CY },
+  { el: 'c part seg', board: '[aria-labelledby="l-part"]', live: '[aria-labelledby="l-part"]', free: CY },
+  { el: 'c part on', board: '[aria-labelledby="l-part"] .on', live: '[aria-labelledby="l-part"] .on', text: true, free: CY },
+  { el: 'c part off', board: '[aria-labelledby="l-part"] > span:not(.on)', live: '[aria-labelledby="l-part"] > button:not(.on)', text: true, free: CY },
+  { el: 'c part note', board: `${LB} > .row.g12 > .col.g4:first-child > .note`, live: '.tp-cp-part > .note', free: { ...CY, h: TEXT_H, w: 'its text is wrapped by the column' } },
+  { el: 'c key col', board: `${LB} > .row.g12 > .col.g4.grow`, live: '.tp-cp-left > .row.g12 > .col.g4.grow', free: { ...CY, h: 'it is as tall as the partition column beside it' } },
+  { el: 'c key label', board: 'label[for="c-key"]', live: 'label[for="f-key"]', free: { ...CY, w: 'the console\'s label also carries the empty-key switch' } },
+  { el: 'c key optional', board: 'label[for="c-key"] .note', live: 'label[for="f-key"] .note', text: true, free: CY },
+  { el: 'c key b64', board: 'label[for="c-key"] .tag', live: 'label[for="f-key"] .tp-tag', text: true, free: CY },
+  { el: 'c key', board: '#c-key', live: '#f-key', free: CY },
+  { el: 'c acks label', board: '#l-acks', live: '#l-acks', text: true, free: { ...CY, h: 'it is the field of the line above' } },
+  { el: 'c acks seg', board: '[aria-labelledby="l-acks"]', live: '[aria-labelledby="l-acks"]', free: CY },
+  { el: 'c acks on', board: '[aria-labelledby="l-acks"] .on', live: '[aria-labelledby="l-acks"] .on', text: true, free: CY },
+  { el: 'c value col', board: `${LB} > .col.g4:last-child`, live: '.tp-ord2', free: { ...CY, h: 'its height is the note under the textarea' } },
+  { el: 'c value row', board: `${LB} > .col.g4:last-child > .row.sb.ce`, live: '.tp-ord2 > .row.sb.ce', free: CY },
+  { el: 'c value label', board: 'label[for="c-val"]', live: 'label[for="f-value"]', text: true, free: CY },
+  { el: 'c value b64', board: 'label[for="c-val"] .tag', live: 'label[for="f-value"] .tp-tag', text: true, free: CY },
+  { el: 'c mode seg', board: '[aria-label="Value mode"]', live: '[aria-label="Value mode"]', free: CY },
+  { el: 'c mode on', board: '[aria-label="Value mode"] .on', live: '[aria-label="Value mode"] .on', text: true, free: CY },
+  { el: 'c value', board: '#c-val', live: '#f-value', free: CY },
+  { el: 'c valid', board: `${LB} > .col.g4:last-child > .note`, live: '#compose-valid', free: { ...CY, w: TEXT_W } },
+  { el: 'c right', board: RB, live: '.tp-cp-body > .col.g12.grow', free: { ...CY, h: 'it is as tall as its content' } },
+  { el: 'c headers col', board: `${RB} > .col.g4:first-child`, live: '.tp-cp-body > .col.g12.grow > .col.g4:first-child', free: { ...CY, h: 'the console adds the Rows/JSON switch under the rows' } },
+  { el: 'c headers label', board: '#l-hdrs', live: '#l-hdrs', text: true, free: CY },
+  { el: 'c header key 0', board: 'input[aria-label="Header key"]', live: 'input[aria-label="Header key"]', free: CY },
+  { el: 'c header value 0', board: 'input[aria-label="Header value"]', live: 'input[aria-label="Header value"]', free: { ...CY, w: 'it takes the rest of the row' } },
+  { el: 'c header b64 0', board: 'button[aria-label="Value is base64"]', live: 'button[aria-label="b64 header value: the value is base64"]', text: true, free: { ...CY, x: 'it follows the value, whose width is the row\'s rest' } },
+  { el: 'c header remove 0', board: 'button[aria-label="Remove header"]', live: 'button[aria-label="Remove header"]', text: true, free: CY },
+  { el: 'c header key 1', board: 'input[aria-label="Header key"]', nth: 1, live: 'input[aria-label="Header key"]', free: CY },
+  { el: 'c add header', board: `${RB} > .col.g4:first-child > .btn.sm`, live: '.tp-cp-body > .col.g12.grow > .col.g4:first-child .btn.sm.tp-fit', text: true, free: CY },
+  { el: 'c sent col', board: `${RB} > .col.g4:nth-child(2)`, live: '.tp-cp-body > .col.g12.grow > .col.g4:has(.tp-cp-sent)', free: CY },
+  { el: 'c sent cap', board: `${RB} > .col.g4:nth-child(2) .cap`, live: '.tp-cp-body > .col.g12.grow > .col.g4:has(.tp-cp-sent) .cap', text: true, free: CY },
+  { el: 'c sent kv', board: `${RB} .kv`, live: '.tp-cp-sent', free: CY },
+  { el: 'c callout', board: `${RB} > .callout`, live: '.tp-cp-body > .col.g12.grow > .callout:not([style*="none"])', free: { ...CY, h: TEXT_H } },
+  { el: 'c callout title', board: `${RB} > .callout .b`, live: '.tp-cp-body > .col.g12.grow > .callout:not([style*="none"]) .b', free: CY },
+  { el: 'c foot', board: `${CARD} > .row.sb.ce:last-child`, live: '.tp-cp-foot', free: CY },
+  { el: 'c foot note', board: `${CARD} > .row.sb.ce:last-child > .note`, live: '.tp-cp-foot > .note:not([style*="none"])', text: true, free: CY },
+  { el: 'c clear', board: `${CARD} > .row.sb.ce:last-child .btn:not(.pri)`, live: '.tp-cp-foot .btn:not(.pri)', text: true, free: CY },
+  { el: 'c send', board: `${CARD} > .row.sb.ce:last-child .btn.pri`, live: '.tp-cp-foot .btn.pri', free: { ...CY, w: 'the console draws the send glyph before the word' } },
+];

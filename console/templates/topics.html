@@ -192,6 +192,7 @@
       {{range .Tabs}}<a class="tab {{if .On}}on{{end}}" href="{{.URL}}"{{if .On}} aria-current="page"{{end}}>{{.Label}}{{if .Count}} <span class="m mut">{{.Count}}</span>{{end}}</a>{{end}}
     </nav>
 
+    <div id="resend-note" role="status"></div>
     {{if eq .Tab "messages"}}{{template "tape_and_table" .}}
     {{else if eq .Tab "partitions"}}{{template "topic_partitions" .}}
     {{else if eq .Tab "readers"}}{{template "topic_readers" .}}
@@ -207,6 +208,9 @@
         <span class="sub">the same fields the Produce API has</span>
         <span class="kbd">p</span>
         <span class="twist">{{icon "chevron"}}</span>
+        {{/* Tp-10: open, the bar is the composer's head: its title, the topic, the note and the fold control. */}}
+        <span class="open-only row ce g8"><span class="h2">Send a message</span><span class="m mut">to {{.Topic.Name}}</span></span>
+        <span class="open-only row ce g8"><span class="note">the same fields the Produce API has</span><span class="btn sm ghost" aria-label="Collapse composer">▾</span></span>
       </button>
       {{/* Sy-01 part 7 (and Tp-05's Try it row): closed, the composer is still a key, a
            value and Send. The partition is chosen by the key and acks is 1, as the open
@@ -223,62 +227,59 @@
         <div class="err form-err" data-err-slot hidden role="alert"></div>
       </form>
       <div class="dock-form" id="compose-body">
-        <form hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" {{if eq .Tab "messages"}}hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML"{{else}}hx-swap="none"{{end}} x-data="{hdrs:[], acks:'1', keyEmpty:false, keyB64:false, valB64:false, tomb:false}" x-effect="window.dozeEditor && dozeEditor.setValidate($refs.value, !(valB64 || tomb), tomb ? 'null value — nothing is sent' : (valB64 ? 'base64 — sent as raw bytes' : ''))" @htmx:after-request="if($event.detail.xhr.status < 400){window.dozeEditor?dozeEditor.set($refs.value,''):$refs.value.value='';$refs.key.value='';hdrs=[];keyEmpty=false;keyB64=false;valB64=false;tomb=false}">
+        <form class="tp-compose" id="compose-form" hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" {{if eq .Tab "messages"}}hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML"{{else}}hx-swap="none"{{end}}
+          x-data="topicsCompose({preview: '{{topicURL .Topic.Name}}/compose/preview', parts: {{.Topic.Partitions}}, fixed: {{if ge .Partition 0}}{{.Partition}}{{else}}0{{end}}, subject: '{{.DefaultSubject}}', subjects: {{if .SchemaSubjects}}true{{else}}false{{end}}, partNote: '{{.PartNote}}'})"
+          @htmx:before-request="beforeSend($event)" @htmx:after-request="if($event.detail.xhr.status < 400 && $event.detail.elt === $el){ reset() }">
           <input type="hidden" name="partition_ctx" value="{{if .Merged}}all{{else}}{{.Partition}}{{end}}">
-          <div class="crow">
-            <div class="field w-part">
-              <label for="f-partition">Partition</label>
-              <select class="input" id="f-partition" name="partition">
-                <option value="auto">Auto (by key)</option>
-                {{range $i := .PartitionRange}}<option value="{{$i}}" {{if eq $i $.Partition}}selected{{end}}>P{{$i}}</option>{{end}}
-              </select>
-            </div>
-            <div class="field">
-              <span class="lbl"><label for="f-key">Key</label> <span class="hint">optional</span>
-                <button type="button" class="b64tog" :class="keyB64&&'on'" :aria-pressed="keyB64" @click="keyB64=!keyB64" aria-label="b64 key: the key is base64" title="The key is base64 for binary bytes">b64</button></span>
-              <input class="input mono" id="f-key" name="key" x-ref="key" placeholder="e.g. ord_8901" autocomplete="off">
-              <input type="hidden" name="key_enc" :value="keyB64 ? 'base64' : 'text'">
-              <label class="note"><input type="checkbox" name="key_empty" value="1" x-model="keyEmpty"> empty key, not null</label>
-            </div>
-            <div class="field w-acks">
-              <span class="lbl" id="l-acks">Acknowledgment</span>
-              <div class="seg" role="group" aria-labelledby="l-acks">
-                {{range acksChoices}}<button type="button" :class="acks==='{{.Value}}'&&'on'" :aria-pressed="acks==='{{.Value}}'" @click="acks='{{.Value}}'" aria-label="{{.Aria}}">{{.Value}}</button>{{end}}
-                <input type="hidden" name="acks" :value="acks">
+          <input type="hidden" name="partition" :value="part === 'auto' ? 'auto' : fixed">
+          <input type="hidden" name="acks" :value="acks">
+          <input type="hidden" name="key_enc" :value="keyB64 ? 'base64' : 'text'">
+          <input type="hidden" name="key_empty" :value="keyEmpty ? '1' : ''">
+          <input type="hidden" name="value_enc" :value="valB64 ? 'base64' : 'text'">
+          <input type="hidden" name="tombstone" :value="mode === 'null' ? '1' : ''">
+          <input type="hidden" name="headers" :value="headersWire()">
+          <input type="hidden" name="schema_subject" :value="subject">
+          <div class="row g16 tp-cp-body">
+            <div class="col g12 tp-cp-left">
+              <div class="row g12">
+                <div class="col g4 tp-cp-part"><span class="b" id="l-part">Partition</span>
+                  <span class="seg" role="group" aria-labelledby="l-part"><button type="button" :class="part==='auto'&&'on'" :aria-pressed="part==='auto'" @click="part='auto'">Auto, by key</button><button type="button" :class="part==='fixed'&&'on'" :aria-pressed="part==='fixed'" @click="part='fixed'">Fixed</button></span>
+                  <select class="inp m" id="f-partition" aria-label="Partition number" x-show="part==='fixed'" x-model.number="fixed" x-cloak>{{range $i := .PartitionRange}}<option value="{{$i}}">P{{$i}}</option>{{end}}</select>
+                  <span class="note" x-text="pv.partNote || partNote"></span></div>
+                <div class="col g4 grow"><label class="b" for="f-key">Key <span class="note tp-cp-opt">optional</span> <span role="button" tabindex="0" class="tag tp-tag" :class="keyB64&&'on'" :aria-pressed="keyB64" @click="keyB64=!keyB64" @keydown.enter.prevent="keyB64=!keyB64" @keydown.space.prevent="keyB64=!keyB64" aria-label="b64 key: the key is base64" title="The key is base64 for binary bytes">b64</span> <span role="button" tabindex="0" class="tag tp-tag" :class="keyEmpty&&'on'" :aria-pressed="keyEmpty" @click="keyEmpty=!keyEmpty" @keydown.enter.prevent="keyEmpty=!keyEmpty" @keydown.space.prevent="keyEmpty=!keyEmpty" aria-label="empty key, not null" title="Send a key of zero bytes, which is not the same as no key">empty</span></label>
+                  <input class="inp m" id="f-key" name="key" x-model="key" x-ref="key" :disabled="keyEmpty" placeholder="e.g. ord_8901" autocomplete="off" spellcheck="false">
+                  <span class="b tp-cp-acks" id="l-acks">Acknowledgment</span>
+                  <span class="seg tp-fit" role="group" aria-labelledby="l-acks">{{range acksChoices}}<button type="button" :class="acks==='{{.Value}}'&&'on'" :aria-pressed="acks==='{{.Value}}'" @click="acks='{{.Value}}'" aria-label="{{.Aria}}">{{.Value}}</button>{{end}}</span></div>
               </div>
+              <div class="col g4 tp-cp-subject" :class="subject ? 'tp-ord1' : 'tp-ord3'" {{if not .SchemaSubjects}}hidden{{end}}><label class="b" for="c-sub">{{if .SchemaSubjects}}Schema subject{{end}}</label>
+                <select class="inp m" id="c-sub" aria-label="Schema subject" x-model="subject"><option value="">No schema, send the bytes as typed</option>{{range .SchemaSubjects}}<option value="{{.}}"{{if eq . $.DefaultSubject}} selected{{end}}>encode with {{.}}</option>{{end}}</select>
+                <span class="note" x-show="subject">Write the value as JSON. It is checked against the subject's latest schema and sent in the registry's framing.</span></div>
+              <div class="col g4 tp-ord2"><div class="row sb ce"><label class="b" for="f-value"><span x-text="subject ? 'Value, as JSON' : 'Value'">Value</span> <span role="button" tabindex="0" class="tag tp-tag" x-show="!subject" :class="valB64&&'on'" :aria-pressed="valB64" @click="valB64=!valB64" @keydown.enter.prevent="valB64=!valB64" @keydown.space.prevent="valB64=!valB64" aria-label="b64 value: the value is base64" title="The value is base64 for binary bytes">b64</span></label>
+                  <span class="seg" role="group" aria-label="Value mode" x-show="!subject"><button type="button" :class="mode==='json'&&'on'" :aria-pressed="mode==='json'" @click="mode='json'">JSON</button><button type="button" :class="mode==='text'&&'on'" :aria-pressed="mode==='text'" @click="mode='text'">Text</button><button type="button" :class="mode==='null'&&'on'" :aria-pressed="mode==='null'" @click="mode='null'">Null (tombstone)</button></span></div>
+                <textarea class="inp m tp-cp-ta" id="f-value" name="value" rows="6" x-ref="value" x-model="value" :disabled="mode==='null' && !subject" placeholder='{"orderId": "ord_8901"}' spellcheck="false"></textarea>
+                <span class="note" id="compose-valid" :class="validity.cls" aria-live="polite" x-text="validity.text"></span></div>
+            </div>
+            <div class="col g12 grow">
+              <div class="col g4"><span class="b" id="l-hdrs">Headers <span class="note tp-cp-opt">optional</span></span>
+                <div class="col g4" role="group" aria-labelledby="l-hdrs" x-show="!hdrJSON">
+                  <template x-for="(h,i) in hdrs" :key="i"><div class="row g8"><input class="inp m tp-cp-hk" x-model="h.k" aria-label="Header key" placeholder="key" autocomplete="off" spellcheck="false"><input class="inp m grow" x-model="h.v" aria-label="Header value" placeholder="value" autocomplete="off" spellcheck="false"><button type="button" class="btn sm" :class="h.b64 ? 'pri' : ''" :aria-pressed="!!h.b64" @click="h.b64=!h.b64" aria-label="b64 header value: the value is base64">b64</button><button type="button" class="btn sm ghost" aria-label="Remove header" @click="hdrs.splice(i,1)">×</button></div></template>
+                </div>
+                <input class="inp m" x-show="hdrJSON" x-model="hdrText" aria-label="Headers as JSON" :aria-invalid="!!hdrError" placeholder='[{"k":"source","v":"console"}]' autocomplete="off" spellcheck="false">
+                <div class="row g8"><button type="button" class="btn sm tp-fit" x-show="!hdrJSON" @click="hdrs.push({k:'',v:'',b64:false})">+ Add header</button>
+                  <span class="seg" role="group" aria-label="Headers as"><button type="button" :class="!hdrJSON&&'on'" :aria-pressed="!hdrJSON" @click="headersAs(false)">Rows</button><button type="button" :class="hdrJSON&&'on'" :aria-pressed="hdrJSON" @click="headersAs(true)">JSON</button></span></div></div>
+              <div class="col g4" x-show="pv.schema && pv.schema.ok"><span class="cap" x-text="'Encoded preview · ' + (pv.schema ? pv.schema.size : 0) + ' B'"></span>
+                <pre class="code" x-text="pv.schema ? pv.schema.hex : ''"></pre>
+                <span class="note"><span class="m">00</span> magic · <span class="m" x-text="pv.schema ? pv.schema.bytes : ''"></span> schema id <span x-text="pv.schema ? pv.schema.id : ''"></span> · then the <span x-text="pv.schema ? pv.schema.type : ''"></span> body, <span x-text="pv.schema ? pv.schema.body : ''"></span> B</span></div>
+              <div class="col g4"><span class="cap">What will be sent</span>
+                <div class="kv m tp-cp-sent"><span>Topic</span><span>{{.Topic.Name}}</span><span>Partition</span><span x-text="pv.partition || '…'">…</span><span>Key</span><span x-text="pv.key || '…'">…</span><span>Value</span><span x-text="pv.value || '…'">…</span><span>Headers</span><span x-text="pv.headers || '…'">…</span><span>Batch</span><span x-text="pv.batch || '…'">…</span><template x-if="subject && pv.schema && pv.schema.ok"><span>Schema id</span></template><template x-if="subject && pv.schema && pv.schema.ok"><span class="b" x-text="pv.schema.id"></span></template></div></div>
+              <div class="callout" x-show="!subject"><span class="b">Sent as the console, not as another client</span><span class="note">The broker sees client {{clientID}}; the Traffic page leaves the console's own requests out, so Written by says not known for this record.{{if .SchemaSubjects}} A topic with a schema subject can be written encoded: pick one under the value.{{end}}</span></div>
+{{if .SchemaSubjects}}              <div class="callout" x-show="subject"><span class="b">If it does not match</span><span class="note">A missing field or a wrong type is refused before anything is sent, with the registry's own message. Nothing reaches the topic.</span></div>
+              <div class="callout" x-show="subject">{{/* the picker lists the subjects that exist */}}<span class="b">Not registered yet?</span><span class="note">Add the schema on the Schemas page first. The picker lists subjects that exist: {{len .SchemaSubjects}} on this broker.</span></div>{{end}}
             </div>
           </div>
-          <div class="crow body">
-            <div class="field w-value" :class="tomb && 'dimmed'">
-              <span class="lbl"><label for="f-value">Value</label>
-                <button type="button" class="b64tog" :class="valB64&&'on'" :aria-pressed="valB64" @click="valB64=!valB64" aria-label="b64 value: the value is base64" title="The value is base64 for binary bytes">b64</button>
-                <label class="chk"><input type="checkbox" name="tombstone" value="1" x-model="tomb"> null value (tombstone)</label>
-                {{if .SchemaSubjects}}<label class="schema-pick"><span class="sr-only">Encode the value with a registered schema</span><select class="input" name="schema_subject" x-ref="schema" title="Write the value as JSON and send it encoded with this subject's latest schema">
-                  <option value="">No schema</option>{{range .SchemaSubjects}}<option value="{{.}}" {{if eq . $.DefaultSubject}}selected{{end}}>encode with {{.}}</option>{{end}}</select></label>{{end}}</span>
-              <textarea class="input mono" id="f-value" name="value" x-ref="value" data-editor="json" rows="4" placeholder='{"orderId": "ord_8901"}'></textarea>
-              <input type="hidden" name="value_enc" :value="valB64 ? 'base64' : 'text'">
-            </div>
-            <div class="field w-hdrs">
-              <span class="lbl" id="l-hdrs">Headers <span class="hint">optional</span></span>
-              <div class="hdr-rows" role="group" aria-labelledby="l-hdrs">
-                <template x-for="(h,i) in hdrs" :key="i">
-                  <div class="hdr-row">
-                    <input class="input mono hk" placeholder="key" aria-label="Header key" x-model="h.k">
-                    <input class="input mono" placeholder="value" aria-label="Header value" x-model="h.v">
-                    <button type="button" class="b64tog" :class="h.b64&&'on'" :aria-pressed="!!h.b64" @click="h.b64=!h.b64" aria-label="b64 header value: the value is base64" title="The value is base64 for binary bytes">b64</button>
-                    <button type="button" class="icon-btn" title="Remove" aria-label="Remove header" @click="hdrs.splice(i,1)">{{icon "x"}}</button>
-                  </div>
-                </template>
-              </div>
-              <button type="button" class="btn sm" @click="hdrs.push({k:'',v:'',b64:false})">+ Add header</button>
-              <input type="hidden" name="headers" :value="JSON.stringify(hdrs)">
-            </div>
-          </div>
-          <div class="err form-err" data-err-slot hidden role="alert"></div>
-          <div class="dock-foot">
-            {{range acksChoices}}<span class="ackscaption" x-show="acks==='{{.Value}}'">{{.Say}}</span>{{end}}
-            <button class="btn pri" type="submit">{{icon "send"}} Send message</button>
-          </div>
+          <div class="err form-err tp-cp-err" data-err-slot data-err-html hidden role="alert"></div>
+          <div class="row sb ce tp-cp-foot"><span class="note" x-show="subject" x-text="pv.lands"></span>{{range acksChoices}}<span class="note ackscaption" x-show="!subject && acks==='{{.Value}}'">{{.Say}}</span>{{end}}
+            <span class="row g8 ce"><button type="button" class="btn" @click="reset()">Clear</button><button class="btn pri" type="submit">Send message</button></span></div>
         </form>
       </div>
     </div>
@@ -315,7 +316,7 @@
      together, so a new message appearing updates both from one partial. With
      .Search set it shows what a search found instead, and does not poll. */}}
 {{define "tape_and_table"}}
-<div class="tapetable" id="tape-and-table" {{if not .Search}}data-msg-base="{{topicURL .Topic.Name}}/message?partition={{if .Merged}}all{{else}}{{.Partition}}{{end}}" {{if .AtTail}}data-live="{{topicURL .Topic.Name}}/tape?partition={{if .Merged}}all{{else}}{{.Partition}}{{end}}{{if .CommittedOnly}}&amp;committed=1{{end}}" data-hash="{{.Hash}}" data-live-ms="2500"{{end}}{{end}}>
+<div class="tapetable" id="tape-and-table"{{if .OOB}} hx-swap-oob="outerHTML"{{end}} {{if not .Search}}data-msg-base="{{topicURL .Topic.Name}}/message?partition={{if .Merged}}all{{else}}{{.Partition}}{{end}}" {{if .AtTail}}data-live="{{topicURL .Topic.Name}}/tape?partition={{if .Merged}}all{{else}}{{.Partition}}{{end}}{{if .CommittedOnly}}&amp;committed=1{{end}}" data-hash="{{.Hash}}" data-live-ms="2500"{{end}}{{end}}>
   {{if not .Search}}
   {{if .Merged}}
   <div class="tape-panel tp-tape">
@@ -359,13 +360,13 @@
     {{if and (not .Search) (not .Merged)}}
     <form class="jump" method="get" action="{{topicURL .Topic.Name}}">
       <input type="hidden" name="partition" value="{{.Partition}}">
-      <label for="jump-to">go to offset</label>
+      <label for="jump-to">Go to offset</label>
       <input class="input mono" id="jump-to" name="jump" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. {{if gt .Latest 0}}{{.Latest}}{{else}}0{{end}}" autocomplete="off">
       <button type="submit" class="btn sm jump-go">Go</button>
     </form>
     <form class="jump" method="get" action="{{topicURL .Topic.Name}}">
       <input type="hidden" name="partition" value="{{.Partition}}">
-      <label for="jump-at">go to time</label>
+      <label for="jump-at">Go to time</label>
       <input class="input mono" id="jump-at" name="at" placeholder="15m, 2h, or 2026-10-07 10:30 (UTC)" autocomplete="off">
       <button type="submit" class="btn sm jump-go">Go</button>
     </form>
@@ -373,7 +374,8 @@
     {{end}}
   </div>
   {{if .Search}}<div class="jumpnote" role="status">{{icon "info"}} <span>{{.Search.Note}}{{if .Search.OlderURL}} <a class="pagelink" href="{{.Search.OlderURL}}">Search older records</a>{{end}}</span></div>{{end}}
-  {{if .JumpNote}}<div class="jumpnote" role="status">{{icon "info"}} {{.JumpNote}}</div>{{end}}
+  {{if .Jump}}{{with .Jump}}<div class="callout {{.Tone}} tp-jump" role="status" id="jump-msg" x-data="{o: true}" x-show="o"><span class="b">{{.Title}}</span><span class="note grow">{{.Note}}</span>{{if .OpenURL}}<a class="btn sm" href="{{.OpenURL}}" hx-boost="false">Open it</a>{{end}}{{if .LatestURL}}<a class="btn sm pri" href="{{.LatestURL}}">{{.LatestLabel}}</a>{{end}}<button type="button" class="btn sm ghost" @click="o = false">Dismiss</button></div>{{end}}
+  {{else if .JumpNote}}<div class="jumpnote" role="status">{{icon "info"}} {{.JumpNote}}</div>{{end}}
   <div class="tbl-wrap">
     {{/* Sy-01's table: P, Offset, Key, Value, Age. The time of day is the Age's tooltip
          and the inspector's Timestamp, the headers are the inspector's (their number is
@@ -388,12 +390,12 @@
           <td colspan="4" class="txnmark-l"title="A commit or abort ends a transaction here. It takes an offset and is not a record.">transaction marker</td>
         </tr>
         {{else}}
-        <tr id="{{if or $.Search $.Merged}}hit-{{.Partition}}-{{.Offset}}{{else}}msg-{{.Offset}}{{end}}" class="{{if and (not $.Search) (eq .Offset $.HL)}}hl{{end}}{{if .Txn}} txn-{{.Txn}}{{end}}" {{if and (not $.Search) (eq .Offset $.HL)}}data-hl{{end}} tabindex="0" role="button" data-inspector-open{{if not (or $.Search $.Merged)}} data-open-keys="{{.Offset}}"{{end}} hx-get="{{topicURL $.Topic.Name}}/message?partition={{.Partition}}&offset={{.Offset}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
+        <tr id="{{if or $.Search $.Merged}}hit-{{.Partition}}-{{.Offset}}{{else}}msg-{{.Offset}}{{end}}" class="{{if and (not $.Search) (eq .Offset $.HL)}}hl{{end}}{{if and (not $.Search) (eq .Offset $.Copied)}} copied{{end}}{{if .Txn}} txn-{{.Txn}}{{end}}" {{if and (not $.Search) (eq .Offset $.HL)}}data-hl{{end}} tabindex="0" role="button" data-inspector-open{{if not (or $.Search $.Merged)}} data-open-keys="{{.Offset}}"{{end}} hx-get="{{topicURL $.Topic.Name}}/message?partition={{.Partition}}&offset={{.Offset}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
           <td class="cell-offset num"><span class="p-inline">p{{.Partition}} · </span>{{num .Offset}}</td>
           <td class="m col-p">{{.Partition}}</td>
           <td class="cell-time m">{{when .Timestamp "clock"}} <span class="mut">· {{when .Timestamp "since"}}</span></td>
-          <td class="cell-key {{if or .Key.Null .Key.Empty}}none{{end}}" title="{{if .Key.Null}}null key{{else}}{{.Key.Preview}} · {{.Key.SizeText}}{{end}}">{{if .Key.Null}}no key{{else}}{{.Key.Preview}}{{end}}</td>
-          <td class="cell-val {{if .Value.Binary}}binary{{end}} {{if .Value.Null}}tomb{{end}}" title="{{.Value.SizeText}}">{{if .Txn}}<span class="txnbadge txnbadge-{{.Txn}}" title="{{if eq .Txn "open"}}Part of a transaction that has not ended; a read-committed consumer cannot see it yet.{{else}}Part of a transaction that aborted; a read-committed consumer never sees it.{{end}}">{{.Txn}}</span> {{end}}{{if or .Value.Binary .Value.Null .Value.Empty}}<span class="vspecial">{{.Value.Preview}}</span>{{else}}{{jsonTint .Value.Preview}}{{end}}</td>
+          <td class="cell-key {{if or .Key.Null .Key.Empty}}none{{end}}" title="{{if .Key.Null}}null key{{else}}{{.Key.Preview}} · {{.Key.SizeText}}{{end}}">{{if .Key.Null}}no key{{else if .Key.Empty}}"" (empty){{else}}{{.Key.Preview}}{{end}}</td>
+          <td class="cell-val {{if .Value.Binary}}binary{{end}} {{if .Value.Null}}tomb{{end}}" title="{{.Value.SizeText}}">{{if .Txn}}<span class="txnbadge txnbadge-{{.Txn}}" title="{{if eq .Txn "open"}}Part of a transaction that has not ended; a read-committed consumer cannot see it yet.{{else}}Part of a transaction that aborted; a read-committed consumer never sees it.{{end}}">{{.Txn}}</span> {{end}}{{if .Value.Null}}<span class="vspecial"><span class="b">tombstone</span> · null value</span>{{else if .Value.Empty}}<span class="vspecial">empty value · 0 B, a record, not a delete</span>{{else if .Value.Binary}}<span class="vspecial">{{.Value.Preview}}</span>{{else}}{{if .Value.Schema}}<span class="mut">{{.Value.Schema.TypeLabel}} · schema {{.Value.Schema.ID}} · </span>{{end}}{{jsonTint .Value.Preview}}{{end}}</td>
           <td class="cell-hdr num m">{{len .Headers}}</td>
         </tr>
         {{end}}
@@ -582,7 +584,7 @@
     <span>Key</span><span class="m">{{if .Key.Null}}<span class="mut">null</span>{{else if .Key.Empty}}<span class="mut">"" (empty)</span>{{else if .Key.Binary}}{{.Key.Preview}}{{else}}{{.Key.Text}}{{end}}{{if and (not .Key.Null) (not .Key.Empty)}} <span class="mut">· {{.Key.SizeText}}</span>{{end}}</span>
     <span>Sizes</span><span class="m">value {{if .Value.Null}}null{{else}}{{.Value.SizeText}}{{end}} · headers {{if .Headers}}{{.HeadersSize}}{{else}}none{{end}}</span>
     <span>Written by</span><span class="m">{{if .Writer.Known}}{{.Writer.Client}}{{if .Writer.Tx}} <span class="mut">· tx {{.Writer.Tx}}</span>{{end}}{{else}}<span class="mut" title="{{.Writer.Why}}">not known</span>{{end}}</span>
-    {{with .Value.Schema}}<span>Schema</span><span class="m">{{.TypeLabel}} · schema {{.ID}}{{if .Subject}} · {{if .URL}}<a href="{{.URL}}">{{.Subject}} v{{.Version}}</a>{{else}}{{.Subject}}{{end}}{{end}}</span>{{end}}
+    {{with .Value.Schema}}<span>Schema</span><span class="m">{{.TypeLabel}} · schema {{.ID}}{{if .Subject}} · {{if .URL}}<a href="{{.URL}}">{{.Subject}} v{{.Version}}</a>{{else}}{{.Subject}}{{end}}{{end}}</span><span>Value</span><span class="m">{{$.Value.SizeText}} on disk <span class="mut">· {{$.BodySize}} after the 5-byte framing</span></span>{{end}}
   </div>
 
   {{if .Trace}}<div class="row ce g8"><a class="btn w5" id="inspector-trace" href="{{.TraceURL}}">Follow this message</a><span class="note">traces it from produce to every fetch and commit</span></div>
@@ -594,29 +596,54 @@
 
   <div x-data="{f: '{{if .Value.Binary}}hex{{else}}text{{end}}'}" class="col g4 tp-val">
     <div class="row sb ce">
-      <span class="cap">Value · {{if or .Value.Null .Value.Empty}}<span class="sz">{{if .Value.Null}}null — a tombstone{{else}}empty{{end}}</span>{{else}}<span class="sz">{{.Value.SizeText}}{{if .Value.Binary}} · binary{{else if .Value.Pretty}} · JSON{{end}}</span>{{end}}</span>
-      {{if not (or .Value.Null .Value.Empty)}}<span class="seg fmt" role="group" aria-label="Value format">
-        {{if not .Value.Binary}}<button type="button" :class="f==='text'&&'on'" :aria-pressed="f==='text'" @click="f='text'">Text</button>{{end}}
+      <span class="cap">Value{{if .Value.Schema}}, decoded{{else}} · {{if or .Value.Null .Value.Empty}}<span class="sz">{{if .Value.Null}}null — a tombstone{{else}}empty{{end}}</span>{{else}}<span class="sz">{{.Value.SizeText}}{{if .Value.Binary}} · binary{{else if .Value.Pretty}} · JSON{{end}}</span>{{end}}{{end}}</span>
+      {{if .Value.Null}}<span class="pill deny">null, a tombstone</span>
+      {{else if not .Value.Empty}}<span class="seg fmt" role="group" aria-label="Value format">
+        {{if .Value.Schema}}<button type="button" :class="f==='text'&&'on'" :aria-pressed="f==='text'" @click="f='text'">Decoded</button><button type="button" :class="f==='hex'&&'on'" :aria-pressed="f==='hex'" @click="f='hex'">Raw</button>
+        {{else}}{{if not .Value.Binary}}<button type="button" :class="f==='text'&&'on'" :aria-pressed="f==='text'" @click="f='text'">Text</button>{{end}}
         <button type="button" :class="f==='hex'&&'on'" :aria-pressed="f==='hex'" @click="f='hex'">Hex</button>
-        {{if .Value.B64}}<button type="button" :class="f==='b64'&&'on'" :aria-pressed="f==='b64'" @click="f='b64'">Base64</button>{{end}}
+        {{if .Value.B64}}<button type="button" :class="f==='b64'&&'on'" :aria-pressed="f==='b64'" @click="f='b64'">Base64</button>{{end}}{{end}}
       </span>{{end}}
     </div>
-    {{if or .Value.Null .Value.Empty}}
-    <div class="valuebox dim">{{if .Value.Null}}This record has a null value.{{else}}This record has an empty value.{{end}}</div>
+    {{if .Value.Null}}
+    <div class="callout deny"><span class="b">This record has a null value.</span><span class="note">Not an empty string and not zero bytes: the value is absent.{{if .Compacted}} It says "this key is deleted".{{else}} This topic is not compacted, so nothing is deleted by it: it is a record with no value.{{end}}</span></div>
+    {{else if .Value.Empty}}
+    <div class="valuebox dim">This record has an empty value: zero bytes, a record and not a delete.</div>
     {{else}}
     {{if not .Value.Binary}}<pre class="code" x-show="f==='text'">{{jsonTint .Value.Text}}</pre>{{end}}
-    <pre class="code hexbox" x-show="f==='hex'" {{if not .Value.Binary}}style="display:none"{{end}}>{{.Value.Hex}}</pre>
+    {{if not .Value.Schema}}<pre class="code hexbox" x-show="f==='hex'" {{if not .Value.Binary}}style="display:none"{{end}}>{{.Value.Hex}}</pre>
     {{if .Value.B64}}<pre class="code" x-show="f==='b64'" style="display:none">{{.Value.B64}}</pre>{{end}}
-    {{if .Value.Truncated}}<div class="honest note-gap">{{icon "info"}}<div>Showing the start of a {{.Value.SizeText}} value. Download it for the rest.</div></div>{{else if .Value.HexCut}}<div class="honest note-gap" x-show="f==='hex'" style="display:none">{{icon "info"}}<div>The hex view shows the first 16 KB of {{.Value.SizeText}}.</div></div>{{end}}
+    {{if and .Value.Binary .Value.B64}}<div class="row sb ce tp-b64" x-show="f==='hex'"><span class="note">Base64 view:</span><span class="m el">{{.Value.B64}}</span></div>{{end}}
+    {{if .Value.Truncated}}<div class="honest note-gap">{{icon "info"}}<div>Showing the start of a {{.Value.SizeText}} value. Download it for the rest.</div></div>{{else if .Value.HexCut}}<div class="honest note-gap" x-show="f==='hex'" style="display:none">{{icon "info"}}<div>The hex view shows the first 16 KB of {{.Value.SizeText}}.</div></div>{{end}}{{end}}
+    {{if .Value.Schema}}<span class="note" x-show="f==='text'">Decoded by {{.Registry}}. Switch to Raw to see the bytes as the broker stores them.</span>
+    <div class="col g4 tp-raw" x-show="f==='hex'" x-cloak><span class="cap">Raw, {{.Value.SizeText}} · the registry framing</span>
+      <pre class="code hexbox">{{.Value.Hex}}</pre>
+      <div class="col tp-framing"><span class="note"><span class="m">00</span> magic byte, always zero</span><span class="note"><span class="m">{{.FrameBytes}}</span> schema id {{.FrameID}}, four bytes, big-endian</span><span class="note">the rest, {{.BodySize}}, is the {{.Value.Schema.TypeLabel}} body{{if eq .Value.Schema.Type "PROTOBUF"}} (its message index first){{end}}</span></div></div>{{end}}
     {{end}}
   </div>
 
   {{with .Value.Schema}}<div class="callout ok"><span class="b">Decoded with schema {{if .Subject}}{{.Subject}} {{end}}{{if .Version}}v{{.Version}}{{end}}</span><span class="note">The record carries schema id {{.ID}}; its bytes were read with that schema.</span></div>{{end}}
 
+  {{with .Value.Frame}}<div class="callout{{if eq .Kind "unknown"}} warn{{end}}">
+    {{if eq .Kind "none"}}<span class="b">Not readable as text, so shown as bytes</span><span class="note">The first byte is {{.First}}, not the registry's 0x00 marker, so this was not written with a registry schema and is not decoded. Download value gives the exact {{$.Value.SizeText}}.</span>
+    {{else if eq .Kind "unknown"}}<span class="b">Schema id {{.ID}} is not registered</span><span class="note">The value starts with the registry's 0x00 marker and the id {{.ID}}, but this registry has no schema with that id ({{.Err}}), so it is shown as bytes.</span>
+    {{else if eq .Kind "unread"}}<span class="b">The registry could not be asked</span><span class="note">The value starts with the registry's 0x00 marker and the id {{.ID}}. Reading schema {{.ID}} failed: {{.Err}}</span>
+    {{else if eq .Kind "mismatch"}}<span class="b">The body does not fit schema {{.ID}}</span><span class="note">The value starts with the registry's 0x00 marker and the id {{.ID}}, but its body does not decode with that schema: {{.Err}}</span>
+    {{else}}<span class="b">Not readable as text, so shown as bytes</span><span class="note">The first byte is {{.First}}. This console has no schema registry connected, so nothing is decoded. Download value gives the exact {{$.Value.SizeText}}.</span>{{end}}
+  </div>{{end}}
+
+  {{with .Legend}}<div class="col g4 tp-legend"><span class="cap">{{.Cap}}</span>
+    <div class="card tp-legend-card">{{range .Rows}}<div class="r{{if .This}} on{{end}}"><span class="m {{.Class}}">{{.Label}}</span><span class="note">{{.Note}}</span><span class="m mut ra">{{.Offset}}</span></div>{{end}}</div>
+    <span class="note">{{.Note}}</span></div>{{end}}
+
+  {{with .History}}<div class="col g4 tp-history"><span class="cap">What compaction will do with {{.Key}}</span>
+    <div class="card tp-legend-card">{{range .Rows}}<div class="r{{if .Deny}} on{{end}}"><span class="m ra">{{.Offset}}</span><span class="m el">{{.Value}}</span><span class="note">{{.Note}}</span></div>{{end}}</div>
+    <span class="note">{{.Summary}} Records of this key that compaction has already removed are offsets that are not there, so they cannot be listed. The cleaner keeps the latest record of each key and drops older ones in the background, never the newest segment.</span></div>{{end}}
+
   <div class="row g8 ce inspector-acts">
-    <button type="button" class="btn w5" data-close-inspector-on-success
+    <button type="button" class="btn w5"
       hx-post="{{topicURL .Topic}}/resend" hx-vals='{"partition":"{{.Partition}}","offset":"{{.Msg.Offset}}"}'
-      hx-target="#tape-and-table" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
+      hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-disabled-elt="this"
       title="Produce an exact copy of this record (same key, value and headers, byte for byte) to partition {{.Partition}}">Send again</button>
     {{if .CanEdit}}
     <button type="button" class="btn" id="inspector-edit"
@@ -639,3 +666,32 @@
   </div>
 </div>
 {{end}}
+
+{{/* Send again's answer (Tp-13): the panel, then the page's tape and the note above it, carried out of band. */}}
+{{define "resend_response"}}{{template "inspector" .}}<div id="resend-note" hx-swap-oob="true" role="status"><div class="callout ok"><span><span class="b">Sent again.</span> {{.Note}}</span></div></div>{{with .Tape}}{{template "tape_and_table" .}}{{end}}{{end}}
+
+{{define "inspector_resend"}}{{with .Resend}}
+<div class="inspector-b tp-resend">
+  <div class="card tp-resend-card tp-resend-where">
+    <div class="r h"><span></span><span>Original</span><span>Copy</span></div>
+    <div class="r"><span class="note">Offset</span><span class="m">{{num .Orig.Offset}}</span><span class="m b">{{num .Copy.Offset}}</span></div>
+    <div class="r"><span class="note">Partition</span><span class="m">{{.Orig.Partition}}</span><span class="m">{{.Copy.Partition}}</span></div>
+    <div class="r"><span class="note">Timestamp</span><span class="m">{{when .Orig.Timestamp "clockms"}}</span><span class="m">{{when .Copy.Timestamp "clockms"}}</span></div>
+  </div>
+  <div class="card tp-resend-card tp-resend-same">
+    <div class="r h"><span>Bytes</span><span>What</span><span class="ra">Same</span></div>
+    {{range .Rows}}<div class="r"><span class="note">{{.Label}}</span><span class="m el">{{.What}}</span><span class="m ra {{if .Same}}ok{{else}}bad{{end}}">{{if .Same}}equal{{else}}differs{{end}}</span></div>{{end}}
+  </div>
+  {{if .Headers}}<div class="col g4"><span class="cap">Headers carried over</span>
+    <div class="kv m hdrkv">{{range .Headers}}<span>{{.Key}}</span><span class="el">{{if .V.Null}}<span class="mut">null</span>{{else if .V.Empty}}<span class="mut">""</span>{{else if .V.Binary}}{{.V.Preview}}{{else}}{{.V.Text}}{{end}}</span>{{end}}</div>
+    <span class="note">Not rewritten: the copy has the headers the original has{{if .TraceID}}, so it carries the same trace id{{end}}.</span></div>{{end}}
+  <div class="callout"><span class="b">Byte for byte, except when</span><span class="note">The offset and the timestamp are new. The key, the value and every header are copied from the stored record, not re-typed, so binary values and schema ids survive. The copy is a plain batch: it carries no producer id or sequence and is not part of a transaction, whatever the original was.</span></div>
+  {{if .Readers}}<div class="callout warn"><span class="b">Readers will see it again</span>
+    <span class="note">{{range $i, $r := .Readers}}{{if $i}} {{end}}<a href="{{$r.URL}}">{{$r.Group}}</a> {{if $r.Read}}has committed past offset {{num $.Resend.Orig.Offset}}, so it has read the original and will read the copy too.{{else}}has not reached the original yet, so it will read both.{{end}}{{end}}</span></div>{{end}}
+  <div class="row g8 ce">
+    <button type="button" class="btn pri" hx-get="{{topicURL .Topic}}/message?partition={{.Partition}}&offset={{.Copy.Offset}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">Open the copy</button>
+    {{if .TraceID}}<a class="btn" href="{{.TraceURL}}">Follow the copy</a>{{end}}
+    <button type="button" class="btn" hx-post="{{topicURL .Topic}}/resend" hx-vals='{"partition":"{{.Partition}}","offset":"{{.Orig.Offset}}"}' hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-disabled-elt="this">Send again</button>
+  </div>
+</div>
+{{end}}{{end}}

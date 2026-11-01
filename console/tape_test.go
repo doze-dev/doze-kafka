@@ -113,7 +113,7 @@ func TestJumpToOffsetSaysWhatItDid(t *testing.T) {
 		t.Error("jumping to a held offset should highlight its row and say nothing")
 	}
 	past := req(t, c, "GET", "/_console/topics/t?partition=0&jump=99", nil).Body.String()
-	if !strings.Contains(past, "Offset 99 has not been written yet (the newest is 4)") {
+	if !strings.Contains(past, "Offset 99 is past the end (latest is 5)") {
 		t.Errorf("a jump past the end should say so, with the newest offset:\n%s", extractNote(past))
 	}
 	empty := req(t, c, "GET", "/_console/topics/t?partition=1&jump=0", nil).Body.String()

@@ -106,7 +106,7 @@ func TestProduceCarriesBinaryNullAndEmptyExactly(t *testing.T) {
 
 	// The table tells them apart.
 	tape := req(t, c, "GET", "/_console/topics/m", nil).Body.String()
-	for _, want := range []string{"∅ null", `&#34;&#34;`, "⟨binary · 6 B⟩ 00 ff fe 10 80 7f"} {
+	for _, want := range []string{"tombstone", "null value", "empty value", "binary · 6 B · 00 ff fe 10 80 7f"} {
 		if !strings.Contains(tape, want) {
 			t.Errorf("the table is missing %q", want)
 		}

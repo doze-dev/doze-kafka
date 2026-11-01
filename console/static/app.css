@@ -1577,3 +1577,57 @@ html[data-paused] #inspector[data-traffic-kept] .tf-kept { display: block; }
 .tp-copymenu .btn { justify-content: flex-start; border-radius: 0; }
 .tp-copymenu .btn.sb { justify-content: space-between; }
 .tp-copymenu .btn:disabled { opacity: .5; cursor: default; }
+
+/* ---------- Topics: slice 3 (Tp-07 to Tp-15) ---------- */
+/* Tp-07, Tp-09: the legend and the key's history are cards of rows; their notes wrap. */
+.tp-legend-card { --c: 80px 1fr 96px; }
+.tp-history .tp-legend-card { --c: 52px 90px 1fr; }
+.tp-legend-card .r { min-height: 30px; padding-block: 4px; align-items: start; }
+.tp-legend-card .r > * { white-space: normal; overflow-wrap: anywhere; }
+.tp-legend-card .r.on { background: var(--sel); }
+.tp-legend-card .r.on:has(.pill), .tp-legend-card .r.deny { background: var(--denybg); }
+.tp-b64 { gap: 8px; }
+.tp-b64 .m { min-width: 0; }
+.tp-legend .note, .tp-raw .note { overflow-wrap: anywhere; }
+.tp-framing { gap: 2px; }
+.refusal-facts { display: block; margin-top: 2px; }
+
+/* Tp-10, Tp-11, Tp-12: the open composer. Closed it is Sy-01's row (above); open, the bar
+   becomes the card's head (title, topic, note, fold control) and the form is the board's
+   two columns, 520 px and the rest, over a well foot. */
+.dock-bar .open-only { display: none; }
+:root[data-dock="open"] .tryit { padding: 0; gap: normal; }
+:root[data-dock="open"] .dock-bar { padding: 8px 14px; border-bottom: 1px solid var(--line2); justify-content: space-between; border-radius: 0; gap: 12px; }
+:root[data-dock="open"] .dock-bar > :not(.open-only) { display: none; }
+:root[data-dock="open"] .dock-bar .open-only { display: flex; }
+:root[data-dock="open"] .dock-bar:hover .h2 { text-decoration: underline; text-underline-offset: 2px; }
+:root[data-dock="open"] .dock-form { margin: 0; padding: 0; border-top: 0; }
+.tp-compose { display: flex; flex-direction: column; }
+.tp-cp-body { padding: 12px 14px; flex: 1; }
+.tp-cp-left { width: 520px; flex: none; }
+.tp-cp-part { width: 230px; flex: none; }
+.tp-cp-opt { font-weight: 400; }
+.tp-cp-acks { padding-top: 6px; }
+.tp-fit { width: fit-content; }
+.tp-cp-ta.inp.m { height: 130px; padding: 8px 9px; line-height: 19px; resize: vertical; }
+.tp-cp-hk { width: 140px; flex: none; }
+.tp-cp-sent { --c: 90px 1fr; row-gap: 2px; }
+.tp-cp-foot { padding: 8px 14px; border-top: 1px solid var(--line2); background: var(--well); }
+.tp-cp-err { margin: 0 14px 12px; }
+.tp-tag { cursor: pointer; }
+.tp-tag.on { color: var(--ink); text-decoration: underline; }
+.tp-tag:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.tp-ord1 { order: 1; } .tp-ord2 { order: 2; } .tp-ord3 { order: 3; }
+.tp-compose .note.ok { color: var(--ok-foreground); }
+.tp-compose .note.bad { color: var(--bad-foreground); }
+@media (max-width: 1100px) { .tp-cp-body { flex-direction: column; } .tp-cp-left { width: auto; } }
+.tp-cp-subject { min-width: 0; }
+.tp-jump { flex-direction: row; align-items: center; gap: 12px; margin: 0 0 8px; }
+.tp-jump .grow { min-width: 0; }
+.tp-resend { gap: 12px; }
+.tp-resend-where { --c: 74px 1fr 1fr; }
+.tp-resend-same { --c: 74px 1fr 60px; }
+.tp-resend-card .r { min-height: 30px; }
+#resend-note:empty { display: none; }
+#resend-note .callout { margin-bottom: 8px; }
+tr.copied td { background: var(--okbg); }

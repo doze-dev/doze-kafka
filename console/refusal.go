@@ -62,6 +62,9 @@ type Refusal struct {
 	Source string
 	// Message says what happened, in the person's terms.
 	Message string
+	// Facts is what the console itself knows about the request that was refused,
+	// said as the console's and never as the broker's answer.
+	Facts string
 	// Rule is the rule that decided: Kafka's own description of the error, or the
 	// console's rule for what it would not send.
 	Rule string
@@ -89,6 +92,9 @@ const (
 type kafkaRefusal struct {
 	Err *kerr.Error
 	Msg string
+	// Facts is what the console knows about the request (sizes, the topic's limit): the
+	// console's, kept apart from the broker's own words.
+	Facts string
 }
 
 func (e *kafkaRefusal) Error() string {
@@ -105,13 +111,21 @@ func refusalFor(err error) Refusal {
 		err = fmt.Errorf("%w: nothing to show", errNotFound)
 	}
 	var kr *kafkaRefusal
+	var nd *notDelivered
 	var ke *kerr.Error
 	var re *regError
 	switch {
 	case errors.As(err, &re):
 		return registryRefusal(re, err)
 	case errors.As(err, &kr):
-		return kafkaRefusalFor(kr.Err, kr.Msg, err)
+		f := kafkaRefusalFor(kr.Err, kr.Msg, err)
+		f.Facts = kr.Facts
+		return f
+	case errors.As(err, &nd):
+		return Refusal{Kind: Failed, Source: SourceConsole, Status: http.StatusBadGateway, Heading: "Not delivered",
+			Message: "Not delivered: the broker closed the connection.",
+			Rule:    "With acks 0 the broker answers nothing, and on a refused batch (too large, an unknown partition, a corrupt batch) it closes the connection instead. That is all it says, so the reason is not known.",
+			Facts:   nd.Facts}
 	case errors.As(err, &ke):
 		return kafkaRefusalFor(ke, "", err)
 	case errors.Is(err, errNotFound):

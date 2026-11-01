@@ -125,6 +125,11 @@ func (c *Console) inspectURL(kind, key string) string {
 
 // inspect renders one selection through the inspector contract.
 func (c *Console) inspect(w http.ResponseWriter, v inspectorView) {
+	c.partial(w, "inspector", c.inspectData(v))
+}
+
+// inspectData is the data the inspector template reads for a selection.
+func (c *Console) inspectData(v inspectorView) map[string]any {
 	data := map[string]any{}
 	for k, val := range v.Body {
 		data[k] = val
@@ -142,7 +147,7 @@ func (c *Console) inspect(w http.ResponseWriter, v inspectorView) {
 	}
 	data["InspStatus"], data["InspStatusTone"], data["InspStatusKind"], data["InspSubTime"] = v.Status, v.StatusTone, v.StatusKind, v.SubTime
 	data["InspNav"], data["InspGone"], data["InspGoneMsg"], data["InspOpen"] = v.Nav, v.Gone, v.GoneMsg, open
-	c.partial(w, "inspector", data)
+	return data
 }
 
 // inspectRoute answers GET {prefix}/inspect/{kind}?key=…, the one address every

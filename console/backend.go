@@ -34,6 +34,8 @@ type backend struct {
 	cl                                     *kgo.Client // metadata/admin
 	produceLeader, produceAll, produceNone *kgo.Client // acks=1, acks=all, acks=0
 
+	closed *disconnects // connections the broker closed on the acks 0 client (produce_raw.go).
+
 	mu    sync.Mutex
 	rrctr map[string]int // topic -> next partition, for auto-partition round robin
 }
@@ -141,9 +143,10 @@ func newBackend(opts Options) (*backend, error) {
 	// leaving it to a client-side partitioner it doesn't control. Idempotent
 	// producing (franz-go's default) requires acks=all, so the acks=1/acks=0
 	// clients must explicitly opt out of it.
-	produce := func(acks kgo.Acks, idempotent bool) (*kgo.Client, error) {
+	produce := func(acks kgo.Acks, idempotent bool, extra ...kgo.Opt) (*kgo.Client, error) {
 		popts := append(append([]kgo.Opt{}, base...),
 			kgo.RequiredAcks(acks), kgo.RecordPartitioner(kgo.ManualPartitioner()))
+		popts = append(popts, extra...)
 		if !idempotent {
 			popts = append(popts, kgo.DisableIdempotentWrite())
 		}
@@ -162,7 +165,8 @@ func newBackend(opts Options) (*backend, error) {
 	if err != nil {
 		return nil, err
 	}
-	produceNone, err := produce(kgo.NoAck(), false)
+	closed := &disconnects{}
+	produceNone, err := produce(kgo.NoAck(), false, kgo.WithHooks(closed))
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +174,7 @@ func newBackend(opts Options) (*backend, error) {
 	return &backend{
 		addr: opts.Addr, opts: opts,
 		cl: cl, produceLeader: produceLeader, produceAll: produceAll, produceNone: produceNone,
-		rrctr: map[string]int{},
+		rrctr: map[string]int{}, closed: closed,
 	}, nil
 }
 
@@ -769,35 +773,6 @@ type ProduceResult struct {
 	Confirmed bool
 }
 
-// Produce sends one message. acks is "1" (default), "0", or "all" — see the
-// compose panel. Partition is always explicit (see pickPartition): the
-// console never leaves partition assignment to an opaque client-side
-// partitioner it can't report back accurately.
-func (b *backend) Produce(ctx context.Context, topic string, partition int32, key, value []byte, headers []MessageHeader, acks string) (ProduceResult, error) {
-	cl := b.produceLeader
-	confirmed := true
-	switch acks {
-	case "0":
-		cl, confirmed = b.produceNone, false
-	case "all":
-		cl = b.produceAll
-	}
-	hdrs := make([]kgo.RecordHeader, len(headers))
-	for i, h := range headers {
-		hdrs[i] = kgo.RecordHeader{Key: h.Key, Value: h.Value}
-	}
-	rec := &kgo.Record{Topic: topic, Partition: partition, Key: key, Value: value, Headers: hdrs}
-	results := cl.ProduceSync(ctx, rec)
-	if err := results.FirstErr(); err != nil {
-		return ProduceResult{}, err
-	}
-	if !confirmed {
-		return ProduceResult{Partition: partition, Offset: -1, Confirmed: false}, nil
-	}
-	got, _ := results.First()
-	return ProduceResult{Partition: got.Partition, Offset: got.Offset, Confirmed: true}, nil
-}
-
 // keyPartitioner hashes keys the way Kafka's default partitioner does (murmur2),
 // so a record the console sends with key K lands on the partition a real Java or
 // franz-go producer would pick for K. The console used to use FNV-1a, so "the same
@@ -807,6 +782,15 @@ var keyPartitioner = kgo.StickyKeyPartitioner(nil)
 // PickPartition chooses a partition for "Auto" in the compose panel: the Kafka
 // hash of the key if one was given (so same-key messages land together, exactly
 // as a real keyed producer would place them), otherwise simple round robin.
+// keyPartition is the partition a key lands on: PickPartition without the round robin,
+// so asking where a key goes changes nothing.
+func (b *backend) keyPartition(topic string, key []byte, partitionCount int32) int32 {
+	if partitionCount <= 1 {
+		return 0
+	}
+	return int32(keyPartitioner.ForTopic(topic).Partition(&kgo.Record{Key: key}, int(partitionCount)))
+}
+
 func (b *backend) PickPartition(topic string, key []byte, partitionCount int32) int32 {
 	if partitionCount <= 1 {
 		return 0

@@ -94,10 +94,8 @@ export const test = base.extend<Fixtures>({
 
   setEditor: async ({ page }, use) => {
     await use(async (value) => {
-      await page.evaluate((v) => {
-        const ta = document.querySelector('#f-value') as HTMLTextAreaElement;
-        (window as any).dozeEditor.set(ta, v);
-      }, value);
+      // The composer's value is a plain textarea (Tp-10): filling it is typing it.
+      await page.locator('#f-value').fill(value);
     });
   },
 

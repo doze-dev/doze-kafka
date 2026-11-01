@@ -40,13 +40,42 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   topic.
 - **Send a message** from the dock at the bottom. Closed, it is one row: a key, a
   value and Send (the partition chosen by the key, acks 1). `p` or its title opens the
-  whole form: key, value, headers, partition (or "auto", which partitions by key
-  exactly as a real client does), acks, each acknowledgement saying what this broker
-  does for it (`all` is answered once the partition is on disk). The composer stays
-  open while you change partition and closes when you move to another topic. Values
-  can be sent as text, JSON, base64, or a tombstone. **Send again** on any record
-  produces an exact copy (the same key, value and headers, byte for byte), and
-  **Edit a copy** opens the composer filled in with it, to change first.
+  whole form (Tp-10): the partition (Auto, by key, or Fixed), the key (optional; `b64`
+  for binary bytes, `empty` for a key of zero bytes, which is not the same as no key),
+  the acknowledgment (each saying what this broker does for it; `all` is answered once
+  the partition is on disk), the value (JSON, checked as you type, Text, or Null for a
+  tombstone; `b64` for binary bytes) and headers as rows or as one JSON array. A card,
+  **What will be sent**, says as you type which partition the key lands on (the same
+  murmur2 a Java client uses), what the key, value and headers weigh, and what the
+  batch weighs; asking writes nothing (`POST /topics/{name}/compose/preview`). With a
+  schema subject chosen the value is written as JSON, checked against the subject's
+  latest schema, shown as the bytes it becomes (the registry's framing and schema id)
+  and sent encoded (Tp-11). The send is one raw Produce request: the page shows what
+  the broker answered, with its own message where it gave one, and what the console
+  knows about the request (the batch size, the topic's `max.message.bytes`) as the
+  console's. With acks 0 the broker answers nothing and closes the connection on a
+  refused batch, so the page says the record was not delivered; a bad header is caught
+  in the form before any request (Tp-12). The composer stays open while you change
+  partition and closes when you move to another topic. **Send again** on any record
+  produces an exact copy (the same key, value and headers, byte for byte, as a plain
+  batch with no producer id) and sets it beside the original, read back from the
+  broker, with the groups that will read it again (Tp-13). **Edit a copy** opens the
+  composer filled in with it, to change first.
+- **A record's bytes** (Tp-07 to Tp-09): a value that is not text is shown as hex and
+  base64, and the page says why it is not decoded (its first byte is not the registry's
+  0x00 marker); a value framed with a schema id the registry does not hold says so; a
+  registry value is shown Decoded with its schema id and subject, or Raw with the
+  framing explained. Null and empty are told apart for the key and the value, with the
+  nearest offset of each in the 201 records around the one open; for a tombstone on a
+  compacted topic the page lists the key's records still on disk (up to 3,000 read) and
+  says what the cleaner does with them; records compaction has already removed cannot be
+  listed.
+- **Go to offset** and **Go to time** (Tp-14, Tp-15): an offset the log does not hold
+  says "Offset N is past the end (latest is M)" and keeps the newest records in view; a
+  time lands on the first record at or after it (a ListOffsets by time) and says so; a
+  time before the first record lands on it ("nothing that early"); a time after the last
+  record is answered -1 by the broker (recorded), and the console then shows the newest
+  records, which is the console's rule.
 - **Consumed by** lists the groups reading the topic, with their lag.
 - **Settings** shows what is in force for the topic (how long records are kept, how
   much, and the segment size), marks the ones that are the topic's own, and lets you

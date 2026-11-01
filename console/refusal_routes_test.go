@@ -78,6 +78,7 @@ func TestEveryRouteRefusesInTheOneVocabulary(t *testing.T) {
 		{"POST /topics/{name}/partitions", "growing a topic to fewer partitions", c, "POST", "/_console/topics/orders/partitions", form("partitions", "1"), true, nil, answer{400, refused, "console", ""}},
 		{"POST /topics/{name}/config", "a topic setting that is not a number", c, "POST", "/_console/topics/orders/config", form("retention.ms", "soon"), true, nil, answer{400, refused, "console", ""}},
 		{"GET /topics/{name}/tape", "the tape of a topic that is not there", c, "GET", "/_console/topics/ghost/tape?partition=0", nil, true, nil, answer{404, refused, "kafka", "UNKNOWN_TOPIC_OR_PARTITION"}},
+		{"POST /topics/{name}/compose/preview", "previewing a send to a topic that is not there", c, "POST", "/_console/topics/ghost/compose/preview", form("value", "x", "partition", "0"), true, nil, answer{404, refused, "kafka", "UNKNOWN_TOPIC_OR_PARTITION"}},
 		{"POST /topics/{name}/produce", "producing to a topic that is not there", c, "POST", "/_console/topics/ghost/produce", form("value", "x", "partition", "0"), true, nil, answer{404, refused, "kafka", "UNKNOWN_TOPIC_OR_PARTITION"}},
 		{"POST /topics/{name}/resend", "sending again a record that is not there", c, "POST", "/_console/topics/orders/resend", form("partition", "0", "offset", "999"), true, nil, answer{404, refused, "console", ""}},
 		{"GET /topics/{name}/message", "a record that is not there", c, "GET", "/_console/topics/orders/message?partition=0&offset=999", nil, true, nil, answer{404, refused, "console", ""}},

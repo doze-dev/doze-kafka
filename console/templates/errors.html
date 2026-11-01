@@ -3,7 +3,7 @@
      message and the rule. It is drawn as the boards' callout (Tp-04: "Refused" in
      bold, the Kafka error name in mono, the message, then the rule). It keeps the
      .err class so a control's error slot and the toast read it the same way. */}}
-{{define "refusal"}}<div class="err refusal callout refusal-{{.Refusal.Kind}}" role="alert" data-refusal-kind="{{.Refusal.Kind}}" data-refusal-source="{{.Refusal.Source}}"{{if .Refusal.Name}} data-refusal-name="{{.Refusal.Name}}"{{end}}><span class="refusal-head"><span class="refusal-kind b">{{.Refusal.Kind.Word}}</span>{{if .Refusal.Name}} <span class="refusal-name m">{{.Refusal.Name}}</span>{{else if eq .Refusal.Source "console"}} <span class="refusal-name">by the console</span>{{end}}</span> <span class="refusal-msg m">{{.Refusal.Message}}</span>{{if .Refusal.Rule}} <span class="refusal-rule note">{{.Refusal.Rule}}</span>{{end}}</div>{{end}}
+{{define "refusal"}}<div class="err refusal callout refusal-{{.Refusal.Kind}}" role="alert" data-refusal-kind="{{.Refusal.Kind}}" data-refusal-source="{{.Refusal.Source}}"{{if .Refusal.Name}} data-refusal-name="{{.Refusal.Name}}"{{end}}><span class="refusal-head"><span class="refusal-kind b">{{.Refusal.Kind.Word}}</span>{{if .Refusal.Name}} <span class="refusal-name m">{{.Refusal.Name}}</span>{{else if eq .Refusal.Source "console"}} <span class="refusal-name">by the console</span>{{end}}</span> <span class="refusal-msg m">{{.Refusal.Message}}</span>{{if .Refusal.Facts}} <span class="refusal-facts note">{{.Refusal.Facts}}</span>{{end}}{{if .Refusal.Rule}} <span class="refusal-rule note">{{.Refusal.Rule}}</span>{{end}}</div>{{end}}
 
 {{define "error_page"}}{{template "shell_top" .}}
   <main class="main" id="detail">

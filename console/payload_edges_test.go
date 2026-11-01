@@ -36,7 +36,7 @@ func TestBinaryPreviewEllipsis(t *testing.T) {
 	if p := binaryPreview(b(12)); strings.Contains(p, "…") || strings.Count(p, "00") != 12 {
 		t.Errorf("12 bytes: %q", p)
 	}
-	if p := binaryPreview(b(13)); !strings.HasSuffix(p, " …") || strings.Count(p, "00") != 12 {
+	if p := binaryPreview(b(13)); !strings.HasSuffix(p, "00…") || strings.Count(p, "00") != 12 {
 		t.Errorf("13 bytes: %q", p)
 	}
 }

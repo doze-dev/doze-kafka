@@ -144,12 +144,12 @@ test('go to time lands on the first message at or after it, and explains an empt
   await page.goto('topics/seed-orders?partition=0');
   await page.locator('#jump-at').fill('1d');
   await page.locator('form.jump', { has: page.locator('#jump-at') }).getByRole('button', { name: 'Go' }).click();
-  await expect(page.locator('.jumpnote')).toContainText('first message at or after');
+  await expect(page.locator('#jump-msg')).toContainText('Nothing that early');
   await expect(page.locator('tr.hl')).toHaveCount(1); // the landing row is highlighted.
 
   await page.locator('#jump-at').fill('2999-01-01');
   await page.locator('form.jump', { has: page.locator('#jump-at') }).getByRole('button', { name: 'Go' }).click();
-  await expect(page.locator('.jumpnote')).toContainText('No message on this partition is at or after');
+  await expect(page.locator('#jump-msg')).toContainText('No record at or after');
 
   await page.locator('#jump-at').fill('whenever');
   await page.locator('form.jump', { has: page.locator('#jump-at') }).getByRole('button', { name: 'Go' }).click();

@@ -312,13 +312,14 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 		data["Partition"] = partition
 	}
 	jump := jumpParam(r)
-	atJump, atNote, atAsked, err := c.atParam(r, name, partition)
+	at, err := c.atResolve(r, name, partition)
 	if err != nil {
 		c.fail(w, r, err)
 		return
 	}
-	if atAsked {
-		jump = atJump
+	atNote := at.Note
+	if at.Asked {
+		jump = at.Jump
 	}
 	tape, err := c.tapeData(ctx, name, detail.ID, partition, detail.Partitions, fromParam(r), hlParam(r), jump, committedParam(r))
 	if err != nil {
@@ -332,6 +333,9 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 	c.composerSchemas(r, name, data)
 	if atNote != "" && tape["JumpNote"] == "" {
 		data["JumpNote"] = atNote
+		if at.View != nil {
+			data["Jump"] = at.View
+		}
 	}
 	c.render(w, r, "topic_detail", data)
 }
@@ -720,6 +724,24 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 		"Writer":        c.recordWriter(name, partition, m.Offset),
 		"Producer":      producerCommand(c.be.displayAddr(), name, keyV, valueV, m.Headers),
 	}
+	// Tp-07, Tp-08, Tp-09: what a value that is not text, null, or framed by a registry
+	// is, and (on a compacted topic) what the cleaner will do with a deleted key.
+	compacted := strings.Contains(c.be.topicConfigValues(r.Context(), name, "cleanup.policy")["cleanup.policy"], "compact")
+	data["Compacted"] = compacted
+	if lg := c.recordLegend(r.Context(), name, partition, m, keyV, valueV, compacted); lg != nil {
+		data["Legend"] = lg
+	}
+	if valueV.Null && compacted && m.Key != nil {
+		if h := c.keyHistory(r.Context(), name, partition, m, keyV); h != nil && len(h.Rows) > 0 {
+			data["History"] = h
+		}
+	}
+	if valueV.Schema != nil {
+		data["Registry"] = c.registryWhere()
+		data["BodySize"] = humanBytes(max(len(m.Value)-5, 0))
+		data["FrameID"] = valueV.Schema.ID
+		data["FrameBytes"] = fmt.Sprintf("%02x %02x %02x %02x", m.Value[1], m.Value[2], m.Value[3], m.Value[4])
+	}
 	if ref := traceOf(m.Headers, c.traceHeader); ref != nil {
 		data["Trace"], data["TraceURL"] = ref, c.traceURL(ref.ID, m.Timestamp, name, partition, m.Offset, "")
 	}
@@ -791,8 +813,16 @@ func (c *Console) topicResend(w http.ResponseWriter, r *http.Request) {
 	}
 	data := map[string]any{"Topic": topicRef{Name: name}, "Partition": partition}
 	maps.Copy(data, tape)
+	data["Copied"] = result.Offset // the copy's row is drawn marked (Tp-13).
 	c.withLiveFacts(ctx, name, data)
-	c.partial(w, "tape_and_table", data)
+	// The copy is read back from the broker, so what the page sets beside the original is
+	// what is stored.
+	copies, err := c.be.FetchWindow(ctx, name, partition, result.Offset, 1)
+	if err != nil || len(copies) == 0 || copies[0].Offset != result.Offset {
+		c.partial(w, "tape_and_table", data)
+		return
+	}
+	c.resendAnswer(w, c.resendView(ctx, name, partition, m, copies[0]), data)
 }
 
 // recordCoordinates parses a partition and an offset that name one record. Both
@@ -968,6 +998,7 @@ func (c *Console) tapeData(ctx context.Context, topic, topicID string, partition
 	// A jump to an offset the log does not hold says so, rather than quietly
 	// landing somewhere else.
 	jumpNote := ""
+	var jumpV *jumpView
 	if jump == jumpMalformed {
 		jumpNote = "That is not an offset. Type a whole number, 0 or more."
 		jump = -1
@@ -980,7 +1011,10 @@ func (c *Console) tapeData(ctx context.Context, topic, topicID string, partition
 			jumpNote = fmt.Sprintf("Offset %d is before the start of the log (the oldest is %d) — showing from there.", jump, earliest)
 			from, hl = earliest, -1
 		case jump >= latest:
-			jumpNote = fmt.Sprintf("Offset %d has not been written yet (the newest is %d) — showing the latest messages.", jump, latest-1)
+			jumpNote = fmt.Sprintf("Offset %s is past the end (latest is %s)", groupDigits(jump), groupDigits(latest))
+			jumpV = &jumpView{Tone: "warn", Title: jumpNote,
+				Note:      fmt.Sprintf("p%d holds offsets %s to %s now. Showing the newest records.", partition, groupDigits(earliest), groupDigits(latest-1)),
+				LatestURL: c.topicURL(topic) + "?partition=" + strconv.Itoa(int(partition)), LatestLabel: "Jump to latest"}
 			from, hl = -1, -1
 		default:
 			from, hl = max(jump-20, earliest), jump
@@ -1037,6 +1071,8 @@ func (c *Console) tapeData(ctx context.Context, topic, topicID string, partition
 		"Bounds":         bounds,
 		"PartSelect":     partitionCount > maxPartitionTabs,
 		"JumpNote":       jumpNote,
+		"Jump":           jumpV,
+		"Copied":         int64(-1),
 		"Messages":       asc,
 		"Rows":           desc,
 		"Earliest":       earliest,
@@ -1236,6 +1272,7 @@ func (c *Console) tapeAllData(ctx context.Context, topic, topicID string, partit
 		ends = append(ends, fmt.Sprintf("p%d %s", b.Partition, num(b.Latest)))
 	}
 	return map[string]any{
+		"Copied":         int64(-1),
 		"PartitionRange": partitionRange(partitionCount),
 		"Bounds":         bounds,
 		"PartSelect":     partitionCount > maxPartitionTabs,
@@ -1426,4 +1463,19 @@ func producerCommand(addr, topic string, key, val bytesView, hs []MessageHeader)
 	esc := strings.NewReplacer("\\", "\\\\", "%", "%%", "\t", "\\t")
 	quote := func(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
 	return producerView{Cmd: "printf " + quote(esc.Replace(line)+`\n`) + " | kafka-console-producer.sh --bootstrap-server " + quote(addr) + " --topic " + quote(topic) + props}
+}
+
+// registryWhere says which registry decoded a value: "the built-in registry at X" or
+// "the registry at X", as the broker's facts name them.
+func (c *Console) registryWhere() string {
+	f := c.facts
+	where := f.RegistryURL
+	if where == "" && c.reg != nil {
+		where = c.reg.base
+	}
+	where = strings.TrimPrefix(strings.TrimPrefix(where, "http://"), "https://")
+	if f.RegistryBuiltIn {
+		return "the built-in registry at " + where
+	}
+	return "the registry at " + where
 }

@@ -17,7 +17,7 @@ func TestBytesViewDistinguishesNullEmptyTextAndBinary(t *testing.T) {
 	if text.Binary || text.Text != "hello, wörld ✓" || text.Size != 17 {
 		t.Errorf("text: %+v", text)
 	}
-	if v := newBytesView([]byte{0x6a, 0x8f, 0xc4, 0x00, 0xff}, false); !v.Binary || v.Text != "" || !strings.HasPrefix(v.Preview, "⟨binary · 5 B⟩ 6a 8f c4 00 ff") {
+	if v := newBytesView([]byte{0x6a, 0x8f, 0xc4, 0x00, 0xff}, false); !v.Binary || v.Text != "" || !strings.HasPrefix(v.Preview, "binary · 5 B · 6a 8f c4 00 ff") {
 		t.Errorf("binary: %+v", v)
 	}
 	// Valid UTF-8 containing a NUL is still not text.

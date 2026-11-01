@@ -81,7 +81,7 @@ test('Send again produces an exact copy; Edit a copy fills the composer', async 
   await page.goto(`topics/${name}`);
   await row(page, 0).click();
   await page.getByRole('button', { name: 'Send again' }).click();
-  await expect(page.locator('#inspector')).toBeHidden(); // closes once the broker has taken the copy.
+  await expect(page.locator('#inspector-title')).toHaveText('Original and copy, side by side'); // the answer is the copy beside the original (Tp-13).
   await expect(row(page, 1)).toBeVisible();
   await settled(page); // a row only answers a click once htmx has processed it.
   await row(page, 1).click();
@@ -91,7 +91,7 @@ test('Send again produces an exact copy; Edit a copy fills the composer', async 
   await page.getByRole('button', { name: 'Edit a copy…' }).click();
   await expect(page.locator('#compose-head')).toHaveAttribute('aria-expanded', 'true');
   await expect(page.locator('#f-key')).toHaveValue('k');
-  await expect(page.locator('#compose-panel .cm-editor')).toContainText('"a":1');
+  await expect(page.locator('#f-value')).toHaveValue('{"a":1,"b":[1,2]}');
 });
 
 test('"go to offset" lands on the record, scrolled into view', async ({ page }) => {
@@ -103,7 +103,7 @@ test('"go to offset" lands on the record, scrolled into view', async ({ page }) 
   await expect(page.locator('tr[data-hl]')).toBeInViewport();
   await page.locator('#jump-to').fill('99999');
   await page.locator('form.jump', { has: page.locator('#jump-to') }).locator('.jump-go').click();
-  await expect(page.locator('.jumpnote')).toContainText('has not been written yet');
+  await expect(page.locator('#jump-msg')).toContainText('is past the end (latest is');
   // Something that is not a number is stopped by the field itself (the server
   // refuses it too: see the Go tests).
   await page.locator('#jump-to').fill('12abc');

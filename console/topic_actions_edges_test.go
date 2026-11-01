@@ -64,7 +64,7 @@ func TestPreviewOnly(t *testing.T) {
 	}{
 		{nil, func(v bytesView) bool { return v.Null && v.Preview == "∅ null" }},
 		{[]byte{}, func(v bytesView) bool { return v.Empty && v.Preview == `""` }},
-		{[]byte{0xff, 0, 1}, func(v bytesView) bool { return v.Binary && strings.HasPrefix(v.Preview, "⟨binary") }},
+		{[]byte{0xff, 0, 1}, func(v bytesView) bool { return v.Binary && strings.HasPrefix(v.Preview, "binary ·") }},
 		{[]byte("a\nb"), func(v bytesView) bool { return v.Preview == "a b" && v.Size == 3 }},
 		{[]byte(long + "tail"), func(v bytesView) bool {
 			return strings.HasSuffix(v.Preview, "…") && len([]rune(v.Preview)) == previewRunes+1

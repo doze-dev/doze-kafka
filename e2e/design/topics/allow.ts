@@ -331,4 +331,16 @@ export const TP06: Allowed[] = [
   { board: 'Tp-06', el: 'cell value', prop: 'border', board_value: "0 | 0 | 0 | 0", live_value: "0 | 0 | 1 rgb(35, 39, 43) | 0", at: ["1440-dark"], reason: TABLE6 },
 ];
 
-export const ALLOW: Allowed[] = [...chrome('Tp-02'), ...chrome('Tp-03'), ...TP05, ...TP06, ...chrome('Tp-04'), ...none, ...['max.message.bytes', 'cleanup.policy', 'message.timestamp.type'].map(newTag)];
+// ---------- Tp-10, the composer ----------
+const KEYS10 = 'the keys strip is the console\'s one strip for every page (Sy-06): it names j k, ↵, Esc, g t, p and ?; the board names the keys of its own form (Tab, ⌘↵, ⌘B, Esc), which the form takes from the browser and the shell';
+const OK_GREY = 'the board writes the note class "note ok" and draws it in the muted ink, because its .note rule comes after its .ok rule; the console draws the green the markup names (--ok-foreground, held to 4.5:1)';
+export const TP10: Allowed[] = [
+  ...shellAllow('Tp-10'),
+  { board: 'Tp-10', el: 'keys strip', prop: 'text', board_value: 'Tabnext field ⌘↵send ⌘Btoggle base64 Esccollapse', live_value: 'jkmove ↵open escclose panel gttopics pproduce ?all keys', at: BOTH, reason: KEYS10 },
+  { board: 'Tp-10', el: 'key', prop: 'w', board_value: '31.8', live_value: '18.6', at: BOTH, reason: KEYS10 },
+  { board: 'Tp-10', el: 'key', prop: 'text', board_value: 'Tab', live_value: 'j', at: BOTH, reason: KEYS10 },
+  { board: 'Tp-10', el: 'c valid', prop: 'color', board_value: 'rgb(86, 91, 99)', live_value: 'rgb(22, 107, 63)', at: ['1440-light'], reason: OK_GREY },
+  { board: 'Tp-10', el: 'c valid', prop: 'color', board_value: 'rgb(163, 169, 176)', live_value: 'rgb(95, 202, 143)', at: ['1440-dark'], reason: OK_GREY },
+];
+
+export const ALLOW: Allowed[] = [...TP10, ...chrome('Tp-02'), ...chrome('Tp-03'), ...TP05, ...TP06, ...chrome('Tp-04'), ...none, ...['max.message.bytes', 'cleanup.policy', 'message.timestamp.type'].map(newTag)];

@@ -114,6 +114,7 @@ func (c *Console) routeTable() []routeRow {
 		post("/topics/{name}/config", specTopics, "its own retention and segment size", c.topicConfig),
 		get("/topics/{name}/tape", specMessages, "HTMX partial, polled", c.topicTape),
 		post("/topics/{name}/produce", specCompose, "send a record", c.topicProduce),
+		post("/topics/{name}/compose/preview", specCompose, "what a send would do, checked as it is typed; it is a POST for the size of a value, and writes nothing", c.topicComposePreview),
 		post("/topics/{name}/resend", specMessages, "an exact copy of a stored record", c.topicResend),
 		get("/topics/{name}/message", specMessages, "inspector partial", c.topicMessage),
 		get("/topics/{name}/message/raw", specMessages, "the stored bytes", c.topicMessageRaw),
