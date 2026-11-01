@@ -1,0 +1,95 @@
+cmd/doze-kafka 86.3 darwin
+cmd/doze-kafka 87 linux
+conformance 88.9 darwin
+conformance 88.9 linux
+console 88.9 darwin
+console 88.9 linux
+e2e/seed 78.7 darwin
+e2e/seed 78.7 linux
+internal/broker 91.5 darwin
+internal/broker 91.6 linux
+internal/config 89.8 darwin
+internal/config 89.8 linux
+internal/consolefeed 97.5 darwin
+internal/consolefeed 97.5 linux
+internal/embed 100 darwin
+internal/embed 100 linux
+internal/hostguard 100 darwin
+internal/hostguard 100 linux
+internal/protocol 89 darwin
+internal/protocol 89.1 linux
+internal/protocol/observe.go 100
+internal/protocol/summary.go 92
+internal/settings 92 darwin
+internal/settings 92 linux
+internal/storage/log 85.9 darwin
+internal/storage/log 85.9 linux
+internal/storage/meta 82.5 darwin
+internal/storage/meta 82.5 linux
+internal/telemetry 98.8 darwin
+internal/telemetry 98.8 linux
+internal/traffic 99.6 darwin
+internal/traffic 99.6 linux
+schemaregistry 90 darwin
+schemaregistry 90 linux
+scripts/apisurface 82.5 darwin
+scripts/apisurface 82.5 linux
+scripts/coverage 86.8 darwin
+scripts/coverage 86.8 linux
+scripts/internal/githist 83.3 darwin
+scripts/internal/githist 83.3 linux
+scripts/lightness 81.7 darwin
+scripts/lightness 81.7 linux
+scripts/mutate 73.7 darwin
+scripts/mutate 73.7 linux
+scripts/vulncheck 61.8 darwin
+scripts/vulncheck 61.8 linux
+server 93.9 darwin
+server 93.9 linux
+# Floors lowered in this file's history, each with what is known of why (written
+# 2026-10-16 from the commits; the gate fails on a lowered floor with no line here).
+# lowered: 2026-10-11 internal/storage/log 81 -> 80.2: aad280e called 80.2 the stable value with no measurement in the commit; the cause, found later, was the maintenance loop's one-second tick landing inside other tests or not (internal/storage/log/maintain_tick_test.go now reaches those lines on purpose)
+# lowered: 2026-10-11 internal/broker 89.5 -> 89.4: dbd4ab9 is the merge of stage 0, which took the stage-0 branch's floors; no measurement or reason was given for the lower number
+# lowered: 2026-10-11 internal/config 63.2 -> 61.9: dbd4ab9, the merge of stage 0, took the stage-0 branch's floor; no measurement or reason was given for the lower number
+# lowered: 2026-10-11 internal/storage/log 81.1 -> 80.4: dbd4ab9, the merge of stage 0, took the stage-0 branch's floor; the timing-dependent maintenance tick (see the first line) is the likely cause, not measured then
+# lowered: 2026-10-11 server 79.2 -> 79: dbd4ab9, the merge of stage 0, took the stage-0 branch's floor; no measurement or reason was given for the lower number
+# lowered: 2026-10-11 internal/storage/log 84.2 -> 83.9: f0ed9ca called 84.2 one run's value and 83.9 the stable one, with no measurement in the commit; the maintenance tick again
+# lowered: 2026-10-12 internal/storage/log 85.1 -> 84.9: e96a084 measured 84.9 alone and 85.1 under ./... (8 of 8 runs each): the maintenance tick fired within other tests only under the full run. Fixed by maintain_tick_test.go: 86.4 in 6 of 6 runs since
+# lowered: 2026-10-12 e2e/seed 78.5 -> 78.4: e96a084 measured 78.4 in 8 of 8 runs; the deadline check after an empty poll in seedGroupTimeline ran only when a poll came back empty. That loop now runs every statement either way: 78.7 in 6 of 6 runs since
+# lowered: 2026-10-12 cmd/doze-kafka 82.3 -> 80.6: e66da06 moved the console's traffic and metrics adapter, with its mapping test, out of cmd/doze-kafka into internal/consolefeed (100%), so the module's console has them too
+# Per-file floors (every platform): the Traffic stage's targets are summary.go 92 and
+# observe.go 100 (plan/stages/traffic.md); both files read 100 since 6e4fb01, and the
+# floors are the stage's targets.
+# Packages with no tests, and why none:
+# no-tests: e2e/connopt: the browser suite's connection options (plain, or SASL over TLS by the run's identity); exercised by every helper the suite starts, in both identities
+# no-tests: e2e/errnames: prints kerr's error names for the Traffic boards spec, which compares them with the Result column; the spec is its test
+# no-tests: e2e/hold: a consumer the browser suite keeps alive for live pages; the specs that start it fail if it does not print ready and stay in its group
+# no-tests: e2e/identity: runs the browser suite against the second identity (e2e.yml, task test:e2e:identity); that run is its test
+# no-tests: e2e/put: writes one record with a chosen timestamp for time.spec.ts, which asserts the shown time
+# no-tests: e2e/routes: prints console/routes.go as JSON for the route gate, which fails on a route the table has and the suite did not reach
+# no-tests: internal/kmsg: the vendored, generated Kafka message codec (franz-go's kmsg, PATCHES.md says what was changed); it is exercised through every protocol and broker test and left out of the coverage profile on purpose
+# no-tests: internal/kmsg/internal/kbin: kmsg's binary reader and writer, vendored with it; the same
+# lowered: 2026-10-16 cmd/doze-kafka@darwin 85.1 -> 84.8: the merge of main (62fc8bc) brought the CLI and config-print changes (18c7cd5, caf265e, 9e520a0, f68e29c) with branches no test in this package reaches on macOS
+# lowered: 2026-10-16 internal/consolefeed@darwin 100 -> 97.5: measured 97.5 in this package's own run on macOS after the merge; e66da06 wrote 100 with no platform and no run recorded
+# lowered: 2026-10-16 internal/settings@darwin 78.9 -> 78: the merge of main brought settings rows (message.max.bytes, timestamp bounds, 9b90f55; compression.type as applied, 94d8def) whose paths no settings test reaches
+# lowered: 2026-10-16 internal/storage/log@darwin 86.4 -> 84: the merge of main brought CheckProduce and the streamed codecs (9b90f55, produce.go and records.go) with refusal branches no test reaches; the code is another worker's
+# lowered: 2026-10-16 cmd/doze-kafka@linux 85.9 -> 85.5: the merge of main (62fc8bc) brought the CLI and config-print changes (18c7cd5, caf265e, 9e520a0, f68e29c) with branches no test in this package reaches on Linux
+# lowered: 2026-10-16 internal/consolefeed@linux 100 -> 97.5: measured 97.5 in this package's own run on Linux after the merge; e66da06 wrote 100 with no platform and no run recorded
+# lowered: 2026-10-16 internal/settings@linux 78.9 -> 78: the merge of main brought settings rows (message.max.bytes, timestamp bounds, 9b90f55; compression.type as applied, 94d8def) whose paths no settings test reaches
+# lowered: 2026-10-16 internal/storage/log@linux 86.4 -> 84: the merge of main brought CheckProduce and the streamed codecs (9b90f55, produce.go and records.go) with refusal branches no test reaches; the code is another worker's
+# lowered: 2026-10-17 internal/storage/log@darwin 84.9 -> 84: the merge of main (3068499) sets main's one-platform floor 84.9 beside this branch's re-recorded per-platform floor; 84 is measured on the merged tree and its fall is explained by the 2026-10-16 line for 86.4 -> 84 (main's CheckProduce branches)
+# lowered: 2026-10-17 internal/storage/log@linux 84.9 -> 84: the merge of main (3068499) sets main's one-platform floor 84.9 beside this branch's re-recorded per-platform floor; 84 is measured on the merged tree and its fall is explained by the 2026-10-16 line for 86.4 -> 84 (main's CheckProduce branches)
+# no-tests: e2e/design/gen: the design gate's traffic generator; e2e/design's traffic spec runs it and compares the page with the ledger it writes
+# no-tests: e2e/design/truth: prints what a running broker holds for the design gate, whose specs compare the console's numbers with it
+# no-tests: internal/powercut: a test-only model of a disk after a power cut, exercised by internal/broker's powercut and durability tests that use it
+# lowered: 2026-10-17 conformance@darwin 91.8 -> 88.9: measured on the tree merged with main 3ca2610, which brought 3,702 lines added outside tests in 25 files (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-17 console@darwin 89.1 -> 88.9: measured on the tree merged with main 3ca2610, which brought 2,734 lines added and 475 removed outside tests (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-17 internal/protocol@darwin 91.2 -> 89: measured on the tree merged with main 3ca2610, which brought 478 lines added outside tests (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-17 internal/storage/meta@darwin 83.3 -> 82.5: measured on the tree merged with main 3ca2610, which brought 237 lines added outside tests (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-17 server@darwin 94.6 -> 93.9: measured on the tree merged with main 3ca2610, which brought 17 lines added (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-16 conformance@linux 91.8 -> 88.9: measured on the tree merged with main 3ca2610, which brought 3,702 lines added outside tests in 25 files (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-16 console@linux 89.2 -> 88.9: measured on the tree merged with main 3ca2610, which brought 2,734 lines added and 475 removed outside tests (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-16 internal/protocol@linux 91.3 -> 89.1: measured on the tree merged with main 3ca2610, which brought 478 lines added outside tests (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-16 internal/storage/meta@linux 83.3 -> 82.5: measured on the tree merged with main 3ca2610, which brought 237 lines added outside tests (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-16 server@linux 94.6 -> 93.9: measured on the tree merged with main 3ca2610, which brought 17 lines added (62fc8bc..3ca2610) that this package's tests do not all reach; which lines was not examined (another worker's code)
+# lowered: 2026-10-31 scripts/mutate@linux 74.5 -> 73.7: GitHub's ubuntu runner measures 73.7% (CI run 41208576650, the same as darwin), where the 74.5% was recorded in a golang:1.27 container on a Mac; the 0.8 points are statements of scripts/mutate that its tests reach in that container and not on the runner, and which ones has not been found

@@ -1,0 +1,69 @@
+name: Mutation
+
+# Do the tests notice when the code is wrong? scripts/mutate changes the code one
+# mutant at a time and runs the tests that reach it (a mutant is KILLED only by a
+# test that ran and failed; a build or setup failure is never a kill), and the run
+# fails on any lived, uncovered, timed-out or setup-failed mutant that
+# testdata/mutation.json does not list, and on a listed one that is now killed.
+#
+# - weekly and on demand: every unit, each split into the shards `mutate list`
+#   shows, one job per shard.
+# - pull requests: off for now. The check fails on a baseline entry that is now
+#   killed, and testdata/mutation.json is partly stale (the 2026-10 survivor
+#   campaign killed mutants it still lists, and the baseline was recorded on
+#   darwin/arm64); a PR would wait on hours of re-recording. To turn it back on,
+#   re-record the baseline (`task mutate:record`, on the platform CI runs) and add
+#   `pull_request:` below: it then runs the units whose files the PR changed
+#   (`mutate matrix <base>`).
+on:
+  schedule:
+    - cron: "0 3 * * 0" # Sundays 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  units:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the changed-units mode diffs against the PR's base
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - id: list
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            matrix="$(go run ./scripts/mutate matrix "$BASE")"
+          else
+            matrix="$(go run ./scripts/mutate matrix)"
+          fi
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "$matrix"
+
+  mutate:
+    needs: units
+    if: needs.units.outputs.matrix != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.units.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    # A shard takes about its unit's time over its shard count: the units' times,
+    # measured on a loaded Mac with 3 workers, are beside their shard counts in
+    # scripts/mutate/main.go (the slowest unit is about two hours, in 8 shards).
+    # Not yet run on a GitHub runner; the timeout is the margin for that.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Mutation check ${{ matrix.unit }} (shard ${{ matrix.shard }})
+        run: go run ./scripts/mutate check -shard "${{ matrix.shard }}" "${{ matrix.unit }}"

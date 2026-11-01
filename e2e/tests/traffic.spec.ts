@@ -6,77 +6,94 @@ import { test, expect } from '../fixtures/console';
 
 test('the rail lists Traffic, and the page shows what the seed asked, who asked it and how it went', async ({ page }) => {
   await page.goto('topics');
-  await page.locator('.rail .ri', { hasText: 'Traffic' }).click();
+  await page.locator('.rail a.nav', { hasText: 'Traffic' }).click();
   await expect(page).toHaveURL(/\/traffic$/);
-  await expect(page.locator('.rail .ri.on')).toHaveText(/Traffic/);
+  await expect(page.locator('.rail a.nav.on')).toHaveText(/Traffic/);
+  // The newest 200 rows are whoever else is asking at the moment: the seed's are found by its name.
+  await page.goto('traffic?client=doze-seed');
   const table = page.locator('#traffic-table');
-  const produce = table.locator('tbody tr', { hasText: 'Produce' }).filter({ hasText: 'seed-orders' }).first();
+  const produce = table.locator('.tf-rows > .r[data-row]', { hasText: 'Produce' }).filter({ hasText: 'seed-orders' }).first();
   await expect(produce).toContainText('doze-seed');
   await expect(produce).toContainText('ok');
   // The refused request carries the broker's own name for the error.
-  await expect(table.locator('tbody tr', { hasText: 'CreateTopics' }).filter({ hasText: 'TOPIC_ALREADY_EXISTS' })).toHaveCount(1);
+  await expect(table.locator('.tf-rows > .r[data-row]', { hasText: 'CreateTopics' }).filter({ hasText: 'TOPIC_ALREADY_EXISTS' })).toHaveCount(1);
   // The console's own polling is not in its own traffic.
-  await expect(table.locator('tbody tr', { hasText: 'doze-kafka-console' })).toHaveCount(0);
+  await page.goto('traffic?client=doze-kafka-console');
+  await expect(page.locator('#traffic-table .tf-rows > .r[data-row]')).toHaveCount(0);
 });
 
 test('the filters narrow the tail, and the narrowing survives a refresh of it', async ({ page }) => {
   await page.goto('traffic');
-  await page.locator('input[name=topic]').fill('seed-orders');
-  await page.getByRole('button', { name: 'Filter', exact: true }).click();
-  await expect(page).toHaveURL(/topic=seed-orders/);
-  const rows = page.locator('#traffic-table tbody tr');
+  // One field (Main): a client, a topic, a group or a request.
+  await page.locator('input[name=q]').fill('seed-orders');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/q=seed-orders/);
+  const rows = page.locator('#traffic-table .tf-rows > .r[data-row]');
   await expect(rows.first()).toBeVisible();
-  for (const row of await rows.all()) await expect(row).toContainText('seed-orders');
+  // A row names the topic in its text, or in the title of a count ("5 topics").
+  for (const row of await rows.all()) {
+    const said = await row.evaluate((el) => el.textContent + ' ' + Array.from(el.querySelectorAll('[title]')).map((t) => t.getAttribute('title')).join(' '));
+    expect(said).toContain('seed-orders');
+  }
 
   // The region polls with the filter in its address.
-  await expect(page.locator('#traffic-live')).toHaveAttribute('data-live', /topic=seed-orders/);
-  const polled = page.waitForResponse((r) => r.url().includes('/traffic/live') && r.url().includes('topic=seed-orders'));
+  await expect(page.locator('#traffic-live')).toHaveAttribute('data-live', /q=seed-orders/);
+  const polled = page.waitForResponse((r) => r.url().includes('/traffic/live') && r.url().includes('q=seed-orders'));
   await polled;
   await expect(page.locator('#traffic-live')).toHaveCount(1); // one region, however many polls.
 
-  await page.getByRole('link', { name: 'Clear' }).click();
-  await expect(page.locator('input[name=topic]')).toHaveValue('');
+  await page.locator('input[name=q]').fill('');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('input[name=q]')).toHaveValue('');
 
-  await page.locator('input[name=errors]').check();
-  await page.getByRole('button', { name: 'Filter', exact: true }).click();
+  // The segmented control: errors only.
+  await page.locator('.seg').getByRole('link', { name: 'errors', exact: true }).click();
+  await expect(page).toHaveURL(/kind=errors/);
   // Other specs share this broker and fail requests of their own, so assert on the
   // seed's refusal being there and on nothing that went well being there.
-  await expect(page.locator('#traffic-table tbody tr', { hasText: 'TOPIC_ALREADY_EXISTS' })).toHaveCount(1);
-  await expect(page.locator('#traffic-table tbody tr:not(:has(.badge))')).toHaveCount(0);
+  await expect(page.locator('#traffic-table .tf-rows > .r[data-row]', { hasText: 'TOPIC_ALREADY_EXISTS' })).toHaveCount(1);
+  await expect(page.locator('#traffic-table .tf-rows > .r[data-row]:not(.errrow)')).toHaveCount(0);
 
-  await page.locator('input[name=errors]').uncheck();
-  await page.locator('input[name=client]').fill('nobody-by-this-name');
-  await page.getByRole('button', { name: 'Filter', exact: true }).click();
-  await expect(page.locator('.honest', { hasText: 'No request matches the filter' })).toBeVisible();
+  await page.locator('.seg').getByRole('link', { name: 'all', exact: true }).click();
+  await expect(page).not.toHaveURL(/kind=/);
+  await page.locator('input[name=q]').fill('nobody-by-this-name');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.tf-none', { hasText: 'No request matches the filter' })).toBeVisible();
 });
 
-test('a row opens its request in the drawer, and Escape closes it', async ({ page }) => {
-  await page.goto('traffic?errors=1&client=doze-seed&api=CreateTopics');
-  const row = page.locator('#traffic-table tbody tr').first();
+test('a row opens its request in the inspector, and Escape closes it', async ({ page }) => {
+  await page.goto('traffic?kind=errors&q=doze-seed');
+  const row = page.locator('#traffic-table .tf-rows > .r[data-row]', { hasText: 'CreateTopics' }).first();
   await row.click();
-  const drawer = page.locator('#drawer');
-  await expect(drawer).toBeVisible();
-  await expect(drawer.locator('#drawer-title')).toContainText('CreateTopics');
-  await expect(drawer).toContainText('doze-seed');
-  await expect(drawer).toContainText('seed-empty');
-  await expect(drawer).toContainText('TOPIC_ALREADY_EXISTS');
-  await expect(drawer).toContainText('User:ANONYMOUS');
+  const inspector = page.locator('#inspector');
+  await expect(inspector).toBeVisible();
+  await expect(inspector.locator('#inspector-title')).toContainText('CreateTopics');
+  await expect(inspector).toContainText('doze-seed');
+  await expect(inspector).toContainText('seed-empty');
+  await expect(inspector).toContainText('TOPIC_ALREADY_EXISTS');
+  await expect(inspector).toContainText(process.env.E2E_SASL_USER ? `User:${process.env.E2E_SASL_USER}` : 'User:ANONYMOUS');
   await page.keyboard.press('Escape');
-  await expect(drawer).toBeHidden();
+  await expect(inspector).toBeHidden();
 });
 
 test('the live toggle pauses the tail', async ({ page }) => {
   await page.goto('traffic');
-  const toggle = page.locator('[data-live-toggle]');
+  const toggle = page.locator('#traffic-controls [data-live-toggle]');
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-  await toggle.click();
+  // Paused, the board offers Resume in the banner (the header keeps only its pill).
+  await page.locator('#paused-resume').click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  // p does both.
+  await page.keyboard.press('p');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('p');
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('a group page shows its timeline, newest first', async ({ page }) => {
-  await page.goto('groups/g-timeline');
+  await page.goto('groups/g-timeline?tab=timeline');
   const timeline = page.locator('#group-timeline');
   await expect(timeline).toBeVisible();
   const kinds = (await timeline.locator('.tl-k').allInnerTexts()).map((s) => s.trim());
@@ -88,24 +105,16 @@ test('a group page shows its timeline, newest first', async ({ page }) => {
   await expect(timeline).toContainText('doze-seed-consumer'); // the join names the client.
 });
 
-test('Traffic is in the palette', async ({ page, openPalette }) => {
+test('Traffic is behind g r, and the palette does not list it as a destination', async ({ page, openPalette }) => {
   await page.goto('topics');
   await openPalette();
   await page.keyboard.type('Traffic');
-  await expect(page.locator('.pal-item', { hasText: 'Traffic' })).toBeVisible();
+  await expect(page.locator('.pal-item', { hasText: /^Traffic$/ })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('g');
+  await page.keyboard.press('r');
+  await expect(page).toHaveURL(/\/traffic$/);
 });
 
-test('a client that reports its own metrics shows them, drawn, and says they are not traces', async ({ page }) => {
-  await page.goto('traffic');
-  const card = page.getByRole('region', { name: 'Metrics from doze-seed-telemetry' });
-  await expect(card).toBeVisible();
-  await expect(page.locator('.sec-title', { hasText: 'Client metrics' })).toContainText('metrics, not traces');
-  await expect(card).toContainText('3 reports');
-  await expect(card).toContainText('client_rack=seed-rack');
-  const latency = card.locator('.mrow', { hasText: 'producer.node.request.latency.avg' });
-  await expect(latency).toContainText('node_id=1');
-  await expect(latency).toContainText('9.75 ms'); // the last of 4.5, 6.25, 9.75.
-  await expect(latency.locator('svg.spark polyline')).toHaveCount(1); // a history to draw.
-  // The reports are in the request tail too, folded into one counted row.
-  await expect(page.locator('#traffic-table tbody tr', { hasText: 'PushTelemetry' }).filter({ hasText: 'doze-seed-telemetry' })).toHaveCount(1);
-});
+// The client metrics cards moved to the client's inspector (Traf-07): traffic-boards.spec.ts
+// holds them, with a consumer that stays connected and reports over its own connection.

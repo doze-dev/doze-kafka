@@ -2,7 +2,7 @@ package broker_test
 
 // The shared test harness. Every integration test boots its broker through
 // boot (directly, or via startBroker / runBroker / runBrokerAt), which goes
-// through server.NewFromConfig — the same wiring the CLI and the embed API use,
+// through embed.NewFromConfig — the same wiring the CLI and the embed API use,
 // including fsync cadence and retention — so what the tests exercise is what
 // ships, rather than a hand-assembled copy of it.
 
@@ -20,7 +20,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
-	"github.com/doze-dev/doze-kafka/server"
+	"github.com/doze-dev/doze-kafka/internal/embed"
 )
 
 // boot starts a broker from a full config and returns the address it bound and
@@ -33,9 +33,9 @@ func boot(t *testing.T, cfg config.Config) (addr string, stop func()) {
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("config: %v", err)
 	}
-	srv, err := server.NewFromConfig(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	srv, err := embed.NewFromConfig(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
-		t.Fatalf("server.NewFromConfig: %v", err)
+		t.Fatalf("embed.NewFromConfig: %v", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	bound, err := srv.Bind(ctx)
@@ -77,6 +77,42 @@ func runBrokerAt(t *testing.T, addr, dir string, version int) func() {
 	cfg.DataDir = filepath.Join(dir, "data")
 	cfg.MetaDB = filepath.Join(dir, "meta.db")
 	return runBroker(t, cfg)
+}
+
+// bootAt is runBrokerAt that also returns the address the broker bound. Pass
+// 127.0.0.1:0 and the port is never probed-then-released (which another test
+// process can win); restart on the returned address with runBrokerAt.
+func bootAt(t *testing.T, addr, dir string, version int) (string, func()) {
+	t.Helper()
+	cfg := config.Default()
+	cfg.Version = version
+	cfg.ListenAddr = addr
+	cfg.DataDir = filepath.Join(dir, "data")
+	cfg.MetaDB = filepath.Join(dir, "meta.db")
+	return boot(t, cfg)
+}
+
+// startBrokerWith is startBroker with the config changed by mod first.
+func startBrokerWith(t *testing.T, version int, mod func(*config.Config)) string {
+	t.Helper()
+	dir := t.TempDir()
+	cfg := config.Default()
+	cfg.Version = version
+	cfg.ListenAddr = "127.0.0.1:0"
+	cfg.DataDir = filepath.Join(dir, "data")
+	cfg.MetaDB = filepath.Join(dir, "meta.db")
+	mod(&cfg)
+	addr, stop := boot(t, cfg)
+	t.Cleanup(stop)
+	return addr
+}
+
+// startBrokerAssigningAtOnce is startBroker with the consumer groups' assignment
+// interval at 0, which Kafka allows: for a test of how members reconcile, which would
+// otherwise wait a second for each new target.
+func startBrokerAssigningAtOnce(t *testing.T, version int) string {
+	t.Helper()
+	return startBrokerWith(t, version, func(c *config.Config) { c.ConsumerAssignmentInterval = 0 })
 }
 
 // runBroker boots a broker from a full config and returns a stop func.

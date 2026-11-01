@@ -92,8 +92,12 @@ func (b *Broker) handleMetadata(ctx context.Context, req *protocol.Request, mr *
 				resp.Topics = append(resp.Topics, b.topicMetadata(name, meta.TopicID{}, 0, kerr.TopicAuthorizationFailed.Code))
 				continue
 			}
-			if created, ok := b.maybeAutoCreate(name, allow); ok {
-				resp.Topics = append(resp.Topics, b.topicMetadata(created.Name, created.ID, created.Partitions, errNone))
+			if _, ok := b.maybeAutoCreate(name, allow); ok {
+				// Apache Kafka creates the topic after it has answered: the request
+				// that asked for it is told it does not exist, and the next one
+				// finds it. Answering with the new topic would hide, from a client
+				// that cannot cope with that first answer, what it will meet there.
+				resp.Topics = append(resp.Topics, b.topicMetadata(name, meta.TopicID{}, 0, kerr.UnknownTopicOrPartition.Code))
 				continue
 			}
 			resp.Topics = append(resp.Topics, b.topicMetadata(name, meta.TopicID{}, 0, kerr.UnknownTopicOrPartition.Code))
@@ -117,6 +121,7 @@ func (b *Broker) topicMetadata(name string, id meta.TopicID, partitions int32, e
 		pt := kmsg.NewMetadataResponseTopicPartition()
 		pt.Partition = p
 		pt.Leader = b.nodeID()
+		pt.LeaderEpoch = 0 // the one epoch a single node has: what ListOffsets answers too.
 		pt.Replicas = []int32{b.nodeID()}
 		pt.ISR = []int32{b.nodeID()}
 		rt.Partitions = append(rt.Partitions, pt)

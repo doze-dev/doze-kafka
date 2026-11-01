@@ -15,26 +15,59 @@ permissions:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Three full passes of the suite (181 tests each when this was written) plus the
+    # browser install. Not measured on a runner: no CI run has happened yet. The
+    # passes have step timeouts of their own so one stuck pass names itself.
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       - name: Install
         working-directory: e2e
         run: |
           bun install --frozen-lockfile
           bunx playwright install --with-deps chromium
+      # Each pass must end with the route gate's own line: the gate refuses
+      # its off switch under CI (e2e/global-teardown.ts), and this catches a run
+      # that skipped it any other way (a partial run is not gated). A test that
+      # passed only on its retry fails the pass (failOnFlakyTests).
       - name: Playwright
         working-directory: e2e
+        timeout-minutes: 18
+        shell: bash
         env:
           CI: "1"
-        run: bunx playwright test
+        run: |
+          bunx playwright test 2>&1 | tee ../pw-1.txt
+          grep -q 'route gate: every console route was visited or driven' ../pw-1.txt
+      # The same suite, route gate included, against a broker started with the second
+      # identity: listener on 127.0.0.1:0, a console prefix, a data directory with a
+      # space, SASL and TLS (foundation B11).
+      - name: Playwright (second identity)
+        timeout-minutes: 18
+        shell: bash
+        env:
+          CI: "1"
+        run: |
+          go build -o bin/doze-kafka ./cmd/doze-kafka
+          go run ./e2e/identity -bin bin/doze-kafka -- sh -c 'cd e2e && bunx playwright test' 2>&1 | tee pw-2.txt
+          grep -q 'route gate: every console route was visited or driven' pw-2.txt
+      - name: Playwright, nothing tidy (listener on :0, a prefix, a data directory with a space, zone off)
+        working-directory: e2e
+        timeout-minutes: 18
+        shell: bash
+        env:
+          CI: "1"
+          E2E_IDENTITY: "1"
+        run: |
+          bunx playwright test 2>&1 | tee ../pw-3.txt
+          grep -q 'route gate: every console route was visited or driven' ../pw-3.txt
       - name: Report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report
           path: |

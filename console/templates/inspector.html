@@ -1,0 +1,86 @@
+{{/* inspector is the one contract every selection renders through: a kind, a title,
+     a body, a close control and an address (data-open, which shell.js puts in the
+     page's URL as ?open=). It is drawn into the right-hand panel (Sy-01), in flow
+     beside the page. The body is the kind's own template, in the page that owns it;
+     this file holds the kinds that have no page of their own. */}}
+{{define "inspector"}}
+<div class="inspector-h" data-inspector-kind="{{.InspKind}}">
+  <div>
+    <span class="cap">{{.InspKindLabel}}</span>
+    {{if .InspStatus}}<div class="t-row"><span class="t" id="inspector-title" data-key="{{.InspKey}}" data-open="{{.InspOpen}}" {{if eq .InspKind "message"}}data-offset="{{.InspKey}}"{{end}}>{{.InspTitle}}</span>{{if eq .InspStatusKind "pill"}}<span class="pill{{if .InspStatusTone}} {{.InspStatusTone}}{{end}} insp-status"><span class="dot" aria-hidden="true"></span>{{.InspStatus}}</span>{{else}}<span class="m {{.InspStatusTone}} insp-status">{{.InspStatus}}</span>{{end}}</div>
+    {{else}}<span class="t" id="inspector-title" data-key="{{.InspKey}}" data-open="{{.InspOpen}}" {{if eq .InspKind "message"}}data-offset="{{.InspKey}}"{{end}}>{{.InspTitle}}</span>{{end}}
+    {{if or .InspSub (not .InspSubTime.IsZero)}}<span class="inspector-sub mono">{{if not .InspSubTime.IsZero}}{{when .InspSubTime "clockms"}}{{if .InspSub}} · {{end}}{{end}}{{.InspSub}}</span>{{end}}
+  </div>
+  <div class="inspector-nav">
+    {{range .InspNav}}<button type="button" class="icon-btn insp-step" aria-label="{{.Label}}" title="{{.Title}}" {{if .Disabled}}disabled{{else}}hx-get="{{.URL}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"{{end}}>{{icon .Glyph}}</button>{{end}}
+    <button type="button" class="icon-btn insp-close" aria-label="Close, esc" title="Close (esc)" data-inspector-close>{{icon "x"}}<span class="close-t" aria-hidden="true"><span class="close-esc">esc</span><span class="close-word">Close</span></span></button>
+  </div>
+</div>
+{{if .InspGone}}
+<div class="inspector-b"><div class="note">{{.InspGoneMsg}} Close this and choose another.</div></div>
+{{else if eq .InspKind "message"}}{{template "inspector_message" .}}
+{{else if eq .InspKind "member"}}{{template "inspector_member" .}}
+{{else if eq .InspKind "subject"}}{{template "inspector_subject" .}}
+{{else if eq .InspKind "transaction"}}{{template "inspector_transaction" .}}
+{{else if eq .InspKind "event"}}{{template "inspector_event" .}}
+{{else if eq .InspKind "acl"}}{{template "inspector_acl" .}}
+{{end}}
+{{end}}
+
+{{define "inspector_member"}}
+<div class="inspector-b">
+  <div class="kv" style="--c: 108px 1fr">
+    <span>Member id</span><span>{{template "kvcopy" .M.ID}}</span>
+    <span>Group</span><span class="m"><a href="{{.GroupURL}}">{{.Group}}</a> <span class="badge {{stateBadge .State}}">{{.State}}</span> <span class="note">{{.Protocol}}</span></span>
+    <span>Client</span><span class="m">{{if .M.ClientID}}{{.M.ClientID}}{{else}}<span class="mut">none sent</span>{{end}}</span>
+    <span>Host</span><span class="m">{{if .M.Host}}{{.M.Host}}{{else}}<span class="mut">unknown</span>{{end}}</span>
+  </div>
+  <span class="cap">Assigned partitions</span>
+  <div class="kv" style="--c: 1fr auto">
+    {{range .M.Assigned}}<span class="m"><a href="{{.TopicURL}}">{{.Topic}}</a></span><span class="m">{{.Parts}}</span>
+    {{else}}<span class="note">Nothing is assigned to this member yet.</span>{{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "inspector_subject"}}
+<div class="inspector-b">
+  <div class="kv" style="--c: 108px 1fr">
+    <span>Subject</span><span>{{template "kvcopy" .Subject}}</span>
+    <span>Type</span><span class="m">{{.Type}}</span>
+    <span>Versions</span><span class="m">{{range $i, $v := .Versions}}{{if $i}}, {{end}}{{$v}}{{end}}</span>
+    <span>Schema id</span><span class="m">{{.Latest.ID}}</span>
+    <span>Compatibility</span><span class="m">{{.Compat}}{{if not .CompatOwn}} <span class="mut">· the registry's default</span>{{end}}</span>
+  </div>
+  <div class="inspector-acts"><a class="btn" href="{{.SubjectURL}}">Open the subject <span aria-hidden="true">→</span></a></div>
+</div>
+{{end}}
+
+{{define "inspector_transaction"}}
+<div class="inspector-b">
+  <div class="kv" style="--c: 108px 1fr">
+    <span>Transactional id</span><span>{{template "kvcopy" .T.ID}}</span>
+    <span>State</span><span class="m">{{.T.State}}</span>
+    <span>Producer</span><span class="m">id {{.T.ProducerID}} · epoch {{.T.Epoch}}</span>
+    {{if not .T.Began.IsZero}}<span>Open for</span><span class="m">{{when .T.Began "since"}} of {{.T.Timeout}}</span>{{end}}
+  </div>
+  <span class="cap">Partitions written</span>
+  <div class="col g4">
+    {{range .Parts}}<span class="m"><a href="{{.URL}}">{{.Name}}</a></span>
+    {{else}}<span class="note">It has not written to any partition yet.</span>{{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "inspector_event"}}
+<div class="inspector-b">
+  <div class="kv" style="--c: 108px 1fr">
+    <span>Time</span><span class="m">{{when .E.Time "clockms"}}</span>
+    <span>What</span><span>{{.E.Label}}</span>
+    <span>Group</span><span class="m"><a href="{{.GroupURL}}">{{.Group}}</a></span>
+    {{if .E.TrafficGroupEvent.Member}}<span>Member</span><span class="m">{{.E.TrafficGroupEvent.Member}}</span>{{end}}
+    {{if .E.Generation}}<span>Generation</span><span class="m">{{.E.Generation}}</span>{{end}}
+    {{if .E.Detail}}<span>Detail</span><span>{{.E.Detail}}</span>{{end}}
+  </div>
+</div>
+{{end}}

@@ -48,6 +48,8 @@ func (b *Broker) handleOffsetCommit(ctx context.Context, req *protocol.Request, 
 				rp.ErrorCode = kerr.TopicAuthorizationFailed.Code
 			case !ok || p.Partition < 0 || p.Partition >= topic.Partitions:
 				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
+			case p.Metadata != nil && len(*p.Metadata) > maxOffsetMetadataBytes:
+				rp.ErrorCode = kerr.OffsetMetadataTooLarge.Code
 			default:
 				md := ""
 				if p.Metadata != nil {
@@ -61,7 +63,7 @@ func (b *Broker) handleOffsetCommit(ctx context.Context, req *protocol.Request, 
 		resp.Topics = append(resp.Topics, rt)
 	}
 	if err := b.meta.CommitOffsets(oc.Group, commits); err != nil {
-		code := b.storageFault("offset commit", err, "group", oc.Group, "partitions", len(commits))
+		code := b.coordinatorFault("offset commit", err, "group", oc.Group, "partitions", len(commits))
 		for _, s := range slots {
 			resp.Topics[s.topic].Partitions[s.part].ErrorCode = code
 		}
@@ -108,9 +110,9 @@ func (b *Broker) handleOffsetFetch(ctx context.Context, req *protocol.Request, o
 				gp := kmsg.NewOffsetFetchResponseGroupTopicPartition()
 				gp.Partition = po.partition
 				gp.Offset = po.offset
-				gp.Metadata = po.metadata
+				gp.Metadata = metadataOrEmpty(po.metadata)
 				if denied {
-					gp.Offset, gp.Metadata = -1, nil
+					gp.Offset, gp.Metadata = -1, metadataOrEmpty(nil)
 					gp.ErrorCode = kerr.TopicAuthorizationFailed.Code
 				}
 				rt.Partitions = append(rt.Partitions, gp) // rt points into rg.Topics; mutation sticks.
@@ -138,14 +140,28 @@ func (b *Broker) handleOffsetFetch(ctx context.Context, req *protocol.Request, o
 		tp := kmsg.NewOffsetFetchResponseTopicPartition()
 		tp.Partition = po.partition
 		tp.Offset = po.offset
-		tp.Metadata = po.metadata
+		tp.Metadata = metadataOrEmpty(po.metadata)
 		if denied {
-			tp.Offset, tp.Metadata = -1, nil
+			tp.Offset, tp.Metadata = -1, metadataOrEmpty(nil)
 			tp.ErrorCode = kerr.TopicAuthorizationFailed.Code
 		}
 		rt.Partitions = append(rt.Partitions, tp) // rt points into resp.Topics; mutation sticks.
 	}
 	return nil
+}
+
+// maxOffsetMetadataBytes is Kafka's offset.metadata.max.bytes default: the longest
+// metadata string a commit may carry before OFFSET_METADATA_TOO_LARGE.
+const maxOffsetMetadataBytes = 4096
+
+// metadataOrEmpty is what OffsetFetch sends for a partition's metadata: Kafka
+// always sends a string, empty when none was committed, never null.
+func metadataOrEmpty(m *string) *string {
+	if m != nil {
+		return m
+	}
+	empty := ""
+	return &empty
 }
 
 // partitionOffset is one resolved (topic, partition) committed offset. A partition
@@ -259,7 +275,7 @@ func (b *Broker) commitFence(oc *kmsg.OffsetCommitRequest) int16 {
 		return kerr.InvalidGroupID.Code
 	}
 	if b.claims.ownerOf(oc.Group) == protoConsumer {
-		return b.cg848.validateCommit(oc.Group, oc.MemberID, oc.Generation)
+		return b.cg848.validateCommitAt(oc.Group, oc.MemberID, oc.Generation, oc.GetVersion())
 	}
 	return b.groups.validateCommit(oc.Group, oc.MemberID, oc.InstanceID, oc.Generation)
 }

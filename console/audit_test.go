@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -85,16 +84,16 @@ func TestDeeplyNestedJSONIsNotExpanded(t *testing.T) {
 	runtime.GC()
 	runtime.ReadMemStats(&before)
 	page := req(t, c, "GET", "/_console/topics/n", nil)
-	drawer := req(t, c, "GET", "/_console/topics/n/message?partition=0&offset=0", nil)
+	inspector := req(t, c, "GET", "/_console/topics/n/message?partition=0&offset=0", nil)
 	runtime.ReadMemStats(&after)
-	if page.Code != 200 || drawer.Code != 200 {
-		t.Fatalf("page %d, drawer %d", page.Code, drawer.Code)
+	if page.Code != 200 || inspector.Code != 200 {
+		t.Fatalf("page %d, inspector %d", page.Code, inspector.Code)
 	}
 	if mb := (after.TotalAlloc - before.TotalAlloc) >> 20; mb > 64 {
-		t.Errorf("rendering a page and a drawer of deeply nested records allocated %d MB", mb)
+		t.Errorf("rendering a page and a inspector of deeply nested records allocated %d MB", mb)
 	}
-	if kb := drawer.Body.Len() >> 10; kb > 512 {
-		t.Errorf("the drawer for a 6 KB record is %d KB", kb)
+	if kb := inspector.Body.Len() >> 10; kb > 512 {
+		t.Errorf("the inspector for a 6 KB record is %d KB", kb)
 	}
 }
 
@@ -149,7 +148,7 @@ func TestSendAgainProducesAnExactCopy(t *testing.T) {
 		t.Error("the composer would be prefilled with re-indented JSON, not the JSON that was stored")
 	}
 	if !strings.Contains(d, "Send again") || !strings.Contains(d, "Edit a copy") {
-		t.Error("the drawer should offer both an exact resend and an editable copy")
+		t.Error("the inspector should offer both an exact resend and an editable copy")
 	}
 }
 
@@ -302,7 +301,7 @@ func TestGroupsNamedDotAndDotDotAreReachable(t *testing.T) {
 			t.Fatalf("the link to group %q is %s, which a browser resolves away", id, u)
 		}
 		page := req(t, c, "GET", u, nil)
-		if page.Code != 200 || !strings.Contains(page.Body.String(), "Offsets &amp; lag") {
+		if page.Code != 200 || !strings.Contains(page.Body.String(), `id="group-live"`) {
 			t.Errorf("group %q at %s: %d", id, u, page.Code)
 			continue
 		}
@@ -335,8 +334,8 @@ func TestErrorsAreClassifiedByWhatTheyAre(t *testing.T) {
 		{context.DeadlineExceeded, 502},
 		{errors.New("unable to dial: dial tcp 127.0.0.1:1: connect: connection refused"), 502},
 	} {
-		if got := classify(tc.err).status; got != tc.status {
-			t.Errorf("classify(%v) = %d, want %d", tc.err, got, tc.status)
+		if got := refusalFor(tc.err).Status; got != tc.status {
+			t.Errorf("refusalFor(%v) = %d, want %d", tc.err, got, tc.status)
 		}
 	}
 }
@@ -415,7 +414,7 @@ func TestPagesCannotBeFramedAndCrossSiteWritesAreRefused(t *testing.T) {
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r.Header.Set("Sec-Fetch-Site", "cross-site") // and no Origin.
 	rec := httptest.NewRecorder()
-	c.ServeHTTP(rec, r)
+	serveInto(t, c, rec, r)
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("a cross-site POST with no Origin header: %d, want 403", rec.Code)
 	}
@@ -433,7 +432,7 @@ func TestUnknownPathsAre404AndRootMountWorks(t *testing.T) {
 			t.Errorf("GET %s = %d, want 200", p, rec.Code)
 		}
 	}
-	for _, p := range []string{"/_console/static/", "/_console/static/cm/"} {
+	for _, p := range []string{"/_console/static/", "/_console/static/fonts/"} {
 		if rec := req(t, c, "GET", p, nil); rec.Code != 404 {
 			t.Errorf("GET %s = %d, want 404 (no directory listings)", p, rec.Code)
 		}
@@ -547,79 +546,8 @@ func TestEachThemeIsDefinedOnce(t *testing.T) {
 	}
 }
 
-// themeTokens reads the custom properties of one rule in app.css.
-func themeTokens(t *testing.T, css, selector string) map[string]string {
-	t.Helper()
-	i := strings.Index(css, selector+" {")
-	if i < 0 {
-		t.Fatalf("app.css has no %q rule", selector)
-	}
-	block := css[i : i+strings.Index(css[i:], "\n}")]
-	out := map[string]string{}
-	for _, m := range regexp.MustCompile(`(--[a-z-]+):\s*(#[0-9a-fA-F]{6})\b`).FindAllStringSubmatch(block, -1) {
-		out[m[1]] = m[2]
-	}
-	return out
-}
-
-func luminance(hex string) float64 {
-	var r, g, b int
-	fmt.Sscanf(hex, "#%02x%02x%02x", &r, &g, &b)
-	f := func(v int) float64 {
-		c := float64(v) / 255
-		if c <= 0.03928 {
-			return c / 12.92
-		}
-		return math.Pow((c+0.055)/1.055, 2.4)
-	}
-	return 0.2126*f(r) + 0.7152*f(g) + 0.0722*f(b)
-}
-
-func contrast(a, b string) float64 {
-	la, lb := luminance(a), luminance(b)
-	if la < lb {
-		la, lb = lb, la
-	}
-	return (la + 0.05) / (lb + 0.05)
-}
-
-// Text holds 4.5:1 on every surface it is set on, and the edge of a control holds
-// 3:1, in both themes. A palette is easy to make pretty and unreadable; the last
-// one had status colours at 3.6:1.
-func TestThemeContrast(t *testing.T) {
-	css := readAll(t, "static/app.css")
-	light := themeTokens(t, css, ":root")
-	dark := themeTokens(t, css, `:root[data-theme="dark"]`)
-	for k, v := range light { // dark overrides; what it does not name is shared.
-		if _, ok := dark[k]; !ok {
-			dark[k] = v
-		}
-	}
-	surfaces := []string{"--background", "--card", "--popover", "--muted", "--sidebar"}
-	text := []string{"--foreground", "--muted-foreground", "--ok-foreground", "--bad-foreground", "--warn-foreground", "--info-foreground", "--violet-foreground"}
-	for name, th := range map[string]map[string]string{"light": light, "dark": dark} {
-		check := func(fg, bg string, min float64) {
-			if th[fg] == "" || th[bg] == "" {
-				t.Errorf("%s: %s or %s is not defined", name, fg, bg)
-				return
-			}
-			if r := contrast(th[fg], th[bg]); r < min {
-				t.Errorf("%s: %s (%s) on %s (%s) is %.2f:1, want %.1f:1", name, fg, th[fg], bg, th[bg], r, min)
-			}
-		}
-		for _, bg := range surfaces {
-			for _, fg := range text {
-				check(fg, bg, 4.5)
-			}
-			check("--input", bg, 3)
-		}
-		check("--foreground", "--accent", 4.5)
-		check("--muted-foreground", "--accent", 4.5)
-		check("--brand-foreground", "--brand", 4.5)
-		check("--destructive-foreground", "--destructive", 4.5)
-		check("--ring", "--background", 3)
-	}
-}
+// (The contrast of every text and surface pair, in all three themes, is
+// contrast_test.go.)
 
 // ---- changing a group's offsets, one partition at a time ----
 
@@ -647,7 +575,7 @@ func TestOneOffsetCanBeSetOrRemoved(t *testing.T) {
 	}
 
 	// The page offers it, per row, and names the range.
-	page := req(t, c, "GET", "/_console/groups/g", nil).Body.String()
+	page := req(t, c, "GET", "/_console/groups/g?tab=offsets", nil).Body.String()
 	for _, want := range []string{`hx-post="/_console/groups/g/offset"`, `hx-post="/_console/groups/g/offset/delete"`, `aria-label="New offset, from 0 to 10"`, `<option value="b">b</option>`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the group page is missing %q", want)
@@ -787,7 +715,7 @@ func TestSearchFindsRecordsAndSaysHowFarItLooked(t *testing.T) {
 	}
 
 	all := get("partition=0&q=needle&all=1")
-	if !strings.Contains(all, `id="hit-1-0"`) || !strings.Contains(all, `id="hit-0-30"`) || !strings.Contains(all, "<th class=\"num\">Partition</th>") {
+	if !strings.Contains(all, `id="hit-1-0"`) || !strings.Contains(all, `id="hit-0-30"`) || !strings.Contains(all, "<th class=\"col-p\">P</th>") {
 		t.Error("searching all partitions should find matches on each, and say which")
 	}
 	if !strings.Contains(all, "across 2 partitions: 5 matches") {
@@ -842,10 +770,11 @@ func (c *Console) scanForTest(t *testing.T, topic string, n int) (int, error) {
 
 // ---- moving between topics ----
 
-// A click in the list replaces the detail pane only, and nothing on the page
-// arrives after it. Replacing the whole workspace redrew the list under the
-// pointer and put its scroll position back to the top.
-func TestListLinksReplaceOnlyTheDetailPane(t *testing.T) {
+// The list, the page, the wire dock and the inspector are one workspace now (the dock
+// and the inspector belong to the page, and sit beside it), so a click in the list
+// replaces the whole workspace, and the script puts the list's scroll position back.
+// Each page has exactly one page (#detail), and the list's links are plain links.
+func TestListLinksAreWholeWorkspaceLinksAndPageIsOne(t *testing.T) {
 	c, addr := newTestConsoleAddr(t)
 	topicWith(t, c, "t", 1, 1)
 	commitFor(t, addr, "g", "t", map[int32]int64{0: 1})
@@ -855,10 +784,13 @@ func TestListLinksReplaceOnlyTheDetailPane(t *testing.T) {
 			t.Errorf("%s has %d elements with id=\"detail\", want 1", path, n)
 		}
 		for _, m := range regexp.MustCompile(`<a class="li[^>]*>`).FindAllString(page, -1) {
-			if !strings.Contains(m, `hx-target="#detail"`) || !strings.Contains(m, `hx-select="#detail"`) {
-				t.Errorf("%s: a list link replaces more than the detail pane: %s", path, m)
+			if strings.Contains(m, `hx-target="#detail"`) {
+				t.Errorf("%s: a list link replaces the page only, and leaves the dock and the inspector of the old page: %s", path, m)
 			}
 		}
+	}
+	if js := readAll(t, "static/shell.js"); !strings.Contains(js, "listScroll") {
+		t.Error("the list's scroll position is not put back after the workspace is replaced")
 	}
 	// The composer's state is not remembered across pages.
 	if js := readAll(t, "static/shell.js"); strings.Contains(js, `store("dock"`) || !strings.Contains(js, "setDock(false);") {
@@ -927,8 +859,8 @@ func TestATopicCanBeCreatedWithItsOwnRetentionAndChangedLater(t *testing.T) {
 	if err != nil || len(own) != 2 || own["retention.ms"] != "604800000" || own["segment.bytes"] != "67108864" {
 		t.Fatalf("the topic's own config after creating it: %v %v", own, err)
 	}
-	page := req(t, c, "GET", "/_console/topics/t", nil).Body.String()
-	for _, want := range []string{`name="retention.ms" value="7d"`, `name="segment.bytes" value="64MB"`, `name="retention.bytes" value=""`, "unlimited (broker default)", "this topic"} {
+	page := req(t, c, "GET", "/_console/topics/t?tab=config", nil).Body.String()
+	for _, want := range []string{`name="retention.ms" value="7d"`, `name="segment.bytes" value="64MB"`, `name="retention.bytes" value=""`, "unlimited (broker default)", "override"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the topic page is missing %q", want)
 		}
@@ -936,7 +868,7 @@ func TestATopicCanBeCreatedWithItsOwnRetentionAndChangedLater(t *testing.T) {
 
 	// Change one, set one, clear one.
 	rec = req(t, c, "POST", "/_console/topics/t/config", url.Values{"retention.ms": {"12h"}, "retention.bytes": {"1GB"}, "segment.bytes": {""}})
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `value="12h"`) || !strings.Contains(rec.Body.String(), "<details") {
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `value="12h"`) || !strings.Contains(rec.Body.String(), `id="topic-config"`) {
 		t.Fatalf("save: %d %.200s", rec.Code, rec.Body)
 	}
 	own, _ = c.be.topicOverrides(context.Background(), "t")
@@ -946,7 +878,7 @@ func TestATopicCanBeCreatedWithItsOwnRetentionAndChangedLater(t *testing.T) {
 
 	// The two that have no broker-wide counterpart: a size and a choice.
 	rec = req(t, c, "POST", "/_console/topics/t/config", url.Values{"retention.ms": {"12h"}, "retention.bytes": {"1GB"}, "max.message.bytes": {"1MB"}, "message.timestamp.type": {"LogAppendTime"}})
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `<option value="LogAppendTime" selected>`) || !strings.Contains(rec.Body.String(), "largest batch") {
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `<option value="LogAppendTime" selected>`) || !strings.Contains(rec.Body.String(), `name="max.message.bytes" value="1MB"`) {
 		t.Fatalf("save of the batch limit and timestamp type: %d %.300s", rec.Code, rec.Body)
 	}
 	if got, _ := c.be.topicOverrides(context.Background(), "t"); got["max.message.bytes"] != "1048576" || got["message.timestamp.type"] != "LogAppendTime" {
@@ -992,7 +924,8 @@ func TestACompactedTopicIsShownAsCompacted(t *testing.T) {
 		t.Fatal(err)
 	}
 	page := req(t, c, "GET", "/_console/topics/c", nil).Body.String()
-	if !strings.Contains(page, `<span class="own">compacted</span>`) || !strings.Contains(page, "This topic is compacted") || strings.Contains(page, "not applied") || strings.Contains(page, "does not compact") {
+	conf := req(t, c, "GET", "/_console/topics/c?tab=config", nil).Body.String()
+	if !strings.Contains(between(page, `id="topic-facts"`, `</p>`), ", compacted") || !strings.Contains(conf, "This topic is compacted") || strings.Contains(conf, "not applied") || strings.Contains(conf, "does not compact") {
 		t.Error("a compacted topic's page should say it is compacted")
 	}
 	if plain := req(t, c, "GET", "/_console/new/topic", nil).Body.String(); strings.Contains(plain, "This topic is compacted") {

@@ -97,7 +97,7 @@ func TestTapeShowsTransactions(t *testing.T) {
 	}
 
 	// The Cluster page lists the transaction while it is open, and not after.
-	cluster := req(t, c, "GET", "/_console/cluster", nil).Body.String()
+	cluster := req(t, c, "GET", "/_console/cluster?view=transactions", nil).Body.String()
 	for _, want := range []string{"tape", "Ongoing", "tx-0"} {
 		if !strings.Contains(cluster, want) {
 			t.Errorf("the Cluster page does not show the open transaction (missing %q)", want)
@@ -106,7 +106,7 @@ func TestTapeShowsTransactions(t *testing.T) {
 	if err := p.EndTransaction(ctx, kgo.TryCommit); err != nil {
 		t.Fatal(err)
 	}
-	cluster = req(t, c, "GET", "/_console/cluster", nil).Body.String()
+	cluster = req(t, c, "GET", "/_console/cluster?view=transactions", nil).Body.String()
 	if !strings.Contains(cluster, "No transaction is open") {
 		t.Error("the Cluster page still lists a transaction that ended")
 	}

@@ -29,17 +29,36 @@ type Summary struct {
 	// TopicIDs are topics the request named only by id (Fetch v13, for one); the
 	// observer resolves them, since only it knows the names.
 	TopicIDs [][16]byte
-	// Group is the consumer group (or transactional id) the request was for.
+	// Group is the consumer group the request was for.
 	Group string
+	// TxnID is the transactional id, for the requests that name one. It is not a
+	// group: the recorder used to list it as one and link it to a page that does not
+	// exist (TRF-10).
+	TxnID string
+	// Kind is the family the request belongs to, for the console's filter: "produce",
+	// "fetch", "groups", "admin", or "" for the rest (Kinds).
+	Kind string
 	// Idle marks a request that moved nothing: a long-poll fetch that timed out
 	// empty, a heartbeat. Repeats of these collapse into one row.
 	Idle bool
 	// Detail is a short phrase: "2 partitions, 14 records".
 	Detail string
+	// Parts are the partitions the request named, as ranges ("p0–p2"), for the requests
+	// whose row writes them beside a topic or a group (an offset commit).
+	Parts string
+	// Gen is the generation (or epoch) the request carried, when HasGen.
+	Gen    int32
+	HasGen bool
+	// AutoCreate says a Metadata request allowed the broker to create the topics it
+	// named. Whether it does is the broker's setting, not the request's.
+	AutoCreate bool
 	// Software is "name version" from ApiVersions, when the client says.
 	Software string
 	// ErrorCode is the first non-zero error in the response, 0 if none.
 	ErrorCode int16
+	// Class says what the error means (Classify): normal flow, a refusal Kafka would
+	// also make, a denial, something not implemented, or the broker failing.
+	Class Class
 }
 
 // ErrorName is the Kafka name of an error code ("UNKNOWN_TOPIC_OR_PARTITION"), or
@@ -48,7 +67,9 @@ func ErrorName(code int16) string {
 	if code == 0 {
 		return ""
 	}
-	if e := kerr.TypedErrorForCode(code); e != nil {
+	// TypedErrorForCode answers UNKNOWN_SERVER_ERROR for a number it has no name for;
+	// that is not this code's name.
+	if e := kerr.TypedErrorForCode(code); e != nil && e.Code == code {
 		return e.Message
 	}
 	return "ERROR_" + strconv.Itoa(int(code))
@@ -64,8 +85,23 @@ type Observation struct {
 	Version   int16
 	Start     time.Time
 	Duration  time.Duration
+	// ReqBytes is 0 for a SASLAuthenticate request, whose size is the length of its
+	// token and so, with PLAIN, of the password (observedSize).
 	ReqBytes  int
 	RespBytes int
+	// Correlation is the request's correlation id: what the client's own log carries.
+	Correlation int32
+	// Closed, when set, says the broker closed the connection because of this request
+	// and why ("API key 99 is not served"). The answer, if any, was never sent.
+	Closed string
+	// Own says the connection is one this process opened to itself (Adopt): the
+	// console beside the broker. It is a fact about the connection, kept in memory,
+	// and nothing a client sends can set it.
+	Own bool
+	// Req and Resp are what the handler decoded and answered with, for an observer that
+	// wants to read more of them (Facts). They are read-only and must not be kept.
+	Req  kmsg.Request
+	Resp kmsg.Response
 	Summary
 }
 
@@ -108,6 +144,8 @@ func (r *Request) Noted(q kmsg.Request, resp kmsg.Response) { r.decoded, r.answe
 
 // Describe is what the API table says this request was about. Safe with a nil
 // request or response (a handler that failed, an acks=0 produce).
+//
+//fuzz:parser FuzzDescribe
 func (r *Request) Describe() Summary {
 	var s Summary
 	for i := range APIs {
@@ -122,9 +160,50 @@ func (r *Request) Describe() Summary {
 	// Answering a newer ApiVersions than we know with UNSUPPORTED_VERSION is how every
 	// client learns what to speak, not a failure: listing it as an error put one on
 	// every new connection of every client newer than the broker.
+	//
+	// The row says what the broker did, not what the client will do next: that is the
+	// client's (A1).
 	if r.Header.APIKey == kmsg.ApiVersions && s.ErrorCode == kerr.UnsupportedVersion.Code {
 		s.ErrorCode = 0
-		s.Detail = "version negotiation: the client asks again at a version offered here"
+		v := "v" + strconv.Itoa(int(r.Header.APIVersion))
+		s.Detail = v + " is newer than this broker serves: answered UNSUPPORTED_VERSION with the versions to ask at"
+		if resp, ok := r.answered.(*kmsg.ApiVersionsResponse); ok {
+			for _, k := range resp.ApiKeys {
+				if k.ApiKey == int16(kmsg.ApiVersions) {
+					s.Detail = v + " is newer than this broker's v" + strconv.Itoa(int(k.MinVersion)) + " to v" + strconv.Itoa(int(k.MaxVersion)) +
+						": answered UNSUPPORTED_VERSION with the versions to ask at"
+				}
+			}
+		}
 	}
+	s.Class = Classify(r.Header.APIKey, s.ErrorCode)
+	// A refused request with nothing else to say says why, in a phrase.
+	if s.Detail == "" && s.ErrorCode != 0 && s.Class != ClassExpected {
+		s.Detail = ErrorPhrase(s.ErrorCode)
+	}
+	s.Kind = Kind(r.Header.APIKey)
 	return s
+}
+
+// Kind is the family of an API, for the console's filter chips: "produce", "fetch",
+// "groups" (the consumer group protocols, offsets and coordinator lookup), "admin"
+// (topics, configs, ACLs, cluster questions), or "" for everything else (metadata,
+// version negotiation, producer ids, transactions, telemetry), which is listed under
+// "all" only.
+func Kind(api APIKey) string {
+	switch api {
+	case kmsg.Produce:
+		return "produce"
+	case kmsg.Fetch, kmsg.ShareFetch:
+		return "fetch"
+	case kmsg.JoinGroup, kmsg.SyncGroup, kmsg.Heartbeat, kmsg.LeaveGroup, kmsg.OffsetCommit, kmsg.OffsetFetch,
+		kmsg.OffsetDelete, kmsg.FindCoordinator, kmsg.ConsumerGroupHeartbeat, kmsg.ConsumerGroupDescribe,
+		kmsg.DescribeGroups, kmsg.ListGroups, kmsg.DeleteGroups, kmsg.TxnOffsetCommit:
+		return "groups"
+	case kmsg.CreateTopics, kmsg.DeleteTopics, kmsg.CreatePartitions, kmsg.AlterConfigs, kmsg.IncrementalAlterConfigs,
+		kmsg.DescribeConfigs, kmsg.CreateACLs, kmsg.DeleteACLs, kmsg.DescribeACLs, kmsg.DeleteRecords, kmsg.DescribeCluster,
+		kmsg.DescribeLogDirs, kmsg.ListTransactions, kmsg.DescribeTransactions, kmsg.DescribeProducers:
+		return "admin"
+	}
+	return ""
 }

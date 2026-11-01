@@ -70,7 +70,7 @@ func TestTrafficShowsAnAppsRequestsAndItsGroupsTimeline(t *testing.T) {
 	}
 
 	// The group's timeline names the join and the generation it produced.
-	group := consoleGet(t, console, "/_console/groups/orders-workers")
+	group := consoleGet(t, console, "/_console/groups/orders-workers?tab=timeline")
 	for _, want := range []string{`id="group-timeline"`, ">joined<", "new generation"} {
 		if !strings.Contains(group, want) {
 			t.Errorf("the group page's timeline does not show %q", want)

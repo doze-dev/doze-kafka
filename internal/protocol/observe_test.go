@@ -93,7 +93,7 @@ func TestDescribeSaysWhatTheRequestWasAbout(t *testing.T) {
 	if len(s.Topics) != 2 || s.Topics[0] != "orders" || s.Topics[1] != "payments" {
 		t.Errorf("topics = %v, want [orders payments]", s.Topics)
 	}
-	if s.Detail != "3 partitions, 6.0 KiB" {
+	if s.Detail != "3 partitions · 6.0 KiB" {
 		t.Errorf("detail = %q", s.Detail)
 	}
 
@@ -107,7 +107,7 @@ func TestDescribeSaysWhatTheRequestWasAbout(t *testing.T) {
 	fresp.SetVersion(12)
 	fr := &Request{Header: RequestHeader{APIKey: kmsg.Fetch}}
 	fr.Noted(fq, fresp)
-	if s := fr.Describe(); !s.Idle || s.Detail != "nothing new" {
+	if s := fr.Describe(); !s.Idle || s.Detail != "empty" {
 		t.Errorf("empty fetch: idle=%v detail=%q", s.Idle, s.Detail)
 	}
 	rt := kmsg.NewFetchResponseTopic()

@@ -17,8 +17,10 @@ doze-kafka dns-setup --print # the script, to read or run yourself
 `doctor` also lists which process holds which name: "my name stopped working" is usually
 another instance with the same name (start this one with `--name <other>`). When the name
 does not resolve on the machine the broker is on, it advertises its address instead, so
-clients still reach it. With no terminal and no setup, the broker prints the command and
-exits; it never waits on a password. `--listen host:port` serves an address and needs none
+clients still reach it. With no setup and no terminal (its input or its error output is
+something else: a pipe, a file, `/dev/null`), the broker prints the command and
+exits 1; it never runs `sudo` and never waits on a password. At a terminal it asks, and
+input that ends without an answer (Ctrl-D) changes nothing. `--listen host:port` serves an address and needs none
 of this.
 
 ## The client connects, then hangs or fails on the next request
@@ -69,7 +71,7 @@ Auto-create is on by default, so producing to a new topic creates it. If you ran
 `--auto-create-topics=false`, create it explicitly first:
 
 ```sh
-kafka-topics.sh --bootstrap-server localhost:9092 --create --topic demo --partitions 1
+kafka-topics.sh --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --create --topic demo --partitions 1
 ```
 
 ## My data disappeared after a restart
@@ -77,7 +79,7 @@ kafka-topics.sh --bootstrap-server localhost:9092 --create --topic demo --partit
 doze-kafka only persists what's under `--data-dir` (the logs, and `meta.db` inside
 it). If you didn't set it, it defaults to `./data` **relative to the current working
 directory** — start the broker from a different directory and it looks like a fresh
-broker. The start-up summary prints the absolute `Data` path it is using. Pin an
+broker. The start-up summary prints the absolute `data` path it is using. Pin an
 absolute path to avoid this:
 
 ```sh

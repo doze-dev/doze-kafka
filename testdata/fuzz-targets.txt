@@ -1,0 +1,64 @@
+# Every fuzz target in the repository: package, then target. `task fuzz` runs each
+# for FUZZ_TIME; the weekly workflow (.github/workflows/fuzz.yml) runs each for at
+# least 60 seconds. A test (docs/fuzz_test.go) fails when a Fuzz function is missing
+# from here or from the parser list in docs/architecture.md.
+#
+# The same test ties this list to the code in the other direction, by a marker that
+# is the last line of a function's doc comment (no space after the slashes):
+#
+#   //fuzz:parser [class=<class>]... FuzzTarget[, FuzzTarget]...
+#       this function reads bytes from outside, and these targets reach it. A name
+#       means the target of that name in the function's own package, else the only
+#       one of that name in the repository. class= says which of the plan's parser
+#       classes it stands for (the list is repoFuzzRules in docs/fuzz_test.go).
+#   //fuzz:not-a-parser <why, at least 10 characters>
+#       it is named and shaped like a parser and reads nothing from outside.
+#
+# It fails when a marker names a target that does not exist or is not listed here;
+# when a target listed here is named by no marker (it would fuzz nothing in
+# particular); when a class has no marked function; and when a function in a package
+# that faces the network is called Parse/Decode/Unmarshal/Read/Scan-something, takes
+# a []byte, string, io.Reader or *http.Request, and has neither marker.
+#
+# The wire: frames, request headers and bodies, what the recorder says about them.
+./internal/protocol FuzzReadFrame
+./internal/protocol FuzzParseAndDecodeRequest
+./internal/protocol FuzzSkipTaggedFields
+./internal/protocol FuzzDescribe
+# Record batches, the record reader, decompression, the segment scan recovery runs.
+./internal/storage/log FuzzValidateBatches
+./internal/storage/log FuzzDecodeRecords
+./internal/storage/log FuzzDecompress
+./internal/storage/log FuzzCheckRecords
+./internal/storage/log FuzzScanLog
+./internal/storage/log FuzzCheckProduce
+# Stored ACL identity.
+./internal/storage/meta FuzzACLKey
+# Pre-authentication bytes, ACL filters, topic config values, the group state machine.
+./internal/broker FuzzSASLPlain
+./internal/broker FuzzSCRAMClientFirst
+./internal/broker FuzzSCRAMClientFinal
+./internal/broker FuzzSCRAMUsernameEscaping
+./internal/broker FuzzACLFilterMatches
+./internal/broker FuzzTopicConfigValues
+./internal/broker FuzzGroupSequence
+./internal/broker FuzzDecodeConsumerProtocol
+# The configuration file.
+./internal/config FuzzConfigFile
+# Client telemetry (OTLP metrics).
+./internal/telemetry FuzzDecode
+# The schema registry: schema texts, wire payloads, REST bodies, descriptors, references,
+# a document to encode, the version in a path.
+./schemaregistry FuzzRegisterAndCompare
+./schemaregistry FuzzDecode
+./schemaregistry FuzzAPIBody
+./schemaregistry FuzzDescriptor
+./schemaregistry FuzzRegisterReferences
+./schemaregistry FuzzEncode
+./schemaregistry FuzzVersionPath
+# The console's form inputs, through its handler, against a real broker.
+./server FuzzConsoleForms
+# The console's own reader: trace headers in a record.
+./console FuzzTraceHeaders
+# The Host header, as the console and the schema registry both judge it.
+./internal/hostguard FuzzHostGuard

@@ -20,7 +20,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	_ "net/http/pprof" // registers /debug/pprof on the default mux; only served if --pprof-addr is set.
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -31,7 +31,10 @@ import (
 
 	"github.com/doze-dev/doze-kafka/console"
 	"github.com/doze-dev/doze-kafka/internal/config"
-	"github.com/doze-dev/doze-kafka/server"
+	"github.com/doze-dev/doze-kafka/internal/consolefeed"
+	"github.com/doze-dev/doze-kafka/internal/embed"
+	"github.com/doze-dev/doze-kafka/internal/protocol"
+	"github.com/doze-dev/doze-kafka/internal/serverhook"
 	names "github.com/doze-dev/doze-names"
 )
 
@@ -116,12 +119,12 @@ func realMain(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if st.cfg.PprofAddr != "" {
-		go func() {
-			logger.Info("pprof listening", "addr", st.cfg.PprofAddr)
-			if err := http.ListenAndServe(st.cfg.PprofAddr, nil); err != nil { //nolint:gosec // debug-only, local
-				logger.Warn("pprof server stopped", "err", err)
-			}
-		}()
+		ln, err := servePprof(st.cfg.PprofAddr, logger)
+		if err != nil {
+			logger.Warn("pprof server stopped", "err", err)
+		} else {
+			defer ln.Close()
+		}
 	}
 
 	// Stop accepting, then let in-flight work drain, on SIGINT/SIGTERM — and on
@@ -134,6 +137,32 @@ func realMain(args []string, stdout, stderr io.Writer) int {
 		return exitRuntime
 	}
 	return 0
+}
+
+// servePprof serves the profiles of net/http/pprof on addr and returns the listener
+// (closing it stops the server). It has a mux of its own: the package's default
+// registration also serves /debug/pprof/cmdline, the command line this process was
+// started with, and that is where --sasl-user user:password is. Nothing here serves
+// the default mux, so that page does not exist.
+func servePprof(addr string, logger *slog.Logger) (net.Listener, error) {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index) // the index and every named profile (heap, goroutine, ...).
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	mux.HandleFunc("/debug/pprof/cmdline", http.NotFound)
+	logger.Info("pprof listening", "addr", ln.Addr().String())
+	go func() {
+		srv := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+		if err := srv.Serve(ln); err != nil && !errors.Is(err, net.ErrClosed) && err != http.ErrServerClosed {
+			logger.Warn("pprof server stopped", "err", err)
+		}
+	}()
+	return ln, nil
 }
 
 // printVersion prints doze-kafka's own version, deliberately prefixed with the
@@ -154,10 +183,22 @@ func usageError(w io.Writer, err error) int {
 // validates first, so what it prints is something the broker would accept.
 func runConfig(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 || args[0] != "print" {
-		fmt.Fprintln(stderr, "usage: doze-kafka config print [flags]")
+		fmt.Fprintln(stderr, "usage: doze-kafka config print [--show-secrets] [flags]")
 		return exitUsage
 	}
-	st, err := loadConfig(args[1:])
+	// --show-secrets is the one flag only this command has: passwords are printed as
+	// "<redacted>" unless it is given, and a file written without it is refused where it
+	// is loaded (config.Redacted).
+	showSecrets := false
+	rest := make([]string, 0, len(args)-1)
+	for _, a := range args[1:] {
+		if a == "--show-secrets" || a == "-show-secrets" {
+			showSecrets = true
+			continue
+		}
+		rest = append(rest, a)
+	}
+	st, err := loadConfig(rest)
 	switch {
 	case errors.Is(err, errHelp):
 		d := config.Default()
@@ -171,7 +212,11 @@ func runConfig(args []string, stdout, stderr io.Writer) int {
 	case err != nil:
 		return usageError(stderr, err)
 	}
-	if err := config.WriteTOML(stdout, st.cfg); err != nil {
+	write := config.WriteTOML
+	if showSecrets {
+		write = config.WriteTOMLWithSecrets
+	}
+	if err := write(stdout, st.cfg); err != nil {
 		fmt.Fprintln(stderr, "doze-kafka: config print:", err)
 		return exitRuntime
 	}
@@ -256,7 +301,7 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 		cfg.AdvertisedHost = bind.host
 	}
 
-	srv, err := server.NewFromConfig(cfg, logger)
+	srv, err := embed.NewFromConfig(cfg, logger)
 	if err != nil {
 		return err
 	}
@@ -270,13 +315,15 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 	if !cfg.ByName() {
 		bootstrap = dialable(bind.ln.Addr(), cfg.AdvertisedHost)
 	}
+	bound := envBound{listen: bind.ln.Addr().String()}
 	ready := readyInfo{version: version, kafka: cfg.Version, bootstrap: bootstrap, dataDir: absPath(cfg.DataDir),
 		auth: authSummary(cfg), configFile: st.configFile}
 
 	// The registry starts first: the console shows what is in it.
 	registryForConsole := ""
 	if cfg.SchemaRegistry {
-		if cfg.SchemaRegistryAddr == "" {
+		besideTheName := cfg.SchemaRegistryAddr == ""
+		if besideTheName {
 			cfg.SchemaRegistryAddr = registryAddrFor(z.ip())
 		}
 		closeRegistry, registryAddr, err := startRegistry(ctx, cfg, srv, logger)
@@ -284,23 +331,29 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 			return err
 		}
 		defer closeRegistry()
-		ready.registryURL = z.routeRegistry(logger, cfg.InstanceName(), registryAddr)
-		if ready.registryURL == "" {
-			ready.registryURL = httpURL(registryAddr)
+		bound.registry = registryAddr
+		if cfg.RegistryTLS() {
+			ready.registryURL = registryTLSURL(besideTheName && cfg.ByName(), bind.host, registryAddr)
+		} else {
+			ready.registryURL = z.routeRegistry(logger, cfg.InstanceName(), registryAddr)
+			if ready.registryURL == "" {
+				ready.registryURL = httpURL(registryAddr)
+			}
 		}
 		// The console reaches the registry directly, on the address it bound.
-		registryForConsole = httpURL(registryAddr)
+		registryForConsole = urlFor(registryScheme(cfg), registryAddr)
 	}
 
 	if cfg.Console {
 		if cfg.ConsoleAddr == "" {
 			cfg.ConsoleAddr = consoleAddrFor(z.ip())
 		}
-		closeConsole, consoleAddr, err := startConsole(ctx, cfg, bind.ln.Addr(), logger, consoleUser, consolePass, consoleMech, registryForConsole, trafficFor(srv.Traffic()), clientMetricsFor(srv.ClientMetrics()))
+		closeConsole, consoleAddr, err := startConsole(ctx, cfg, bind.ln.Addr(), logger, consoleUser, consolePass, consoleMech, registryForConsole, ready.registryURL, consolefeed.Traffic(serverhook.Traffic(srv)), consolefeed.ClientMetrics(serverhook.ClientMetrics(srv)))
 		if err != nil {
 			return err
 		}
 		defer closeConsole()
+		bound.console = consoleAddr
 		// A name's URL is port-less when the shared front door is up; where it is not
 		// (or this instance has no name) the address it actually bound is the URL.
 		ready.consoleURL = z.routeConsole(logger, consoleAddr)
@@ -309,6 +362,10 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 		}
 	}
 
+	ready.envCommand = envHint(st, bound)
+	if readyHook != nil {
+		readyHook(ready)
+	}
 	announce(out, logger, cfg, ready)
 	serving = true
 	if err := srv.ServeListener(ctx, bind.ln); err != nil {
@@ -320,11 +377,17 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 	return nil
 }
 
+// readyHook, when a test sets it, is handed what the summary is about to report. The
+// summary is not printed at --log-level warn or error, and a test that reads those
+// logs still has to find the instance.
+var readyHook func(readyInfo)
+
 // readyInfo is what the start-up summary reports.
 type readyInfo struct {
 	version, bootstrap, consoleURL, registryURL string
 	kafka                                       int
 	dataDir, auth, configFile                   string
+	envCommand                                  string // the `doze-kafka env` that prints this broker (envHint).
 }
 
 // authSummary is one phrase for how the listener is protected.
@@ -372,7 +435,16 @@ func announce(out io.Writer, logger *slog.Logger, cfg config.Config, r readyInfo
 		fmt.Fprintf(&b, "    config    %s\n", r.configFile)
 	}
 	b.WriteString("\n")
-	fmt.Fprintf(&b, "    %-24s point this shell at it\n", `eval "$(doze-kafka env)"`)
+	envCommand := r.envCommand
+	if envCommand == "" {
+		envCommand = "doze-kafka env"
+	}
+	if eval := `eval "$(` + envCommand + `)"`; len(eval) <= 24 {
+		fmt.Fprintf(&b, "    %-24s point this shell at it\n", eval)
+	} else {
+		// Too long to align: the command on a line of its own, to copy whole.
+		fmt.Fprintf(&b, "    point this shell at it:\n      %s\n", eval)
+	}
 	fmt.Fprintf(&b, "    %-24s when something looks wrong\n\n", "doze-kafka doctor")
 	io.WriteString(out, b.String()) //nolint:errcheck // a banner on stdout
 }
@@ -380,15 +452,18 @@ func announce(out io.Writer, logger *slog.Logger, cfg config.Config, r readyInfo
 // httpURL is the URL to open for an HTTP listener at addr. A wildcard listener's own
 // address ("[::]:8081") is where it listens, not somewhere to browse to; for that the
 // URL names localhost.
-func httpURL(addr string) string {
+func httpURL(addr string) string { return urlFor("http", addr) }
+
+// urlFor is httpURL for a listener that may be serving TLS.
+func urlFor(scheme, addr string) string {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
-		return "http://" + addr
+		return scheme + "://" + addr
 	}
 	if ip := net.ParseIP(host); host == "" || (ip != nil && ip.IsUnspecified()) {
 		host = "localhost"
 	}
-	return "http://" + net.JoinHostPort(host, port)
+	return scheme + "://" + net.JoinHostPort(host, port)
 }
 
 // dialable is the bound address as something to paste into a client. A wildcard
@@ -415,6 +490,10 @@ func absPath(p string) string {
 	return p
 }
 
+// credentialRand is where the console's password comes from. A test replaces it to know
+// the password it then looks for in every output.
+var credentialRand io.Reader = rand.Reader
+
 // consoleUserName is the SASL user the console logs in as.
 const consoleUserName = "__console"
 
@@ -424,7 +503,7 @@ const consoleUserName = "__console"
 // enabled (PLAIN preferred for simplicity, else SCRAM). Never logged.
 func provisionConsoleCredential(cfg *config.Config) (user, pass, mech string, err error) {
 	buf := make([]byte, 18)
-	if _, err := rand.Read(buf); err != nil {
+	if _, err := io.ReadFull(credentialRand, buf); err != nil {
 		return "", "", "", fmt.Errorf("generate console credential: %w", err)
 	}
 	mech = ""
@@ -458,19 +537,24 @@ func provisionConsoleCredential(cfg *config.Config) (user, pass, mech string, er
 // returns, so a port that is already taken is reported as the error it is. It
 // returns a func that shuts the console down (the caller defers it) and the
 // address the listener actually got.
-func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger *slog.Logger, user, pass, mech, registryURL string, traffic console.TrafficSource, clientMetrics console.ClientMetricsSource) (func(), string, error) {
+func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger *slog.Logger, user, pass, mech, registryURL, registryPublic string, traffic console.TrafficSource, clientMetrics console.ClientMetricsSource) (func(), string, error) {
 	dialAddr, err := consoleDialAddr(cfg, bound)
 	if err != nil {
 		return nil, "", err
 	}
 
-	var tlsCfg *tls.Config
+	var tlsCfg, registryTLS *tls.Config
 	if cfg.TLSEnabled() {
 		serverTLS, err := cfg.TLSConfig()
 		if err != nil {
 			return nil, "", err
 		}
 		tlsCfg = consoleClientTLS(serverTLS)
+		if cfg.RegistryTLS() {
+			// The registry presents the same certificate, and the console trusts it
+			// the same way: that one certificate, whatever host it names.
+			registryTLS = consoleClientTLS(serverTLS)
+		}
 	}
 
 	ln, err := zoneListen(cfg.ConsoleAddr)
@@ -480,10 +564,20 @@ func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger
 
 	con, err := console.New(console.Options{
 		Addr: dialAddr, SASLUser: user, SASLPass: pass, SASLMechanism: mech, TLSConfig: tlsCfg,
-		AllowedHosts: consoleHosts(cfg),
+		// The console is a client of the broker in this same process: its connections are
+		// marked as the process's own where they arrive, so Traffic leaves them out whatever
+		// any other client calls itself.
+		OnDial:       protocol.Adopt,
+		AllowedHosts: consoleHosts(cfg), Prefix: cfg.ConsolePrefix, Logger: logger,
 		// With SASL the console reaches the registry as the same user it reaches the broker.
-		RegistryURL: registryURL, RegistryUser: user, RegistryPass: pass,
+		RegistryURL: registryURL, RegistryUser: user, RegistryPass: pass, RegistryTLS: registryTLS,
 		Traffic: traffic, TraceHeader: cfg.TraceHeader, ClientMetrics: clientMetrics,
+		Facts: console.BrokerFacts{
+			Workspace: workspaceLabel(cfg.InstanceName()), KafkaMajor: cfg.Version,
+			DataDir: cfg.DataDir, SASLMechanisms: cfg.SASLMechanisms, RegistryURL: registryPublic, RegistryBuiltIn: registryURL != "",
+			AutoCreateTopics: cfg.AutoCreateTopics, DefaultPartitions: cfg.DefaultPartitions, MaxPartitions: cfg.MaxPartitions,
+			Version: version, Started: time.Now(),
+		},
 	})
 	if err != nil {
 		ln.Close()
@@ -567,4 +661,15 @@ func consoleDialAddr(cfg config.Config, bound net.Addr) (string, error) {
 		host = "127.0.0.1"
 	}
 	return net.JoinHostPort(host, port), nil
+}
+
+// workspaceLabel is what the top bar prints after the product name (Sy-01 draws
+// "doze-kafka harbour"). An instance that carries no name of its own, the
+// default or one derived from a directory that happens to be called doze-kafka,
+// has nothing to add: the bar says "doze-kafka" once rather than twice.
+func workspaceLabel(name string) string {
+	if name == config.DefaultName || name == "doze-kafka" {
+		return ""
+	}
+	return name
 }

@@ -1,0 +1,3 @@
+# Routes the browser suite does not visit or drive, each with the reason.
+# One per line: METHOD /path reason. Empty is the goal; a line for a route a test
+# now drives (or one that left the table) fails the gate until it is removed.

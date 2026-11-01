@@ -13,7 +13,7 @@ import (
 // litRailItem returns the label of the rail item the server rendered as active.
 func litRailItem(t *testing.T, body string) string {
 	t.Helper()
-	m := regexp.MustCompile(`(?s)<a href="[^"]*" class="ri on"[^>]*>.*?<span class="ri-nm">([^<]*)</span>`).FindStringSubmatch(body)
+	m := regexp.MustCompile(`(?s)<a href="[^"]*" class="nav on"[^>]*>.*?<span class="nm">([^<]*)</span>`).FindStringSubmatch(body)
 	if m == nil {
 		return ""
 	}
@@ -64,7 +64,7 @@ func TestRailHighlightIsRightOnEveryPage(t *testing.T) {
 		"/_console/topics":    "Topics",
 		"/_console/topics/t":  "Topics",
 		"/_console/new/topic": "Topics",
-		"/_console/groups":    "Consumer groups",
+		"/_console/groups":    "Groups",
 		"/_console/cluster":   "Cluster",
 		"/_console/access":    "Access",
 	} {
@@ -91,12 +91,12 @@ func TestShellMarkupIsLabelled(t *testing.T) {
 	page := req(t, c, "GET", "/_console/topics/t", nil).Body.String()
 	for _, want := range []string{
 		`role="dialog" aria-modal="true" aria-label="Command palette"`,
-		`role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-msg"`,
-		`class="ri on" aria-label="Topics"`, // the slim rail hides the text; the name must remain.
+		`role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-msg confirm-rows"`,
+		`class="nav on" aria-current="page"`, // the name is the text: the narrow rail clips it, it does not remove it.
 		`<nav class="rail" aria-label="Sections"`,
-		`<main class="detail`,
+		`<main class="main`,
 		`aria-label="Filter Topics"`,
-		`data-confirm-title="Delete topic"`,
+		`data-confirm-title="Delete topic t"`,
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the topic page is missing %q", want)
@@ -119,16 +119,20 @@ func TestConfirmFocusesCancel(t *testing.T) {
 	}
 }
 
-// The palette's catalogue comes from the server, views and actions included.
-func TestPaletteCatalogueIsServedWithViewsAndActions(t *testing.T) {
+// The palette's catalogue comes from the server: actions and every topic, group and
+// subject. Sy-05 has four groups (Topics, Groups, Subjects, Actions) and no "Go to":
+// the sections are reached by the g chords and the rail, so the catalogue has no view.
+func TestPaletteCatalogueIsServedWithActionsAndNoViews(t *testing.T) {
 	c := newTestConsole(t)
 	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"a"}, "partitions": {"1"}})
 	body := req(t, c, "GET", "/_console/api/palette", nil).Body.String()
-	for _, want := range []string{`"n":"Topics","u":"/_console/topics","k":"view"`, `"n":"Consumer groups"`, `"n":"Cluster"`,
-		`"n":"Create topic","u":"/_console/new/topic","k":"action"`, `"n":"a","u":"/_console/topics/a","k":"topic"`} {
+	for _, want := range []string{`"n":"Create topic","u":"/_console/new/topic","k":"action"`, `"n":"a","u":"/_console/topics/a","k":"topic"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the palette catalogue is missing %s in %s", want, body)
 		}
+	}
+	if strings.Contains(body, `"k":"view"`) {
+		t.Errorf("the palette catalogue still lists the sections as a Go to group: %s", body)
 	}
 	js, _ := staticFS.ReadFile("static/shell.js")
 	if strings.Contains(string(js), `"Create topic"`) {

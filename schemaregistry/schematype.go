@@ -42,6 +42,8 @@ type parsedSchema interface {
 
 // parseSchema reads schema text of the given language. refs are every schema it
 // depends on, dependencies before dependents.
+//
+//fuzz:parser class=schema-texts FuzzRegisterAndCompare
 func parseSchema(typ, text string, refs []resolvedRef) (parsedSchema, error) {
 	switch typ {
 	case TypeAvro:

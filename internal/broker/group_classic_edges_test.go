@@ -2,8 +2,11 @@ package broker_test
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/doze-dev/doze-kafka/internal/config"
 
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
@@ -423,8 +426,10 @@ func TestGroupClassic_ParkedJoinsAreReleased(t *testing.T) {
 	first := joinAsync(ctx, B, g, idb, testSessionMs, testRebalanceMsDefault) // parks.
 	time.Sleep(200 * time.Millisecond)
 	second := joinAsync(ctx, B2, g, idb, testSessionMs, testRebalanceMsDefault) // the client retried.
-	if o := await(t, first, 3*time.Second, "superseded join"); o.err != nil || o.resp.ErrorCode != codeUnknownMember {
-		t.Fatalf("the superseded join = %+v %v, want UNKNOWN_MEMBER_ID", o.resp, o.err)
+	select {                                                                    // Kafka never answers it (claim: groups G4).
+	case o := <-first:
+		t.Fatalf("the superseded join was answered: %+v %v", o.resp, o.err)
+	case <-time.After(500 * time.Millisecond):
 	}
 
 	time.Sleep(100 * time.Millisecond)
@@ -434,10 +439,20 @@ func TestGroupClassic_ParkedJoinsAreReleased(t *testing.T) {
 	}
 }
 
-// An empty group with nothing committed is not worth listing; one with offsets
-// is, because those are durable and a consumer will come back for them.
+// A group that has just emptied is listed Empty, whether or not it holds offsets, as on
+// Kafka (recorded: mixed-protocol-rolling, down-list-after-leave). One with nothing
+// committed is gone at the next sweep of the offsets retention (recorded:
+// offsets-retention-recreate, g-none); one with offsets stays, because those are durable
+// and a consumer will come back for them.
 func TestGroupClassic_EmptyGroupsAreForgottenUnlessTheyHoldOffsets(t *testing.T) {
-	addr := startBroker(t, 4)
+	dir := t.TempDir()
+	cfg := config.Default()
+	cfg.ListenAddr = "127.0.0.1:0"
+	cfg.DataDir = filepath.Join(dir, "data")
+	cfg.MetaDB = filepath.Join(dir, "meta.db")
+	cfg.OffsetsRetention = time.Minute // the sweep runs every 600 ms.
+	addr, stop := boot(t, cfg)
+	t.Cleanup(stop)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cl := newClient(t, addr)
@@ -454,10 +469,46 @@ func TestGroupClassic_EmptyGroupsAreForgottenUnlessTheyHoldOffsets(t *testing.T)
 	}
 
 	got := listedGroups(t, ctx, cl)
+	for deadline := time.Now().Add(10 * time.Second); got["ghost"] != "" && time.Now().Before(deadline); got = listedGroups(t, ctx, cl) {
+		if got["ghost"] != "Empty" {
+			t.Fatalf("an emptied group is listed as %q until it is dropped, want Empty", got["ghost"])
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 	if got["ghost"] != "" {
-		t.Errorf("an empty group with no offsets is still listed: %v", got)
+		t.Errorf("an empty group with no offsets is still listed after several sweeps: %v", got)
 	}
 	if got["keeper"] != "Empty" {
 		t.Errorf("a group with committed offsets should stay listed as Empty: %v", got)
+	}
+}
+
+// A SyncGroup that is refused names no protocol type and no protocol, where one that
+// succeeds echoes the request's (recorded: mixed-protocol-parked, ps-b-sync-parked and
+// ps-a-leader-sync against pj-b-sync).
+func TestGroupClassic_ARefusedSyncGroupNamesNoProtocol(t *testing.T) {
+	addr := startBroker(t, 4)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cl := newClient(t, addr)
+	defer cl.Close()
+	id, gen := stableGroupOfOne(t, ctx, cl, "g", testSessionMs, testRebalanceMsDefault)
+
+	sync := func(member string) *kmsg.SyncGroupResponse {
+		req := kmsg.NewPtrSyncGroupRequest()
+		req.Group, req.MemberID, req.Generation = "g", member, gen
+		ptype, protocol := "consumer", "range"
+		req.ProtocolType, req.Protocol = &ptype, &protocol
+		resp, err := req.RequestWith(ctx, cl)
+		if err != nil {
+			t.Fatalf("SyncGroup: %v", err)
+		}
+		return resp
+	}
+	if ok := sync(id); ok.ErrorCode != 0 || ok.ProtocolType == nil || *ok.ProtocolType != "consumer" || ok.Protocol == nil || *ok.Protocol != "range" {
+		t.Errorf("a SyncGroup that succeeds: code %d type %v protocol %v, want the request's echoed", ok.ErrorCode, ok.ProtocolType, ok.Protocol)
+	}
+	if refused := sync("nobody"); refused.ErrorCode != kerr.UnknownMemberID.Code || refused.ProtocolType != nil || refused.Protocol != nil {
+		t.Errorf("a refused SyncGroup: code %d type %v protocol %v, want UNKNOWN_MEMBER_ID and neither", refused.ErrorCode, refused.ProtocolType, refused.Protocol)
 	}
 }

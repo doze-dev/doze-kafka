@@ -24,6 +24,9 @@ func obs(conn uint64, client string, api protocol.APIKey, at time.Duration, mod 
 
 func TestTheRingKeepsTheNewestAndNoMore(t *testing.T) {
 	r := New(5, nil)
+	if r.Capacity() != 5 {
+		t.Errorf("capacity %d, want 5", r.Capacity())
+	}
 	r.ConnOpened(1, "x")
 	for i := 0; i < 12; i++ {
 		i := i
@@ -47,8 +50,8 @@ func TestTheConsolesOwnRequestsAreLeftOut(t *testing.T) {
 	r := New(50, nil)
 	r.ConnOpened(1, "a")
 	r.ConnOpened(2, "b")
-	r.Request(obs(1, "doze-kafka-console", kmsg.Metadata, 0))
-	r.Request(obs(1, "doze-kafka-console", kmsg.Fetch, time.Second))
+	r.Request(obs(1, "doze-kafka-console", kmsg.Metadata, 0, own))
+	r.Request(obs(1, "doze-kafka-console", kmsg.Fetch, time.Second, own))
 	r.Request(obs(2, "billing", kmsg.Produce, 2*time.Second))
 	if got := r.Events(Filter{}, 0); len(got) != 1 || got[0].ClientID != "billing" {
 		t.Fatalf("rows = %+v, want only billing's", got)
@@ -137,17 +140,18 @@ func TestFilters(t *testing.T) {
 		f    Filter
 		want int
 	}{
-		"all":         {Filter{}, 4},
-		"topic":       {Filter{Topic: "orders"}, 2},
-		"topic exact": {Filter{Topic: "order"}, 0},
-		"group":       {Filter{Group: "billing"}, 1},
-		"api":         {Filter{API: "FETCH"}, 1},
-		"errors":      {Filter{ErrorsOnly: true}, 1},
-		"client":      {Filter{Client: "BILLING"}, 4},
-		"software":    {Filter{Client: "java 3.7"}, 1},
-		"remote":      {Filter{Client: "127.0.0.1"}, 4},
-		"nobody":      {Filter{Client: "inventory"}, 0},
-		"combined":    {Filter{Topic: "orders", API: "produce"}, 1},
+		"all":                  {Filter{}, 4},
+		"topic":                {Filter{Topic: "orders"}, 2},
+		"topic exact":          {Filter{Topic: "order"}, 0},
+		"group":                {Filter{Group: "billing"}, 1},
+		"api":                  {Filter{API: "FETCH"}, 1},
+		"errors":               {Filter{ErrorsOnly: true}, 1},
+		"client":               {Filter{Client: "billing-app"}, 4},
+		"client is one client": {Filter{Client: "BILLING"}, 0},
+		"software":             {Filter{Any: "java 3.7"}, 1},
+		"remote":               {Filter{Any: "127.0.0.1"}, 4},
+		"nobody":               {Filter{Client: "inventory"}, 0},
+		"combined":             {Filter{Topic: "orders", API: "produce"}, 1},
 	} {
 		if got := n(c.f); got != c.want {
 			t.Errorf("%s: %d rows, want %d", name, got, c.want)
@@ -177,13 +181,18 @@ func TestClientsAreTheLiveConnections(t *testing.T) {
 	r.ConnOpened(2, "10.0.0.2:2")
 	r.Request(obs(2, "billing", kmsg.ApiVersions, 0, func(o *protocol.Observation) { o.Software = "librdkafka 2.3.0" }))
 	r.Request(obs(2, "billing", kmsg.JoinGroup, time.Second, func(o *protocol.Observation) { o.Group = "billing" }))
+	// A connection that has not sent a request (a port probe) is not a client yet.
 	cs := r.Clients()
-	if len(cs) != 2 || cs[0].Conn != 1 || cs[1].Conn != 2 {
-		t.Fatalf("clients = %+v", cs)
+	if len(cs) != 1 || cs[0].Conn != 2 {
+		t.Fatalf("clients = %+v, want only the connection that has spoken", cs)
 	}
-	c := cs[1]
+	c := cs[0]
 	if c.ClientID != "billing" || c.Software != "librdkafka 2.3.0" || c.Requests != 2 || len(c.Groups) != 1 || c.Groups[0] != "billing" {
 		t.Errorf("client 2 = %+v", c)
+	}
+	r.Request(obs(1, "probe", kmsg.ApiVersions, 2*time.Second))
+	if cs := r.Clients(); len(cs) != 2 || cs[0].Conn != 1 || cs[1].Conn != 2 {
+		t.Errorf("once it speaks it is listed, oldest first: %+v", cs)
 	}
 	r.ConnClosed(1)
 	if cs := r.Clients(); len(cs) != 1 || cs[0].Conn != 2 {
@@ -198,10 +207,10 @@ func TestClientsAreTheLiveConnections(t *testing.T) {
 
 func TestGroupEventsAreKeptInOrderPerGroup(t *testing.T) {
 	r := New(4, nil)
-	r.GroupEvent("billing", "joined", "m1", 0, "client a")
-	r.GroupEvent("audit", "joined", "x1", 0, "")
-	r.GroupEvent("billing", "rebalance", "m1", 0, "a member joined")
-	r.GroupEvent("billing", "generation", "m1", 1, "1 member")
+	r.GroupEvent("billing", "joined", "m1", 0, "client a", 0, "")
+	r.GroupEvent("audit", "joined", "x1", 0, "", 0, "")
+	r.GroupEvent("billing", "rebalance", "m1", 0, "a member joined", 0, "")
+	r.GroupEvent("billing", "generation", "m1", 1, "1 member", 0, "")
 	got := r.GroupEvents("billing", 0)
 	if len(got) != 3 || got[0].Kind != "joined" || got[1].Kind != "rebalance" || got[2].Kind != "generation" || got[2].Generation != 1 {
 		t.Fatalf("billing events = %+v", got)
@@ -212,10 +221,17 @@ func TestGroupEventsAreKeptInOrderPerGroup(t *testing.T) {
 	if last := r.GroupEvents("billing", 1); len(last) != 1 || last[0].Kind != "generation" {
 		t.Errorf("limit 1 = %+v", last)
 	}
-	// Bounded: a fifth event pushes the oldest out.
-	r.GroupEvent("billing", "assigned", "m1", 1, "")
-	if got := r.GroupEvents("billing", 0); len(got) != 3 || got[0].Kind != "rebalance" {
-		t.Errorf("after overflow: %+v", got)
+	// Bounded per group: the 201st event of one group pushes its oldest out, and does
+	// not touch another group's story (TRF-19).
+	for i := 0; i < MaxGroupEvents; i++ {
+		r.GroupEvent("noisy", "assigned", "m", 1, "", 0, "")
+	}
+	r.GroupEvent("noisy", "left", "m", 1, "", 0, "")
+	if got := r.GroupEvents("noisy", 0); len(got) != MaxGroupEvents || got[len(got)-1].Kind != "left" {
+		t.Errorf("a noisy group keeps %d events, last %q", len(got), got[len(got)-1].Kind)
+	}
+	if got := r.GroupEvents("billing", 0); len(got) != 3 || got[0].Kind != "joined" {
+		t.Errorf("a noisy group evicted another's story: %+v", got)
 	}
 	if got := r.GroupEvents("nobody", 0); len(got) != 0 {
 		t.Errorf("unknown group: %+v", got)

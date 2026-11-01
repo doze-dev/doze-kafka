@@ -21,6 +21,7 @@ type APIRange struct {
 // little to show here; padding it out with a dashboard would be dishonest.
 type ClusterInfo struct {
 	NodeID        int32
+	Brokers       int // how many brokers DescribeCluster lists: one, here.
 	ClusterID     string
 	Host          string
 	Port          int32
@@ -42,7 +43,7 @@ type TxnRow struct {
 	State      string
 	ProducerID int64
 	Epoch      int16
-	Age        string // since it began.
+	Began      time.Time // when it began; zero when the broker did not say.
 	Timeout    string
 	Partitions []string // topic-partition, as the transaction has written to them.
 }
@@ -59,7 +60,7 @@ func (b *backend) ClusterInfo(ctx context.Context) (*ClusterInfo, error) {
 	if dresp.ErrorCode != 0 {
 		return nil, kerr.ErrorForCode(dresp.ErrorCode)
 	}
-	info := &ClusterInfo{ClusterID: dresp.ClusterID, TLS: b.opts.TLSConfig != nil}
+	info := &ClusterInfo{ClusterID: dresp.ClusterID, Brokers: len(dresp.Brokers), TLS: b.opts.TLSConfig != nil}
 	if b.opts.SASLUser != "" {
 		if info.AuthMech = b.opts.SASLMechanism; info.AuthMech == "" {
 			info.AuthMech = "PLAIN"
@@ -135,7 +136,7 @@ func (b *backend) openTransactions(ctx context.Context) []TxnRow {
 		row := TxnRow{ID: s.TransactionalID, State: s.State, ProducerID: s.ProducerID, Epoch: s.ProducerEpoch,
 			Timeout: (time.Duration(s.TimeoutMillis) * time.Millisecond).String()}
 		if s.StartTimestamp > 0 {
-			row.Age = time.Since(time.UnixMilli(s.StartTimestamp)).Round(time.Second).String()
+			row.Began = time.UnixMilli(s.StartTimestamp)
 		}
 		for _, t := range s.Topics {
 			for _, p := range t.Partitions {

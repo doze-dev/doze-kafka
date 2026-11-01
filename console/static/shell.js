@@ -1,5 +1,5 @@
 // shell.js — the console's chrome: theme, toasts, copy, confirm dialog, command
-// palette, keyboard shortcuts, the message drawer, the docked composer and live
+// palette, keyboard shortcuts, the message inspector, the docked composer and live
 // polling. Chrome elements live outside #workspace, so they survive every
 // content swap; anything inside it is looked up when it is needed, never held.
 (function () {
@@ -7,7 +7,7 @@
   var root = document.documentElement;
   var PREFIX = (document.querySelector('link[rel="icon"]') || {}).href
     ? new URL(document.querySelector('link[rel="icon"]').href).pathname.replace(/\/static\/favicon\.svg$/, "")
-    : "/_console";
+    : "";
   function stored(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
   function store(key, value) {
     try { if (value == null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch (e) {}
@@ -22,74 +22,170 @@
     resetListCursor();
   });
 
-  // ---------- theme: light / system / dark ----------
-  // The stylesheet knows two themes. "System" is this script choosing between
-  // them from the OS setting, and following it when it changes; it is stored as
-  // the absence of a choice. (The same resolution runs inline in <head>, before
-  // first paint.)
-  var themeSeg = document.getElementById("theme-seg");
+  // ---------- theme: light / dark / high contrast / system ----------
+  // The stylesheet knows three themes. "System" is this script choosing between
+  // them from the OS settings (dark, or a request for more contrast), and
+  // following them when they change; it is stored as the absence of a choice.
+  // (The same resolution runs inline in <head>, before first paint.)
+  // The switch is in the top bar, and at phone width at the foot of the ☰ menu (Sy-07: "a
+  // switch in the top bar overrides it"; a 390 px top bar has room for none): every
+  // copy of it says the same.
+  var themeSegs = document.querySelectorAll(".theme-seg");
   var darkMQ = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+  var contrastMQ = window.matchMedia ? window.matchMedia("(prefers-contrast: more)") : null;
   function themeMode() {
     var t = stored("theme");
-    return t === "light" || t === "dark" ? t : "system";
+    return t === "light" || t === "dark" || t === "contrast" ? t : "system";
   }
   function applyTheme(mode) {
-    root.setAttribute("data-theme", mode === "system" ? (darkMQ && darkMQ.matches ? "dark" : "light") : mode);
+    var system = contrastMQ && contrastMQ.matches ? "contrast" : (darkMQ && darkMQ.matches ? "dark" : "light");
+    root.setAttribute("data-theme", mode === "system" ? system : mode);
     store("theme", mode === "system" ? null : mode);
-    if (themeSeg) themeSeg.querySelectorAll("button").forEach(function (b) {
+    Array.prototype.forEach.call(document.querySelectorAll(".theme-seg button"), function (b) {
       var on = b.getAttribute("data-mode") === mode;
       b.classList.toggle("on", on);
       b.setAttribute("aria-pressed", on ? "true" : "false");
     });
   }
   applyTheme(themeMode());
-  if (themeSeg) themeSeg.addEventListener("click", function (e) {
-    var b = e.target.closest("button[data-mode]");
-    if (b) applyTheme(b.getAttribute("data-mode"));
+  Array.prototype.forEach.call(themeSegs, function (seg) {
+    seg.addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-mode]");
+      if (b) applyTheme(b.getAttribute("data-mode"));
+    });
   });
-  if (darkMQ && darkMQ.addEventListener) darkMQ.addEventListener("change", function () {
-    if (themeMode() === "system") applyTheme("system");
+  [darkMQ, contrastMQ].forEach(function (mq) {
+    if (mq && mq.addEventListener) mq.addEventListener("change", function () {
+      if (themeMode() === "system") applyTheme("system");
+    });
   });
 
-  // ---------- collapsible rail ----------
-  function railSlim() { return root.getAttribute("data-rail") === "slim"; }
-  // The rail folds to icons on narrow windows unless you have chosen "wide".
-  var narrowMQ = window.matchMedia ? window.matchMedia("(max-width:1180px)") : null;
-  function applyRailAuto() {
-    var pref = stored("rail");
-    var slim = pref === "slim" || (pref !== "wide" && !!narrowMQ && narrowMQ.matches);
-    if (slim) root.setAttribute("data-rail", "slim"); else root.removeAttribute("data-rail");
+  // ---------- the heartbeat, and the rail's numbers ----------
+  // Every page, whatever it shows, asks /api/counts every 5 s while it is in front.
+  // The answer is the counts beside Traffic, Topics, Groups and Schemas (an item with
+  // no number keeps what it showed), and whether the broker answered ("broker": 1).
+  // It is the shell's own word on the broker (A7): a page with nothing live of its
+  // own (the Topics list, Cluster, Connect, a form) shows "not reachable" on the pill
+  // from it, and comes back from it, as a page whose rows poll does. No answer at all
+  // (the console's process is gone) is the same state.
+  var brokerLost = false, beating = false;
+  function heartbeat() {
+    if (document.hidden || beating) return;
+    beating = true;
+    var ctl = window.AbortController ? new AbortController() : null;
+    var timer = ctl ? setTimeout(function () { ctl.abort(); }, 4500) : 0;
+    fetch(PREFIX + "/api/counts", { headers: { Accept: "application/json" }, cache: "no-store", signal: ctl ? ctl.signal : undefined })
+      .then(function (r) { if (!r.ok) throw new Error("status " + r.status); return r.json(); })
+      .then(function (counts) {
+        document.querySelectorAll(".rail [data-ct]").forEach(function (el) {
+          var n = counts[el.getAttribute("data-ct")];
+          if (n == null) return;
+          el.textContent = String(n) + (el.getAttribute("data-ct-unit") || "");
+        });
+        setBrokerLost(counts.broker === 0);
+      }, function () { setBrokerLost(true); })
+      .then(function () { clearTimeout(timer); beating = false; });
   }
-  if (narrowMQ && narrowMQ.addEventListener) narrowMQ.addEventListener("change", applyRailAuto);
-  function setRail(slim) {
-    if (slim) root.setAttribute("data-rail", "slim"); else root.removeAttribute("data-rail");
-    store("rail", slim ? "slim" : "wide");
+  function setBrokerLost(lost) {
+    var was = brokerLost;
+    brokerLost = lost;
+    if (!lost) lastGood = Date.now();
+    // Back: every region that froze asks again now rather than at its next tick.
+    if (was && !lost) retryFrozen();
+    if (was !== lost) renderPill();
   }
-  var railToggle = document.getElementById("rail-toggle");
-  if (railToggle) railToggle.addEventListener("click", function () { setRail(!railSlim()); });
-  // Flyout labels in slim mode: positioned on hover so the rail's own overflow
-  // can never clip them.
-  document.addEventListener("mouseover", function (e) {
-    if (!railSlim()) return;
-    var ri = e.target.closest(".rail .ri");
-    var fly = ri && ri.querySelector(".ri-fly");
-    if (!fly) return;
-    var r = ri.getBoundingClientRect();
-    fly.style.left = (r.right + 8) + "px";
-    fly.style.top = (r.top + r.height / 2) + "px";
-  });
-  // The counts beside Topics and Consumer groups, refreshed gently.
-  function refreshCounts() {
-    if (document.hidden) return;
-    fetch(PREFIX + "/api/counts").then(function (r) { return r.json(); }).then(function (counts) {
-      document.querySelectorAll(".rail [data-ct]").forEach(function (el) {
-        var n = counts[el.getAttribute("data-ct")];
-        el.textContent = n == null ? "" : String(n);
+  heartbeat();
+  setInterval(heartbeat, 5000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) heartbeat(); });
+
+  // ---------- the list pane's numbers ----------
+  // A list of topics or groups (data-list) keeps its numbers current: every 5 s, while
+  // the page is in front and the broker answers, the list's numbers are asked for and
+  // redrawn in place (the filter, the scroll and the selection stay). A list whose
+  // names changed (a topic made or deleted elsewhere) is fetched again with the page
+  // and replaced, keeping what was typed into its filter.
+  var listBusy = false;
+  function refreshList() {
+    var list = document.querySelector(".list[data-list]");
+    if (!list || document.hidden || listBusy || brokerLost) return;
+    listBusy = true;
+    fetch(PREFIX + "/api/list/" + list.getAttribute("data-list"), { headers: { Accept: "application/json" }, cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error("status " + r.status); return r.json(); })
+      .then(function (rows) {
+        rows = rows || [];
+        var items = list.querySelectorAll(".li[data-name]");
+        var same = items.length === rows.length;
+        for (var i = 0; same && i < rows.length; i++) same = items[i].getAttribute("data-name") === rows[i].name;
+        if (!same) return replaceList(list);
+        rows.forEach(function (row, i) {
+          var n = items[i].querySelector("[data-n]"), dot = items[i].querySelector(".dot");
+          if (n && n.textContent !== row.n) n.textContent = row.n;
+          if (n) { n.classList.toggle("warn", row.tone === "warn"); n.classList.toggle("mut", row.tone !== "warn"); }
+          if (dot) dot.className = "dot" + (row.dot ? " " + row.dot : "");
+        });
+      })
+      .catch(function () {})
+      .then(function () { listBusy = false; });
+  }
+  function replaceList(list) {
+    return fetch(location.href, { headers: { Accept: "text/html" }, cache: "no-store" })
+      .then(function (r) { return r.ok ? r.text() : null; })
+      .then(function (html) {
+        if (!html) return;
+        var fresh = new DOMParser().parseFromString(html, "text/html").querySelector(".list[data-list]");
+        var cur = document.querySelector(".list[data-list]");
+        if (!fresh || !cur) return;
+        var q = cur.querySelector("input[data-filter-target]"), sc = cur.querySelector(".list-scroll");
+        var typed = q ? q.value : "", top = sc ? sc.scrollTop : 0;
+        cur.replaceWith(fresh);
+        var q2 = fresh.querySelector("input[data-filter-target]"), sc2 = fresh.querySelector(".list-scroll");
+        if (q2 && typed) q2.value = typed;
+        if (sc2) sc2.scrollTop = top;
+        if (window.htmx) htmx.process(fresh);
+        applyFilters();
       });
-    }).catch(function () {});
   }
-  refreshCounts();
-  setInterval(refreshCounts, 5000);
+  setInterval(refreshList, 5000);
+
+  // ---------- the traces you opened ----------
+  // Kept in this tab only (sessionStorage): the ids of the traces followed, newest
+  // first, with how many messages each had once its scan finished. The Trace page
+  // lists them (Tc-Home's list).
+  function traceRecents() {
+    try { return JSON.parse(sessionStorage.getItem("traces") || "[]") || []; } catch (e) { return []; }
+  }
+  function rememberTrace() {
+    var page = document.querySelector("[data-trace-id]");
+    if (!page) return;
+    var id = page.getAttribute("data-trace-id"), live = document.getElementById("trace-live");
+    var hits = live && live.hasAttribute("data-hits") ? live.getAttribute("data-hits") : null;
+    try {
+      var all = traceRecents(), prev = all.filter(function (x) { return x.id === id; })[0];
+      all = all.filter(function (x) { return x.id !== id; });
+      all.unshift({ id: id, n: hits != null ? hits : (prev ? prev.n : null) });
+      sessionStorage.setItem("traces", JSON.stringify(all.slice(0, 12)));
+    } catch (e) {}
+  }
+  function renderTraceRecents() {
+    var box = document.querySelector("[data-trace-recents]");
+    if (!box) return;
+    box.textContent = "";
+    traceRecents().forEach(function (t) {
+      var a = document.createElement("a");
+      a.className = "li";
+      a.href = PREFIX + "/trace?id=" + encodeURIComponent(t.id);
+      var name = document.createElement("span");
+      name.className = "m grow el";
+      name.textContent = t.id.length > 18 ? t.id.slice(0, 8) + "\u2026" + t.id.slice(-7) : t.id;
+      name.title = t.id;
+      a.appendChild(name);
+      if (t.n != null) { var n = document.createElement("span"); n.className = "m mut"; n.textContent = t.n; a.appendChild(n); }
+      box.appendChild(a);
+    });
+  }
+  function traceBookkeeping() { rememberTrace(); renderTraceRecents(); }
+  document.addEventListener("DOMContentLoaded", traceBookkeeping);
+  document.addEventListener("htmx:afterSettle", traceBookkeeping);
 
   // ---------- toasts ----------
   function toast(msg, kind) {
@@ -118,36 +214,106 @@
   }
   // Is this event about a live region's own poll? A failing poll must not toast
   // every few seconds; it gets one persistent state on the live control instead.
+  // The live regions a poll's path belongs to.
+  function liveRegionsFor(path) {
+    return Array.prototype.filter.call(document.querySelectorAll("[data-live]"), function (el) {
+      var base = el.getAttribute("data-live");
+      return !!base && path.indexOf(base) === 0;
+    });
+  }
   function isLivePoll(e) {
     var path = (e.detail && e.detail.requestConfig && e.detail.requestConfig.path) || "";
-    var el = document.querySelector("[data-live]");
-    var base = el && el.getAttribute("data-live");
-    return !!base && path.indexOf(base) === 0;
+    // Any live region's own poll counts: a page can have several (the tape and
+    // the wire dock), and a failing poll of any of them is "not updating", once.
+    return liveRegionsFor(path).length > 0;
   }
-  function isDrawerRequest(e) { return !!(e.detail && e.detail.target && e.detail.target.id === "drawer"); }
-  function setDisconnected(on, why) {
-    document.querySelectorAll("[data-live]").forEach(function (el) {
+  function pollPath(e) { return (e.detail && e.detail.requestConfig && e.detail.requestConfig.path) || ""; }
+  function isInspectorRequest(e) { return !!(e.detail && e.detail.target && e.detail.target.id === "inspector"); }
+  // The console when the broker is not there. One persistent state, not a toast
+  // per poll: the live pill says "Not connected" with the last time anything was
+  // heard, the regions whose poll failed are frozen under a muted overlay, and one
+  // Retry asks again at once. Polling carries on behind it, so it ends by itself
+  // (no reload) when the broker comes back.
+  var lastGood = Date.now();
+  function clockText(ms) {
+    return window.dozeTime ? window.dozeTime.clock(ms) : new Date(ms).toLocaleTimeString();
+  }
+  function renderPill() {
+    var pill = document.getElementById("live-pill");
+    var down = brokerLost || document.querySelectorAll("[data-live].disconnected").length > 0;
+    document.documentElement.toggleAttribute("data-connection-lost", down);
+    if (!pill) return;
+    pill.classList.toggle("disconnected", down);
+    // Traf-10 draws the top bar's pill red with the address and the words "not
+    // reachable"; the time of the last good answer is the page's own (its header and
+    // its callout say it) and is this pill's tooltip, so the bar stays one short pill.
+    pill.classList.toggle("bad", down);
+    pill.title = down ? "Not reachable. The last answer was at " + clockText(lastGood) : "The broker this console is connected to";
+    var st = pill.querySelector(".pill-state"), retry = document.getElementById("pill-retry");
+    if (st) {
+      st.textContent = down ? "not reachable" : "";
+      st.hidden = !down;
+    }
+    // Retry is the page header's button where the page draws one (Traf-10). A page
+    // without one gets it beside the pill, never inside it, so the jump field keeps
+    // its width.
+    var pageRetry = document.querySelector("main [data-retry]");
+    if (down && !retry && !pageRetry) {
+      retry = document.createElement("button");
+      retry.type = "button"; retry.id = "pill-retry"; retry.className = "btn sm"; retry.textContent = "Retry";
+      pill.insertAdjacentElement("afterend", retry);
+    } else if (!down && retry) {
+      retry.remove();
+    }
+    pill.setAttribute("aria-live", "polite");
+    if (down) document.querySelectorAll("[data-lastgood]").forEach(function (el) { el.textContent = clockText(lastGood); });
+  }
+  // setDisconnected marks the regions whose poll failed (or all of them, with no
+  // path), once: a failing poll repeats every few seconds and says nothing new.
+  function setDisconnected(on, why, path) {
+    var regions = path ? liveRegionsFor(path) : Array.prototype.slice.call(document.querySelectorAll("[data-live]"));
+    regions.forEach(function (el) {
       el.classList.toggle("disconnected", on);
       var b = el.querySelector("[data-live-toggle]");
       if (b) b.title = on ? "Not updating: " + (why || "can't reach the broker") : (livePaused ? "Resume live updates" : "Pause live updates");
     });
+    if (!on && regions.length) lastGood = Date.now();
+    renderPill();
   }
+  // One retry: the heartbeat asks now, and every frozen region asks now rather than
+  // at its next tick.
+  function retryFrozen() {
+    if (!window.htmx) return;
+    document.querySelectorAll("[data-live].disconnected").forEach(function (el) {
+      var url = el.getAttribute("data-live");
+      if (url && el.id) htmx.ajax("GET", url + (url.indexOf("?") >= 0 ? "&" : "?") + "h=", { target: "#" + el.id, swap: "outerHTML" }).catch(function () {});
+    });
+  }
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest("#pill-retry, [data-retry]")) return;
+    heartbeat();
+    retryFrozen();
+  });
   // An error response is shown where the person is looking: in the failed form's
-  // error slot if it has one, else a toast. (The drawer reports its own; see below.)
+  // error slot if it has one, else a toast. (The inspector reports its own; see below.)
   document.addEventListener("htmx:responseError", function (e) {
     var msg = errorText(e.detail.xhr);
-    if (isLivePoll(e)) { setDisconnected(true, msg); return; }
-    if (isDrawerRequest(e)) return;
-    var elt = e.detail.elt;
+    if (isLivePoll(e)) { setDisconnected(true, msg, pollPath(e)); return; }
+    if (isInspectorRequest(e)) return;
+    sayFailure(e, msg);
+  });
+  function sayFailure(e, msg) {
+    // The element that asked: in htmx:beforeSwap, detail.elt is where it would swap.
+    var elt = (e.detail.requestConfig && e.detail.requestConfig.elt) || e.detail.elt;
     var form = elt && elt.closest ? elt.closest("form") : null;
     var slot = form && form.querySelector("[data-err-slot]");
     if (slot) { slot.textContent = msg; slot.hidden = false; return; }
     toast(msg.length > 140 ? msg.slice(0, 140) + "…" : msg, "err");
-  });
+  }
   // Nothing came back at all (the console server itself is gone).
   function networkFailure(e) {
-    if (isLivePoll(e)) { setDisconnected(true, "the console server did not answer"); return; }
-    if (isDrawerRequest(e)) return;
+    if (isLivePoll(e)) { setDisconnected(true, "the console server did not answer", pollPath(e)); return; }
+    if (isInspectorRequest(e)) return;
     toast("No answer from the console — is doze-kafka still running?", "err");
   }
   document.addEventListener("htmx:sendError", networkFailure);
@@ -160,6 +326,14 @@
     if (xhr && xhr.getResponseHeader("X-Doze-Page") === "error") {
       e.detail.shouldSwap = true;
       e.detail.isError = false;
+    } else if (xhr && xhr.status >= 400 && !isLivePoll(e) && !isInspectorRequest(e)) {
+      // A refusal (A2: Kafka's 4xx) or a failure, from something the person did: it
+      // is said where they are looking, and is the answer, not an error of the page's.
+      // htmx would also log every one as a console error; told it is not an error, it
+      // does not, and what reads "successful" reads the status instead.
+      sayFailure(e, errorText(xhr));
+      e.detail.shouldSwap = false;
+      e.detail.isError = false;
     }
   });
 
@@ -170,7 +344,7 @@
   //
   // The end of a request is taken from the XMLHttpRequest itself, not from
   // htmx:afterRequest: htmx raises that on the element that asked, and when the
-  // response replaces that element (the drawer's Older and Newer buttons replace
+  // response replaces that element (the inspector's Older and Newer buttons replace
   // themselves) the event has nowhere to bubble from, and the bar stayed on.
   var slowTimer = null, inflight = 0;
   document.addEventListener("htmx:beforeRequest", function (e) {
@@ -178,12 +352,15 @@
     var elt = e.detail.elt;
     var form = elt && elt.closest ? elt.closest("form") : null;
     var slot = form && form.querySelector("[data-err-slot]");
-    if (slot) { slot.hidden = true; slot.textContent = ""; }
+    // Only the form's own sending clears its last error: a preview inside the form (a
+    // GET as it is typed into) refreshing after a refusal wiped the refusal.
+    var verb = e.detail.requestConfig && e.detail.requestConfig.verb;
+    if (slot && verb && verb !== "get") { slot.hidden = true; slot.textContent = ""; }
     var bar = document.getElementById("reqbar");
     inflight++;
     if (!slowTimer && bar) slowTimer = setTimeout(function () { bar.hidden = false; }, 500);
     var xhr = e.detail.xhr;
-    if (isDrawerRequest(e)) drawerRequestStarted(xhr, elt);
+    if (isInspectorRequest(e)) inspectorRequestStarted(xhr, elt);
     xhr.addEventListener("loadend", function () {
       inflight = Math.max(0, inflight - 1);
       if (inflight === 0) {
@@ -221,19 +398,19 @@
       function () { toast("This browser would not copy that; select the text and copy it by hand.", "err"); });
   });
 
-  // ---------- "Edit a copy" (drawer → composer) ----------
-  // Prefills the composer from a record in the drawer: key, value, headers,
+  // ---------- "Edit a copy" (inspector → composer) ----------
+  // Prefills the composer from a record in the inspector: key, value, headers,
   // partition, and how each is encoded, for changing before sending. ("Send
   // again" is a different thing: the server re-produces the stored record
   // exactly, which a form cannot promise.)
   document.addEventListener("click", function (e) {
-    var b = e.target.closest("#drawer-edit");
+    var b = e.target.closest("#inspector-edit");
     if (!b) return;
-    closeDrawer(false);
+    closeInspector(false);
     var panel = document.getElementById("compose-panel");
     if (!panel) return;
     setDock(true);
-    var form = panel.querySelector("form");
+    var form = panel.querySelector("#compose-body form");
     var st = window.Alpine ? Alpine.$data(form) : null;
     var key = form.querySelector('input[name="key"]');
     if (key) key.value = b.getAttribute("data-key") || "";
@@ -260,13 +437,15 @@
 
   // ---------- dialogs ----------
   // Three things open over the page: the confirm dialog, the command palette and
-  // the message drawer. Only one is open at a time, and while one is, the page's
-  // single-key shortcuts are off.
+  // the key help. Only one is open at a time, and while one is, the page's
+  // single-key shortcuts are off. (The inspector is not one of them: it is part of
+  // the page, and its keys are the page's.)
   var FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
   function isOpen(id) { var el = document.getElementById(id); return !!el && !el.hidden; }
   function confirmOpen() { return isOpen("confirm"); }
   function paletteOpen() { return isOpen("palette"); }
-  function drawerIsOpen() { return isOpen("drawer-overlay"); }
+  function inspectorIsOpen() { return isOpen("inspector"); }
+  function helpOpen() { return isOpen("help"); }
   // Tab stays inside an open dialog.
   function trapTab(box, ev) {
     if (ev.key !== "Tab") return;
@@ -283,21 +462,69 @@
   // (data-confirm-title / data-confirm-verb), so the dialog says "Delete topic",
   // not "Are you sure? / Confirm". Focus starts on Cancel: Enter on a destructive
   // dialog must not be the dangerous answer.
+  // The sentence is measured when the button is pressed (data-confirm-url): the
+  // one drawn into the page is as old as the page, and a topic gains records. The
+  // drawn one is the fallback when the console cannot answer.
+  var confirmPending = false;
+  // segs draws a confirm's runs of text (plain, mono, bold) with textContent: a name
+  // in a sentence is the broker's, never markup.
+  function segs(el, list) {
+    el.textContent = "";
+    (list || []).forEach(function (s) {
+      if (!s.m && !s.b) { el.appendChild(document.createTextNode(s.t)); return; }
+      var n = document.createElement("span");
+      n.className = s.m ? "m" : "b";
+      n.textContent = s.t;
+      el.appendChild(n);
+    });
+  }
   document.addEventListener("htmx:confirm", function (e) {
     var box = document.getElementById("confirm");
     var q = e.detail.question;
     if (!q || !box) return;
     e.preventDefault();
-    if (confirmOpen()) return; // one question at a time.
+    if (confirmOpen() || confirmPending) return; // one question at a time.
     var elt = e.detail.elt || {}, data = elt.dataset || {};
     var opener = document.activeElement;
-    document.getElementById("confirm-title").textContent = data.confirmTitle || "Are you sure?";
-    document.getElementById("confirm-msg").textContent = q;
+    if (data.confirmUrl) {
+      confirmPending = true;
+      // A form's confirm is measured with what was typed into it (how many
+      // partitions to add).
+      var url = data.confirmUrl;
+      if (elt.tagName === "FORM") {
+        new FormData(elt).forEach(function (v, k) { if (typeof v === "string") url += "&" + encodeURIComponent(k) + "=" + encodeURIComponent(v); });
+      }
+      fetch(url, { headers: { Accept: "application/json" } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; })
+        .then(function (fresh) {
+          confirmPending = false;
+          showConfirm(fresh && fresh.text ? fresh : { text: q, title: data.confirmTitle, verb: data.confirmVerb });
+        });
+      return;
+    }
+    showConfirm({ text: q, title: data.confirmTitle, verb: data.confirmVerb });
+    function showConfirm(say) {
+    document.getElementById("confirm-title").textContent = say.title || "Are you sure?";
+    var msg = document.getElementById("confirm-msg"), rows = document.getElementById("confirm-rows");
+    // The measured confirm comes as a paragraph and a table (Tp-24); the fallback is
+    // the one sentence drawn into the page.
+    if (say.body) segs(msg, say.body); else msg.textContent = say.text;
+    rows.textContent = "";
+    (say.rows || []).forEach(function (r) {
+      var l = document.createElement("span"), v = document.createElement("span");
+      l.textContent = r.label; segs(v, r.value);
+      rows.appendChild(l); rows.appendChild(v);
+    });
+    rows.hidden = !(say.rows && say.rows.length);
     var yes = document.getElementById("confirm-yes"), no = document.getElementById("confirm-no");
-    yes.textContent = data.confirmVerb || "Confirm";
+    yes.textContent = say.verb || "Confirm";
     box.hidden = false;
+    // The keys strip says what the keys do in the dialog while it is open (Tp-24).
+    root.setAttribute("data-dialog", "confirm");
     function close(restore) {
       box.hidden = true; yes.onclick = no.onclick = box.onclick = null;
+      root.removeAttribute("data-dialog");
       document.removeEventListener("keydown", onKey, true);
       if (restore && opener && document.contains(opener) && opener.focus) opener.focus();
     }
@@ -310,11 +537,18 @@
     box.onclick = function (ev) { if (ev.target === box) close(true); };
     document.addEventListener("keydown", onKey, true);
     no.focus();
+    }
   });
 
-  // ---------- command palette ----------
+  // ---------- command palette (Sy-05) ----------
+  // Jump or act: results are grouped under Topics, Groups, Subjects and Actions, each
+  // row has what it is beside its name, the part of the name that matched is bold, and
+  // the foot has Connect an app and the keys. There is no "Go to" group: the sections
+  // are the rail's and the g chords'.
   var pal = document.getElementById("palette"), palQ = document.getElementById("pal-q"), palList = document.getElementById("pal-list");
-  var palItems = [], palSel = 0, palOpener = null;
+  var palItems = [], palSel = 0, palOpener = null, palShown = [];
+  var PAL_GROUPS = [["topics", "Topics"], ["groups", "Groups"], ["schemas", "Subjects"], ["actions", "Actions"]];
+  var PAL_CHIP = { topics: ["TP", "c-tp"], groups: ["GR", "c-gr"], schemas: ["SC", "c-sc"] };
 
   // The palette lists the last few topics and groups you opened first: the one
   // you just left costs ⌘K ⏎ instead of retyping its name.
@@ -332,11 +566,53 @@
   document.addEventListener("DOMContentLoaded", trackVisit);
   document.addEventListener("htmx:pushedIntoHistory", trackVisit);
 
+  function bucketOf(it) {
+    if (it.k === "action") return "actions";
+    if (it.s === "schemas") return "schemas";
+    return it.s;
+  }
+  // What can be done to the page you are on: the topic's composer, the group's reset.
+  function contextActions() {
+    var out = [], rest = location.pathname.indexOf(PREFIX + "/") === 0 ? location.pathname.slice(PREFIX.length + 1).split("/") : [];
+    if (rest[0] === "topics" && rest[1] && document.getElementById("compose-panel")) {
+      out.push({ s: "actions", n: "Produce to " + decodeURIComponent(rest[1]), k: "action", a: "produce", h: "p", glyph: "+", ctx: true });
+    }
+    if (rest[0] === "groups" && rest[1]) {
+      out.push({ s: "actions", n: "Reset offsets for " + decodeURIComponent(rest[1]), k: "action", u: location.pathname + "?tab=offsets#reset", h: "asks first", glyph: "↺", ctx: true });
+    }
+    return out;
+  }
+  // Sy-05's Actions: with something typed, the first topic that matched can be
+  // produced to and the first group that matched can have its offsets reset (which
+  // asks first, on its own page). The page's own are already in contextActions.
+  var PAL_CHORD = { topics: "g t", groups: "g g", schemas: "g s" };
+  function matchActions(rows, q) {
+    var out = [];
+    if (!q) return out;
+    var t = rows.filter(function (it) { return bucketOf(it) === "topics" && it.k !== "recent"; })[0];
+    var g = rows.filter(function (it) { return bucketOf(it) === "groups" && it.k !== "recent"; })[0];
+    if (t) out.push({ s: "actions", n: "Produce to " + t.n, k: "action", a: "produce-to", u: t.u, glyph: "+", h: "p", ctx: true, match: true });
+    if (g) out.push({ s: "actions", n: "Reset offsets for " + g.n, k: "action", u: g.u + "?tab=offsets#reset", h: "asks first", glyph: "↺", ctx: true, match: true });
+    return out;
+  }
+  // A "Produce to" on another topic: go there, and open the composer when it is up.
+  function produceTo(u) {
+    if (location.pathname === u && document.getElementById("compose-panel")) { setDock(true); focusComposer(); return; }
+    try { sessionStorage.setItem("composeOn", u); } catch (e) {}
+    location.href = u;
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    var u = null;
+    try { u = sessionStorage.getItem("composeOn"); sessionStorage.removeItem("composeOn"); } catch (e) {}
+    if (u && u === location.pathname && document.getElementById("compose-panel")) { setDock(true); focusComposer(); }
+  });
+
   function openPalette() {
     if (!pal || confirmOpen()) return;
-    if (drawerIsOpen()) closeDrawer(false);
+    if (helpOpen()) closeHelp();
     if (!paletteOpen()) palOpener = document.activeElement;
     pal.hidden = false; palQ.value = ""; palSel = 0;
+    root.setAttribute("data-dialog", "palette"); // the strip is the palette's (Sy-05)
     var here = location.pathname;
     var recents = [];
     try {
@@ -344,16 +620,17 @@
         .filter(function (x) { return x.u !== here; }).slice(0, 5)
         .map(function (x) { return { s: x.s, n: x.n, u: x.u, k: "recent" }; });
     } catch (e) {}
-    palItems = recents;
+    palItems = recents.concat(contextActions());
     renderPal();
     palQ.focus();
-    // The catalogue (views, actions, every topic and group) comes from the server,
-    // so the palette cannot drift from the console's real routes.
+    // The catalogue (actions, every topic, group and subject) comes from the
+    // server, so the palette cannot drift from the console's real routes.
     fetch(PREFIX + "/api/palette").then(function (r) { return r.json(); }).then(function (all) {
-      var live = {}, fixed = [], resources = [];
+      var live = {}, fixed = [], resources = [], detail = {};
       (all || []).forEach(function (x) {
-        live[x.u] = 1;
-        (x.k === "view" || x.k === "action" ? fixed : resources).push(x);
+        if (x.u) live[x.u] = 1;
+        if (x.d) detail[x.u] = x.d;
+        (x.k === "action" ? fixed : resources).push(x);
       });
       // A recent that no longer exists (a deleted topic) would be a dead link:
       // drop it here and from storage.
@@ -361,32 +638,111 @@
       if (pruned.length !== recents.length) {
         try { store("recents", JSON.stringify(JSON.parse(stored("recents") || "[]").filter(function (x) { return live[x.u]; }))); } catch (e) {}
       }
+      pruned.forEach(function (x) { x.d = detail[x.u]; });
       var seen = {};
       pruned.forEach(function (x) { seen[x.u] = 1; });
-      palItems = pruned.concat(resources.filter(function (r) { return !seen[r.u]; })).concat(fixed);
+      palItems = pruned.concat(resources.filter(function (r) { return !seen[r.u]; })).concat(contextActions()).concat(fixed);
       renderPal();
     }).catch(function () {}); // the console is unreachable: recents still work.
   }
+  // An entry is an address, or (it.a) something the console does in the browser.
+  function goTo(it) {
+    if (!it.a) { location.href = it.u; return; }
+    closePalette();
+    var act = it.a;
+    if (act === "produce-to") { produceTo(it.u); return; }
+    if (act === "pause") { if (document.querySelector("[data-live-toggle]")) setPaused(!livePaused); }
+    else if (act === "help") openHelp();
+    else if (act === "produce") { setDock(true); focusComposer(); }
+  }
   function palFiltered() {
     var q = palQ.value.toLowerCase().trim();
-    if (!q) return palItems.slice(0, 14);
-    return palItems.filter(function (it) { return (it.n + " " + it.k).toLowerCase().indexOf(q) >= 0; }).slice(0, 14);
+    var rows = palItems.filter(function (it) {
+      if (it.ctx && q) return it.n.toLowerCase().indexOf(q) >= 0 || /^(produce|reset)/.test(q);
+      return !q || (it.n + " " + it.k).toLowerCase().indexOf(q) >= 0;
+    });
+    // In groups, in the board's order; recents lead their own group.
+    var out = [], per = q ? 6 : 5;
+    var extra = matchActions(rows, q).filter(function (m) { return !rows.some(function (r) { return r.n === m.n; }); });
+    rows = rows.concat(extra);
+    PAL_GROUPS.forEach(function (g) {
+      var inG = rows.filter(function (it) { return bucketOf(it) === g[0]; });
+      inG.sort(function (a, b) { return (a.k === "recent" ? 0 : 1) - (b.k === "recent" ? 0 : 1); });
+      var seen = {};
+      inG.filter(function (it) { var k = it.u || it.n; if (seen[k]) return false; seen[k] = 1; return true; }).slice(0, per).forEach(function (it) { out.push(it); });
+    });
+    return out;
+  }
+  function highlight(el, text, q) {
+    el.textContent = "";
+    var i = q ? text.toLowerCase().indexOf(q) : -1;
+    if (i < 0) { el.textContent = text; return; }
+    el.appendChild(document.createTextNode(text.slice(0, i)));
+    var b = document.createElement("b");
+    b.textContent = text.slice(i, i + q.length);
+    el.appendChild(b);
+    el.appendChild(document.createTextNode(text.slice(i + q.length)));
   }
   function renderPal() {
-    var items = palFiltered();
+    var items = palFiltered(), q = palQ.value.toLowerCase().trim();
+    palShown = items;
     if (palSel >= items.length) palSel = Math.max(0, items.length - 1);
     palList.innerHTML = "";
+    var count = document.getElementById("pal-count");
+    // The board counts the groups: "4 groups of results".
+    var ngroups = {};
+    items.forEach(function (it) { ngroups[bucketOf(it)] = 1; });
+    var gn = Object.keys(ngroups).length;
+    if (count) count.textContent = gn ? gn + " group" + (gn === 1 ? "" : "s") + " of results" : "";
     if (!items.length) { palList.innerHTML = '<div class="pal-empty">Nothing matches</div>'; palQ.removeAttribute("aria-activedescendant"); return; }
+    var lastGroup = "", chorded = {};
     items.forEach(function (it, i) {
+      var g = bucketOf(it);
+      if (g !== lastGroup) {
+        lastGroup = g;
+        var cap = document.createElement("div");
+        cap.className = "cap pal-cap";
+        cap.setAttribute("role", "presentation");
+        cap.textContent = PAL_GROUPS.filter(function (x) { return x[0] === g; })[0][1];
+        palList.appendChild(cap);
+      }
       var a = document.createElement("a");
       a.className = "pal-item" + (i === palSel ? " sel" : "");
-      a.href = it.u;
+      a.href = it.a ? "#" : it.u;
+      a.addEventListener("click", function (ev) { if (it.a) { ev.preventDefault(); goTo(it); } });
       a.id = "pal-opt-" + i; a.setAttribute("role", "option"); a.setAttribute("aria-selected", i === palSel ? "true" : "false"); a.tabIndex = -1;
-      a.innerHTML = '<span class="pal-dot"></span><span class="pal-name"></span><span class="pal-kind"></span>';
-      // The dot is what the row is (topic, group, view), not how it got into the list.
-      a.querySelector(".pal-dot").classList.add(it.s === "topics" ? "d-topic" : it.s === "groups" ? "d-group" : "d-view");
-      a.querySelector(".pal-name").textContent = it.n;
-      a.querySelector(".pal-kind").textContent = it.k;
+      var lead = document.createElement("span");
+      if (PAL_CHIP[g]) { lead.className = "sv sm " + PAL_CHIP[g][1]; lead.textContent = PAL_CHIP[g][0]; lead.setAttribute("aria-hidden", "true"); }
+      else { lead.className = "m mut pal-glyph"; lead.setAttribute("aria-hidden", "true"); lead.textContent = it.glyph || (it.a ? "·" : g === "actions" ? "+" : "→"); }
+      var name = document.createElement("span");
+      name.className = "pal-name" + (PAL_CHIP[g] ? " m" : "");
+      highlight(name, it.n, q);
+      var det = document.createElement("span");
+      det.className = "grow note el pal-detail";
+      det.textContent = it.d || "";
+      a.appendChild(lead); a.appendChild(name); a.appendChild(det);
+      // An action's own key (or "asks first"), and on the selected row what Enter does.
+      if (it.h) {
+        var hint = document.createElement("span");
+        hint.className = it.h.length > 3 ? "note" : "kbd";
+        hint.textContent = it.h;
+        a.appendChild(hint);
+      }
+      // The first row of a group that is not the selected one says the chord that goes
+      // to its section (Sy-05: the selected row says what Enter does instead).
+      if (!it.h && i !== palSel && PAL_CHORD[g] && !chorded[g]) {
+        chorded[g] = true;
+        var chord = document.createElement("span");
+        chord.className = "kbd";
+        chord.textContent = PAL_CHORD[g];
+        a.appendChild(chord);
+      }
+      if (i === palSel) {
+        var enter = document.createElement("span");
+        enter.className = "kbd";
+        enter.textContent = "↵";
+        a.appendChild(enter);
+      }
       a.onmousemove = function () { if (palSel !== i) { palSel = i; renderPal(); } };
       palList.appendChild(a);
     });
@@ -396,8 +752,17 @@
   function closePalette() {
     if (!paletteOpen()) return;
     pal.hidden = true;
+    if (root.getAttribute("data-dialog") === "palette") root.removeAttribute("data-dialog");
     if (palOpener && document.contains(palOpener) && palOpener.focus) palOpener.focus();
   }
+  // The phone's menu: the rail, opened over the page.
+  var menuBtn = document.getElementById("menu-btn");
+  (function () { var t = document.getElementById("pg-title"), nm = document.querySelector(".rail .nav.on .nm"); if (t && nm) t.textContent = nm.textContent; })();
+  if (menuBtn) menuBtn.addEventListener("click", function () {
+    var open = document.documentElement.getAttribute("data-menu") === "open";
+    if (open) document.documentElement.removeAttribute("data-menu"); else document.documentElement.setAttribute("data-menu", "open");
+    menuBtn.setAttribute("aria-expanded", open ? "false" : "true");
+  });
   var palButton = document.getElementById("palette-open");
   if (palButton) palButton.addEventListener("click", openPalette);
   if (palQ) palQ.addEventListener("input", function () { palSel = 0; renderPal(); });
@@ -406,34 +771,33 @@
   // ---------- rail active state ----------
   // The rail is outside #workspace, so a boosted navigation does not repaint its
   // server-rendered `.on`. Recompute it from the URL after every navigation. The
-  // console's home and the create-topic form belong to Topics.
+  // console's home belongs to whichever section the server says is home (Traffic,
+  // or Topics when the broker records no traffic); a create form belongs to the
+  // section it creates in.
   function sectionFor(path) {
     if (path.indexOf(PREFIX) !== 0) return "";
-    var seg = path.slice(PREFIX.length).replace(/^\/+/, "").split("/")[0];
-    if (seg === "" || seg === "topics" || seg === "new") return "topics";
+    var parts = path.slice(PREFIX.length).replace(/^\/+/, "").split("/");
+    var seg = parts[0];
+    if (seg === "") return (document.querySelector(".app") || {}).getAttribute ? document.querySelector(".app").getAttribute("data-home") || "topics" : "topics";
+    if (seg === "new") return parts[1] === "schema" ? "schemas" : "topics";
     return seg;
   }
   var currentSection = sectionFor(location.pathname), currentPath = location.pathname;
   function afterNavigation() {
     if (window.dozeView) window.dozeView();
     var section = sectionFor(location.pathname);
-    document.querySelectorAll(".rail .ri").forEach(function (a) {
+    document.documentElement.removeAttribute("data-menu");
+    var mb = document.getElementById("menu-btn");
+    if (mb) mb.setAttribute("aria-expanded", "false");
+    document.querySelectorAll(".rail .nav").forEach(function (a) {
       var on = sectionFor(new URL(a.href, location.origin).pathname) === section;
       a.classList.toggle("on", on);
+      if (on) { var t = document.getElementById("pg-title"), nm = a.querySelector(".nm"); if (t && nm) t.textContent = nm.textContent; }
       if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     });
     // A filter typed in one section means nothing in the next (topic names do
     // not filter groups), and used to carry over and hide everything.
-    if (section !== currentSection) {
-      currentSection = section;
-      if (window.Alpine && Alpine.store("filter")) Alpine.store("filter").q = "";
-    }
-    // A click in the list replaces only the detail pane, so the list itself (its
-    // scroll position, the row under the pointer) stays put; its highlight is
-    // moved here.
-    document.querySelectorAll(".listpane .li[href]").forEach(function (a) {
-      a.classList.toggle("on", new URL(a.href, location.origin).pathname === location.pathname);
-    });
+    if (section !== currentSection) currentSection = section;
     // Pausing, and an open composer, belong to the page they were on. A pause used
     // to follow you to a group page (which has no pause control) and freeze it;
     // an open composer followed you to the next topic and covered its messages.
@@ -449,18 +813,29 @@
 
   // ---------- keyboard ----------
   // The cursor is a row, not an index: filtering changes which rows are visible,
-  // and an index into the old list pointed at the wrong (or a hidden) one.
+  // and an index into the old list pointed at the wrong (or a hidden) one. j and k
+  // move over the page's own rows (a table's, the home table's) and, on a page that
+  // has none, over the list.
   var cursorEl = null;
+  var ROW_SEL = 'main tr[data-inspector-open], main a.r[href], main [data-row]';
+  function visible(el) { return el.offsetParent !== null; }
   function listRows() {
-    return Array.prototype.filter.call(document.querySelectorAll(".listpane .li[href]"), function (r) { return r.offsetParent !== null; });
+    var rows = Array.prototype.filter.call(document.querySelectorAll(ROW_SEL), visible);
+    if (rows.length) return rows;
+    return Array.prototype.filter.call(document.querySelectorAll(".list .li[href]"), visible);
   }
-  function resetListCursor() { cursorEl = null; }
+  // A swap forgets the row only when it took the row away. Forgetting it on every swap
+  // (a background poll is one) left the mark on screen and made Enter do nothing.
+  function resetListCursor() { if (cursorEl && !document.contains(cursorEl)) cursorEl = null; }
   function moveCursor(d) {
     var rows = listRows();
     if (!rows.length) return;
     var at = rows.indexOf(cursorEl);
+    // In the list, the first j moves from the open row (the page being looked at), not
+    // from the top: landing on the open row and pressing ↵ opened what was already open.
+    if (at < 0) at = rows.findIndex(function (r) { return r.classList.contains("on"); });
     var next = at < 0 ? (d > 0 ? 0 : rows.length - 1) : Math.min(rows.length - 1, Math.max(0, at + d));
-    document.querySelectorAll(".listpane .li.cursor").forEach(function (r) { r.classList.remove("cursor"); });
+    document.querySelectorAll(".cursor").forEach(function (r) { r.classList.remove("cursor"); });
     cursorEl = rows[next];
     cursorEl.classList.add("cursor");
     cursorEl.scrollIntoView({ block: "nearest" });
@@ -473,26 +848,40 @@
       if (ta && ta.__cm) ta.__cm.focus(); else if (ta) ta.focus();
     });
   }
+  // g, then a letter, goes to a section (Sy-06's "Go to"). The chord is armed for a
+  // moment and lapses; any other key disarms it.
+  var chord = 0;
   document.addEventListener("keydown", function (e) {
     if (confirmOpen()) return; // the dialog has its own keys, and nothing else gets any.
     var mod = e.metaKey || e.ctrlKey;
+    // The key sheet is a dialog too (Sy-06): while it is open the page's keys are
+    // off. Its own keys are bound where it is (Esc and ? close it, Tab stays inside);
+    // ⌘K swaps it for the palette, one thing being open at a time. Without this
+    // every single key went through to the page behind the sheet: ? then p paused
+    // the tail, j and k moved a cursor nobody could see, c and the g chords left.
+    if (helpOpen()) {
+      chord = 0;
+      if (mod && !e.altKey && !e.shiftKey && e.key === "k") { e.preventDefault(); openPalette(); }
+      return;
+    }
     if (paletteOpen()) {
       var items = palFiltered();
       if (e.key === "Tab") { e.preventDefault(); return; } // one control; focus stays on the search box.
       if (e.key === "Escape") { closePalette(); e.preventDefault(); }
+      else if (mod && !e.altKey && !e.shiftKey && e.key === "k") { closePalette(); e.preventDefault(); } // the strip's ⌘K (Sy-05)
       else if (e.key === "ArrowDown") { palSel = Math.min(palSel + 1, items.length - 1); renderPal(); e.preventDefault(); }
       else if (e.key === "ArrowUp") { palSel = Math.max(palSel - 1, 0); renderPal(); e.preventDefault(); }
-      else if (e.key === "Enter") { var it = items[palSel]; if (it) location.href = it.u; e.preventDefault(); }
+      else if (e.key === "Enter") { var it = items[palSel]; if (it) goTo(it); e.preventDefault(); }
       return;
     }
     if (mod && !e.altKey && !e.shiftKey && e.key === "k") { e.preventDefault(); openPalette(); return; }
-    if (drawerIsOpen()) return; // the drawer's keys are handled where the drawer is.
     var active = document.activeElement || document.body;
     // ⌘⏎ sends from the composer, from a plain field or from inside the editor.
     // Once per press: a held key repeats, and each repeat used to send a record.
     if (mod && e.key === "Enter") {
-      var form = active.closest ? active.closest("form") : null;
-      if (form && form.querySelector("textarea, .CodeMirror")) {
+      // A create form (data-mod-enter, Ac-03) is sent from anywhere on its page.
+      var form = (active.closest ? active.closest("form") : null) || document.querySelector("main form[data-mod-enter]");
+      if (form && (form.hasAttribute("data-mod-enter") || form.querySelector("textarea, .cm-editor"))) {
         e.preventDefault();
         if (!e.repeat && !form.classList.contains("htmx-request")) form.requestSubmit();
       }
@@ -501,145 +890,381 @@
     // Single-key shortcuts are single keys. With a modifier held the key belongs
     // to the browser or the OS: ⌘C is copy, not "new topic".
     if (mod || e.altKey) return;
-    if (/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || active.isContentEditable || (active.closest && active.closest(".CodeMirror"))) return;
-    if (e.key === "/") {
-      var f = document.querySelector(".listpane .filter input");
-      if (f && f.offsetParent !== null) { f.focus(); e.preventDefault(); } else { openPalette(); e.preventDefault(); }
-    } else if (e.key === "j") moveCursor(1);
-    else if (e.key === "k") moveCursor(-1);
-    else if (e.key === "Enter") {
+    var typing = /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || active.isContentEditable || (active.closest && active.closest(".cm-editor"));
+    // Esc is the one key that works from a field: it clears the field's filter, or
+    // leaves the field, and only then closes the panel.
+    if (typing) {
+      if (e.key === "Escape" && active.hasAttribute && active.hasAttribute("data-filter-target") && active.value) {
+        active.value = ""; active.dispatchEvent(new Event("input", { bubbles: true })); e.preventDefault();
+      } else if (e.key === "Escape" && !active.closest(".cm-editor")) {
+        active.blur();
+      }
+      chord = 0;
+      return;
+    }
+    // The key map is declared once, on the server (keys.go), and arrives as JSON:
+    // what a key does is looked up there, so a key cannot be bound here and left out
+    // of the help overlay.
+    if (chord && Date.now() < chord) {
+      chord = 0;
+      var b = bindingFor("g " + e.key);
+      if (b) { goToSection(b.target); e.preventDefault(); return; }
+    }
+    chord = 0;
+    if (e.key === "g" && !e.repeat) { chord = Date.now() + 1500; return; }
+    var acts = pageKeys(e.key);
+    for (var i = 0; i < acts.length; i++) {
+      if (pageActions[acts[i]] && pageActions[acts[i]](e, active) !== false) return;
+    }
+  });
+  function goToSection(target) {
+    // A section this console does not have (no recorder, no registry) is not a place to go.
+    var link = document.querySelector('.rail a.nav[href$="' + target + '"]');
+    if (link) link.click();
+  }
+
+  // ---------- the key map ----------
+  var KEYMAP = [];
+  try { KEYMAP = JSON.parse(document.getElementById("keymap").textContent) || []; } catch (err) {}
+  function bindingFor(key) {
+    for (var i = 0; i < KEYMAP.length; i++) if (KEYMAP[i].key === key) return KEYMAP[i];
+    return null;
+  }
+  // Every action a single key stands for, in the order they are declared: "p" is
+  // produce on a topic and pause on a page that tails, and the page decides.
+  function pageKeys(key) {
+    var out = [];
+    for (var i = 0; i < KEYMAP.length; i++) {
+      var b = KEYMAP[i];
+      if (b.key === key && b.scope !== "In a dialog") out.push(b.action);
+    }
+    return out;
+  }
+  var pageActions = {
+    // / is the page's own field: the trace id on Trace (data-slash), else the filter of
+    // the table or of the list. A page with neither has no / (its strip does not name
+    // one); it was the palette, which ⌘K already is.
+    filter: function (e) {
+      var f = document.querySelector("main [data-slash]") || document.querySelector("main [data-traffic-filter]") || document.querySelector("main input[data-filter-target]") || document.querySelector(".list input[data-filter-target]");
+      if (!f || !visible(f)) return false;
+      f.focus();
+      e.preventDefault();
+    },
+    next: function () { moveCursor(1); },
+    prev: function () { moveCursor(-1); },
+    open: function (e, active) {
       // Enter on a focused button or link is that control's own. The list cursor
       // is opened only when nothing else has the keyboard.
-      if (active !== document.body && active.matches && active.matches(FOCUSABLE + ", summary")) return;
-      if (cursorEl && document.contains(cursorEl) && cursorEl.offsetParent !== null) cursorEl.click();
-    }
-    else if (e.key === "c") { var nb = document.querySelector(".listpane .new-link"); if (nb) nb.click(); }
-    else if (e.key === "m") {
-      if (document.getElementById("compose-panel")) { e.preventDefault(); setDock(true); focusComposer(); }
-    }
-    else if (e.key === "[") setRail(!railSlim());
-  });
+      if (active !== document.body && active.matches && active.matches(FOCUSABLE + ", summary")) return false;
+      if (cursorEl && document.contains(cursorEl) && visible(cursorEl)) {
+        // The click puts focus on the inspector's Close button; left alone, this
+        // same Enter then activates that button and shuts what it just opened.
+        e.preventDefault();
+        cursorEl.click();
+        return;
+      }
+      // A page that is one question (Ac-05's checker, data-enter) asks it.
+      var ask = document.querySelector("main form[data-enter]");
+      if (ask) { e.preventDefault(); ask.requestSubmit(); return; }
+      return false;
+    },
+    create: function () {
+      var nb = document.querySelector("[data-create]");
+      if (nb) nb.click(); else return false;
+    },
+    // r: Retry now, on a page whose broker is lost (Traffic, Traf-10); the same button.
+    retry: function () {
+      if (!document.documentElement.hasAttribute("data-connection-lost")) return false;
+      var b = document.querySelector("[data-retry], #pill-retry");
+      if (!b) return false;
+      b.click();
+    },
+    // On a topic, p is produce: the composer opens and takes focus.
+    produce: function (e) {
+      if (!document.getElementById("compose-panel")) return false;
+      e.preventDefault(); setDock(true); focusComposer();
+    },
+    // Anywhere else that tails, p pauses.
+    pause: function () {
+      if (document.getElementById("compose-panel")) return false;
+      if (!document.querySelector("[data-live-toggle]")) return false;
+      setPaused(!livePaused);
+    },
+    help: function (e) { e.preventDefault(); openHelp(); },
+    // e: the errors-only chip of Traffic, and back to all.
+    errors: function () {
+      var seg = document.querySelector('main .seg[aria-label="Kind of request"]');
+      if (!seg) return false;
+      var on = seg.querySelector("a.on"), isErr = on && on.textContent.trim() === "errors";
+      var want = Array.prototype.find.call(seg.querySelectorAll("a"), function (a) { return a.textContent.trim() === (isErr ? "all" : "errors"); });
+      if (!want) return false;
+      want.click();
+    },
+    // u: unfold the folded row that is open; m: all of the open client's metrics.
+    unfold: function () { var b = document.querySelector("#inspector [data-unfold]"); if (!b) return false; b.click(); },
+    metrics: function () { var b = document.querySelector("#inspector [data-all-metrics]"); if (!b) return false; b.click(); },
+    // c copies the decoded request when a request is open (elsewhere c creates).
+    copy: function () {
+      var b = document.querySelector("#inspector [data-copy-decoded]");
+      if (!b) return false;
+      copyText(b.textContent).then(function () { toast("Copied the decoded fields"); },
+        function () { toast("This browser would not copy that; select the text and copy it by hand.", "err"); });
+    },
+    // ] and [ move along the page's tabs.
+    "tab-next": function () { return stepTab(1); },
+    "tab-prev": function () { return stepTab(-1); },
+    // Esc closes the panel; with none open it clears the page's own filter.
+    close: function (e) {
+      if (inspectorIsOpen()) { closeInspector(); e.preventDefault(); return; }
+      var f = document.querySelector("input[data-filter-target]");
+      if (f && f.value) { f.value = ""; f.dispatchEvent(new Event("input", { bubbles: true })); e.preventDefault(); return; }
+      // A page reached from a list goes back to it (Ac-03's cancel, Ac-05's back).
+      var back = document.querySelector("main [data-esc]");
+      if (back) { e.preventDefault(); back.click(); return; }
+      return false;
+    },
+    // The chord's own binding is handled where the chord is; these have no key alone.
+    goto: function () { return false; },
+  };
+  function stepTab(d) {
+    var tabs = Array.prototype.filter.call(document.querySelectorAll("main .tabs a.tab"), visible);
+    if (tabs.length < 2) return false;
+    var at = -1;
+    tabs.forEach(function (t, i) { if (t.classList.contains("on")) at = i; });
+    var to = tabs[(at + d + tabs.length) % tabs.length];
+    if (to) to.click();
+  }
 
-  // ---------- the message drawer ----------
-  // A real dialog in every state (loading, a record, an error): it has a title
-  // and a close button, takes focus when it opens, keeps Tab inside, closes on
-  // Esc or a click outside, and hands focus back to the row that opened it. Its
-  // record is in the URL (?open=OFFSET), so a refresh or a shared link reopens it.
-  var drawerOverlay = document.getElementById("drawer-overlay");
-  var drawer = document.getElementById("drawer");
-  var drawerOpener = null, drawerXhr = null, drawerRefocus = null;
-  function setOpenParam(offset) {
+  // ---------- help: the keys, listed from the declared map ----------
+  var helpBox = document.getElementById("help"), helpOpener = null;
+  function openHelp() {
+    if (!helpBox || confirmOpen()) return;
+    if (paletteOpen()) closePalette();
+    if (!helpOpen()) helpOpener = document.activeElement;
+    helpBox.hidden = false;
+    root.setAttribute("data-dialog", "help"); // the strip is the sheet's (Sy-06)
+    var c = document.getElementById("help-close");
+    if (c) c.focus();
+  }
+  function closeHelp() {
+    if (!helpOpen()) return;
+    helpBox.hidden = true;
+    if (root.getAttribute("data-dialog") === "help") root.removeAttribute("data-dialog");
+    if (helpOpener && document.contains(helpOpener) && helpOpener.focus) helpOpener.focus();
+  }
+  if (helpBox) {
+    helpBox.addEventListener("click", function (e) { if (e.target === helpBox) closeHelp(); });
+    var hc = document.getElementById("help-close");
+    if (hc) hc.addEventListener("click", closeHelp);
+  }
+  document.addEventListener("keydown", function (e) {
+    if (!helpOpen()) return;
+    if (e.key === "Escape" || e.key === "?") { closeHelp(); e.preventDefault(); e.stopPropagation(); return; }
+    trapTab(helpBox, e);
+  }, true);
+
+  // ---------- the inspector ----------
+  // The right-hand panel (Sy-01), in flow beside the page: nothing slides over the
+  // content and there is no scrim. A selection fills #inspector; closing it puts the
+  // page's own summary back (Traffic's open connections), or hides the panel. It has
+  // a title and a close button in every state (loading, a record, an error), takes
+  // focus when it opens, closes on Esc, and hands focus back to the row that opened
+  // it. Its selection is in the URL (?open=), so a refresh or a shared link reopens it.
+  var inspectorPanel = document.getElementById("inspector-panel");
+  var inspector = document.getElementById("inspector");
+  var inspectorOpener = null, inspectorXhr = null, inspectorRefocus = null;
+  // The selection is in the address as ?open=. Opening one pushes an entry (so
+  // Back returns to the previous selection, or to none); closing rewrites the
+  // current entry without it. Our entries carry a marker so a popstate to one of
+  // them is ours to answer and htmx (which restores only its own) leaves it alone.
+  function openParamNow() { return new URLSearchParams(location.search).get("open"); }
+  function setOpenParam(value, push) {
     try {
       var u = new URL(location.href);
-      if (offset == null) u.searchParams.delete("open"); else u.searchParams.set("open", offset);
-      history.replaceState(history.state, "", u.pathname + (u.search || "") + u.hash);
+      if (value == null) u.searchParams.delete("open"); else u.searchParams.set("open", value);
+      var next = u.pathname + (u.search || "") + u.hash;
+      if (next === location.pathname + location.search + location.hash) return;
+      if (push) history.pushState({ dozeInspector: 1 }, "", next);
+      else history.replaceState(history.state, "", next);
     } catch (e) {}
   }
-  function openDrawer(from) {
-    if (!drawerOverlay || confirmOpen()) return;
-    if (!drawerIsOpen()) drawerOpener = from || document.activeElement;
-    drawerOverlay.hidden = false;
+  // markOpenRow draws the row that is open the way the boards do (.on, the --sel fill)
+  // and says so to a screen reader. A row names what it opens in data-open-keys
+  // ("request:<id>", "client:<conn>"); the selection is the address's ?open=, so the
+  // mark survives a poll that replaces the rows and a reload.
+  function markOpenRow() {
+    var open = openParamNow();
+    document.querySelectorAll("[data-open-keys]").forEach(function (el) {
+      var on = open != null && (" " + el.getAttribute("data-open-keys") + " ").indexOf(" " + open + " ") >= 0;
+      el.classList.toggle("on", on);
+      // A row of a table or a grid (Traffic's) is selected; a row that is a button (a
+      // record), or a div that is a row of a list, is the current one.
+      if ((el.tagName === "TR" && el.getAttribute("role") !== "button") || el.getAttribute("role") === "row") el.setAttribute("aria-selected", on ? "true" : "false");
+      else if (on) el.setAttribute("aria-current", "true");
+      else el.removeAttribute("aria-current");
+    });
   }
-  function closeDrawer(restoreFocus) {
-    if (!drawerIsOpen()) return;
-    drawerOverlay.hidden = true;
-    // A request still on its way is for a drawer that is no longer open. Left
-    // alone, its answer filled the closed drawer and put ?open= back in the URL.
-    if (drawerXhr) { drawerXhr.dozeDropped = true; drawerXhr.abort(); drawerXhr = null; }
-    drawer.textContent = "";
-    drawer.classList.remove("busy");
-    drawer.removeAttribute("aria-busy");
-    setOpenParam(null);
-    var back = drawerOpener;
-    drawerOpener = null;
+  document.addEventListener("htmx:afterSettle", markOpenRow);
+  document.addEventListener("htmx:afterSwap", markOpenRow);
+  function currentInspector() {
+    // The page is swapped under the script; the panel and its body are looked up when
+    // they are needed, never held.
+    inspectorPanel = document.getElementById("inspector-panel");
+    inspector = document.getElementById("inspector");
+  }
+  function openInspector(from) {
+    currentInspector();
+    if (!inspector || confirmOpen()) return;
+    if (!inspectorIsOpen()) inspectorOpener = from || document.activeElement;
+    inspector.hidden = false;
+    inspectorPanel.hidden = false;
+    var def = document.getElementById("insp-default");
+    if (def) def.hidden = true;
+    // Where the panel is stacked under the page (Sy-03) it takes the foot of the screen:
+    // the row that opened it is kept in view above it.
+    var row = from && from.closest && from.closest("tr, .r");
+    if (row) requestAnimationFrame(function () { if (document.contains(row)) row.scrollIntoView({ block: "nearest" }); });
+  }
+  // closeInspector(restoreFocus, keepURL): the URL loses ?open= unless the close
+  // is the answer to the URL having already lost it (Back).
+  function closeInspector(restoreFocus, keepURL) {
+    currentInspector();
+    if (!inspectorIsOpen()) return;
+    inspector.hidden = true;
+    var def = document.getElementById("insp-default");
+    if (def) def.hidden = false; else inspectorPanel.hidden = true;
+    // A request still on its way is for an inspector that is no longer open. Left
+    // alone, its answer filled the closed inspector and put ?open= back in the URL.
+    if (inspectorXhr) { inspectorXhr.dozeDropped = true; inspectorXhr.abort(); inspectorXhr = null; }
+    inspector.textContent = "";
+    inspector.classList.remove("busy");
+    inspector.removeAttribute("aria-busy");
+    if (!keepURL) setOpenParam(null, false);
+    markOpenRow();
+    trafficSync();
+    var back = inspectorOpener;
+    inspectorOpener = null;
     if (restoreFocus === false || !back) return;
     // A live update may have replaced the row since; the new one has the same id.
     if (!document.contains(back) && back.id) back = document.getElementById(back.id);
     if (back && back.focus) back.focus();
   }
-  // message fills the drawer with a titled state that is not a record: loading,
-  // or what went wrong.
-  function drawerMessage(title, text, isError) {
-    drawer.textContent = "";
+  // message fills the inspector with a titled state that is not a selection:
+  // loading, or what went wrong.
+  function inspectorMessage(title, text, isError) {
+    currentInspector();
+    inspector.textContent = "";
     var h = document.createElement("div");
-    h.className = "drawer-h";
-    h.innerHTML = '<div><span class="t" id="drawer-title"></span></div><div class="drawer-nav"><button type="button" class="icon-btn" aria-label="Close" data-drawer-close>✕</button></div>';
-    h.querySelector("#drawer-title").textContent = title;
+    h.className = "inspector-h";
+    h.innerHTML = '<div><span class="cap">Details</span><span class="t h2" id="inspector-title"></span></div><div class="inspector-nav"><button type="button" class="icon-btn" aria-label="Close" data-inspector-close>✕</button></div>';
+    h.querySelector("#inspector-title").textContent = title;
     var b = document.createElement("div");
-    if (isError) { b.className = "err drawer-err"; b.setAttribute("role", "alert"); b.textContent = text; }
-    else { b.className = "drawer-loading"; b.innerHTML = '<span class="spinner" aria-hidden="true"></span> '; b.appendChild(document.createTextNode(text)); }
-    drawer.appendChild(h);
-    drawer.appendChild(b);
-    h.querySelector("[data-drawer-close]").focus();
+    if (isError) { b.className = "err inspector-err"; b.setAttribute("role", "alert"); b.textContent = text; }
+    else { b.className = "inspector-loading"; b.innerHTML = '<span class="spinner" aria-hidden="true"></span> '; b.appendChild(document.createTextNode(text)); }
+    inspector.appendChild(h);
+    inspector.appendChild(b);
+    h.querySelector("[data-inspector-close]").focus();
   }
-  function drawerRequestStarted(xhr, from) {
-    if (!drawer) return;
-    // htmx hears the click on a row before the document does, so the request can
-    // start while the drawer is still hidden, and a hidden dialog cannot take focus.
-    openDrawer(from);
-    if (drawerXhr) { drawerXhr.dozeDropped = true; drawerXhr.abort(); } // the newer click wins.
-    drawerXhr = xhr;
+  function inspectorRequestStarted(xhr, from) {
+    currentInspector();
+    if (!inspector) return;
+    openInspector(from);
+    if (inspectorXhr) { inspectorXhr.dozeDropped = true; inspectorXhr.abort(); } // the newer click wins.
+    inspectorXhr = xhr;
     var a = document.activeElement;
-    drawerRefocus = a && drawer.contains(a) ? a.getAttribute("aria-label") : null;
+    inspectorRefocus = a && inspector.contains(a) ? a.getAttribute("aria-label") : null;
     // Stepping to the next record keeps the current one on screen, dimmed, until
     // the new one arrives. A first open has nothing to keep, and says so.
-    if (drawer.querySelector(".drawer-b")) { drawer.classList.add("busy"); drawer.setAttribute("aria-busy", "true"); }
-    else drawerMessage("Opening record", "Loading…", false);
+    if (inspector.querySelector(".inspector-b")) { inspector.classList.add("busy"); inspector.setAttribute("aria-busy", "true"); }
+    else inspectorMessage("Opening", "Loading…", false);
     xhr.addEventListener("loadend", function () {
       if (xhr.dozeDropped) return;
-      if (drawerXhr === xhr) drawerXhr = null;
-      drawer.classList.remove("busy");
-      drawer.removeAttribute("aria-busy");
-      if (!drawerIsOpen()) return;
-      if (xhr.status === 0) drawerMessage("Could not open the record", "No answer from the console — is doze-kafka still running?", true);
-      else if (xhr.status >= 400) drawerMessage("Could not open the record", errorText(xhr), true);
+      if (inspectorXhr === xhr) inspectorXhr = null;
+      inspector.classList.remove("busy");
+      inspector.removeAttribute("aria-busy");
+      if (!inspectorIsOpen()) return;
+      if (xhr.status === 0) inspectorMessage("Could not open it", "No answer from the console — is doze-kafka still running?", true);
+      else if (xhr.status >= 400) inspectorMessage("Could not open it", errorText(xhr), true);
     });
   }
   document.addEventListener("click", function (e) {
-    var row = e.target.closest("[data-drawer-open]");
-    if (row) { openDrawer(row); return; }
-    if (e.target.closest("[data-drawer-close]")) { closeDrawer(); return; }
-    if (e.target === drawerOverlay) closeDrawer();
+    var row = e.target.closest("[data-inspector-open]");
+    if (row) { openInspector(row); return; }
+    if (e.target.closest("[data-inspector-close]")) { closeInspector(); return; }
   });
   document.addEventListener("keydown", function (e) {
-    if (confirmOpen() || paletteOpen()) return;
-    var row = e.target.closest && e.target.closest("[data-drawer-open]");
-    if (row && (e.key === "Enter" || e.key === " ")) { openDrawer(row); return; } // htmx fires the request.
-    if (!drawerIsOpen()) return;
-    if (e.key === "Escape") { closeDrawer(); e.preventDefault(); e.stopPropagation(); return; }
-    trapTab(drawerOverlay, e);
+    if (confirmOpen() || paletteOpen() || helpOpen()) return;
+    var row = e.target.closest && e.target.closest("[data-inspector-open]");
+    if (row && (e.key === "Enter" || e.key === " ")) {
+      // htmx fires the request. The key is the row's: its default would go to the
+      // Close button the loading inspector has just taken focus for, and press it.
+      // A link or button that opens a selection (the inspector's client link) is
+      // left to itself: its own Enter is the click that opens it, made while focus is
+      // still on it. Only a row, which has no click of its own, is cancelled.
+      var tag = e.target.tagName;
+      if (row === e.target && (tag === "A" || tag === "BUTTON")) return;
+      if (row === e.target) e.preventDefault();
+      openInspector(row);
+      return;
+    }
   }, true);
-  // A record landed in the drawer: put it in the URL and move focus in — to the
-  // button that asked, when it was Older or Newer, so stepping keeps its place.
+  // A selection landed in the inspector: put it in the URL and move focus in, to
+  // the button that asked when it was Older or Newer, so stepping keeps its place.
   document.addEventListener("htmx:afterSwap", function (e) {
     var t = e.detail.target;
-    if (!t || t.id !== "drawer") return;
-    if (!drawerIsOpen()) { t.textContent = ""; return; }
-    var title = t.querySelector("#drawer-title[data-offset]");
-    // Only on the partition's own table: ?open= names an offset on the partition
-    // in view, which a search across partitions does not have.
+    if (!t || t.id !== "inspector") return;
+    if (!inspectorIsOpen()) { t.textContent = ""; return; }
+    var title = t.querySelector("#inspector-title[data-open]");
+    var open = title ? title.getAttribute("data-open") : "";
+    var kind = t.querySelector("[data-inspector-kind]");
+    if (inspectorPanel && kind) inspectorPanel.setAttribute("data-kind", kind.getAttribute("data-inspector-kind"));
+    // A record is named by an offset on the partition in view; a search across
+    // partitions has no single partition, and so no address for it.
     var region = document.getElementById("tape-and-table");
-    if (title && region && region.hasAttribute("data-msg-base")) setOpenParam(title.getAttribute("data-offset"));
-    var again = drawerRefocus && t.querySelector('button[aria-label="' + drawerRefocus + '"]:not([disabled])');
-    var btn = again || t.querySelector("[data-drawer-close]");
+    var isMessage = title && title.hasAttribute("data-offset");
+    if (open && (!isMessage || (region && region.hasAttribute("data-msg-base")))) setOpenParam(open, openParamNow() !== open);
+    markOpenRow();
+    // The open row stays in view when the panel takes room from the page (Sy-03).
+    var onRow = document.querySelector("main tr.on, main .r.on");
+    if (onRow) requestAnimationFrame(function () { onRow.scrollIntoView({ block: "nearest" }); });
+    var again = inspectorRefocus && t.querySelector('button[aria-label="' + inspectorRefocus + '"]:not([disabled])');
+    var btn = again || t.querySelector("[data-inspector-close]");
     if (btn) btn.focus();
   });
-  // A link or refresh with ?open=N reopens that record.
-  function reopenFromURL() {
-    var open = new URLSearchParams(location.search).get("open");
+  // Where a selection named by ?open= is fetched from: a bare value is a record on
+  // the page's own partition; kind:key is the inspector's route.
+  function inspectorFetchURL(open) {
+    var m = /^([a-z]+):(.*)$/.exec(open);
+    if (m) return PREFIX + "/inspect/" + m[1] + "?key=" + encodeURIComponent(m[2]);
     var region = document.getElementById("tape-and-table");
-    if (open == null || !region || !region.hasAttribute("data-msg-base") || !window.htmx) return;
-    openDrawer(document.getElementById("msg-" + open));
-    htmx.ajax("GET", region.getAttribute("data-msg-base") + "&offset=" + encodeURIComponent(open), {
-      target: "#drawer", swap: "innerHTML",
-    }).catch(function () {});
+    if (!region || !region.hasAttribute("data-msg-base")) return null;
+    return region.getAttribute("data-msg-base") + "&offset=" + encodeURIComponent(open);
   }
-  document.addEventListener("DOMContentLoaded", reopenFromURL);
-  // "Send again" closes the drawer once the broker has taken the copy; on a
+  function inspectorOpenRow(open) {
+    var m = /^([a-z]+):(.*)$/.exec(open);
+    return m ? null : document.getElementById("msg-" + open);
+  }
+  // A link or refresh with ?open= reopens that selection; Back and Forward move
+  // between the selections the person made.
+  function syncInspectorFromURL() {
+    markOpenRow();
+    var open = openParamNow();
+    if (open == null) { closeInspector(true, true); return; }
+    var url = inspectorFetchURL(open);
+    if (!url || !window.htmx) return;
+    currentInspector();
+    var title = inspectorIsOpen() && inspector.querySelector("#inspector-title[data-open]");
+    if (title && title.getAttribute("data-open") === open) return;
+    openInspector(inspectorOpenRow(open));
+    htmx.ajax("GET", url, { target: "#inspector", swap: "innerHTML" }).catch(function () {});
+  }
+  document.addEventListener("DOMContentLoaded", syncInspectorFromURL);
+  window.addEventListener("popstate", syncInspectorFromURL);
+  // "Send again" closes the inspector once the broker has taken the copy; on a
   // failure it stays open, and the error is a toast.
   document.addEventListener("htmx:afterRequest", function (e) {
     var el = e.detail.elt;
-    if (el && el.hasAttribute && el.hasAttribute("data-close-drawer-on-success") && e.detail.successful) closeDrawer(false);
+    if (el && el.hasAttribute && el.hasAttribute("data-close-inspector-on-success") && e.detail.xhr && e.detail.xhr.status < 400) closeInspector(false);
   });
 
   // ---------- docked composer ----------
@@ -662,23 +1287,214 @@
     if (e.target.closest("[data-dock-toggle]")) setDock(!dockOpen());
   });
   document.addEventListener("DOMContentLoaded", syncDock);
+
+  // ---------- scroll regions ----------
+  // A box whose content is wider or taller than it scrolls; someone without a mouse
+  // can only scroll it if it can take focus. Every such box gets tabindex=0 while it
+  // overflows (a command, a value, a request's fields, the inspector), after every
+  // swap and when the window changes size.
+  function focusableScrollers() {
+    document.querySelectorAll("pre, .code, #inspector-panel, .insp-sel, .inspector-b, [data-scroller]").forEach(function (el) {
+      if (!el.getClientRects().length) return;
+      var cs = getComputedStyle(el);
+      var scrolls = (/(auto|scroll)/.test(cs.overflowX) && el.scrollWidth > el.clientWidth + 1) || (/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 1);
+      if (scrolls && !el.hasAttribute("tabindex")) { el.setAttribute("tabindex", "0"); el.setAttribute("data-scroll-focus", ""); }
+      else if (!scrolls && el.hasAttribute("data-scroll-focus")) { el.removeAttribute("tabindex"); el.removeAttribute("data-scroll-focus"); }
+    });
+  }
+  document.addEventListener("DOMContentLoaded", focusableScrollers);
+  document.addEventListener("htmx:afterSettle", function () { requestAnimationFrame(focusableScrollers); });
+  var scrollerTimer = 0;
+  window.addEventListener("resize", function () { clearTimeout(scrollerTimer); scrollerTimer = setTimeout(focusableScrollers, 150); });
   document.addEventListener("htmx:afterSettle", syncDock);
 
-  // ---------- relative times ----------
-  // The server renders "3m ago" once; on a quiet or paused view it would freeze
-  // there while the clock moved on. Tick them in the browser.
+  // ---------- filters ----------
+  // A text field with data-filter-target="<selector>" narrows the elements that match
+  // the selector to those whose name (data-name, or else their text) contains what is
+  // typed; a segmented control with data-seg-for="<same selector>" narrows them to
+  // those that carry its value in data-seg. data-filter-none names the element that
+  // says nothing matched. Both are reapplied after a swap, so a poll does not undo them.
+  function applyFilters() {
+    var done = {};
+    document.querySelectorAll("input[data-filter-target]").forEach(function (inp) {
+      var sel = inp.getAttribute("data-filter-target");
+      if (!sel || done[sel]) return;
+      done[sel] = true;
+      runFilter(sel, inp);
+    });
+    document.querySelectorAll(".seg[data-seg-for]").forEach(function (seg) {
+      var sel = seg.getAttribute("data-seg-for");
+      if (done[sel]) return;
+      done[sel] = true;
+      runFilter(sel, null);
+    });
+  }
+  function runFilter(sel, inp) {
+    var q = inp ? inp.value.toLowerCase().trim() : "";
+    var seg = document.querySelector('.seg[data-seg-for="' + sel + '"] .on');
+    var segVal = seg ? (seg.getAttribute("data-seg-value") || "") : "";
+    var rows;
+    try { rows = document.querySelectorAll(sel); } catch (e) { return; }
+    var shown = 0;
+    rows.forEach(function (row) {
+      var hay = ((row.getAttribute("data-name") || "") + " " + (row.getAttribute("data-text") || "") + " " + (row.getAttribute("data-name") ? "" : row.textContent)).toLowerCase();
+      var ok = (!q || hay.indexOf(q) >= 0) && (!segVal || (row.getAttribute("data-seg") || "").split(" ").indexOf(segVal) >= 0);
+      row.hidden = !ok;
+      if (ok) shown++;
+    });
+    var noneSel = inp && inp.getAttribute("data-filter-none");
+    var none = noneSel && document.querySelector(noneSel);
+    if (none) none.hidden = !(rows.length && shown === 0);
+  }
+  document.addEventListener("input", function (e) {
+    if (e.target && e.target.matches && e.target.matches("input[data-filter-target]")) applyFilters();
+  });
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest && e.target.closest(".seg[data-seg-for] [data-seg-value]");
+    if (!b) return;
+    var seg = b.closest(".seg");
+    seg.querySelectorAll("[data-seg-value]").forEach(function (x) {
+      var on = x === b;
+      x.classList.toggle("on", on);
+      x.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    applyFilters();
+  });
+  document.addEventListener("htmx:afterSettle", applyFilters);
+  document.addEventListener("DOMContentLoaded", applyFilters);
+
+  // ---------- the list keeps its place ----------
+  // A click in the list replaces the whole page (the inspector and the dock belong to
+  // it), so the list's scroll position is put back on the list that arrives.
+  var listScroll = 0;
+  document.addEventListener("htmx:beforeSwap", function (e) {
+    var t = e.detail.target;
+    if (!t || t.id !== "workspace") return;
+    var sc = document.querySelector(".list .list-scroll");
+    listScroll = sc ? sc.scrollTop : 0;
+  });
+  document.addEventListener("htmx:afterSettle", function (e) {
+    var t = e.detail.target;
+    if (!t || t.id !== "workspace" || !listScroll) return;
+    var sc = document.querySelector(".list .list-scroll");
+    if (sc) sc.scrollTop = listScroll;
+    listScroll = 0;
+  });
+
+  // ---------- the page's own summary comes back ----------
+  // The open connections are replaced out of band with the Traffic page's poll. While
+  // a selection is open they stay hidden behind it, and are visible again when it
+  // closes.
+  document.addEventListener("htmx:oobAfterSwap", function () {
+    var def = document.getElementById("insp-default");
+    if (def && inspectorIsOpen()) def.hidden = true;
+  });
+
+  // ---------- the ··· menu ----------
+  // Closes when a click lands elsewhere, and on Esc.
+  function closeMenus(except) {
+    document.querySelectorAll(".more > [data-more][aria-expanded=true]").forEach(function (b) {
+      if (b === except) return;
+      b.setAttribute("aria-expanded", "false");
+      var m = b.parentNode.querySelector(".menu");
+      if (m) m.hidden = true;
+    });
+  }
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest && e.target.closest(".more > [data-more]");
+    if (btn) {
+      var menu = btn.parentNode.querySelector(".menu"), open = btn.getAttribute("aria-expanded") === "true";
+      closeMenus(btn);
+      btn.setAttribute("aria-expanded", open ? "false" : "true");
+      if (menu) menu.hidden = open;
+      return;
+    }
+    // A menu action is done: the menu closes (a confirm may follow); a click elsewhere closes it too.
+    closeMenus(null);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    var open = document.querySelector(".more > [data-more][aria-expanded=true]");
+    if (open) { closeMenus(null); open.focus(); e.stopPropagation(); e.preventDefault(); }
+  }, true);
+
+  // ---------- the produce button ----------
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest && e.target.closest("[data-compose-open]");
+    if (!b || !document.getElementById("compose-panel")) return;
+    e.preventDefault();
+    setDock(true);
+    focusComposer();
+    var panel = document.getElementById("compose-panel");
+    if (panel && panel.scrollIntoView) panel.scrollIntoView({ block: "nearest" });
+  });
+
+  // ---------- time ----------
+  // One formatter. The server writes every moment as <time datetime="UTC" data-style>
+  // with its own text in UTC (timefmt.go). Here it is shown in the browser's zone,
+  // with the zone and the UTC instant on hover, and "ago" and "since" are counted in
+  // the browser so they keep moving on a quiet or paused page. The styles are the
+  // server's: clock, clockms, datetime, date, ago, since.
+  function pad(n, w) { n = String(n); while (n.length < (w || 2)) n = "0" + n; return n; }
+  function zoneName() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { return ""; } }
+  function offsetText(d) {
+    var m = -d.getTimezoneOffset(), sign = m < 0 ? "-" : "+";
+    m = Math.abs(m);
+    return "UTC" + sign + pad(Math.floor(m / 60)) + ":" + pad(m % 60);
+  }
+  function local(ms, style) {
+    var d = new Date(ms);
+    var date = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+    var clock = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    switch (style) {
+      case "clockms": return clock + "." + pad(d.getMilliseconds(), 3);
+      case "datetime": return date + " " + clock;
+      case "date": return date;
+    }
+    return clock;
+  }
+  function spanText(ms) {
+    var s = Math.max(0, Math.floor(ms / 1000));
+    if (s < 2) return "just now";
+    if (s < 60) return s + "s";
+    if (s < 3600) return Math.floor(s / 60) + "m " + pad(s % 60) + "s";
+    if (s < 172800) return Math.floor(s / 3600) + "h " + pad(Math.floor(s / 60) % 60) + "m";
+    return Math.floor(s / 86400) + "d " + pad(Math.floor(s / 3600) % 24) + "h";
+  }
   function agoText(ms) {
-    var s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+    var s = Math.max(0, Math.round(ms / 1000));
     if (s < 60) return "just now";
     if (s < 3600) return Math.floor(s / 60) + "m ago";
     if (s < 86400) return Math.floor(s / 3600) + "h ago";
     return Math.floor(s / 86400) + "d ago";
   }
+  function formatTime(el) {
+    var ms = Date.parse(el.getAttribute("datetime") || "");
+    if (isNaN(ms)) return;
+    var style = el.getAttribute("data-style") || "clock", d = new Date(ms);
+    if (style === "ago") el.textContent = agoText(Date.now() - ms);
+    else if (style === "since") el.textContent = spanText(Date.now() - ms);
+    // "just now" takes no "ago" after it where a page adds one (a phone's card).
+    if (style === "since") el.toggleAttribute("data-now", el.textContent === "just now");
+    else el.textContent = local(ms, style);
+    // On hover: the moment in this browser's zone, then the same instant in UTC.
+    var utc = new Date(ms).toISOString().replace("T", " ").replace("Z", " UTC");
+    el.title = local(ms, "datetime") + "." + pad(d.getMilliseconds(), 3) + " " + (zoneName() ? zoneName() + " " : "") + "(" + offsetText(d) + ") · " + utc;
+  }
+  function formatTimes(root) {
+    (root || document).querySelectorAll("time.when").forEach(formatTime);
+  }
+  window.dozeTime = {
+    // clock is a moment as the time of day in this browser's zone.
+    clock: function (ms) { return local(ms, "clock"); },
+    format: formatTimes,
+  };
+  document.addEventListener("DOMContentLoaded", function () { formatTimes(); });
+  document.addEventListener("htmx:afterSettle", function () { formatTimes(); });
+  document.addEventListener("htmx:afterSwap", function () { formatTimes(); });
   setInterval(function () {
-    document.querySelectorAll(".ago[data-ts]").forEach(function (el) {
-      el.textContent = "· " + agoText(parseInt(el.getAttribute("data-ts"), 10));
-    });
-  }, 20000);
+    document.querySelectorAll('time.when[data-style="ago"], time.when[data-style="since"]').forEach(formatTime);
+  }, 5000);
 
   // ---------- flash banner ----------
   // The server shows a one-shot "Topic created" banner for a ?flash= redirect. Left
@@ -693,6 +1509,15 @@
     } catch (e) {}
   }
   document.addEventListener("DOMContentLoaded", stripFlash);
+  // The banner says what the last action did. The next action makes it old news:
+  // left up, "Topic created" stood beside the refusal of what came after it.
+  document.addEventListener("htmx:beforeRequest", function (e) {
+    var elt = e.detail && e.detail.elt;
+    if (!elt || isLivePoll(e) || isInspectorRequest(e)) return;
+    if (!(elt.tagName === "FORM" || (elt.closest && elt.closest("form, button")))) return;
+    var bar = document.getElementById("flashbar");
+    if (bar) bar.remove();
+  });
 
   // ---------- jump-to-offset landing ----------
   // The row a jump lands on is marked by the server; bring it into view when the
@@ -725,18 +1550,87 @@
   // lose (the jump field's text, keyboard focus, the table's scroll position) is
   // saved before the swap and put back after it.
   var livePaused = false;
+  var pausedTimer = null;
+  // A paused Traffic page asks, cheaply, how many requests it has missed since the
+  // newest row it shows (Traf-08). The list stays where it is.
+  function countMissed() {
+    var banner = document.getElementById("paused-banner"), region = document.getElementById("traffic-live");
+    if (!banner || !region) return;
+    var base = banner.getAttribute("data-new-url"), since = region.getAttribute("data-since");
+    if (!base || !since) return;
+    var live = region.getAttribute("data-live") || "", q = live.indexOf("?") >= 0 ? live.slice(live.indexOf("?") + 1) : "";
+    // Paused, this is the page's only question to the broker, so it is also how a paused
+    // page learns that the broker has gone (B3: the pill stayed green for 40 s and more).
+    fetch(base + "?since=" + encodeURIComponent(since) + (q ? "&" + q : ""), { headers: { Accept: "application/json" } })
+      .then(function (r) {
+        if (r.status >= 500) throw new Error("the console could not reach the broker");
+        return r.ok ? r.json() : null;
+      })
+      .then(function (j) {
+        setDisconnected(false, "", live);
+        if (!j) return;
+        var text = (j.atLeast ? "at least " : "") + j.n, s = j.n === 1 && !j.atLeast ? "" : "s";
+        document.querySelectorAll("[data-new-n], [data-new-n2]").forEach(function (el) { el.textContent = text; });
+        document.querySelectorAll("[data-new-s], [data-new-s2]").forEach(function (el) { el.textContent = s; });
+      }).catch(function () { setDisconnected(true, "can't reach the broker", live); });
+  }
   function setPaused(p) {
+    var was = livePaused;
     livePaused = p;
+    document.documentElement.toggleAttribute("data-paused", p);
+    if (p && !was) {
+      // What is open when the page pauses stays open, and says so (Traf-08: "Still
+      // selected from before you paused").
+      var held = document.getElementById("inspector");
+      if (held && !held.hidden) held.setAttribute("data-traffic-kept", "");
+      var region = document.getElementById("traffic-live"), since = region && region.getAttribute("data-since");
+      document.querySelectorAll("[data-paused-since]").forEach(function (el) {
+        el.textContent = since && Number(since) > 0 ? clockText(Number(since)) : clockText(Date.now());
+      });
+      countMissed();
+      if (!pausedTimer) pausedTimer = setInterval(countMissed, 2500);
+    } else if (!p && pausedTimer) {
+      clearInterval(pausedTimer);
+      pausedTimer = null;
+    }
     document.querySelectorAll("[data-live-toggle]").forEach(function (b) {
       b.setAttribute("aria-pressed", p ? "true" : "false");
       b.classList.toggle("on", p);
       b.title = p ? "Resume live updates" : "Pause live updates";
+      // The Traffic page's toggle is a button that says what it will do (Main).
+      var off = b.getAttribute("data-label-off"), on = b.getAttribute("data-label-on");
+      if (off && on) b.textContent = p ? on : off;
     });
+    document.querySelectorAll("[data-live-state]").forEach(function (el) {
+      el.classList.toggle("ok", !p);
+      el.classList.toggle("warn", p);
+      var l = el.querySelector("[data-live-state-l]");
+      if (l) l.textContent = p ? "paused" : "live";
+      // Traffic's pill is the board's: the dot, then the word as the pill's own text.
+      else if (el.lastChild && el.lastChild.nodeType === 3) el.lastChild.textContent = p ? "paused" : "live";
+      var d = el.querySelector(".dot");
+      if (d) { d.classList.toggle("off", false); d.classList.toggle("warn", p); }
+    });
+    trafficSync();
   }
   document.addEventListener("click", function (e) {
     if (e.target.closest("[data-live-toggle]")) setPaused(!livePaused);
   });
   var liveTimers = [];
+  // The element a region's poll is sent from: an empty one of its own, so that no poll
+  // waits behind another region's in htmx's queue for the same source.
+  var pollSources = {};
+  function pollSource(id) {
+    var el = pollSources[id];
+    if (!el || !el.isConnected) {
+      el = document.createElement("span");
+      el.hidden = true;
+      el.setAttribute("data-poll-source", id);
+      document.body.appendChild(el);
+      pollSources[id] = el;
+    }
+    return el;
+  }
   function setupLive() {
     liveTimers.forEach(clearInterval);
     liveTimers = [];
@@ -748,8 +1642,17 @@
         // reference would go stale and the poll would silently die.
         var cur = document.getElementById(id);
         if (!cur || busy || document.hidden) return;
-        // Only a region with a pause control can be paused.
-        if (livePaused && cur.querySelector("[data-live-toggle]")) return;
+        // Paused is the page's: the tape, the dock and whatever else polls stop
+        // together (a navigation clears it, so it never follows you to a page
+        // that has no control to undo it).
+        if (livePaused) return;
+        // Retrying a broker that is not there is slower than polling one that is: the
+        // page says "every 5 s", and it is.
+        if (cur.classList.contains("disconnected") && every < 5000) {
+          var last = parseInt(cur.getAttribute("data-last-try") || "0", 10);
+          if (Date.now() - last < 4900) return;
+          cur.setAttribute("data-last-try", String(Date.now()));
+        }
         // A confirm dialog is asking about a button in this region. Replacing the
         // region would detach that button, and "Confirm" would then do nothing.
         // The same goes for a row whose offset is being edited (data-hold-live):
@@ -762,12 +1665,16 @@
         // A failed poll is reported by the responseError / sendError handlers (as
         // the "not updating" state); the rejection itself is not news.
         htmx.ajax("GET", url + (url.indexOf("?") >= 0 ? "&" : "?") + "h=" + encodeURIComponent(cur.getAttribute("data-hash") || ""), {
-          target: "#" + id, swap: "outerHTML",
+          // Each region polls from a source of its own: with none, htmx makes the page body
+          // the source of every poll and queues one behind another, and a queued request
+          // that fails (the broker gone, two regions polling) is a promise nobody holds.
+          source: pollSource(id), target: "#" + id, swap: "outerHTML",
         }).then(done, done);
       }, every));
     });
   }
   document.addEventListener("DOMContentLoaded", setupLive);
+  document.addEventListener("htmx:afterSettle", renderPill);
   document.addEventListener("htmx:afterSwap", function (e) {
     // Re-arm after a navigation, or after any swap that lands or contains a live region.
     var t = e.detail.target;
@@ -777,6 +1684,120 @@
     }
   });
 
+  // ---------- Traffic: the page's states (Main, Traf-02 to Traf-12) ----------
+  // What the boards draw for a state the browser is in: which kind of selection is open
+  // (data-traffic-open on <html>: request, folded, client-metrics, client-none, which
+  // app.css draws the page by), the keys strip of the state as each board draws it
+  // (B2), Esc clearing the filter (B1), and the rows as one tab stop of a grid.
+  function trafficPage() {
+    var d = document.getElementById("detail");
+    return d && d.hasAttribute("data-traffic-view") ? d : null;
+  }
+  function trafficOpenKind() {
+    var insp = document.getElementById("inspector");
+    if (!insp || insp.hidden) return "";
+    var hd = insp.querySelector("[data-traffic-insp]");
+    return hd ? hd.getAttribute("data-traffic-insp") : "request";
+  }
+  // The strip of each state, in the boards' words and order: Main, Traf-02 (a filter),
+  // Traf-03 (errors), Traf-04 (a request open), Traf-05 (a folded row), Traf-06 (the
+  // clients), Traf-07 and Traf-11 (a client open), Traf-08 (paused), Traf-09 (empty),
+  // Traf-12 (a group's story). Traf-10's (lost) is the server's keys-lost hints.
+  function trafficKeys(page, open) {
+    var move = [["j", "k"], "move"], openK = [["↵"], "open"], filter = [["/"], "filter"], jump = [["⌘K"], "jump or act"];
+    var paused = livePaused, pause = [["p"], paused ? "resume" : "pause"], close = [["esc"], "close"];
+    var view = page.getAttribute("data-traffic-view");
+    if (page.hasAttribute("data-traffic-empty")) return [[["c"], "connect an app"], pause, jump];
+    if (open) {
+      var kind = [];
+      var insp = document.getElementById("inspector");
+      if (open === "request" && insp && insp.querySelector("[data-copy-decoded]")) kind.push([["c"], "copy decoded"]);
+      if (open === "folded" && insp && insp.querySelector("[data-unfold]")) kind.push([["u"], "unfold"]);
+      var all = insp && insp.querySelector("[data-all-metrics]");
+      if (open === "client-metrics" && all) kind.push([["m"], all.textContent.trim().replace(/^All/, "all")]);
+      if (view === "clients") return [move, openK].concat(kind, [close, jump]);
+      return paused ? [move, openK].concat(kind, [pause, close, jump]) : [move, openK].concat(kind, [close, pause, jump]);
+    }
+    if (view === "clients") return [move, [["↵"], "open client"], [["g", "r"], "requests"], jump];
+    if (page.hasAttribute("data-traffic-story")) return [move, openK, [["esc"], "clear filter"], jump];
+    if (page.hasAttribute("data-traffic-errors")) return [move, openK, filter, [["e"], "errors only"], pause, jump];
+    if (page.hasAttribute("data-traffic-filtered")) return [move, openK, filter, [["esc"], "clear filter"], pause, jump];
+    return [move, openK, filter, pause, jump];
+  }
+  function renderTrafficKeys(page, open) {
+    var strip = document.getElementById("keys");
+    if (!strip) return;
+    // What the page does not draw stays: the hints of a lost broker, and the strips of the dialogs.
+    var lost = Array.prototype.filter.call(strip.children, function (s) { return s.classList.contains("keys-lost") || s.classList.contains("keys-dialog"); });
+    strip.textContent = "";
+    trafficKeys(page, open).forEach(function (h) {
+      var s = document.createElement("span");
+      s.className = "keys-live";
+      h[0].forEach(function (k) { var b = document.createElement("span"); b.className = "kbd"; b.textContent = k; s.appendChild(b); });
+      s.appendChild(document.createTextNode(h[1]));
+      strip.appendChild(s);
+    });
+    lost.forEach(function (s) { strip.appendChild(s); });
+  }
+  function trafficSync() {
+    var page = trafficPage(), root = document.documentElement;
+    if (!page) { root.removeAttribute("data-traffic-open"); return; }
+    var open = trafficOpenKind();
+    if (open) root.setAttribute("data-traffic-open", open); else root.removeAttribute("data-traffic-open");
+    renderTrafficKeys(page, open);
+  }
+  document.addEventListener("DOMContentLoaded", trafficSync);
+  document.addEventListener("htmx:afterSettle", trafficSync);
+  document.addEventListener("htmx:oobAfterSwap", function (e) { if (e.detail && e.detail.target && e.detail.target.id === "keys") trafficSync(); });
+  document.addEventListener("htmx:afterSwap", function (e) {
+    // A selection opened while paused is not one from before the pause.
+    var t = e.detail.target;
+    if (t && t.id === "inspector") t.removeAttribute("data-traffic-kept");
+  });
+  // Esc clears the filter (Traf-02, Traf-12: "esc clear filter"): with nothing open,
+  // from the page or from the field itself, it goes to the page without the filter.
+  // The field emptied with the filter still applied was B1. With a selection open, Esc
+  // is the shell's: it closes the selection first.
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape" || e.metaKey || e.ctrlKey || e.altKey) return;
+    var page = trafficPage();
+    if (!page || confirmOpen() || paletteOpen() || helpOpen() || inspectorIsOpen()) return;
+    var field = page.querySelector("[data-traffic-filter]"), active = document.activeElement;
+    var typing = active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName);
+    if (typing && active !== field) return;
+    var applied = page.hasAttribute("data-traffic-story") || !!page.querySelector("#filter-pills") || (field && field.defaultValue);
+    if (applied && field) {
+      e.preventDefault(); e.stopPropagation();
+      var to = field.getAttribute("data-clear-url");
+      var link = document.createElement("a");
+      link.href = to; link.setAttribute("hx-boost", "true"); link.hidden = true;
+      page.appendChild(link);
+      if (window.htmx) htmx.process(link);
+      link.click();
+      return;
+    }
+    if (field && field.value) { e.preventDefault(); e.stopPropagation(); field.value = ""; }
+  }, true);
+  // The rows are one tab stop (a grid): the one last focused, or the first, is in the
+  // tab order, and the arrow keys move between them.
+  document.addEventListener("focusin", function (e) {
+    var r = e.target.closest && e.target.closest(".tf-rows > .r");
+    if (!r) return;
+    r.parentNode.querySelectorAll(':scope > .r[tabindex="0"]').forEach(function (x) { if (x !== r) x.tabIndex = -1; });
+    r.tabIndex = 0;
+  });
+  document.addEventListener("keydown", function (e) {
+    var r = e.target.closest && e.target.closest(".tf-rows > .r");
+    if (!r || r !== e.target || e.metaKey || e.ctrlKey || e.altKey) return;
+    var rows = Array.prototype.filter.call(r.parentNode.children, function (x) { return x.classList.contains("r") && x.offsetParent !== null; });
+    var at = rows.indexOf(r), to = -1;
+    if (e.key === "ArrowDown") to = Math.min(rows.length - 1, at + 1);
+    else if (e.key === "ArrowUp") to = Math.max(0, at - 1);
+    if (to < 0) return;
+    e.preventDefault();
+    rows[to].focus();
+  });
+
   var liveState = null;
   document.addEventListener("htmx:beforeSwap", function (e) {
     var t = e.detail.target;
@@ -784,7 +1805,7 @@
     // A poll that was already on its way when a confirm dialog opened.
     if ((confirmOpen() || t.querySelector("[data-hold-live]")) && isLivePoll(e)) { e.detail.shouldSwap = false; if (e.detail.xhr) e.detail.xhr.dozeHeld = true; return; }
     // Fires for a 204 too, where nothing will be swapped. Saving state then left
-    // it lying around for the next unrelated swap (opening the drawer) to
+    // it lying around for the next unrelated swap (opening the inspector) to
     // "restore", which threw the table back to wherever it had been.
     if (!e.detail.shouldSwap) return;
     var jump = t.querySelector("#jump-to");
@@ -799,8 +1820,13 @@
       // among the region's focusable elements, which a refresh rarely changes.
       focus = active.id ? { id: active.id } : { at: Array.prototype.indexOf.call(t.querySelectorAll(FOCUSABLE), active), tag: active.tagName };
     }
+    // Which kind a segmented filter in the region shows ("with members"), by what it filters.
+    var segs = {};
+    t.querySelectorAll(".seg[data-seg-for] .on[data-seg-value]").forEach(function (b) {
+      segs[b.closest(".seg").getAttribute("data-seg-for")] = b.getAttribute("data-seg-value");
+    });
     liveState = {
-      id: t.id, focus: focus, typed: typed, poll: isLivePoll(e),
+      id: t.id, focus: focus, typed: typed, poll: isLivePoll(e), segs: segs,
       selStart: jump ? jump.selectionStart : null, selEnd: jump ? jump.selectionEnd : null,
       scrollTop: wrap ? wrap.scrollTop : 0, scrollLeft: wrap ? wrap.scrollLeft : 0,
       atTop: !wrap || wrap.scrollTop < 4,
@@ -820,13 +1846,21 @@
       if (!i || !region.contains(i)) return;
       if (i.type === "checkbox") i.checked = st.typed[id]; else if (st.typed[id]) i.value = st.typed[id];
     });
+    Object.keys(st.segs || {}).forEach(function (sel) {
+      region.querySelectorAll('.seg[data-seg-for="' + sel + '"] [data-seg-value]').forEach(function (b) {
+        var on = b.getAttribute("data-seg-value") === st.segs[sel];
+        b.classList.toggle("on", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+    });
+    applyFilters();
     // A record that arrived while you were watching lands with a small motion.
     if (st.poll) region.classList.add("landed");
     var wrap = region.querySelector(".tbl-wrap");
     // Someone reading down the table keeps their place; someone parked at the top
     // (the newest rows) just sees the new ones arrive.
     if (wrap) { wrap.scrollLeft = st.scrollLeft; if (!st.atTop) wrap.scrollTop = st.scrollTop; }
-    if (st.focus && !drawerIsOpen() && !paletteOpen()) {
+    if (st.focus && !inspectorIsOpen() && !paletteOpen()) {
       var el = st.focus.id ? document.getElementById(st.focus.id) : region.querySelectorAll(FOCUSABLE)[st.focus.at];
       if (el && region.contains(el) && (st.focus.id || el.tagName === st.focus.tag)) {
         el.focus({ preventScroll: true });
@@ -840,7 +1874,10 @@
   document.addEventListener("htmx:afterRequest", function (e) {
     var xhr = e.detail.xhr;
     if (!xhr) return;
-    if (e.detail.successful && isLivePoll(e)) setDisconnected(false);
+    if (e.detail.successful && isLivePoll(e)) {
+      setDisconnected(false, "", pollPath(e));
+      if (brokerLost) setBrokerLost(false); // the region's answer came from the broker.
+    }
     var h = xhr.getResponseHeader("HX-Live-Hash");
     if (!h || xhr.dozeHeld) return;
     var path = (e.detail.requestConfig && e.detail.requestConfig.path) || "";

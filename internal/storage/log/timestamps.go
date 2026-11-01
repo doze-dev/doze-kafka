@@ -152,7 +152,16 @@ func (p *Partition) offsetForTimestamp(target int64) (offset, timestamp int64, f
 				}
 				return true
 			})
-			return !found, decodeErr
+			if decodeErr != nil {
+				// A batch whose records cannot be read. Nothing is stored like that
+				// any more (produce reads every record first), but a log written by an
+				// earlier version can hold one, and one unreadable batch used to fail
+				// every lookup that reached it, for good. Its header says a record in
+				// it is at or past the target: the batch's first visible offset is the
+				// answer at the grain there is.
+				offset, timestamp, found = max(info.baseOffset, p.logStartOffset), int64(binary.BigEndian.Uint64(batch[batchMaxTimestampOff:])), true
+			}
+			return !found, nil
 		})
 		if err != nil {
 			return 0, 0, false, err
@@ -165,8 +174,8 @@ func (p *Partition) offsetForTimestamp(target int64) (offset, timestamp int64, f
 }
 
 // OffsetOfMaxTimestamp returns the offset and timestamp of the visible record with
-// the largest timestamp (the first of them if several tie), as Kafka does for the
-// "max timestamp" ListOffsets query.
+// the largest timestamp, as Kafka answers the "max timestamp" ListOffsets query
+// (claim: topics R9). Of several that tie it is the first: no recording has a tie.
 func (p *Partition) OffsetOfMaxTimestamp() (offset, timestamp int64, found bool, err error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -187,12 +196,16 @@ func (p *Partition) OffsetOfMaxTimestamp() (offset, timestamp int64, found bool,
 				if info.baseOffset+int64(info.recordCount) <= p.logStartOffset {
 					return true, nil
 				}
-				return true, batchRecords(batch, func(off, ts int64) bool {
+				if err := batchRecords(batch, func(off, ts int64) bool {
 					if off >= p.logStartOffset && ts > m {
 						m = ts
 					}
 					return true
-				})
+				}); err != nil {
+					// Unreadable (see offsetForTimestamp): its header's maximum stands in.
+					m = max(m, int64(binary.BigEndian.Uint64(batch[batchMaxTimestampOff:])))
+				}
+				return true, nil
 			})
 			if err != nil {
 				return 0, 0, false, err

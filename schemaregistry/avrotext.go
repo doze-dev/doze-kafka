@@ -36,6 +36,7 @@ func (n *node) get(key string) *node {
 	return nil
 }
 
+//fuzz:parser class=schema-texts FuzzRegisterAndCompare
 func parseNode(text string) (*node, error) {
 	dec := json.NewDecoder(strings.NewReader(text))
 	dec.UseNumber()

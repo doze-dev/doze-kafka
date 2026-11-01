@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Kafka Connect in distributed mode: the worker creates and verifies its three internal
 # topics (which must be compacted), runs a file source into a topic and a file sink out
-# of it, and after a restart picks its connectors and its offsets back up from those topics.
+# of it (the plugin path holds only the file connectors: scanning all of libs/ takes minutes on a loaded machine and has nothing to do with the broker), and after a restart picks its connectors and its offsets back up from those topics.
 set -euo pipefail
 . ../lib.sh
 need_docker; trap_cleanup
@@ -19,22 +19,23 @@ ${pre}ssl.truststore.location=/ca.pem
   done
   MOUNT=(-v "$CA_CERT:/ca.pem:ro")
 fi
-CONF="bootstrap.servers=$BOOTSTRAP
-group.id=connect-$P
-key.converter=org.apache.kafka.connect.storage.StringConverter
-value.converter=org.apache.kafka.connect.storage.StringConverter
-offset.storage.topic=connect-offsets-$P
-offset.storage.replication.factor=1
-config.storage.topic=connect-configs-$P
-config.storage.replication.factor=1
-status.storage.topic=connect-status-$P
-status.storage.replication.factor=1
+# The worker's settings are docs/frameworks.md's, as a reader copies them: the broker's
+# address for this run, and a per-run suffix on the group and the three topics (the
+# document says so), are the only changes. A setting the document lacks fails here.
+DOC=$(doc_properties "Kafka Connect") || exit 1
+CONF=$(printf '%s\n' "$DOC" | sed -E \
+  -e "s#^bootstrap\.servers=.*#bootstrap.servers=$BOOTSTRAP#" \
+  -e "s#^group\.id=(.*)#group.id=\1-$P#" \
+  -e "s#^((offset|config|status)\.storage\.topic)=(.*)#\1=\3-$P#")
+topic_of() { printf '%s\n' "$CONF" | sed -n "s|^$1\.storage\.topic=||p"; }
+for k in offset config status; do [ -n "$(topic_of "$k")" ] || fail "docs/frameworks.md's Connect settings have no $k.storage.topic"; done
+CONF="$CONF
 listeners=http://0.0.0.0:8083
-plugin.path=/opt/kafka/libs
+plugin.path=/tmp/plugins
 $SEC"
 # shellcheck disable=SC2086
-docker run -d --name "$CONTAINER" ${HOSTS_FLAG:-} -p 127.0.0.1::8083 ${MOUNT[@]+"${MOUNT[@]}"} -e CONF="$CONF" --entrypoint sh apache/kafka:4.0.0 \
-  -c 'printf "%s\n" "$CONF" > /tmp/worker.properties; exec /opt/kafka/bin/connect-distributed.sh /tmp/worker.properties' >/dev/null
+docker run -d --name "$CONTAINER" ${HOSTS_FLAG:-} -p 127.0.0.1::8083 ${MOUNT[@]+"${MOUNT[@]}"} -e CONF="$CONF" --entrypoint sh apache/kafka:4.3.1 \
+  -c 'mkdir /tmp/plugins && cp /opt/kafka/libs/connect-file-*.jar /tmp/plugins/; printf "%s\n" "$CONF" > /tmp/worker.properties; exec /opt/kafka/bin/connect-distributed.sh /tmp/worker.properties' >/dev/null
 PORT=$(publish_port "$CONTAINER" 8083)
 URL=http://127.0.0.1:$PORT
 wait_http "$URL/connectors" 180 || fail "the Connect worker did not start against doze-kafka"
@@ -69,7 +70,7 @@ done
 ok "after a restart: connectors restored from the config topic, source resumed from its stored offset"
 
 # The three internal topics are what Connect requires of them.
-for t in connect-offsets-$P connect-configs-$P connect-status-$P; do
+for t in "$(topic_of offset)" "$(topic_of config)" "$(topic_of status)"; do
   kafka_tool kafka-configs.sh --describe --entity-type topics --entity-name "$t" 2>/dev/null | grep -q "cleanup.policy=compact" || fail "$t is not a compacted topic"
 done
 ok "the offsets, configs and status topics are compacted"

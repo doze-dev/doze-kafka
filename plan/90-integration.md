@@ -1,0 +1,120 @@
+# Integration: what is tested only once every stage is done
+
+A stage proves its own surface. These checks need two or more stages to be true,
+so they wait until the last stage has met its criteria. They are the difference
+between "each page is right" and "the product is right".
+
+## 1. The harbour end to end
+
+One scripted run against a built binary, on a clean data directory, that does
+everything the design's world does and then looks at every page.
+
+| Step | Stages it crosses |
+|---|---|
+| Start with auth on (SCRAM) and TLS on, the registry on, the zone on | Cluster, Access, Connect |
+| Create the 7 topics through the console and `kafka-topics.sh`, with the settings the boards show | Topics, Cluster |
+| Register the 5 subjects through the console and through a stock Java serializer | Schemas, Topics |
+| Run `checkout-api` (Java, transactional), `order-validator` (librdkafka, KIP-848), `depot-router` (franz-go, classic), `loyalty-etl` (refused), `seed-loader` | Traffic, Groups, Access |
+| Produce with `traceparent` across three topics; follow it | Trace, Topics |
+| Open every page and every inspector and compare with the board | all |
+| Kill -9 the broker mid-transaction, restart, and check every page again | Bad days, Cluster, Topics, Groups |
+
+**Done when.** The run is a Playwright test plus a Go driver (`e2e/harbour/`),
+passes in CI, and a failure names the board it disagrees with.
+
+## 2. The board review
+
+137 boards, each with a status: `built`, `built differently` (with why), `cut`
+(with why). A table in this folder lists every board and the commit that built
+it. Screenshots of each built page at 1440 px, light and dark, are produced by
+the browser suite and attached to the release candidate.
+
+**Done when.** No board is unlisted, every `cut` has a sentence, and a person
+has looked at every screenshot beside its board. This step is a human read; the
+checklist is the artefact.
+
+## 3. The client matrix, widened
+
+The 24 cells of today (12 clients, plain and SCRAM over TLS; `compat/run.sh`
+fails unless every one passes) plus the cells the stages asked for.
+
+| Cell | Asked by |
+|---|---|
+| Java client at a second version (3.9 and 4.0) | [connect](stages/connect.md) |
+| Python with a generated Protobuf class | [connect](stages/connect.md), [schemas](stages/schemas.md) |
+| Sarama and franz-go as cells, not only Go tests | [connect](stages/connect.md) |
+| A real Java client and a real librdkafka asserted to appear in Traffic with metrics | [traffic](stages/traffic.md) |
+| A Streams restore while a cleaner pass runs | [topics](stages/topics.md) |
+| Connect with the Confluent registry's converters pointed at the built-in registry | [schemas](stages/schemas.md) |
+
+**Done when.** `go tool task test:compat` runs every cell, all pass, and the
+workflow runs it on every pull request and weekly.
+
+## 4. Soak and chaos, with every workload
+
+`task soak` and `task chaos` today run produce and consume, groups, and a
+transactional workload with an exactly-once invariant. They gain: a compacted
+topic with a "latest value per key is never lost" invariant, the console
+polling every page, the registry under load, ACL changes, and topic create,
+delete and partition growth during the run.
+
+**Done when.** A 30-minute chaos run, with kills, passes with no invariant
+broken, flat heap and flat file descriptors; the weekly workflow runs it and
+opens an issue on failure.
+
+## 5. Budgets
+
+| Budget | Source |
+|---|---|
+| Idle heap, binary size, module list | foundation B9 |
+| Produce `acks=all`, OffsetCommit of 20 partitions, fetch of 1 MiB | the benchmarks from the performance work (`BenchmarkProduceAcksAll` and its peers), recorded in `testdata/bench.txt` |
+| Console page render time with 1,000 topics and 100 groups | a new benchmark on the surfaces test |
+| Shutdown time with 5,000 partitions | the figure measured in the audit (29.7 s before, under 2 s after) |
+
+**Done when.** Each budget is a number in a file, checked in CI, and a change
+that moves one says why in its commit.
+
+## 6. Security pass
+
+A matrix test: every served API (the version-matrix list) against four
+principals (anonymous, a user with all permissions, a user with only the
+permissions the API needs, a user with none), asserting the error code and that
+nothing was changed by a refused request. Plus: the pre-authentication frame cap
+holds, a malformed SASL exchange closes one connection, the console refuses a
+foreign `Origin` and `Host` on every mutating route, and no console page shows a
+credential.
+
+**Done when.** The matrix test exists, passes, and `TestEveryServedAPIIsAuthorized`
+is generated from the same table.
+
+## 7. Platforms
+
+`GOOS=windows go vet` is in `check`. Add: a Windows binary smoke run in CI
+(start, produce, consume with the Go client, stop); `goreleaser build --snapshot`
+in the release workflow; an upgrade test that starts a data directory written by
+the previous release and reads it.
+
+**Done when.** The three run in CI, and the upgrade test's fixture directory is
+regenerated by `task fixture:release` at each tag.
+
+## 8. The documents
+
+`docs/getting-started.md` is followed literally by a test on a clean directory;
+every command in `docs/configuration.md` runs; the README's claims are each a
+named test or a matrix cell; `docs/reports/TESTING.md` lists the counts from the
+last run.
+
+**Done when.** The documents test (foundation B14) is green and `TESTING.md`
+is regenerated by a task, not edited by hand.
+
+## Acceptance criteria
+
+- [ ] Sections 1 to 8 each meet their "done when".
+- [ ] Every stage's status in [README.md](README.md) is `done` with the actual
+      days recorded.
+- [ ] `go tool task check`, `coverage`, `mutate:check`, `lightness`, `api`,
+      `test:e2e`, `test:compat`, `soak`, `chaos`, `fuzz` are green on `main` in
+      one CI run.
+- [ ] Nothing in `plan/` is referenced from outside it, and the folder is
+      removed in the commit that tags the release (what it produced lives on in
+      the tests, the ledger and the guides).

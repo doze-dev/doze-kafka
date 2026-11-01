@@ -33,6 +33,8 @@ import (
 )
 
 // WireID reports the schema id a value in Confluent's wire format names.
+//
+//fuzz:parser FuzzDecode
 func WireID(value []byte) (id int, ok bool) {
 	if len(value) < 5 || value[0] != 0 {
 		return 0, false
@@ -65,11 +67,15 @@ func NewCodec(typ, text string, refs []Ref) (*Codec, error) {
 // Type is AVRO, JSON or PROTOBUF.
 func (c *Codec) Type() string { return c.p.Type() }
 
-// avroLimits bounds what a decoder may allocate for one value. A record's bytes name
-// their own array lengths, so without a bound a few bytes ask for gigabytes.
-var avroLimits = avro.Config{MaxByteSliceSize: 8 << 20, MaxSliceAllocSize: 1 << 20}.Freeze()
+// avroLimits bounds what a decoder may allocate for one string and one array. A
+// record's bytes name their own lengths, so without a bound a few bytes ask for
+// gigabytes. It is not the whole bound (the limit on an array is per array, and there
+// is none on a map): checkAvro, which every value passes first, is.
+var avroLimits = avro.Config{MaxByteSliceSize: 8 << 20, MaxSliceAllocSize: maxAvroItems}.Freeze()
 
 // Decode turns a whole record value (header included) into JSON text.
+//
+//fuzz:parser FuzzDecode
 func (c *Codec) Decode(value []byte) (out string, err error) {
 	// The bytes are whatever a producer wrote; a decoder that trips over them must say
 	// so, not take the caller down with it.
@@ -84,6 +90,11 @@ func (c *Codec) Decode(value []byte) (out string, err error) {
 	body := value[5:]
 	switch p := c.p.(type) {
 	case *avroSchema:
+		// Before the decoder sees a byte: it trusts counts and lengths that these
+		// bytes, which anyone may have produced, are free to lie about (avroguard.go).
+		if err := checkAvro(p.schema, body); err != nil {
+			return "", err
+		}
 		var v any
 		if err := avroLimits.Unmarshal(p.schema, body, &v); err != nil {
 			return "", err
@@ -122,6 +133,8 @@ func (c *Codec) Decode(value []byte) (out string, err error) {
 }
 
 // Encode turns JSON text into a record value for schema id.
+//
+//fuzz:parser FuzzEncode
 func (c *Codec) Encode(id int, doc string) ([]byte, error) {
 	head := make([]byte, 5)
 	binary.BigEndian.PutUint32(head[1:], uint32(id))
@@ -176,6 +189,8 @@ func (c *Codec) Encode(id int, doc string) ([]byte, error) {
 
 // readMessageIndex reads Protobuf's message-index list: a zigzag-varint count, then
 // that many zigzag varints. A count of zero stands for [0].
+//
+//fuzz:parser FuzzDecode
 func readMessageIndex(b []byte) (idx []int, rest []byte, err error) {
 	n, k := binary.Varint(b)
 	if k <= 0 {
@@ -213,6 +228,7 @@ func messageAt(msgs protoreflect.MessageDescriptors, idx []int) (protoreflect.Me
 	return md, nil
 }
 
+//fuzz:parser FuzzEncode
 func parseJSONValue(doc string) (any, error) {
 	dec := json.NewDecoder(strings.NewReader(doc))
 	dec.UseNumber()
@@ -308,6 +324,23 @@ func jsonToAvro(s avro.Schema, v any) (any, error) {
 				return nil, nil
 			}
 			return nil, errors.New("null is not one of the union's branches")
+		}
+		// The tagged form, {"double": 0}, is what the decoder shows for a union value
+		// and Avro's own JSON encoding: a message read in the console can be sent as it
+		// stands. A one-key object that names no branch, or whose value its branch does
+		// not take, is tried as the untagged value below.
+		if m, ok := v.(map[string]any); ok && len(m) == 1 {
+			for _, br := range sc.Types() {
+				inner, named := m[unionBranchName(br)]
+				if !named || br.Type() == avro.Null {
+					continue
+				}
+				if native, err := jsonToAvro(br, inner); err == nil {
+					if _, merr := avro.Marshal(br, native); merr == nil {
+						return map[string]any{unionBranchName(br): native}, nil
+					}
+				}
+			}
 		}
 		var errs []string
 		for _, br := range sc.Types() {

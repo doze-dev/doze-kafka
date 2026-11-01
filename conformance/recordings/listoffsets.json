@@ -1,0 +1,1230 @@
+{
+  "scenario": "listoffsets",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 2,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "lo"
+          },
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "lo-empty"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 2,
+            "ReplicationFactor": 1,
+            "Topic": "lo",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          },
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "lo-empty",
+            "TopicID": "\u003ctopic-id:2\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "produce-five",
+      "api": "Produce",
+      "version": 9,
+      "request": {
+        "Acks": -1,
+        "TimeoutMillis": 10000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "Partition": 0,
+                "Records": "AAAAAAAAAAAAAABd/////wIzjw6bAAAAAAAEAAABdIdug+gAAAF0h26TiP//////////////////AAAABQ4AAAAAAmEAEADQDwIAAmIAEADwLgQAAmMAEACgHwYAAmQAEADAPggAAmUA"
+              }
+            ],
+            "Topic": "lo",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ],
+        "TransactionID": null
+      },
+      "response": {
+        "Brokers": null,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "BaseOffset": 0,
+                "CurrentLeader": {
+                  "LeaderEpoch": -1,
+                  "LeaderID": -1
+                },
+                "ErrorCode": 0,
+                "ErrorMessage": null,
+                "ErrorRecords": null,
+                "LogAppendTime": -1,
+                "LogStartOffset": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "lo",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "earliest",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -2
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 0,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "latest",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 5,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "max-timestamp",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -3
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 4,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": 1600000005000
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "earliest-local",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -4
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 35,
+                "LeaderEpoch": -1,
+                "Offset": -1,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "latest-tiered",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -5
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 35,
+                "LeaderEpoch": -1,
+                "Offset": -1,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "before-everything",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": 1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 0,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": 1600000001000
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "exact-first",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": 1600000001000
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 0,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": 1600000001000
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "between",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": 1600000002500
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 2,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": 1600000004000
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "exact-out-of-order",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": 1600000003000
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 2,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": 1600000004000
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "after-the-out-of-order",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": 1600000003500
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 2,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": 1600000004000
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "exact-last",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": 1600000005000
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 4,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": 1600000005000
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "after-everything",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": 1600000009000
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": -1,
+                "Offset": -1,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "unsupported-negative",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -6
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 35,
+                "LeaderEpoch": -1,
+                "Offset": -1,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "zero-timestamp",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": 0
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 0,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": 1600000001000
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "read-committed-latest",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 1,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 5,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "empty-partition-earliest",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 1,
+                "Timestamp": -2
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 0,
+                "OldStyleOffsets": null,
+                "Partition": 1,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "empty-partition-latest",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 1,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 0,
+                "OldStyleOffsets": null,
+                "Partition": 1,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "empty-partition-max-timestamp",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 1,
+                "Timestamp": -3
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": -1,
+                "Offset": -1,
+                "OldStyleOffsets": null,
+                "Partition": 1,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "empty-partition-by-time",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 1,
+                "Timestamp": 1600000000000
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": -1,
+                "Offset": -1,
+                "OldStyleOffsets": null,
+                "Partition": 1,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "empty-topic-max-timestamp",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -3
+              }
+            ],
+            "Topic": "lo-empty"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": -1,
+                "Offset": -1,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo-empty"
+          }
+        ]
+      }
+    },
+    {
+      "label": "unknown-partition",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 9,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 3,
+                "LeaderEpoch": -1,
+                "Offset": -1,
+                "OldStyleOffsets": null,
+                "Partition": 9,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "negative-partition",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": -1,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 3,
+                "LeaderEpoch": -1,
+                "Offset": -1,
+                "OldStyleOffsets": null,
+                "Partition": -1,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "unknown-topic",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo-nope"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 3,
+                "LeaderEpoch": -1,
+                "Offset": -1,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo-nope"
+          }
+        ]
+      }
+    },
+    {
+      "label": "future-leader-epoch",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": 100,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 75,
+                "LeaderEpoch": -1,
+                "Offset": -1,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "unknown-isolation-level",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 7,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": -1,
+                "LeaderEpoch": -1,
+                "Offset": -1,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "repeated-partition",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": -1,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              },
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 1,
+                "Timestamp": -1
+              },
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 0,
+                "OldStyleOffsets": null,
+                "Partition": 1,
+                "Timestamp": -1
+              },
+              {
+                "ErrorCode": 42,
+                "LeaderEpoch": -1,
+                "Offset": -1,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    },
+    {
+      "label": "replica-id-set",
+      "api": "ListOffsets",
+      "version": 7,
+      "request": {
+        "IsolationLevel": 0,
+        "ReplicaID": 5,
+        "TimeoutMillis": 30000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "CurrentLeaderEpoch": -1,
+                "MaxNumOffsets": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "LeaderEpoch": 0,
+                "Offset": 5,
+                "OldStyleOffsets": null,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "lo"
+          }
+        ]
+      }
+    }
+  ]
+}

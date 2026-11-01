@@ -1,0 +1,161 @@
+{{/* The inspector's bodies for Traffic, as the boards draw them: one request
+     (Traf-04; an OffsetCommit as Traf-08 draws it), a folded row (Traf-05), a client
+     that reports metrics (Traf-07) and one that does not (Traf-11). The head is the
+     boards' .hd: the cap, the title with its status at the right, the line under it.
+     The close control is out of flow in the head's corner (a pointer has no Esc; the
+     boards draw none), so the head is the board's size.
+
+     The inspector says what it holds to a screen reader: it is a region named by its
+     title, and a new selection is announced (aria-live on the panel's body). */}}
+{{define "traffic_inspector"}}
+<div class="hd tf-ihd" data-inspector-kind="{{.InspKind}}"{{if .InspTone}} data-traffic-insp="{{.InspTone}}"{{end}}>
+  <span class="cap">{{.InspKindLabel}}</span>
+  {{if .InspStatus}}<div class="row sb ce"><span class="h2" id="inspector-title" data-key="{{.InspKey}}" data-open="{{.InspOpen}}">{{.InspTitleHTML}}</span>{{if eq .InspStatusKind "pill"}}<span class="pill{{if .InspStatusTone}} {{.InspStatusTone}}{{end}}"><span class="dot" aria-hidden="true"></span>{{.InspStatus}}</span>{{else}}<span class="m {{.InspStatusTone}}">{{.InspStatus}}</span>{{end}}</div>
+  {{else}}<span class="h2" id="inspector-title" data-key="{{.InspKey}}" data-open="{{.InspOpen}}">{{.InspTitleHTML}}</span>{{end}}
+  {{if or .InspSub (not .InspSubTime.IsZero)}}<span class="m mut">{{if not .InspSubTime.IsZero}}{{when .InspSubTime "clockms"}}{{if .InspSub}} · {{end}}{{end}}{{.InspSub}}</span>{{end}}
+  <button type="button" class="btn ghost sm tf-close" aria-label="Close (esc)" title="Close (esc)" data-inspector-close>×</button>
+</div>
+{{if .InspGone}}
+<div class="bd"><div class="note">{{.InspGoneMsg}} Close this and choose another.</div></div>
+{{else if eq .InspKind "request"}}{{template "inspector_request" .}}
+{{else if eq .InspKind "client"}}{{template "inspector_client" .}}
+{{end}}
+{{end}}
+
+{{define "inspector_request"}}
+{{if .Fold}}
+<div class="bd" id="request-inspector">
+  <p id="fold-sentence">{{.R.Count}} identical {{pluralWord .Fold.Unit}} are shown as one row. Each one asked the same thing and got the same answer.</p>
+  <div class="kv" style="--c: 108px 1fr">
+    <span>First</span><span class="m">{{when .R.First "clockms"}}</span>
+    <span>Last</span><span class="m">{{when .R.Time "clockms"}}</span>
+    {{if .Fold.Interval}}<span>Interval</span><span class="m">{{.Fold.Interval}}</span>{{end}}
+    <span>Result</span><span class="m ok">{{.Fold.Each}}</span>
+    {{if .Fold.Same}}<span>{{.Fold.SameLabel}}</span><span class="m">{{.Fold.Same}}</span>{{end}}
+  </div>
+  <div class="col g6" id="fold-ticks">
+    <span class="cap">{{.Fold.Note}}</span>
+    <div class="well" style="padding: 10px 12px"><div class="row tf-ticks" style="gap: 4px; align-items: flex-end; height: 22px">{{range .Fold.Ticks}}<i class="tick" style="height: 14px" title="{{.Title}}"></i>{{end}}</div>
+    {{if .Fold.Ticks}}<div class="row sb"><span class="m mut">{{when (index .Fold.Ticks 0).At "clock"}}</span><span class="m mut">{{when .R.Time "clock"}}</span></div>{{end}}</div>
+  </div>
+  <div class="callout"><span class="b">Why it folded</span><span class="note">Idle repeats fold; any change breaks the fold. A slower interval, a different answer or a rebalance would show up as its own row.</span></div>
+  {{if .Fold.Unfold}}
+  <div class="card" id="unfolded" style="--c: 1fr 70px">
+    <div class="r h"><span>Time</span><span class="ra">Took</span></div>
+    {{range .Fold.Ticks}}<div class="r"><span class="m">{{when .At "clockms"}}</span><span class="m ra">{{.Took}}</span></div>{{end}}
+  </div>
+  {{if gt .R.Count .Fold.Kept}}<div class="note">These are the last {{.Fold.Kept}} of the {{.R.Count}}: a folded row keeps its last {{.Fold.Kept}} repeats.</div>{{end}}
+  {{end}}
+  <div class="grow"></div>
+  <div class="row g8">{{if not .Fold.Unfold}}<button type="button" class="btn" data-unfold hx-get="{{inspectHref "request" .InspKey}}&amp;unfold=1" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">{{if gt .R.Count .Fold.Kept}}Unfold the last {{.Fold.Kept}}{{else}}Unfold these {{.R.Count}}{{end}}</button>{{end}}{{if .GroupName}}<a class="btn w5" href="{{.GroupLink}}">Open {{.GroupName}}<span aria-hidden="true">→</span></a>{{end}}</div>
+</div>
+{{else}}
+<div class="bd" id="request-inspector"{{if not .Commit}} style="gap: 10px"{{end}}>
+  {{with .Explain}}
+  <div class="callout {{.Tone}}" role="alert" id="request-refusal"><div class="row g8 ce"><span class="b">{{.Word}}</span><span class="m">{{.Name}}</span></div>
+    {{if .Meaning}}<span class="m">{{.Meaning}}</span>{{end}}
+    {{if .Verdict}}<span class="note">{{.Verdict}}</span>{{end}}</div>
+  {{if .Cause}}<p>{{.Cause}}</p>{{end}}
+  {{if .Fix}}<div class="note">{{.Fix}}</div>{{end}}
+  {{end}}
+  <div class="kv" style="--c: 108px 1fr">
+    <span>Client</span>{{if .R.ClientID}}{{if .ClientOpen}}<a class="m" href="{{.WhoFilter}}" data-inspector-open hx-get="{{.ClientOpen}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false">{{.R.ClientID}}</a>{{else}}<a class="m" href="{{.WhoFilter}}">{{.R.ClientID}}</a>{{end}}{{else}}<span class="m mut">no client id</span>{{end}}
+    <span>Software</span><span class="m">{{if .R.Software}}{{.R.Software}}{{else}}<span class="mut">not reported</span>{{end}}</span>
+    <span>Principal</span><span class="m">{{.R.Principal}}</span>
+    <span>Remote</span><span class="m">{{.R.Remote}}</span>
+    {{if .Commit}}
+    {{if .GroupName}}<span>Group</span><a class="m" href="{{.GroupLink}}">{{.GroupName}}</a>{{end}}
+    <span>Commits</span><span class="m">{{.Commits}}</span>
+    {{else}}
+    <span>Size in / out</span><span class="m">{{.R.Sizes}}</span>
+    {{if .HasAcks}}<span>Acks</span><span class="m">{{.Acks}}</span>{{end}}
+    {{if .R.TxnID}}<span>Transactional id</span><span class="m">{{.R.TxnID}}</span>{{end}}
+    {{if and .GroupName (not .Parts)}}<span>Group</span><span class="m"><a href="{{.GroupLink}}">{{.GroupName}}</a>{{if .GroupVia}} <span class="mut">(the group of its connection)</span>{{end}}</span>{{end}}
+    {{if and .R.Topics (not .Parts)}}<span>Topics</span><span class="m">{{range $i, $t := .R.Topics}}{{if $i}}, {{end}}{{$t}}{{end}}{{if .R.TopicsMore}} and {{.R.TopicsMore}} more{{end}}</span>{{end}}
+    {{if and .R.DetailText (not .Parts)}}<span>Detail</span><span>{{.R.DetailText}}</span>{{end}}
+    {{if .R.Closed}}<span>Closed</span><span>The broker closed the connection: {{.R.Closed}}.</span>{{end}}
+    {{end}}
+  </div>
+  {{if not .Commit}}
+  {{if .Parts}}
+  <div class="col g4" id="result-per-partition">
+    <span class="cap">Result per partition</span>
+    <div class="card" style="--c: 1fr 56px 100px 70px">
+      <div class="r h"><span>Topic</span><span>Part</span><span class="ra">{{if eq .R.Kind "produce"}}Base offset{{else}}Offset{{end}}</span><span class="ra">Result</span></div>
+      {{range .Parts}}<div class="r"><span class="m el" title="{{.Topic}}">{{.Topic}}</span><span class="m">{{.Partition}}</span><span class="m ra">{{if .Offset}}{{.Offset}}{{else}}<span class="mut">—</span>{{end}}</span><span class="m {{.Tone}} ra">{{.Result}}</span></div>{{end}}
+    </div>
+    {{if .PartsMore}}<span class="note">{{.PartsMore}} more partitions are not listed.</span>{{end}}
+  </div>
+  {{end}}
+  {{if .DecodedRaw}}
+  <div class="col g4" id="decoded">
+    <span class="cap">Decoded fields</span>
+    <pre class="code" tabindex="0" role="region" aria-label="The request's decoded fields" data-copy-decoded>{{.Decoded}}</pre>
+  </div>
+  {{end}}
+  {{if eq .R.Kind "produce"}}<div class="note">Record bytes are shown on the topic page, not here.</div>{{end}}
+  {{end}}
+  <div class="note tf-kept">Still selected from before you paused.</div>
+  {{if not .Commit}}
+  <div class="grow"></div>
+  {{if .FollowURL}}<a class="btn w5" href="{{.FollowURL}}">Follow in Topics<span aria-hidden="true">→</span></a>{{end}}
+  {{end}}
+</div>
+{{end}}
+{{end}}
+
+{{/* A client (Traf-07), or one that reports no metrics (Traf-11). */}}
+{{define "inspector_client"}}
+<div class="bd" id="client-inspector"{{if .HasMetrics}} style="gap: 10px"{{end}}>
+  {{if .HasMetrics}}{{with .M}}
+  <div class="col g4">
+    <span class="b">Metrics reported by the client itself</span>
+    <span class="note">KIP-714 client telemetry. These are metrics, not traces: averages and counters, never one request. {{if .Every}}Reported every {{.Every}}, {{else}}{{.Reports}} report{{if ne .Reports 1}}s{{end}}, {{end}}{{.Metrics}} metric{{if ne .Metrics 1}}s{{end}}, last report <span class="m">{{when .Last "clock"}}</span>.{{if .Terminated}} It said it is closing.{{end}}</span>
+  </div>
+  {{if .Worth}}
+  <span class="cap">Worth a look first</span>
+  <div class="well tf-metrics" style="padding: 8px 12px; display: grid; grid-template-columns: 1fr 76px 72px; column-gap: 10px; row-gap: 8px; align-items: center">{{range .Worth}}{{template "metric_row" .}}{{end}}</div>
+  {{end}}
+  {{if .Rest}}
+  <span class="cap">{{if .Worth}}The rest{{else}}What it reports{{end}}</span>
+  <div class="tf-metrics" style="display: grid; grid-template-columns: 1fr 76px 72px; column-gap: 10px; row-gap: 9px; align-items: center">{{range .Rest}}{{template "metric_row" .}}{{end}}</div>
+  {{end}}
+  <div class="note">{{if .Span}}Sparklines cover {{.Span}}, one bar per report.{{else}}Sparklines draw one bar per report.{{end}}{{if .More}} {{.More}} more metric{{if ne .More 1}}s{{end}} {{if eq .More 1}}is{{else}}are{{end}} in the full list.{{end}}{{if .Dropped}} {{.Dropped}} series {{if eq .Dropped 1}}was{{else}}were{{end}} not kept.{{end}}{{if .Skipped}} {{.Skipped}} report{{if ne .Skipped 1}}s{{end}} came faster than the broker asked and {{if eq .Skipped 1}}was{{else}}were{{end}} not read.{{end}}</div>
+  {{end}}
+  {{else if .NoMetrics}}
+  <div class="callout" id="no-metrics"><span class="b">This client does not report metrics</span><span class="note">{{if .Asked}}It asked what to report and has sent nothing yet. {{else}}It has not asked to report. {{end}}Request latency, poll idle ratio and the rest are blank for {{.C.Who}}. Its requests are still listed on the Requests tab.</span></div>
+  <div class="col g6">
+    <span class="cap">Two reasons</span>
+    <div class="row g8"><span class="num">1</span><div class="col"><span class="b">The client is too old</span><span class="note">Client telemetry (KIP-714) needs the Java client 3.7 or later, or librdkafka 2.5 or later. Other clients may not implement it at all.</span></div></div>
+    <div class="row g8"><span class="num">2</span><div class="col"><span class="b">The client turned it off</span><span class="note">Reporting is on by default in a client that supports it, until its config says otherwise.</span></div></div>
+  </div>
+  <div class="col g6">
+    <span class="cap">Settings to flip</span>
+    <pre class="code"><span class="jt-p"># in the client's config</span>
+enable.metrics.push=<span class="jt-n">true</span>
+
+<span class="jt-p"># on the broker, already set here</span>
+--client-telemetry</pre>
+    <span class="note">After the client reconnects, its first report arrives within a few seconds.</span>
+  </div>
+  {{else if not .MetricsOn}}
+  <div class="callout"><span class="b">This broker does not collect client metrics</span><span class="note">Start it with <span class="m">--client-telemetry</span> to see what clients report about themselves.</span></div>
+  {{end}}
+  {{if .Members}}
+  <div class="col g4" id="client-connections">
+    <span class="cap">Its {{.C.Conns}} connections</span>
+    <div class="card" style="--c: 1fr 70px 70px 56px">
+      <div class="r h"><span>Address</span><span>Open for</span><span>Last</span><span class="ra">Requests</span></div>
+      {{range .Members}}<div class="r"><span class="m el" title="{{.Principal}}">{{.Remote}}</span><span class="m">{{.Age}}</span><span class="m">{{when .Last "clock"}}</span><span class="m ra">{{.Requests}}</span></div>{{end}}
+    </div>
+  </div>
+  {{end}}
+  <div class="grow"></div>
+  <div class="row g8 wrap tf-acts">
+    <a class="btn w5" href="{{.Reqs}}">Its requests<span aria-hidden="true">→</span></a>
+    {{range .GroupLinks}}<a class="btn w5 tf-name" href="{{.URL}}" title="{{.Name}}"><span class="el">{{.Name}}</span><span aria-hidden="true">→</span></a>{{end}}
+    {{if .OtherURL}}<a class="btn w5" data-inspector-open hx-get="{{.OtherURL}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false" href="{{.OtherHref}}">See a client that reports</a>{{end}}
+    {{if .HasMetrics}}{{if .M.More}}<button type="button" class="tf-hidden-act" hidden data-all-metrics hx-get="{{inspectHref "client" .InspKey}}&amp;all=1" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">All {{.M.Metrics}} metrics</button>{{end}}{{end}}
+  </div>
+</div>
+{{end}}

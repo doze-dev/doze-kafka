@@ -2,6 +2,7 @@ package broker_test
 
 import (
 	"context"
+	"github.com/doze-dev/doze-kafka/internal/broker"
 	"testing"
 	"time"
 
@@ -29,6 +30,7 @@ func twoClients(t *testing.T) (context.Context, *kgo.Client, *kgo.Client) {
 // must not evict it while it waits: the rebalance may legitimately take up to the
 // rebalance timeout, which is normally the longer of the two.
 func TestGroupClassic_ParkedMemberIsNotEvictedByItsOwnSession(t *testing.T) {
+	t.Cleanup(broker.SetMinSessionTimeoutForTest(0)) // B's 1.5 s session is below Kafka's 6 s minimum; the test is about the timer.
 	ctx, A, B := twoClients(t)
 	const g = "parked-not-evicted"
 	ida, _ := stableGroupOfOne(t, ctx, A, g, testSessionMs, testRebalanceMsDefault)

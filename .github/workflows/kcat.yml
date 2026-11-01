@@ -17,12 +17,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - name: Install kcat
-        run: sudo apt-get update && sudo apt-get install -y kcat
+      - name: Install kcat (librdkafka 2.15.1, built from pinned sources; Ubuntu's links 2.3, too old for kcat-telemetry)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config zlib1g-dev libzstd-dev liblz4-dev \
+            libssl-dev libsasl2-dev libcurl4-openssl-dev libyajl-dev
+          scripts/install-kcat.sh /usr/local
       - name: Build
         run: go build -o doze-kafka ./cmd/doze-kafka
       - name: kcat checks

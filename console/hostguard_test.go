@@ -40,6 +40,32 @@ func TestHostAllowed(t *testing.T) {
 	}
 }
 
+// Found by FuzzHostGuard's seeds: everything after the last colon was taken for a
+// port and dropped, whatever it was, so a header that names a foreign host after a
+// trusted name and a colon was allowed. No browser writes such a Host header (it
+// drops userinfo and sends a numeric port), so this was not a way round the
+// rebinding defence, but the guard should not call these loopback.
+func TestOnlyDigitsAreAPortToTheHostGuard(t *testing.T) {
+	for _, h := range []string{
+		"localhost:pw@evil.example", "localhost:9093@evil.example", "[::1]:80@evil.example",
+		"localhost:evil.example", "[::1]:evil.example", "127.0.0.1:80 evil.example",
+		"kafka.doze:x", "localhost:80a", "localhost: 80", "localhost:-1",
+	} {
+		if hostAllowed(h, nil) {
+			t.Errorf("hostAllowed(%q) = true, want false", h)
+		}
+	}
+	if hostAllowed("dev.example.com:9093@evil.example", []string{"dev.example.com"}) {
+		t.Error("an operator-allowed name followed by a colon and a foreign host was allowed")
+	}
+	// A numeric port, and the empty one some clients send, still pass.
+	for _, h := range []string{"localhost:9093", "localhost:", "[::1]:0", "127.0.0.1:65535", "kafka.doze:80"} {
+		if !hostAllowed(h, nil) {
+			t.Errorf("hostAllowed(%q) = false, want true", h)
+		}
+	}
+}
+
 // A rebound request arrives with a perfectly consistent Origin and Host, both
 // naming the attacker. The Origin check passes it; only the Host guard stops it.
 func TestRebindingRequestsAreRefused(t *testing.T) {
@@ -58,7 +84,7 @@ func TestRebindingRequestsAreRefused(t *testing.T) {
 			r.Header.Set("Origin", origin)
 		}
 		rec := httptest.NewRecorder()
-		c.ServeHTTP(rec, r)
+		serveInto(t, c, rec, r)
 		return rec
 	}
 

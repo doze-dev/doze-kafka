@@ -16,7 +16,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
-	"github.com/doze-dev/doze-kafka/server"
+	"github.com/doze-dev/doze-kafka/internal/embed"
 )
 
 func sp(s string) *string { return &s }
@@ -99,21 +99,30 @@ func TestCreateACLsRejectsEntriesThatAreNotConcrete(t *testing.T) {
 		name string
 		c    kmsg.CreateACLsRequestCreation
 		ok   bool
+		// anyValue: ANY or MATCH, which Kafka answers UNKNOWN_SERVER_ERROR with no
+		// message (conformance/recordings/acl-unknown-codes.json, create-*-any).
+		anyValue bool
 	}{
-		{"a good entry", createACL(kmsg.ACLResourceTypeTopic, "t", lit, "User:a", "*", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAllow), true},
-		{"prefixed", createACL(kmsg.ACLResourceTypeTopic, "t-", pre, "User:a", "*", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAllow), true},
-		{"any resource type", createACL(kmsg.ACLResourceTypeAny, "t", lit, "User:a", "*", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAllow), false},
-		{"match pattern", createACL(kmsg.ACLResourceTypeTopic, "t", kmsg.ACLResourcePatternTypeMatch, "User:a", "*", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAllow), false},
-		{"any operation", createACL(kmsg.ACLResourceTypeTopic, "t", lit, "User:a", "*", kmsg.ACLOperationAny, kmsg.ACLPermissionTypeAllow), false},
-		{"any permission", createACL(kmsg.ACLResourceTypeTopic, "t", lit, "User:a", "*", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAny), false},
-		{"a principal with no type", createACL(kmsg.ACLResourceTypeTopic, "t", lit, "alice", "*", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAllow), false},
-		{"no host", createACL(kmsg.ACLResourceTypeTopic, "t", lit, "User:a", "", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAllow), false},
-		{"no name", createACL(kmsg.ACLResourceTypeTopic, "", lit, "User:a", "*", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAllow), false},
-		{"a cluster by another name", createACL(kmsg.ACLResourceTypeCluster, "mine", lit, "User:a", "*", kmsg.ACLOperationAlter, kmsg.ACLPermissionTypeAllow), false},
+		{"a good entry", createACL(kmsg.ACLResourceTypeTopic, "t", lit, "User:a", "*", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAllow), true, false},
+		{"prefixed", createACL(kmsg.ACLResourceTypeTopic, "t-", pre, "User:a", "*", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAllow), true, false},
+		{"any resource type", createACL(kmsg.ACLResourceTypeAny, "t", lit, "User:a", "*", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAllow), false, true},
+		{"match pattern", createACL(kmsg.ACLResourceTypeTopic, "t", kmsg.ACLResourcePatternTypeMatch, "User:a", "*", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAllow), false, true},
+		{"any operation", createACL(kmsg.ACLResourceTypeTopic, "t", lit, "User:a", "*", kmsg.ACLOperationAny, kmsg.ACLPermissionTypeAllow), false, true},
+		{"any permission", createACL(kmsg.ACLResourceTypeTopic, "t", lit, "User:a", "*", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAny), false, true},
+		{"a principal with no type", createACL(kmsg.ACLResourceTypeTopic, "t", lit, "alice", "*", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAllow), false, false},
+		{"no host", createACL(kmsg.ACLResourceTypeTopic, "t", lit, "User:a", "", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAllow), false, false},
+		{"no name", createACL(kmsg.ACLResourceTypeTopic, "", lit, "User:a", "*", kmsg.ACLOperationRead, kmsg.ACLPermissionTypeAllow), false, false},
+		{"a cluster by another name", createACL(kmsg.ACLResourceTypeCluster, "mine", lit, "User:a", "*", kmsg.ACLOperationAlter, kmsg.ACLPermissionTypeAllow), false, false},
 	} {
 		res := createACLs(t, ctx, cl, tc.c)[0]
 		if tc.ok && res.ErrorCode != 0 {
 			t.Errorf("%s: refused: %d %v", tc.name, res.ErrorCode, res.ErrorMessage)
+		}
+		if tc.anyValue {
+			if res.ErrorCode != kerr.UnknownServerError.Code || res.ErrorMessage != nil {
+				t.Errorf("%s: code %d message %v, want UNKNOWN_SERVER_ERROR with none", tc.name, res.ErrorCode, res.ErrorMessage)
+			}
+			continue
 		}
 		if !tc.ok && (res.ErrorCode != kerr.InvalidRequest.Code || res.ErrorMessage == nil) {
 			t.Errorf("%s: code %d, want INVALID_REQUEST with a message", tc.name, res.ErrorCode)
@@ -192,11 +201,13 @@ func TestACLsRoundTripWithFilters(t *testing.T) {
 		t.Errorf("bob's entry = %v", e)
 	}
 
-	// A filter that names something unknown is a refusal, not "matches nothing".
+	// A describe filter with a code that is no operation matches nothing, as in
+	// Kafka (acl-unknown-codes.json, describe-operation-99); 0 closes the
+	// connection (TestACLRequestWithTheUnknownCodeClosesTheConnection).
 	bad := anyACL()
-	bad.op = 0
-	if _, code := describeACLs(t, ctx, cl, bad); code != kerr.InvalidRequest.Code {
-		t.Errorf("an unknown operation in a filter: code %d", code)
+	bad.op = 99
+	if got, code := describeACLs(t, ctx, cl, bad); code != 0 || len(got) != 0 {
+		t.Errorf("an operation that is no code in a filter: code %d, %v", code, got)
 	}
 
 	// Delete reports what it removed, and a second delete finds nothing.
@@ -210,7 +221,7 @@ func TestACLsRoundTripWithFilters(t *testing.T) {
 	if got := count(anyACL()); got != 4 {
 		t.Errorf("%d entries left, want 4", got)
 	}
-	if r := deleteACLs(t, ctx, cl, func() aclQuery { q := anyACL(); q.op = 0; return q }()); r.ErrorCode != kerr.InvalidRequest.Code {
+	if r := deleteACLs(t, ctx, cl, func() aclQuery { q := anyACL(); q.op = 99; return q }()); r.ErrorCode != kerr.InvalidRequest.Code {
 		t.Errorf("a delete filter with an unknown operation: %+v", r)
 	}
 	if got := count(anyACL()); got != 4 {
@@ -225,18 +236,20 @@ func TestACLsPersistAndAreEnforcedAfterARestart(t *testing.T) {
 	skipShort(t)
 	dir := t.TempDir()
 	cfg := config.Default()
-	cfg.ListenAddr = "127.0.0.1:" + strconv.Itoa(freePort(t))
+	cfg.ListenAddr = "127.0.0.1:0"
 	cfg.DataDir, cfg.MetaDB = filepath.Join(dir, "data"), filepath.Join(dir, "meta.db")
 
 	start := func(logs io.Writer) (stop func()) {
-		srv, err := server.NewFromConfig(cfg, slog.New(slog.NewTextHandler(logs, nil)))
+		srv, err := embed.NewFromConfig(cfg, slog.New(slog.NewTextHandler(logs, nil)))
 		if err != nil {
 			t.Fatal(err)
 		}
 		ctx, cancel := context.WithCancel(context.Background())
-		if _, err := srv.Bind(ctx); err != nil {
+		bound, err := srv.Bind(ctx)
+		if err != nil {
 			t.Fatal(err)
 		}
+		cfg.ListenAddr = bound.String() // the restart binds the same address.
 		done := make(chan struct{})
 		go func() { srv.Serve(ctx); close(done) }()
 		return func() { cancel(); <-done }
@@ -287,3 +300,39 @@ func (l *lockedLog) Write(p []byte) (int, error) {
 	return l.b.Write(p)
 }
 func (l *lockedLog) String() string { l.mu.Lock(); defer l.mu.Unlock(); return l.b.String() }
+
+// Kafka refuses an ACL request naming UNKNOWN (0) for a resource type, pattern
+// type, operation or permission while reading it, and closes the connection,
+// for describe, delete and create alike (acl-unknown-codes.json, *-0 steps).
+func TestACLRequestWithTheUnknownCodeClosesTheConnection(t *testing.T) {
+	addr := startBroker(t, 4)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	q := anyACL()
+	q.perm = 0
+	for name, req := range map[string]kmsg.Request{
+		"describe": func() kmsg.Request {
+			r := kmsg.NewPtrDescribeACLsRequest()
+			r.ResourceType, r.ResourcePatternType, r.Operation, r.PermissionType = q.rt, q.pt, q.op, q.perm
+			return r
+		}(),
+		"delete": func() kmsg.Request {
+			r := kmsg.NewPtrDeleteACLsRequest()
+			f := kmsg.NewDeleteACLsRequestFilter()
+			f.ResourceType, f.ResourcePatternType, f.Operation, f.PermissionType = q.rt, q.pt, q.op, q.perm
+			r.Filters = append(r.Filters, f)
+			return r
+		}(),
+		"create": func() kmsg.Request {
+			r := kmsg.NewPtrCreateACLsRequest()
+			r.Creations = append(r.Creations, createACL(kmsg.ACLResourceTypeTopic, "t", kmsg.ACLResourcePatternTypeLiteral, "User:a", "*", kmsg.ACLOperationRead, 0))
+			return r
+		}(),
+	} {
+		cl := newClient(t, addr)
+		if _, err := cl.Request(ctx, req); err == nil {
+			t.Errorf("%s with permission type 0 was answered", name)
+		}
+		cl.Close()
+	}
+}

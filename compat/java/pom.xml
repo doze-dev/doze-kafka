@@ -8,13 +8,13 @@
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <kafka.version>4.0.0</kafka.version>
-    <confluent.version>8.0.0</confluent.version>
+    <kafka.version>4.3.1</kafka.version>
+    <confluent.version>8.3.2</confluent.version>
   </properties>
   <dependencyManagement>
     <dependencies>
       <!-- the serializers pull Jackson modules at different versions; one set -->
-      <dependency><groupId>com.fasterxml.jackson</groupId><artifactId>jackson-bom</artifactId><version>2.18.2</version><type>pom</type><scope>import</scope></dependency>
+      <dependency><groupId>com.fasterxml.jackson</groupId><artifactId>jackson-bom</artifactId><version>2.22.3</version><type>pom</type><scope>import</scope></dependency>
     </dependencies>
   </dependencyManagement>
   <repositories>

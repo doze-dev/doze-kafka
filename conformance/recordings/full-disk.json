@@ -1,0 +1,130 @@
+{
+  "scenario": "full-disk",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "disk"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "disk",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "small-ok",
+      "api": "Produce",
+      "version": 9,
+      "request": {
+        "Acks": -1,
+        "TimeoutMillis": 10000,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "Partition": 0,
+                "Records": "AAAAAAAAAAAAAAA6/////wJxamGJAAAAAAAAAAAAAAAAA+gAAAAAAAAD6P//////////////////AAAAARAAAAACawJ2AA=="
+              }
+            ],
+            "Topic": "disk",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ],
+        "TransactionID": null
+      },
+      "response": {
+        "Brokers": null,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "BaseOffset": 0,
+                "CurrentLeader": {
+                  "LeaderEpoch": -1,
+                  "LeaderID": -1
+                },
+                "ErrorCode": 0,
+                "ErrorMessage": null,
+                "ErrorRecords": null,
+                "LogAppendTime": -1,
+                "LogStartOffset": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "disk",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "first-refused",
+      "api": "Produce",
+      "version": 9,
+      "request": {
+        "(a batch of 700 KiB, repeated until the volume was full)": -1
+      },
+      "response": {
+        "Brokers": null,
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "BaseOffset": -1,
+                "CurrentLeader": {
+                  "LeaderEpoch": -1,
+                  "LeaderID": -1
+                },
+                "ErrorCode": 56,
+                "ErrorMessage": null,
+                "ErrorRecords": null,
+                "LogAppendTime": -1,
+                "LogStartOffset": -1,
+                "Partition": 0
+              }
+            ],
+            "Topic": "disk",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "broker-after-the-refusal",
+      "api": "(broker)",
+      "version": 0,
+      "request": {
+        "(Metadata on a new connection, until it is not answered)": 0
+      },
+      "response": {
+        "(broker)": "stopped"
+      }
+    }
+  ]
+}

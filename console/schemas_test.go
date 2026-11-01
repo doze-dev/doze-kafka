@@ -2,6 +2,7 @@ package console
 
 import (
 	"context"
+	"encoding/json"
 	"html"
 	"net/http"
 	"net/http/httptest"
@@ -17,7 +18,7 @@ import (
 
 // newRegistryConsole is a console with a schema registry (the real one, in memory)
 // beside its broker.
-func newRegistryConsole(t testing.TB) (*Console, string, *httptest.Server) {
+func newRegistryConsole(t testing.TB, mod ...func(*Options)) (*Console, string, *httptest.Server) {
 	t.Helper()
 	reg, err := schemaregistry.Open(schemaregistry.NewMemoryStorage())
 	if err != nil {
@@ -25,7 +26,7 @@ func newRegistryConsole(t testing.TB) (*Console, string, *httptest.Server) {
 	}
 	ts := httptest.NewServer(schemaregistry.NewAPI(reg, schemaregistry.Options{}))
 	t.Cleanup(ts.Close)
-	c, addr := newTestConsoleAddr(t, func(o *Options) { o.RegistryURL = ts.URL })
+	c, addr := newTestConsoleAddr(t, append([]func(*Options){func(o *Options) { o.RegistryURL = ts.URL }}, mod...)...)
 	return c, addr, ts
 }
 
@@ -100,18 +101,18 @@ func TestSchemaSubjectLifecycle(t *testing.T) {
 		}
 	}
 	rec = req(t, c, "GET", "/_console/schemas/orders-value?version=1", nil)
-	if strings.Contains(rec.Body.String(), "email") && !strings.Contains(rec.Body.String(), "New version") {
+	if strings.Contains(rec.Body.String(), "email") {
 		t.Error("version 1 page shows version 2's field")
 	}
 
 	// Compatibility: the registry's default, then the subject's own, then back.
-	if body := req(t, c, "GET", "/_console/schemas/orders-value", nil).Body.String(); !strings.Contains(body, "BACKWARD · default") {
+	if body := req(t, c, "GET", "/_console/schemas/orders-value", nil).Body.String(); !strings.Contains(body, "level BACKWARD (global)") {
 		t.Error("the page does not say BACKWARD is the registry default")
 	}
 	if rec := req(t, c, "POST", "/_console/schemas/orders-value/config", url.Values{"level": {"FULL"}}); rec.Code != http.StatusSeeOther {
 		t.Fatalf("set level: %d %s", rec.Code, rec.Body)
 	}
-	if body := req(t, c, "GET", "/_console/schemas/orders-value", nil).Body.String(); !strings.Contains(body, "FULL") || strings.Contains(body, "FULL · default") {
+	if body := req(t, c, "GET", "/_console/schemas/orders-value", nil).Body.String(); !strings.Contains(body, "level FULL") || strings.Contains(body, "level FULL (global)") {
 		t.Error("the subject's own level is not shown")
 	}
 	if rec := req(t, c, "POST", "/_console/schemas/orders-value/config", url.Values{"level": {"default"}}); rec.Code != http.StatusSeeOther {
@@ -153,7 +154,9 @@ func TestSchemaCheckSaysWhyNot(t *testing.T) {
 	if !strings.Contains(bad, "Not compatible") || !strings.Contains(bad, "email") {
 		t.Errorf("an incompatible schema: %s", bad)
 	}
-	if got := check(`{"type":"record"`); !strings.Contains(got, "Not a valid schema") {
+	// A schema that does not parse is the registry's refusal (42201), said as one (A2:
+	// its kind, its source, its name), in the check's own place.
+	if got := check(`{"type":"record"`); !strings.Contains(got, `data-refusal-kind="refused" data-refusal-source="registry" data-refusal-name="42201"`) {
 		t.Errorf("a broken schema: %s", got)
 	}
 	// Registering the incompatible one is refused with the registry's reason.
@@ -170,7 +173,7 @@ func TestSubjectNamesRoundTripThroughLinks(t *testing.T) {
 		register(t, c, name, userV1)
 		link := schemaPath("/_console", name)
 		rec := req(t, c, "GET", link, nil)
-		if rec.Code != 200 || !strings.Contains(rec.Body.String(), "version 1") && !strings.Contains(rec.Body.String(), "Version 1") {
+		if rec.Code != 200 || !strings.Contains(rec.Body.String(), "1 version") {
 			t.Errorf("%q: GET %s = %d", name, link, rec.Code)
 		}
 	}
@@ -181,7 +184,7 @@ func TestSubjectNamesRoundTripThroughLinks(t *testing.T) {
 }
 
 // Records a Confluent serializer wrote are shown as the JSON they mean, in the table
-// and in the drawer, with the schema named; anything else is shown as it always was.
+// and in the inspector, with the schema named; anything else is shown as it always was.
 func TestRegistryEncodedRecordsAreDecoded(t *testing.T) {
 	c, addr, ts := newRegistryConsole(t)
 	register(t, c, "events-value", userV1)
@@ -216,15 +219,15 @@ func TestRegistryEncodedRecordsAreDecoded(t *testing.T) {
 		t.Error("the topic page does not link its value schema")
 	}
 
-	drawer := req(t, c, "GET", "/_console/topics/events/message?partition=0&offset=0", nil).Body.String()
-	drawer = readable(drawer) + drawer
+	inspector := req(t, c, "GET", "/_console/topics/events/message?partition=0&offset=0", nil).Body.String()
+	inspector = readable(inspector) + inspector
 	for _, want := range []string{`"id": 4242`, "Avro · schema 1", "events-value v1", "data-schema=\"events-value\"", `data-value-enc="text"`} {
-		if !strings.Contains(drawer, want) {
-			t.Errorf("drawer for the decoded record is missing %q:\n%s", want, drawer)
+		if !strings.Contains(inspector, want) {
+			t.Errorf("inspector for the decoded record is missing %q:\n%s", want, inspector)
 		}
 	}
 	// Send again still carries the stored bytes: the edit button's JSON is for editing only.
-	if !strings.Contains(drawer, "Send again") {
+	if !strings.Contains(inspector, "Send again") {
 		t.Error("no Send again for a decoded record")
 	}
 
@@ -243,7 +246,7 @@ func TestRegistryEncodedRecordsAreDecoded(t *testing.T) {
 		t.Errorf("topic page with the registry down = %d", rec.Code)
 	}
 	if rec := req(t, c, "GET", "/_console/topics/events/message?partition=0&offset=0", nil); rec.Code != 200 {
-		t.Errorf("drawer with the registry down = %d", rec.Code)
+		t.Errorf("inspector with the registry down = %d", rec.Code)
 	}
 }
 
@@ -301,6 +304,35 @@ func TestPaletteListsSubjects(t *testing.T) {
 	}
 	if counts := req(t, c, "GET", "/_console/api/counts", nil).Body.String(); !strings.Contains(counts, `"schemas":1`) {
 		t.Errorf("counts = %s, want schemas:1", counts)
+	}
+}
+
+// Sy-05's subject result: its language, its versions and its compatibility level
+// ("Avro · v1-3 · BACKWARD"), read from the registry, the level the subject's own
+// where it has one.
+func TestPaletteSaysASubjectsVersionsAndLevel(t *testing.T) {
+	c, _, _ := newRegistryConsole(t)
+	register(t, c, "orders-value", userV1)
+	register(t, c, "orders-value", userV2)
+	register(t, c, "audit-value", userV1)
+	if err := c.reg.SetCompat(context.Background(), "audit-value", "FULL"); err != nil {
+		t.Fatal(err)
+	}
+	var entries []paletteEntry
+	if err := json.Unmarshal(req(t, c, "GET", "/_console/api/palette", nil).Body.Bytes(), &entries); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"orders-value": "Avro · v1-2 · BACKWARD", "audit-value": "Avro · v1 · FULL"}
+	for _, e := range entries {
+		if w, ok := want[e.N]; ok && e.K == "schema" {
+			if e.D != w {
+				t.Errorf("%s says %q, want %q", e.N, e.D, w)
+			}
+			delete(want, e.N)
+		}
+	}
+	if len(want) != 0 {
+		t.Errorf("not in the palette: %v", want)
 	}
 }
 

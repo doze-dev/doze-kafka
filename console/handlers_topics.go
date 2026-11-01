@@ -2,10 +2,12 @@ package console
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"math"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -16,19 +18,142 @@ import (
 // on every 2.5s tick.
 type topicRef struct{ Name string }
 
-// topics is the home surface: every topic, no selection.
+// topics is the Topics home (Tp-Home): every topic, the table of them and what needs a
+// look. Nothing is selected.
 func (c *Console) topics(w http.ResponseWriter, r *http.Request) {
-	list, err := c.be.ListTopics(r.Context())
+	data, err := c.topicsHomeData(r)
 	if err != nil {
 		c.fail(w, r, err)
 		return
 	}
-	c.render(w, r, "topics_home", map[string]any{"List": list, "Page": "topics"})
+	data["LiveHash"], _ = c.liveHash("topics_live", data)
+	c.render(w, r, "topics_home", data)
+}
+
+// topicsLive is Tp-Home's table and what is counted over it, polled: the rail's count
+// moves when a topic gains records, and the table beside it moves with it.
+func (c *Console) topicsLive(w http.ResponseWriter, r *http.Request) {
+	data, err := c.topicsHomeData(r)
+	if err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	c.livePartial(w, r, "topics_live", data)
+}
+
+func (c *Console) topicsHomeData(r *http.Request) (map[string]any, error) {
+	ctx := r.Context()
+	list, err := c.be.ListTopics(ctx)
+	if err != nil {
+		return nil, err
+	}
+	groups := c.groupRows(ctx, c.listGroupsQuiet(ctx))
+	rows := c.topicRows(ctx, list, groups, true)
+
+	var partitions int
+	var messages int64
+	var compacted, dead int
+	readers := map[string]bool{}
+	var deadNames []string
+	var deadUnread []string
+	var size int64
+	hasSize := len(rows) > 0
+	for _, t := range rows {
+		partitions += int(t.Partitions)
+		messages += t.Msgs
+		size += t.Size
+		hasSize = hasSize && t.HasSize
+		if t.Compact {
+			compacted++
+		}
+		if t.DeadLetter {
+			dead++
+			deadNames = append(deadNames, t.Name)
+			if t.ReadByCount == 0 {
+				deadUnread = append(deadUnread, t.Name)
+			}
+		}
+		for _, g := range t.ReadBy {
+			readers[g] = true
+		}
+	}
+	data := map[string]any{
+		"List": list, "Rows": rows, "Page": "topics", "Title": "Topics", "Groups": groups,
+		"Partitions": partitions, "Messages": messages, "ReaderCount": len(readers),
+		"Size": diskSize(size), "HasSize": hasSize, "CompactedWord": countWord(compacted),
+		"Compacted": compacted, "DeadLetters": dead, "DeadNames": deadNames, "DeadUnread": deadUnread,
+		"AutoCreate": c.facts.AutoCreateTopics, "AutoParts": c.facts.DefaultPartitions, "KnowsAuto": c.facts.KafkaMajor > 0,
+	}
+	if c.traffic != nil {
+		writers := map[string]bool{}
+		for _, e := range c.traffic.Events(TrafficFilter{API: "Produce"}, 0) {
+			if e.API == "Produce" && len(e.Topics) > 0 {
+				who := e.ClientID
+				if who == "" {
+					who = e.Remote
+				}
+				writers[who] = true
+			}
+		}
+		data["Writers"], data["HasWriters"] = len(writers), true
+		data["RingText"], data["WrittenFrom"] = c.ringText(time.Now())
+	}
+	if len(rows) == 0 {
+		f := c.connectFacts(r)
+		data["Facts"], data["Command"] = f, createCommand(f, "", "", nil)
+	} else {
+		data["Facts"] = connectFacts{DataDir: c.facts.DataDir}
+	}
+	return data, nil
+}
+
+// listGroupsQuiet is ListGroups for a page that can do without it: a broker that does
+// not answer is no groups, and the page's own request has already said so.
+func (c *Console) listGroupsQuiet(ctx context.Context) []GroupSummary {
+	gs, err := c.be.ListGroups(ctx)
+	if err != nil {
+		return nil
+	}
+	return gs
 }
 
 func (c *Console) topicCreatePage(w http.ResponseWriter, r *http.Request) {
 	list, _ := c.be.ListTopics(r.Context())
-	c.render(w, r, "topic_create", map[string]any{"List": list, "Page": "topics", "Title": "Create topic", "Config": newConfigView(nil)})
+	taken := make([]string, 0, len(list))
+	for _, t := range list {
+		taken = append(taken, t.Name)
+	}
+	b, _ := json.Marshal(taken)
+	prefill := strings.TrimSpace(r.URL.Query().Get("name"))
+	pj, _ := json.Marshal(prefill)
+	c.render(w, r, "topic_create", map[string]any{
+		"List": list, "Page": "topics", "Title": "Create topic", "Config": newConfigView(nil),
+		"Taken": taken, "TakenJSON": string(b), "Prefill": prefill, "PrefillJSON": string(pj), "HasRegistry": c.reg != nil, "MaxParts": c.facts.MaxPartitions,
+		"Command": createCommand(c.connectFacts(r), "", "", nil),
+	})
+}
+
+// topicShell is the shell command under the create form, rebuilt from what has been
+// typed so far. A value that does not parse yet leaves its --config out and says why.
+func (c *Console) topicShell(w http.ResponseWriter, r *http.Request) {
+	set := map[string]string{}
+	note := ""
+	for _, ts := range topicSettings {
+		raw := strings.TrimSpace(r.FormValue(ts.Key))
+		if raw == "" {
+			continue
+		}
+		v, err := ts.parse(raw)
+		if err != nil {
+			note = ts.Label + ": " + err.Error()
+			continue
+		}
+		set[ts.Key] = v
+	}
+	c.partial(w, "shell_preview", map[string]any{
+		"Command": createCommand(c.connectFacts(r), strings.TrimSpace(r.FormValue("name")), strings.TrimSpace(r.FormValue("partitions")), set),
+		"Note":    note,
+	})
 }
 
 func (c *Console) topicCreate(w http.ResponseWriter, r *http.Request) {
@@ -75,6 +200,10 @@ func (c *Console) topicPurge(w http.ResponseWriter, r *http.Request) {
 	c.redirect(w, r, c.topicURL(name), "Topic purged — all messages deleted")
 }
 
+// topicTabs are the tabs of a topic's page, in the order Sy-01 draws them. Schema is
+// there only for a topic the registry has a subject for.
+var topicTabs = []string{"messages", "partitions", "readers", "config", "schema"}
+
 func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	ctx := r.Context()
@@ -86,14 +215,56 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	partition := partitionParam(r, detail.Partitions)
+	schemas := c.topicSchemas(r, name)
+
+	tab := r.URL.Query().Get("tab")
+	valid := false
+	for _, t := range topicTabs {
+		valid = valid || t == tab
+	}
+	if !valid || (tab == "schema" && len(schemas) == 0) {
+		tab = "messages"
+	}
 
 	data := map[string]any{
-		"Schemas": c.topicSchemas(r, name),
-		"List":    list, "Topic": detail, "Page": "topics",
+		"Schemas": schemas,
+		"List":    list, "Topic": detail, "Page": "topics", "View": "topic", "Tab": tab,
 		"Partition": partition, "Title": name,
 		"Consumers": c.topicConsumers(ctx, name),
 		"Config":    newConfigView(detail.Config),
 	}
+	data["Confirm"] = c.topicConfirms(ctx, name, int(detail.Partitions))
+	maps.Copy(data, c.dockData(DockFilter{Topic: name}))
+	data["Neighbours"] = c.neighbourClauses(c.topicGraph(ctx, name, data["Consumers"].([]consumerRow)), NodeTopic, name)
+	if c.traffic != nil {
+		short, _ := c.ringText(time.Now())
+		data["NeighboursNote"] = "Written by is " + short + ". Read by is the groups that have committed offsets here; a consumer that assigns partitions itself has no group and is not counted."
+	}
+	data["Tabs"] = c.topicTabLinks(name, partition, tab, len(schemas) > 0, int(detail.Partitions), len(data["Consumers"].([]consumerRow)))
+	data["ListCount"] = len(list)
+
+	if tab != "messages" {
+		bounds, err := c.be.PartitionBounds(ctx, name, detail.Partitions)
+		if err != nil {
+			c.fail(w, r, err)
+			return
+		}
+		data["Bounds"] = bounds
+		data["Facts"] = c.topicSummary(ctx, detail, bounds)
+		data["PartitionRange"] = partitionRange(detail.Partitions)
+		switch tab {
+		case "partitions":
+			data["PartitionRows"] = c.partitionRows(ctx, name, bounds)
+		case "readers":
+			data["Readers"] = c.topicReaders(ctx, name, bounds)
+			data["Writers"] = c.topicWriters(name)
+			data["HasTraffic"] = c.traffic != nil
+		}
+		c.composerSchemas(r, name, data)
+		c.render(w, r, "topic_detail", data)
+		return
+	}
+
 	if q, all, before, asked := searchParams(r); asked {
 		// A search replaces the tape and the live table with what it found.
 		found, err := c.searchTopic(ctx, name, partition, detail.Partitions, q, all, before)
@@ -102,6 +273,9 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		data["Search"], data["PartitionRange"], data["Rows"] = found, partitionRange(detail.Partitions), found.Rows
+		if bounds, err := c.be.PartitionBounds(ctx, name, detail.Partitions); err == nil {
+			data["Facts"] = c.topicSummary(ctx, detail, bounds)
+		}
 		c.composerSchemas(r, name, data)
 		c.render(w, r, "topic_detail", data)
 		return
@@ -121,11 +295,219 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	maps.Copy(data, tape)
+	if bounds, ok := tape["Bounds"].([]PartitionBound); ok {
+		data["Facts"] = c.topicSummary(ctx, detail, bounds)
+	}
 	c.composerSchemas(r, name, data)
 	if atNote != "" && tape["JumpNote"] == "" {
 		data["JumpNote"] = atNote
 	}
 	c.render(w, r, "topic_detail", data)
+}
+
+// topicFactsView is the one sentence under a topic's name (Sy-01 part 4): partitions,
+// messages, how long they are kept, the schema, and when the newest was written.
+type topicFactsView struct {
+	Partitions int32
+	Messages   int64
+	Retention  string
+	Compact    bool
+	SchemaType string // "Avro", "JSON Schema" or "Protobuf" for the value subject, or "".
+	SchemaVer  int
+	Newest     time.Time
+	HasNewest  bool
+	Subject    string
+	SubjectURL string
+}
+
+func (c *Console) topicSummary(ctx context.Context, d *TopicDetail, bounds []PartitionBound) topicFactsView {
+	f := c.boundsFacts(ctx, d.Name, bounds)
+	f.Partitions = d.Partitions
+	policy, retention := "", ""
+	for _, e := range d.Config {
+		switch e.Name {
+		case "cleanup.policy":
+			policy = e.Value
+		case "retention.ms":
+			retention = e.Value
+		}
+	}
+	f.Compact = strings.Contains(policy, "compact")
+	switch {
+	case f.Compact && !strings.Contains(policy, "delete"):
+		f.Retention = "per key"
+	default:
+		f.Retention = retentionText(retention)
+	}
+	return f
+}
+
+// boundsFacts is the part of the facts sentence that moves as records arrive: how
+// many there are, when the newest was written, and what it is. The tape's poll sends
+// it with the tape (topic_facts_live), so the sentence and the tape never disagree.
+func (c *Console) boundsFacts(ctx context.Context, topic string, bounds []PartitionBound) topicFactsView {
+	var f topicFactsView
+	newestIn := -1
+	for i, b := range bounds {
+		f.Messages += b.Count()
+		if b.Count() > 0 && b.Newest.After(f.Newest) {
+			f.Newest, f.HasNewest, newestIn = b.Newest, true, i
+		}
+	}
+	// The schema is the newest record's, read from its bytes: a value a registry-aware
+	// serializer wrote carries the schema's id. A subject named like the topic says
+	// nothing about what was written (a producer need not use it), so it is not asked.
+	if newestIn >= 0 && c.reg != nil {
+		b := bounds[newestIn]
+		if msgs, err := c.be.FetchWindow(ctx, topic, b.Partition, b.Latest-1, 1); err == nil && len(msgs) > 0 {
+			if v := c.msgView(ctx, topic, msgs[len(msgs)-1]); v.Value.Schema != nil {
+				s := v.Value.Schema
+				f.SchemaType, f.SchemaVer, f.Subject, f.SubjectURL = s.TypeLabel, s.Version, s.Subject, s.URL
+			}
+		}
+	}
+	return f
+}
+
+// withLiveFacts adds the moving part of the facts sentence to a tape answer.
+func (c *Console) withLiveFacts(ctx context.Context, topic string, data map[string]any) {
+	if bounds, ok := data["Bounds"].([]PartitionBound); ok {
+		data["FactsLive"] = c.boundsFacts(ctx, topic, bounds)
+	}
+}
+
+// tabLink is one tab of a topic's page.
+type tabLink struct {
+	Key, Label, URL string
+	On              bool
+	Count           string
+}
+
+func (c *Console) topicTabLinks(name string, partition int32, tab string, hasSchema bool, partitions, readers int) []tabLink {
+	mk := func(key, label, count string) tabLink {
+		u := c.topicURL(name)
+		q := url.Values{}
+		if key != "messages" {
+			q.Set("tab", key)
+		} else if partition != 0 {
+			q.Set("partition", strconv.Itoa(int(partition)))
+		}
+		if len(q) > 0 {
+			u += "?" + q.Encode()
+		}
+		return tabLink{Key: key, Label: label, URL: u, On: tab == key, Count: count}
+	}
+	out := []tabLink{
+		mk("messages", "Messages", ""),
+		mk("partitions", "Partitions", strconv.Itoa(partitions)),
+		mk("readers", "Readers", strconv.Itoa(readers)),
+		mk("config", "Config", ""),
+	}
+	if hasSchema {
+		out = append(out, mk("schema", "Schema", ""))
+	}
+	return out
+}
+
+// partitionRow is one partition on the Partitions tab: what the broker reports about
+// where its log starts and ends and how far a read-committed consumer may read.
+type partitionRow struct {
+	Partition int32
+	Start     int64
+	End       int64
+	Count     int64
+	Stable    int64 // the last stable offset.
+	Held      bool  // an open transaction holds it behind the end.
+	Newest    time.Time
+	HasNewest bool
+}
+
+func (c *Console) partitionRows(ctx context.Context, topic string, bounds []PartitionBound) []partitionRow {
+	rows := make([]partitionRow, len(bounds))
+	for i, b := range bounds {
+		r := partitionRow{Partition: b.Partition, Start: b.Earliest, End: b.Latest, Count: b.Count(), Stable: b.Latest, Newest: b.Newest, HasNewest: !b.Newest.IsZero()}
+		if st, err := c.be.StableOffset(ctx, topic, b.Partition); err == nil && st >= 0 && st < b.Latest {
+			r.Stable, r.Held = st, true
+		}
+		rows[i] = r
+	}
+	return rows
+}
+
+// readerRow is a group reading a topic, with its lag on each partition.
+type readerRow struct {
+	Group, URL, State, Protocol string
+	Members                     int
+	PartLag                     []int64 // by partition; -1 where the group has no offset.
+	Total                       int64
+}
+
+func (c *Console) topicReaders(ctx context.Context, topic string, bounds []PartitionBound) []readerRow {
+	groups, err := c.be.ListGroups(ctx)
+	if err != nil {
+		return nil
+	}
+	var out []readerRow
+	for _, g := range groups {
+		offs, err := c.be.GroupOffsets(ctx, g.ID)
+		if err != nil {
+			continue
+		}
+		row := readerRow{Group: g.ID, URL: c.groupURL(g.ID), State: g.State, Protocol: protoLabelOf(g.Protocol), Members: g.Members}
+		row.PartLag = make([]int64, len(bounds))
+		for i := range row.PartLag {
+			row.PartLag[i] = -1
+		}
+		on := false
+		for _, o := range offs {
+			if o.Topic != topic || o.Partition < 0 || int(o.Partition) >= len(bounds) {
+				continue
+			}
+			on = true
+			lag := max(bounds[o.Partition].Latest-o.Committed, 0)
+			row.PartLag[o.Partition] = lag
+			row.Total += lag
+		}
+		if on {
+			out = append(out, row)
+		}
+	}
+	return out
+}
+
+// writerRow is a client the recorder saw produce to a topic.
+type writerRow struct {
+	Client, Principal, Detail string
+	Last                      time.Time
+	Error                     string
+	Count                     int
+}
+
+// topicWriters are the clients whose Produce requests to this topic are among the
+// recorder's last rows. A client that has not produced since then is not listed.
+func (c *Console) topicWriters(topic string) []writerRow {
+	if c.traffic == nil {
+		return nil
+	}
+	idx := map[string]int{}
+	var out []writerRow
+	for _, e := range c.traffic.Events(TrafficFilter{Topic: topic, API: "Produce"}, 0) {
+		if e.API != "Produce" {
+			continue
+		}
+		who := e.ClientID
+		if who == "" {
+			who = e.Remote
+		}
+		i, ok := idx[who]
+		if !ok {
+			idx[who] = len(out)
+			out = append(out, writerRow{Client: who, Principal: e.Principal, Detail: e.Detail, Last: e.Time, Error: e.Error})
+			i = len(out) - 1
+		}
+		out[i].Count += max(e.Count, 1)
+	}
+	return out
 }
 
 // topicTape is the live-polled partial backing the tape + message table.
@@ -157,6 +539,7 @@ func (c *Console) topicTape(w http.ResponseWriter, r *http.Request) {
 	}
 	data := map[string]any{"Topic": topicRef{Name: name}, "Partition": partition}
 	maps.Copy(data, tape)
+	c.withLiveFacts(ctx, name, data)
 	c.partial(w, "tape_and_table", data)
 }
 
@@ -225,6 +608,7 @@ func (c *Console) topicProduce(w http.ResponseWriter, r *http.Request) {
 	}
 	data := map[string]any{"Topic": topicRef{Name: name}, "Partition": viewing}
 	maps.Copy(data, tape)
+	c.withLiveFacts(ctx, name, data)
 	c.partial(w, "tape_and_table", data)
 }
 
@@ -247,7 +631,7 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m := msgs[0]
-	// Neighbouring records, for the drawer's older/newer buttons.
+	// Neighbouring records, for the inspector's older/newer buttons.
 	older, newer := int64(-1), int64(-1)
 	if earliest, latest, err := c.be.PartitionOffsets(r.Context(), name, partition); err == nil {
 		if offset-1 >= earliest {
@@ -262,7 +646,7 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 	keyV := c.readThroughRegistry(r.Context(), name, newBytesView(m.Key, m.Key == nil), m.Key)
 	data := map[string]any{
 		"Topic": name, "Partition": partition, "Msg": m, "Older": older, "Newer": newer,
-		"TimeStr": m.Timestamp.Format(time.RFC3339), "Key": keyV, "Value": valueV, "Headers": hdrs,
+		"Key": keyV, "Value": valueV, "Headers": hdrs,
 		// "Send again" is done by the server from the stored record, so it is exact
 		// for any bytes. These are for "Edit a copy": the composer is prefilled with
 		// the record as text (or base64 when it is not text), as stored rather than
@@ -281,7 +665,24 @@ func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {
 	if valueV.Schema != nil {
 		data["EditValue"], data["EditValueEnc"], data["EditSchema"] = valueV.Text, "text", valueV.Schema.Subject
 	}
-	c.partial(w, "message_drawer", data)
+	// A record found by a search across partitions has no single partition to put
+	// in the address; the page says which by whether it carries a message base.
+	nav := func(label, glyph, word string, off int64) inspectorNav {
+		n := inspectorNav{Label: label, Glyph: glyph, Disabled: off < 0}
+		if off >= 0 {
+			n.Title = fmt.Sprintf("%s (offset %d)", word, off)
+			n.URL = fmt.Sprintf("%s/message?partition=%d&offset=%d", c.topicURL(name), partition, off)
+		} else {
+			n.Title = word + " (offset )"
+		}
+		return n
+	}
+	c.inspect(w, inspectorView{
+		Kind: KindMessage, Key: strconv.FormatInt(m.Offset, 10),
+		Title: fmt.Sprintf("P%d · offset %d", partition, m.Offset), Sub: name,
+		Nav:  []inspectorNav{nav("Older record", "chevron-up", "Older", older), nav("Newer record", "chevron-down", "Newer", newer)},
+		Body: data,
+	})
 }
 
 // topicResend produces an exact copy of a stored record: the same key, value and
@@ -325,6 +726,7 @@ func (c *Console) topicResend(w http.ResponseWriter, r *http.Request) {
 	}
 	data := map[string]any{"Topic": topicRef{Name: name}, "Partition": partition}
 	maps.Copy(data, tape)
+	c.withLiveFacts(ctx, name, data)
 	c.partial(w, "tape_and_table", data)
 }
 
@@ -352,7 +754,7 @@ func editField(v bytesView) string {
 	case v.Null || v.Empty:
 		return ""
 	case v.Binary, v.Schema != nil:
-		return v.B64 // a decoded value is edited as JSON; that is arranged where the drawer is built.
+		return v.B64 // a decoded value is edited as JSON; that is arranged where the inspector is built.
 	default:
 		return v.Raw
 	}
@@ -436,8 +838,6 @@ type msgView struct {
 	Offset     int64
 	Partition  int32
 	Timestamp  time.Time
-	TimeStr    string
-	TimeFull   string // full RFC 3339 timestamp, for the hover title.
 	Key        bytesView
 	Value      bytesView
 	Headers    []MessageHeader
@@ -553,11 +953,6 @@ func (c *Console) tapeData(ctx context.Context, topic, topicID string, partition
 	for i, v := range rows {
 		desc[len(rows)-1-i] = v
 	}
-	committedQ := ""
-	if committedOnly {
-		committedQ = "&committed=1"
-	}
-
 	return map[string]any{
 		"PartitionRange": partitionRange(partitionCount),
 		"Bounds":         bounds,
@@ -579,7 +974,6 @@ func (c *Console) tapeData(ctx context.Context, topic, topicID string, partition
 		"HL":             hl,
 		"HasTxn":         hasTxn,
 		"CommittedOnly":  committedOnly,
-		"CommittedQ":     committedQ,
 	}, nil
 }
 
@@ -588,8 +982,7 @@ func committedParam(r *http.Request) bool { return r.URL.Query().Get("committed"
 
 // txnStatus works out which records in [from, to) belong to a transaction that has not
 // committed, and which offsets are markers. hasTxn says the partition has transactions
-// worth a toggle. It costs one request for the last stable offset, and a second read only
-// when the window has a marker or reaches the open part of the log.
+// worth a toggle. It costs a request for the last stable offset and a read of the committed view.
 func (c *Console) txnStatus(ctx context.Context, topic string, partition int32, from, to, latest int64, msgs []Message) (status map[int64]string, markers map[int64]bool, hasTxn bool) {
 	status, markers = map[int64]string{}, map[int64]bool{}
 	if len(msgs) == 0 {
@@ -609,18 +1002,25 @@ func (c *Console) txnStatus(ctx context.Context, topic string, partition int32, 
 		lso = latest // an older broker, or one that cannot say: nothing is open.
 	}
 	hasTxn = len(markers) > 0 || lso < latest
+	// The committed view is read every time: an aborted record whose marker lies past the
+	// window shows no sign of it in the window itself.
+	committed := map[int64]bool{}
+	if cm, err := c.be.FetchWindowCommitted(ctx, topic, partition, from, int(to-from)); err == nil {
+		for _, m := range cm {
+			committed[m.Offset] = true
+		}
+	} else {
+		committed = nil // cannot tell aborted from committed; mark only what is open.
+	}
+	if committed != nil {
+		for _, m := range msgs {
+			if m.Offset < lso && !committed[m.Offset] {
+				hasTxn = true
+			}
+		}
+	}
 	if !hasTxn {
 		return
-	}
-	committed := map[int64]bool{}
-	if len(markers) > 0 || lso < to {
-		if cm, err := c.be.FetchWindowCommitted(ctx, topic, partition, from, int(to-from)); err == nil {
-			for _, m := range cm {
-				committed[m.Offset] = true
-			}
-		} else {
-			committed = nil // cannot tell aborted from committed; mark only what is open.
-		}
 	}
 	for _, m := range msgs {
 		switch {
@@ -653,7 +1053,7 @@ func tickHeight(size int) int {
 }
 
 // topicMessageRaw serves a record's key or value as the exact bytes, for a value
-// too large to read in the drawer or one that is binary.
+// too large to read in the inspector or one that is binary.
 func (c *Console) topicMessageRaw(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	partition, offset, err := recordCoordinates(r.URL.Query().Get("partition"), r.URL.Query().Get("offset"))

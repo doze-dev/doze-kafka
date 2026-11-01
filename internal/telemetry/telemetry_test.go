@@ -84,7 +84,10 @@ func TestIntegerPointsAndAttributes(t *testing.T) {
 	kv = protowire.AppendBytes(kv, intVal)
 	dp = protowire.AppendTag(dp, 7, protowire.BytesType)
 	dp = protowire.AppendBytes(dp, kv)
-	pt := decodeNumberPoint(dp)
+	pt, err := decodeNumberPoint(dp)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if pt.Value != -42 || pt.Attrs != "partition=5" || !pt.Time.Equal(t0) {
 		t.Errorf("point = %+v", pt)
 	}
@@ -118,6 +121,10 @@ func FuzzDecode(f *testing.F) {
 	f.Add(Encode(samplePayload()))
 	f.Add([]byte{})
 	f.Add([]byte{0x0a, 0x00})
+	full := Encode(samplePayload())
+	for n := 1; n < len(full); n += 3 {
+		f.Add(full[:n]) // the truncation corpus: every cut is a boundary the decoder has to refuse or read.
+	}
 	f.Fuzz(func(t *testing.T, b []byte) {
 		_, _ = Decode(b) // must not panic or hang, whatever the bytes.
 	})

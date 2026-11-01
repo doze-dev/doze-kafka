@@ -2,8 +2,11 @@ package schemaregistry
 
 import (
 	"encoding/hex"
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 func hexBytes(t *testing.T, s string) []byte {
@@ -152,25 +155,90 @@ func TestDecodeRefusesWhatIsNotWireFormat(t *testing.T) {
 
 func FuzzDecode(f *testing.F) {
 	f.Add(hexString("000000000102"), []byte{0, 0, 0, 0, 1, 2})
+	// A block that claims 2^63-1 elements, one that claims -2^63, nulls by the million.
+	f.Add("", []byte{0, 0, 0, 0, 1, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01})
+	f.Add("", []byte{0, 0, 0, 0, 1, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01, 0, 0})
+	f.Add("", []byte{0, 0, 0, 0, 1, 0x80, 0x80, 0x80, 0x01, 0x80, 0x80, 0x80, 0x01, 0, 0})
 	f.Fuzz(func(t *testing.T, _ string, value []byte) {
-		for _, c := range fuzzCodecs {
+		for _, c := range fuzzCodecs(t) {
+			// Whatever the bytes, a value is decoded or refused in the time and
+			// memory its size is worth: a hang or a blow-up here is the finding.
+			start := time.Now()
 			c.Decode(value)
+			if took := time.Since(start); took > 5*time.Second {
+				t.Fatalf("decoding %d bytes took %s", len(value), took)
+			}
 		}
 	})
 }
 
 func hexString(s string) string { return s }
 
-var fuzzCodecs = func() []*Codec {
-	var out []*Codec
-	for _, x := range []struct{ typ, s string }{
-		{TypeAvro, `{"type":"record","name":"R","fields":[{"name":"a","type":["null","string"]},{"name":"b","type":{"type":"array","items":"long"}}]}`},
+// fuzzAvroSchemas are the shapes the Avro decoder has to be kept from trusting: arrays
+// and maps (of things that weigh nothing, too), inside one another, a fixed, a schema
+// that refers to itself.
+var fuzzAvroSchemas = []string{
+	`{"type":"record","name":"R","fields":[{"name":"a","type":["null","string"]},{"name":"b","type":{"type":"array","items":"long"}}]}`,
+	`{"type":"record","name":"M","fields":[{"name":"m","type":{"type":"map","values":{"type":"array","items":"null"}}},{"name":"y","type":"bytes"}]}`,
+	`{"type":"array","items":{"type":"array","items":{"type":"record","name":"E","fields":[]}}}`,
+	`{"type":"record","name":"Tree","fields":[{"name":"v","type":{"type":"fixed","name":"F","size":3}},{"name":"kids","type":{"type":"array","items":"Tree"}},{"name":"next","type":["null","Tree"]}]}`,
+	`{"type":"map","values":{"type":"map","values":["null","double",{"type":"enum","name":"K","symbols":["A","B"]}]}}`,
+}
+
+// fuzzCodecs is built by the first test that asks, not when the package loads: built
+// at load a codec that cannot be built panicked before any test had started, and the
+// mutation run could only call that a failed setup.
+func fuzzCodecs(t testing.TB) []*Codec {
+	t.Helper()
+	cs, err := fuzzCodecsOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cs
+}
+
+var fuzzCodecsOnce = sync.OnceValues(func() ([]*Codec, error) {
+	type schema struct{ typ, s string }
+	all := []schema{
 		{TypeProtobuf, `syntax = "proto3"; message A { int32 x = 1; repeated string s = 2; } message B { A a = 1; }`},
 		{TypeJSON, `{"type":"object"}`},
-	} {
-		if c, err := NewCodec(x.typ, x.s, nil); err == nil {
-			out = append(out, c)
+	}
+	for _, s := range fuzzAvroSchemas {
+		all = append(all, schema{TypeAvro, s})
+	}
+	var out []*Codec
+	for _, x := range all {
+		c, err := NewCodec(x.typ, x.s, nil)
+		if err != nil {
+			return nil, fmt.Errorf("the %s schema %s: %v", x.typ, x.s, err)
+		}
+		out = append(out, c)
+	}
+	return out, nil
+})
+
+// A union value as the decoder shows it, {"double": 0}, is accepted back by the encoder:
+// a message read in the console can be sent as it stands (found by FuzzEncode).
+func TestAUnionValueAsDecodedEncodesAgain(t *testing.T) {
+	c, err := NewCodec(TypeAvro, `["null","double",{"type":"enum","name":"K","symbols":["A","B"]},{"type":"record","name":"P","fields":[{"name":"double","type":"long"}]}]`, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, doc := range []string{`{"double":0}`, `{"K":"B"}`, `0`, `"A"`, `{"P":{"double":7}}`, `{"double":7}`} {
+		out, err := c.Encode(7, doc)
+		if err != nil {
+			t.Fatalf("%s: %v", doc, err)
+		}
+		back, err := c.Decode(out)
+		if err != nil {
+			t.Fatalf("%s: %v", doc, err)
+		}
+		if _, err := c.Encode(7, back); err != nil {
+			t.Errorf("%s reads back as %s, which does not encode: %v", doc, back, err)
 		}
 	}
-	return out
-}()
+	out, _ := c.Encode(7, `{"double":3}`)
+	if back, _ := c.Decode(out); !strings.Contains(back, `"double":3`) {
+		t.Errorf("the tagged double 3 reads back as %s", back)
+	}
+}

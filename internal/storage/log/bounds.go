@@ -13,7 +13,7 @@ import (
 // answer is exactly what opening the partition would report. An earlier version
 // trusted the index and checked only a short header, and after a crash it
 // reported an end offset above the one the opened partition then had.
-func boundsFromDisk(dir string) (start, end int64, err error) {
+func boundsFromDisk(dir string, crcAll bool) (start, end int64, err error) {
 	bases, err := listSegmentBases(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -37,7 +37,7 @@ func boundsFromDisk(dir string) (start, end int64, err error) {
 		return 0, 0, err
 	}
 	r := &windowReader{f: f, size: info.Size()}
-	_, end, _, _, err = scanLog(r.read, info.Size(), last, 1<<62)
+	_, end, _, _, err = scanLog(r.read, info.Size(), last, 1<<62, crcAll)
 	if err != nil {
 		return 0, 0, err
 	}

@@ -8,18 +8,22 @@
 package console
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"embed"
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"log"
+	"io"
+	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -29,20 +33,27 @@ var templateFS embed.FS
 //go:embed static/*
 var staticFS embed.FS
 
+// defaultPrefix is where the console is mounted when nothing says otherwise.
+const defaultPrefix = "/_console"
+
 // Console is the web-UI http.Handler. Mount it on its own listener — Kafka's
 // wire protocol can't share a port with HTTP.
 type Console struct {
+	log         *slog.Logger // where the console reports its own failures (Options.Logger).
 	be          *backend
 	reg         *registryClient     // nil when there is no schema registry to talk to.
 	traffic     TrafficSource       // nil when the broker's traffic is not available to this console.
 	metrics     ClientMetricsSource // nil when clients' own metrics are not available.
+	dock        DockSource          // nil: the dock is built from traffic, or not offered.
 	traces      traceJobs           // message-lineage scans, running and recent.
 	traceHeader string              // an extra record header that holds a trace id (Options.TraceHeader).
 	mux         *http.ServeMux
+	tmplOnce    sync.Once // the templates are parsed on the first request, not at start (idle heap is a budget).
 	tmpl        *template.Template
 	dev         string // DOZE_KAFKA_CONSOLE_DEV: read templates and static files from this directory, live.
 	prefix      string
 	hosts       []string // extra Host names to answer to (see hostguard.go).
+	facts       BrokerFacts
 }
 
 // Options configures the console.
@@ -55,8 +66,14 @@ type Options struct {
 	SASLUser, SASLPass, SASLMechanism string
 	// TLSConfig, if set, dials the broker over TLS with this trust config.
 	TLSConfig *tls.Config
+	// OnDial, if set, is called with every TCP connection the console opens to the
+	// broker, after it is made and before anything is sent on it. A broker in the same
+	// process uses it to know the console's connections for its own, so that the
+	// Traffic page can leave the console's requests out without trusting a client id.
+	// Its error is not the console's business: the connection is used either way.
+	OnDial func(ctx context.Context, conn net.Conn) error
 	// Prefix is the URL path the console is mounted under; defaults to
-	// "/_console".
+	// "/_console" (or DOZE_KAFKA_CONSOLE_PREFIX, when set).
 	Prefix string
 	// DisplayAddr is the bootstrap address pages SHOW clients (copy chips
 	// etc.) when Addr itself is not dialable by them — the embedded topology
@@ -75,23 +92,77 @@ type Options struct {
 	// RegistryUser and RegistryPass are HTTP basic credentials for the registry, when
 	// it requires them.
 	RegistryUser, RegistryPass string
+	// Logger is where the console reports what goes wrong on its side (a page that
+	// could not be drawn, a dev template tree that does not parse). Nil is
+	// slog.Default().
+	Logger *slog.Logger
+	// RegistryTLS, if set, is the trust configuration for a registry served over
+	// https. Nil, an https RegistryURL is verified against the system's roots.
+	RegistryTLS *tls.Config
 	// Traffic is what the broker remembers of its clients' requests and its groups'
 	// membership changes. Nil, the Traffic section is not offered: the console cannot
 	// see the wire of a broker it is not part of.
 	Traffic TrafficSource
+	// Dock is what the wire dock under a topic, group or subject reads. Nil, it is
+	// built from Traffic (which can answer for a topic or a group); with neither, no
+	// dock is shown.
+	Dock DockSource
 	// TraceHeader is the name of a record header whose whole value is a trace id (a
 	// request id, a correlation id), found in addition to W3C traceparent and B3.
 	TraceHeader string
 	// ClientMetrics is what clients have reported about themselves (KIP-714). Nil, the
 	// Traffic page has no client metrics section.
 	ClientMetrics ClientMetricsSource
+	// Facts are what the broker knows about itself that the console cannot read off
+	// the wire: its name in the top bar, the Kafka major it declares, where its data
+	// is and which SASL mechanisms it serves. The zero value is honest: the pages
+	// leave out what they are not told.
+	Facts BrokerFacts
+}
+
+// BrokerFacts is what the broker's own configuration says about it. The console
+// shows these in the top bar, on the Connect page and on a first run; it never
+// invents a value for one that was not given.
+type BrokerFacts struct {
+	// Workspace labels the broker in the top bar: the instance's name, so two brokers
+	// on one machine can be told apart. With the zone on it is also the name the broker
+	// answers to (kafka.<name>.doze); with DOZE_ZONE=off it is only the label.
+	Workspace string
+	// KafkaMajor is the Kafka major version the broker declares ("Kafka 4.0 compat").
+	KafkaMajor int
+	// DataDir is the data directory, as the person should read it.
+	DataDir string
+	// SASLMechanisms are the mechanisms the listener serves; empty when it is open.
+	SASLMechanisms []string
+	// Version is this doze-kafka's version, and Started when it began serving.
+	Version string
+	Started time.Time
+	// RegistryURL is where clients reach the schema registry, which is not always
+	// where the console does (a name the zone routes, against the loopback port).
+	RegistryURL string
+	// RegistryBuiltIn says the registry is the broker's own, which keeps its schemas in
+	// the broker's metadata database (meta.db), not in a _schemas topic.
+	RegistryBuiltIn bool
+	// AutoCreateTopics says whether a producer that names a topic that does not exist
+	// makes it, with DefaultPartitions partitions.
+	AutoCreateTopics  bool
+	DefaultPartitions int
+	// MaxPartitions is the most partitions one topic may have (--max-partitions); zero
+	// when the console was not told, and the forms then name no cap.
+	MaxPartitions int
 }
 
 // New builds a console with a real Kafka client dialed at opts.Addr.
 func New(opts Options) (*Console, error) {
 	prefix := opts.Prefix
 	if prefix == "" {
-		prefix = "/_console"
+		// DOZE_KAFKA_CONSOLE_PREFIX mounts the console elsewhere without a code
+		// change: the suites run once under a prefix that is not the default, to show
+		// nothing assumes it (like DOZE_KAFKA_CONSOLE_DEV below, a developer's hook).
+		prefix = os.Getenv("DOZE_KAFKA_CONSOLE_PREFIX")
+	}
+	if prefix == "" {
+		prefix = defaultPrefix
 	}
 	prefix = "/" + strings.Trim(prefix, "/")
 	if prefix == "/" {
@@ -102,20 +173,21 @@ func New(opts Options) (*Console, error) {
 	// templates and static files from disk on every request, so an edit shows on
 	// reload without rebuilding the binary (`task dev` sets it).
 	dev := os.Getenv("DOZE_KAFKA_CONSOLE_DEV")
-	c := &Console{prefix: prefix, hosts: opts.AllowedHosts, dev: dev}
-	tmpl, err := c.parseTemplates()
-	if err != nil {
-		return nil, err
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.Default()
 	}
+	c := &Console{log: logger, prefix: prefix, hosts: opts.AllowedHosts, dev: dev, facts: opts.Facts}
 	be, err := newBackend(opts)
 	if err != nil {
 		return nil, err
 	}
-	c.be, c.tmpl = be, tmpl
-	c.reg = newRegistryClient(opts.RegistryURL, opts.RegistryUser, opts.RegistryPass)
+	c.be = be
+	c.reg = newRegistryClient(opts.RegistryURL, opts.RegistryUser, opts.RegistryPass, opts.RegistryTLS)
 	c.traffic = opts.Traffic
 	c.metrics = opts.ClientMetrics
 	c.traceHeader = strings.TrimSpace(opts.TraceHeader)
+	c.dock = opts.Dock
 	c.routes()
 	return c, nil
 }
@@ -123,7 +195,7 @@ func New(opts Options) (*Console, error) {
 // parseTemplates loads the page templates: embedded in the binary, or from disk in
 // dev mode.
 func (c *Console) parseTemplates() (*template.Template, error) {
-	t := template.New("").Funcs(templateFuncs(c.prefix))
+	t := template.New("").Funcs(templateFuncs(c.prefix, c.teach))
 	if c.dev != "" {
 		return t.ParseFS(os.DirFS(c.dev), "templates/*.html")
 	}
@@ -133,12 +205,21 @@ func (c *Console) parseTemplates() (*template.Template, error) {
 // templates is the template set to render with. In dev mode it is re-read each
 // time (a template that does not parse is reported on the page, not swallowed).
 func (c *Console) templates() *template.Template {
+	c.tmplOnce.Do(func() {
+		t, err := c.parseTemplates()
+		if err != nil {
+			// The embedded set is checked by the suite; a dev tree can be mid-edit.
+			c.log.Error("console: the templates do not parse", "err", err)
+			t = template.New("")
+		}
+		c.tmpl = t
+	})
 	if c.dev == "" {
 		return c.tmpl
 	}
 	t, err := c.parseTemplates()
 	if err != nil {
-		log.Printf("console dev mode: %v", err)
+		c.log.Warn("console dev mode: the templates do not parse; serving the last good set", "dir", c.dev, "err", err)
 		return c.tmpl
 	}
 	return t
@@ -147,6 +228,7 @@ func (c *Console) templates() *template.Template {
 // Close releases the console's Kafka client.
 func (c *Console) Close() { c.be.close() }
 
+//fuzz:parser class=console-forms FuzzConsoleForms
 func (c *Console) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// DNS rebinding: refuse any Host name we were not expecting, for every
 	// method — a rebound GET reads the whole console too (hostguard.go).
@@ -160,13 +242,15 @@ func (c *Console) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// attacker) — that is the Host guard above.
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		if origin := r.Header.Get("Origin"); origin != "" && !originMatchesHost(origin, r.Host) {
-			http.Error(w, "cross-origin request refused", http.StatusForbidden)
+			c.refuse(w, Refusal{Kind: Denied, Source: SourceConsole, Status: http.StatusForbidden,
+				Message: "cross-origin request refused", Rule: "Refused by the console: a change must come from the console's own pages."})
 			return
 		}
 		// Browsers say where a request came from; a state change coming from
 		// another site is refused even if it somehow carries no Origin.
 		if site := r.Header.Get("Sec-Fetch-Site"); site == "cross-site" {
-			http.Error(w, "cross-site request refused", http.StatusForbidden)
+			c.refuse(w, Refusal{Kind: Denied, Source: SourceConsole, Status: http.StatusForbidden,
+				Message: "cross-site request refused", Rule: "Refused by the console: a change must come from the console's own pages."})
 			return
 		}
 	}
@@ -190,6 +274,9 @@ func (c *Console) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // (a variable only so a test need not wait it out).
 var requestTimeout = 15 * time.Second
 
+// railCountsTimeout bounds the broker calls that draw the rail's numbers.
+const railCountsTimeout = 2 * time.Second
+
 func originMatchesHost(origin, host string) bool {
 	u, err := url.Parse(origin)
 	if err != nil || u.Host == "" {
@@ -198,82 +285,11 @@ func originMatchesHost(origin, host string) bool {
 	return u.Host == host
 }
 
+// routes registers the route table (routes.go): the one list of what the
+// console answers.
 func (c *Console) routes() {
 	m := http.NewServeMux()
-	p := c.prefix
-
-	m.Handle("GET "+p+"/static/", http.StripPrefix(p+"/", c.staticHandler()))
-
-	// The bare root points at the console, so http://host:port works as a URL.
-	if p != "" && p != "/" {
-		m.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, p, http.StatusFound)
-		})
-	}
-
-	// Topics is the home surface. "/" also catches every path under the prefix
-	// that nothing else matches, so it answers only for the prefix itself; a
-	// mistyped address is a 404, not the home page with a 200.
-	m.HandleFunc("GET "+p+"/", func(w http.ResponseWriter, r *http.Request) {
-		if strings.TrimSuffix(r.URL.Path, "/") != strings.TrimSuffix(p, "/") {
-			c.fail(w, r, fmt.Errorf("%w: there is no page at %s", errNotFound, r.URL.Path))
-			return
-		}
-		c.topics(w, r)
-	})
-	if p != "" { // mounted at the root, "/" above is the only spelling.
-		m.HandleFunc("GET "+p, c.topics)
-	}
-	m.HandleFunc("GET "+p+"/topics", c.topics)
-	m.HandleFunc("GET "+newTopicPath(p), c.topicCreatePage)
-	m.HandleFunc("POST "+newTopicPath(p), c.topicCreate)
-	m.HandleFunc("GET "+p+"/topics/{name}", c.topicDetail)
-	m.HandleFunc("POST "+p+"/topics/{name}/delete", c.topicDelete)
-	m.HandleFunc("POST "+p+"/topics/{name}/purge", c.topicPurge)
-	m.HandleFunc("POST "+p+"/topics/{name}/partitions", c.topicPartitions) // grow it; never shrinks
-	m.HandleFunc("POST "+p+"/topics/{name}/config", c.topicConfig)         // the topic's own retention and segment size
-	m.HandleFunc("GET "+p+"/topics/{name}/tape", c.topicTape)              // HTMX partial (polled)
-	m.HandleFunc("POST "+p+"/topics/{name}/produce", c.topicProduce)
-	m.HandleFunc("POST "+p+"/topics/{name}/resend", c.topicResend)  // an exact copy of a stored record
-	m.HandleFunc("GET "+p+"/topics/{name}/message", c.topicMessage) // drawer partial
-	m.HandleFunc("GET "+p+"/topics/{name}/message/raw", c.topicMessageRaw)
-
-	// Lineage: where else did the messages of one trace go.
-	m.HandleFunc("GET "+p+"/trace", c.tracePage)
-	m.HandleFunc("GET "+p+"/trace/live", c.traceLive) // HTMX partial (polled)
-
-	// Traffic (what clients asked the broker).
-	m.HandleFunc("GET "+p+"/traffic", c.trafficPage)
-	m.HandleFunc("GET "+p+"/traffic/live", c.trafficLive)       // HTMX partial (polled)
-	m.HandleFunc("GET "+p+"/traffic/request", c.trafficRequest) // drawer partial
-
-	// Schemas (the built-in registry).
-	m.HandleFunc("GET "+p+"/schemas", c.schemas)
-	m.HandleFunc("GET "+newSchemaPath(p), c.schemaCreatePage)
-	m.HandleFunc("POST "+newSchemaPath(p), c.schemaCreate)
-	m.HandleFunc("GET "+p+"/schemas/{subject}", c.schemaDetail)
-	m.HandleFunc("POST "+p+"/schemas/{subject}/check", c.schemaCheck)
-	m.HandleFunc("POST "+p+"/schemas/{subject}/register", c.schemaRegister)
-	m.HandleFunc("POST "+p+"/schemas/{subject}/config", c.schemaConfig)
-	m.HandleFunc("POST "+p+"/schemas/{subject}/delete", c.schemaDelete)
-
-	// Consumer groups.
-	m.HandleFunc("GET "+p+"/groups", c.groups)
-	m.HandleFunc("GET "+p+"/groups/{id}", c.groupDetail)
-	m.HandleFunc("GET "+p+"/groups/{id}/live", c.groupLive) // HTMX partial (polled)
-	m.HandleFunc("POST "+p+"/groups/{id}/reset", c.groupReset)
-	m.HandleFunc("POST "+p+"/groups/{id}/offset", c.groupOffsetSet)           // one partition's committed offset
-	m.HandleFunc("POST "+p+"/groups/{id}/offset/delete", c.groupOffsetDelete) // remove one
-	m.HandleFunc("POST "+p+"/groups/{id}/delete", c.groupDelete)
-
-	// Cluster.
-	m.HandleFunc("GET "+p+"/cluster", c.cluster)
-	m.HandleFunc("GET "+p+"/access", c.access) // stored ACLs, read-only, with the banner that they are not enforced
-
-	// Resource index for the command palette.
-	m.HandleFunc("GET "+p+"/api/palette", c.apiPalette)
-	m.HandleFunc("GET "+p+"/api/counts", c.apiCounts)
-
+	c.register(m)
 	c.mux = m
 }
 
@@ -282,22 +298,80 @@ func (c *Console) render(w http.ResponseWriter, r *http.Request, page string, da
 	if data == nil {
 		data = map[string]any{}
 	}
-	data["Prefix"] = c.prefix
 	// The handler says which rail section a page belongs to (a topic's detail page
 	// is "topics"); only fall back to the template name when it did not. Overwriting
 	// it made the rail's server-rendered highlight wrong on every detail page.
 	if _, ok := data["Page"]; !ok {
 		data["Page"] = page
 	}
-	data["Endpoint"] = c.be.displayAddr()
-	data["HasRegistry"] = c.reg != nil
-	data["HasTraffic"] = c.traffic != nil
+	c.shellData(r, data)
 	if f := r.URL.Query().Get("flash"); f != "" {
 		data["Flash"] = f
 	}
+	c.execute(w, http.StatusOK, page, data, true)
+}
+
+// execute draws the template name into a buffer and only then writes it, with
+// status, so a template that fails halfway sends no half page: the browser gets a
+// plain error page (or, for a fragment, a line) with 500, and the console's logger
+// gets the reason. A client that has gone away by the time it is written is not
+// an error worth reporting.
+func (c *Console) execute(w http.ResponseWriter, status int, name string, data any, whole bool) {
+	var buf bytes.Buffer
+	if err := c.templates().ExecuteTemplate(&buf, name, data); err != nil {
+		c.log.Error("console: a page could not be drawn", "template", name, "err", err)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusInternalServerError)
+		if whole {
+			io.WriteString(w, couldNotDrawPage) //nolint:errcheck // the client may have gone
+		} else {
+			io.WriteString(w, couldNotDrawFragment) //nolint:errcheck
+		}
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := c.templates().ExecuteTemplate(w, page, data); err != nil {
-		http.Error(w, err.Error(), 500)
+	w.WriteHeader(status)
+	w.Write(buf.Bytes()) //nolint:errcheck // the client may have gone
+}
+
+// What a page or a fragment says when its template failed. They name no detail:
+// that is in the log, and a template's error text is not for the browser.
+const (
+	couldNotDrawPage     = "<!doctype html>\n<meta charset=\"utf-8\"><title>Console error</title>\n<p>The console could not draw this page. The broker's log says why; reload to try again.</p>\n"
+	couldNotDrawFragment = `<div class="err" role="alert">The console could not draw this part of the page. The broker's log says why.</div>`
+)
+
+// shellData adds what every full page needs of the shell around it: the prefix, the
+// broker's address, which sections exist, the rail's numbers and the top bar's
+// labels. An error page is a full page too, and calls this as well.
+func (c *Console) shellData(r *http.Request, data map[string]any) {
+	data["Prefix"] = c.prefix
+	data["Endpoint"] = c.be.displayAddr()
+	data["HasRegistry"] = c.reg != nil
+	// The rail's numbers are drawn with the page, so the first paint has them; the
+	// script keeps them current. Bounded: a broker that is not answering must not hold
+	// every page for a request's whole deadline just to draw a count.
+	cctx, cancel := context.WithTimeout(r.Context(), railCountsTimeout)
+	counts := map[string]string{}
+	for k, n := range c.railCounts(cctx) {
+		counts[k] = strconv.Itoa(n)
+	}
+	cancel()
+	data["Counts"] = counts
+	data["Home"] = c.homeSection()
+	data["Workspace"] = c.facts.Workspace
+	if m := c.facts.KafkaMajor; m > 0 {
+		data["KafkaCompat"] = fmt.Sprintf("Kafka %d.0 compat", m)
+	}
+	data["HasTraffic"] = c.traffic != nil
+	// What the keys strip at the foot of the page says: the page's own hints, by its
+	// view (a topic's page is "topic", though its section is "topics").
+	if _, ok := data["Hints"]; !ok {
+		view, _ := data["View"].(string)
+		if view == "" {
+			view, _ = data["Page"].(string)
+		}
+		data["Hints"] = pageHints(view)
 	}
 }
 
@@ -307,10 +381,7 @@ func (c *Console) partial(w http.ResponseWriter, name string, data map[string]an
 		data = map[string]any{}
 	}
 	data["Prefix"] = c.prefix
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := c.templates().ExecuteTemplate(w, name, data); err != nil {
-		http.Error(w, err.Error(), 500)
-	}
+	c.execute(w, http.StatusOK, name, data, false)
 }
 
 // redirect sends the browser to `to` with an optional flash banner — via
@@ -340,13 +411,23 @@ func toast(w http.ResponseWriter, msg string) {
 	w.Header().Set("HX-Trigger", `{"toast":`+strconv.QuoteToASCII(msg)+`}`)
 }
 
-func templateFuncs(prefix string) template.FuncMap {
+// wrapName escapes s and lets it break after each underscore.
+func wrapName(s string) template.HTML {
+	return template.HTML(strings.ReplaceAll(template.HTMLEscapeString(s), "_", "_<wbr>"))
+}
+
+func templateFuncs(prefix string, teach func(kind, name string) string) template.FuncMap {
 	return template.FuncMap{
 		"prefix": func() string { return prefix },
-		"icon":   icon,
+		// A name that may wrap, at its underscores: UNKNOWN_TOPIC_OR_PARTITION is three
+		// words, not a run to be cut anywhere (AD5).
+		"wrapName": wrapName,
+		"icon":     icon,
 		// Links to resources. Names are data: never concatenate them into a URL
 		// in a template, use these (see resourceurl.go).
-		"topicURL":    func(name string) string { return topicPath(prefix, name) },
+		"topicURL": func(name string) string { return topicPath(prefix, name) },
+		// The address the inspector fetches a selection of one kind from.
+		"inspectHref": func(kind, key string) string { return prefix + "/inspect/" + kind + "?key=" + url.QueryEscape(key) },
 		"groupURL":    func(id string) string { return groupPath(prefix, id) },
 		"newTopicURL": func() string { return newTopicPath(prefix) },
 		"schemaURL":   func(subject string) string { return schemaPath(prefix, subject) },
@@ -358,6 +439,25 @@ func templateFuncs(prefix string) template.FuncMap {
 			return u
 		},
 		"t": uiText,
+		// keyCaps splits how a key is drawn into its caps: "g r" is two keys.
+		"keyCaps": func(show string) []string { return strings.Fields(show) },
+		// num writes a count with thousands separators (14,407), as the boards do.
+		"num": num,
+		// needsLook is whether a topic's number is coloured in the list: a dead-letter
+		// topic that has records in it.
+		"needsLook": func(name string, msgs int64) bool { return isDeadLetterName(name) && msgs > 0 },
+		// teach is the line under a field, read from the settings table by the
+		// record's kind and name (teaching.go).
+		"teach": teach,
+		// confirmOffset is the confirm of one row's Remove (confirms.go).
+		"confirmOffset": offsetDeleteConfirm,
+		"confirmURL":    func(id string, kv ...any) string { return confirmURLFor(prefix, id, kv...) },
+		// Keys of the inspector's selections, escaped for a query string.
+		"memberKey": func(group, member string) string { return url.QueryEscape(joinKey(group, member)) },
+		"eventKey": func(group string, seq uint64) string {
+			return url.QueryEscape(joinKey(group, strconv.FormatUint(seq, 10)))
+		},
+		"txnKey": func(id string) string { return url.QueryEscape(id) },
 		"dict": func(kv ...any) map[string]any {
 			m := make(map[string]any, len(kv)/2)
 			for i := 0; i+1 < len(kv); i += 2 {
@@ -367,16 +467,39 @@ func templateFuncs(prefix string) template.FuncMap {
 			}
 			return m
 		},
-		"list":      func(items ...any) []any { return items },
-		"sub":       func(a, b int) int { return a - b },
-		"ago":       ago,
-		"hasPrefix": strings.HasPrefix,
-		"hasSuffix": strings.HasSuffix,
+		"list": func(items ...any) []any { return items },
+		"sub":  func(a, b int) int { return a - b },
+		// when is the one formatter for a moment in time (timefmt.go); whenText is
+		// its plain text, for an attribute.
+		"when": when,
+		// the declared key map, for the help overlay and for shell.js (keys.go).
+		"keyGroups":       keyGroups,
+		"dialogHints":     dialogHints,
+		"acksChoices":     acksChoices,
+		"topicNameRule":   topicNameRule,
+		"topicNameMax":    topicNameMax,
+		"takenRule":       takenRule,
+		"subjectNameRule": subjectNameRule,
+		"pluralWord":      pluralWord,
+		"aclNote":         func(f string) string { return aclFieldNotes[f] },
+		"add":             func(a, b int) int { return a + b },
+		"segs":            segsHTML,
+		"diskSize":        diskSize,
+		"countWord":       countWord,
+		"groupDot":        groupDot,
+		"keymapJSON":      keymapJSON,
+		"whenText":        whenText,
+		"hasPrefix":       strings.HasPrefix,
+		"hasSuffix":       strings.HasSuffix,
 		"refsJSON": func(refs any) string {
 			b, _ := json.Marshal(refs)
 			return string(b)
 		},
-		"lower":    strings.ToLower,
+		"lower": strings.ToLower,
+		// capital and upper write a word the way a column of the boards does: Topic, Write,
+		// ALLOW. The stored value stays as the broker names it.
+		"capital":  upperFirst,
+		"upper":    strings.ToUpper,
 		"jsonTint": jsonTint,
 		"stateBadge": func(state string) string {
 			switch state {
@@ -422,19 +545,4 @@ func humanBytes(n int) string {
 func trimFloat(f float64) string {
 	s := strconv.FormatFloat(f, 'f', 1, 64)
 	return strings.TrimSuffix(s, ".0")
-}
-
-// ago renders a compact relative time ("3m ago", "just now").
-func ago(t time.Time) string {
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		return strconv.Itoa(int(d.Minutes())) + "m ago"
-	case d < 24*time.Hour:
-		return strconv.Itoa(int(d.Hours())) + "h ago"
-	default:
-		return strconv.Itoa(int(d.Hours()/24)) + "d ago"
-	}
 }

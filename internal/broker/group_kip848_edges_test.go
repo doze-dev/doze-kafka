@@ -48,7 +48,10 @@ func (m *cgMember) heartbeat(t *testing.T, ctx context.Context, subscribe []stri
 	if subscribe != nil {
 		r.SubscribedTopicNames = subscribe
 	}
-	if reportOwned {
+	switch {
+	case m.epoch == 0:
+		r.Topics = []kmsg.ConsumerGroupHeartbeatRequestTopic{} // a join owns nothing, and says so.
+	case reportOwned:
 		r.Topics = []kmsg.ConsumerGroupHeartbeatRequestTopic{}
 		for id, ps := range m.held {
 			if len(ps) == 0 {
@@ -109,6 +112,7 @@ func TestGroupKIP848_BrokerMintsAMemberIDWhenNoneIsGiven(t *testing.T) {
 		r.SetVersion(version)
 		r.Group, r.RebalanceTimeoutMillis = "mint", 60_000
 		r.SubscribedTopicNames = []string{"t"}
+		r.Topics = []kmsg.ConsumerGroupHeartbeatRequestTopic{} // a join owns nothing.
 		var resp kmsg.ConsumerGroupHeartbeatResponse
 		if !c.do(r, &resp) {
 			t.Fatal("connection closed")
@@ -134,7 +138,7 @@ func TestGroupKIP848_BrokerMintsAMemberIDWhenNoneIsGiven(t *testing.T) {
 // (still empty) handed B partitions A believed it owned. Playing both members by
 // hand, no partition may ever be in both hands.
 func TestGroupKIP848_NoPartitionIsHeldByTwoMembers(t *testing.T) {
-	addr := startBroker(t, 4)
+	addr := startBrokerAssigningAtOnce(t, 4) // of reconciliation, not of when targets are computed.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	admin := newClient(t, addr)
@@ -219,8 +223,10 @@ func TestGroupKIP848_TopicCreatedAfterSubscribingIsAssigned(t *testing.T) {
 	}
 }
 
-// A group id is one protocol or the other; sharing it gave every partition to
-// both sets of members and listed the group twice.
+// A group id is one coordinator's at a time; sharing it gave every partition to both
+// sets of members and listed the group twice. Members whose subscription is not the
+// consumer protocol's cannot be moved between the two, so these are refused (the cases
+// that are accepted are in TestGroupCoordinators_MembersOfBothProtocolsShareAGroup).
 func TestGroupCoordinators_ShareNoGroupID(t *testing.T) {
 	addr := startBroker(t, 4)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -244,8 +250,10 @@ func TestGroupCoordinators_ShareNoGroupID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.ErrorCode != kerr.InconsistentGroupProtocol.Code {
-		t.Errorf("classic join into a live KIP-848 group: code %d, want INCONSISTENT_GROUP_PROTOCOL (%d)", resp.ErrorCode, kerr.InconsistentGroupProtocol.Code)
+	// Its subscription is not one (joinRequest's metadata): Kafka answers that
+	// UNKNOWN_SERVER_ERROR and seats nobody (recorded: unreadable-subscription).
+	if resp.ErrorCode != kerr.UnknownServerError.Code {
+		t.Errorf("classic join into a live KIP-848 group: code %d, want UNKNOWN_SERVER_ERROR (%d)", resp.ErrorCode, kerr.UnknownServerError.Code)
 	}
 
 	// Neither id is listed twice.
@@ -262,4 +270,183 @@ func TestGroupCoordinators_ShareNoGroupID(t *testing.T) {
 			t.Errorf("group %q is listed %d times", id, n)
 		}
 	}
+}
+
+// Classic and consumer-protocol members of one group id, as a rolling upgrade has them
+// (GRP-8, D7; what Kafka answers is recorded in conformance/recordings/mixed-*.json).
+// The group is listed once, whichever protocol joined first.
+func TestGroupCoordinators_MembersOfBothProtocolsShareAGroup(t *testing.T) {
+	addr := startBroker(t, 4)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cl := newClient(t, addr)
+	defer cl.Close()
+	mustCreateTopic(t, ctx, cl, "t", 2)
+
+	join := func(group, member string) *kmsg.JoinGroupResponse {
+		r := joinRequest(group, member, testSessionMs, testRebalanceMsDefault)
+		r.Protocols[0].Metadata = mixSubscription("t")
+		resp, err := r.RequestWith(ctx, cl)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp
+	}
+
+	// A classic group first.
+	id := join("up", "").MemberID
+	j := join("up", id)
+	if j.ErrorCode != 0 {
+		t.Fatalf("classic join: %d", j.ErrorCode)
+	}
+	sr := kmsg.NewPtrSyncGroupRequest()
+	sr.Group, sr.MemberID, sr.Generation = "up", id, j.Generation
+	sa := kmsg.NewSyncGroupRequestGroupAssignment()
+	sa.MemberID, sa.MemberAssignment = id, mixAssignment("t", 0, 1)
+	sr.GroupAssignment = append(sr.GroupAssignment, sa)
+	if resp, err := sr.RequestWith(ctx, cl); err != nil || resp.ErrorCode != 0 {
+		t.Fatalf("classic sync: %v %+v", err, resp)
+	}
+
+	// A consumer-protocol member joins it: accepted, and the classic member is told to
+	// rejoin by its next heartbeat, as Kafka tells it.
+	m := newCGMember(t, addr, "up", "instance-2")
+	if resp := m.heartbeat(t, ctx, []string{"t"}, false); resp.ErrorCode != 0 {
+		t.Fatalf("a consumer-protocol join into a classic group: code %d, want it accepted", resp.ErrorCode)
+	}
+	hb := kmsg.NewPtrHeartbeatRequest()
+	hb.Group, hb.MemberID, hb.Generation = "up", id, j.Generation
+	if resp, err := hb.RequestWith(ctx, cl); err != nil || resp.ErrorCode != kerr.RebalanceInProgress.Code {
+		t.Fatalf("the classic member's heartbeat: %v %+v, want REBALANCE_IN_PROGRESS", err, resp)
+	}
+	// It rejoins and is given its half; the other member then gets the rest.
+	rj := join("up", id)
+	if rj.ErrorCode != 0 || rj.LeaderID != "" || len(rj.Members) != 0 {
+		t.Fatalf("classic rejoin: %+v, want success with no leader and no member list", rj)
+	}
+	sync2 := kmsg.NewPtrSyncGroupRequest()
+	sync2.Group, sync2.MemberID, sync2.Generation = "up", id, rj.Generation
+	resp, err := sync2.RequestWith(ctx, cl)
+	if err != nil || resp.ErrorCode != 0 {
+		t.Fatalf("classic sync after rejoin: %v %+v", err, resp)
+	}
+	if n := mixAssignedPartitions(resp.MemberAssignment); n != 1 {
+		t.Errorf("the classic member's assignment holds %d partitions (%x), want one of the two", n, resp.MemberAssignment)
+	}
+	tid := topicIDOf(t, ctx, cl, "t")
+	for i := 0; i < 5 && len(m.holds(tid)) < 1; i++ {
+		m.heartbeat(t, ctx, nil, true)
+	}
+	if got := m.holds(tid); len(got) != 1 {
+		t.Errorf("the consumer-protocol member holds %v, want the other partition", got)
+	}
+
+	// Listed once, as a consumer group; DescribeGroups does not describe it.
+	lr, err := kmsg.NewPtrListGroupsRequest().RequestWith(ctx, cl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, g := range lr.Groups {
+		if g.Group == "up" {
+			n++
+			if g.GroupType != "consumer" {
+				t.Errorf("listed as %q, want consumer", g.GroupType)
+			}
+		}
+	}
+	if n != 1 {
+		t.Errorf("listed %d times", n)
+	}
+	dr := kmsg.NewPtrDescribeGroupsRequest()
+	dr.Groups = []string{"up"}
+	if d, err := dr.RequestWith(ctx, cl); err != nil || d.Groups[0].State != "Dead" {
+		t.Errorf("DescribeGroups of a consumer group: %v %+v, want Dead", err, d)
+	}
+}
+
+// A consumer group of classic members only, when its last consumer-protocol member
+// leaves, is a classic group again, and its members are told their generation is gone.
+func TestGroupCoordinators_TheLastConsumerProtocolMemberLeavingMakesItClassicAgain(t *testing.T) {
+	addr := startBroker(t, 4)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cl := newClient(t, addr)
+	defer cl.Close()
+	mustCreateTopic(t, ctx, cl, "t", 2)
+
+	m := newCGMember(t, addr, "down", "instance-1")
+	if resp := m.heartbeat(t, ctx, []string{"t"}, false); resp.ErrorCode != 0 {
+		t.Fatalf("join: %d", resp.ErrorCode)
+	}
+	r := joinRequest("down", "", testSessionMs, testRebalanceMsDefault)
+	r.Protocols[0].Metadata = mixSubscription("t")
+	first, err := r.RequestWith(ctx, cl)
+	if err != nil || first.ErrorCode != codeMemberIDRequired {
+		t.Fatalf("%v %+v", err, first)
+	}
+	r2 := joinRequest("down", first.MemberID, testSessionMs, testRebalanceMsDefault)
+	r2.Protocols[0].Metadata = mixSubscription("t")
+	j, err := r2.RequestWith(ctx, cl)
+	if err != nil || j.ErrorCode != 0 {
+		t.Fatalf("classic join: %v %+v", err, j)
+	}
+
+	// The consumer-protocol member leaves (epoch -1).
+	m.epoch = -1
+	if resp := m.heartbeat(t, ctx, nil, false); resp.ErrorCode != 0 {
+		t.Fatalf("leave: %d", resp.ErrorCode)
+	}
+
+	hb := kmsg.NewPtrHeartbeatRequest()
+	hb.Group, hb.MemberID, hb.Generation = "down", first.MemberID, j.Generation
+	if resp, err := hb.RequestWith(ctx, cl); err != nil || resp.ErrorCode != kerr.IllegalGeneration.Code {
+		t.Fatalf("heartbeat of the classic member: %v %+v, want ILLEGAL_GENERATION", err, resp)
+	}
+	dr := kmsg.NewPtrDescribeGroupsRequest()
+	dr.Groups = []string{"down"}
+	d, err := dr.RequestWith(ctx, cl)
+	if err != nil || d.Groups[0].State != "PreparingRebalance" || len(d.Groups[0].Members) != 1 {
+		t.Fatalf("DescribeGroups: %v %+v, want a classic group in PreparingRebalance with the member", err, d)
+	}
+	// It rejoins as the classic group's member and is its leader.
+	rj := joinRequest("down", first.MemberID, testSessionMs, testRebalanceMsDefault)
+	rj.Protocols[0].Metadata = mixSubscription("t")
+	resp, err := rj.RequestWith(ctx, cl)
+	if err != nil || resp.ErrorCode != 0 || resp.LeaderID != first.MemberID || len(resp.Members) != 1 {
+		t.Fatalf("rejoin: %v %+v", err, resp)
+	}
+}
+
+// mixSubscription is a classic consumer's protocol metadata: version 0, topics, no user data.
+func mixSubscription(topics ...string) []byte {
+	b := []byte{0, 0, 0, 0, 0, byte(len(topics))}
+	for _, t := range topics {
+		b = append(b, 0, byte(len(t)))
+		b = append(b, t...)
+	}
+	return append(b, 0xff, 0xff, 0xff, 0xff)
+}
+
+// mixAssignment is a classic consumer's assignment of partitions of one topic.
+func mixAssignment(topic string, partitions ...int32) []byte {
+	b := []byte{0, 0, 0, 0, 0, 1, 0, byte(len(topic))}
+	b = append(b, topic...)
+	b = append(b, 0, 0, 0, byte(len(partitions)))
+	for _, p := range partitions {
+		b = append(b, 0, 0, 0, byte(p))
+	}
+	return append(b, 0xff, 0xff, 0xff, 0xff)
+}
+
+// mixAssignedPartitions counts the partitions of a one-topic classic assignment.
+func mixAssignedPartitions(b []byte) int {
+	if len(b) < 8 || b[5] != 1 {
+		return 0
+	}
+	rest := b[8+int(b[7]):]
+	if len(rest) < 4 {
+		return 0
+	}
+	return int(rest[3])
 }

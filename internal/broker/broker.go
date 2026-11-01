@@ -5,11 +5,16 @@
 package broker
 
 import (
+	"errors"
+	"io/fs"
 	"log/slog"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"syscall"
+	"time"
 
 	"context"
 	"fmt"
@@ -33,7 +38,8 @@ type Broker struct {
 	log     *slog.Logger
 	logs    *log.Manager
 	meta    meta.Store
-	claims  *groupClaims // which protocol each live group id belongs to.
+	claims  *groupClaims  // which protocol each live group id belongs to.
+	expiry  *offsetExpiry // applies the offsets retention; nil when it is off.
 	groups  *groupManager
 	cg848   *cg848Manager    // KIP-848 broker-driven groups (Kafka-4 profile).
 	auth    *authenticator   // nil when SASL is disabled.
@@ -42,10 +48,8 @@ type Broker struct {
 	produce *notifier        // wakes long-polling fetchers when data is produced.
 
 	// telemetry holds what clients report about themselves (KIP-714); nil when
-	// --client-telemetry is off. subscriptionID is handed to every client and checked
-	// on every push, so a push from before a restart is told to subscribe again.
-	telemetry      *telemetry.Store
-	subscriptionID int32
+	// --client-telemetry is off.
+	telemetry *telemetry.Store
 
 	// boundPort is the port the TCP listener actually bound, learned after Bind.
 	// It is what Metadata must advertise when the configured address names no
@@ -89,21 +93,40 @@ func New(cfg config.Config, logger *slog.Logger, logs *log.Manager, m meta.Store
 		logs:   logs,
 		meta:   m,
 		claims: claims,
-		groups: newGroupManager(func(group string) bool {
-			entries, err := m.ListOffsets(group)
-			return err == nil && len(entries) > 0
-		}, claims),
-		cg848:   newCG848Manager(m, logger, cfg.ConsumerSessionTimeout, claims),
+		// An emptied group stays until the offsets retention's sweep finds it holds
+		// nothing (offsetexpiry.go).
+		groups:  newGroupManager(func(string) bool { return true }, claims),
+		cg848:   newCG848Manager(m, logger, cfg.ConsumerSessionTimeout, cfg.ConsumerAssignmentInterval, claims),
 		auth:    auth,
 		idem:    newIdempotency(),
 		profile: profile,
 		produce: newNotifier(),
 	}
-	if cfg.ClientTelemetry {
-		b.telemetry, b.subscriptionID = telemetry.NewStore(), newSubscriptionID()
+	// Only a broker with a console keeps what clients report: the console is its one
+	// reader, and a broker without one advertises nothing for clients to push into.
+	b.cg848.bridge = b.groups
+	b.groups.initialDelay = cfg.GroupInitialRebalanceDelay
+	// Which groups have members is recorded whatever the retention is, zero included:
+	// a broker run for a while with the retention off and then with it on must not
+	// take the groups of that while for groups nobody ever joined.
+	exp, err := newOffsetExpiry(b, cfg.OffsetsRetention, cfg.OffsetsRetentionCheckInterval)
+	if err != nil {
+		return nil, fmt.Errorf("broker: read what is recorded of the groups' members: %w", err)
+	}
+	b.expiry = exp
+	b.groups.liveness, b.cg848.liveness = exp, exp
+	exp.restoreEmptyGroups()
+	exp.start()
+	if cfg.ClientTelemetry && cfg.Console {
+		b.telemetry = telemetry.NewStore()
+		b.telemetry.SetPushInterval(telemetryPushMillis * time.Millisecond)
 	}
 	return b, nil
 }
+
+// CheckOffsets applies the offsets retention now, as its scheduled check does, and
+// returns once it has (reached through serverhook by the conformance replays).
+func (b *Broker) CheckOffsets() { b.expiry.checkNow() }
 
 // Register binds a handler to every API the active profile offers, and tells the
 // router to refuse everything else. What is offered comes from protocol.APIs; what
@@ -207,12 +230,51 @@ func typed[Q kmsg.Request, R kmsg.Response](fn func(ctx context.Context, req *pr
 	}
 }
 
-// storageFault logs an internal error that is about to be reported to a client as
-// UNKNOWN_SERVER_ERROR and returns that code. The client sees only a code; without
-// this, the cause of "my produce fails" existed nowhere a developer could look.
+// storageFault logs an internal error that is about to be reported to a client
+// and returns the code to report. The client sees only a code; without this, the
+// cause of "my produce fails" existed nowhere a developer could look.
+//
+// An I/O failure (a full disk, a read-only remount, a failing device) is
+// KAFKA_STORAGE_ERROR, as Apache Kafka answers when a log directory fails: a
+// retriable code that says the broker's storage is the problem. Anything else is
+// UNKNOWN_SERVER_ERROR (claim: bad-days Q2a).
 func (b *Broker) storageFault(op string, err error, attrs ...any) int16 {
 	b.log.Error("request failed: "+op, append(attrs, "err", err)...)
+	if isIOError(err) {
+		return kerr.KafkaStorageError.Code
+	}
 	return kerr.UnknownServerError.Code
+}
+
+// coordinatorFault is storageFault for a write of the group coordinator's own
+// state (a committed offset). Apache Kafka keeps that state in a log, and when the
+// append to it fails the client is told NOT_COORDINATOR, not KAFKA_STORAGE_ERROR
+// (recorded: full-disk-offset-commit, on a volume with no room): it looks the
+// coordinator up again and retries, where a consumer that is handed
+// KAFKA_STORAGE_ERROR on a commit has no rule for it.
+func (b *Broker) coordinatorFault(op string, err error, attrs ...any) int16 {
+	if b.storageFault(op, err, attrs...) == kerr.KafkaStorageError.Code {
+		return kerr.NotCoordinator.Code
+	}
+	return kerr.UnknownServerError.Code
+}
+
+// storageFaultError is storageFault for the handlers that answer with a *kerr.Error.
+func (b *Broker) storageFaultError(op string, err error, attrs ...any) *kerr.Error {
+	if b.storageFault(op, err, attrs...) == kerr.KafkaStorageError.Code {
+		return kerr.KafkaStorageError
+	}
+	return kerr.UnknownServerError
+}
+
+// isIOError reports whether err came from the file system rather than from the
+// broker's own logic.
+func isIOError(err error) bool {
+	var pe *fs.PathError
+	var le *os.LinkError
+	var se *os.SyscallError
+	var en syscall.Errno
+	return errors.Is(err, log.ErrStorageOffline) || errors.As(err, &pe) || errors.As(err, &le) || errors.As(err, &se) || errors.As(err, &en)
 }
 
 // nodeID is this broker's node id. Single-node, so it is a constant.
@@ -344,6 +406,7 @@ func (b *Broker) advertised() []protocol.AdvertisedAPI {
 // a member's session timer firing afterwards would run an assignment against a
 // closed metadata store.
 func (b *Broker) Stop() {
+	b.expiry.stopAndFlush()
 	b.groups.stop()
 	b.cg848.stop()
 }

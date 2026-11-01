@@ -67,6 +67,8 @@ type Payload struct {
 var ErrMalformed = errors.New("telemetry: not a valid OTLP metrics payload")
 
 // Decode reads an ExportMetricsServiceRequest.
+//
+//fuzz:parser class=otlp FuzzDecode
 func Decode(b []byte) (Payload, error) {
 	p := Payload{Resource: map[string]string{}}
 	err := eachField(b, func(num protowire.Number, typ protowire.Type, v []byte, _ uint64) error {
@@ -132,6 +134,8 @@ func eachField(b []byte, fn func(num protowire.Number, typ protowire.Type, bytes
 }
 
 // ResourceMetrics { Resource resource = 1; repeated ScopeMetrics scope_metrics = 2; }
+//
+//fuzz:parser class=otlp FuzzDecode
 func decodeResourceMetrics(b []byte, out *Payload) error {
 	return eachField(b, func(num protowire.Number, typ protowire.Type, v []byte, _ uint64) error {
 		if typ != protowire.BytesType {
@@ -141,8 +145,12 @@ func decodeResourceMetrics(b []byte, out *Payload) error {
 		case 1:
 			return eachField(v, func(num protowire.Number, typ protowire.Type, kv []byte, _ uint64) error {
 				if num == 1 && typ == protowire.BytesType { // Resource.attributes
-					if k, val, ok := decodeKeyValue(kv); ok {
-						out.Resource[k] = val
+					k, val, ok, err := decodeKeyValue(kv)
+					if err != nil {
+						return err
+					}
+					if ok {
+						setResource(out.Resource, k, val)
 					}
 				}
 				return nil
@@ -155,6 +163,8 @@ func decodeResourceMetrics(b []byte, out *Payload) error {
 }
 
 // ScopeMetrics { InstrumentationScope scope = 1; repeated Metric metrics = 2; }
+//
+//fuzz:parser class=otlp FuzzDecode
 func decodeScopeMetrics(b []byte, out *Payload) error {
 	return eachField(b, func(num protowire.Number, typ protowire.Type, v []byte, _ uint64) error {
 		if num == 2 && typ == protowire.BytesType {
@@ -172,6 +182,8 @@ func decodeScopeMetrics(b []byte, out *Payload) error {
 
 // Metric { string name = 1; string description = 2; string unit = 3;
 // oneof data { Gauge gauge = 5; Sum sum = 7; Histogram histogram = 9; ... } }
+//
+//fuzz:parser class=otlp FuzzDecode
 func decodeMetric(b []byte) (Metric, error) {
 	var m Metric
 	err := eachField(b, func(num protowire.Number, typ protowire.Type, v []byte, _ uint64) error {
@@ -187,7 +199,11 @@ func decodeMetric(b []byte) (Metric, error) {
 			m.Kind = Gauge
 			return eachField(v, func(n protowire.Number, t protowire.Type, dp []byte, _ uint64) error {
 				if n == 1 && t == protowire.BytesType {
-					m.Points = append(m.Points, decodeNumberPoint(dp))
+					pt, err := decodeNumberPoint(dp)
+					if err != nil {
+						return err
+					}
+					m.Points = append(m.Points, pt)
 				}
 				return nil
 			})
@@ -195,7 +211,11 @@ func decodeMetric(b []byte) (Metric, error) {
 			m.Kind = Sum
 			return eachField(v, func(n protowire.Number, t protowire.Type, dp []byte, _ uint64) error {
 				if n == 1 && t == protowire.BytesType {
-					m.Points = append(m.Points, decodeNumberPoint(dp))
+					pt, err := decodeNumberPoint(dp)
+					if err != nil {
+						return err
+					}
+					m.Points = append(m.Points, pt)
 				}
 				return nil
 			})
@@ -203,7 +223,11 @@ func decodeMetric(b []byte) (Metric, error) {
 			m.Kind = Histogram
 			return eachField(v, func(n protowire.Number, t protowire.Type, dp []byte, _ uint64) error {
 				if n == 1 && t == protowire.BytesType {
-					m.Points = append(m.Points, decodeHistogramPoint(dp))
+					pt, err := decodeHistogramPoint(dp)
+					if err != nil {
+						return err
+					}
+					m.Points = append(m.Points, pt)
 				}
 				return nil
 			})
@@ -215,10 +239,12 @@ func decodeMetric(b []byte) (Metric, error) {
 
 // NumberDataPoint { repeated KeyValue attributes = 7; fixed64 time_unix_nano = 3;
 // oneof value { double as_double = 4; sfixed64 as_int = 6; } }
-func decodeNumberPoint(b []byte) Point {
+//
+//fuzz:parser class=otlp FuzzDecode
+func decodeNumberPoint(b []byte) (Point, error) {
 	var p Point
 	var attrs []string
-	_ = eachField(b, func(num protowire.Number, typ protowire.Type, v []byte, val uint64) error {
+	err := eachField(b, func(num protowire.Number, typ protowire.Type, v []byte, val uint64) error {
 		switch {
 		case num == 3 && typ == protowire.Fixed64Type:
 			p.Time = time.Unix(0, int64(val))
@@ -227,23 +253,32 @@ func decodeNumberPoint(b []byte) Point {
 		case num == 6 && typ == protowire.Fixed64Type:
 			p.Value = float64(int64(val))
 		case num == 7 && typ == protowire.BytesType:
-			if k, s, ok := decodeKeyValue(v); ok {
+			k, s, ok, err := decodeKeyValue(v)
+			if err != nil {
+				return err
+			}
+			if ok {
 				attrs = append(attrs, k+"="+s)
 			}
 		}
 		return nil
 	})
+	if err != nil {
+		return Point{}, err
+	}
 	p.Attrs = joinAttrs(attrs)
-	return p
+	return p, nil
 }
 
 // HistogramDataPoint { repeated KeyValue attributes = 9; fixed64 time_unix_nano = 3;
 // fixed64 count = 4; optional double sum = 5; }
-func decodeHistogramPoint(b []byte) Point {
+//
+//fuzz:parser class=otlp FuzzDecode
+func decodeHistogramPoint(b []byte) (Point, error) {
 	var p Point
 	var attrs []string
 	var sum float64
-	_ = eachField(b, func(num protowire.Number, typ protowire.Type, v []byte, val uint64) error {
+	err := eachField(b, func(num protowire.Number, typ protowire.Type, v []byte, val uint64) error {
 		switch {
 		case num == 3 && typ == protowire.Fixed64Type:
 			p.Time = time.Unix(0, int64(val))
@@ -252,17 +287,24 @@ func decodeHistogramPoint(b []byte) Point {
 		case num == 5 && typ == protowire.Fixed64Type:
 			sum = math.Float64frombits(val)
 		case num == 9 && typ == protowire.BytesType:
-			if k, s, ok := decodeKeyValue(v); ok {
+			k, s, ok, err := decodeKeyValue(v)
+			if err != nil {
+				return err
+			}
+			if ok {
 				attrs = append(attrs, k+"="+s)
 			}
 		}
 		return nil
 	})
+	if err != nil {
+		return Point{}, err
+	}
 	if p.Count > 0 {
 		p.Value = sum / float64(p.Count)
 	}
 	p.Attrs = joinAttrs(attrs)
-	return p
+	return p, nil
 }
 
 func joinAttrs(a []string) string {
@@ -273,13 +315,15 @@ func joinAttrs(a []string) string {
 // KeyValue { string key = 1; AnyValue value = 2; }
 // AnyValue { oneof value { string string_value = 1; bool bool_value = 2; int64 int_value = 3;
 // double double_value = 4; ... } }
-func decodeKeyValue(b []byte) (key, val string, ok bool) {
-	_ = eachField(b, func(num protowire.Number, typ protowire.Type, v []byte, _ uint64) error {
+//
+//fuzz:parser class=otlp FuzzDecode
+func decodeKeyValue(b []byte) (key, val string, ok bool, err error) {
+	err = eachField(b, func(num protowire.Number, typ protowire.Type, v []byte, _ uint64) error {
 		switch {
 		case num == 1 && typ == protowire.BytesType:
 			key = string(v)
 		case num == 2 && typ == protowire.BytesType:
-			_ = eachField(v, func(n protowire.Number, t protowire.Type, s []byte, x uint64) error {
+			return eachField(v, func(n protowire.Number, t protowire.Type, s []byte, x uint64) error {
 				switch {
 				case n == 1 && t == protowire.BytesType:
 					val = string(s)
@@ -295,5 +339,5 @@ func decodeKeyValue(b []byte) (key, val string, ok bool) {
 		}
 		return nil
 	})
-	return key, val, key != ""
+	return key, val, key != "" && err == nil, err
 }

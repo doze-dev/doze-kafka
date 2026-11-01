@@ -42,10 +42,10 @@ func startBinary(t *testing.T, bin, addr, dataDir, metaDB string) (*exec.Cmd, *b
 	t.Helper()
 	var log bytes.Buffer
 	cmd := exec.Command(bin, "-listen", addr, "-data-dir", dataDir, "-meta-db", metaDB,
-		// Only what the test is about: no console on the default port (the suite
-		// failed whenever 9093 was busy). --listen means no name is claimed, so
-		// nothing lands in the developer's real zone.
-		"-console=false")
+		// Only what the test is about: no console and no registry on their default
+		// ports (the suite failed whenever 9093, or 8081, was busy). --listen means
+		// no name is claimed, so nothing lands in the developer's real zone.
+		"-console=false", "-schema-registry=false")
 	cmd.Stdout = &log
 	cmd.Stderr = &log
 	if err := cmd.Start(); err != nil {

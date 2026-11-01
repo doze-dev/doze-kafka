@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -131,12 +132,18 @@ func TestAnUnresolvableNameIsAdvertisedAsItsAddress(t *testing.T) {
 	z := joinZone(ctx, quietLogger(), "unresolvable")
 	defer z.close()
 	if z.own == nil {
-		t.Skip("no name claimed")
+		skipOrFail(t, "no name claimed")
 	}
+	// The lookups below are stand-ins, so the question after them (does the name
+	// answer) is stood in for too: this registry is the test's own, and the machine's
+	// resolver has never heard of the name.
+	z.reach = func(string, int) bool { return true }
 	nothing := func(context.Context, string) ([]string, error) { return nil, errors.New("no such host") }
 	b, err := openListener(config.Default(), z, quietLogger(), nothing)
 	if err != nil {
-		t.Skipf("cannot bind %s (loopback pool not aliased?): %v", z.ip(), err)
+		// A Mac whose network daemon is not running, or (under this package's
+		// throwaway DOZE_HOME) one whose daemon serves another home.
+		skipOrFail(t, "cannot listen on %s for the name: %v", z.ip(), err)
 	}
 	defer b.ln.Close()
 	if b.host != z.ip() || strings.Contains(b.bootstrap, ".doze") {
@@ -154,6 +161,19 @@ func TestAnUnresolvableNameIsAdvertisedAsItsAddress(t *testing.T) {
 	if b.host != z.host() {
 		t.Errorf("advertised host %q for a name that resolves here, want %q", b.host, z.host())
 	}
+
+	// It resolves here, and nothing answers at it: still the address.
+	b.ln.Close()
+	z.reach = func(string, int) bool { return false }
+	b, err = openListener(config.Default(), z, quietLogger(), here)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.ln.Close()
+	if b.host != z.ip() || strings.Contains(b.bootstrap, ".doze") {
+		t.Errorf("advertised host %q, bootstrap %q for a name nothing answers at", b.host, b.bootstrap)
+	}
+	z.reach = func(string, int) bool { return true }
 
 	// A name that resolves, but to someone else's address (a container inheriting its
 	// host's DNS) is not this instance's name.
@@ -195,16 +215,23 @@ func TestResolvesHereNeedsBothAnAnswerAndTheRightOne(t *testing.T) {
 // A taken port on the name's address is an error that names the cause: the remedy is
 // the opposite of "run dns-setup".
 func TestATakenAddressSaysSoRatherThanBlamingDNS(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		// Not a missing setup, so not a failure under DOZE_NAMES_REQUIRED either: on
+		// macOS a name's address is never bound (doze-names translates it to a
+		// private port), so no other process can be holding it, and this clash
+		// cannot be arranged.
+		t.Skip("on macOS a name's address is translated, never bound: nothing else can hold its port")
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	z := joinZone(ctx, quietLogger(), "portclash")
 	defer z.close()
 	if z.own == nil {
-		t.Skip("no name claimed")
+		skipOrFail(t, "no name claimed")
 	}
 	blocker, err := net.Listen("tcp", net.JoinHostPort(z.ip(), "9092"))
 	if err != nil {
-		t.Skipf("cannot bind %s:9092 (loopback pool not aliased, or in use): %v", z.ip(), err)
+		skipOrFail(t, "cannot bind %s:9092 (in use?): %v", z.ip(), err)
 	}
 	defer blocker.Close()
 
@@ -223,19 +250,27 @@ func TestATakenAddressSaysSoRatherThanBlamingDNS(t *testing.T) {
 // it bound. A blank or "localhost" host here would send every client to a different
 // machine than the one that answered the bootstrap.
 func TestNameModeAdvertisesWhereTheBrokerIs(t *testing.T) {
+	// run() below sets the machine up when it is not (as root without asking), which
+	// is not a test's business: look first, and start nothing on a machine that is
+	// not ready.
+	needZone(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	z := joinZone(ctx, quietLogger(), "metadata")
 	if z.own == nil {
 		z.close()
-		t.Skip("no name claimed")
+		skipOrFail(t, "no name claimed")
 	}
-	ip := z.ip()
-	z.close()
-	if l, err := net.Listen("tcp", net.JoinHostPort(ip, "9092")); err != nil {
-		t.Skipf("cannot bind %s:9092 (loopback pool not aliased, or in use): %v", ip, err)
-	} else {
+	ip, host := z.ip(), z.own.Name.Host
+	// Through the lease, as the server listens: on macOS the address is not one a
+	// process can bind.
+	l, err := z.own.Listen(kafkaPort)
+	if err == nil {
 		l.Close()
+	}
+	z.close()
+	if err != nil {
+		skipOrFail(t, "cannot listen on %s:9092 for %s (in use?): %v", ip, host, err)
 	}
 
 	dir := t.TempDir()
@@ -254,7 +289,7 @@ func TestNameModeAdvertisesWhereTheBrokerIs(t *testing.T) {
 	waitFor(t, "the summary", func() bool {
 		select {
 		case err := <-done:
-			t.Skipf("did not start in name mode here (no .doze setup?): %v", err)
+			skipOrFail(t, "did not start in name mode here: %v", err)
 		default:
 		}
 		return strings.Contains(out.String(), "doze-kafka is up")
@@ -269,8 +304,17 @@ func TestNameModeAdvertisesWhereTheBrokerIs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(resp.Brokers) != 1 || resp.Brokers[0].Host != ip || resp.Brokers[0].Port != 9092 {
-		t.Errorf("Metadata brokers = %+v, want one at %s:9092", resp.Brokers, ip)
+	// The broker tells clients the name where the name resolves here (a machine set
+	// up for .doze, as a CI runner is once something has run setup) and the address
+	// where it does not. Under DOZE_NAMES_REQUIRED the machine is one where it must.
+	want := ip
+	if resolvesHere(net.DefaultResolver.LookupHost, host, ip) && names.Reachable(host, kafkaPort) {
+		want = host
+	} else if namesRequired() {
+		t.Errorf("%s does not resolve to %s and answer on this machine, and %s says it must", host, ip, envNamesRequired)
+	}
+	if len(resp.Brokers) != 1 || resp.Brokers[0].Host != want || resp.Brokers[0].Port != 9092 {
+		t.Errorf("Metadata brokers = %+v, want one at %s:9092", resp.Brokers, want)
 	}
 }
 

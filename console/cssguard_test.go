@@ -20,10 +20,21 @@ import (
 func TestTemplateClassesAreStyled(t *testing.T) {
 	// Classes that intentionally carry no styles: pure JS/layout hooks.
 	hookClasses := map[string]string{
-		"ago": "relative-time hook — shell.js rewrites its text as time passes",
+		"ago":           "relative-time hook — shell.js rewrites its text as time passes",
+		"done":          "marks a finished rebalance in the story, for the browser spec",
+		"going":         "marks a rebalance still in progress in the story, for the browser spec",
+		"worth":         "names the first list of a client's metrics, for the browser spec",
+		"rest":          "names the second list of a client's metrics, for the browser spec",
+		"rebalance":     "marks a rebalance row in the story, for the browser spec",
+		"c-er":          "the Error rate column of the clients table, which the table sizes",
+		"paused-text":   "the banner's sentence, for the browser spec",
+		"tf-empty":      "the empty-state card, for the browser spec",
+		"kid":           "marks a request that came before the oldest rebalance, drawn muted by .r.kid",
+		"tf-head":       "the Traffic page's head, for the design gate (e2e/design)",
+		"tf-hidden-act": "the button the m key presses (all of a client's metrics); the board draws none",
 	}
 
-	css := readAll(t, "static/app.css") + readAll(t, filepath.Join("static", "cm", "codemirror.min.css"))
+	css := readAll(t, "static/app.css")
 
 	actionRe := regexp.MustCompile(`(?s){{.*?}}`)
 	// Whitespace before class= keeps Alpine's bound :class="expr" (a JS
@@ -185,7 +196,10 @@ func TestTypeScaleIsClosed(t *testing.T) {
 // that table stated in the most local place available, and converting eighty of
 // those to classes would make the markup worse and the stylesheet longer.
 var inlineBudget = map[string]int{
-	"groups.html": 1, "panes.html": 1, "topics.html": 4,
+	"groups.html": 1, "inspector.html": 0, "panes.html": 1, "topics.html": 4,
+	// Traffic writes the boards' own inline styles where the board does (a column's tracks,
+	// a body's gap, the empty card's size), so a template reads like the board it implements.
+	"traffic.html": 3, "traffic_inspector.html": 7,
 }
 
 func TestInlineStyleBudget(t *testing.T) {
@@ -312,6 +326,126 @@ func TestCompoundClassesAreStyled(t *testing.T) {
 		}
 		t.Errorf("modifier .%s is only ever compounded with %v in the CSS, but is used without any of them in %s — add the missing compound rule",
 			tok, sortedKeys(partners(tok)), strings.Join(where, ", "))
+	}
+}
+
+// cssRule is one top-level rule: its selectors, its declarations and the line it
+// begins on.
+type cssRule struct {
+	selectors []string
+	decls     map[string]string
+	line      int
+}
+
+// topLevelRules reads the rules of a stylesheet that stand outside every at-rule
+// (@media, @supports, @keyframes, @font-face: a rule in there is conditional or is
+// not a style rule, and restating a selector inside one is how a condition is
+// written). Comments are blanked first, keeping the line numbers.
+func topLevelRules(css string) []cssRule {
+	css = regexp.MustCompile(`(?s)/\*.*?\*/`).ReplaceAllStringFunc(css, func(c string) string {
+		return strings.Map(func(r rune) rune {
+			if r == '\n' {
+				return r
+			}
+			return ' '
+		}, c)
+	})
+	space := regexp.MustCompile(`\s+`)
+	norm := func(s string) string { return strings.TrimSpace(space.ReplaceAllString(s, " ")) }
+	var rules []cssRule
+	line, start, startLine := 1, 0, 1
+	for i := 0; i < len(css); i++ {
+		switch css[i] {
+		case '\n':
+			line++
+		case ';':
+			start, startLine = i+1, line // an @import or @charset: a statement, not a rule.
+		case '{':
+			prelude := norm(css[start:i])
+			// Find the end of this block, whatever it nests.
+			depth, j := 1, i+1
+			for ; j < len(css) && depth > 0; j++ {
+				switch css[j] {
+				case '{':
+					depth++
+				case '}':
+					depth--
+				}
+			}
+			body := css[i+1 : j-1]
+			if !strings.HasPrefix(prelude, "@") {
+				r := cssRule{decls: map[string]string{}, line: startLine + strings.Count(css[start:i], "\n") - strings.Count(strings.TrimLeft(css[start:i], " \t\r\n"), "\n")}
+				for _, sel := range strings.Split(prelude, ",") {
+					r.selectors = append(r.selectors, norm(sel))
+				}
+				for _, d := range strings.Split(body, ";") {
+					if k, v, ok := strings.Cut(d, ":"); ok {
+						r.decls[norm(k)] = norm(v)
+					}
+				}
+				rules = append(rules, r)
+			}
+			line += strings.Count(css[i:j], "\n")
+			i = j - 1
+			start, startLine = j, line
+		}
+	}
+	return rules
+}
+
+// TestNoSelectorIsDefinedTwiceWithConflictingDeclarations: a selector that stands at
+// the top level of the stylesheet in two rules which give one property two values
+// is two components sharing a name, and the later one quietly restyles the
+// earlier. It happened four times: the inspector's `.tick` (3 px, ink) was added
+// 700 lines after the message tape's `.tick` (8 px, the input colour) and redrew
+// the tape; `.form-sec`, `.note` and `.panes` each had a second definition from an
+// earlier design that decided what the first one said.
+//
+// The same selector in two rules is fine while they agree or speak of different
+// properties (a reset list and the component's own rule). A rule that means "this
+// class, in that place" says the place in its selector.
+func TestNoSelectorIsDefinedTwiceWithConflictingDeclarations(t *testing.T) {
+	type def struct {
+		value string
+		line  int
+	}
+	seen := map[string]map[string]def{} // selector -> property -> first definition
+	var msgs []string
+	for _, r := range topLevelRules(readAll(t, "static/app.css")) {
+		for _, sel := range r.selectors {
+			if seen[sel] == nil {
+				seen[sel] = map[string]def{}
+			}
+			for prop, val := range r.decls {
+				first, ok := seen[sel][prop]
+				if !ok {
+					seen[sel][prop] = def{val, r.line}
+					continue
+				}
+				if first.value != val && first.line != r.line {
+					msgs = append(msgs, "app.css:"+itoa(r.line)+": "+sel+" sets "+prop+": "+val+", and line "+itoa(first.line)+" sets it to "+first.value+" — one of them is another component: scope it")
+				}
+			}
+		}
+	}
+	sort.Strings(msgs)
+	for _, m := range msgs {
+		t.Error(m)
+	}
+}
+
+// The reader the guard above stands on: what it calls top level, and that it sees a
+// conflict when there is one.
+func TestTopLevelRulesReader(t *testing.T) {
+	rules := topLevelRules("/* .gone { x: 1 } */\n.a, .b  .c { color: red; width: 3px }\n@media (max-width: 9px) { .a { color: blue } }\n@keyframes k { from { color: red } to { color: blue } }\n.a { color:  red; height: 1px; }\n")
+	if len(rules) != 2 {
+		t.Fatalf("%d top-level rules, want 2: %+v", len(rules), rules)
+	}
+	if got := strings.Join(rules[0].selectors, "|"); got != ".a|.b .c" || rules[0].decls["color"] != "red" || rules[0].decls["width"] != "3px" || rules[0].line != 2 {
+		t.Errorf("first rule = %+v", rules[0])
+	}
+	if rules[1].line != 5 || rules[1].decls["height"] != "1px" || rules[1].decls["color"] != "red" {
+		t.Errorf("second rule = %+v", rules[1])
 	}
 }
 

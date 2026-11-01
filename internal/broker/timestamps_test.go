@@ -51,7 +51,9 @@ func writeStamped(t *testing.T, ctx context.Context, addr, topic string, stamps 
 // "Replay from ten minutes ago", offsetsForTimes and start-from-timestamp used to get
 // the earliest offset whatever the time asked for, silently.
 func TestListOffsetsByTimestampIsExact(t *testing.T) {
-	addr := startBroker(t, 4)
+	// The Kafka 3 profile: it has ListOffsets v7 and also v0, which Kafka 4 removed
+	// and the Kafka 4 profile therefore does not serve (claim: api V2).
+	addr := startBroker(t, 3)
 	cl := newClient(t, addr)
 	defer cl.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -126,8 +128,7 @@ func TestListOffsetsByTimestampIsExact(t *testing.T) {
 func TestListOffsetsByTimestampAfterDeleteAndRestart(t *testing.T) {
 	skipShort(t)
 	dir := t.TempDir()
-	addr := "127.0.0.1:" + strconv.Itoa(freePort(t))
-	stop := runBrokerAt(t, addr, dir, 4)
+	addr, stop := bootAt(t, "127.0.0.1:0", dir, 4)
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 	cl := newClient(t, addr)

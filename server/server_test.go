@@ -16,6 +16,8 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
+	"github.com/doze-dev/doze-kafka/internal/embed"
+	"github.com/doze-dev/doze-kafka/internal/serverhook"
 	"github.com/doze-dev/doze-kafka/server"
 )
 
@@ -454,27 +456,27 @@ func TestOnlyABrokerWithAConsoleKeepsATrafficRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer embedded.Close()
-	if embedded.Traffic() != nil {
+	if serverhook.Traffic(embedded) != nil {
 		t.Error("an embedded broker keeps a traffic record nobody will read")
 	}
 
 	cfg := config.Default()
 	cfg.DataDir, cfg.ListenAddr = t.TempDir(), "127.0.0.1:0"
-	withConsole, err := server.NewFromConfig(cfg, nil)
+	withConsole, err := embed.NewFromConfig(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer withConsole.Close()
-	if withConsole.Traffic() == nil {
+	if serverhook.Traffic(withConsole) == nil {
 		t.Error("a broker with a console keeps no traffic record")
 	}
 	cfg.Console, cfg.DataDir = false, t.TempDir()
-	without, err := server.NewFromConfig(cfg, nil)
+	without, err := embed.NewFromConfig(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer without.Close()
-	if without.Traffic() != nil {
+	if serverhook.Traffic(without) != nil {
 		t.Error("--console=false still keeps a traffic record")
 	}
 }

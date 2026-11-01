@@ -1,0 +1,138 @@
+{
+  "scenario": "apiversions-unsupported-version",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "highest-served",
+      "api": "ApiVersions",
+      "version": 4,
+      "request": {
+        "ClientSoftwareName": "my-app",
+        "ClientSoftwareVersion": "1.0",
+        "ClusterID": null,
+        "NodeID": -1
+      },
+      "response": {
+        "ApiKeys": [
+          {
+            "ApiKey": 18,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          }
+        ],
+        "ErrorCode": 0,
+        "OtherApiKeys": true
+      }
+    },
+    {
+      "label": "one-past-the-highest",
+      "api": "ApiVersions",
+      "version": 5,
+      "request": {
+        "ClientSoftwareName": "my-app",
+        "ClientSoftwareVersion": "1.0",
+        "ClusterID": null,
+        "NodeID": -1
+      },
+      "response": {
+        "ApiKeys": [
+          {
+            "ApiKey": 18,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          }
+        ],
+        "ErrorCode": 35,
+        "OtherApiKeys": false
+      }
+    },
+    {
+      "label": "far-past-the-highest",
+      "api": "ApiVersions",
+      "version": 99,
+      "request": {
+        "ClientSoftwareName": "my-app",
+        "ClientSoftwareVersion": "1.0",
+        "ClusterID": null,
+        "NodeID": -1
+      },
+      "response": {
+        "ApiKeys": [
+          {
+            "ApiKey": 18,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          }
+        ],
+        "ErrorCode": 35,
+        "OtherApiKeys": false
+      }
+    },
+    {
+      "label": "highest-a-version-can-be",
+      "api": "ApiVersions",
+      "version": 32767,
+      "request": {
+        "ClientSoftwareName": "my-app",
+        "ClientSoftwareVersion": "1.0",
+        "ClusterID": null,
+        "NodeID": -1
+      },
+      "response": {
+        "ApiKeys": [
+          {
+            "ApiKey": 18,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          }
+        ],
+        "ErrorCode": 35,
+        "OtherApiKeys": false
+      }
+    },
+    {
+      "label": "past-the-highest-with-a-name-it-would-refuse",
+      "api": "ApiVersions",
+      "version": 5,
+      "request": {
+        "ClientSoftwareName": "my app",
+        "ClientSoftwareVersion": "1.0",
+        "ClusterID": null,
+        "NodeID": -1
+      },
+      "response": {
+        "ApiKeys": [
+          {
+            "ApiKey": 18,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          }
+        ],
+        "ErrorCode": 35,
+        "OtherApiKeys": false
+      }
+    },
+    {
+      "label": "served-again-after-them",
+      "api": "ApiVersions",
+      "version": 3,
+      "request": {
+        "ClientSoftwareName": "my-app",
+        "ClientSoftwareVersion": "1.0",
+        "ClusterID": null,
+        "NodeID": -1
+      },
+      "response": {
+        "ApiKeys": [
+          {
+            "ApiKey": 18,
+            "MaxVersion": 4,
+            "MinVersion": 0
+          }
+        ],
+        "ErrorCode": 0,
+        "OtherApiKeys": true
+      }
+    }
+  ]
+}

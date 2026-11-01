@@ -16,10 +16,21 @@ type fakeTraffic struct {
 	events  []TrafficEvent
 	clients []TrafficClient
 	groups  map[string][]TrafficGroupEvent
+	story   TrafficStory
 	asked   []TrafficFilter
+	whole   int // how many times everything held was asked for.
 }
 
 func (f *fakeTraffic) Events(flt TrafficFilter, limit int) []TrafficEvent {
+	if flt == (TrafficFilter{}) && limit == 0 {
+		f.mu.Lock()
+		f.whole++ // a copy of everything held.
+		f.mu.Unlock()
+	}
+	return f.find(flt)
+}
+
+func (f *fakeTraffic) find(flt TrafficFilter) []TrafficEvent {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.asked = append(f.asked, flt)
@@ -28,13 +39,107 @@ func (f *fakeTraffic) Events(flt TrafficFilter, limit int) []TrafficEvent {
 		if flt.Topic != "" && !slices.Contains(e.Topics, flt.Topic) {
 			continue
 		}
-		if flt.ErrorsOnly && e.Error == "" {
+		if flt.Group != "" && e.Group != flt.Group && e.ViaGroup != flt.Group {
+			continue
+		}
+		if flt.ErrorsOnly && (e.Class == "" || e.Class == "expected") && !(e.Error != "" && e.Class == "") {
+			continue
+		}
+		if flt.Any != "" && !slices.ContainsFunc(append([]string{e.ClientID, e.Software, e.Remote, e.API, e.Group, e.ViaGroup, e.TxnID, e.Principal, e.Error}, e.Topics...),
+			func(s string) bool { return strings.Contains(strings.ToLower(s), strings.ToLower(flt.Any)) }) {
 			continue
 		}
 		out = append(out, e)
 	}
 	return out
 }
+
+// Query is Events with the counts the recorder keeps: what matched, and what is held.
+func (f *fakeTraffic) Query(flt TrafficFilter, limit int) TrafficResult {
+	var res TrafficResult
+	res.Rows = f.find(flt)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, e := range f.events {
+		res.Held += max(e.Count, 1)
+	}
+	for _, e := range res.Rows {
+		res.Total++
+		res.Requests += max(e.Count, 1)
+		if e.Time.After(res.Newest) {
+			res.Newest = e.Time
+		}
+		if res.Oldest.IsZero() || e.First.Before(res.Oldest) {
+			res.Oldest = e.First
+		}
+	}
+	if limit > 0 && len(res.Rows) > limit {
+		res.Rows = res.Rows[:limit]
+	}
+	return res
+}
+func (f *fakeTraffic) Row(id string) (TrafficEvent, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, e := range f.events {
+		if e.ID == id {
+			return e, true
+		}
+	}
+	return TrafficEvent{}, false
+}
+
+func (f *fakeTraffic) NewSince(flt TrafficFilter, t time.Time) (int, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, e := range f.events {
+		if e.Time.After(t) {
+			n += max(e.Count, 1)
+		}
+	}
+	return n, false
+}
+
+func (f *fakeTraffic) Story(group string) TrafficStory {
+	if f.story.Group == group {
+		return f.story
+	}
+	return TrafficStory{Group: group}
+}
+
+func (f *fakeTraffic) Window(d time.Duration) TrafficWindow {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var w TrafficWindow
+	for _, e := range f.events {
+		if time.Since(e.Time) > d {
+			continue
+		}
+		w.Requests += max(e.Count, 1)
+		if e.Class != "" && e.Class != "expected" {
+			w.Errors += max(e.Count, 1)
+		}
+	}
+	return w
+}
+
+func (f *fakeTraffic) Refusals() []TrafficRefusal {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []TrafficRefusal
+	for _, e := range f.events {
+		if e.Class != "" && e.Class != "expected" {
+			out = append(out, TrafficRefusal{Code: e.ErrorCode, Name: e.Error, Class: e.Class, Count: 1,
+				Clients: []TrafficClientCount{{e.ClientID, 1}}, First: e.Time, Last: e.Time, Latest: e.ID, API: e.API, Topics: e.Topics})
+		}
+	}
+	return out
+}
+
+func (f *fakeTraffic) Capacity() int    { return 2000 }
+func (f *fakeTraffic) Since() time.Time { return tt0 }
+
 func (f *fakeTraffic) Clients() []TrafficClient { return f.clients }
 func (f *fakeTraffic) GroupEvents(g string, limit int) []TrafficGroupEvent {
 	return f.groups[g]
@@ -45,11 +150,11 @@ var tt0 = time.Date(2026, 10, 10, 12, 30, 15, 250_000_000, time.Local)
 func sampleTraffic() *fakeTraffic {
 	return &fakeTraffic{
 		events: []TrafficEvent{
-			{Seq: 9, First: tt0, Time: tt0.Add(5 * time.Second), Count: 4, ClientID: "billing", Remote: "127.0.0.1:50001", Principal: "User:ANONYMOUS",
+			{ID: "r9", Seq: 9, First: tt0, Time: tt0.Add(5 * time.Second), Count: 4, ClientID: "billing", Remote: "127.0.0.1:50001", Principal: "User:ANONYMOUS",
 				API: "Heartbeat", Version: 4, Group: "billing-workers", Duration: 800 * time.Microsecond, ReqBytes: 60, RespBytes: 12},
-			{Seq: 8, First: tt0, Time: tt0, Count: 1, ClientID: "billing", Software: "apache-kafka-java 3.7.0", Remote: "127.0.0.1:50001", Principal: "User:ANONYMOUS",
+			{ID: "r8", Seq: 8, First: tt0, Time: tt0, Count: 1, ClientID: "billing", Software: "apache-kafka-java 3.7.0", Remote: "127.0.0.1:50001", Principal: "User:ANONYMOUS",
 				API: "Produce", Version: 9, Topics: []string{"orders"}, Detail: "1 partition, 2.0 KiB", Duration: 12 * time.Millisecond, ReqBytes: 2100, RespBytes: 80},
-			{Seq: 7, First: tt0, Time: tt0, Count: 1, ClientID: "audit", Remote: "127.0.0.1:50002", Principal: "User:ANONYMOUS",
+			{ID: "r7", Seq: 7, First: tt0, Class: "refused", ErrorCode: 3, Time: tt0, Count: 1, ClientID: "audit", Remote: "127.0.0.1:50002", Principal: "User:ANONYMOUS",
 				API: "Fetch", Version: 13, Topics: []string{"payments"}, Error: "UNKNOWN_TOPIC_OR_PARTITION", Duration: 2 * time.Millisecond, ReqBytes: 90, RespBytes: 50},
 		},
 		clients: []TrafficClient{{Conn: 1, Remote: "127.0.0.1:50001", ClientID: "billing", Software: "apache-kafka-java 3.7.0", Principal: "User:ANONYMOUS",
@@ -72,22 +177,22 @@ func TestTrafficPageShowsRequestsAndClients(t *testing.T) {
 	if rec.Code != 200 {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
 	}
-	body := rec.Body.String()
+	body := strings.ReplaceAll(rec.Body.String(), "<wbr>", "") // a result wraps at its underscores.
 	for _, want := range []string{
 		"Heartbeat", "v4", "×4", "billing-workers", // a folded row, with its count and its group.
 		"Produce", "orders", "1 partition, 2.0 KiB", "12 ms",
 		"UNKNOWN_TOPIC_OR_PARTITION", // the failed fetch, named.
 		"apache-kafka-java 3.7.0",    // in the clients table.
-		`id="clients-table"`, `id="traffic-table"`,
+		`id="clients-list"`, `id="traffic-table"`,
 		`data-live="/_console/traffic/live"`, // the tail polls itself.
-		`hx-get="/_console/traffic/request?seq=8"`,
+		`hx-get="/_console/inspect/request?key=`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the page does not show %q", want)
 		}
 	}
 	// The rail offers it and marks it current.
-	if !strings.Contains(body, `href="/_console/traffic" class="ri on"`) {
+	if !strings.Contains(body, `href="/_console/traffic" class="nav on"`) {
 		t.Error("the rail does not mark Traffic as the current section")
 	}
 }
@@ -161,7 +266,7 @@ func TestTrafficLiveOnlyAnswersWhenSomethingChanged(t *testing.T) {
 	}
 }
 
-func TestTrafficDrawerShowsOneRequestAndSaysWhenItMovedOn(t *testing.T) {
+func TestTrafficInspectorShowsOneRequestAndSaysWhenItMovedOn(t *testing.T) {
 	src := sampleTraffic()
 	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = src })
 
@@ -170,12 +275,12 @@ func TestTrafficDrawerShowsOneRequestAndSaysWhenItMovedOn(t *testing.T) {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"Produce v9", "billing", "apache-kafka-java 3.7.0", "127.0.0.1:50001", "User:ANONYMOUS", "orders", "1 partition, 2.0 KiB", "12 ms", "2.1 KB in"} {
+	for _, want := range []string{`Produce <span class="mut">v9</span>`, "billing", "apache-kafka-java 3.7.0", "127.0.0.1:50001", "User:ANONYMOUS", "orders", "12 ms", "2.1 KiB / "} {
 		if !strings.Contains(body, want) {
-			t.Errorf("the drawer is missing %q:\n%s", want, body)
+			t.Errorf("the inspector is missing %q:\n%s", want, body)
 		}
 	}
-	if gone := req(t, c, "GET", "/_console/traffic/request?seq=999", nil); gone.Code != 200 || !strings.Contains(gone.Body.String(), "changed or aged out") {
+	if gone := req(t, c, "GET", "/_console/traffic/request?seq=999", nil); gone.Code != 200 || !strings.Contains(gone.Body.String(), "aged out") {
 		t.Errorf("a vanished row: %d %s", gone.Code, gone.Body)
 	}
 	if bad := req(t, c, "GET", "/_console/traffic/request?seq=abc", nil); bad.Code != 400 {
@@ -189,7 +294,7 @@ func TestGroupPageShowsItsTimelineNewestFirst(t *testing.T) {
 	topicWith(t, c, "orders", 1, 1)
 	commitFor(t, addr, "billing-workers", "orders", map[int32]int64{0: 1})
 
-	rec := req(t, c, "GET", "/_console/groups/billing-workers", nil)
+	rec := req(t, c, "GET", "/_console/groups/billing-workers?tab=timeline", nil)
 	if rec.Code != 200 {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
 	}
@@ -206,7 +311,7 @@ func TestGroupPageShowsItsTimelineNewestFirst(t *testing.T) {
 
 	// A group the coordinator has said nothing about says so, rather than showing a blank.
 	commitFor(t, addr, "quiet", "orders", map[int32]int64{0: 1})
-	if q := req(t, c, "GET", "/_console/groups/quiet", nil); !strings.Contains(q.Body.String(), "Nothing has happened in this group since the broker started") {
+	if q := req(t, c, "GET", "/_console/groups/quiet?tab=timeline", nil); !strings.Contains(q.Body.String(), "Nothing has happened in this group since the broker started") {
 		t.Error("a group with no events does not say so")
 	}
 }
@@ -228,13 +333,24 @@ func TestWithoutATrafficSourceThereIsNoTrafficSection(t *testing.T) {
 	}
 }
 
+// A duration is the boards': whole milliseconds, rounded (22.8 ms was "22 ms": A9), "0 ms"
+// under half a millisecond as the boards print it, seconds to a tenth from one second;
+// the measured time is the tooltip (AD6).
 func TestShortDuration(t *testing.T) {
 	for in, want := range map[time.Duration]string{
-		400 * time.Microsecond: "0.4 ms", 12 * time.Millisecond: "12 ms", 2500 * time.Millisecond: "2.5 s",
-		190 * time.Second: "3m10s", 0: "0.0 ms",
+		400 * time.Microsecond: "0 ms", 12 * time.Millisecond: "12 ms", 2500 * time.Millisecond: "2.5 s",
+		190 * time.Second: "3 m 10 s", 0: "0 ms", 42 * time.Microsecond: "0 ms", 499 * time.Microsecond: "0 ms",
+		500 * time.Microsecond: "1 ms", 960 * time.Microsecond: "1 ms", -3 * time.Microsecond: "0 ms",
+		22800 * time.Microsecond: "23 ms", time.Millisecond: "1 ms", 999 * time.Millisecond: "999 ms", 999600 * time.Microsecond: "1.0 s",
+		3 * time.Second: "3.0 s",
 	} {
 		if got := shortDuration(in); got != want {
 			t.Errorf("shortDuration(%v) = %q, want %q", in, got, want)
+		}
+	}
+	for in, want := range map[time.Duration]string{42 * time.Microsecond: "took 42 µs", 400 * time.Microsecond: "took 0.4 ms", 22800 * time.Microsecond: "took 22.8 ms", 3 * time.Second: "took 3.000 s"} {
+		if got := exactDuration(in); got != want {
+			t.Errorf("exactDuration(%v) = %q, want %q", in, got, want)
 		}
 	}
 }
@@ -242,6 +358,8 @@ func TestShortDuration(t *testing.T) {
 func TestSpanText(t *testing.T) {
 	for in, want := range map[time.Duration]string{
 		0: "just now", time.Second: "just now", 12 * time.Second: "12s", 190 * time.Second: "3m 10s", 125 * time.Minute: "2h 05m",
+		// A record's age in the table is a span too: a day or more counts in days.
+		47 * time.Hour: "47h 00m", 48 * time.Hour: "2d 00h", 77 * time.Hour: "3d 05h",
 	} {
 		if got := spanText(in); got != want {
 			t.Errorf("spanText(%v) = %q, want %q", in, got, want)
@@ -275,74 +393,83 @@ func sampleMetrics() fakeMetrics {
 		MetricSeries{Name: "org.apache.kafka.producer.somethingelse.total", Kind: "sum", Samples: ramp(3, 1000, 1000)},
 	)
 	return fakeMetrics{[]ClientInstance{
-		{ID: "0d7a8e3c-1b1e-4c2f-9a77-3b7c2f6a9d10", ClientID: "billing", Software: "apache-kafka-java 3.7.1", Principal: "User:ANONYMOUS", Host: "/127.0.0.1",
-			First: tt0, Last: time.Now(), Pushes: 20, Resource: map[string]string{"client_rack": "r1"}, Series: series},
+		{ID: "0d7a8e3c-1b1e-4c2f-9a77-3b7c2f6a9d10", Conn: 1, ClientID: "billing", Software: "apache-kafka-java 3.7.1", Principal: "User:ANONYMOUS", Host: "/127.0.0.1",
+			First: tt0, Last: tt0.Add(95 * time.Second), Pushes: 20, Resource: map[string]string{"client_rack": "r1"}, Series: series},
 		{ID: "11111111-2222-4333-8444-555555555555", ClientID: "audit", Last: time.Now(), Pushes: 1, Terminated: true},
 	}}
 }
 
-func TestTrafficPageShowsWhatClientsReportAboutThemselves(t *testing.T) {
+// A client's own metrics are the client's page (Traf-07), not a section under the
+// requests: the inspector says what they are and puts the ones worth a look first.
+func TestClientInspectorShowsWhatItReportsAboutItself(t *testing.T) {
 	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic(); o.ClientMetrics = sampleMetrics() })
-	body := req(t, c, "GET", "/_console/traffic", nil).Body.String()
-
+	body := req(t, c, "GET", "/_console/inspect/client?key=1", nil).Body.String()
 	for _, want := range []string{
-		"Client metrics", "metrics, not traces", // what it is, said on the page.
-		`aria-label="Metrics from billing"`, "apache-kafka-java 3.7.1", "0d7a8e3c…", "20 reports",
-		"producer.node.request.latency.avg", "node_id=1", // the short name, and the attributes it is for.
-		"13.5 ms",        // 4 + 19*0.5, with its unit and without float noise.
-		"3",              // the connection total.
-		"3,000",          // a thousands separator.
-		"client_rack=r1", // what the client said about itself.
-		"closing",        // the one whose last report said it was closing.
-		"It has reported no metrics yet",
+		"Metrics reported by the client itself", "metrics, not traces", "Reported every 5 s", "last report",
+		"Request latency to a node, average", "node_id=1", // the metric's own name in words, and the attributes it is for.
+		"13.5 ms", // 4 + 19*0.5, with its unit and without float noise.
+		"Sparklines cover the last minute, one bar per report",
+		"more metrics are in the full list",
+		"connected",
 	} {
 		if !strings.Contains(body, want) {
-			t.Errorf("the page does not show %q", want)
+			t.Errorf("the client's inspector does not show %q:\n%s", want, body)
 		}
 	}
-	// A series with samples is drawn; one with a single sample is not.
-	if n := strings.Count(body, `<polyline points=`); n < 3 {
-		t.Errorf("%d sparklines, want one per series that has a history", n)
+	// One bar a report, the last twelve (Traf-07).
+	if n := strings.Count(body, `<span class="spark">`); n < 1 || strings.Count(between(body, `<span class="spark">`, "</span>"), "<i ") != 12 {
+		t.Errorf("%d sparklines drawn: %s", n, between(body, `<span class="spark">`, "</span>"))
 	}
-	// The interesting ones come first, and the rest fold away.
-	lat, filler := strings.Index(body, "producer.node.request.latency.avg"), strings.Index(body, "producer.filler.00")
-	if !(lat > 0 && filler > lat) {
-		t.Errorf("the request latency (%d) does not come before filler (%d)", lat, filler)
+	// The interesting ones come first, and the rest fold away until asked for.
+	if strings.Contains(body, "producer.filler.09") {
+		t.Error("the filler is not folded away")
 	}
-	// Three of the thirteen are folded: the interesting ones stayed up, so what is folded
-	// is filler, never the latency.
-	if folded := between(body, `class="mc-more"`, "</details>"); strings.Contains(folded, "request.latency") || !strings.Contains(folded, "filler") {
-		t.Errorf("the fold hides the wrong metrics:\n%s", folded)
-	}
-	if !strings.Contains(body, "<summary>3 more metrics</summary>") {
-		t.Errorf("a long list is not folded:\n%s", between(body, "mc-more", "</summary>"))
+	all := req(t, c, "GET", "/_console/inspect/client?key=1&all=1", nil).Body.String()
+	if !strings.Contains(all, "producer.filler.09") || strings.Contains(all, "more metrics are in the full list") {
+		t.Error("asking for all of them does not list them all")
 	}
 }
 
-func TestClientMetricsSectionIsAbsentWithoutASourceAndSaysSoWhenThereAreNone(t *testing.T) {
-	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic() })
-	if body := req(t, c, "GET", "/_console/traffic", nil).Body.String(); strings.Contains(body, "Client metrics") {
-		t.Error("the page offers client metrics with nothing behind them")
+func TestClientWithoutMetricsSaysWhyAndWhatToFlip(t *testing.T) {
+	src := sampleTraffic()
+	src.clients = append(src.clients, TrafficClient{Conn: 2, ClientID: "seed-loader", Software: "kgo", Principal: "User:ANONYMOUS", Remote: "127.0.0.1:55190",
+		Opened: time.Now().Add(-9 * time.Second), Last: time.Now(), Requests: 3})
+	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = src; o.ClientMetrics = sampleMetrics() })
+	body := req(t, c, "GET", "/_console/inspect/client?key=2", nil).Body.String()
+	for _, want := range []string{"This client does not report metrics", "The client is too old", "The client turned it off", "enable.metrics.push=", "--client-telemetry", "See a client that reports"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the no-metrics inspector does not show %q", want)
+		}
 	}
-	c, _ = newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic(); o.ClientMetrics = fakeMetrics{} })
+	// With telemetry off on the broker it says that instead of blaming the client.
+	c2, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = src })
+	if b := req(t, c2, "GET", "/_console/inspect/client?key=2", nil).Body.String(); strings.Contains(b, "does not report metrics") || !strings.Contains(b, "does not collect client metrics") {
+		t.Errorf("without a store the page still blames the client:\n%s", b)
+	}
+}
+
+// The requests page no longer carries a section of metric cards: the open connections
+// are the inspector's default, with the sentence that points at a client.
+func TestTrafficPageHasNoMetricCardsAndPointsAtTheClient(t *testing.T) {
+	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic(); o.ClientMetrics = sampleMetrics() })
 	body := req(t, c, "GET", "/_console/traffic", nil).Body.String()
-	if !strings.Contains(body, "No client has reported metrics yet") || !strings.Contains(body, "enable.metrics.push") {
-		t.Error("with metrics on and none reported, the page does not explain why it is empty")
+	if strings.Contains(body, `class="mcard"`) {
+		t.Error("the page still draws metric cards under the requests")
+	}
+	if !strings.Contains(body, "Open a client to see them.") {
+		t.Error("the connected clients do not say where the metrics are")
 	}
 }
 
-// A new report must refresh the polled region, or a quiet page would never move.
-func TestClientMetricsRefreshTheLiveRegion(t *testing.T) {
+// A new report changes nothing in the request region: the metrics are not part of it.
+func TestClientMetricsDoNotRefreshTheRequestRegion(t *testing.T) {
 	src := sampleMetrics()
 	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic(); o.ClientMetrics = src })
 	first := req(t, c, "GET", "/_console/traffic/live", nil)
 	hash := first.Header().Get("HX-Live-Hash")
-	if rec := req(t, c, "GET", "/_console/traffic/live?h="+hash, nil); rec.Code != 204 {
-		t.Fatalf("nothing changed, but the poll answered %d", rec.Code)
-	}
 	src.instances[0].Pushes++
-	if rec := req(t, c, "GET", "/_console/traffic/live?h="+hash, nil); rec.Code != 200 {
-		t.Errorf("a new report did not refresh the region: %d", rec.Code)
+	if rec := req(t, c, "GET", "/_console/traffic/live?h="+hash, nil); rec.Code != 204 {
+		t.Errorf("a metrics report refreshed the whole request region: %d", rec.Code)
 	}
 }
 
@@ -361,25 +488,22 @@ func TestFormatMetric(t *testing.T) {
 	}
 }
 
-func TestSparklineScalesTheLastSamplesAndDrawsNothingForOne(t *testing.T) {
-	if got := sparkline(ramp(1, 1, 1)); got != "" {
-		t.Errorf("one sample drew %q", got)
+// Traf-07's sparkline is a bar a report, the last twelve, each 2 px at the least and as
+// tall as its value is of the largest drawn (16 px), as the board draws it.
+func TestSparkBarsAreTheLastTwelveReports(t *testing.T) {
+	if got := sparkBarsHTML(nil); got != "" {
+		t.Errorf("nothing drew %q", got)
 	}
-	flat := string(sparkline(ramp(5, 7, 0)))
-	if !strings.Contains(flat, `points="1.0,12.0 `) {
-		t.Errorf("a flat series is not drawn along the middle: %s", flat)
+	bars := string(sparkBarsHTML(ramp(20, 0, 1)))
+	if n := strings.Count(bars, "<i "); n != sparkBars {
+		t.Errorf("%d bars for 20 reports, want the last %d", n, sparkBars)
 	}
-	rising := string(sparkline(ramp(5, 0, 1)))
-	// Oldest at the left and the bottom, newest at the right and the top.
-	if !strings.HasPrefix(between(rising, `points="`, `"/>`), `points="1.0,22.0 `) || !strings.HasSuffix(between(rising, `points="`, `"/>`), `119.0,2.0`) {
-		t.Errorf("a rising series does not run bottom-left to top-right: %s", rising)
+	// The last twelve of 0..19 are 8..19: the first is 2 + 14*8/19, the last 16.
+	if !strings.Contains(bars, `<span class="spark"><i style="height: 8px"></i>`) || !strings.Contains(bars, `<i style="height: 16px"></i></span>`) {
+		t.Errorf("the bars do not scale to the largest drawn: %s", bars)
 	}
-	long := string(sparkline(ramp(200, 0, 1)))
-	if n := strings.Count(between(long, `points="`, `"/>`), ","); n != sparkPoints {
-		t.Errorf("%d points drawn for 200 samples, want the last %d", n, sparkPoints)
-	}
-	if !strings.Contains(long, "the last 60 samples, from 140 to 199") {
-		t.Errorf("the chart's description is wrong: %s", long)
+	if zero := string(sparkBarsHTML(ramp(3, 0, 0))); strings.Count(zero, "height: 2px") != 3 {
+		t.Errorf("a series of zeros is not three 2 px bars: %s", zero)
 	}
 }
 
@@ -406,5 +530,21 @@ func TestMetricRankPutsWhatAnswersIsThisClientHealthyFirst(t *testing.T) {
 	}
 	if metricRank("org.apache.kafka.producer.topic.record.retry.rate", 2) >= 0 {
 		t.Error("a non-zero retry rate does not come first")
+	}
+}
+
+// The refused count and the "N of M" figure are outside the polled region, so the poll
+// carries them out of band; drawn once they would go stale.
+func TestTrafficLiveRefreshesTheRefusedAndMatchCounts(t *testing.T) {
+	c, _ := newTestConsoleAddr(t, func(o *Options) { o.Traffic = sampleTraffic() })
+	page := req(t, c, "GET", "/_console/traffic?kind=errors&client=billing", nil).Body.String()
+	if !strings.Contains(page, `id="refused-count"`) || !strings.Contains(page, `id="match-count"`) {
+		t.Fatalf("the page lacks the counts: %s", page)
+	}
+	live := req(t, c, "GET", "/_console/traffic/live?kind=errors&client=billing", nil).Body.String()
+	for _, id := range []string{"refused-count", "match-count"} {
+		if !strings.Contains(live, `id="`+id+`" hx-swap-oob="true"`) {
+			t.Errorf("the live answer does not refresh #%s", id)
+		}
 	}
 }

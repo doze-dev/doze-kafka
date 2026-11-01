@@ -172,6 +172,8 @@ func newFetchBudget(maxBytes int32) *fetchBudget {
 }
 
 // readPartition fills rp from one partition and returns the record bytes read.
+//
+//fuzz:not-a-parser reads a partition's stored batches for a Fetch; its string is a topic name already resolved, and no bytes from outside are parsed here
 func (b *Broker) readPartition(topic string, part kmsg.FetchRequestTopicPartition, fr *kmsg.FetchRequest, rp *kmsg.FetchResponseTopicPartition, budget *fetchBudget) int {
 	plog, err := b.logs.ExistingPartition(topic, part.Partition)
 	if errors.Is(err, log.ErrNoSuchPartition) {
@@ -215,7 +217,11 @@ func (b *Broker) readPartition(topic string, part kmsg.FetchRequestTopicPartitio
 
 	switch {
 	case errors.Is(err, log.ErrOffsetOutOfRange):
+		// Kafka answers it with no offsets and no aborted transactions, and empty
+		// (not null) records (claim: api V7).
 		rp.ErrorCode = kerr.OffsetOutOfRange.Code
+		rp.HighWatermark, rp.LastStableOffset, rp.LogStartOffset = -1, -1, -1
+		rp.AbortedTransactions, rp.RecordBatches = nil, []byte{}
 		return 0
 	case err != nil:
 		rp.ErrorCode = b.storageFault("fetch: read", err, "topic", topic, "partition", part.Partition, "offset", part.FetchOffset)

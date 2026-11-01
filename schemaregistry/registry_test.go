@@ -216,7 +216,7 @@ func TestReferencesInJSONAndProtobuf(t *testing.T) {
 // Subject names can hold anything, "/" included, as a URL-encoded path element.
 func TestSubjectsWithUnusualNames(t *testing.T) {
 	r, _ := openReg(t)
-	api := NewAPI(r, Options{})
+	api := NewAPI(r, Options{AllowedHosts: testHosts})
 	for _, name := range []string{"a/b", "with space", "ünïcode-значение", "100%", "dot.dot", "q?mark", "hash#tag"} {
 		path := "/subjects/" + url.PathEscape(name) + "/versions"
 		req := httptest.NewRequest("POST", path, strings.NewReader(schemaBody(avroUser1)))
@@ -244,7 +244,7 @@ func TestSubjectsWithUnusualNames(t *testing.T) {
 // included, and a wrong pair is the same 401 as none.
 func TestBasicAuthIsRequiredWhenConfigured(t *testing.T) {
 	r, _ := openReg(t)
-	api := NewAPI(r, Options{Auth: func(u, p string) bool { return u == "alice" && p == "pw" }})
+	api := NewAPI(r, Options{AllowedHosts: testHosts, Auth: func(u, p string) bool { return u == "alice" && p == "pw" }})
 	try := func(user, pass string) int {
 		req := httptest.NewRequest("GET", "/subjects", nil)
 		if user != "" {

@@ -24,9 +24,13 @@ Nothing special: `bootstrap.servers`, and everything Streams needs is there.
 
 ```properties
 spring.kafka.bootstrap-servers=${KAFKA_BOOTSTRAP_SERVERS}
-spring.kafka.producer.transaction-id-prefix=tx-          # transactions, if you use them
+# transactions, if you use them
+spring.kafka.producer.transaction-id-prefix=tx-
 spring.kafka.consumer.isolation-level=read_committed
 ```
+
+These are the settings `compat/spring` runs with, read from this page (a `#` after a
+value is part of the value in a `.properties` file, so the comment has a line of its own).
 
 - `KafkaAdmin` creates every `NewTopic` bean at start-up and **raises the partition count**
   when a declaration grows (`CreatePartitions`); it never shrinks one.
@@ -42,6 +46,9 @@ run; any connector that needs only the Kafka protocol should work.
 
 ```properties
 bootstrap.servers=kafka.myproject.doze:9092
+group.id=connect-cluster
+key.converter=org.apache.kafka.connect.storage.StringConverter
+value.converter=org.apache.kafka.connect.storage.StringConverter
 offset.storage.topic=connect-offsets
 config.storage.topic=connect-configs
 status.storage.topic=connect-status
@@ -49,6 +56,9 @@ offset.storage.replication.factor=1
 config.storage.replication.factor=1
 status.storage.replication.factor=1
 ```
+
+These are the worker settings `compat/connect` runs with (it adds a per-run suffix to the
+group and topic names); `group.id` is required in distributed mode.
 
 ## Schema Registry
 

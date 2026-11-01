@@ -60,11 +60,34 @@ type Config struct {
 
 	// Groups.
 	ConsumerSessionTimeout time.Duration // KIP-848 session timeout: evict a member after this long without a heartbeat.
+	// ConsumerAssignmentInterval is the least time between two computations of a
+	// consumer group's target assignment (group.consumer.assignment.interval.ms, 1 s,
+	// as Kafka's default; 0 computes at every heartbeat, which Kafka allows too). It
+	// has no flag or file key: the broker tests of reconciliation set it to 0.
+	ConsumerAssignmentInterval time.Duration
+	// GroupInitialRebalanceDelay is how long the first rebalance of an empty classic
+	// group waits for more members, started again while members keep joining, up to
+	// the rebalance timeout (group.initial.rebalance.delay.ms). Kafka's default is 3 s;
+	// this broker's is 200 ms (docs/limitations.md). Zero completes it at once.
+	GroupInitialRebalanceDelay time.Duration
+	// OffsetsRetention is how long a group's committed offsets are kept once nothing is
+	// reading them (offsets.retention.minutes: 7 days). Zero keeps them for ever.
+	OffsetsRetention time.Duration
+	// OffsetsRetentionCheckInterval is how often the retention is applied
+	// (offsets.retention.check.interval.ms). Zero is a hundredth of the retention,
+	// between 50 ms and ten minutes. It has no flag or file key: the conformance
+	// replays set it long, and apply the retention at the points of a script where
+	// Kafka's check has run (serverhook.CheckOffsets), so that what they compare
+	// does not depend on when a ticker fires.
+	OffsetsRetentionCheckInterval time.Duration
 
 	// Topics.
 	AutoCreateTopics  bool
 	DefaultPartitions int // partition count for auto-created topics.
 	MaxPartitions     int // most partitions a single topic may have; every one is open files and a directory.
+	// MessageMaxBytes is the largest record batch a topic accepts unless it sets
+	// max.message.bytes itself: Kafka's message.max.bytes, with Kafka's default.
+	MessageMaxBytes int64
 
 	// Auth (all optional; empty = disabled). SASL gates the listener behind a
 	// handshake; TLS encrypts it. The two are independent — SASL over plaintext,
@@ -84,17 +107,28 @@ type Config struct {
 	// Console: the web UI, served over HTTP beside the broker.
 	Console           bool     // serve the console.
 	ConsoleAddr       string   // host:port for the console's HTTP listener.
+	ConsolePrefix     string   // URL path the console is mounted under; "" is DefaultConsolePrefix.
 	ConsoleAllowHosts []string // extra Host names the console answers to (DNS-rebinding guard).
-	TraceHeader       string   // a record header holding a trace id, for the console's message lineage.
+	// ConsoleUnprotected accepts serving the console beyond loopback while SASL or
+	// TLS is on. The console has no login and acts on the broker as a super user, so
+	// without this that combination is refused (see Validate).
+	ConsoleUnprotected bool
+	TraceHeader        string // a record header holding a trace id, for the console's message lineage.
 
 	// ClientTelemetry accepts the metrics clients push about themselves (KIP-714) and
 	// keeps the last few minutes in memory for the console.
 	ClientTelemetry bool
+	// Zone joins the shared .doze zone (names, the front door). False is the same
+	// switch as DOZE_ZONE=off, so a CI job or container can say it once.
+	Zone bool
 
 	// SchemaRegistry: a Confluent-compatible schema registry, served over HTTP beside
 	// the broker. Its records live in the metadata database.
 	SchemaRegistry     bool   // serve the registry.
 	SchemaRegistryAddr string // host:port for the registry's HTTP listener.
+	// SchemaRegistryTLS serves the registry over TLS, with the broker's certificate,
+	// whenever the broker has one. False keeps it plain HTTP (see RegistryTLS).
+	SchemaRegistryTLS bool
 
 	// Name is this instance's name in the shared .doze zone. It answers on
 	// kafka.<name>.doze, so two projects on one machine are two instances that
@@ -128,9 +162,18 @@ const (
 	listenModeConsole  = "127.0.0.1:9093"
 	// The registry is HTTP too, on Confluent's own port, beside the broker on the
 	// name's address in name mode and on loopback under --listen.
-	listenModeRegistry  = "127.0.0.1:8081"
+	listenModeRegistry = "127.0.0.1:8081"
+	// Under a --listen on port 0, both take a port the system chooses.
+	listenModeAnyPort   = "127.0.0.1:0"
 	defaultSegmentBytes = 128 << 20 // 128 MiB
 	defaultIndexStride  = 4 << 10   // 4 KiB
+
+	// DefaultMessageMaxBytes is Kafka's default for message.max.bytes: the largest
+	// record batch a topic with no limit of its own accepts. A development broker
+	// that took any size let an application ship a batch size production refuses
+	// (recorded against apache/kafka:4.3.1: 1048588 bytes is stored, 1048589 is
+	// MESSAGE_TOO_LARGE; conformance/recordings/produce-validation.json).
+	DefaultMessageMaxBytes = 1048588
 
 	// defaultMaxPartitions bounds one topic, not the broker. A partition is a
 	// directory and two open files, so an unbounded count lets a typo take the
@@ -149,25 +192,31 @@ func Default() Config {
 		listen = "127.0.0.1:9092"
 	}
 	return Config{
-		Version:                MaxKafkaMajor,
-		ListenAddr:             listen,
-		AdvertisedHost:         "", // derived from the listen address: see ResolveAdvertisedHost.
-		DataDir:                DefaultDataDir,
-		MetaDB:                 "", // empty = <data-dir>/meta.db; see ResolveMetaDB.
-		SegmentBytes:           defaultSegmentBytes,
-		IndexIntervalBytes:     defaultIndexStride,
-		FsyncInterval:          500 * time.Millisecond,
-		ConsumerSessionTimeout: 45 * time.Second,
-		AutoCreateTopics:       true,
-		DefaultPartitions:      1,
-		MaxPartitions:          defaultMaxPartitions,
-		Console:                true,
-		ClientTelemetry:        true,
-		SchemaRegistry:         true,
-		ACLDefault:             ACLAllow,
-		ConsoleAddr:            defaultConsoleAddr,
-		LogLevel:               "info",
-		LogFormat:              "text",
+		Version:                    MaxKafkaMajor,
+		ListenAddr:                 listen,
+		AdvertisedHost:             "", // derived from the listen address: see ResolveAdvertisedHost.
+		DataDir:                    DefaultDataDir,
+		MetaDB:                     "", // empty = <data-dir>/meta.db; see ResolveMetaDB.
+		SegmentBytes:               defaultSegmentBytes,
+		IndexIntervalBytes:         defaultIndexStride,
+		FsyncInterval:              500 * time.Millisecond,
+		ConsumerSessionTimeout:     45 * time.Second,
+		ConsumerAssignmentInterval: time.Second,
+		GroupInitialRebalanceDelay: 200 * time.Millisecond,
+		OffsetsRetention:           7 * 24 * time.Hour,
+		AutoCreateTopics:           true,
+		DefaultPartitions:          1,
+		MaxPartitions:              defaultMaxPartitions,
+		MessageMaxBytes:            DefaultMessageMaxBytes,
+		Console:                    true,
+		ClientTelemetry:            true,
+		Zone:                       true,
+		SchemaRegistry:             true,
+		SchemaRegistryTLS:          true,
+		ACLDefault:                 ACLAllow,
+		ConsoleAddr:                defaultConsoleAddr,
+		LogLevel:                   "info",
+		LogFormat:                  "text",
 	}
 }
 
@@ -208,16 +257,33 @@ func DeriveName(dir string) string {
 // --listen gave it an address, which replaces the name rather than adding to it.
 func (c Config) ByName() bool { return c.ListenAddr == "" }
 
-// ResolveConsoleAddr fills in the console's address under --listen. In name mode
-// it stays empty until the name's own address is known (see cmd/doze-kafka).
+// ResolveConsoleAddr fills in the console's and the registry's addresses under
+// --listen. In name mode they stay empty until the name's own address is known
+// (see cmd/doze-kafka).
+//
+// A --listen on port 0 asks the system for a port, which is how a script or a
+// test runs a broker that cannot collide with another: the console and the
+// registry then take system-chosen ports too, on loopback, rather than fixed ones
+// that a second copy would find taken. A fixed --listen keeps the fixed ports
+// (9093 and Confluent's 8081), which are what a person types.
 func (c *Config) ResolveConsoleAddr() {
-	if c.ConsoleAddr == "" && !c.ByName() {
-		c.ConsoleAddr = listenModeConsole
+	if c.ByName() {
+		return
 	}
-	if c.SchemaRegistryAddr == "" && !c.ByName() {
-		c.SchemaRegistryAddr = listenModeRegistry
+	console, registry := listenModeConsole, listenModeRegistry
+	if _, port, err := net.SplitHostPort(c.ListenAddr); err == nil && port == "0" {
+		console, registry = listenModeAnyPort, listenModeAnyPort
+	}
+	if c.ConsoleAddr == "" {
+		c.ConsoleAddr = console
+	}
+	if c.SchemaRegistryAddr == "" {
+		c.SchemaRegistryAddr = registry
 	}
 }
+
+// DefaultConsolePrefix is the URL path the console is served under by default.
+const DefaultConsolePrefix = "/_console"
 
 // DefaultDataDir is where a bare `doze-kafka` keeps its data.
 const DefaultDataDir = "./data"
@@ -332,6 +398,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: listen address %q is not host:port (for example 127.0.0.1:9092 or :9092)", c.ListenAddr)
 	case c.Console && c.ConsoleAddr != "" && !validHostPort(c.ConsoleAddr):
 		return fmt.Errorf("config: console address %q is not host:port (for example 127.0.0.1:9093)", c.ConsoleAddr)
+	case c.ConsolePrefix != "" && !validURLPrefix(c.ConsolePrefix):
+		return fmt.Errorf("config: console prefix %q is not a URL path such as /_console (it starts with /, and has no spaces, ?, #, %% or .. in it)", c.ConsolePrefix)
 	case c.SchemaRegistry && c.SchemaRegistryAddr != "" && !validHostPort(c.SchemaRegistryAddr):
 		return fmt.Errorf("config: schema registry address %q is not host:port (for example 127.0.0.1:8081)", c.SchemaRegistryAddr)
 	case c.TraceHeader != "" && !validHeaderName(c.TraceHeader):
@@ -352,6 +420,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: max-partitions must be positive, got %d", c.MaxPartitions)
 	case c.DefaultPartitions > c.MaxPartitions:
 		return fmt.Errorf("config: default-partitions (%d) is above max-partitions (%d)", c.DefaultPartitions, c.MaxPartitions)
+	case c.MessageMaxBytes <= 0:
+		return fmt.Errorf("config: message-max-bytes must be positive, got %d (Kafka's default is %d)", c.MessageMaxBytes, DefaultMessageMaxBytes)
 	case c.RetentionBytes < 0:
 		return fmt.Errorf("config: retention-bytes must be non-negative (0 disables), got %d", c.RetentionBytes)
 	case c.RetentionMs < 0:
@@ -369,6 +439,14 @@ func (c Config) Validate() error {
 		return fmt.Errorf("config: advertised-port %d is not a port (1–65535, or 0 for the port actually bound)", c.AdvertisedPort)
 	case c.AdvertisedHost != "" && !validAdvertisedHost(c.AdvertisedHost): // "" is "derive it": see ResolveAdvertisedHost.
 		return fmt.Errorf("config: advertised-host %q is not a host name or an IP address (no scheme, port or spaces; the port is --advertised-port)", c.AdvertisedHost)
+	case c.OffsetsRetention < 0:
+		return fmt.Errorf("config: offsets-retention must not be negative, got %s (0 keeps offsets for ever)", c.OffsetsRetention)
+	case c.OffsetsRetentionCheckInterval < 0:
+		return fmt.Errorf("config: the offsets retention check interval must not be negative, got %s", c.OffsetsRetentionCheckInterval)
+	case c.GroupInitialRebalanceDelay < 0:
+		return fmt.Errorf("config: group-initial-rebalance-delay must not be negative, got %s (0 does not wait)", c.GroupInitialRebalanceDelay)
+	case c.ConsumerAssignmentInterval < 0:
+		return fmt.Errorf("config: the consumer group assignment interval must not be negative, got %s", c.ConsumerAssignmentInterval)
 	case c.ConsumerSessionTimeout <= 0:
 		return fmt.Errorf("config: consumer-session-timeout must be positive, got %s (a member would be evicted the moment it joined)", c.ConsumerSessionTimeout)
 	case c.PprofAddr != "" && !validHostPort(c.PprofAddr):
@@ -402,13 +480,30 @@ func (c Config) Validate() error {
 			if user == "" {
 				return fmt.Errorf("config: SASL credential has an empty username")
 			}
+			if pass == Redacted {
+				return fmt.Errorf("config: SASL user %q has the placeholder %q for a password: `config print` hides passwords, so a file it wrote is not one to run from; put the password back, or print with --show-secrets", user, Redacted)
+			}
 			if pass == "" {
 				return fmt.Errorf("config: SASL user %q has an empty password", user)
 			}
 		}
 	}
+	if !c.Zone && c.ByName() {
+		// Without the zone there is no name, and without a name or an address there
+		// is nothing to listen on: a configuration that cannot start, so it is
+		// refused here like any other, not after the broker has begun starting.
+		return fmt.Errorf("config: --zone=false (zone = false) turns .doze names off, and no --listen was set, so there is nothing to listen on; give --listen host:port (127.0.0.1:9092 for this machine only), or drop --zone=false")
+	}
 	if (c.TLSCertFile == "") != (c.TLSKeyFile == "") {
 		return fmt.Errorf("config: TLS needs both --tls-cert and --tls-key, or neither")
+	}
+	if c.consoleExposed() && !c.ConsoleUnprotected {
+		// Refused rather than warned about. Turning SASL or TLS on is the operator
+		// saying who may reach this broker and how; the console has no login, is plain
+		// HTTP and acts as a super user, so on an address other machines can reach it
+		// undoes both without anyone having asked for that. A warning scrolls past in
+		// a log; a start that does not happen is read.
+		return fmt.Errorf("config: the console has no login and is plain HTTP, and %s is on: serving it on %s would %s. Keep --console-addr on loopback (and put a proxy that authenticates in front of it), turn it off with --console=false, or accept this with --console-unprotected", c.protection(), c.ConsoleAddr, c.exposure())
 	}
 	// Loaded here, with everything else that can be wrong, so a missing or
 	// mismatched certificate is reported before anything starts (and by `config
@@ -435,14 +530,82 @@ func validAdvertisedHost(h string) bool {
 	return !strings.Contains(h, ":") // a colon that is not an IPv6 address is a port.
 }
 
-// AuthEnabled reports whether SASL authentication is configured.
 // The values of ACLDefault.
 const (
 	ACLAllow = "allow"
 	ACLDeny  = "deny"
 )
 
+// AuthEnabled reports whether SASL authentication is configured.
 func (c Config) AuthEnabled() bool { return len(c.SASLMechanisms) > 0 }
+
+// RegistryTLS reports whether the schema registry is served over TLS: it is on,
+// the broker has a certificate, and --schema-registry-tls was not turned off.
+//
+// The registry is a network API that Confluent's clients reach with
+// schema.registry.url, and a deployment that encrypts the broker encrypts it too:
+// with SASL its requests carry the same passwords as HTTP basic authentication.
+// So the certificate the broker was given serves both, as the default.
+func (c Config) RegistryTLS() bool { return c.SchemaRegistry && c.TLSEnabled() && c.SchemaRegistryTLS }
+
+// protection names what the operator turned on to restrict the broker.
+func (c Config) protection() string {
+	switch {
+	case c.AuthEnabled() && c.TLSEnabled():
+		return "SASL and TLS"
+	case c.AuthEnabled():
+		return "SASL"
+	}
+	return "TLS"
+}
+
+// exposure is what serving the console beyond loopback gives away, as the rest
+// of a sentence that begins "serving it there would".
+func (c Config) exposure() string {
+	if c.AuthEnabled() {
+		// It logs in as a user of its own that no ACL refuses.
+		return "let anyone who can reach that address act on the broker as a super user, without a password"
+	}
+	return "send topics and messages unencrypted to anyone who can reach that address"
+}
+
+// consoleExposed reports whether the console would be served beyond loopback
+// while SASL or TLS is on.
+func (c Config) consoleExposed() bool {
+	return c.Console && (c.AuthEnabled() || c.TLSEnabled()) && c.ConsoleAddr != "" && BeyondLoopback(c.ConsoleAddr)
+}
+
+// BeyondLoopback reports whether a listener on addr (host:port) can be reached
+// from another machine: a wildcard or empty host, an address that is not
+// loopback, or a host name other than localhost (a name is not resolved here;
+// one that is not localhost is taken at its word).
+func BeyondLoopback(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return !ip.IsLoopback()
+	}
+	return !strings.EqualFold(host, "localhost")
+}
+
+// Warnings are the things about a valid configuration that the operator should be
+// told once at start-up: each is a choice they made that leaves something open.
+func (c Config) Warnings() []string {
+	var out []string
+	if c.consoleExposed() && c.ConsoleUnprotected {
+		out = append(out, fmt.Sprintf("the console is served on %s with no login and over plain HTTP although %s is on (--console-unprotected): that will %s", c.ConsoleAddr, c.protection(), c.exposure()))
+	}
+	if c.SchemaRegistry && c.TLSEnabled() && !c.SchemaRegistryTLS && c.SchemaRegistryAddr != "" && BeyondLoopback(c.SchemaRegistryAddr) {
+		what := "its requests and answers"
+		if c.AuthEnabled() {
+			what = "its requests, answers and the basic-auth passwords (the broker's SASL users)"
+		}
+		out = append(out, fmt.Sprintf("the schema registry is served on %s over plain HTTP although the broker has TLS on (--schema-registry-tls=false): %s cross the network unencrypted", c.SchemaRegistryAddr, what))
+	}
+	return out
+}
 
 // TLSEnabled reports whether a TLS certificate/key pair is configured.
 func (c Config) TLSEnabled() bool { return c.TLSCertFile != "" && c.TLSKeyFile != "" }
@@ -472,4 +635,17 @@ func validHostPort(addr string) bool {
 	}
 	_, err = net.LookupPort("tcp", port)
 	return err == nil
+}
+
+// validURLPrefix reports whether p is a URL path the console can be mounted under.
+func validURLPrefix(p string) bool {
+	if !strings.HasPrefix(p, "/") || strings.ContainsAny(p, " ?#%\\\t\n") {
+		return false
+	}
+	for _, seg := range strings.Split(p, "/") {
+		if seg == ".." || seg == "." {
+			return false
+		}
+	}
+	return p == "/" || !strings.HasPrefix(p, "//") && p != "/healthz" && !strings.HasPrefix(p, "/healthz/")
 }

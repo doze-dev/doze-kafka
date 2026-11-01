@@ -5,7 +5,7 @@ through it, and confirms your data survives a restart. It takes a couple of minu
 
 ## Prerequisites
 
-- **Go 1.26+** to build the binary. That's the only build dependency.
+- **Go 1.27+** to build the binary. That's the only build dependency.
 - A Kafka client to talk to it. Any will do; the examples use
   [`kcat`](https://github.com/edenhill/kcat) because it's a single command, but see
   [Clients](clients.md) for franz-go, Sarama, kafkajs, the Java client, and more.
@@ -33,28 +33,41 @@ everything under the current directory in `./data`: the partition logs, and
 ./doze-kafka
 ```
 
-You'll see it come up, with everything you need to connect:
+You'll see it come up, with everything you need to connect (the `time=` and `level=`
+lines are the log, on stderr; the block between them is the summary, on stdout):
 
+<!-- output: banner -->
 ```text
+time=2026-10-16T16:12:14.687+01:00 level=INFO msg=doze-kafka version=dev kafka_compat=4
+
   doze-kafka is up.
 
     kafka     kafka.project.doze:9092
     console   http://kafka.project.doze   topics, messages and consumer groups, live
+    registry  http://schema.project.doze   Confluent-compatible schema registry
     data      /home/you/project/data
     serving   Kafka 4 protocol · no auth · plaintext
 
     eval "$(doze-kafka env)" point this shell at it
     doze-kafka doctor        when something looks wrong
+
+time=2026-10-16T16:12:14.721+01:00 level=INFO msg=listening addr=127.0.0.2:9092
 ```
 
 The first time, if `.doze` names are not set up on the machine, it asks once
-(`Set it up now? [Y/n]`, one `sudo`, per machine rather than per project). With no
-terminal to ask on it prints the command to run and exits rather than waiting on a
-password. `doze-kafka --listen 127.0.0.1:9092` skips names entirely.
+(`Set it up now? [Y/n]`, one `sudo`, per machine rather than per project). It asks
+only when both its input and its error output are a terminal, and only Enter, `y` or
+`yes` runs `sudo`. Started any other way (a service manager, CI, `nohup`,
+`</dev/null`, a pipe) it prints the command to run and exits 1 rather than waiting
+on a password; it never runs `sudo` there. `doze-kafka --listen 127.0.0.1:9092` skips names entirely.
 
 That's it — there's a Kafka broker at that name, and a web console at the URL on the
-next line ([Console](console.md)). Run `eval "$(doze-kafka env)"` in the client
-terminal so the commands below find it. Leave it running in this terminal;
+next line ([Console](console.md)). Run the `eval "$(doze-kafka env ...)"` line the
+summary ends with, in the client terminal, so the commands below find it. By name it is
+`eval "$(doze-kafka env)"`, run in the project directory; under `--listen` the summary
+spells out the flags that give this broker's addresses (`env` reads only its own flags
+and `doze-kafka.toml`, not a running broker), for example
+`eval "$(doze-kafka env --listen 127.0.0.1:9092 --console-addr 127.0.0.1:9093 --schema-registry-addr 127.0.0.1:8081 --config '')"`. Leave it running in this terminal;
 open another for the client.
 
 ## Produce and consume
@@ -69,6 +82,7 @@ printf 'one\ntwo\nthree\n' | kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -t demo -P
 kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -t demo -C -o beginning -e
 ```
 
+<!-- output: consume -->
 ```
 one
 two
@@ -91,6 +105,7 @@ kafka-console-consumer.sh --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --topic 
 This is the part a container-in-memory setup can't give you. Stop the broker with
 **Ctrl-C** — it logs a clean shutdown:
 
+<!-- output: shutdown -->
 ```
 level=INFO msg="shutting down: flushing logs to disk"
 ```
@@ -102,6 +117,7 @@ Start it again with the same command, and read the topic once more:
 kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -t demo -C -o beginning -e
 ```
 
+<!-- output: consume -->
 ```
 one
 two

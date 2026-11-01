@@ -25,5 +25,16 @@ kafka_tool() {
     [ "$tool" = kafka-console-consumer.sh ] && cfgarg=(--consumer.config /tools.properties)
   fi
   # shellcheck disable=SC2086
-  docker run --rm -i ${HOSTS_FLAG:-} ${mount[@]+"${mount[@]}"} apache/kafka:4.0.0 "/opt/kafka/bin/$tool" --bootstrap-server "$BOOTSTRAP" ${cfgarg[@]+"${cfgarg[@]}"} "$@"
+  docker run --rm -i ${HOSTS_FLAG:-} ${mount[@]+"${mount[@]}"} apache/kafka:4.3.1 "/opt/kafka/bin/$tool" --bootstrap-server "$BOOTSTRAP" ${cfgarg[@]+"${cfgarg[@]}"} "$@"
+}
+
+# doc_properties HEADING prints the ```properties block under "## HEADING" in
+# docs/frameworks.md: the snippet a reader copies. The Spring and Connect cells run
+# with it, so a snippet that does not work fails its cell. It fails when there is none.
+doc_properties() {
+  local doc out
+  doc="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/docs/frameworks.md"
+  out=$(awk -v h="## $1" '$0 == h { f = 1; next } f && /^## / { exit } f && /^```properties/ { p = 1; next } p && /^```/ { exit } p { print }' "$doc")
+  [ -n "$out" ] || { echo "FAIL docs/frameworks.md has no \`\`\`properties block under \"## $1\"" >&2; return 1; }
+  printf '%s\n' "$out"
 }

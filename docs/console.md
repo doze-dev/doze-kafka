@@ -3,7 +3,7 @@
 doze-kafka serves a small web console beside the broker. It is on by default at
 **http://kafka.&lt;name&gt;.doze** (port-less, through the shared front door; the start-up
 summary prints the address). Under `--listen` there is no name and it is on
-`127.0.0.1:9093`. Turn it off with
+`127.0.0.1:9093` (a free loopback port when `--listen` is on port 0). Turn it off with
 `--console=false`; move it with `--console-addr`.
 
 It is a development tool, not an operations product. It answers the questions you
@@ -23,7 +23,7 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   switch partition and show per-partition counts.
 - A **message table** that follows the log live. Pause it with the toggle. Click a
   row for the full record
-  in a drawer: key, value, headers, timestamp, size. The drawer's address is in the
+  in a inspector: key, value, headers, timestamp, size. The inspector's address is in the
   URL, so a refresh keeps it open and you can share it. Older/newer buttons walk
   the log.
 - Records are shown **as they are**. Valid UTF-8 appears as text (JSON is
@@ -38,10 +38,12 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   to search every partition's newest records and see the matches together, newest
   first; with no search text that is simply the latest records across the whole
   topic.
-- **Send a message** from the dock at the bottom: key, value, headers, partition
-  (or "auto", which partitions by key exactly as a real client does), acks. The
-  composer stays open while you change partition and closes when you move to another
-  topic. Values
+- **Send a message** from the dock at the bottom. Closed, it is one row: a key, a
+  value and Send (the partition chosen by the key, acks 1). `p` or its title opens the
+  whole form: key, value, headers, partition (or "auto", which partitions by key
+  exactly as a real client does), acks, each acknowledgement saying what this broker
+  does for it (`all` is answered once the partition is on disk). The composer stays
+  open while you change partition and closes when you move to another topic. Values
   can be sent as text, JSON, base64, or a tombstone. **Send again** on any record
   produces an exact copy (the same key, value and headers, byte for byte), and
   **Edit a copy** opens the composer filled in with it, to change first.
@@ -77,7 +79,7 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   its groups' committed offsets, so a group that had read everything carries on with
   the next record. **Delete** removes the topic. Both ask first, naming the action.
 
-- **Follow this message**, in the drawer of a record that carries a trace id
+- **Follow this trace**, in the inspector of a record that carries a trace id
   (`traceparent`, B3, or the header named by `--trace-header`): every record of the
   same trace in every topic, in order, with the groups that have read each. See
   [Observability](observability.md).
@@ -106,18 +108,24 @@ SASL is on (doze-kafka provisions it a private one at start-up).
 
 ## Traffic
 
-What clients have asked the broker, newest first, with the clients connected now: who
-sent each request, what it was about, how it went, and the Kafka error name when it
-failed. Repeats of idle requests fold into one row, and the tail filters by client,
-request type, topic, group and errors. Below the clients, **Client metrics** shows what
-each client reports about itself (KIP-714): the metrics that say whether it is healthy,
-with the latest value and a small chart. They are metrics, not traces. See
-[Observability](observability.md).
+What clients have asked the broker, newest first: who sent each request, what it was
+about, how it went, and the Kafka error name when it did not. Repeats of idle requests
+fold into one row, and the tail filters by client, topic, group, request and kind.
+Select a row for the request in full (how each partition went, its decoded fields, why
+a refusal happened and what to do), a folded row for its ticks, or a client for its own
+page, with what it reports about itself (KIP-714: metrics, not traces). **Clients**
+(`?view=clients`) lists who is connected and how each is behaving; a group filter tells
+the group's rebalances in order, in epochs for a KIP-848 group. Pausing keeps the list
+still and counts what it missed; Esc clears a filter, and the strip of keys at the foot
+is the page's own for the state it is in. The page is drawn as its boards (design gate:
+`go tool task design`, [`e2e/design/README.md`](../e2e/design/README.md)); each row is
+one tab stop of a grid, moved with the arrows. See [Observability](observability.md) for what each number is counted over and
+what is kept.
 
 ## Schemas
 
 With the built-in [schema registry](schema-registry.md) running, the console grows a
-**Schemas** section (and a Schemas item in the command palette).
+**Schemas** section (its subjects are in the command palette, under Subjects).
 
 - The list shows every subject with its language (Avro, JSON Schema, Protobuf) and
   its newest version.
@@ -135,7 +143,7 @@ Where a topic has `<topic>-key` or `<topic>-value` subjects, its page links them
 
 **Records written by a registry-aware serializer are shown as what they mean.** A value
 that starts with the registry's wire-format header (a zero byte and a schema id) is read
-with that schema, in the table and in the drawer, which names the schema and links its
+with that schema, in the table and in the inspector, which names the schema and links its
 version. The Hex and Base64 views still show the stored bytes, *Send again* still
 resends them exactly, and a value whose schema the registry no longer has is shown as
 binary, as before. *Edit a copy* of a decoded record brings back the JSON and chooses
@@ -160,28 +168,97 @@ segment and index sizes. Settings Kafka has no name for (the data directory, the
 interval, the emulated version) are not there; `doze-kafka config print` shows those.
 It links to [what is not implemented](limitations.md).
 
+## The inspector
+
+Selecting a record, a request, a client, a group member, a schema subject, an open
+transaction or a group event opens it in the inspector, the column at the right of
+the page. The page narrows to make room: the inspector is part of the layout and
+nothing is drawn over it (below 640px it is a sheet from the foot). All of them look
+the same: a title, a body and a close control. With nothing selected it says what you
+can select here. The selection is in the address (`?open=`), so a refresh or a shared
+link reopens it, Back returns to the previous selection (or to none), and `Esc`
+closes it and puts focus back on the row.
+
+## Pages and tabs
+
+A topic is one page with tabs: Messages, Partitions, Readers, Config and Schema. A
+group has Lag, Members, Timeline and Offsets; a subject has Versions, Compatibility
+and Register. The tab is in the address (`?tab=`), and `[` and `]` move between
+tabs. The Cluster page has Overview, Config, APIs and Transactions (`?view=`).
+
+The sections are Traffic and Trace (Observe), Topics, Groups and Schemas (Data), and
+Access and Cluster (Broker), each in the rail with a count where there is one. A
+section's home lists its resources with the page's own summary beside them. The
+first thing a broker with nothing in it shows is a first-run page with the address
+and a way to make a first topic; **Connect an app** (`/connect`) gives the address
+to paste and how to check it.
+
+## The wire dock and neighbours
+
+A topic or group page ends with the requests that touched it, live, with the same
+pause control as the tape. It shows the newest eight; **Older** pages back through the
+rest in place (the older page keeps refreshing as itself) and **Newest** returns, and
+"Traffic page" opens Traffic filtered to that topic or group. Under a topic's title one sentence says who writes it, who
+reads it and which schema subject describes it ("Written by checkout-api, read by
+g-order-validator, schema subject orders-value"), each name a link.
+
 ## Keyboard
+
+Press `?` for the list. It is generated from the one table the console binds its keys
+from, so it is always the keys that work. The strip under the page shows the few that
+matter on the page you are on, and while a dialog is open, that dialog's (a confirm's
+`tab`, `esc` and `↵`; the palette's `⌘K`; the list of keys' `?` and `⌘K`).
 
 | Key | Does |
 |---|---|
-| `⌘K` / `Ctrl+K` | Command palette: jump to any topic, group or view |
-| `/` | Focus the list filter |
-| `j` / `k`, `Enter` | Move through the list and open |
-| `c` | New topic |
-| `m` | Open the composer |
-| `[` | Collapse or expand the rail |
-| `⌘Enter` / `Ctrl+Enter` | Send, from the composer |
-| `Esc` | Close a dialog or the drawer |
+| `⌘K` / `Ctrl+K` | Command palette: jump to a topic, group or subject, or act |
+| `g` then `r` `t` `g` `s` `a` `c` | Go to Traffic, Topics, Groups, Schemas, Access, Cluster |
+| `?` | Show the keys |
+| `/` | Filter this table |
+| `j` / `k`, `Enter` | Move through the list and open (in the list pane, from the page that is open) |
+| `[` / `]` | Previous or next tab |
+| `c` | Create: a topic, a schema, an ACL; on an empty Traffic, connect an app; on Cluster, copy the bootstrap address |
+| `p` | Produce, on a topic; otherwise pause or resume live updates |
+| `e` | On Traffic: errors only, and back |
+| `u` / `m` / `c` | On Traffic, with a request or client open: unfold a folded row, all of a client's metrics, copy a request's decoded fields |
+| `r` | Retry now, when the broker is not reachable |
+| `⌘Enter` / `Ctrl+Enter` | Send, from the composer; create, on a create form |
+| `Esc` | Close a dialog or the inspector, or clear the filter |
 
 Single keys act only when you are not typing in a field, with no modifier held, and
-no dialog open.
+no dialog open. The list of keys is a dialog too: while it is open only `Esc` and `?`
+(close it), `Tab` and `⌘K` (the palette instead) do anything. The inspector is not a
+dialog; it is part of the page, and the page's keys work beside it.
+
+## The palette
+
+`⌘K` opens a palette with results under Topics, Groups, Subjects and Actions, and
+`⌘K` again closes it. A row says what it is (a topic its partitions and messages, a
+group its state, members and lag, a subject its versions and compatibility level),
+the part of the name you typed is bold, and an action carries its key. It offers to
+produce to the topic you are on or the first one that matched, and to reset the
+offsets of the group you are on or the first one that matched, which still asks
+before it does anything; pausing, the list of keys and (when traffic is recorded)
+errors only are actions too. The sections themselves are not in the palette: the rail
+and `g` then a letter go to them.
 
 ## Appearance
 
-Light and dark themes, or follow the system (the switch is at the top right). The
-fonts (IBM Plex Sans and Mono) are part of the binary, so the console looks the same
-offline. It works down to phone widths: below about 640px the list and the detail
-become two screens.
+Light, dark and high-contrast themes, or follow the system (dark, or a request for
+more contrast); the control at the top right is four words: system, light, dark, high
+contrast. High contrast also outlines every selection (a section, a list item, a
+row), so it does not rely on a fill. Every text and background pair is measured in all
+three, and the ratios are in `console/testdata/contrast.txt`; the accessibility sweep
+(`e2e/tests/a11y.spec.ts`) also measures what every page draws, placeholders included,
+at three widths in all three themes. The fonts (IBM Plex Sans and Mono) are part of
+the binary, so the console looks the same offline. It works down to phone widths: at
+960px the rail is icons, the list is one tap away and an open record is a card under
+the records (`esc` closes it); below 640px each page is one screen, the top bar is a
+menu, the page title and the palette, messages are cards, and an open record is a
+sheet that rises from the foot (Close).
+
+Times are shown in your browser's zone, with the zone and the UTC instant on hover;
+"3m ago" keeps counting on a paused page.
 
 ## Safety
 
@@ -189,11 +266,31 @@ become two screens.
   addresses, `*.doze`, and anything you add with `--console-allow-host` — and
   refuses state-changing requests from other origins. That keeps a web page open in
   your browser from reaching it through DNS rebinding or a forged form.
-- It is plain HTTP with no login of its own. Bind it beyond loopback only on a
-  network you trust.
+- `--console-prefix` (`console-prefix` in the file) mounts it somewhere other than
+  `/_console`, behind a reverse proxy; `/` serves it at the root of its port.
+  `DOZE_KAFKA_CONSOLE_PREFIX` does the same when neither is set (the test suites use it
+  to show nothing assumes the default).
+- It is plain HTTP with no login of its own, and with SASL on it acts on the broker as
+  a super user. It listens on loopback. With SASL or TLS on, a `--console-addr` beyond
+  loopback is refused at start-up unless `--console-unprotected` accepts it; what to
+  put in front of it instead is in
+  [What SASL and TLS cover](auth-and-tls.md#what-sasl-and-tls-cover). Without either,
+  bind it beyond loopback only on a network you trust.
 
 ## Errors
 
-When the broker is unreachable the console says so, in the page, and keeps the live
-views waiting rather than flashing errors. A topic or group that does not exist gives
-a real 404 page with near-miss suggestions ("did you mean `orders`?").
+Every error is one of four words, each with its own colour: **Refused** (real Kafka
+would say no too), **Denied** (an ACL or a login decided), **Not implemented** (this
+broker does not do it) and **Failed** (the broker is unhappy). It names what said no:
+the Kafka error name, the registry's `error_code`, or "by the console" for a rule of
+the console's own, with the broker's own explanation where it gave one.
+
+The console asks the broker every five seconds whether it is there. When it is not,
+the pill at the top right turns red and says **not reachable** beside its address
+(the time of the last answer is its tooltip), with one Retry (`r`); what was on screen
+stays, muted, and comes back by itself when the broker does. A topic or group that does not
+exist gives a real 404 page with near-miss suggestions ("did you mean `orders`?").
+
+Every destructive action confirms, and the confirm says what goes with it, measured
+at the moment you press the button: "deletes its 3 partitions and 12 records, and the
+committed offsets of 2 groups".

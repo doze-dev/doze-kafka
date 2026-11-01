@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"testing"
 	"time"
 
@@ -217,8 +216,7 @@ func TestATransactionPastItsTimeoutIsAborted(t *testing.T) {
 func TestExactlyOnceSurvivesAbortsAndARestart(t *testing.T) {
 	skipShort(t)
 	dir := t.TempDir()
-	addr := "127.0.0.1:" + strconv.Itoa(freePort(t))
-	stop := runBrokerAt(t, addr, dir, 4)
+	addr, stop := bootAt(t, "127.0.0.1:0", dir, 4)
 	defer func() { stop() }()
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()

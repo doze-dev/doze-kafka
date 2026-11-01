@@ -1,0 +1,101 @@
+# The kafka doze module (module/), built and published beside the broker it embeds.
+#
+# A version bump in module/module.yaml is the release intent. The plugin is a pure-Go
+# cross-compile, so one runner builds every platform. It is published as a rolling
+# release tagged "kafka" with an index.yaml + per-platform archives, and doze-registry
+# picks it up on its next hourly run (publish.yml there pulls from the repo named in
+# registry/doze/<name>/source). The doze-kafka product releases (v*) are separate and untouched:
+# this release is never marked Latest, so install.sh keeps finding the broker.
+#
+# No token is needed here: the registry pulls, so this workflow only uploads the release.
+name: module
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [module/**, .github/workflows/module.yml]
+
+permissions:
+  contents: write
+
+env:
+  NAME: kafka
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: module
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: module/go.mod
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  bumped:
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.diff.outputs.release }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 2 }
+      - id: diff
+        run: |
+          cur=$(yq '.version' module/module.yaml)
+          prev=$(git show HEAD^:module/module.yaml 2>/dev/null | yq '.version' || true)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$cur" != "$prev" ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    needs: [test, bumped]
+    if: needs.bumped.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: module/go.mod
+
+      # Published (version, platform) artifacts are immutable, so the build starts from
+      # the index already published: this repo's own release, or, the first time,
+      # what the registry has signed from the doze-modules repo this module came from
+      # (those entries keep their absolute URLs there).
+      - name: Seed the index
+        run: |
+          mkdir -p "module/dist/$NAME"
+          idx="module/dist/$NAME/index.yaml"
+          if ! curl -sfL "https://github.com/${{ github.repository }}/releases/download/$NAME/index.yaml" -o "$idx"; then
+            if curl -sfL "https://raw.githubusercontent.com/doze-dev/doze-registry/main/registry/doze/$NAME/index.yaml" -o "$idx"; then
+              yq -i 'del(.signature) | del(.releases[].artifacts[].sig)' "$idx" || rm -f "$idx"
+            else
+              rm -f "$idx"
+            fi
+          fi
+
+      - name: Build
+        working-directory: module
+        run: go run ./release --out dist
+
+      - name: Publish the release
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          gh release view "$NAME" >/dev/null 2>&1 || \
+            gh release create "$NAME" --latest=false --title "$NAME module" --notes "doze $NAME plugin module"
+          for attempt in 1 2 3; do
+            gh release upload "$NAME" "module/dist/$NAME"/* --clobber && break
+            [ "$attempt" = 3 ] && exit 1
+            echo "upload failed (attempt $attempt), retrying in 15s…"
+            sleep 15
+          done
+

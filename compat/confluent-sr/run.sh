@@ -20,7 +20,7 @@ else
   ENVS+=(-e "SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS=PLAINTEXT://$BOOTSTRAP")
 fi
 # shellcheck disable=SC2086
-docker run -d --name "$CONTAINER" ${HOSTS_FLAG:-} -p 127.0.0.1::8081 "${ENVS[@]}" ${MOUNT[@]+"${MOUNT[@]}"} confluentinc/cp-schema-registry:7.7.1 >/dev/null
+docker run -d --name "$CONTAINER" ${HOSTS_FLAG:-} -p 127.0.0.1::8081 "${ENVS[@]}" ${MOUNT[@]+"${MOUNT[@]}"} confluentinc/cp-schema-registry:8.3.2 >/dev/null
 PORT=$(publish_port "$CONTAINER" 8081)
 wait_http "http://127.0.0.1:$PORT/subjects" 150 || fail "Confluent's Schema Registry did not come up against doze-kafka"
 ok "Confluent Schema Registry started against doze-kafka and created its _schemas topic"

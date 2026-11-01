@@ -7,7 +7,8 @@ belong.
 ## The inner loop
 
 ```sh
-go tool task check        # the gate: gofmt, go vet, Windows cross-vet, the whole suite with -race
+go tool task check        # the gate: gofmt, go vet, Windows cross-vet, the whole suite with -race, every benchmark once
+go tool task vuln         # govulncheck (needs the network); CI runs it on every push and daily
 go tool task test:unit    # ~seconds: storage, codec, handlers; no sockets (-short)
 go test ./internal/broker -run TestThing -count=1     # one test
 go tool task dev          # run the broker with the console read live from disk
@@ -44,11 +45,43 @@ first and watch it fail.
   embed API do not); the gate runs them all.
 - Name test files after behaviour (`group_classic_test.go`), not after the phase that
   added them.
+- "What does Kafka answer?" is settled by the oracle, not by memory: scripts in
+  `conformance/scenarios.go` are recorded against `apache/kafka` in Docker
+  (`go tool task conformance:record`) and replayed against this broker in every test
+  run (`go tool task conformance`). A difference is fixed, or listed as `Known` with
+  its sentence in `docs/limitations.md`.
+- A restart or crash test is `startNode(t, ...)` (`internal/broker/node_test.go`):
+  `Restart()`, and with `nodeSubprocess()` also `Kill()` (SIGKILL) and `Pause()`.
+  Failures on command (a write error, a failing or slow fsync, a failing metadata
+  write) are `internal/faultinject`, behind the `faultinject` build tag, which a
+  release build does not contain; a full disk is a real 12 MiB volume (`smallVolume`).
 - Fuzz targets live next to the codec; a crasher goes in `testdata/fuzz/` so it stays
-  fixed. `go tool task fuzz` runs all three for 30s each (`FUZZ_TIME=5m` for longer);
+  fixed. `go tool task fuzz` runs every target in `testdata/fuzz-targets.txt` for 30s
+  each (`FUZZ_TIME=5m` for longer; `task fuzz -- Scram` for some); a new parser of
+  untrusted bytes gets a target there and a row in `docs/architecture.md` (a test
+  fails otherwise). The parser says which target reaches it in the last line of its
+  doc comment, `//fuzz:parser [class=<class>] FuzzTarget[, FuzzOther]`; a function
+  that only looks like one (`Parse…`, `Decode…`, `Read…` taking bytes, text, a reader
+  or a request, in a package that faces the network) says
+  `//fuzz:not-a-parser <why>`. `docs/fuzz_test.go` fails on a parser-shaped function
+  with neither, and on a marker or a listed target with nothing at its other end.
   `soak` and `chaos` run the long harnesses.
+- Tests notice when the code is wrong, not only when it runs: `go tool task
+  mutate:check -- internal/protocol` (scripts/mutate) runs the tests that reach each
+  mutant and fails on any lived, uncovered, timed-out or setup-failed mutant that
+  `testdata/mutation.json` does not list, and on a listed one that is now killed. A
+  build or setup failure is never counted as a kill. Each listed mutant carries a
+  reason, or "open" while nobody has examined it; `plan/evidence/mutation-survivors.md`
+  lists them (`go run ./scripts/mutate report`). `mutate:list` shows the units and
+  their shards. It takes minutes to hours: CI runs the units a pull request changed,
+  and every shard weekly, not in `task check` (the gate's own self-test is).
+- The embedding API (`server/`) is pinned: `go tool task api` fails when its exported
+  surface changed without a `CHANGELOG.md` line containing "server API"
+  (`task api:record` writes the new surface).
 - The console in a real browser is checked by the Playwright suite in `e2e/`
-  (`go tool task test:e2e`; needs `bun`). It builds the binary, boots it on its own
+  (`go tool task test:e2e`; needs `bun` and `node`, both pinned in `.prototools`:
+  `proto use` installs them, and a clean checkout fails with "Failed to detect an
+  applicable version" without the pin). It builds the binary, boots it on its own
   ports over a fresh data directory, and seeds it (`e2e/seed`). It runs in CI as its
   own workflow, not in `task check`. A console change that the Go tests cannot see
   (focus, the keyboard, live updates, layout) gets a spec there.
@@ -86,7 +119,8 @@ front-end libraries are vendored (`console/static/VERSIONS`).
 Guards keep it consistent, and they fail with instructions: every template class
 must be styled, every `var(--x)` defined, font sizes come from the `--fs-*` tokens, and
 inline styles are on a ratchet (`console/cssguard_test.go`); every text colour holds
-4.5:1 on every surface in both themes (`TestThemeContrast`). Every GET route must render
+4.5:1 on every surface in all three themes, light, dark and high contrast
+(`TestEveryTextAndBackgroundPairHoldsItsContrastInAllThreeThemes`). Every GET route must render
 (also with the broker down) and every POST must refuse a foreign origin and fail with a
 4xx (`console/surfaces_test.go`); both read the route table from `console.go`, so a new
 route is covered automatically.

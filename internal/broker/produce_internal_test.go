@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
@@ -21,7 +20,13 @@ import (
 	"github.com/twmb/franz-go/pkg/kerr"
 )
 
-// plainBatch is a minimal header-valid, non-idempotent (producer id -1) batch.
+// testRecord is the smallest record there is, eight bytes: no key, the value "v",
+// no headers, at offset delta i (below 64, so that it is one byte).
+func testRecord(i int32) []byte {
+	return []byte{0x0e, 0, 0, byte(i << 1), 0x01, 0x02, 'v', 0}
+}
+
+// plainBatch is a minimal valid, non-idempotent (producer id -1) batch of one record.
 func plainBatch() []byte {
 	b := make([]byte, 61+8)
 	binary.BigEndian.PutUint32(b[8:], uint32(len(b)-12)) // batchLength
@@ -31,6 +36,7 @@ func plainBatch() []byte {
 		b[i] = 0xff // producerId = -1 (non-idempotent)
 	}
 	binary.BigEndian.PutUint32(b[57:], 1) // recordsCount
+	copy(b[61:], testRecord(0))
 	binary.BigEndian.PutUint32(b[17:], crc32.Checksum(b[21:], crc32.MakeTable(crc32.Castagnoli)))
 	return b
 }
@@ -187,8 +193,10 @@ func TestProduceFsyncFailureIsReportedNotAcknowledged(t *testing.T) {
 	if p.ErrorCode != kerr.KafkaStorageError.Code {
 		t.Fatalf("acks=all with a failing fsync: error code %d, want KAFKA_STORAGE_ERROR (%d)", p.ErrorCode, kerr.KafkaStorageError.Code)
 	}
-	if p.ErrorMessage == nil || !strings.Contains(*p.ErrorMessage, "input/output error") {
-		t.Errorf("the failure should say why, got %v", p.ErrorMessage)
+	// As Kafka answers it (recorded: full-disk): no offsets and no message; the
+	// cause is in the broker's log.
+	if p.ErrorMessage != nil || p.BaseOffset != -1 || p.LogStartOffset != -1 {
+		t.Errorf("the refusal: message %v, base offset %d, log start %d; want nil, -1, -1", p.ErrorMessage, p.BaseOffset, p.LogStartOffset)
 	}
 
 	// acks=1 never promised durability, so it must not fail on a sync it never makes.
@@ -203,26 +211,34 @@ func TestProduceFsyncFailureIsReportedNotAcknowledged(t *testing.T) {
 	}
 }
 
-// A batch that fails validation is refused whole, before anything is written —
-// including the good batches that precede it in the same payload.
+// A batch that fails validation is refused whole, before anything is written, with
+// the error Apache Kafka answers for it (recorded: produce-validation). A second
+// batch in the same partition's records, and a batch cut short, are INVALID_RECORD:
+// a Produce request carries exactly one whole batch a partition.
 func TestProduceRefusesCorruptBatches(t *testing.T) {
 	var failSync bool
 	b, logs := newTestBroker(t, &failSync)
 
 	good := plainBatch()
 	flip := func(batch []byte, i int) []byte { c := append([]byte{}, batch...); c[i] ^= 0xFF; return c }
-	cases := map[string][]byte{
-		"payload byte flipped (CRC)": flip(good, len(good)-1),
-		"header byte flipped (CRC)":  flip(good, 22),
-		"wrong magic":                flip(good, 16),
-		"good batch then a bad one":  append(append([]byte{}, good...), flip(good, len(good)-1)...),
-		"truncated batch":            good[:len(good)-4],
-		"trailing junk":              append(append([]byte{}, good...), 1, 2, 3),
+	cases := map[string]struct {
+		records []byte
+		want    int16
+	}{
+		"payload byte flipped (CRC)": {flip(good, len(good)-1), kerr.CorruptMessage.Code},
+		"header byte flipped (CRC)":  {flip(good, 30), kerr.CorruptMessage.Code},
+		"wrong magic":                {flip(good, 16), kerr.CorruptMessage.Code},
+		"good batch then a bad one":  {append(append([]byte{}, good...), flip(good, len(good)-1)...), kerr.InvalidRecord.Code},
+		"two good batches":           {append(append([]byte{}, good...), good...), kerr.InvalidRecord.Code},
+		"truncated batch":            {good[:len(good)-4], kerr.InvalidRecord.Code},
+		"no records at all":          {nil, kerr.InvalidRecord.Code},
+		// The transactional bit, in a request that names no transactional id.
+		"attributes flipped": {flip(good, 22), kerr.TransactionalIDAuthorizationFailed.Code},
 	}
-	for name, records := range cases {
-		p := produceOnce(t, b, 1, records).Topics[0].Partitions[0]
-		if p.ErrorCode != kerr.CorruptMessage.Code {
-			t.Errorf("%s: error code %d, want CORRUPT_MESSAGE (%d)", name, p.ErrorCode, kerr.CorruptMessage.Code)
+	for name, tc := range cases {
+		p := produceOnce(t, b, 1, tc.records).Topics[0].Partitions[0]
+		if p.ErrorCode != tc.want || p.BaseOffset != -1 {
+			t.Errorf("%s: error code %d at offset %d, want %d at -1", name, p.ErrorCode, p.BaseOffset, tc.want)
 		}
 	}
 	part, err := logs.Partition("t", 0)
@@ -237,6 +253,14 @@ func TestProduceRefusesCorruptBatches(t *testing.T) {
 	if p := produceOnce(t, b, 1, good).Topics[0].Partitions[0]; p.ErrorCode != 0 || p.BaseOffset != 0 {
 		t.Fatalf("a valid batch after the refusals: code %d offset %d, want 0 at 0", p.ErrorCode, p.BaseOffset)
 	}
+	// Bytes after the batch that are too few to be another are not the batch's, and
+	// not an error: Kafka takes the batch and drops them, and so does this.
+	if p := produceOnce(t, b, 1, append(append([]byte{}, good...), 1, 2, 3)).Topics[0].Partitions[0]; p.ErrorCode != 0 || p.BaseOffset != 1 {
+		t.Fatalf("a batch followed by three bytes: code %d offset %d, want 0 at 1", p.ErrorCode, p.BaseOffset)
+	}
+	if stored, err := part.Read(0, 1<<20); err != nil || len(stored) != 2*len(good) {
+		t.Errorf("the log holds %d bytes after two batches of %d (%v): the three bytes after the second were stored", len(stored), len(good), err)
+	}
 }
 
 // Creating a topic, and asking for the offsets of all its partitions, must not
@@ -247,7 +271,7 @@ func TestTopicCreationAndOffsetListingDoNotOpenPartitions(t *testing.T) {
 
 	ct := kmsg.NewCreateTopicsRequestTopic()
 	ct.Topic, ct.NumPartitions, ct.ReplicationFactor = "wide", 40, 1
-	if got := b.createTopic(ct, false); got.ErrorCode != 0 {
+	if got := b.createTopic(ct, false, nil); got.ErrorCode != 0 {
 		t.Fatalf("createTopic: %d", got.ErrorCode)
 	}
 	if n := logs.OpenPartitions(); n != 0 {
@@ -307,6 +331,9 @@ func idemBatch(pid int64, epoch int16, seq, n int32, attrs uint16) []byte {
 	binary.BigEndian.PutUint16(b[51:], uint16(epoch))
 	binary.BigEndian.PutUint32(b[53:], uint32(seq))
 	binary.BigEndian.PutUint32(b[57:], uint32(n))
+	for i := int32(0); i < n; i++ {
+		copy(b[61+8*i:], testRecord(i))
+	}
 	binary.BigEndian.PutUint32(b[17:], crc32.Checksum(b[21:], crc32.MakeTable(crc32.Castagnoli)))
 	return b
 }
@@ -349,16 +376,16 @@ func TestProduceValidatesAcksControlBatchesAndRecordCounts(t *testing.T) {
 		}
 	}
 	// A control batch (attributes bit 5) is the broker's to write, not a client's.
-	if c := produceOnce(t, b, 1, idemBatch(-1, 0, 0, 1, 0x20)).Topics[0].Partitions[0].ErrorCode; c != kerr.CorruptMessage.Code {
-		t.Errorf("a client-sent control batch: code %d, want it refused (2)", c)
+	if c := produceOnce(t, b, 1, idemBatch(-1, 0, 0, 1, 0x20)).Topics[0].Partitions[0].ErrorCode; c != kerr.InvalidRecord.Code {
+		t.Errorf("a client-sent control batch: code %d, want INVALID_RECORD (87), as Kafka answers", c)
 	}
 	// A header that claims two billion records over an 8-byte body.
 	huge := plainBatch()
 	binary.BigEndian.PutUint32(huge[23:], uint32(1<<31-2))
 	binary.BigEndian.PutUint32(huge[57:], uint32(1<<31-1))
 	binary.BigEndian.PutUint32(huge[17:], crc32.Checksum(huge[21:], crc32.MakeTable(crc32.Castagnoli)))
-	if c := produceOnce(t, b, 1, huge).Topics[0].Partitions[0].ErrorCode; c != kerr.CorruptMessage.Code {
-		t.Errorf("a batch claiming 2^31-1 records in 8 bytes: code %d, want it refused (2)", c)
+	if c := produceOnce(t, b, 1, huge).Topics[0].Partitions[0].ErrorCode; c != kerr.InvalidRecord.Code {
+		t.Errorf("a batch claiming 2^31-1 records in 8 bytes: code %d, want INVALID_RECORD (87)", c)
 	}
 	if end := part.LogEndOffset(); end != 0 {
 		t.Errorf("the log end is %d after only refused produces", end)
@@ -411,7 +438,7 @@ func TestDeletingATopicForgetsItsProducerState(t *testing.T) {
 	}
 	ct := kmsg.NewCreateTopicsRequestTopic()
 	ct.Topic, ct.NumPartitions, ct.ReplicationFactor = "t", 1, 1
-	if got := b.createTopic(ct, false); got.ErrorCode != 0 {
+	if got := b.createTopic(ct, false, nil); got.ErrorCode != 0 {
 		t.Fatal(got.ErrorCode)
 	}
 	p := produceOnce(t, b, 1, idemBatch(5, 0, 0, 3, 0)).Topics[0].Partitions[0]

@@ -1,0 +1,1073 @@
+{
+  "scenario": "mixed-protocol-cooperative",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 4,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "mc"
+          },
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "mc3"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 4,
+            "ReplicationFactor": 1,
+            "Topic": "mc",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          },
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "mc3",
+            "TopicID": "\u003ctopic-id:2\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "find-coordinators",
+      "api": "FindCoordinator",
+      "version": 4,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": [
+          "mc-coop",
+          "mc-v3"
+        ],
+        "CoordinatorType": 0
+      },
+      "response": {
+        "Coordinators": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "mc-coop",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          },
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "mc-v3",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          }
+        ],
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-a-join-needs-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "mc-coop",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAEAAAABAAJtY/////8AAAAA",
+            "Name": "cooperative-sticky"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-a-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "mc-coop",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAEAAAABAAJtY/////8AAAAA",
+            "Name": "cooperative-sticky"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:1\u003e",
+            "ProtocolMetadata": "AAEAAAABAAJtY/////8AAAAA"
+          }
+        ],
+        "Protocol": "cooperative-sticky",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-a-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "mc-coop",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAJtYwAAAAQAAAAAAAAAAQAAAAIAAAAD/////w==",
+            "MemberID": "\u003cmember:1\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "Protocol": "cooperative-sticky",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJtYwAAAAQAAAAAAAAAAQAAAAIAAAAD/////w==",
+        "Protocol": "cooperative-sticky",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-n-join",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "mc-coop",
+        "InstanceID": null,
+        "MemberEpoch": 0,
+        "MemberID": "",
+        "RackID": null,
+        "RebalanceTimeoutMillis": 30000,
+        "ServerAssignor": "uniform",
+        "SubscribedTopicNames": [
+          "mc"
+        ],
+        "SubscribedTopicRegex": null,
+        "Topics": []
+      },
+      "response": {
+        "Assignment": {
+          "Topics": null
+        },
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:2\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-n-heartbeat-1",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "mc-coop",
+        "InstanceID": null,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:2\u003e",
+        "RackID": null,
+        "RebalanceTimeoutMillis": -1,
+        "ServerAssignor": null,
+        "SubscribedTopicNames": null,
+        "SubscribedTopicRegex": null,
+        "Topics": null
+      },
+      "response": {
+        "Assignment": null,
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:2\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-a-heartbeat-1",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 1,
+        "Group": "mc-coop",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e"
+      },
+      "response": {
+        "ErrorCode": 27,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-a-rejoin-1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "mc-coop",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAEAAAABAAJtY/////8AAAABAAJtYwAAAAQAAAAAAAAAAQAAAAIAAAAD",
+            "Name": "cooperative-sticky"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": null,
+        "Protocol": "cooperative-sticky",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-a-resync-1",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "mc-coop",
+        "GroupAssignment": null,
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "Protocol": "cooperative-sticky",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAEAAAABAAJtYwAAAAIAAAAAAAAAAf////8=",
+        "Protocol": "cooperative-sticky",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-n-heartbeat-after-1a",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "mc-coop",
+        "InstanceID": null,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:2\u003e",
+        "RackID": null,
+        "RebalanceTimeoutMillis": -1,
+        "ServerAssignor": null,
+        "SubscribedTopicNames": null,
+        "SubscribedTopicRegex": null,
+        "Topics": null
+      },
+      "response": {
+        "Assignment": null,
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:2\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-n-heartbeat-after-1b",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "mc-coop",
+        "InstanceID": null,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:2\u003e",
+        "RackID": null,
+        "RebalanceTimeoutMillis": -1,
+        "ServerAssignor": null,
+        "SubscribedTopicNames": null,
+        "SubscribedTopicRegex": null,
+        "Topics": null
+      },
+      "response": {
+        "Assignment": null,
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:2\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-a-heartbeat-after-1",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 1,
+        "Group": "mc-coop",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e"
+      },
+      "response": {
+        "ErrorCode": 27,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-describe-after-1",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "mc-coop"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "mc-coop",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1,
+                        2,
+                        3
+                      ],
+                      "Topic": "mc",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 1,
+                "MemberID": "\u003cmember:1\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "mc"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1
+                      ],
+                      "Topic": "mc",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              },
+              {
+                "Assignment": {
+                  "TopicPartitions": null
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:2\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "mc"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        2,
+                        3
+                      ],
+                      "Topic": "mc",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Reconciling"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-a-rejoin-2",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "mc-coop",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAEAAAABAAJtY/////8AAAABAAJtYwAAAAIAAAAAAAAAAQ==",
+            "Name": "cooperative-sticky"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": null,
+        "Protocol": "cooperative-sticky",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-a-resync-2",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 2,
+        "Group": "mc-coop",
+        "GroupAssignment": null,
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "Protocol": "cooperative-sticky",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAEAAAABAAJtYwAAAAIAAAAAAAAAAf////8=",
+        "Protocol": "cooperative-sticky",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-n-heartbeat-after-2a",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "mc-coop",
+        "InstanceID": null,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:2\u003e",
+        "RackID": null,
+        "RebalanceTimeoutMillis": -1,
+        "ServerAssignor": null,
+        "SubscribedTopicNames": null,
+        "SubscribedTopicRegex": null,
+        "Topics": null
+      },
+      "response": {
+        "Assignment": {
+          "Topics": [
+            {
+              "Partitions": [
+                2,
+                3
+              ],
+              "TopicID": "\u003ctopic-id:1\u003e"
+            }
+          ]
+        },
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:2\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-n-heartbeat-after-2b",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "mc-coop",
+        "InstanceID": null,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:2\u003e",
+        "RackID": null,
+        "RebalanceTimeoutMillis": -1,
+        "ServerAssignor": null,
+        "SubscribedTopicNames": null,
+        "SubscribedTopicRegex": null,
+        "Topics": null
+      },
+      "response": {
+        "Assignment": null,
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:2\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-a-heartbeat-after-2",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 2,
+        "Group": "mc-coop",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-describe-after-2",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "mc-coop"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "mc-coop",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1
+                      ],
+                      "Topic": "mc",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:1\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "mc"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1
+                      ],
+                      "Topic": "mc",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              },
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        2,
+                        3
+                      ],
+                      "Topic": "mc",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:2\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "mc"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        2,
+                        3
+                      ],
+                      "Topic": "mc",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-a-rejoin-3",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "mc-coop",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAEAAAABAAJtY/////8AAAABAAJtYwAAAAIAAAAAAAAAAQ==",
+            "Name": "cooperative-sticky"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": null,
+        "Protocol": "cooperative-sticky",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-a-resync-3",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 2,
+        "Group": "mc-coop",
+        "GroupAssignment": null,
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "Protocol": "cooperative-sticky",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAEAAAABAAJtYwAAAAIAAAAAAAAAAf////8=",
+        "Protocol": "cooperative-sticky",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-n-heartbeat-after-3a",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "mc-coop",
+        "InstanceID": null,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:2\u003e",
+        "RackID": null,
+        "RebalanceTimeoutMillis": -1,
+        "ServerAssignor": null,
+        "SubscribedTopicNames": null,
+        "SubscribedTopicRegex": null,
+        "Topics": null
+      },
+      "response": {
+        "Assignment": null,
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:2\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-n-heartbeat-after-3b",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "mc-coop",
+        "InstanceID": null,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:2\u003e",
+        "RackID": null,
+        "RebalanceTimeoutMillis": -1,
+        "ServerAssignor": null,
+        "SubscribedTopicNames": null,
+        "SubscribedTopicRegex": null,
+        "Topics": null
+      },
+      "response": {
+        "Assignment": null,
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:2\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-a-heartbeat-after-3",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 2,
+        "Group": "mc-coop",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-describe-after-3",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "mc-coop"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 2,
+            "AssignorName": "uniform",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 2,
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "Group": "mc-coop",
+            "Members": [
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1
+                      ],
+                      "Topic": "mc",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:1\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "mc"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        0,
+                        1
+                      ],
+                      "Topic": "mc",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              },
+              {
+                "Assignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        2,
+                        3
+                      ],
+                      "Topic": "mc",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                },
+                "ClientHost": "\u003chost\u003e",
+                "ClientID": "doze-conformance",
+                "InstanceID": null,
+                "MemberEpoch": 2,
+                "MemberID": "\u003cmember:2\u003e",
+                "MemberType": -1,
+                "RackID": null,
+                "SubscribedTopicRegex": "",
+                "SubscribedTopics": [
+                  "mc"
+                ],
+                "TargetAssignment": {
+                  "TopicPartitions": [
+                    {
+                      "Partitions": [
+                        2,
+                        3
+                      ],
+                      "Topic": "mc",
+                      "TopicID": "\u003ctopic-id:1\u003e"
+                    }
+                  ]
+                }
+              }
+            ],
+            "State": "Stable"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "co-describe-nobody",
+      "api": "ConsumerGroupDescribe",
+      "version": 0,
+      "request": {
+        "Groups": [
+          "mc-nobody"
+        ],
+        "IncludeAuthorizedOperations": false
+      },
+      "response": {
+        "Groups": [
+          {
+            "AssignmentEpoch": 0,
+            "AssignorName": "",
+            "AuthorizedOperations": -2147483648,
+            "Epoch": 0,
+            "ErrorCode": 69,
+            "ErrorMessage": "Group mc-nobody not found.",
+            "Group": "mc-nobody",
+            "Members": null,
+            "State": ""
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "v3-n-join",
+      "api": "ConsumerGroupHeartbeat",
+      "version": 0,
+      "request": {
+        "Group": "mc-v3",
+        "InstanceID": null,
+        "MemberEpoch": 0,
+        "MemberID": "",
+        "RackID": null,
+        "RebalanceTimeoutMillis": 30000,
+        "ServerAssignor": "uniform",
+        "SubscribedTopicNames": [
+          "mc3"
+        ],
+        "SubscribedTopicRegex": null,
+        "Topics": []
+      },
+      "response": {
+        "Assignment": {
+          "Topics": [
+            {
+              "Partitions": [
+                0
+              ],
+              "TopicID": "\u003ctopic-id:2\u003e"
+            }
+          ]
+        },
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "HeartbeatIntervalMillis": 5000,
+        "MemberEpoch": 2,
+        "MemberID": "\u003cmember:3\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "v3-c-join-needs-id",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "mc-v3",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAMAAAABAANtYzP/////AAAAAP///////w==",
+            "Name": "cooperative-sticky"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:4\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "v3-c-join",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "mc-v3",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAMAAAABAANtYzP/////AAAAAP///////w==",
+            "Name": "cooperative-sticky"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 30000,
+        "SessionTimeoutMillis": 30000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:4\u003e",
+        "Members": null,
+        "Protocol": "cooperative-sticky",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "v3-c-sync",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 2,
+        "Group": "mc-v3",
+        "GroupAssignment": null,
+        "InstanceID": null,
+        "MemberID": "\u003cmember:4\u003e",
+        "Protocol": "cooperative-sticky",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAMAAAAA/////w==",
+        "Protocol": "cooperative-sticky",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}

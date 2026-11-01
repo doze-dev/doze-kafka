@@ -28,6 +28,11 @@ const (
 	// less a hostile one can cost.
 	maxControlFrameBytes = 1 << 20
 
+	// maxPushTelemetryFrameBytes is PushTelemetry's: the 1 MiB of metrics a client was
+	// told it may send (telemetry.max.bytes, Kafka's default and what is advertised), and
+	// room for the header and the instance id around it.
+	maxPushTelemetryFrameBytes = 1<<20 + 4096
+
 	// frameChunk is how much of a frame is trusted up front. A frame bigger than
 	// this is read as the bytes arrive, so memory follows what the peer actually
 	// sends rather than what its length prefix claims.
@@ -36,6 +41,8 @@ const (
 
 // ReadFrame reads one length-prefixed Kafka message — a 4-byte big-endian length
 // followed by that many bytes — and returns the payload without the prefix.
+//
+//fuzz:parser class=frame FuzzReadFrame
 func ReadFrame(r io.Reader) ([]byte, error) { return ReadFrameLimit(r, maxFrameBytes) }
 
 // ReadFrameLimit is ReadFrame with a caller-chosen size cap, refusing an
@@ -46,6 +53,8 @@ func ReadFrame(r io.Reader) ([]byte, error) { return ReadFrameLimit(r, maxFrameB
 // pin up to the cap of memory per connection (and a few hundred connections
 // exhaust the machine). Past frameChunk the buffer therefore grows as data
 // arrives: a peer that claims 100 MiB and sends nothing costs one chunk.
+//
+//fuzz:parser class=frame FuzzReadFrame
 func ReadFrameLimit(r io.Reader, limit int) ([]byte, error) {
 	var lenBuf [4]byte
 	if _, err := io.ReadFull(r, lenBuf[:]); err != nil {

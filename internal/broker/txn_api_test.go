@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"hash/crc32"
 	"path/filepath"
-	"strconv"
 	"testing"
 	"time"
 
@@ -297,8 +296,7 @@ func TestTransactionOffsetsAreAppliedOnlyOnCommit(t *testing.T) {
 func TestTransactionsLeftHalfDoneAreFinishedAfterARestart(t *testing.T) {
 	skipShort(t)
 	dir := t.TempDir()
-	addr := "127.0.0.1:" + strconv.Itoa(freePort(t))
-	stop := runBrokerAt(t, addr, dir, 4)
+	addr, stop := bootAt(t, "127.0.0.1:0", dir, 4)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	admin := newClient(t, addr)
@@ -397,8 +395,7 @@ func rawIdemBatch(pid int64, epoch int16, seq int32, value string) []byte {
 func TestARetriedBatchIsRecognisedAfterARestart(t *testing.T) {
 	skipShort(t)
 	dir := t.TempDir()
-	addr := "127.0.0.1:" + strconv.Itoa(freePort(t))
-	stop := runBrokerAt(t, addr, dir, 4)
+	addr, stop := bootAt(t, "127.0.0.1:0", dir, 4)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	admin := newClient(t, addr)
@@ -444,5 +441,56 @@ func TestARetriedBatchIsRecognisedAfterARestart(t *testing.T) {
 	// A sequence that skips ahead is still out of order.
 	if code, _ := send(c, 9, "gap", rawIdemBatch(init.ProducerID, init.ProducerEpoch, 9, "gap")); code != kerr.OutOfOrderSequenceNumber.Code {
 		t.Errorf("a gap after the restart: %s, want OUT_OF_ORDER_SEQUENCE_NUMBER", kerr.ErrorForCode(code))
+	}
+}
+
+// An empty transactional id is a malformed request, not the id of a transaction
+// nobody began: Kafka answers INVALID_REQUEST to each transactional API, and to
+// InitProducerId, where an empty id is not the null that means "no id"
+// (conformance/claims/api.md V4). An empty group in AddOffsetsToTxn is not
+// refused (step add-offsets-real-no-group).
+func TestAnEmptyTransactionalIDIsAnInvalidRequest(t *testing.T) {
+	addr := startBroker(t, 4)
+	cl := newClient(t, addr)
+	defer cl.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	end := kmsg.NewPtrEndTxnRequest()
+	end.ProducerID, end.Commit = 1, true
+	off := kmsg.NewPtrAddOffsetsToTxnRequest()
+	off.ProducerID, off.Group = 1, "g"
+	parts := kmsg.NewPtrAddPartitionsToTxnRequest()
+	parts.ProducerID = 1
+	pt := kmsg.NewAddPartitionsToTxnRequestTopic()
+	pt.Topic, pt.Partitions = "t", []int32{0}
+	parts.Topics = append(parts.Topics, pt)
+	init := kmsg.NewPtrInitProducerIDRequest()
+	empty := ""
+	init.TransactionalID, init.TransactionTimeoutMillis, init.ProducerID, init.ProducerEpoch = &empty, 60000, -1, -1
+
+	if r, err := end.RequestWith(ctx, cl); err != nil || r.ErrorCode != kerr.InvalidRequest.Code {
+		t.Errorf("EndTxn: %v %+v", err, r)
+	}
+	if r, err := off.RequestWith(ctx, cl); err != nil || r.ErrorCode != kerr.InvalidRequest.Code {
+		t.Errorf("AddOffsetsToTxn: %v %+v", err, r)
+	}
+	if r, err := parts.RequestWith(ctx, cl); err != nil || len(r.Topics) != 1 || r.Topics[0].Partitions[0].ErrorCode != kerr.InvalidRequest.Code {
+		t.Errorf("AddPartitionsToTxn: %v %+v", err, r)
+	}
+	if r, err := init.RequestWith(ctx, cl); err != nil || r.ErrorCode != kerr.InvalidRequest.Code || r.ProducerID != -1 {
+		t.Errorf("InitProducerId: %v %+v", err, r)
+	}
+
+	// A transaction that has a producer adds an empty group, as Kafka does.
+	id := "tx"
+	init.TransactionalID = &id
+	got, err := init.RequestWith(ctx, cl)
+	if err != nil || got.ErrorCode != 0 {
+		t.Fatalf("InitProducerId tx: %v %+v", err, got)
+	}
+	off.TransactionalID, off.ProducerID, off.ProducerEpoch, off.Group = id, got.ProducerID, got.ProducerEpoch, ""
+	if r, err := off.RequestWith(ctx, cl); err != nil || r.ErrorCode != 0 {
+		t.Errorf("AddOffsetsToTxn with an empty group: %v %+v", err, r)
 	}
 }

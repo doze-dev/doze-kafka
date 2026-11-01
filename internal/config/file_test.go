@@ -144,8 +144,8 @@ func TestWriteTOML_RoundTrips(t *testing.T) {
 	orig.TLSKeyFile = "k.pem"
 
 	var buf bytes.Buffer
-	if err := WriteTOML(&buf, orig); err != nil {
-		t.Fatalf("WriteTOML: %v", err)
+	if err := WriteTOMLWithSecrets(&buf, orig); err != nil {
+		t.Fatalf("WriteTOMLWithSecrets: %v", err)
 	}
 
 	path := writeFile(t, buf.String())
@@ -161,6 +161,58 @@ func TestWriteTOML_RoundTrips(t *testing.T) {
 		got.Credentials["carol"] != "pw" ||
 		strings.Join(got.SASLMechanisms, ",") != "SCRAM-SHA-512" {
 		t.Errorf("round-trip mismatch:\n got  %+v\n want %+v\n toml:\n%s", got, orig, buf.String())
+	}
+}
+
+// D6: WriteTOML never writes a password, and the file it writes is refused where it is
+// loaded when it still has the placeholder, by user, so "<redacted>" cannot become one.
+func TestWriteTOML_RedactsPasswordsAndTheFileIsRefusedUntilTheyAreBack(t *testing.T) {
+	orig := Default()
+	orig.SASLMechanisms = []string{"PLAIN"}
+	orig.Credentials = map[string]string{"carol": "hunter2-distinctive", "dave": "other-distinctive"}
+
+	var buf bytes.Buffer
+	if err := WriteTOML(&buf, orig); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), "distinctive") {
+		t.Errorf("a password was written:\n%s", buf.String())
+	}
+	if strings.Count(buf.String(), `"`+Redacted+`"`) != 2 {
+		t.Errorf("each password is the placeholder:\n%s", buf.String())
+	}
+	got := Default()
+	if err := LoadFile(writeFile(t, buf.String()), &got); err != nil {
+		t.Fatal(err)
+	}
+	err := got.Validate()
+	if err == nil || !strings.Contains(err.Error(), "--show-secrets") || !(strings.Contains(err.Error(), `"carol"`) || strings.Contains(err.Error(), `"dave"`)) {
+		t.Errorf("a file with the placeholder as a password validated: %v", err)
+	}
+	// With the passwords back it is a file to run from.
+	got.Credentials = orig.Credentials
+	if err := got.Validate(); err != nil {
+		t.Errorf("with the passwords back: %v", err)
+	}
+}
+
+// The parser quotes what it found where it expected a value; for a credential that is
+// the password, and it is not repeated.
+func TestLoadFile_ABadCredentialValueIsNotQuoted(t *testing.T) {
+	for _, content := range []string{
+		"[credentials]\nalice = PLANTEDsecret9f\n",
+		"[credentials]\nalice = 12PLANTEDsecret9f\n",
+		"[credentials]\nalice = [\"PLANTEDsecret9f\"]\n",
+	} {
+		cfg := Default()
+		err := LoadFile(writeFile(t, content), &cfg)
+		if err == nil {
+			t.Errorf("%q loaded", content)
+			continue
+		}
+		if strings.Contains(err.Error(), "PLANTED") {
+			t.Errorf("the error repeats the password: %v", err)
+		}
 	}
 }
 

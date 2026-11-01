@@ -92,6 +92,7 @@ type jsonLoader struct {
 	depth int
 }
 
+//fuzz:parser class=schema-texts FuzzRegisterAndCompare
 func parseJSONDoc(text string) (any, error) {
 	dec := json.NewDecoder(strings.NewReader(text))
 	dec.UseNumber()

@@ -1,0 +1,679 @@
+{
+  "scenario": "classic-join-flow",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create-topic",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 2,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "cg"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 2,
+            "ReplicationFactor": 1,
+            "Topic": "cg",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "find-coordinator",
+      "api": "FindCoordinator",
+      "version": 4,
+      "request": {
+        "CoordinatorKey": "",
+        "CoordinatorKeys": [
+          "flow"
+        ],
+        "CoordinatorType": 0
+      },
+      "response": {
+        "Coordinators": [
+          {
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "Host": "\u003chost\u003e",
+            "Key": "flow",
+            "NodeID": "\u003cnode\u003e",
+            "Port": "\u003cport\u003e"
+          }
+        ],
+        "ErrorCode": 0,
+        "ErrorMessage": null,
+        "Host": "\u003chost\u003e",
+        "NodeID": "\u003cnode\u003e",
+        "Port": "\u003cport\u003e",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-join-no-id",
+      "conn": "c1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "flow",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 10000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-join-with-id",
+      "conn": "c1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "flow",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 10000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 1,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:1\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJjZ/////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-sync",
+      "conn": "c1",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 1,
+        "Group": "flow",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAJjZwAAAAIAAAAAAAAAAf////8=",
+            "MemberID": "\u003cmember:1\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJjZwAAAAIAAAAAAAAAAf////8=",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-heartbeat",
+      "conn": "c1",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 1,
+        "Group": "flow",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-commit",
+      "conn": "c1",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": 1,
+        "Group": "flow",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "cg",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "cg",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "c2-join-no-id",
+      "conn": "c2",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "flow",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 10000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-heartbeat-during-rebalance",
+      "conn": "c1",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 1,
+        "Group": "flow",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e"
+      },
+      "response": {
+        "ErrorCode": 27,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-rejoin",
+      "conn": "c1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "flow",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 10000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:1\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJjZ/////8="
+          },
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:2\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJjZ/////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c2-join-with-id",
+      "conn": "c2",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "flow",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 10000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 2,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": null,
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-sync-leader",
+      "conn": "c1",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 2,
+        "Group": "flow",
+        "GroupAssignment": [
+          {
+            "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAA/////w==",
+            "MemberID": "\u003cmember:1\u003e"
+          },
+          {
+            "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAB/////w==",
+            "MemberID": "\u003cmember:2\u003e"
+          }
+        ],
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAA/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c2-sync-follower",
+      "conn": "c2",
+      "api": "SyncGroup",
+      "version": 5,
+      "request": {
+        "Generation": 2,
+        "Group": "flow",
+        "GroupAssignment": null,
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "Protocol": "range",
+        "ProtocolType": "consumer"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "MemberAssignment": "AAAAAAABAAJjZwAAAAEAAAAB/////w==",
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "leader-heartbeat",
+      "conn": "c1",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 2,
+        "Group": "flow",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e"
+      },
+      "response": {
+        "ErrorCode": 0,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "leader-commit",
+      "conn": "c1",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": 2,
+        "Group": "flow",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "cg",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "cg",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "follower-commit",
+      "conn": "c2",
+      "api": "OffsetCommit",
+      "version": 8,
+      "request": {
+        "Generation": 2,
+        "Group": "flow",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "RetentionTimeMillis": -1,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "LeaderEpoch": -1,
+                "Metadata": null,
+                "Offset": 1,
+                "Partition": 0,
+                "Timestamp": -1
+              }
+            ],
+            "Topic": "cg",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "Partitions": [
+              {
+                "ErrorCode": 0,
+                "Partition": 0
+              }
+            ],
+            "Topic": "cg",
+            "TopicID": "\u003czero-id\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "c3-join-no-id",
+      "conn": "c3",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "flow",
+        "InstanceID": null,
+        "MemberID": "",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 10000
+      },
+      "response": {
+        "ErrorCode": 79,
+        "Generation": -1,
+        "LeaderID": "",
+        "MemberID": "\u003cmember:3\u003e",
+        "Members": null,
+        "Protocol": null,
+        "ProtocolType": null,
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-heartbeat-during-rebalance-3",
+      "conn": "c1",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 2,
+        "Group": "flow",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e"
+      },
+      "response": {
+        "ErrorCode": 27,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c2-heartbeat-during-rebalance-3",
+      "conn": "c2",
+      "api": "Heartbeat",
+      "version": 4,
+      "request": {
+        "Generation": 2,
+        "Group": "flow",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e"
+      },
+      "response": {
+        "ErrorCode": 27,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c1-rejoin-3",
+      "conn": "c1",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "flow",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:1\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 10000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 3,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:1\u003e",
+        "Members": [
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:1\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJjZ/////8="
+          },
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:2\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJjZ/////8="
+          },
+          {
+            "InstanceID": null,
+            "MemberID": "\u003cmember:3\u003e",
+            "ProtocolMetadata": "AAAAAAABAAJjZ/////8="
+          }
+        ],
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c2-rejoin-3",
+      "conn": "c2",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "flow",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:2\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 10000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 3,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:2\u003e",
+        "Members": null,
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    },
+    {
+      "label": "c3-join-with-id",
+      "conn": "c3",
+      "api": "JoinGroup",
+      "version": 7,
+      "request": {
+        "Group": "flow",
+        "InstanceID": null,
+        "MemberID": "\u003cmember:3\u003e",
+        "ProtocolType": "consumer",
+        "Protocols": [
+          {
+            "Metadata": "AAAAAAABAAJjZ/////8=",
+            "Name": "range"
+          }
+        ],
+        "Reason": null,
+        "RebalanceTimeoutMillis": 20000,
+        "SessionTimeoutMillis": 10000
+      },
+      "response": {
+        "ErrorCode": 0,
+        "Generation": 3,
+        "LeaderID": "\u003cmember:1\u003e",
+        "MemberID": "\u003cmember:3\u003e",
+        "Members": null,
+        "Protocol": "range",
+        "ProtocolType": "consumer",
+        "SkipAssignment": false,
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}

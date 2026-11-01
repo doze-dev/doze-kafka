@@ -21,9 +21,10 @@ func (b *Broker) groupIsActive(id string) bool {
 }
 
 // handleDeleteGroups removes empty groups. A group with live members is refused
-// (NON_EMPTY_GROUP), an unknown one is GROUP_ID_NOT_FOUND, as on Kafka.
+// (NON_EMPTY_GROUP), an unknown one is GROUP_ID_NOT_FOUND, as on Kafka
+// (claim: groups G1).
 func (b *Broker) handleDeleteGroups(ctx context.Context, req *protocol.Request, dr *kmsg.DeleteGroupsRequest, resp *kmsg.DeleteGroupsResponse) error {
-	for _, id := range dr.Groups {
+	for _, id := range inKafkaGroupOrder(dr.Groups) {
 		rg := kmsg.NewDeleteGroupsResponseGroup()
 		rg.Group = id
 		if !b.canGroup(req.Conn, id, opDelete) {
@@ -53,10 +54,16 @@ func (b *Broker) deleteGroup(id string) int16 {
 	if b.cg848.forget(id) {
 		existed = true
 	}
+	// When the group became empty goes with it, and before its offsets do: the id used
+	// again is a group nobody has joined (recorded: offsets-retention-recreate, g-del),
+	// and nothing still waiting to be written may put the old group back in the store.
+	was, known := b.expiry.forget(id)
 	n, err := b.meta.DeleteGroupOffsets(id)
 	if err != nil {
-		b.log.Warn("delete group: could not remove committed offsets", "group", id, "err", err)
-		return kerr.UnknownServerError.Code
+		if known {
+			b.expiry.restore(id, was)
+		}
+		return b.storageFault("delete group: remove committed offsets", err, "group", id)
 	}
 	if !existed && n == 0 {
 		return kerr.GroupIDNotFound.Code
@@ -72,6 +79,10 @@ func (b *Broker) deleteGroup(id string) int16 {
 func (b *Broker) handleOffsetDelete(ctx context.Context, req *protocol.Request, odr *kmsg.OffsetDeleteRequest, resp *kmsg.OffsetDeleteResponse) error {
 	if !b.canGroup(req.Conn, odr.Group, opDelete) {
 		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
+		return nil
+	}
+	if odr.Group == "" {
+		resp.ErrorCode = kerr.InvalidGroupID.Code // recorded: group-requests-refused, ej-offset-delete.
 		return nil
 	}
 	known := b.groupIsActive(odr.Group) || b.groupHasOffsets(odr.Group)
@@ -97,12 +108,12 @@ func (b *Broker) handleOffsetDelete(ctx context.Context, req *protocol.Request, 
 				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code
 			default:
 				// Including an offset whose topic is gone. Kafka answers
-				// UNKNOWN_TOPIC_OR_PARTITION there, but it also never keeps such an
+				// UNKNOWN_TOPIC_OR_PARTITION there (claim: groups G2), but it also drops such an
 				// offset; a data directory from an earlier version of this broker
 				// can hold one, and refusing left no way to remove it short of
 				// deleting the whole group.
 				if err := b.meta.DeleteOffset(odr.Group, t.Topic, p.Partition); err != nil {
-					rp.ErrorCode = kerr.UnknownServerError.Code
+					rp.ErrorCode = b.storageFault("delete group offsets", err, "group", odr.Group, "topic", t.Topic)
 				}
 			}
 			rt.Partitions = append(rt.Partitions, rp)

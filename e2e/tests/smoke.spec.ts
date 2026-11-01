@@ -10,17 +10,25 @@ test('the console shell renders and the broker is seeded', async ({ page, reques
   await page.goto('');
   await expect(page).toHaveTitle(/doze-kafka/);
   await expect(page.locator('.rail')).toBeVisible();
+  // The console opens on Traffic (Main, "the home page").
+  await expect(page.locator('.rail a.on')).toHaveText(/Traffic/);
+  await page.goto('topics');
   await expect(page.locator('.rail a.on')).toHaveText(/Topics/);
-  await expect(page.locator('.listpane .li[data-name="seed-orders"]')).toBeVisible();
-  const health = await request.get('../healthz');
+  await expect(page.locator('.list .li[data-name="seed-orders"]')).toBeVisible();
+  // /healthz sits at the origin, whatever prefix the console is mounted under.
+  const health = await request.get(new URL('/healthz', page.url()).toString());
   expect(health.status()).toBe(200);
 });
 
 test('the cluster page lists the broker, its APIs and its settings', async ({ page }) => {
   await page.goto('cluster');
   await expect(page.locator('h1')).toHaveText('Cluster');
+  await page.goto('cluster?view=apis');
   await expect(page.locator('.apilist')).toContainText('Produce');
   await expect(page.locator('.apilist')).toContainText('IncrementalAlterConfigs');
+  await page.goto('cluster?view=config');
   await expect(page.getByText('log.retention.ms')).toBeVisible();
-  await expect(page.getByText('no authentication')).toBeVisible();
+  await page.goto('cluster');
+  // How the console itself is connected: the second identity (E2E_EXTERNAL) is SASL over TLS.
+  await expect(page.getByText(process.env.E2E_EXTERNAL === '1' ? /SASL SCRAM-SHA-512 · TLS/ : /no authentication · plaintext/)).toBeVisible();
 });

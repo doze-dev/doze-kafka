@@ -11,7 +11,7 @@
 # Go test / coverage artifacts.
 *.test
 *.out
-coverage.*
+/coverage.*
 
 # Editor / OS noise.
 .DS_Store
@@ -26,3 +26,7 @@ e2e/playwright-report/
 compat/**/node_modules/
 compat/**/target/
 compat/**/.venv/
+console/cm6/node_modules/
+
+# Mutation runs: every mutant of the last run of each unit (scripts/mutate), for a person to read.
+/.mutate/

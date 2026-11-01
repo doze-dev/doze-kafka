@@ -46,8 +46,10 @@ func TestAPITableIsWellFormed(t *testing.T) {
 			if o.Max > req.MaxVersion() {
 				t.Errorf("%s at Kafka %d: v%d is beyond what the protocol library can encode (v%d)", name, major, o.Max, req.MaxVersion())
 			}
+			// A newer major may start higher (Kafka 4 removed old versions, KIP-896); it
+			// does not start lower, and it does not stop sooner.
 			if i > 0 && a.Versions[i-1].OK && (o.Max < a.Versions[i-1].Max || o.Min < a.Versions[i-1].Min) {
-				t.Errorf("%s: Kafka %d offers %d–%d, narrower than Kafka %d", name, major, o.Min, o.Max, major-1)
+				t.Errorf("%s: Kafka %d offers %d–%d, which starts or stops below Kafka %d's %d–%d", name, major, o.Min, o.Max, major-1, a.Versions[i-1].Min, a.Versions[i-1].Max)
 			}
 		}
 		if !offered {

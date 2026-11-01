@@ -30,6 +30,8 @@ var errNotATime = errors.New("that is not a time")
 // The zone is never guessed: the page shows times in the browser's zone and this
 // server does not know it, so a bare date and time is read as UTC and the placeholder
 // and the note say so.
+//
+//fuzz:parser class=console-forms FuzzConsoleForms
 func parseAt(raw string, now time.Time) (time.Time, error) {
 	s := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(raw), "ago"))
 	if s == "" {

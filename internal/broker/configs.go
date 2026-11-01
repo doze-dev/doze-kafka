@@ -3,12 +3,11 @@ package broker
 import (
 	"context"
 	"slices"
-	"strconv"
-	"strings"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
 
 	"github.com/doze-dev/doze-kafka/internal/protocol"
+	"github.com/doze-dev/doze-kafka/internal/settings"
 	"github.com/doze-dev/doze-kafka/internal/storage/meta"
 
 	"github.com/twmb/franz-go/pkg/kerr"
@@ -20,14 +19,6 @@ import (
 // values (set at CreateTopics or by AlterConfigs; see alterconfigs.go). The
 // broker's own configuration is static and reported read-only.
 
-// unbounded is how Kafka reports a disabled size/time bound; our config uses 0.
-func retentionValue(v int64) string {
-	if v <= 0 {
-		return "-1"
-	}
-	return strconv.FormatInt(v, 10)
-}
-
 // handleDescribeConfigs returns the effective configuration of a topic or the
 // broker. Topic configs are the broker defaults overlaid with the per-topic
 // overrides stored at CreateTopics; broker configs are the process's static
@@ -37,20 +28,23 @@ func (b *Broker) handleDescribeConfigs(ctx context.Context, req *protocol.Reques
 		rr := kmsg.NewDescribeConfigsResponseResource()
 		rr.ResourceType = res.ResourceType
 		rr.ResourceName = res.ResourceName
+		// An empty message, not a null one, where Kafka answers a resource
+		// (claim: api V6).
+		rr.ErrorMessage = new(string)
 
 		switch res.ResourceType {
 		case kmsg.ConfigResourceTypeTopic:
 			t, ok, err := b.meta.Topic(res.ResourceName)
 			if !b.canTopic(req.Conn, res.ResourceName, opDescribeConfig) {
-				rr.ErrorCode = kerr.TopicAuthorizationFailed.Code
+				rr.ErrorCode, rr.ErrorMessage = kerr.TopicAuthorizationFailed.Code, nil
 			} else if err != nil || !ok {
-				rr.ErrorCode = kerr.UnknownTopicOrPartition.Code
+				rr.ErrorCode, rr.ErrorMessage = kerr.UnknownTopicOrPartition.Code, nil
 			} else {
 				rr.Configs = b.topicConfigEntries(t, res.ConfigNames)
 			}
 		case kmsg.ConfigResourceTypeBroker:
 			if !b.canCluster(req.Conn, opDescribeConfig) {
-				rr.ErrorCode = kerr.ClusterAuthorizationFailed.Code
+				rr.ErrorCode, rr.ErrorMessage = kerr.ClusterAuthorizationFailed.Code, nil
 				break
 			}
 			rr.Configs = b.brokerConfigEntries(res.ConfigNames)
@@ -71,16 +65,13 @@ type configEntry struct {
 }
 
 func (b *Broker) topicConfigEntries(t meta.Topic, names []string) []kmsg.DescribeConfigsResponseResourceConfig {
-	// Broker defaults for the standard topic knobs...
-	eff := map[string]configEntry{
-		"cleanup.policy":       {"delete", kmsg.ConfigSourceDefaultConfig},
-		"retention.ms":         {retentionValue(b.cfg.RetentionMs), kmsg.ConfigSourceDefaultConfig},
-		"retention.bytes":      {retentionValue(b.cfg.RetentionBytes), kmsg.ConfigSourceDefaultConfig},
-		"segment.bytes":        {strconv.FormatInt(b.cfg.SegmentBytes, 10), kmsg.ConfigSourceDefaultConfig},
-		"index.interval.bytes": {strconv.FormatInt(b.cfg.IndexIntervalBytes, 10), kmsg.ConfigSourceDefaultConfig},
-		// CreateTime is what applies unless a topic says otherwise. max.message.bytes
-		// has no entry: unset, there is no per-batch limit to report.
-		"message.timestamp.type": {"CreateTime", kmsg.ConfigSourceDefaultConfig},
+	// The broker's defaults for the topic configs that have one (the settings
+	// table says which)...
+	eff := map[string]configEntry{}
+	for _, s := range settings.All(settings.Topic) {
+		if s.Default != nil {
+			eff[s.Name] = configEntry{s.Default(b.cfg), kmsg.ConfigSourceDefaultConfig}
+		}
 	}
 	// ...overlaid with per-topic overrides from CreateTopics (dynamic topic config).
 	for k, v := range t.Config {
@@ -90,16 +81,11 @@ func (b *Broker) topicConfigEntries(t meta.Topic, names []string) []kmsg.Describ
 }
 
 func (b *Broker) brokerConfigEntries(names []string) []kmsg.DescribeConfigsResponseResourceConfig {
-	eff := map[string]configEntry{
-		"log.retention.bytes":       {retentionValue(b.cfg.RetentionBytes), kmsg.ConfigSourceStaticBrokerConfig},
-		"log.retention.ms":          {retentionValue(b.cfg.RetentionMs), kmsg.ConfigSourceStaticBrokerConfig},
-		"log.segment.bytes":         {strconv.FormatInt(b.cfg.SegmentBytes, 10), kmsg.ConfigSourceStaticBrokerConfig},
-		"log.index.interval.bytes":  {strconv.FormatInt(b.cfg.IndexIntervalBytes, 10), kmsg.ConfigSourceStaticBrokerConfig},
-		"num.partitions":            {strconv.Itoa(b.cfg.DefaultPartitions), kmsg.ConfigSourceStaticBrokerConfig},
-		"auto.create.topics.enable": {strconv.FormatBool(b.cfg.AutoCreateTopics), kmsg.ConfigSourceStaticBrokerConfig},
-		// The authorizer's settings, under the names Kafka gives them.
-		"allow.everyone.if.no.acl.found": {strconv.FormatBool(b.authz.defaultAll), kmsg.ConfigSourceStaticBrokerConfig},
-		"super.users":                    {strings.Join(b.cfg.ACLSuperUsers, ";"), kmsg.ConfigSourceStaticBrokerConfig},
+	eff := map[string]configEntry{}
+	for _, s := range settings.All(settings.Broker) {
+		if s.Wire && s.Default != nil {
+			eff[s.Name] = configEntry{s.Default(b.cfg), kmsg.ConfigSourceStaticBrokerConfig}
+		}
 	}
 	return configEntries(eff, names)
 }

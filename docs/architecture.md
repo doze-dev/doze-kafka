@@ -108,6 +108,62 @@ summary on stdout. `names.go` is the zone, `dnsready.go` the first-run setup, `l
 where the broker binds and what it advertises, `doctor.go`/`env.go` the two commands; on
 Windows the zone builds but has no machine setup yet, so the default there is an address.
 
+## Parsers of untrusted bytes
+
+Anything read from a socket, a request body or a file somebody else wrote is
+parsed by one of these, and each has a fuzz target: bytes in, and no panic, no
+unbounded allocation, no hang. `task fuzz` runs them all (`testdata/fuzz-targets.txt`
+is the list); the weekly workflow runs each for at least 60 seconds, and a test
+(`docs/fuzz_test.go`) fails when a `Fuzz` function is missing from the list or from
+this table.
+
+The same test holds the code to the list. A function that reads bytes from outside
+says which targets reach it in the last line of its doc comment
+(`//fuzz:parser class=frame FuzzReadFrame`), and the test fails when a marker names
+a target that does not exist, when a listed target is named by no marker, when one
+of the classes of parser below has no marked function, and when a function in a
+package that faces the network is named and shaped like a parser (`Parse…`,
+`Decode…`, `Unmarshal…`, `Read…`, `Scan…` taking a `[]byte`, `string`, `io.Reader`
+or `*http.Request`) and carries neither that marker nor
+`//fuzz:not-a-parser <why>`. The net is by name: a parser written inline, or called
+something else, is still its author's to mark.
+
+| Parser | Where | Fuzz target |
+|---|---|---|
+| Frame (length prefix, size cap) | `internal/protocol` | `FuzzReadFrame` |
+| Request header and body, including tagged fields | `internal/protocol` | `FuzzParseAndDecodeRequest`, `FuzzSkipTaggedFields` |
+| What the recorder says about a decoded request | `internal/protocol` | `FuzzDescribe` |
+| Record batch (shape, CRC, whole batches only) | `internal/storage/log` | `FuzzValidateBatches` |
+| Record reader | `internal/storage/log` | `FuzzDecodeRecords` |
+| Decompression (gzip, snappy block and xerial, lz4, zstd) | `internal/storage/log` | `FuzzDecompress` |
+| The streamed look inside a produced batch (keys, inflated size) | `internal/storage/log` | `FuzzCheckRecords` |
+| A Produce payload read whole before it is stored (shape, every record through its codec, timestamps) | `internal/storage/log` | `FuzzCheckProduce` |
+| Segment scan that recovery truncates by | `internal/storage/log` | `FuzzScanLog` |
+| OTLP metrics (client telemetry) | `internal/telemetry` | `FuzzDecode` |
+| SASL/PLAIN and SCRAM messages | `internal/broker` | `FuzzSASLPlain`, `FuzzSCRAMClientFirst`, `FuzzSCRAMClientFinal`, `FuzzSCRAMUsernameEscaping` |
+| ACL filters and the identity of a stored entry | `internal/broker`, `internal/storage/meta` | `FuzzACLFilterMatches`, `FuzzACLKey` |
+| Topic config values | `internal/broker` | `FuzzTopicConfigValues` |
+| The classic consumer protocol bytes (a subscription, an assignment) | `internal/broker` | `FuzzDecodeConsumerProtocol` |
+| Consumer-group state machine (the KIP-848 coordinator parses nothing; the bytes are its schedule) | `internal/broker` | `FuzzGroupSequence` |
+| Configuration file | `internal/config` | `FuzzConfigFile` |
+| Schema texts (Avro, JSON Schema, Protobuf) and their compatibility | `schemaregistry` | `FuzzRegisterAndCompare` |
+| Registry wire payloads | `schemaregistry` | `FuzzDecode` |
+| Registry REST bodies, every route | `schemaregistry` | `FuzzAPIBody` |
+| Protobuf descriptors | `schemaregistry` | `FuzzDescriptor` |
+| Schema references (graph shapes) | `schemaregistry` | `FuzzRegisterReferences` |
+| A JSON document to encode under a schema (the console's compose panel) | `schemaregistry` | `FuzzEncode` |
+| The version in a registry path | `schemaregistry` | `FuzzVersionPath` |
+| The console's form inputs and query strings | `console` (driven through its handler) | `FuzzConsoleForms` |
+| Trace headers in a record (W3C `traceparent`, B3, the configured header) | `console` | `FuzzTraceHeaders` |
+| The Host header (the DNS-rebinding guard of the console and of the schema registry) | `internal/hostguard` | `FuzzHostGuard` |
+
+Not yet covered, with the reason: the console reads a classic group member's
+assignment bytes inline in `describeGroupClassic` (`console/backend_groups.go`),
+with the Kafka client library's decoder, behind a DescribeGroups call; a target
+for it needs a group whose leader sends fuzzed bytes, and is owed to the Groups
+stage. The console's schema forms (`/schemas/…`) need a registry behind the
+console, which `FuzzConsoleForms` does not start.
+
 ## Why this stays small
 
 Most of Kafka's size is distributed-systems machinery — replication, the controller

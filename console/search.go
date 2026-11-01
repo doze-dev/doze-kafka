@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // Searching a topic's records.
@@ -58,6 +57,8 @@ func recordMatches(m Message, needle []byte) bool {
 // scanPartition reads up to budget records of one partition ending just before
 // `before` (-1 = the end of the log), newest chunk first, and returns the matches
 // with the range it read: [from, to).
+//
+//fuzz:not-a-parser fetches records with the Kafka client and compares their bytes with the needle; the needle is searched for, never parsed
 func (c *Console) scanPartition(ctx context.Context, topic string, partition int32, needle []byte, before int64, budget int) (hits []Message, from, to, earliest int64, err error) {
 	earliest, latest, err := c.be.PartitionOffsets(ctx, topic, partition)
 	if err != nil {
@@ -163,9 +164,9 @@ func (c *Console) searchTopic(ctx context.Context, topic string, partition, part
 // newMsgView dresses a record for a table row.
 func newMsgView(m Message) msgView {
 	return msgView{
-		Offset: m.Offset, Partition: m.Partition, Timestamp: m.Timestamp, TimeStr: m.Timestamp.Format("15:04:05"),
-		TimeFull:   m.Timestamp.Format(time.RFC3339),
-		Key:        previewOnly(m.Key), // the table shows one line; the drawer does the rest.
+		Offset: m.Offset, Partition: m.Partition, Timestamp: m.Timestamp,
+
+		Key:        previewOnly(m.Key), // the table shows one line; the inspector does the rest.
 		Value:      previewOnly(m.Value),
 		Headers:    m.Headers,
 		TickHeight: tickHeight(len(m.Value)),

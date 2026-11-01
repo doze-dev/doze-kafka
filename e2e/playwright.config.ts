@@ -4,18 +4,39 @@ import { defineConfig, devices } from '@playwright/test';
 // on an address (--listen): no DNS, no name claimed, nothing shared with a broker
 // already running on the machine. E2E_PORT moves it, so two runs can coexist.
 const PORT = Number(process.env.E2E_PORT ?? 14092);
-export const KAFKA_ADDR = `127.0.0.1:${PORT}`;
 export const CONSOLE_PORT = PORT + 1;
 export const REGISTRY_PORT = PORT + 2;
-export const REGISTRY_URL = `http://127.0.0.1:${REGISTRY_PORT}`;
-export const BASE_URL = `http://127.0.0.1:${CONSOLE_PORT}/_console/`;
+
+// E2E_IDENTITY=1 runs the suite with nothing tidy about the broker: its listener
+// picks its own port (127.0.0.1:0), the console is mounted under a prefix that is
+// not the default, the data directory's path has a space in it and the name zone
+// is off (plan A8). The address the broker bound is then read from its console
+// (global-setup.ts, addr.ts).
+//
+// The second identity (foundation B11, `task test:e2e:identity`) starts the broker
+// itself, with SASL and TLS as well, and says where it is in the environment.
+const EXTERNAL = process.env.E2E_EXTERNAL === '1';
+export const IDENTITY = !!process.env.E2E_IDENTITY;
+// The console's prefix: where the second identity mounted the console it started
+// (read from its address), else the identity's, else the default.
+export const PREFIX = EXTERNAL && process.env.E2E_CONSOLE_URL ? new URL(process.env.E2E_CONSOLE_URL).pathname.replace(/\/$/, '') : IDENTITY ? '/ops/kafka-ui' : '/_console';
+export const KAFKA_ADDR = EXTERNAL ? process.env.E2E_KAFKA_ADDR! : `127.0.0.1:${PORT}`;
+export const REGISTRY_URL = EXTERNAL ? process.env.E2E_REGISTRY_URL! : `http://127.0.0.1:${REGISTRY_PORT}`;
+export const BASE_URL = EXTERNAL ? process.env.E2E_CONSOLE_URL! : `http://127.0.0.1:${CONSOLE_PORT}${PREFIX}/`;
+const LISTEN = IDENTITY ? '127.0.0.1:0' : KAFKA_ADDR;
+const DATA_DIR = IDENTITY ? `data dir ${PORT}` : `data-${PORT}`;
 
 export default defineConfig({
   testDir: './tests',
   globalSetup: './global-setup.ts',
+  globalTeardown: './global-teardown.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  // A retry is kept in CI for its trace (trace: 'on-first-retry'), and a test that
+  // passed only on a retry is flaky: failOnFlakyTests makes that a failure of the
+  // run, so the number of retried passes allowed is zero, and none is green.
+  retries: process.env.CI ? 1 : 0,
+  failOnFlakyTests: !!process.env.CI,
   workers: process.env.CI ? 4 : undefined,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
 
@@ -27,13 +48,14 @@ export default defineConfig({
 
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 
-  webServer: {
+  webServer: EXTERNAL ? undefined : {
     // A fresh data directory every run: state left over from a previous run is
     // how a suite's result comes to depend on how often it has been run.
     command:
       `sh -c "cd .. && GOWORK=off go build -o e2e/.tmp/bin/doze-kafka-${PORT} ./cmd/doze-kafka && ` +
-      `cd e2e/.tmp && rm -rf data-${PORT} && mkdir -p data-${PORT} && ` +
-      `./bin/doze-kafka-${PORT} --listen ${KAFKA_ADDR} --console-addr 127.0.0.1:${CONSOLE_PORT} --schema-registry-addr 127.0.0.1:${REGISTRY_PORT} --data-dir data-${PORT}"`,
+      `cd e2e/.tmp && rm -rf \\\"${DATA_DIR}\\\" && mkdir -p \\\"${DATA_DIR}\\\" && ` +
+      `./bin/doze-kafka-${PORT} --listen ${LISTEN} --console-addr 127.0.0.1:${CONSOLE_PORT} --schema-registry-addr 127.0.0.1:${REGISTRY_PORT} --data-dir \\\"${DATA_DIR}\\\""`,
+    env: IDENTITY ? { DOZE_ZONE: 'off', DOZE_KAFKA_CONSOLE_PREFIX: PREFIX } : {},
     url: `http://127.0.0.1:${CONSOLE_PORT}/healthz`,
     reuseExistingServer: false, // a reused server keeps its state, and the wipe above never runs.
     timeout: 120_000,

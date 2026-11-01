@@ -78,7 +78,7 @@ func TestSchemaRegistryIsServedAndSurvivesARestart(t *testing.T) {
 func TestSchemaRegistryCanBeTurnedOff(t *testing.T) {
 	out, _ := start(t, "--schema-registry=false")
 	waitFor(t, "the summary", func() bool { return strings.Contains(out.String(), "doze-kafka is up") })
-	if strings.Contains(out.String(), "registry") {
+	if regexp.MustCompile(`(?m)^\s+registry\s`).MatchString(out.String()) {
 		t.Errorf("--schema-registry=false but the summary names a registry:\n%s", out.String())
 	}
 }
@@ -165,7 +165,9 @@ func TestRegistryGetsItsOwnNameInTheZone(t *testing.T) {
 	if err != nil {
 		t.Skipf("the zone registry cannot be used here: %v", err)
 	}
-	z := &zone{reg: reg, own: own}
+	// What is asked here is the route; whether the name answers is asked in
+	// TestTheRegistryURLIsTheNameOnlyWhenTheNameAnswers.
+	z := &zone{reg: reg, own: own, reach: func(string, int) bool { return true }}
 	defer z.close()
 
 	url := z.routeRegistry(slog.New(slog.NewTextHandler(io.Discard, nil)), "shop", "127.0.0.9:8081")

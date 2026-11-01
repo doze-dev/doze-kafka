@@ -4,19 +4,57 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"maps"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 )
 
+// groups is the Groups home (Gr-Home): every group, how far behind each is, and which
+// need a look.
 func (c *Console) groups(w http.ResponseWriter, r *http.Request) {
-	list, err := c.be.ListGroups(r.Context())
+	data, err := c.groupsHomeData(r)
 	if err != nil {
 		c.fail(w, r, err)
 		return
 	}
-	c.render(w, r, "groups_home", map[string]any{"List": list, "Page": "groups"})
+	data["LiveHash"], _ = c.liveHash("groups_live", data)
+	c.render(w, r, "groups_home", data)
+}
+
+// groupsLive is Gr-Home's summary, table and callouts, polled every 3 s as the board
+// says ("refreshes every 3 s").
+func (c *Console) groupsLive(w http.ResponseWriter, r *http.Request) {
+	data, err := c.groupsHomeData(r)
+	if err != nil {
+		c.fail(w, r, err)
+		return
+	}
+	c.livePartial(w, r, "groups_live", data)
+}
+
+func (c *Console) groupsHomeData(r *http.Request) (map[string]any, error) {
+	list, err := c.be.ListGroups(r.Context())
+	if err != nil {
+		return nil, err
+	}
+	rows := c.groupRows(r.Context(), list)
+	var withMembers, members int
+	var lag int64
+	var need []groupRow
+	for _, g := range rows {
+		members += g.Members
+		if g.Members > 0 {
+			withMembers++
+		}
+		lag += g.Lag
+		if g.Members == 0 && g.Lag > 0 {
+			need = append(need, g)
+		}
+	}
+	return map[string]any{"Groups": rows, "Page": "groups", "Title": "Groups",
+		"WithMembers": withMembers, "MemberCount": members, "TotalLag": lag, "NeedALook": need}, nil
 }
 
 // groupLagRow is one topic-partition's committed-vs-latest offset, dressed
@@ -36,6 +74,17 @@ type groupLagRow struct {
 	Ahead      bool // committed is beyond the log end (the topic was purged or recreated).
 	AheadBy    int64
 	Trimmed    bool // committed is before the oldest retained offset: records were lost to retention.
+}
+
+// tryRow is the partition the Try it form starts on: the first one the group has an
+// offset for, or none (the fields then start empty).
+func tryRow(rows []groupLagRow) groupLagRow {
+	for _, r := range rows {
+		if !r.Deleted {
+			return r
+		}
+	}
+	return groupLagRow{}
 }
 
 // memberView is a group member, ready to show.
@@ -102,6 +151,12 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 		return nil, err
 	}
 
+	tab := r.FormValue("tab")
+	switch tab {
+	case "members", "timeline", "offsets":
+	default:
+		tab = "lag"
+	}
 	owner := map[string]string{} // "topic/partition" -> member label.
 	members := make([]memberView, 0, len(detail.Members))
 	for _, m := range detail.Members {
@@ -124,8 +179,9 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 	}
 
 	rows := make([]groupLagRow, 0, len(offsets))
-	var totalLag int64
+	var totalLag, totalCommitted, totalLogEnd int64
 	var anyAhead bool
+	var largest *groupLagRow
 	bounds := map[string][]PartitionBound{}
 	for _, o := range offsets {
 		row := groupLagRow{Topic: o.Topic, TopicURL: c.topicURL(o.Topic), Partition: o.Partition, Committed: o.Committed,
@@ -155,6 +211,12 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 		}
 		row.Trimmed = o.Committed < b[o.Partition].Earliest
 		totalLag += row.Lag
+		totalCommitted += row.Committed
+		totalLogEnd += row.Latest
+		if row.Lag > 0 && (largest == nil || row.Lag > largest.Lag) {
+			cp := row
+			largest = &cp
+		}
 		if row.Latest > 0 {
 			row.LagPercent = int(row.Lag * 100 / row.Latest)
 			if row.Lag > 0 && row.LagPercent < 6 {
@@ -181,13 +243,57 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 		fmt.Fprint(h, e.Seq, ";")
 	}
 
-	return map[string]any{
+	var generation int32
+	if c.traffic != nil {
+		evs := c.traffic.GroupEvents(id, 0)
+		for i := len(evs) - 1; i >= 0; i-- {
+			if evs[i].Generation > 0 {
+				generation = evs[i].Generation
+				break
+			}
+		}
+	}
+	topics := offsetTopics(rows)
+	g := NewGraph()
+	g.AddGroupReads(id, topics)
+	clients := make([]string, 0, len(members))
+	for _, m := range members {
+		clients = append(clients, m.ClientID)
+	}
+	g.AddGroupMembers(id, clients)
+	if c.reg != nil {
+		g.AddSubjects(c.reg.SubjectNames(r.Context()), topics)
+	}
+	if c.traffic != nil {
+		g.AddTraffic(c.traffic.Events(TrafficFilter{Group: id}, 0))
+	}
+	fmt.Fprint(h, "|", tab, generation)
+
+	tl := func(key, label, count string) tabLink {
+		u := c.groupURL(id)
+		if key != "lag" {
+			u += "?tab=" + key
+		}
+		return tabLink{Key: key, Label: label, URL: u, On: tab == key, Count: count}
+	}
+	tabs := []tabLink{tl("lag", "Lag", ""), tl("members", "Members", strconv.Itoa(len(members))), tl("timeline", "Timeline", ""), tl("offsets", "Offsets", "")}
+
+	out := map[string]any{
 		"Timeline": timeline, "HasTimeline": c.traffic != nil, "Group": detail, "Members": members, "Offsets": rows, "TotalLag": totalLag, "AnyAhead": anyAhead,
-		"Topics":    offsetTopics(rows),
+		"TotalCommitted": totalCommitted, "TotalLogEnd": totalLogEnd, "Generation": generation,
+		"Topics":    topics,
+		"Try":       tryRow(rows),
+		"Confirm":   groupConfirms(id, rows),
 		"CanAct":    detail.State == "Empty" && len(detail.Members) == 0,
 		"NoCommits": len(offsets) == 0,
 		"Hash":      fmt.Sprintf("%x", h.Sum64()),
-	}, nil
+		"Tab":       tab, "Tabs": tabs, "View": "group",
+		"Neighbours": c.neighbourClauses(g, NodeGroup, id),
+	}
+	if largest != nil {
+		out["Largest"] = largest
+	}
+	return out, nil
 }
 
 func (c *Console) groupDetail(w http.ResponseWriter, r *http.Request) {
@@ -198,7 +304,10 @@ func (c *Console) groupDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	list, _ := c.be.ListGroups(r.Context())
-	data["List"], data["Page"], data["Title"] = list, "groups", id
+	data["Groups"], data["Page"], data["Title"] = c.groupRows(r.Context(), list), "groups", id
+	// The group page has no pause control of its own, so its dock carries one, and
+	// says so to its poll.
+	maps.Copy(data, c.dockPage(dockView{DockFilter: DockFilter{Group: id}, Toggle: true}))
 	c.render(w, r, "group_detail", data)
 }
 

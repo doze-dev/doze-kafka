@@ -32,11 +32,7 @@ func (gm *groupManager) list() []adminGroupListing {
 	defer gm.mu.Unlock()
 	out := make([]adminGroupListing, 0, len(gm.groups))
 	for id, g := range gm.groups {
-		pt := g.protocolType
-		if pt == "" {
-			pt = "consumer"
-		}
-		out = append(out, adminGroupListing{id: id, state: g.state.String(), groupType: "classic", protocolType: pt, members: len(g.members)})
+		out = append(out, adminGroupListing{id: id, state: g.state.String(), groupType: "classic", protocolType: g.protocolType, members: len(g.members)})
 	}
 	return out
 }
@@ -86,7 +82,7 @@ func (b *Broker) listAllGroups() []adminGroupListing {
 	}
 	for _, id := range ids {
 		if !known[id] {
-			groups = append(groups, adminGroupListing{id: id, state: "Empty", groupType: "classic", protocolType: "consumer"})
+			groups = append(groups, adminGroupListing{id: id, state: "Empty", groupType: "classic"})
 		}
 	}
 	return groups
@@ -158,10 +154,7 @@ func (b *Broker) handleListGroups(ctx context.Context, req *protocol.Request, lr
 		}
 		rg := kmsg.NewListGroupsResponseGroup()
 		rg.Group = g.id
-		rg.ProtocolType = g.protocolType
-		if rg.ProtocolType == "" {
-			rg.ProtocolType = "consumer"
-		}
+		rg.ProtocolType = g.protocolType // "" for a group that has had no members, as Kafka lists it.
 		rg.GroupState = g.state
 		rg.GroupType = g.groupType
 		resp.Groups = append(resp.Groups, rg)
@@ -173,16 +166,22 @@ func (b *Broker) handleListGroups(ctx context.Context, req *protocol.Request, lr
 // protocol groups are described via ConsumerGroupDescribe). An unknown group is
 // reported as Dead with no members — Kafka's behaviour, not an error.
 func (b *Broker) handleDescribeGroups(ctx context.Context, req *protocol.Request, dr *kmsg.DescribeGroupsRequest, resp *kmsg.DescribeGroupsResponse) error {
-	for _, id := range dr.Groups {
+	for _, id := range inKafkaGroupOrder(dr.Groups) {
 		rg := kmsg.NewDescribeGroupsResponseGroup()
 		rg.Group = id
-		rg.ProtocolType = "consumer"
 		if !b.canGroup(req.Conn, id, opDescribe) {
 			rg.ErrorCode = kerr.GroupAuthorizationFailed.Code
 			resp.Groups = append(resp.Groups, rg)
 			continue
 		}
 
+		// A consumer group is not described by the classic API: it is Dead here, as on
+		// Kafka (recorded: mixed-protocol-groups), and ConsumerGroupDescribe has it.
+		if b.claims.ownerOf(id) == protoConsumer {
+			rg.State = "Dead"
+			resp.Groups = append(resp.Groups, rg)
+			continue
+		}
 		d, ok := b.groups.describe(id)
 		if !ok {
 			// Known only by its committed offsets: Empty, not Dead. Dead is a
@@ -195,9 +194,13 @@ func (b *Broker) handleDescribeGroups(ctx context.Context, req *protocol.Request
 			continue
 		}
 		rg.State = d.state
-		rg.Protocol = d.protocol
-		if d.protocolType != "" {
-			rg.ProtocolType = d.protocolType
+		rg.ProtocolType = d.protocolType
+		// Only a Stable group shows its protocol and its members' metadata: in a
+		// rebalance, CompletingRebalance included, Kafka leaves both out and shows the
+		// assignments as they are (claim: groups R23c).
+		stable := d.state == stateStable.String()
+		if stable {
+			rg.Protocol = d.protocol
 		}
 		for _, m := range d.members {
 			rm := kmsg.NewDescribeGroupsResponseGroupMember()
@@ -205,7 +208,9 @@ func (b *Broker) handleDescribeGroups(ctx context.Context, req *protocol.Request
 			rm.ClientID = m.client.clientID
 			rm.ClientHost = m.client.host
 			rm.InstanceID = m.instanceID
-			rm.ProtocolMetadata = m.metadata
+			if stable {
+				rm.ProtocolMetadata = m.metadata
+			}
 			rm.MemberAssignment = m.assignment
 			rg.Members = append(rg.Members, rm)
 		}

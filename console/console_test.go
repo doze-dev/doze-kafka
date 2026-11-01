@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -34,8 +35,14 @@ func newTestConsoleAddr(t testing.TB, mod ...func(*Options)) (*Console, string) 
 	if testing.Short() {
 		t.Skip("boots a real broker; omit -short (or run `go tool task test:integration`)")
 	}
+	// A data directory whose path has a space in it, and a listener that picks its
+	// own port: nothing here may depend on either being tidy (plan A8).
+	dataDir := filepath.Join(t.TempDir(), "data dir")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	srv, err := server.New(server.Options{
-		DataDir: t.TempDir(), ListenAddr: "127.0.0.1:0", AdvertisedHost: "127.0.0.1",
+		DataDir: dataDir, ListenAddr: "127.0.0.1:0", AdvertisedHost: "127.0.0.1",
 	})
 	if err != nil {
 		t.Fatalf("server.New: %v", err)
@@ -53,7 +60,7 @@ func newTestConsoleAddr(t testing.TB, mod ...func(*Options)) (*Console, string) 
 	go func() { defer close(done); srv.Serve(ctx) }()
 	t.Cleanup(func() { cancel(); <-done })
 
-	opts := Options{Addr: addr}
+	opts := Options{Addr: addr, Facts: BrokerFacts{DataDir: dataDir}}
 	for _, m := range mod {
 		m(&opts)
 	}
@@ -63,6 +70,40 @@ func newTestConsoleAddr(t testing.TB, mod ...func(*Options)) (*Console, string) 
 	}
 	t.Cleanup(con.Close)
 	return con, addr
+}
+
+// testPrefix is where the suite mounts the console when DOZE_KAFKA_CONSOLE_PREFIX
+// is set (task test:identity): every console.New reads it. The tests are written against "/_console"; serveInto
+// rewrites each request into the prefix and each answer back out of it, and fails
+// for an answer that still says "/_console", which is a prefix hard-coded in the
+// console.
+var testPrefix = os.Getenv("DOZE_KAFKA_CONSOLE_PREFIX")
+
+func serveInto(t testing.TB, c *Console, rec *httptest.ResponseRecorder, r *http.Request) {
+	t.Helper()
+	if testPrefix == "" {
+		c.ServeHTTP(rec, r)
+		return
+	}
+	r.URL.Path = strings.Replace(r.URL.Path, defaultPrefix, testPrefix, 1)
+	r.URL.RawPath = strings.Replace(r.URL.RawPath, defaultPrefix, testPrefix, 1)
+	r.RequestURI = ""
+	if o := r.Header.Get("Referer"); o != "" {
+		r.Header.Set("Referer", strings.Replace(o, defaultPrefix, testPrefix, 1))
+	}
+	tmp := httptest.NewRecorder()
+	c.ServeHTTP(tmp, r)
+	body := tmp.Body.String()
+	if strings.Contains(body, defaultPrefix) {
+		t.Errorf("%s answered with %q in it, with the console mounted at %q: the prefix is hard-coded", r.URL.Path, defaultPrefix, testPrefix)
+	}
+	rec.Code = tmp.Code
+	for k, vs := range tmp.Header() {
+		for _, v := range vs {
+			rec.Header().Add(k, strings.ReplaceAll(v, testPrefix, defaultPrefix))
+		}
+	}
+	rec.Body.WriteString(strings.ReplaceAll(body, testPrefix, defaultPrefix))
 }
 
 func req(t *testing.T, c *Console, method, path string, form url.Values) *httptest.ResponseRecorder {
@@ -76,7 +117,7 @@ func req(t *testing.T, c *Console, method, path string, form url.Values) *httpte
 	}
 	r.Host = "127.0.0.1:9093" // httptest defaults to example.com, which the Host guard refuses.
 	rec := httptest.NewRecorder()
-	c.ServeHTTP(rec, r)
+	serveInto(t, c, rec, r)
 	return rec
 }
 
@@ -103,10 +144,13 @@ func TestTopicLifecycle(t *testing.T) {
 		t.Fatalf("detail: status %d: %s", rec.Code, rec.Body)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"orders.created", "3 partition", "Save settings", "No messages on this partition yet"} {
+	for _, want := range []string{"orders.created", "3 partition", "No messages on this partition yet", "Produce a message"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("detail missing %q", want)
 		}
+	}
+	if conf := req(t, c, "GET", "/_console/topics/orders.created?tab=config", nil).Body.String(); !strings.Contains(conf, "Save settings") {
+		t.Error("the Config tab does not offer to save settings")
 	}
 
 	// Delete.
@@ -138,7 +182,7 @@ func TestProduceAndTape(t *testing.T) {
 	body := rec.Body.String()
 	// The value renders JSON-tinted: key and number tokens each wrapped in a
 	// tint span, with the raw text HTML-escaped inside.
-	for _, want := range []string{"msg-0", "k1", `<span class="jt-k">&#34;a&#34;</span>`, `<span class="jt-n">1</span>`, "hdrct"} {
+	for _, want := range []string{"msg-0", "k1", `<span class="jt-k">&#34;a&#34;</span>`, `<span class="jt-n">1</span>`, `title="7 B · 1 header"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("tape/table response missing %q:\n%s", want, body)
 		}
@@ -152,13 +196,13 @@ func TestProduceAndTape(t *testing.T) {
 		t.Errorf("acks=0 toast = %q", trig)
 	}
 
-	// The drawer shows the full record, including headers.
+	// The inspector shows the full record, including headers.
 	rec = req(t, c, "GET", "/_console/topics/demo/message?partition=0&offset=0", nil)
 	if rec.Code != 200 {
-		t.Fatalf("drawer: status %d: %s", rec.Code, rec.Body)
+		t.Fatalf("inspector: status %d: %s", rec.Code, rec.Body)
 	}
 	if b := rec.Body.String(); !strings.Contains(b, "trace") || !strings.Contains(b, "tr-1") {
-		t.Errorf("drawer missing header content:\n%s", b)
+		t.Errorf("inspector missing header content:\n%s", b)
 	}
 
 	// Live-poll: stale hash returns fresh content, current hash returns 204.
@@ -277,7 +321,7 @@ func TestConsumerGroup(t *testing.T) {
 		t.Fatalf("group detail: status %d: %s", rec.Code, rec.Body)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"workers", "classic", "No members connected", "events", "lagnum zero"} {
+	for _, want := range []string{"workers", "classic", "No members", "caught up"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("group detail missing %q:\n%s", want, body)
 		}
@@ -290,7 +334,7 @@ func TestClusterInfo(t *testing.T) {
 	if rec.Code != 200 {
 		t.Fatalf("cluster: status %d: %s", rec.Code, rec.Body)
 	}
-	body := rec.Body.String()
+	body := rec.Body.String() + req(t, c, "GET", "/_console/cluster?view=apis", nil).Body.String()
 	for _, want := range []string{"doze-kafka", "node 1", "Produce", "ApiVersions"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("cluster page missing %q:\n%s", want, body)
@@ -335,7 +379,10 @@ func TestAPIPaletteAndCounts(t *testing.T) {
 // crucially the tape's short-lived FetchWindow consumer (a raw unix path once
 // leaked into its SeedBrokers and failed host:port parsing).
 func TestUnixSocketConsole(t *testing.T) {
-	dir, err := os.MkdirTemp("/tmp", "kcon") // short path: unix sockets cap ~104 bytes
+	// /tmp rather than t.TempDir(): a unix socket's path is capped near 104 bytes,
+	// and the test temp directory (/var/folders/... on macOS) is longer than that.
+	// Removed by the cleanup below.
+	dir, err := os.MkdirTemp("/tmp", "kcon")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -394,7 +441,7 @@ func TestAddPartitions(t *testing.T) {
 	c := newTestConsole(t)
 	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"grow"}, "partitions": {"2"}})
 
-	page := req(t, c, "GET", "/_console/topics/grow", nil).Body.String()
+	page := req(t, c, "GET", "/_console/topics/grow?tab=partitions", nil).Body.String()
 	for _, want := range []string{`id="topic-addparts"`, "/topics/grow/partitions", "cannot be removed", "stop being ordered"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the topic page is missing %q", want)
@@ -443,7 +490,7 @@ func TestAccessPageListsACLsUnderTheEnforcedBanner(t *testing.T) {
 		t.Fatalf("create an ACL: %v %+v", err, resp)
 	}
 	page := req(t, c, "GET", "/_console/access", nil).Body.String()
-	for _, want := range []string{"These are enforced", "allow · read", "User:alice", "orders", "literal"} {
+	for _, want := range []string{"These are enforced", ">ALLOW<", ">Read<", ">Topic<", "User:alice", "orders", "literal"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the Access page is missing %q after one ACL was stored", want)
 		}
@@ -451,7 +498,32 @@ func TestAccessPageListsACLsUnderTheEnforcedBanner(t *testing.T) {
 	if strings.Contains(page, "None stored") {
 		t.Error("the page says none are stored while one is listed")
 	}
-	if pal := req(t, c, "GET", "/_console/api/palette", nil).Body.String(); !strings.Contains(pal, "/access") {
-		t.Error("the palette does not offer the Access page")
+	// The section is reached by name from the rail and by g a; the palette does not list it.
+	if pal := req(t, c, "GET", "/_console/api/palette", nil).Body.String(); strings.Contains(pal, `"u":"/_console/access"`) {
+		t.Error("the palette lists the Access page as a destination (Sy-05 has no Go to group)")
+	}
+}
+
+// Cl-Home counts the partitions of the topics whose cleanup.policy compacts them (from
+// the topics' own configuration), and says what this broker is not.
+func TestClusterOverviewCountsCompactedPartitionsAndSaysWhatTheBrokerIsNot(t *testing.T) {
+	c := newTestConsole(t)
+	topicWith(t, c, "plain", 2, 1)
+	if err := c.be.CreateTopic(context.Background(), "latest", 3, map[string]string{"cleanup.policy": "compact"}); err != nil {
+		t.Fatal(err)
+	}
+	body := req(t, c, "GET", "/_console/cluster", nil).Body.String()
+	for _, want := range []string{
+		`<span>Compacted partitions</span><span class="m ra b">3</span>`,
+		`What this broker is not`, `single node`, `replication factor reported as`, `no leader election, no ISR`,
+		`no KRaft, no ZooKeeper`, `not durable against disk loss`, `All limits`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("cluster overview missing %q", want)
+		}
+	}
+	// Another view does not read every topic's configuration for a count it does not draw.
+	if strings.Contains(req(t, c, "GET", "/_console/cluster?view=apis", nil).Body.String(), "Compacted partitions") {
+		t.Error("the APIs view draws the overview's counts")
 	}
 }

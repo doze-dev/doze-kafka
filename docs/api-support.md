@@ -30,7 +30,7 @@ specifically testing an older client's paths.
 | OffsetCommit / OffsetFetch | 8 / 9 | Commit and read consumer-group offsets. |
 | ConsumerGroupHeartbeat | 68 | KIP-848 broker-driven group protocol (version 4 only). |
 | ConsumerGroupDescribe | 69 | Describe KIP-848 groups (version 4 only). |
-| GetTelemetrySubscriptions / PushTelemetry | 71 / 72 | Client telemetry (KIP-714, version 4 only): a client asks what to report and pushes its own metrics, which the console shows ([Observability](observability.md)). Off with `--client-telemetry=false`. |
+| GetTelemetrySubscriptions / PushTelemetry | 71 / 72 | Client telemetry (KIP-714, version 4 only): a client asks what to report and pushes its own metrics, which the console shows ([Observability](observability.md)). Offered only with the console on and not `--client-telemetry=false`. |
 | ListGroups | 16 | List consumer groups. |
 | DescribeGroups | 15 | Describe classic consumer groups. |
 | DescribeConfigs | 32 | Read topic and broker configuration. |
@@ -50,12 +50,32 @@ Each emulated major advertises the ranges below (min–max); a client uses the h
 version you both support. This table is the broker's own, generated from the code (a
 test fails if the two differ).
 
-The ranges are **ours**, not a copy of Apache Kafka's. Each profile is close to what a
-real broker of that major offers, but not the same: several maxima are lower, because
-the newer versions carry features doze-kafka does not have (Kafka 4.x brokers go well
-past Produce v9 and Fetch v13, for example), and a few are a version higher than that
-release shipped. The minima are raised: Produce starts at v3 and Fetch at v4, the
-first versions that carry record batch format v2, the only format the log stores.
+The ranges are **ours**, not a copy of Apache Kafka's, and they are never wider than
+Kafka's. Each profile is what a real broker of that major offers, less what
+doze-kafka does not implement: several maxima are lower, because the newer versions
+carry features it does not have (Kafka 4.x brokers go well past Produce v9 and Fetch
+v13, for example). No profile offers an API or a version the real broker of that
+major does not list. A test holds every column to the recorded `ApiVersions` answer
+of one (`conformance/recordings/api-versions.json`):
+
+| Profile | Held to | Which is |
+|---|---|---|
+| Kafka 4 | `apache/kafka:4.3.1` | Apache's image of 4.3.1, the broker every other recording is of. |
+| Kafka 3 | `apache/kafka:3.9.1` | Apache's image of the last 3.x. |
+| Kafka 2 | `confluentinc/cp-kafka:6.2.15` | Confluent Platform 6.2, which Confluent documents as Apache Kafka 2.8, the last 2.x. Apache published no images before 3.7; the mapping of the platform version to the Kafka version is Confluent's documentation, not something the recording shows. |
+| Kafka 1 | `confluentinc/cp-kafka:4.1.4` | Confluent Platform 4.1, whose broker jar is `kafka_2.11-1.1.1-cp4.jar`: Apache Kafka 1.1.1, the last 1.x. |
+
+So the Kafka 4 column starts where Kafka 4 starts. Kafka 4 removed the oldest versions
+of several APIs (KIP-896) and closes the connection on them, and so does this broker
+at `--kafka-version 4` (before this it served nine of them: ListOffsets v0,
+OffsetCommit v0–1, OffsetFetch v0, CreateTopics v0–1, DeleteTopics v0, Describe-,
+Create- and DeleteACLs v0, DescribeConfigs v0; the Kafka 1 column offered six
+versions newer than 1.1.1 has). A client that old still works at
+`--kafka-version 3`, as it does against a Kafka 3 broker.
+
+Two more minima are raised on purpose, in every profile: Produce starts at v3 and
+Fetch at v4, the first versions that carry record batch format v2, the only format
+the log stores. `SaslHandshake` is v1 only (v0 means "unframed tokens follow").
 None of this needs configuring. A client reads the ranges from `ApiVersions` and uses
 the highest version both sides support; a request outside them is not served.
 
@@ -64,35 +84,35 @@ the highest version both sides support; a request outside them is not served.
 |---|---|---|---|---|---|
 | Produce | 0 | 3–5 | 3–7 | 3–9 | 3–9 |
 | Fetch | 1 | 4–6 | 4–10 | 4–13 | 4–13 |
-| ListOffsets | 2 | 0–2 | 0–5 | 0–7 | 0–7 |
-| Metadata | 3 | 0–6 | 0–8 | 0–12 | 0–12 |
-| OffsetCommit | 8 | 0–3 | 0–6 | 0–8 | 0–9 |
-| OffsetFetch | 9 | 0–3 | 0–5 | 0–8 | 0–9 |
-| FindCoordinator | 10 | 0–2 | 0–2 | 0–4 | 0–4 |
+| ListOffsets | 2 | 0–2 | 0–5 | 0–7 | 1–7 |
+| Metadata | 3 | 0–5 | 0–8 | 0–12 | 0–12 |
+| OffsetCommit | 8 | 0–3 | 0–6 | 0–8 | 2–9 |
+| OffsetFetch | 9 | 0–3 | 0–5 | 0–8 | 1–9 |
+| FindCoordinator | 10 | 0–1 | 0–2 | 0–4 | 0–4 |
 | JoinGroup | 11 | 0–2 | 0–4 | 0–7 | 0–9 |
 | Heartbeat | 12 | 0–1 | 0–2 | 0–4 | 0–4 |
 | LeaveGroup | 13 | 0–1 | 0–2 | 0–4 | 0–5 |
 | SyncGroup | 14 | 0–1 | 0–3 | 0–4 | 0–5 |
 | DescribeGroups | 15 | 0–1 | 0–3 | 0–5 | 0–5 |
-| ListGroups | 16 | 0–2 | 0–2 | 0–4 | 0–5 |
+| ListGroups | 16 | 0–1 | 0–2 | 0–4 | 0–5 |
 | SASLHandshake | 17 | 1–1 | 1–1 | 1–1 | 1–1 | only when SASL is configured
-| ApiVersions | 18 | 0–1 | 0–2 | 0–3 | 0–3 |
-| CreateTopics | 19 | 0–2 | 0–3 | 0–7 | 0–7 |
-| DeleteTopics | 20 | 0–1 | 0–3 | 0–5 | 0–6 |
+| ApiVersions | 18 | 0–1 | 0–2 | 0–3 | 0–4 |
+| CreateTopics | 19 | 0–2 | 0–3 | 0–7 | 2–7 |
+| DeleteTopics | 20 | 0–1 | 0–3 | 0–5 | 1–6 |
 | DeleteRecords | 21 | 0–0 | 0–1 | 0–2 | 0–2 |
-| InitProducerID | 22 | 0–1 | 0–1 | 0–4 | 0–4 |
+| InitProducerID | 22 | 0–0 | 0–1 | 0–4 | 0–4 |
 | AddPartitionsToTxn | 24 | 0–0 | 0–1 | 0–3 | 0–3 |
 | AddOffsetsToTxn | 25 | 0–0 | 0–1 | 0–3 | 0–3 |
 | EndTxn | 26 | 0–0 | 0–1 | 0–3 | 0–3 |
 | TxnOffsetCommit | 28 | 0–0 | 0–2 | 0–3 | 0–3 |
-| DescribeACLs | 29 | 0–0 | 0–1 | 0–3 | 0–3 |
-| CreateACLs | 30 | 0–0 | 0–1 | 0–3 | 0–3 |
-| DeleteACLs | 31 | 0–0 | 0–1 | 0–3 | 0–3 |
-| DescribeConfigs | 32 | 0–1 | 0–2 | 0–4 | 0–4 |
+| DescribeACLs | 29 | 0–0 | 0–1 | 0–3 | 1–3 |
+| CreateACLs | 30 | 0–0 | 0–1 | 0–3 | 1–3 |
+| DeleteACLs | 31 | 0–0 | 0–1 | 0–3 | 1–3 |
+| DescribeConfigs | 32 | 0–1 | 0–2 | 0–4 | 1–4 |
 | AlterConfigs | 33 | 0–0 | 0–2 | 0–2 | 0–2 |
-| SASLAuthenticate | 36 | 0–2 | 0–2 | 0–2 | 0–2 | only when SASL is configured
+| SASLAuthenticate | 36 | 0–0 | 0–2 | 0–2 | 0–2 | only when SASL is configured
 | CreatePartitions | 37 | 0–0 | 0–1 | 0–3 | 0–3 |
-| DeleteGroups | 42 | 0–1 | 0–2 | 0–2 | 0–2 |
+| DeleteGroups | 42 | 0–0 | 0–2 | 0–2 | 0–2 |
 | IncrementalAlterConfigs | 44 | — | 0–1 | 0–1 | 0–1 |
 | OffsetDelete | 47 | — | 0–0 | 0–0 | 0–0 |
 | DescribeCluster | 60 | — | — | 0–1 | 0–2 |
@@ -108,11 +128,140 @@ the highest version both sides support; a request outside them is not served.
 The hard floor is Kafka's record-batch format v2 (Kafka 0.11), so the oldest
 emulated major is 1; the pre-0.11 message-set format is not supported.
 
+## Every Kafka API, by tier
+
+One row for every API key in the Kafka 4.x protocol specification (the protocol
+library's key table, which a test walks). Nothing is absent from this table.
+
+- **F, functional.** It works locally and its effect is observable.
+- **C, cosmetic.** Accepted and round-tripped with no local effect.
+- **S, stub.** Not served: it is not advertised, and a request for it closes the
+  connection, as a request for a version outside an advertised range does. That is
+  what Apache Kafka does with an API it does not list and a version it does not serve
+  (recorded against `apache/kafka:4.3.1`: `conformance/claims/api.md`, V2 and V3).
+  Every S row says why.
+
+An API row is F when the broker advertises it (see the version table above) and S
+when it does not; the notes are written by hand and a test fails for an S row
+without a reason. Settings that are accepted and stored without acting (most topic
+configs) are listed in [Limitations](limitations.md), not here.
+
+<!-- api-tiers:begin (generated from the protocol library's key table and internal/protocol/versions.go; do not edit by hand) -->
+| API | Key | Tier | Note |
+|---|---|---|---|
+| Produce | 0 | F | `acks=all` fsyncs before the reply. |
+| Fetch | 1 | F | Long-poll capped at 30 s; no fetch sessions. |
+| ListOffsets | 2 | F |  |
+| Metadata | 3 | F |  |
+| LeaderAndISR | 4 | S | Broker-to-broker traffic; there is one node and no peer sends it or waits for it. |
+| StopReplica | 5 | S | Broker-to-broker traffic; there is one node and no peer sends it or waits for it. |
+| UpdateMetadata | 6 | S | Broker-to-broker traffic; there is one node and no peer sends it or waits for it. |
+| ControlledShutdown | 7 | S | The controller's shutdown handshake; there is no controller. |
+| OffsetCommit | 8 | F |  |
+| OffsetFetch | 9 | F |  |
+| FindCoordinator | 10 | F | Always this node. |
+| JoinGroup | 11 | F |  |
+| Heartbeat | 12 | F |  |
+| LeaveGroup | 13 | F |  |
+| SyncGroup | 14 | F |  |
+| DescribeGroups | 15 | F |  |
+| ListGroups | 16 | F |  |
+| SASLHandshake | 17 | F | Only when SASL is configured. |
+| ApiVersions | 18 | F |  |
+| CreateTopics | 19 | F | A replication factor above 1 is not honoured (one node). |
+| DeleteTopics | 20 | F |  |
+| DeleteRecords | 21 | F |  |
+| InitProducerID | 22 | F |  |
+| OffsetForLeaderEpoch | 23 | S | Replica truncation after a leader change; there are no leader changes. A client falls back to ListOffsets. |
+| AddPartitionsToTxn | 24 | F |  |
+| AddOffsetsToTxn | 25 | F |  |
+| EndTxn | 26 | F |  |
+| WriteTxnMarkers | 27 | S | A transaction coordinator writing markers to other brokers' partitions; the coordinator here writes its own log directly. |
+| TxnOffsetCommit | 28 | F |  |
+| DescribeACLs | 29 | F |  |
+| CreateACLs | 30 | F |  |
+| DeleteACLs | 31 | F |  |
+| DescribeConfigs | 32 | F | Topic configs; broker configs read-only. |
+| AlterConfigs | 33 | F | Five topic settings act, the rest are stored (see [Limitations](limitations.md)). |
+| AlterReplicaLogDirs | 34 | S | Moves a replica between log directories; there is one data directory. |
+| DescribeLogDirs | 35 | S | Not implemented yet: per-partition sizes are planned (the topics stage). A UI that probes it gets the connection closed. |
+| SASLAuthenticate | 36 | F | Only when SASL is configured. |
+| CreatePartitions | 37 | F |  |
+| CreateDelegationToken | 38 | S | Delegation tokens are not implemented; authentication is SASL/PLAIN and SASL/SCRAM. |
+| RenewDelegationToken | 39 | S | Delegation tokens are not implemented; authentication is SASL/PLAIN and SASL/SCRAM. |
+| ExpireDelegationToken | 40 | S | Delegation tokens are not implemented; authentication is SASL/PLAIN and SASL/SCRAM. |
+| DescribeDelegationToken | 41 | S | Delegation tokens are not implemented; authentication is SASL/PLAIN and SASL/SCRAM. |
+| DeleteGroups | 42 | F |  |
+| ElectLeaders | 43 | S | There is one replica and it is always the leader. |
+| IncrementalAlterConfigs | 44 | F | As AlterConfigs. |
+| AlterPartitionAssignments | 45 | S | Replica placement and reassignment; every partition has one replica on this node. |
+| ListPartitionReassignments | 46 | S | Replica placement and reassignment; every partition has one replica on this node. |
+| OffsetDelete | 47 | F |  |
+| DescribeClientQuotas | 48 | S | Quotas are not implemented: nothing is throttled, so there is nothing to describe. |
+| AlterClientQuotas | 49 | S | Quotas are not implemented: nothing is throttled. |
+| DescribeUserSCRAMCredentials | 50 | S | SCRAM users come from the configuration file and flags; they cannot be managed over the wire. |
+| AlterUserSCRAMCredentials | 51 | S | SCRAM users come from the configuration file and flags; they cannot be managed over the wire. |
+| Vote | 52 | S | KRaft controller-quorum management; there is no controller quorum, the one node is its own metadata store. |
+| BeginQuorumEpoch | 53 | S | KRaft controller-quorum management; there is no controller quorum, the one node is its own metadata store. |
+| EndQuorumEpoch | 54 | S | KRaft controller-quorum management; there is no controller quorum, the one node is its own metadata store. |
+| DescribeQuorum | 55 | S | KRaft controller-quorum management; there is no controller quorum, the one node is its own metadata store. |
+| AlterPartition | 56 | S | ISR changes sent to the controller; there is no ISR to change. |
+| UpdateFeatures | 57 | S | Cluster feature levels are not tracked; the broker emulates one Kafka major (`--kafka-version`). |
+| Envelope | 58 | S | Forwarding a request from a broker to the controller; there is no controller to forward to. |
+| FetchSnapshot | 59 | S | KRaft metadata snapshots; there is no metadata log to snapshot. |
+| DescribeCluster | 60 | F | This single node. |
+| DescribeProducers | 61 | F |  |
+| BrokerRegistration | 62 | S | Broker registration with a controller; there is no controller to register with. |
+| BrokerHeartbeat | 63 | S | Broker registration with a controller; there is no controller to register with. |
+| UnregisterBroker | 64 | S | Broker registration with a controller; there is no controller to register with. |
+| DescribeTransactions | 65 | F |  |
+| ListTransactions | 66 | F |  |
+| AllocateProducerIDs | 67 | S | A broker asking the controller for a block of producer ids; this node allocates its own. |
+| ConsumerGroupHeartbeat | 68 | F | Kafka 4 profile only. |
+| ConsumerGroupDescribe | 69 | F | Kafka 4 profile only. |
+| ControllerRegistration | 70 | S | Broker registration with a controller; there is no controller to register with. |
+| GetTelemetrySubscriptions | 71 | F | Kafka 4 profile only; offered with the console on and not `--client-telemetry=false`. Answers a fixed subscription (every `org.apache.kafka.` metric, every 5 s, cumulative: C, there is no `CLIENT_METRICS` resource); a second request inside the interval is `THROTTLING_QUOTA_EXCEEDED`, as Apache Kafka answers it. |
+| PushTelemetry | 72 | F | Kafka 4 profile only; same condition. Codes, in the order Apache Kafka 4.3.1 applies them: `INVALID_REQUEST` (no instance id, or the push after a terminating one), `THROTTLING_QUOTA_EXCEEDED` (before the interval has passed; a terminating push is never early), `UNKNOWN_SUBSCRIPTION_ID`, `UNSUPPORTED_COMPRESSION_TYPE`, `TELEMETRY_TOO_LARGE` (over 1 MiB), `INVALID_RECORD` (a body that does not decompress or inflates past 1 MiB). A body that is not OpenTelemetry metrics is answered 0 and not read. |
+| AssignReplicasToDirs | 73 | S | Replica-to-directory assignment between a broker and the controller; one directory. |
+| ListConfigResources | 74 | S | Not implemented; Metadata and DescribeConfigs cover what a client needs. |
+| DescribeTopicPartitions | 75 | S | Not implemented; Metadata serves the same answer, and clients fall back to it. |
+| ShareGroupHeartbeat | 76 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| ShareGroupDescribe | 77 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| ShareFetch | 78 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| ShareAcknowledge | 79 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| AddRaftVoter | 80 | S | KRaft controller-quorum management; there is no controller quorum, the one node is its own metadata store. |
+| RemoveRaftVoter | 81 | S | KRaft controller-quorum management; there is no controller quorum, the one node is its own metadata store. |
+| UpdateRaftVoter | 82 | S | KRaft controller-quorum management; there is no controller quorum, the one node is its own metadata store. |
+| InitializeShareGroupState | 83 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| ReadShareGroupState | 84 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| WriteShareGroupState | 85 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| DeleteShareGroupState | 86 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| ReadShareGroupStateSummary | 87 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| StreamsGroupHeartbeat | 88 | S | Streams groups (KIP-1071) are not implemented; Kafka Streams uses the classic group protocol. |
+| StreamsGroupDescribe | 89 | S | Streams groups (KIP-1071) are not implemented; Kafka Streams uses the classic group protocol. |
+| DescribeShareGroupOffsets | 90 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| AlterShareGroupOffsets | 91 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+| DeleteShareGroupOffsets | 92 | S | Share groups (KIP-932) are not implemented; the consumer group protocols are classic and KIP-848. |
+<!-- api-tiers:end -->
+
 ## Not implemented (by design)
 
-`OffsetForLeaderEpoch`, `DescribeLogDirs`, quota APIs, and
-the client-metrics/telemetry APIs. The broker serves exactly what it advertises: a
+`OffsetForLeaderEpoch`, `DescribeLogDirs`, the quota APIs, and the `CLIENT_METRICS`
+config resource (client telemetry itself, APIs 71 and 72, is implemented: see the
+table above). The broker serves exactly what it advertises: a
 request for an API it does not have, or at a version outside the advertised range,
-gets no response and its connection is closed, rather than being left to hang (the one
-exception is `ApiVersions` itself, where an unknown version is answered with the
-supported range, as Kafka does). See [Limitations](limitations.md).
+gets no response and its connection is closed, rather than being left to hang. See
+[Limitations](limitations.md).
+
+The one exception is `ApiVersions` itself, the request a client sends before it knows
+what the broker speaks. Both of its special answers are Apache Kafka's, recorded
+against 4.3.1 (`conformance/recordings/apiversions-*.json`):
+
+- **A version of `ApiVersions` that is not served** is answered in the v0 form with
+  `UNSUPPORTED_VERSION` and one row, the versions of `ApiVersions` itself (0 to 4 when
+  emulating Kafka 4). The client asks again at one of those and is given the list.
+- **A client software name or version Kafka does not take** (from v3: empty, or not
+  letters and digits with dots and dashes only between them) is answered
+  `INVALID_REQUEST` with no rows, and the connection stays open. Kafka refuses none for
+  its length; the broker keeps the first 128 bytes of a name and version, for the
+  Traffic page.

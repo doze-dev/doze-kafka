@@ -9,9 +9,15 @@ import (
 	"log/slog"
 	"net"
 	"runtime/debug"
+	"strconv"
+	"strings"
+	"sync/atomic"
+	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 // defaultPreAuthTimeout is how long a connection that must authenticate may sit
@@ -62,12 +68,16 @@ type Conn struct {
 	accepted       time.Time // when the connection was accepted; the pre-auth budget runs from here.
 	closeAfter     bool      // close once the current response is written (a failed authentication).
 	saslMechanism  string
+	versionsSeen   bool   // an ApiVersions request was answered before the SaslHandshake (one is allowed).
 	saslState      any    // opaque per-connection state owned by the SASL handler (e.g. SCRAM step).
 	software       string // the client's own name and version, from ApiVersions, e.g. "apache-kafka-java 3.7.0".
 	principal      string // who this connection authenticated as ("User:alice"); empty until it has.
 
 	observer Observer // told about this connection and its requests; nil = nobody is watching.
 	id       uint64   // this connection's number, for the observer.
+	done     atomic.Bool
+	// own says this process opened the connection to itself (Adopt): the console's.
+	own atomic.Bool
 }
 
 func newConn(raw net.Conn, router *Router, logger *slog.Logger, authRequired bool) *Conn {
@@ -119,11 +129,65 @@ func (c *Conn) ClientSoftware() string {
 	return c.software
 }
 
-// SetClientSoftware records the client's name and version from its ApiVersions request.
-func (c *Conn) SetClientSoftware(s string) {
+// SetClientSoftware records the client's name and version from its ApiVersions
+// request. What is kept is bounded here, where it is kept (ClientSoftware), whatever
+// the caller was sent.
+func (c *Conn) SetClientSoftware(name, version string) {
 	if c != nil {
-		c.software = s
+		c.software = ClientSoftware(name, version)
 	}
+}
+
+// MaxClientSoftware is how many bytes of a client's software name and version are
+// kept. Kafka refuses a name for its characters and never for its length (recorded:
+// 20,000 characters are taken; claim: cluster AV3), so a name may fill a frame, and it is kept for as long
+// as the connection is open: 300 connections that each sent a 1 MiB name held half a
+// gigabyte. It is for people to read, so what is kept is its beginning.
+const MaxClientSoftware = 128
+
+// ClientSoftware is "name version" as it is kept and shown: cut to MaxClientSoftware
+// bytes, ending in an ellipsis when it was cut, and a copy, so that it does not keep
+// the request it came from alive.
+func ClientSoftware(name, version string) string {
+	const dots = "…"
+	// Only the beginning can be kept, so only the beginning is put together: one byte
+	// past the bound, so that what was cut here is still seen to be too long below.
+	if len(name) > MaxClientSoftware+1 {
+		name = name[:MaxClientSoftware+1]
+	}
+	if len(version) > MaxClientSoftware+1 {
+		version = version[:MaxClientSoftware+1]
+	}
+	s := strings.TrimSpace(name + " " + version)
+	if len(s) <= MaxClientSoftware {
+		return strings.Clone(s)
+	}
+	cut := MaxClientSoftware - len(dots)
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + dots
+}
+
+// ValidClientSoftware reports whether s is a client software name or version that
+// Apache Kafka accepts in ApiVersions v3 and later: letters and digits, with dots and
+// dashes allowed between them, and at least one character (its
+// ApiVersionsRequest.isValid; recorded against 4.3.1 in
+// conformance/recordings/apiversions-client-software.json; claim: cluster AV1). Kafka answers anything
+// else INVALID_REQUEST.
+func ValidClientSoftware(s string) bool {
+	alnum := func(c byte) bool {
+		return 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9'
+	}
+	if s == "" || !alnum(s[0]) || !alnum(s[len(s)-1]) {
+		return false
+	}
+	for i := 1; i < len(s)-1; i++ {
+		if c := s[i]; !alnum(c) && c != '-' && c != '.' {
+			return false
+		}
+	}
+	return true
 }
 
 // SetPrincipal records who the SASL exchange authenticated. An empty string clears it.
@@ -145,6 +209,12 @@ func (c *Conn) RemoteIP() string {
 // SetAuthenticated marks the connection authenticated after a successful SASL
 // exchange, lifting the pre-auth gate.
 func (c *Conn) SetAuthenticated(v bool) { c.authenticated = v }
+
+// Authenticated reports whether a SASL exchange has completed on this connection.
+// From then on the connection is that principal until it closes: Kafka answers a
+// further SaslHandshake or SaslAuthenticate ILLEGAL_SASL_STATE and changes nothing
+// (claim: auth A7).
+func (c *Conn) Authenticated() bool { return c.authenticated }
 
 // SASLMechanism returns the mechanism negotiated by SaslHandshake, if any.
 func (c *Conn) SASLMechanism() string { return c.saslMechanism }
@@ -168,21 +238,88 @@ func (c *Conn) CloseAfterResponse() { c.closeAfter = true }
 // unblock a connection parked in a blocking read so its serve loop can exit.
 func (c *Conn) close() error { return c.raw.Close() }
 
-// preAuthAllowed reports whether an API may be sent before authentication: the
-// version handshake and the SASL exchange itself.
-func preAuthAllowed(key APIKey) bool {
-	switch key {
-	case kmsg.ApiVersions, kmsg.SASLHandshake, kmsg.SASLAuthenticate:
-		return true
-	default:
-		return false
+// What the gate does with a request on a connection that has still to log in.
+type preAuthVerdict int
+
+const (
+	preAuthServe  preAuthVerdict = iota // hand it to its handler.
+	preAuthClose                        // close the connection, with no answer.
+	preAuthRefuse                       // answer ILLEGAL_SASL_STATE, then close.
+)
+
+// preAuth is the order a login must come in, which is the order Apache Kafka holds
+// a connection to (recorded: conformance/recordings/sasl-plain.json and
+// sasl-scram.json; claims: auth A8, A9, A10):
+//
+//   - before the SaslHandshake: one ApiVersions, then the SaslHandshake. A second
+//     ApiVersions, a SaslAuthenticate with no handshake, and any other request
+//     close the connection with no answer.
+//   - after an accepted SaslHandshake, until the exchange is over: SaslAuthenticate
+//     only. A second SaslHandshake and an ApiVersions are answered
+//     ILLEGAL_SASL_STATE and the connection is closed. Any other request closes it
+//     too; Kafka first answers that request's own error shape with
+//     ILLEGAL_SASL_STATE, which this broker does not (docs/limitations.md).
+//
+// It is asked only while the connection is not authenticated.
+func (c *Conn) preAuth(key APIKey) preAuthVerdict {
+	if c.saslMechanism != "" {
+		switch key {
+		case kmsg.SASLAuthenticate:
+			return preAuthServe
+		case kmsg.SASLHandshake, kmsg.ApiVersions:
+			return preAuthRefuse
+		}
+		return preAuthClose
 	}
+	switch key {
+	case kmsg.ApiVersions:
+		// One that was served is the one allowed (AnsweredVersions, set by the handler);
+		// an answer of "that version is not served, ask again at one of these" is not
+		// one served, and the client's second ask is its first (franz-go opens at v5).
+		if c.versionsSeen {
+			return preAuthClose
+		}
+		return preAuthServe
+	case kmsg.SASLHandshake:
+		return preAuthServe
+	}
+	return preAuthClose
+}
+
+// AnsweredVersions is called by the ApiVersions handler when it answered with the
+// list (or refused the request itself) and not with "that version is not served":
+// from then on a connection that has still to log in may not ask again.
+func (c *Conn) AnsweredVersions() { c.versionsSeen = true }
+
+// illegalSASLState is the answer to a SaslHandshake or an ApiVersions that came in
+// the middle of a login: the error and nothing else (no mechanisms, no APIs).
+func illegalSASLState(h RequestHeader) []byte {
+	var resp kmsg.Response
+	switch h.APIKey {
+	case kmsg.SASLHandshake:
+		r := kmsg.NewPtrSASLHandshakeResponse()
+		r.ErrorCode = kerr.IllegalSaslState.Code
+		resp = r
+	case kmsg.ApiVersions:
+		r := kmsg.NewPtrApiVersionsResponse()
+		r.ErrorCode = kerr.IllegalSaslState.Code
+		resp = r
+	default:
+		return nil
+	}
+	if h.APIVersion < 0 || h.APIVersion > resp.MaxVersion() {
+		return nil // a version there is no shape for: the connection is closed without an answer.
+	}
+	resp.SetVersion(h.APIVersion)
+	return EncodeResponse(h, resp)
 }
 
 // serve reads, dispatches, and replies until the peer closes the connection or
 // ctx is cancelled.
 func (c *Conn) serve(ctx context.Context) {
+	defer c.done.Store(true)
 	defer c.raw.Close()
+	defer c.forget() // before the socket is closed: see own.go.
 	if c.observer != nil {
 		c.observer.ConnOpened(c.id, c.raw.RemoteAddr().String())
 		defer c.observer.ConnClosed(c.id)
@@ -220,6 +357,9 @@ func (c *Conn) serve(ctx context.Context) {
 				return maxPreAuthFrameBytes
 			case key == kmsg.Produce:
 				return maxFrameBytes
+			case key == kmsg.PushTelemetry:
+				// A payload up to telemetry.max.bytes (1 MiB, advertised) and its header.
+				return maxPushTelemetryFrameBytes
 			default:
 				return maxControlFrameBytes
 			}
@@ -235,6 +375,7 @@ func (c *Conn) serve(ctx context.Context) {
 		header, bodyOffset, err := ParseRequestHeader(frame)
 		if err != nil {
 			c.log.Warn("bad request header", "err", err)
+			c.observeClosed(&RequestHeader{APIKey: -1}, time.Now(), len(frame), "the request header could not be read: "+err.Error(), ClassRefused)
 			return
 		}
 		// Debug: one line per request is a firehose at info (a consumer polls many
@@ -249,9 +390,23 @@ func (c *Conn) serve(ctx context.Context) {
 		// Enforce the SASL gate: until the connection authenticates, only the
 		// version handshake and the SASL exchange are allowed. A violation is a
 		// misbehaving or unauthenticated client — drop the connection.
-		if c.authRequired && !c.authenticated && !preAuthAllowed(header.APIKey) {
-			c.log.Warn("unauthenticated request rejected", "api", APIName(header.APIKey))
-			return
+		if c.authRequired && !c.authenticated {
+			switch c.preAuth(header.APIKey) {
+			case preAuthClose:
+				c.log.Warn("unauthenticated request rejected", "api", APIName(header.APIKey))
+				c.observeClosed(&header, time.Now(), len(frame), "the request came before authentication", ClassDenied)
+				return
+			case preAuthRefuse:
+				c.log.Warn("request out of order during authentication; closing the connection", "api", APIName(header.APIKey))
+				if resp := illegalSASLState(header); resp != nil {
+					_ = c.raw.SetWriteDeadline(time.Now().Add(c.writeTimeout))
+					if WriteFrame(c.w, resp) == nil {
+						_ = c.w.Flush()
+					}
+				}
+				c.observeClosed(&header, time.Now(), len(frame), "the request came in the middle of authentication", ClassDenied)
+				return
+			}
 		}
 
 		req := &Request{Header: header, Body: frame[bodyOffset:], Conn: c}
@@ -262,7 +417,18 @@ func (c *Conn) serve(ctx context.Context) {
 			// The handler's bug must cost this connection, not the broker: every
 			// other client keeps being served.
 			c.log.Error("handler panicked; closing the connection", "api", APIName(header.APIKey),
-				"version", header.APIVersion, "client_id", header.ClientID, "panic", pe.value, "stack", pe.stack)
+				"version", header.APIVersion, "client_id", header.ClientID, "panic", pe.logValue(header.APIKey), "stack", pe.stack)
+			c.observeClosed(&header, began, len(frame), "the broker's handler panicked", ClassFailed)
+			return
+		}
+		var ce *CloseError
+		if errors.As(err, &ce) {
+			c.log.Warn("closing connection", "api", APIName(header.APIKey), "reason", ce.Reason)
+			class := ce.Class
+			if class == ClassOK {
+				class = ClassRefused
+			}
+			c.observeClosed(&header, began, len(frame), ce.Reason, class)
 			return
 		}
 		if err != nil {
@@ -272,6 +438,7 @@ func (c *Conn) serve(ctx context.Context) {
 			// hanging until its own timeout. Conformant clients never hit this —
 			// they only call APIs we advertise.
 			c.log.Warn("closing connection: unhandled request", "api", APIName(header.APIKey), "err", err)
+			c.observeClosed(&header, began, len(frame), notServed(header), notServedClass(header))
 			return
 		}
 		if resp == nil {
@@ -284,10 +451,14 @@ func (c *Conn) serve(ctx context.Context) {
 		_ = c.raw.SetWriteDeadline(time.Now().Add(c.writeTimeout))
 		if err := WriteFrame(c.w, resp); err != nil {
 			c.log.Debug("write failed", "err", err)
+			why, class := writeFailure(err)
+			c.observeClosed(&header, began, len(frame), why, class)
 			return
 		}
 		if err := c.w.Flush(); err != nil {
 			c.log.Debug("flush failed", "err", err)
+			why, class := writeFailure(err)
+			c.observeClosed(&header, began, len(frame), why, class)
 			return
 		}
 		if c.observer != nil {
@@ -301,13 +472,61 @@ func (c *Conn) serve(ctx context.Context) {
 
 // observe tells the observer about an answered request.
 func (c *Conn) observe(req *Request, began time.Time, reqBytes, respBytes int) {
-	c.observer.Request(Observation{
+	// The sizes are what crossed the wire: the frame and its four-byte length (a
+	// client's own count has them; the page said four bytes less on each side).
+	reqBytes += 4
+	if respBytes > 0 {
+		respBytes += 4
+	}
+	o := Observation{
 		Conn: c.id, Remote: c.raw.RemoteAddr().String(), Principal: c.Principal(),
 		ClientID: req.Header.ClientID, API: req.Header.APIKey, Version: req.Header.APIVersion,
-		Start: began, Duration: time.Since(began), ReqBytes: reqBytes, RespBytes: respBytes,
-		Summary: req.Describe(),
+		Start: began, Duration: time.Since(began), ReqBytes: observedSize(req.Header.APIKey, reqBytes), RespBytes: respBytes,
+		Correlation: req.Header.CorrelationID, Own: c.own.Load(),
+	}
+	// The process's own requests (the console's polling) are told to the observer and
+	// not described: nobody lists them, and they are most of the requests on a quiet
+	// broker with a page open.
+	if !o.Own {
+		o.Req, o.Resp, o.Summary = req.decoded, req.answered, req.Describe()
+	}
+	c.observer.Request(o)
+}
+
+// observeClosed tells the observer that this request ended the connection, and why.
+// It is the row "why does my app keep disconnecting" needs: the loop returns, and
+// before this the only trace was a log line.
+//
+// class is what kind of no it was, and whose: the client's bytes or the API key it
+// asked (refused: no broker answers them), the login (denied), the broker's own bug
+// (failed), or the client hanging up before its answer (expected: the broker did not
+// fail; a consumer closes its fetch connection under a long poll at a rebalance).
+func (c *Conn) observeClosed(h *RequestHeader, began time.Time, reqBytes int, reason string, class Class) {
+	if c.observer == nil {
+		return
+	}
+	c.observer.Request(Observation{
+		Conn: c.id, Remote: c.raw.RemoteAddr().String(), Principal: c.Principal(),
+		ClientID: h.ClientID, API: h.APIKey, Version: h.APIVersion,
+		Start: began, Duration: time.Since(began), ReqBytes: observedSize(h.APIKey, reqBytes+4),
+		Correlation: h.CorrelationID, Closed: reason, Own: c.own.Load(),
+		Summary: Summary{Class: class, Kind: Kind(h.APIKey), Detail: "closed the connection: " + reason},
 	})
 }
+
+// CloseError is what a handler returns to end the connection with no answer, for
+// the cases where that is what Apache Kafka does (a SCRAM proof of the wrong
+// length, claim: auth A14). Reason is for the log and the console; it must not
+// hold anything the client sent.
+//
+// Class is whose no it was: the login (ClassDenied), or by default the client's bytes
+// (ClassRefused, what Kafka does to a request it cannot take).
+type CloseError struct {
+	Reason string
+	Class  Class
+}
+
+func (e *CloseError) Error() string { return "closing the connection: " + e.Reason }
 
 // handlerPanic is a recovered panic from a request handler.
 type handlerPanic struct {
@@ -317,6 +536,18 @@ type handlerPanic struct {
 
 func (p *handlerPanic) Error() string { return fmt.Sprintf("handler panic: %v", p.value) }
 
+// logValue is what the log says the handler panicked with. A panic's value is
+// whatever the code that panicked put in it, and a handler reading a SASL token can
+// put the token there (a formatted "unexpected ..." with its input, an index that is
+// the token's length). So for a request that carries a credential the log names the
+// value's type and leaves the stack to say where; the stack holds no values.
+func (p *handlerPanic) logValue(api APIKey) any {
+	if IsAuthAPI(api) {
+		return fmt.Sprintf("a %T (its text is not logged for a request that carries a credential)", p.value)
+	}
+	return p.value
+}
+
 // route dispatches a request, converting a handler panic into an error so one
 // connection's bad request cannot take the process down.
 func (c *Conn) route(ctx context.Context, req *Request) (resp []byte, err error) {
@@ -325,5 +556,38 @@ func (c *Conn) route(ctx context.Context, req *Request) (resp []byte, err error)
 			resp, err = nil, &handlerPanic{value: v, stack: string(debug.Stack())}
 		}
 	}()
+	if hook := routeHook.Load(); hook != nil {
+		(*hook)(req)
+	}
 	return c.router.Route(ctx, req)
+}
+
+// notServed says why a request the router would not take ended its connection: an API
+// the broker knows by name but not at the version asked for ("Produce v99 is not served
+// by this broker"), or a key it has never heard of ("API key 999 is not served...").
+// notServedClass is what kind of no an unserved request is: an API Kafka has and this
+// broker does not serve is not implemented; a key no version of Kafka has is the
+// client's (refused).
+func notServedClass(h RequestHeader) Class {
+	if kmsg.RequestForKey(int16(h.APIKey)) != nil {
+		return ClassNotImplemented
+	}
+	return ClassRefused
+}
+
+// writeFailure says why an answer could not be written, and whose that was: a client
+// that closed its connection before its answer came (a reset, a broken pipe) left; any
+// other failure to write is the broker's.
+func writeFailure(err error) (string, Class) {
+	if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) || errors.Is(err, net.ErrClosed) {
+		return "the client closed the connection before the answer", ClassExpected
+	}
+	return "the answer could not be written: " + err.Error(), ClassFailed
+}
+
+func notServed(h RequestHeader) string {
+	if kmsg.RequestForKey(int16(h.APIKey)) != nil {
+		return h.APIKey.Name() + " v" + strconv.Itoa(int(h.APIVersion)) + " is not served by this broker"
+	}
+	return "API key " + strconv.Itoa(int(h.APIKey)) + " is not served by this broker"
 }

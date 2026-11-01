@@ -17,10 +17,6 @@ import (
 // version against it before registering. A subject name is data like a group id, and
 // travels in the path the same way (see groupSegment).
 
-var compatLevels = []string{
-	"BACKWARD", "BACKWARD_TRANSITIVE", "FORWARD", "FORWARD_TRANSITIVE", "FULL", "FULL_TRANSITIVE", "NONE",
-}
-
 func schemasPath(prefix string) string             { return prefix + "/schemas" }
 func schemaPath(prefix, subject string) string     { return prefix + "/schemas/" + groupSegment(subject) }
 func newSchemaPath(prefix string) string           { return prefix + "/new/schema" }
@@ -43,12 +39,79 @@ func (c *Console) schemas(w http.ResponseWriter, r *http.Request) {
 	if c.registryOff(w, r) {
 		return
 	}
-	list, err := c.reg.Subjects(r.Context())
+	ctx := r.Context()
+	list, ids, err := c.reg.Catalogue(ctx)
 	if err != nil {
 		c.fail(w, r, err)
 		return
 	}
-	c.render(w, r, "schemas_home", map[string]any{"List": list, "Page": "schemas", "Title": "Schemas"})
+	// The home table (Sc-Home): each subject's versions, latest id, level and the topic
+	// its name says it is for. One request or two per subject: it is a handful.
+	topicSet := map[string]bool{}
+	if ts, err := c.be.ListTopics(ctx); err == nil {
+		for _, t := range ts {
+			topicSet[t.Name] = true
+		}
+	}
+	type row struct {
+		SubjectRow
+		Versions int
+		Level    string
+		OwnLevel bool
+		Topic    string
+	}
+	rows := make([]row, 0, len(list))
+	var versions int
+	for _, s := range list {
+		r := row{SubjectRow: s, Versions: s.Versions}
+		versions += r.Versions
+		r.Level, r.OwnLevel, _ = c.reg.Compat(ctx, s.Name)
+		if t := subjectTopic(s.Name); t != "" && topicSet[t] {
+			r.Topic = t
+		}
+		rows = append(rows, r)
+	}
+	global, _ := c.reg.GlobalCompat(ctx)
+	regURL := c.facts.RegistryURL
+	if regURL == "" {
+		regURL = c.reg.base
+	}
+	host := strings.TrimPrefix(strings.TrimPrefix(regURL, "http://"), "https://")
+	mode, _ := c.reg.Mode(ctx)
+	c.render(w, r, "schemas_home", map[string]any{"List": list, "Rows": rows, "Page": "schemas", "Title": "Schemas",
+		"VersionCount": versions, "GlobalLevel": global, "RegistryURL": regURL, "RegistryHost": host, "Mode": mode,
+		"BuiltIn": c.facts.RegistryBuiltIn, "IDs": idSummary(ids),
+		"SASL": len(c.facts.SASLMechanisms) > 0 || c.be.opts.SASLUser != ""})
+}
+
+// idSpan is Sc-Home's list foot: how many schemas, the ids they span, and the ids in
+// that span no version uses ("ids 1 to 10. Id 9 is not in use here.").
+type idSpan struct {
+	Count, From, To int
+	Unused          []int
+	More            int // unused ids past the ones named.
+}
+
+func idSummary(ids []int) idSpan {
+	s := idSpan{Count: len(ids)}
+	if len(ids) == 0 {
+		return s
+	}
+	s.From, s.To = ids[0], ids[len(ids)-1]
+	used := map[int]bool{}
+	for _, id := range ids {
+		used[id] = true
+	}
+	for id := s.From; id <= s.To; id++ {
+		if !used[id] {
+			if len(s.Unused) < 3 {
+				s.Unused = append(s.Unused, id)
+			} else {
+				s.More++
+			}
+		}
+	}
+	return s
 }
 
 func (c *Console) schemaCreatePage(w http.ResponseWriter, r *http.Request) {
@@ -127,11 +190,69 @@ func (c *Console) schemaDetail(w http.ResponseWriter, r *http.Request) {
 	list, _ := c.reg.Subjects(ctx)
 	level, own, _ := c.reg.Compat(ctx, subject)
 
+	tab := r.URL.Query().Get("tab")
+	if tab != "compat" && tab != "register" {
+		tab = "versions"
+	}
+	tabURL := func(key string) string {
+		if key == "versions" {
+			return c.schemaURL(subject)
+		}
+		return c.schemaURL(subject) + "?tab=" + key
+	}
+	latestV := versions[len(versions)-1]
 	data := map[string]any{
-		"List": list, "Sel": subject, "Subject": subject, "Page": "schemas", "Title": subject,
-		"Versions": versions, "Cur": cur, "Text": cur.Pretty(), "Latest": versions[len(versions)-1],
-		"Compat": level, "CompatOwn": own, "Levels": compatLevels,
-		"IsLatest": cur.Version == versions[len(versions)-1],
+		"List": list, "Sel": subject, "Subject": subject, "Page": "schemas", "View": "schema", "Title": subject,
+		"Versions": versions, "Cur": cur, "Text": cur.Pretty(), "Latest": latestV,
+		"Compat": level, "CompatOwn": own, "Levels": compatLevels(),
+		"IsLatest": cur.Version == latestV, "Tab": tab,
+		"Tabs": []tabLink{
+			{Key: "versions", Label: "Versions", URL: tabURL("versions"), On: tab == "versions"},
+			{Key: "compat", Label: "Compatibility", URL: tabURL("compat"), On: tab == "compat"},
+			{Key: "register", Label: "Register", URL: tabURL("register"), On: tab == "register"},
+		},
+	}
+	// The versions table: each version, its id and what it changed from the one before.
+	if tab == "versions" {
+		type vrow struct {
+			Version, ID int
+			Latest      bool
+			Changed     string
+		}
+		var vrows []vrow
+		var prevText string
+		for i, v := range versions {
+			sv, err := c.reg.Version(ctx, subject, v)
+			if err != nil {
+				continue
+			}
+			vr := vrow{Version: v, ID: sv.ID, Latest: v == latestV}
+			if i == 0 {
+				vr.Changed = "first version"
+			} else {
+				changed := 0
+				for _, l := range diffLines(prevText, sv.Pretty()) {
+					if l.Op != "same" {
+						changed++
+					}
+				}
+				if changed == 0 {
+					vr.Changed = "no change to the text"
+				} else {
+					vr.Changed = fmt.Sprintf("%d line%s changed from v%d", changed, plural(changed), versions[i-1])
+				}
+			}
+			prevText = sv.Pretty()
+			vrows = append(vrows, vr)
+		}
+		// Newest first, as the board lists them.
+		for i, j := 0, len(vrows)-1; i < j; i, j = i+1, j-1 {
+			vrows[i], vrows[j] = vrows[j], vrows[i]
+		}
+		data["VersionRows"] = vrows
+	}
+	if lv, err := c.reg.Version(ctx, subject, 0); err == nil {
+		data["LatestID"] = lv.ID
 	}
 	// The editor for a new version starts from the latest, whichever is on show.
 	if latest, err := c.reg.Version(ctx, subject, 0); err == nil {
@@ -155,18 +276,29 @@ func (c *Console) schemaDetail(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	data["Confirm"] = subjectConfirms(subject, versions, cur.Version)
+	// The topic this subject is named for, when there is one.
+	if topics, err := c.be.ListTopics(ctx); err == nil {
+		var names []string
+		for _, t := range topics {
+			names = append(names, t.Name)
+		}
+		g := NewGraph()
+		g.AddSubjects([]string{subject}, names)
+		data["Neighbours"] = c.neighbourClauses(g, NodeSubject, subject)
+	}
 	c.render(w, r, "schema_detail", data)
 }
 
 // failSubject is failResource for a subject, which is in the Schemas section.
 func (c *Console) failSubject(w http.ResponseWriter, r *http.Request, err error, subject string) {
-	f := classify(err)
-	if f.kind != "notfound" || !wantsPage(r) {
+	f := refusalFor(err)
+	if !f.NotFound || !wantsPage(r) {
 		c.fail(w, r, err)
 		return
 	}
-	f.title = "Subject not found"
-	f.message = fmt.Sprintf("There is no subject named %q in the schema registry.", subject)
+	f.Heading = "Subject not found"
+	f.Message = fmt.Sprintf("There is no subject named %q in the schema registry.", subject)
 	page := errorPage{Section: "schemas", Back: schemasPath(c.prefix)}
 	if rows, lerr := c.reg.Subjects(r.Context()); lerr == nil {
 		var names []string
@@ -193,8 +325,9 @@ func (c *Console) schemaCheck(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var re *regError
 		if errors.As(err, &re) && re.Status == http.StatusUnprocessableEntity {
-			// A schema that does not parse is an answer to this question, not a failure.
-			c.partial(w, "schema_check", map[string]any{"Invalid": re.Message})
+			// A schema that does not parse is an answer to this question, not a failure:
+			// the registry's refusal (42201), said as one (A2), in the check's place.
+			c.partial(w, "schema_check", map[string]any{"Invalid": refusalFor(err).data(nil)})
 			return
 		}
 		c.fail(w, r, err)
@@ -319,6 +452,8 @@ func (c *Console) msgView(ctx context.Context, topic string, m Message) msgView 
 
 // readThroughRegistry replaces the display of a value that a registry-aware serializer
 // wrote with the JSON it decodes to.
+//
+//fuzz:not-a-parser hands the record value to registryClient.decode and lays out the JSON that comes back; it reads no bytes itself
 func (c *Console) readThroughRegistry(ctx context.Context, topic string, v bytesView, raw []byte) bytesView {
 	if c.reg == nil || v.Null || v.Empty {
 		return v
@@ -359,7 +494,7 @@ func (c *Console) composerSchemas(r *http.Request, topic string, data map[string
 	}
 	data["SchemaSubjects"] = names
 	for _, n := range names {
-		if n == topic+"-value" {
+		if n == topic+valueSubjectSuffix {
 			data["DefaultSubject"] = n
 		}
 	}

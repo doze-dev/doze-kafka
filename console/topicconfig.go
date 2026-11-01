@@ -32,15 +32,17 @@ type topicSetting struct {
 }
 
 var topicSettings = []topicSetting{
-	{Key: "retention.ms", Label: "Keep records for", Hint: "7d, 12h, 30m, 90s, or forever", parse: parseDuration, show: showDuration, Always: true},
-	{Key: "retention.bytes", Label: "Keep at most", Hint: "per partition: 1GB, 500MB, or unlimited", parse: parseSize, show: showSize, Always: true},
-	{Key: "segment.bytes", Label: "Segment size", Hint: "64MB, 1GB; retention removes whole segments", parse: parseSegment, show: showSize, Always: true},
-	{Key: "max.message.bytes", Label: "Largest batch", Hint: "refuse a record batch bigger than this: 1MB, 64KB", parse: parseSegment, show: showSize},
-	{Key: "message.timestamp.type", Label: "Record time", Hint: "LogAppendTime stamps records with the broker's clock", parse: parseChoice("CreateTime", "LogAppendTime"), show: func(v string) string { return v },
+	{Key: "retention.ms", Label: "Keep records for", Hint: "7d, 12h, 30m, 90s or forever", parse: parseDuration, show: showDuration, Always: true},
+	{Key: "retention.bytes", Label: "Keep at most", Hint: "1GB, 500MB or unlimited", parse: parseSize, show: showSize, Always: true},
+	{Key: "segment.bytes", Label: "Segment size", Hint: "64MB or 1GB", parse: parseSegment, show: showSize, Always: true},
+	{Key: "max.message.bytes", Label: "Largest batch", Hint: "1MB or 64KB", parse: parseSegment, show: showSize},
+	{Key: "message.timestamp.type", Label: "Record time", Hint: "", parse: parseChoice("CreateTime", "LogAppendTime"), show: func(v string) string { return v },
 		Options: []string{"CreateTime", "LogAppendTime"}},
 }
 
 // parseChoice accepts exactly one of the given values.
+//
+//fuzz:parser class=console-forms FuzzConsoleForms
 func parseChoice(options ...string) func(string) (string, error) {
 	return func(raw string) (string, error) {
 		for _, o := range options {
@@ -82,6 +84,7 @@ func scaled(raw string, units map[string]int64, what, examples string) (string, 
 	return strconv.FormatInt(n*mult, 10), nil
 }
 
+//fuzz:parser class=console-forms FuzzConsoleForms
 func parseDuration(raw string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "forever", "-1", "unlimited":
@@ -90,6 +93,7 @@ func parseDuration(raw string) (string, error) {
 	return scaled(raw, map[string]int64{"": 1, "ms": 1, "s": 1000, "m": 60_000, "h": 3_600_000, "d": 86_400_000}, "a length of time", "7d, 12h, 30m, 90s, or forever")
 }
 
+//fuzz:parser class=console-forms FuzzConsoleForms
 func parseSize(raw string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "unlimited", "-1", "forever":
@@ -98,6 +102,7 @@ func parseSize(raw string) (string, error) {
 	return sizeValue(raw)
 }
 
+//fuzz:parser class=console-forms FuzzConsoleForms
 func parseSegment(raw string) (string, error) { return sizeValue(raw) }
 
 func sizeValue(raw string) (string, error) {
@@ -181,7 +186,7 @@ func newConfigView(entries []ConfigEntry) configView {
 	for _, ts := range topicSettings {
 		editable[ts.Key] = true
 		e, ok := byKey[ts.Key]
-		sv := settingView{Key: ts.Key, Label: ts.Label, Hint: ts.Hint, Options: ts.Options}
+		sv := settingView{Key: ts.Key, Label: ts.Label, Hint: settingHint(ts.Key, ts.Hint), Options: ts.Options}
 		if ok {
 			sv.Effective = ts.show(e.Value)
 			if e.Own {
@@ -203,21 +208,19 @@ func newConfigView(entries []ConfigEntry) configView {
 	return v
 }
 
-// refusal turns a broker's refusal into an error for the person at the form: the
-// broker's own explanation when it gave one for something they can correct, the
-// Kafka error otherwise.
+// refusal turns a broker's refusal into an error that keeps its code and the
+// broker's own ErrorMessage (E3): the Refusal shown names the Kafka error and says
+// what the broker said about this request.
 func refusal(code int16, msg *string) error {
-	err := kerr.ErrorForCode(code)
+	err := kerr.TypedErrorForCode(code)
 	if err == nil {
 		return nil
 	}
-	if msg != nil && *msg != "" {
-		switch code {
-		case kerr.InvalidConfig.Code, kerr.InvalidTopicException.Code, kerr.InvalidPartitions.Code, kerr.InvalidRequest.Code:
-			return badInput("%s", *msg)
-		}
+	r := &kafkaRefusal{Err: err}
+	if msg != nil {
+		r.Msg = *msg
 	}
-	return err
+	return r
 }
 
 // AlterTopicConfig sets and unsets a topic's own settings in one change.

@@ -2,7 +2,7 @@ package broker_test
 
 import (
 	"context"
-	"fmt"
+	"github.com/doze-dev/doze-kafka/internal/broker"
 	"path/filepath"
 	"testing"
 	"time"
@@ -20,6 +20,7 @@ import (
 // TestGroupSessionExpiry_Classic: a classic member joins with a short session
 // timeout, then goes silent. The coordinator's session timer must evict it.
 func TestGroupSessionExpiry_Classic(t *testing.T) {
+	t.Cleanup(broker.SetMinSessionTimeoutForTest(0)) // a 1 s session is below Kafka's 6 s minimum; the test is about the timer.
 	addr := startBroker(t, 4)
 	cl := newClient(t, addr)
 	defer cl.Close()
@@ -86,14 +87,14 @@ func TestGroupSessionExpiry_Classic(t *testing.T) {
 // disappears (ConsumerGroupDescribe -> GROUP_ID_NOT_FOUND).
 func TestGroupSessionExpiry_KIP848(t *testing.T) {
 	dir := t.TempDir()
-	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
 	cfg := config.Default()
 	cfg.Version = 4
-	cfg.ListenAddr = addr
+	cfg.ListenAddr = "127.0.0.1:0"
 	cfg.DataDir = filepath.Join(dir, "data")
 	cfg.MetaDB = filepath.Join(dir, "meta.db")
 	cfg.ConsumerSessionTimeout = time.Second // short, for the test.
-	defer runBroker(t, cfg)()
+	addr, stop := boot(t, cfg)
+	defer stop()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -108,6 +109,7 @@ func TestGroupSessionExpiry_KIP848(t *testing.T) {
 	req.MemberEpoch = 0
 	req.RebalanceTimeoutMillis = 3000
 	req.SubscribedTopicNames = []string{"expiry-topic"}
+	req.Topics = []kmsg.ConsumerGroupHeartbeatRequestTopic{} // a join owns nothing.
 	assignor := "uniform"
 	req.ServerAssignor = &assignor
 	resp, err := req.RequestWith(ctx, cl)

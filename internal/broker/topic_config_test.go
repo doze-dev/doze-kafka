@@ -159,11 +159,12 @@ func TestTopicConfig_ATopicsOwnRetentionBeatsTheBrokers(t *testing.T) {
 	dir := t.TempDir()
 	cfg := config.Default()
 	cfg.Version = 4
-	cfg.ListenAddr = fmt.Sprintf("127.0.0.1:%d", freePort(t))
+	cfg.ListenAddr = "127.0.0.1:0"
 	cfg.DataDir, cfg.MetaDB = filepath.Join(dir, "data"), filepath.Join(dir, "meta.db")
 	cfg.SegmentBytes = 2048
 	cfg.RetentionBytes = 8192 // the broker trims everything to ~8 KiB…
-	stop := runBroker(t, cfg)
+	addr0, stop := boot(t, cfg)
+	cfg.ListenAddr = addr0 // the restart below binds the same address.
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -206,8 +207,7 @@ func TestTopicConfig_ATopicsOwnRetentionBeatsTheBrokers(t *testing.T) {
 // A topic's retention can be given, changed and taken away after it exists.
 func TestTopicConfig_AlterTakesEffectAndSurvivesARestart(t *testing.T) {
 	dir := t.TempDir()
-	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
-	stop := runBrokerAt(t, addr, dir, 4)
+	addr, stop := bootAt(t, "127.0.0.1:0", dir, 4)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	cl := newClient(t, addr)

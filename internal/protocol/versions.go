@@ -78,9 +78,15 @@ type API struct {
 // docs/api-support.md is checked against it. Adding an API is a row here and a
 // handler in internal/broker.
 //
-// The ranges are ours, not a copy of Apache Kafka's: each column is close to what
-// a real broker of that major offers, capped where a newer version carries
-// something not implemented here. Two floors are deliberate. Produce starts at v3
+// The ranges are ours, not a copy of Apache Kafka's: each column is what a real
+// broker of that major offers, less what is not implemented here. It is never
+// more: no column has an API or a version the real broker of that major does not
+// list in ApiVersions (TestNoProfileServesWhatARealBrokerOfThatMajorDoesNot holds
+// each to the recorded answer of one: conformance/recordings/api-versions.json).
+// So the Kafka 4 column starts where Kafka 4 starts: it removed the oldest
+// versions of nine of these APIs (KIP-896) and closes the connection on them
+// (recorded: versions-not-served; claims: api V2), and so does this broker at
+// --kafka-version 4. Two more floors are deliberate. Produce starts at v3
 // and Fetch at v4, the first versions that carry record batch format v2, the only
 // format the log stores; earlier versions use the legacy message-set layout, and
 // advertising them invited clients to send data the log would keep as garbage.
@@ -92,35 +98,35 @@ type API struct {
 var APIs = []API{
 	{Key: kmsg.Produce, Versions: [4]Offered{v(3, 5), v(3, 7), v(3, 9), v(3, 9)}, Summary: sumProduce},
 	{Key: kmsg.Fetch, Versions: [4]Offered{v(4, 6), v(4, 10), v(4, 13), v(4, 13)}, Summary: sumFetch},
-	{Key: kmsg.ListOffsets, Versions: [4]Offered{v(0, 2), v(0, 5), v(0, 7), v(0, 7)}, Summary: sumListOffsets},
-	{Key: kmsg.Metadata, Versions: [4]Offered{v(0, 6), v(0, 8), v(0, 12), v(0, 12)}, Summary: sumMetadata},
-	{Key: kmsg.OffsetCommit, Versions: [4]Offered{v(0, 3), v(0, 6), v(0, 8), v(0, 9)}, Summary: sumOffsetCommit},
-	{Key: kmsg.OffsetFetch, Versions: [4]Offered{v(0, 3), v(0, 5), v(0, 8), v(0, 9)}, Summary: sumOffsetFetch},
-	{Key: kmsg.FindCoordinator, Versions: [4]Offered{v(0, 2), v(0, 2), v(0, 4), v(0, 4)}, Summary: sumFindCoordinator},
+	{Key: kmsg.ListOffsets, Versions: [4]Offered{v(0, 2), v(0, 5), v(0, 7), v(1, 7)}, Summary: sumListOffsets},
+	{Key: kmsg.Metadata, Versions: [4]Offered{v(0, 5), v(0, 8), v(0, 12), v(0, 12)}, Summary: sumMetadata},
+	{Key: kmsg.OffsetCommit, Versions: [4]Offered{v(0, 3), v(0, 6), v(0, 8), v(2, 9)}, Summary: sumOffsetCommit},
+	{Key: kmsg.OffsetFetch, Versions: [4]Offered{v(0, 3), v(0, 5), v(0, 8), v(1, 9)}, Summary: sumOffsetFetch},
+	{Key: kmsg.FindCoordinator, Versions: [4]Offered{v(0, 1), v(0, 2), v(0, 4), v(0, 4)}, Summary: sumFindCoordinator},
 	{Key: kmsg.JoinGroup, Versions: [4]Offered{v(0, 2), v(0, 4), v(0, 7), v(0, 9)}, Summary: sumJoin},
 	{Key: kmsg.Heartbeat, Versions: [4]Offered{v(0, 1), v(0, 2), v(0, 4), v(0, 4)}, Summary: sumHeartbeat},
 	{Key: kmsg.LeaveGroup, Versions: [4]Offered{v(0, 1), v(0, 2), v(0, 4), v(0, 5)}, Summary: sumLeave},
 	{Key: kmsg.SyncGroup, Versions: [4]Offered{v(0, 1), v(0, 3), v(0, 4), v(0, 5)}, Summary: sumSync},
 	{Key: kmsg.DescribeGroups, Versions: [4]Offered{v(0, 1), v(0, 3), v(0, 5), v(0, 5)}, Summary: sumGroups},
-	{Key: kmsg.ListGroups, Versions: [4]Offered{v(0, 2), v(0, 2), v(0, 4), v(0, 5)}, Summary: sumNothing},
+	{Key: kmsg.ListGroups, Versions: [4]Offered{v(0, 1), v(0, 2), v(0, 4), v(0, 5)}, Summary: sumNothing},
 	{Key: kmsg.SASLHandshake, Versions: [4]Offered{v(1, 1), v(1, 1), v(1, 1), v(1, 1)}, When: WhenSASL, Summary: sumNothing},
-	{Key: kmsg.ApiVersions, Versions: [4]Offered{v(0, 1), v(0, 2), v(0, 3), v(0, 3)}, Summary: sumApiVersions},
-	{Key: kmsg.CreateTopics, Versions: [4]Offered{v(0, 2), v(0, 3), v(0, 7), v(0, 7)}, Summary: sumCreateTopics},
-	{Key: kmsg.DeleteTopics, Versions: [4]Offered{v(0, 1), v(0, 3), v(0, 5), v(0, 6)}, Summary: sumDeleteTopics},
+	{Key: kmsg.ApiVersions, Versions: [4]Offered{v(0, 1), v(0, 2), v(0, 3), v(0, 4)}, Summary: sumApiVersions},
+	{Key: kmsg.CreateTopics, Versions: [4]Offered{v(0, 2), v(0, 3), v(0, 7), v(2, 7)}, Summary: sumCreateTopics},
+	{Key: kmsg.DeleteTopics, Versions: [4]Offered{v(0, 1), v(0, 3), v(0, 5), v(1, 6)}, Summary: sumDeleteTopics},
 	{Key: kmsg.DeleteRecords, Versions: [4]Offered{v(0, 0), v(0, 1), v(0, 2), v(0, 2)}, Summary: sumDeleteRecords},
-	{Key: kmsg.InitProducerID, Versions: [4]Offered{v(0, 1), v(0, 1), v(0, 4), v(0, 4)}, Summary: sumInitProducerID},
+	{Key: kmsg.InitProducerID, Versions: [4]Offered{v(0, 0), v(0, 1), v(0, 4), v(0, 4)}, Summary: sumInitProducerID},
 	{Key: kmsg.AddPartitionsToTxn, Versions: [4]Offered{v(0, 0), v(0, 1), v(0, 3), v(0, 3)}, Summary: sumAddPartitionsToTxn},
 	{Key: kmsg.AddOffsetsToTxn, Versions: [4]Offered{v(0, 0), v(0, 1), v(0, 3), v(0, 3)}, Summary: sumAddOffsetsToTxn},
 	{Key: kmsg.EndTxn, Versions: [4]Offered{v(0, 0), v(0, 1), v(0, 3), v(0, 3)}, Summary: sumEndTxn},
 	{Key: kmsg.TxnOffsetCommit, Versions: [4]Offered{v(0, 0), v(0, 2), v(0, 3), v(0, 3)}, Summary: sumTxnOffsetCommit},
-	{Key: kmsg.DescribeACLs, Versions: [4]Offered{v(0, 0), v(0, 1), v(0, 3), v(0, 3)}, Summary: sumNothing},
-	{Key: kmsg.CreateACLs, Versions: [4]Offered{v(0, 0), v(0, 1), v(0, 3), v(0, 3)}, Summary: sumNothing},
-	{Key: kmsg.DeleteACLs, Versions: [4]Offered{v(0, 0), v(0, 1), v(0, 3), v(0, 3)}, Summary: sumNothing},
-	{Key: kmsg.DescribeConfigs, Versions: [4]Offered{v(0, 1), v(0, 2), v(0, 4), v(0, 4)}, Summary: sumConfigs},
+	{Key: kmsg.DescribeACLs, Versions: [4]Offered{v(0, 0), v(0, 1), v(0, 3), v(1, 3)}, Summary: sumNothing},
+	{Key: kmsg.CreateACLs, Versions: [4]Offered{v(0, 0), v(0, 1), v(0, 3), v(1, 3)}, Summary: sumNothing},
+	{Key: kmsg.DeleteACLs, Versions: [4]Offered{v(0, 0), v(0, 1), v(0, 3), v(1, 3)}, Summary: sumNothing},
+	{Key: kmsg.DescribeConfigs, Versions: [4]Offered{v(0, 1), v(0, 2), v(0, 4), v(1, 4)}, Summary: sumConfigs},
 	{Key: kmsg.AlterConfigs, Versions: [4]Offered{v(0, 0), v(0, 2), v(0, 2), v(0, 2)}, Summary: sumConfigs},
-	{Key: kmsg.SASLAuthenticate, Versions: [4]Offered{v(0, 2), v(0, 2), v(0, 2), v(0, 2)}, When: WhenSASL, Summary: sumNothing},
+	{Key: kmsg.SASLAuthenticate, Versions: [4]Offered{v(0, 0), v(0, 2), v(0, 2), v(0, 2)}, When: WhenSASL, Summary: sumNothing},
 	{Key: kmsg.CreatePartitions, Versions: [4]Offered{v(0, 0), v(0, 1), v(0, 3), v(0, 3)}, Summary: sumCreatePartitions},
-	{Key: kmsg.DeleteGroups, Versions: [4]Offered{v(0, 1), v(0, 2), v(0, 2), v(0, 2)}, Summary: sumGroups},
+	{Key: kmsg.DeleteGroups, Versions: [4]Offered{v(0, 0), v(0, 2), v(0, 2), v(0, 2)}, Summary: sumGroups},
 	{Key: kmsg.IncrementalAlterConfigs, Versions: [4]Offered{none, v(0, 1), v(0, 1), v(0, 1)}, Summary: sumConfigs},
 	{Key: kmsg.OffsetDelete, Versions: [4]Offered{none, v(0, 0), v(0, 0), v(0, 0)}, Summary: sumOffsetDelete},
 	{Key: kmsg.DescribeCluster, Versions: [4]Offered{none, none, v(0, 1), v(0, 2)}, Summary: sumNothing},

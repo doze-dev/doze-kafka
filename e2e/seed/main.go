@@ -17,6 +17,10 @@
 //	g-timeline    a group whose one member joined, read and left, for its timeline.
 //	g-reset-*     one group per test that resets, sets or deletes, so tests that
 //	              change a group never share one.
+//
+// And the harbour world (harbour.go), the boards' fixture: 7 topics, 4 groups, 5
+// clients, 5 subjects, ACLs, an open transaction and a trace across three topics.
+// Both are written once: run the seed twice and the broker holds the same world.
 package main
 
 import (
@@ -51,12 +55,27 @@ func main() {
 func run(addr, registryURL string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.ClientID("doze-seed"), kgo.RecordPartitioner(kgo.ManualPartitioner()))
+	cl, err := newKgo(kgo.SeedBrokers(addr), kgo.ClientID("doze-seed"), kgo.RecordPartitioner(kgo.ManualPartitioner()))
 	if err != nil {
 		return err
 	}
 	defer cl.Close()
 
+	// Running it again changes nothing: the legacy world is only written when its
+	// first topic has no records yet, and every harbour section checks for itself.
+	// The harbour world goes first, so the older world's requests are the newest in
+	// Traffic, where the specs written for it look.
+	if err := seedHarbour(ctx, addr, registryURL); err != nil {
+		return err
+	}
+	if !topicHasRecords(ctx, cl, "seed-orders") {
+		return seedLegacy(ctx, cl, addr, registryURL)
+	}
+	return nil
+}
+
+// seedLegacy is the world the first browser specs read: seed-orders and its siblings.
+func seedLegacy(ctx context.Context, cl *kgo.Client, addr, registryURL string) error {
 	for name, parts := range map[string]int32{"seed-orders": 3, "seed-empty": 1, "seed-txn": 1, "seed-events": 1, "seed-proto": 1, "seed-trace-a": 1, "seed-trace-b": 1} {
 		req := kmsg.NewPtrCreateTopicsRequest()
 		rt := kmsg.NewCreateTopicsRequestTopic()
@@ -160,19 +179,22 @@ func run(addr, registryURL string) error {
 // seedGroupTimeline has one consumer join g-timeline, read a record, commit and leave,
 // so the group's page has a timeline to show: a join, a generation, an assignment, a leave.
 func seedGroupTimeline(ctx context.Context, addr string) error {
-	cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.ClientID("doze-seed-consumer"), kgo.ConsumerGroup("g-timeline"),
+	cl, err := newKgo(kgo.SeedBrokers(addr), kgo.ClientID("doze-seed-consumer"), kgo.ConsumerGroup("g-timeline"),
 		kgo.ConsumeTopics("seed-events"), kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()), kgo.DisableAutoCommit())
 	if err != nil {
 		return err
 	}
-	for {
-		if cl.PollFetches(ctx).NumRecords() > 0 {
-			break
-		}
-		if ctx.Err() != nil {
-			cl.Close()
-			return fmt.Errorf("g-timeline: no record before the deadline: %w", ctx.Err())
-		}
+	// One loop whose every statement runs whether the first poll has the record
+	// or a later one does: written the other way (a check of the deadline after
+	// an empty poll) that check ran only on the runs where a poll came back
+	// empty, and the package's coverage read 78.4% or 78.5% by the weather.
+	got := 0
+	for got == 0 && ctx.Err() == nil {
+		got = cl.PollFetches(ctx).NumRecords()
+	}
+	if got == 0 {
+		cl.Close()
+		return fmt.Errorf("g-timeline: no record before the deadline: %w", ctx.Err())
 	}
 	if err := cl.CommitUncommittedOffsets(ctx); err != nil {
 		cl.Close()
@@ -186,7 +208,7 @@ func seedGroupTimeline(ctx context.Context, addr string) error {
 // is left open, each from the same producer except the open one.
 func seedTransactions(ctx context.Context, addr string) error {
 	newTx := func(id string) (*kgo.Client, error) {
-		return kgo.NewClient(kgo.SeedBrokers(addr), kgo.TransactionalID(id), kgo.TransactionTimeout(10*time.Minute), kgo.RecordPartitioner(kgo.ManualPartitioner()))
+		return newKgo(kgo.SeedBrokers(addr), kgo.TransactionalID(id), kgo.TransactionTimeout(10*time.Minute), kgo.RecordPartitioner(kgo.ManualPartitioner()))
 	}
 	write := func(cl *kgo.Client, v string) error {
 		return cl.ProduceSync(ctx, &kgo.Record{Topic: "seed-txn", Partition: 0, Value: []byte(v)}).FirstErr()
@@ -228,7 +250,7 @@ func seedRegistry(ctx context.Context, cl *kgo.Client, base string) error {
 		body, _ := json.Marshal(map[string]string{"schema": schema, "schemaType": typ})
 		req, _ := http.NewRequestWithContext(ctx, "POST", base+"/subjects/"+subject+"/versions", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/vnd.schemaregistry.v1+json")
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := doRegistry(req)
 		if err != nil {
 			return 0, err
 		}
@@ -281,9 +303,10 @@ func seedRegistry(ctx context.Context, cl *kgo.Client, base string) error {
 
 // seedTelemetry plays a client that reports its own metrics (KIP-714): it subscribes and
 // pushes three reports, gzip-compressed, with a request latency that climbs, so the
-// Traffic page has a series to draw.
+// Traffic page has a series to draw. A report that comes before the interval the broker
+// advised has passed is refused, as Apache Kafka refuses it, so each waits one out.
 func seedTelemetry(ctx context.Context, addr string) error {
-	cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.ClientID("doze-seed-telemetry"))
+	cl, err := newKgo(kgo.SeedBrokers(addr), kgo.ClientID("doze-seed-telemetry"))
 	if err != nil {
 		return err
 	}
@@ -293,7 +316,15 @@ func seedTelemetry(ctx context.Context, addr string) error {
 	if err != nil || subResp.ErrorCode != 0 {
 		return fmt.Errorf("telemetry subscription: %v %+v", err, subResp)
 	}
+	interval := time.Duration(subResp.PushIntervalMillis)*time.Millisecond + 100*time.Millisecond
 	for i, latency := range []float64{4.5, 6.25, 9.75} {
+		if i > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(interval):
+			}
+		}
 		payload := telemetry.Encode(telemetry.Payload{
 			Resource: map[string]string{"client_rack": "seed-rack"},
 			Metrics: []telemetry.Metric{

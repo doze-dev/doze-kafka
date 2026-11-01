@@ -21,6 +21,7 @@ func (p *protoSchema) Canonical(bool) string { return p.text }
 
 const protoMainName = "schema.proto"
 
+//fuzz:parser class=schema-texts FuzzRegisterAndCompare
 func parseProtobuf(text string, refs []resolvedRef) (parsedSchema, error) {
 	sources := map[string]string{protoMainName: text}
 	for _, r := range refs {

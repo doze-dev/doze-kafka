@@ -60,9 +60,7 @@ func groupConsume(t *testing.T, ctx context.Context, addr, group, topic string, 
 // committed offset — it sees only records produced after the commit, not a replay.
 func TestGroupClassic_GroupConsumeCommitAndResume(t *testing.T) {
 	dir := t.TempDir()
-	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
-
-	stop := runBrokerAt(t, addr, dir, 4)
+	addr, stop := bootAt(t, "127.0.0.1:0", dir, 4)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -118,8 +116,8 @@ func TestGroupClassic_GroupConsumeCommitAndResume(t *testing.T) {
 // joins.
 func TestGroupClassic_TwoConsumersSplitPartitions(t *testing.T) {
 	dir := t.TempDir()
-	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
-	defer runBrokerAt(t, addr, dir, 4)()
+	addr, stop := bootAt(t, "127.0.0.1:0", dir, 4)
+	defer stop()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()

@@ -14,65 +14,59 @@
 <meta name="htmx-config" content='{"historyCacheSize":0,"refreshOnHistoryMiss":true}'>
 <title>{{if .Title}}{{.Title}} — {{end}}doze-kafka</title>
 <link rel="icon" type="image/svg+xml" href="{{.Prefix}}/static/favicon.svg">
-<!-- Vendor CSS before app.css: app.css re-themes CodeMirror (background, syntax
-     colors) at equal specificity, so it must come later to win the cascade. -->
+<!-- CodeMirror 6 brings its own base styles when it starts; app.css themes it with
+     the console tokens and raises its selectors' specificity to win against them. -->
 {{/* The two faces every page uses, fetched with the stylesheet rather than after it
      has been parsed, so text is not drawn in a fallback font and then redrawn. */}}
 <link rel="preload" as="font" type="font/woff2" crossorigin href="{{.Prefix}}/static/fonts/ibm-plex-sans-latin-wght-normal.woff2">
 <link rel="preload" as="font" type="font/woff2" crossorigin href="{{.Prefix}}/static/fonts/ibm-plex-mono-latin-400-normal.woff2">
-<link rel="stylesheet" href="{{.Prefix}}/static/cm/codemirror.min.css">
 <link rel="stylesheet" href="{{.Prefix}}/static/app.css">
 {{/* Before first paint: the theme ("system" is resolved here, so the stylesheet
      defines each theme once) and the rail's width. */}}
 <script>(function(){var d=document.documentElement,g=function(k){try{return localStorage.getItem(k);}catch(e){return null;}};
-var t=g("theme");d.setAttribute("data-theme",t==="light"||t==="dark"?t:(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
-var r=g("rail");if(r==="slim"||(r!=="wide"&&matchMedia("(max-width:1180px)").matches))d.setAttribute("data-rail","slim");
+var t=g("theme");d.setAttribute("data-theme",t==="light"||t==="dark"||t==="contrast"?t:(matchMedia("(prefers-contrast: more)").matches?"contrast":matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
 window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").replace(/^\/+|\/+$/g,"").split("/");var v=(p[0]===""||((p[0]==="topics"||p[0]==="groups")&&!p[1]))?"list":"detail";d.setAttribute("data-view",v);};window.dozeView();})();</script>
-<script>document.addEventListener("alpine:init",function(){window.Alpine.store("filter",{
-  q:"",
-  // True when a filter is set and no row in root matches it, so the list can say
-  // "no matches" instead of just going blank. Rows carry their name in data-name.
-  none:function(root){var q=this.q.toLowerCase();if(!q||!root)return false;var rows=root.querySelectorAll(".li");
-    if(!rows.length)return false;return !Array.prototype.some.call(rows,function(r){return (r.getAttribute("data-name")||"").toLowerCase().indexOf(q)>=0;});}
-});});</script>
 <script src="{{.Prefix}}/static/htmx.min.js"></script>
 <script defer src="{{.Prefix}}/static/alpine.min.js"></script>
-<script src="{{.Prefix}}/static/cm/codemirror.min.js"></script>
-<script src="{{.Prefix}}/static/cm/javascript.min.js"></script>
-<script src="{{.Prefix}}/static/cm/matchbrackets.min.js"></script>
-<script src="{{.Prefix}}/static/cm/closebrackets.min.js"></script>
+<script src="{{.Prefix}}/static/cm6.min.js"></script>
 <script src="{{.Prefix}}/static/editor.js"></script>
 <script src="{{.Prefix}}/static/shell.js" defer></script>
 </head>
 <body>
 <div class="reqbar" id="reqbar" hidden role="progressbar" aria-label="Working"></div>
-<div class="app">
+<div class="app" data-home="{{.Home}}">
   <header class="topbar">
-    <a class="brand" href="{{.Prefix}}/topics"><span class="brand-mark" aria-hidden="true"></span> doze-kafka <span class="sub">console</span></a>
-    <button type="button" class="tb-palette" id="palette-open" aria-haspopup="dialog">{{icon "search"}} <span>Search or jump to…</span> <span class="kbd">⌘K</span></button>
+    <button type="button" class="menu-btn" id="menu-btn" aria-label="Menu" aria-controls="rail" aria-expanded="false">☰</button>
+    <a class="brand" href="{{.Prefix}}/"><span class="logo" aria-hidden="true">z</span><span class="brand-name">doze-kafka</span>{{if .Workspace}}<span class="sub" id="workspace-label">{{.Workspace}}</span>{{end}}</a>
+    <span class="pg-title" id="pg-title" aria-hidden="true"></span>
+    {{/* The jump field's words are Sy-01's at full width and Sy-03's ("Jump or act…")
+         where the field is 300 px; the one shown is the button's name. */}}
+    <button type="button" class="tb-palette" id="palette-open" aria-haspopup="dialog"><span class="grow tb-long">Jump to a topic, group or subject, or do something…</span><span class="grow tb-short">Jump or act…</span><span class="kbd">⌘K</span></button>
     <div class="tb-spacer"></div>
     <div class="tb-right">
-      <span class="chip live mono" title="The broker this console is connected to">{{if .Endpoint}}{{.Endpoint}}{{else}}127.0.0.1:9092{{end}}</span>
-      <div class="theme-seg" id="theme-seg" role="group" aria-label="Theme">
-        <button type="button" data-mode="light" title="Light" aria-label="Light theme">{{icon "sun"}}</button>
-        <button type="button" data-mode="system" title="Match system" aria-label="System theme">{{icon "monitor"}}</button>
-        <button type="button" data-mode="dark" title="Dark" aria-label="Dark theme">{{icon "moon"}}</button>
-      </div>
+      <span class="pill live" id="live-pill" title="The broker this console is connected to"><span class="dot" aria-hidden="true"></span><span class="m pill-addr">{{if .Endpoint}}{{.Endpoint}}{{else}}broker{{end}}</span><span class="pill-state" hidden></span></span>
+      {{if .KafkaCompat}}<span class="pill" id="compat-pill">{{.KafkaCompat}}</span>{{end}}
+      {{template "theme_seg" ""}}
     </div>
   </header>
 
   <div class="body">
-    <nav class="rail" aria-label="Sections" hx-boost="true" hx-target="#workspace" hx-select="#workspace" hx-swap="outerHTML">
-      <div class="rgroup">Broker</div>
-      {{template "ri" dict "P" .Prefix "URL" "/topics" "On" (hasPrefix .Page "topics") "Name" "Topics" "Glyph" "layers" "Ct" "topics"}}
-      {{template "ri" dict "P" .Prefix "URL" "/groups" "On" (hasPrefix .Page "groups") "Name" "Consumer groups" "Glyph" "users" "Ct" "groups"}}
-      {{if .HasRegistry}}{{template "ri" dict "P" .Prefix "URL" "/schemas" "On" (hasPrefix .Page "schemas") "Name" "Schemas" "Glyph" "braces" "Ct" "schemas"}}{{end}}
-      {{if .HasTraffic}}{{template "ri" dict "P" .Prefix "URL" "/traffic" "On" (eq .Page "traffic") "Name" "Traffic" "Glyph" "activity"}}{{end}}
-      {{template "ri" dict "P" .Prefix "URL" "/cluster" "On" (eq .Page "cluster") "Name" "Cluster" "Glyph" "server"}}
-      {{template "ri" dict "P" .Prefix "URL" "/access" "On" (eq .Page "access") "Name" "Access" "Glyph" "key"}}
-      <button type="button" class="rail-toggle" id="rail-toggle" title="Collapse / expand ([)">
-        <span class="rt-ic">{{icon "chevron"}}</span><span class="ri-nm">Collapse</span>
-      </button>
+    <nav class="rail" aria-label="Sections" id="rail" hx-boost="true" hx-target="#workspace" hx-select="#workspace" hx-swap="outerHTML">
+      {{/* Three groups, as the design draws them: what is happening (Observe), what is
+           stored (Data) and the broker itself. A group with nothing in it is not drawn. */}}
+      <span class="cap first">Observe</span>
+      {{if .HasTraffic}}{{template "ri" dict "P" .Prefix "URL" "/traffic" "On" (eq .Page "traffic") "Name" "Traffic" "Chip" "TR" "C" "tr" "Ct" "traffic" "N" (index .Counts "traffic") "Unit" " open"}}{{end}}
+      {{template "ri" dict "P" .Prefix "URL" "/trace" "On" (eq .Page "trace") "Name" "Trace" "Chip" "TC" "C" "tc"}}
+      <span class="cap">Data</span>
+      {{template "ri" dict "P" .Prefix "URL" "/topics" "On" (hasPrefix .Page "topics") "Name" "Topics" "Chip" "TP" "C" "tp" "Ct" "topics" "N" (index .Counts "topics")}}
+      {{template "ri" dict "P" .Prefix "URL" "/groups" "On" (hasPrefix .Page "groups") "Name" "Groups" "Chip" "GR" "C" "gr" "Ct" "groups" "N" (index .Counts "groups")}}
+      {{if .HasRegistry}}{{template "ri" dict "P" .Prefix "URL" "/schemas" "On" (hasPrefix .Page "schemas") "Name" "Schemas" "Chip" "SC" "C" "sc" "Ct" "schemas" "N" (index .Counts "schemas")}}{{end}}
+      <span class="cap">Broker</span>
+      {{template "ri" dict "P" .Prefix "URL" "/access" "On" (eq .Page "access") "Name" "Access" "Chip" "AC" "C" "ac"}}
+      {{template "ri" dict "P" .Prefix "URL" "/cluster" "On" (eq .Page "cluster") "Name" "Cluster" "Chip" "CL" "C" "cl"}}
+      <div class="grow"></div>
+      {{template "ri" dict "P" .Prefix "URL" "/connect" "On" (eq .Page "connect") "Name" "Connect an app" "Chip" "⇢" "C" "mut"}}
+      {{template "theme_seg" "rail-theme"}}
     </nav>
 
     {{/* NOTE: hx-target/hx-select here are INHERITED by every htmx actuator
@@ -86,42 +80,69 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
         <button type="button" class="icon-btn sm" aria-label="Dismiss" onclick="this.closest('.flash').remove()">{{icon "x"}}</button>
       </div>
       {{end}}
-      {{if or (hasPrefix .Page "topics") (hasPrefix .Page "groups") (hasPrefix .Page "schemas")}}<a class="backbar" href="{{.Prefix}}/{{if hasPrefix .Page "topics"}}topics{{else if hasPrefix .Page "groups"}}groups{{else}}schemas{{end}}">‹ {{if hasPrefix .Page "topics"}}Topics{{else if hasPrefix .Page "groups"}}Consumer groups{{else}}Schemas{{end}}</a>{{end}}
       <div class="panes">
 {{end}}
 
 {{define "shell_bottom"}}
+      {{template "inspector_aside" .}}
       </div><!-- /panes -->
     </div><!-- /workspace -->
   </div>
+
+  {{template "keys_strip" .}}
 
   <!-- command palette (vanilla — survives every swap since it's outside #workspace) -->
   <div class="overlay palette-overlay" id="palette" hidden>
     <div class="palette anim" role="dialog" aria-modal="true" aria-label="Command palette">
       <div class="pal-input">
-        {{icon "search"}}
-        <input id="pal-q" role="combobox" aria-expanded="true" aria-controls="pal-list" aria-autocomplete="list" aria-label="Search topics, groups and actions" placeholder="Search topics, groups, actions…" spellcheck="false" autocomplete="off">
+        <span class="mut" aria-hidden="true">⌕</span>
+        <input id="pal-q" role="combobox" aria-expanded="true" aria-controls="pal-list" aria-autocomplete="list" aria-label="Jump to a topic, group, subject or action" placeholder="Jump to a topic, group, subject or action" spellcheck="false" autocomplete="off">
+        <span class="note" id="pal-count" aria-live="polite"></span>
         <span class="kbd">esc</span>
       </div>
       <div class="pal-list" id="pal-list" role="listbox" aria-label="Results"></div>
-    </div>
-  </div>
-
-  <!-- styled confirm (replaces native hx-confirm dialogs) -->
-  <div class="overlay" id="confirm" hidden>
-    <div class="dialog anim" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-msg">
-      <div class="dialog-h"><h3 id="confirm-title">Are you sure?</h3><p id="confirm-msg"></p></div>
-      <div class="dialog-f">
-        <button type="button" class="btn btn-outline" id="confirm-no">Cancel</button>
-        <button type="button" class="btn btn-destructive" id="confirm-yes">Confirm</button>
+      <div class="pal-foot">
+        <a class="row ce g8" href="{{.Prefix}}/connect"><span class="sv sm c-mut" aria-hidden="true">⇢</span><span>Connect an app</span></a>
+        <div class="row ce g8 note"><span><span class="kbd">↑</span><span class="kbd">↓</span>move</span><span><span class="kbd">↵</span>open</span><span><span class="kbd">esc</span>close</span></div>
       </div>
     </div>
   </div>
 
-  <!-- message drawer (topic detail's table rows open here) -->
-  <div class="overlay" id="drawer-overlay" hidden data-drawer-backdrop>
-    <div class="drawer anim" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title"></div>
+  <!-- styled confirm (replaces native hx-confirm dialogs): Tp-24's title, paragraph,
+       table of what goes and what stays, then Cancel (focused) and the verb -->
+  <div class="overlay" id="confirm" hidden>
+    <div class="modal anim" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-msg confirm-rows">
+      <div class="pad col g12">
+        <h2 class="h2" id="confirm-title">Are you sure?</h2>
+        <p id="confirm-msg"></p>
+        <div class="kv" id="confirm-rows" style="--c: 118px 1fr" hidden></div>
+        <div class="row g8 confirm-f">
+          <button type="button" class="btn" id="confirm-no">Cancel</button>
+          <button type="button" class="btn danger" id="confirm-yes">Confirm</button>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <!-- the keys (Sy-06): generated from the declared key map (keys.go), never typed here -->
+  <div class="overlay" id="help" hidden>
+    <div class="dialog help anim" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <div class="help-h row sb ce">
+        <div class="col"><h2 class="h2" id="help-title">Keyboard shortcuts</h2><span class="note">Single keys work when no text field has focus. They never act on data without asking first.</span></div>
+        <button type="button" class="btn sm" id="help-close" aria-label="esc, close the shortcuts">esc</button>
+      </div>
+      <div class="help-b" tabindex="0" role="region" aria-label="Keys">
+        {{range keyGroups}}
+        <div class="help-g col g8 grow">
+          <span class="cap">{{.Scope}}</span>
+          {{range .Keys}}{{if or (ne .Target "/traffic") $.HasTraffic}}<div class="help-r row sb ce"><span class="help-l">{{.Label}}</span><span class="help-k">{{range $i, $k := keyCaps .Show}}<span class="kbd">{{$k}}</span>{{end}}</span></div>{{end}}{{end}}
+        </div>
+        {{end}}
+      </div>
+      <div class="help-f row ce g8"><span class="note"><span class="m">p</span> means pause on a page that tails and produce on a topic, never both on one page. <span class="m">g</span> then a letter goes to a section.</span></div>
+    </div>
+  </div>
+  <script type="application/json" id="keymap">{{keymapJSON}}</script>
 
   <div class="toasts" id="toasts"></div>
 </div>
@@ -129,26 +150,46 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
 </html>
 {{end}}
 
-{{/* ri = one rail item. Ct, if set, gets a live count via shell.js's refreshCounts. */}}
+{{/* The theme switch (Sy-07): in the top bar, and at the foot of the ☰ menu at phone
+     width (the "rail-theme" copy), where the top bar has no room for it. */}}
+{{define "theme_seg"}}<div class="theme-seg{{if .}} {{.}}{{end}}"{{if not .}} id="theme-seg"{{end}} role="group" aria-label="Theme">
+  <button type="button" data-mode="system" title="Follow the system setting">system</button>
+  <button type="button" data-mode="light" title="Light">light</button>
+  <button type="button" data-mode="dark" title="Dark">dark</button>
+  <button type="button" data-mode="contrast" title="High contrast">high contrast</button>
+</div>{{end}}
+
+{{/* ri = one rail item: the section's chip, its name and, where it has one, the
+     number the boards put beside it. A count with a Ct is kept live by shell.js. */}}
 {{define "ri"}}
-<a href="{{.P}}{{.URL}}" class="ri {{if .On}}on{{end}}" aria-label="{{.Name}}">
-  <span class="ri-ic">{{icon .Glyph}}</span>
-  <span class="ri-nm">{{.Name}}</span>
-  {{if .Ct}}<span class="ri-ct" data-ct="{{.Ct}}"></span>{{end}}
-  <span class="ri-fly">{{.Name}}</span>
-</a>
+<a href="{{.P}}{{.URL}}" class="nav{{if .On}} on{{end}}"{{if .On}} aria-current="page"{{end}} title="{{.Name}}"><span class="sv c-{{.C}}" aria-hidden="true">{{.Chip}}</span><span class="nm">{{.Name}}</span>{{if .Ct}}<span class="n" data-ct="{{.Ct}}"{{if .Unit}} data-ct-unit="{{.Unit}}"{{end}}>{{if .N}}{{.N}}{{.Unit}}{{end}}</span>{{end}}</a>
 {{end}}
 
 {{define "copychip"}}<span class="copychip">{{if .Label}}<span class="cc-label">{{.Label}}</span>{{end}}<span class="cc-val" title="{{.Value}}">{{.Value}}</span><button type="button" class="copy-btn" data-copy="{{.Value}}" title="Copy" aria-label="Copy {{if .Label}}{{.Label}}{{else}}value{{end}}">{{icon "copy"}}</button></span>{{end}}
 
 {{define "kvcopy"}}<span class="kv-copy"><span class="kv">{{.}}</span><button type="button" class="copy-btn" data-copy="{{.}}" title="Copy" aria-label="Copy">{{icon "copy"}}</button></span>{{end}}
 
-{{define "empty_detail"}}
-<main class="detail" id="detail">
-  <div class="empty-detail">
-    {{icon .Glyph}}
-    <p>{{.Hint}}</p>
-    {{if .CTA}}<a class="btn primary" href="{{.CTAURL}}">{{icon "plus"}} {{.CTA}}</a>{{end}}
-  </div>
-</main>
+{{/* neighbours: "Written by checkout-api, read by g-order-validator, schema subject
+     orders-value." One sentence of links, rendered from the neighbours graph
+     (graph.go). A subject opens in the inspector; the rest go to their pages. */}}
+{{define "neighbours"}}{{if .Neighbours}}<div class="neighbours" id="neighbours">{{range $c := .Neighbours}}{{range $c.Links}}<a class="well" href="{{.URL}}"{{if .Open}} data-inspector-open hx-get="{{.Open}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"{{end}}>{{if eq .Kind "group"}}<span class="sv sm c-gr" aria-hidden="true">GR</span><span class="note">{{lower $c.Verb}}</span>{{else if eq .Kind "topic"}}<span class="sv sm c-tp" aria-hidden="true">TP</span><span class="note">{{lower $c.Verb}}</span>{{else if eq .Kind "subject"}}<span class="sv sm c-sc" aria-hidden="true">SC</span>{{else}}<span class="note">{{lower $c.Verb}}</span>{{end}}<span class="m">{{.Name}}</span></a>{{end}}{{end}}</div>{{if .NeighboursNote}}<div class="note nbnote" id="neighbours-note">{{.NeighboursNote}}</div>{{end}}{{end}}{{end}}
+
+{{/* The inspector (Sy-01, part of the page): the right-hand panel, in flow beside the
+     content, never over it. A selection (a message, a request, a client, a member, a
+     subject, a transaction, a group event) replaces what is in it; Esc puts the
+     page's own summary back (a page that has one: Traffic's open connections), or
+     closes the panel. #inspector is where a selection is fetched into. */}}
+{{define "inspector_aside"}}
+<aside class="insp" id="inspector-panel" aria-label="Details"{{if not .InspDefault}} hidden{{end}}>
+  {{if .InspDefault}}<div class="insp-default" id="insp-default">{{template "insp_default" .}}</div>{{end}}
+  <div class="insp-sel" id="inspector" hidden></div>
+</aside>
+{{end}}
+
+{{define "insp_default"}}{{if eq .InspDefault "traffic"}}{{template "traffic_clients" .}}{{else if eq .InspDefault "errors"}}{{template "traffic_errors_default" .}}{{else if eq .InspDefault "touched"}}{{template "traffic_touched" .}}{{else if eq .InspDefault "story"}}{{template "traffic_group_default" .}}{{end}}{{end}}
+
+{{/* The keys strip: what the keys do on this page, one line at the foot (Sy-01).
+     The hints come from keys.go, per page; a hint is a key the page really has. */}}
+{{define "keys_strip"}}
+<footer class="keys" id="keys" hx-swap-oob="true" aria-label="Keys on this page">{{range .Hints}}<span{{if or .Only .Width}} class="{{if .Only}}keys-{{.Only}}{{end}}{{if .Width}} keys-w-{{.Width}}{{end}}"{{end}}>{{range .Keys}}<span class="kbd">{{.}}</span>{{end}}{{.Label}}</span>{{end}}{{range dialogHints}}{{$k := .Kind}}{{range .Hints}}<span class="keys-dialog keys-dialog-{{$k}}">{{range .Keys}}<span class="kbd">{{.}}</span>{{end}}{{.Label}}</span>{{end}}{{end}}</footer>
 {{end}}

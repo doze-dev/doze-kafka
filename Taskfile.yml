@@ -24,7 +24,7 @@ tasks:
       - go build -o bin/{{.BINARY}} ./cmd/doze-kafka
 
   run:
-    desc: 'Build and run the broker (zero config: 127.0.0.1:9092, console on :9093)'
+    desc: 'Build and run the broker (zero config: kafka.<dir>.doze:9092, console at http://kafka.<dir>.doze)'
     deps: [build]
     cmds:
       - ./bin/{{.BINARY}}
@@ -65,9 +65,27 @@ tasks:
       # Tracked and new files only: scratch worktrees and vendored trees are not ours to format.
       - 'files=$(git ls-files --cached --others --exclude-standard -- "*.go"); test -z "$(gofmt -l $files)" || { echo "gofmt needed:"; gofmt -l $files; exit 1; }'
       - go vet ./...
+      # Every module in the repository is tidy (the gates' fixture modules too).
+      - 'for mod in $(git ls-files "*go.mod"); do (cd "$(dirname "$mod")" && go mod tidy -diff) || { echo "go mod tidy needed in $(dirname "$mod")"; exit 1; }; done'
       # Windows ships in the release and nobody here runs it; this at least proves it compiles.
       - GOOS=windows GOARCH=amd64 go vet ./...
       - go test -race ./...
+      # Every benchmark once: one that no longer runs (BenchmarkInitProducerID sent a body
+      # its handler could not decode, and nobody noticed) fails here, not when somebody
+      # next wants a number from it.
+      - task: bench:smoke
+      # The fault seam (internal/faultinject) exists only behind its tag, so its tests only run with it.
+      - go test -tags faultinject ./internal/faultinject/ ./internal/storage/... ./internal/broker/ -run 'FaultSeam|^Test(Parse|HitAfterAndClear|Delay|FileIsRead)'
+
+  vuln:
+    desc: 'govulncheck over this module and module/: fails on any reachable vulnerability not accepted, with its guarding test, in testdata/vulncheck-accepted.txt. Needs the network (vuln.go.dev), so it is its own workflow and not part of check'
+    cmds:
+      - go run ./scripts/vulncheck . module
+
+  bench:smoke:
+    desc: 'Run every benchmark for one iteration, so a benchmark that has stopped working fails the gate'
+    cmds:
+      - go test -run '^$' -bench . -benchtime=1x ./...
 
   hooks:install:
     desc: Install a git pre-push hook that runs `task check`.
@@ -94,11 +112,73 @@ tasks:
       - bun install --frozen-lockfile
       - bunx playwright install chromium
       - bunx playwright test
+      - task: design
+
+  design:
+    desc: 'The design gate (e2e/design): each board of the design (the shell, the section homes, the Traffic pages) rendered from its own files and compared with the live console element by element, in light and dark at 1440 and at the widths the boards draw; every difference is on an allow-list with its reason, or the gate fails. Its own brokers on E2E_PORT=14192 (the Traffic gate starts a third, with real clients, at +40). Run by test:e2e, once.'
+    dir: e2e
+    env:
+      E2E_PORT: '{{.E2E_PORT | default "14192"}}'
+    cmds:
+      - bun install --frozen-lockfile
+      - bunx playwright install chromium
+      - bunx playwright test -c design/playwright.config.ts
+
+  evidence:
+    desc: 'Design evidence: screenshots of the live console at each board state (light, dark; 1440, and 960/390 where a board has one) into plan/evidence/, with the index. DESIGN_DIR=<the design artifact''s project/ files> also renders the boards. Not part of test:e2e.'
+    dir: e2e
+    cmds:
+      - bun install --frozen-lockfile
+      - bunx playwright install chromium
+      - bunx playwright test -c evidence/playwright.config.ts
+      - python3 evidence/optimise.py ../plan/evidence
+
+  check:identity:
+    desc: 'The second identity (listener on :0, a console prefix, a data directory with a space, SASL/SCRAM-SHA-512 and TLS on): the built binary, booted twice over the same directory, used by a real client and the console (TestSecondIdentity; task check runs it with the rest)'
+    cmds:
+      - go test -race -count=1 -run 'SecondIdentity' ./cmd/doze-kafka
+
+  test:e2e:identity:
+    desc: 'The browser suite against a broker started with the second identity (listener on 127.0.0.1:0, console prefix, data dir with a space, SASL/SCRAM-SHA-512 and TLS); the route gate is on'
+    cmds:
+      - go build -o bin/{{.BINARY}} ./cmd/doze-kafka
+      - cd e2e && bun install --frozen-lockfile && bunx playwright install chromium
+      - go run ./e2e/identity -bin bin/{{.BINARY}} -- sh -c 'cd e2e && bunx playwright test'
+
+  test:identity:
+    desc: 'The console and browser suites with nothing tidy about the broker: the console under /ops/kafka-ui, a data directory with a space, the listener on 127.0.0.1:0 (browser), DOZE_ZONE=off. The run with the name zone on needs the doze-names daemon and is local only.'
+    cmds:
+      - DOZE_ZONE=off DOZE_KAFKA_CONSOLE_PREFIX=/ops/kafka-ui go test -count=1 ./console
+      - cd e2e && bun install --frozen-lockfile && bunx playwright install chromium && E2E_IDENTITY=1 bunx playwright test
 
   test:compat:
     desc: 'Real clients and frameworks against the binary (compat/): Java, Streams, Spring, Python, KafkaJS, kcat. Needs Docker for the JVM ones; missing toolchains are SKIPPED, not passed. Name clients to run only those: task test:compat -- java python'
     cmds:
       - compat/run.sh {{.CLI_ARGS}}
+
+  conformance:
+    desc: 'Replay the recorded Apache Kafka scenarios (conformance/recordings) against doze-kafka; no Docker'
+    cmds:
+      - go test ./conformance -count=1 -v -run 'TestReplay|TestKnown'
+      # The full-volume scenarios, with the fault seam standing in for the volume.
+      - go test -tags faultinject ./conformance -count=1 -v -run TestReplayFullDisk
+
+  conformance:record:
+    desc: 'Record the scenarios against apache/kafka:4.3.1 in Docker and rewrite conformance/recordings. One scenario: task conformance:record -- -only=listoffsets. The client runs are conformance:record:clients'
+    cmds:
+      # Anchored: an unanchored TestRecord also matches TestRecordClientTelemetry, so
+      # recording one scenario rewrote client-telemetry.json as well (its counts vary).
+      - go test ./conformance -count=1 -v -run '^TestRecord$' -record {{.CLI_ARGS}}
+
+  conformance:record:clients:
+    desc: 'Record what real clients send for client telemetry (conformance/recordings/client-telemetry.json): Docker, and kcat 2.5 or newer for the librdkafka run'
+    cmds:
+      - go test ./conformance -count=1 -v -run '^TestRecordClientTelemetry$' -record
+
+  conformance:stable:
+    desc: 'Record every scripted scenario against apache/kafka:4.3.1 three times and fail unless each run is byte-identical to the committed recordings (a timing-dependent step shows as a changed file). Needs Docker and a clean conformance/recordings'
+    cmds:
+      - scripts/conformance-stable.sh
 
   test:kcat:
     desc: 'kcat (librdkafka) against the real binary; needs kcat installed'
@@ -106,19 +186,73 @@ tasks:
       - go build -o bin/doze-kafka ./cmd/doze-kafka
       - scripts/kcat-check.sh bin/doze-kafka
 
+  gate-report:
+    desc: 'Run every gate and write the results to plan/evidence/gates-<date>.md for the stage close commit (task gate-report -- --slow adds the mutation check and the compat matrix)'
+    cmds:
+      - scripts/gate-report.sh {{.CLI_ARGS}}
+
+  docs:check:
+    desc: 'Every check of the documents: links and anchors in every markdown file outside plan/, getting-started run as written with its output blocks compared, kafka-*.sh lines run in apache/kafka (Docker), and error names and messages the documents quote held to the source'
+    cmds:
+      - scripts/docs-check.sh {{.CLI_ARGS}}
+
+  coverage:
+    desc: 'Statement coverage per package against the committed floor (testdata/coverage.txt); fails if one fell by more than 0.1 point'
+    cmds:
+      - scripts/coverage.sh
+
+  coverage:record:
+    desc: 'Raise the coverage floor to the current numbers (never lowers one unless ALLOW_LOWER=1)'
+    cmds:
+      - scripts/coverage.sh record
+
+  lightness:
+    desc: 'Binary size (exact), idle heap (within the start-to-start variation measured when recorded) and module count (exact) against this platform''s budget in testdata/lightness.json; every raise in the file''s history needs its reason in the file'
+    cmds:
+      - scripts/lightness.sh
+
+  lightness:record:
+    desc: 'Record this platform''s weight as its budget (20 starts). A number that went up needs -reason, which is written into the file: task lightness:record -- -reason "why"'
+    cmds:
+      - scripts/lightness.sh record {{.CLI_ARGS}}
+
+  mutate:record:
+    desc: 'Mutation-test units (scripts/mutate: each mutant runs the tests that reach it) and store every lived, uncovered, timed-out and setup-failed mutant, with a reason or "open", in testdata/mutation.json. Name units: task mutate:record -- internal/protocol'
+    cmds:
+      - go run ./scripts/mutate record {{.CLI_ARGS}}
+
+  mutate:check:
+    desc: 'Fail on a surviving mutant the baseline (testdata/mutation.json) does not have. No package named runs every unit; internal/broker is four units, split by file group. task mutate:list shows them'
+    cmds:
+      - go run ./scripts/mutate check {{.CLI_ARGS}}
+
+  mutate:list:
+    desc: 'The mutation units (a package, or a file group of one that is too slow to run whole)'
+    cmds:
+      - go run ./scripts/mutate list
+
+  claims:
+    desc: 'Print the number of claims per evidence source (spec, recorded, doc, memory) and check every claims table under conformance/claims/'
+    cmds:
+      - go test ./conformance -run TestClaimsCountPerSource -v -count=1
+
+  api:
+    desc: 'The exported surface of server/ (the embedding API) against testdata/api/server.txt; a change needs a CHANGELOG.md line containing "server API"'
+    cmds:
+      - scripts/api.sh
+
+  api:record:
+    desc: 'Write the exported surface of server/ to testdata/api/server.txt (add the CHANGELOG.md line in the same commit)'
+    cmds:
+      - scripts/api.sh record
+
   fuzz:
-    desc: 'Fuzz the wire-protocol decoder: each target for FUZZ_TIME (default 30s)'
+    desc: 'Fuzz every parser of untrusted bytes (testdata/fuzz-targets.txt, listed in docs/architecture.md), each for FUZZ_TIME (default 30s). Name some to run only those: task fuzz -- Scram'
     vars:
       FUZZ_TIME: '{{.FUZZ_TIME | default "30s"}}'
     cmds:
       # One target per run: go test refuses -fuzz when it matches more than one.
-      - go test ./internal/protocol/ -run '^$' -fuzz '^FuzzParseAndDecodeRequest$' -fuzztime {{.FUZZ_TIME}}
-      - go test ./internal/protocol/ -run '^$' -fuzz '^FuzzSkipTaggedFields$' -fuzztime {{.FUZZ_TIME}}
-      - go test ./internal/protocol/ -run '^$' -fuzz '^FuzzReadFrame$' -fuzztime {{.FUZZ_TIME}}
-      - go test ./internal/storage/log/ -run '^$' -fuzz '^FuzzDecodeRecords$' -fuzztime {{.FUZZ_TIME}}
-      - go test ./schemaregistry/ -run '^$' -fuzz '^FuzzRegisterAndCompare$' -fuzztime {{.FUZZ_TIME}}
-      - go test ./schemaregistry/ -run '^$' -fuzz '^FuzzDecode$' -fuzztime {{.FUZZ_TIME}}
-      - go test ./internal/telemetry/ -run '^$' -fuzz '^FuzzDecode$' -fuzztime {{.FUZZ_TIME}}
+      - scripts/fuzz.sh {{.FUZZ_TIME}} {{.CLI_ARGS | default "."}}
 
   soak:
     desc: 'Leak-detection soak: sustained load, no faults (SOAK_DURATION, default 2m)'

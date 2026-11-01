@@ -2,7 +2,6 @@ package broker_test
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -22,8 +21,7 @@ import (
 // resume from them.
 func TestGroupAdmin_GroupsWithOffsetsSurviveARestart(t *testing.T) {
 	dir := t.TempDir()
-	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
-	stop := runBrokerAt(t, addr, dir, 4)
+	addr, stop := bootAt(t, "127.0.0.1:0", dir, 4)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -89,9 +87,17 @@ func TestGroupAdmin_ConsumerGroupStateIsReal(t *testing.T) {
 		t.Errorf("a lone member holding its whole target: state %q, want Stable", s)
 	}
 
+	// A second member a moment after the first targets: the group is Assigning until
+	// a heartbeat a second (the assignment interval) after them computes the new ones,
+	// and then Reconciling while partitions move (recorded: consumer-assignment-interval).
 	b.heartbeat(t, ctx, []string{"t"}, false)
+	if s := consumerGroupState(t, ctx, a); s != "Assigning" {
+		t.Errorf("a second member joined a moment after the first targets: state %q, want Assigning", s)
+	}
+	time.Sleep(1100 * time.Millisecond)
+	a.heartbeat(t, ctx, nil, false)
 	if s := consumerGroupState(t, ctx, a); s != "Reconciling" {
-		t.Errorf("a second member joined and partitions must move: state %q, want Reconciling", s)
+		t.Errorf("the new targets are computed and partitions must move: state %q, want Reconciling", s)
 	}
 	for range 8 {
 		a.heartbeat(t, ctx, nil, true)
@@ -262,8 +268,7 @@ func TestGroupAdmin_MembersCarryClientIDAndHost(t *testing.T) {
 // as the only way to be rid of it.
 func TestGroupAdmin_OffsetDeleteRemovesAnOffsetWhoseTopicIsGone(t *testing.T) {
 	dir := t.TempDir()
-	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
-	stop := runBrokerAt(t, addr, dir, 4)
+	addr, stop := bootAt(t, "127.0.0.1:0", dir, 4)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cl := newClient(t, addr)
@@ -341,5 +346,32 @@ func TestGroupAdmin_OffsetDeleteRemovesAnOffsetWhoseTopicIsGone(t *testing.T) {
 	}
 	if off := fetchCommitted(t, ctx, cl, "g", "kept"); off != 3 {
 		t.Errorf("another topic's offset was disturbed: %d", off)
+	}
+}
+
+// ConsumerGroupDescribe of a group that is a classic group is GROUP_ID_NOT_FOUND, and
+// the message says why (Kafka's own words, recorded: mixed-protocol-rolling and
+// offsets-retention-restart), so a tool tells "no such group" from "ask
+// DescribeGroups".
+func TestGroupAdmin_ConsumerGroupDescribeOfAClassicGroup(t *testing.T) {
+	addr := startBroker(t, 4)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cl := newClient(t, addr)
+	defer cl.Close()
+	stableGroupOfOne(t, ctx, cl, "classic-g", 30000, 30000)
+
+	req := kmsg.NewPtrConsumerGroupDescribeRequest()
+	req.Groups = []string{"classic-g", "nobody-at-all"}
+	resp, err := req.RequestWith(ctx, cl)
+	if err != nil || len(resp.Groups) != 2 {
+		t.Fatalf("ConsumerGroupDescribe: %v %+v", err, resp)
+	}
+	classic, none := resp.Groups[0], resp.Groups[1]
+	if classic.ErrorCode != kerr.GroupIDNotFound.Code || classic.ErrorMessage == nil || *classic.ErrorMessage != "Group classic-g is not a consumer group." {
+		t.Errorf("a classic group: code %d message %v", classic.ErrorCode, classic.ErrorMessage)
+	}
+	if none.ErrorCode != kerr.GroupIDNotFound.Code || none.ErrorMessage == nil || *none.ErrorMessage != "Group nobody-at-all not found." {
+		t.Errorf("a group that does not exist: code %d message %v", none.ErrorCode, none.ErrorMessage)
 	}
 }
