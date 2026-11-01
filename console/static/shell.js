@@ -1586,6 +1586,21 @@
         document.querySelectorAll("[data-new-s], [data-new-s2]").forEach(function (el) { el.textContent = s; });
       }).catch(function () { setDisconnected(true, "can't reach the broker", live); });
   }
+  // A paused topic page asks how many records have arrived since it paused (Tp-26):
+  // the broker's log ends now against the ones the page was showing.
+  function topicsCountMissed() {
+    var banner = document.getElementById("topic-paused");
+    if (!banner) return;
+    var base = banner.getAttribute("data-new-url"), ends = banner.getAttribute("data-ends");
+    if (!base || !ends) return;
+    fetch(base + "?ends=" + encodeURIComponent(ends), { headers: { Accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j) return;
+        document.querySelectorAll("[data-topic-new-n]").forEach(function (el) { el.textContent = String(j.n); });
+        document.querySelectorAll("[data-topic-new-s]").forEach(function (el) { el.textContent = j.n === 1 ? "" : "s"; });
+      }).catch(function () {});
+  }
   function setPaused(p) {
     var was = livePaused;
     livePaused = p;
@@ -1600,7 +1615,8 @@
         el.textContent = since && Number(since) > 0 ? clockText(Number(since)) : clockText(Date.now());
       });
       countMissed();
-      if (!pausedTimer) pausedTimer = setInterval(countMissed, 2500);
+      topicsCountMissed();
+      if (!pausedTimer) pausedTimer = setInterval(function () { countMissed(); topicsCountMissed(); }, 2500);
     } else if (!p && pausedTimer) {
       clearInterval(pausedTimer);
       pausedTimer = null;

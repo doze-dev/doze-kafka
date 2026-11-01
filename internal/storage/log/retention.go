@@ -147,10 +147,9 @@ func (m *Manager) EnforceClosedRetention() error {
 }
 
 // age is the time a sealed segment is judged old by: the largest timestamp of its
-// records, as Kafka judges it (LogSegment.largestTimestamp), or, when no record has
+// records, or, when no record has
 // one, the time it was last written. Records stamped long ago (a replay, a mirror,
 // a backfill) are old at the next sweep however new the file is.
-// claim: topics TOP-3
 func (s *Segment) age() time.Time {
 	if err := s.extendScan(); err == nil && s.ts.max >= 0 {
 		return time.UnixMilli(s.ts.max)

@@ -121,19 +121,20 @@ test('partitions are added after a warning, the tabs grow, and a bad number is e
 
   await page.getByRole('link', { name: /Partitions/ }).click();
   await page.locator('#topic-addparts summary').click();
+  const add = page.locator('#topic-addparts').getByRole('button', { name: /^Add (\d+ partitions?|partitions)$/ });
   await page.locator('#f-addparts').evaluate((el: HTMLInputElement) => { el.type = 'text'; }); // past the browser's own check.
   await page.locator('#f-addparts').fill('x');
-  await page.locator('#topic-addparts').getByRole('button', { name: 'Add partitions' }).click();
+  await add.click();
   await confirmDialog('accept');
-  await expect(page.locator('#topic-addparts [data-err-slot]')).toContainText('how many partitions to add');
+  await expect(page.locator('#topic-addparts [data-err-slot]')).toContainText('the number of partitions the topic should have in total');
   await expect(page.locator('#partitions-table a.r')).toHaveCount(2);
 
   await page.locator('#f-addparts').evaluate((el: HTMLInputElement) => { el.type = 'number'; });
-  await page.locator('#f-addparts').fill('2');
-  await page.locator('#topic-addparts').getByRole('button', { name: 'Add partitions' }).click();
+  await page.locator('#f-addparts').fill('4');
+  await expect(page.locator('#topic-addparts').getByRole('button', { name: 'Add 2 partitions' })).toBeVisible(); // the preview has caught up.
+  await add.click();
   await expect(page.locator('#confirm')).toContainText('cannot be removed'); // the cost is said before it is paid.
-  await expect(page.locator('#confirm')).toContainText('which has 2 partitions now, 4 after'); // and how many, as typed.
-  await expect(page.locator('#confirm-yes')).toHaveText('Add 2 partitions');
+  await expect(page.locator('#confirm')).toContainText('which has 2 partitions now'); // and how many it has.
   await confirmDialog('accept');
   await expect(page.locator('#flashbar')).toContainText('Topic now has 4 partitions');
   await expect(page.locator('#topic-facts')).toContainText('4 partitions');

@@ -193,7 +193,7 @@
     </nav>
 
     <div id="resend-note" role="status"></div>
-    {{if eq .Tab "messages"}}{{template "tape_and_table" .}}
+    {{if eq .Tab "messages"}}{{template "topic_states" .}}{{template "tape_and_table" .}}
     {{else if eq .Tab "partitions"}}{{template "topic_partitions" .}}
     {{else if eq .Tab "readers"}}{{template "topic_readers" .}}
     {{else if eq .Tab "config"}}{{template "topic_config" .}}
@@ -312,11 +312,62 @@
     {{end}}
 {{end}}
 
+{{/* topic_states: the cards above the tape. Each exists only when its state does. */}}
+{{define "topic_states"}}
+{{with .Denied}}<div class="callout bad" id="topic-denied" role="status"><span class="b">Refused</span> <span class="m">{{.Error}}</span> <span class="note">{{when .When "clockms"}}</span>
+  <span class="note"><span class="m b">{{.Client}}</span> ({{.Principal}}, {{.Remote}}) sent <span class="m">{{.API}} v{{.Version}}</span>{{if .Parts}} for <span class="m">{{.Parts}}</span>{{end}} and the broker said no. Nothing was written. {{if gt .Count 1}}{{.Count}} such requests are among those the broker kept. {{end}}A refused produce adds nothing to the log.</span>
+  {{if .Rules}}<div class="col g4" id="topic-denied-rule"><span class="b">Which rule decided</span>
+    {{if .By}}<span class="note"><span class="m">{{.By.Permission}} {{.By.Principal}} {{.By.Operation}} {{.By.Resource}} {{.By.Name}} ({{.By.Pattern}})</span> decided this one.</span>
+    {{else}}<span class="note">No stored ACL matches: the broker's default decided{{if not .Allowed}}, and it refuses{{end}}.</span>{{end}}
+    <a class="m" href="{{.CheckURL}}">Check this in Access</a></div>
+  {{else}}<span class="note">The console could not read the ACLs, so it cannot say which rule decided.</span>{{end}}
+</div>{{end}}
+{{with .Cleaner}}<div class="card pad col g8" id="topic-cleaner"><div class="row sb ce"><span class="h2">Cleaner</span><span class="note">{{.Scope}}</span></div>
+  {{if .Seen}}
+  <div class="row g12 wrap">
+    <div class="col g4"><span class="cap">State</span><span class="m">{{if .Running}}running{{else}}idle{{end}}</span></div>
+    <div class="col g4"><span class="cap">Last cleaned</span><span class="m">{{if .Ran}}{{when .LastAt "clock"}} <span class="mut">({{when .LastAt "since"}} ago)</span>{{else}}not since the broker started{{end}}</span></div>
+    <div class="col g4"><span class="cap">Records removed</span><span class="m">{{if .Ran}}{{num .LastRemoved}} in the last pass, {{num .TotalRemoved}} since start{{else}}none since start{{end}}</span></div>
+    <div class="col g4"><span class="cap">Cleaned to</span><span class="m">{{.CleanedTo}}</span></div>
+  </div>
+  <span class="note">Counts begin again when the broker restarts; nothing is written to disk. The dirty ratio, the tombstones kept and the number of keys held are not something the broker reports, so they are not shown.</span>
+  {{else}}<span class="note">The console cannot see the cleaner here: the broker it reads is not in this process, and Kafka has no request that reports it.</span>{{end}}
+  <span class="note">The newest segment is the active one and is left alone, so its older duplicate keys stay until it rolls. See <a href="{{.ConfigURL}}">the compaction keys</a>. A compacted topic refuses a record with no key. Offsets jump where the cleaner removed the older record of a key: gaps are normal here, not lost data.</span>
+</div>{{end}}
+{{with .TxnHold}}<div class="callout warn" id="topic-txnhold"><span class="b">Last stable offset is {{num .Stable}} on p{{.Partition}}</span><span class="note">Records from <span class="m">{{num .Stable}}</span> to the end <span class="m">{{num .End}}</span> belong to an open transaction{{range .Txns}}, <span class="m b">{{if .TxnID}}{{.TxnID}}{{else}}producer {{.ProducerID}}{{end}}</span> (epoch {{.Epoch}}, from {{num .Start}}){{end}}, so a read_committed reader of p{{.Partition}} waits there. Dividers are commit and abort markers; they take an offset but are not records. <a href="{{.CommitURL}}">Committed only</a> shows what such a reader sees. The open transactions are listed on <a href="{{.Cluster}}">the Cluster page</a>; there is no page for a single transaction.</span></div>{{end}}
+{{with .Empty}}<div class="card pad col g8" id="topic-empty"><span class="h2">Nothing has been written to this topic yet</span>
+  <span class="note">The topic exists and works; it just holds no records. Start offset 0, end offset 0. This is not a filter and nothing was deleted. The tape fills in here the moment something is produced.</span>
+  <form class="col g8" id="first-record" hx-post="{{topicURL $.Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" hx-target="#topic-empty" hx-select="#tape-and-table" hx-swap="outerHTML">
+    <input type="hidden" name="partition_ctx" value="0"><input type="hidden" name="acks" value="1">
+    <div class="row g8 wrap ce">
+      <div class="field"><label for="fr-partition">Partition</label><select class="input mono" id="fr-partition" name="partition"><option value="auto">auto</option>{{range .Partitions}}<option value="{{.}}">{{.}}</option>{{end}}</select></div>
+      <div class="field grow"><label for="fr-key">Key</label><input class="input mono" id="fr-key" name="key" autocomplete="off"></div>
+      <div class="field grow"><label for="fr-value">Value</label><input class="input mono" id="fr-value" name="value" autocomplete="off"></div>
+      <button type="submit" class="btn pri">Send record</button>
+    </div>
+    <div class="err form-err" data-err-slot hidden role="alert"></div>
+  </form>
+  <span class="note">The first record lands at offset 0.</span>
+  <span class="cap">Or from a client</span>
+  {{if .SASL}}<span class="note"># client.properties holds the SASL login</span>{{end}}
+  <pre class="code">{{.Command}}</pre>
+</div>{{end}}
+{{with .LogMoved}}<div class="callout" id="log-moved"><span class="b">The log on p{{.Partition}} now starts at offset {{num .Start}}</span><span class="note">Offsets 0 to {{num .Gone}} are gone: retention, a purge or DeleteRecords moves the start. Asking for an older offset shows from {{num .Start}} and says so. The log ends at {{num .End}}. The console does not keep a history of config changes, so it cannot say which of them moved the start.</span>
+  {{if .Behind}}
+  <div class="tbl-wrap" id="behind-start"><table class="tbl"><thead><tr><th>Group</th><th class="num">Committed on p{{.Partition}}</th><th class="num">Log start</th><th class="num">Behind start by</th><th>Next fetch</th></tr></thead><tbody>
+    {{range .Behind}}<tr><td class="m b"><a href="{{.URL}}">{{.Group}}</a> <span class="mut">{{.State}}</span></td><td class="m num">{{num .Committed}}</td><td class="m num">{{num .Start}}</td><td class="m num warn">{{num .Behind}}</td><td class="m">a fetch at {{num .Committed}} is below the start: <span class="bad">OFFSET_OUT_OF_RANGE</span>; the consumer's auto.offset.reset decides, or it stops with an error</td></tr>{{end}}
+  </tbody></table></div>
+  <span class="note">Only groups with a commit below the new start are hit. Reset a group's offsets from its page.</span>
+  {{else}}<span class="note">No group has a commit below the start.</span>{{end}}
+</div>{{end}}
+{{end}}
+
 {{/* tape_and_table is the live-polled unit: the tick strip + message table
      together, so a new message appearing updates both from one partial. With
      .Search set it shows what a search found instead, and does not poll. */}}
 {{define "tape_and_table"}}
 <div class="tapetable" id="tape-and-table"{{if .OOB}} hx-swap-oob="outerHTML"{{end}} {{if not .Search}}data-msg-base="{{topicURL .Topic.Name}}/message?partition={{if .Merged}}all{{else}}{{.Partition}}{{end}}" {{if .AtTail}}data-live="{{topicURL .Topic.Name}}/tape?partition={{if .Merged}}all{{else}}{{.Partition}}{{end}}{{if .CommittedOnly}}&amp;committed=1{{end}}" data-hash="{{.Hash}}" data-live-ms="2500"{{end}}{{end}}>
+  {{if and .AtTail (not .Search)}}<div class="callout warn paused-only" role="status" id="topic-paused" data-new-url="{{topicURL .Topic.Name}}/new" data-ends="{{range $i, $b := .Bounds}}{{if $i}},{{end}}{{$b.Partition}}:{{$b.Latest}}{{end}}"><span><span class="b">Paused.</span> <span class="m" data-topic-new-n>0</span> new record<span data-topic-new-s>s</span> since <span class="m" data-paused-since></span>. The view stays where it was and the selected record stays selected; new records are counted here, not inserted under you.</span><button type="button" class="btn pri sm" data-live-toggle>Resume live</button></div>{{end}}
   {{if not .Search}}
   {{if .Merged}}
   <div class="tape-panel tp-tape">
@@ -400,7 +451,7 @@
         </tr>
         {{end}}
         {{else}}
-        <tr><td colspan="6" class="empty">{{if .Search}}{{if .Search.Query}}Nothing in the records that were read contains “{{.Search.Query}}”.{{else}}No records.{{end}}{{else if gt .Earliest 0}}{{t "messages.retention" .Earliest}}{{else}}{{t "messages.none"}}{{end}}</td></tr>
+        <tr><td colspan="6" class="empty">{{if .Search}}{{if .Search.Query}}<span id="search-empty">Nothing in the records that were read contains “{{.Search.Query}}”.{{if gt .Facts.Messages 0}} The topic is not empty, and nothing was deleted: only this search matched nothing.{{end}} Keys, values and headers are matched as text, ignoring case. {{.Search.Note}} <a class="btn sm jump-go" href="{{.Search.ClearURL}}">Clear search</a>{{if .Search.OlderURL}} <a class="btn sm jump-go" href="{{.Search.OlderURL}}">Search further back</a>{{end}}</span>{{else}}No records.{{end}}{{else if gt .Earliest 0}}{{t "messages.retention" .Earliest}}{{else}}{{t "messages.none"}}{{end}}</td></tr>
         {{end}}
       </tbody>
     </table>
@@ -420,29 +471,39 @@
 {{with .FactsLive}}{{template "facts_messages_oob" .}}{{template "facts_newest_oob" .}}{{end}}
 {{end}}
 
-{{/* Partitions (Tp-16): where each partition's log starts and ends, and how far a
-     read-committed consumer may read. Size, segments and the active segment are not
-     columns because the broker does not report them over the wire. */}}
+{{/* Partitions (Tp-16): where each partition's log starts and ends, who leads it,
+     how far a read-committed consumer may read, what it takes on disk, and the
+     transactions open on it. Disk columns need the data directory; without it they
+     say so instead of showing nothing. */}}
 {{define "topic_partitions"}}
 <div class="row sb ce wrap">
-  <span class="note">One broker, so every partition is led here and the high watermark is the end of the log.</span>
+  <span class="note">One broker, so every partition is led here and the high watermark is the end of the log. {{if .PartitionTotals.HasDisk}}Sizes are bytes on disk under <span class="m">{{.DataDir}}</span>.{{else}}Size, segments and the active segment are not shown: this console was not told where the broker keeps its data.{{end}}</span>
+  <a class="btn sm" href="{{topicURL .Topic.Name}}?tab=partitions&amp;add=1#topic-addparts">Add partitions</a>
 </div>
-<div class="card" id="partitions-table" style="--c: 56px 100px 100px 100px 120px minmax(0, 1fr)">
-  <div class="r h"><span>Part.</span><span class="ra">Start</span><span class="ra">End</span><span class="ra">Messages</span><span class="ra">Last stable</span><span>Newest write</span></div>
+<div class="card" id="partitions-table" style="--c: 44px 70px 80px 80px 80px 80px 90px 80px 70px minmax(0, 1fr) 150px">
+  <div class="r h"><span>Part.</span><span>Leader</span><span class="ra">Start</span><span class="ra">End</span><span class="ra">High mark</span><span class="ra">Messages</span><span class="ra">Last stable</span><span class="ra">Size</span><span class="ra">Segments</span><span>Active segment</span><span>Newest write</span></div>
   {{range .PartitionRows}}
   <a class="r" href="{{topicURL $.Topic.Name}}?partition={{.Partition}}" data-row>
     <span class="m b">p{{.Partition}}</span>
+    <span class="m">{{if .Leader}}{{.Leader}}{{else}}<span class="mut">—</span>{{end}}</span>
     <span class="m ra">{{num .Start}}</span>
+    <span class="m ra">{{num .End}}</span>
     <span class="m ra">{{num .End}}</span>
     <span class="m ra">{{num .Count}}</span>
     <span class="m ra {{if .Held}}warn{{end}}">{{num .Stable}}</span>
+    <span class="m ra">{{if .HasDisk}}{{.Size}}{{else}}<span class="mut">—</span>{{end}}</span>
+    <span class="m ra">{{if .HasDisk}}{{.Segments}}{{else}}<span class="mut">—</span>{{end}}</span>
+    <span class="m">{{if .Active}}{{.Active}} · {{.ActiveSize}}{{else}}<span class="mut">—</span>{{end}}</span>
     <span class="m">{{if .HasNewest}}{{when .Newest "clock"}} <span class="mut">· {{when .Newest "ago"}}</span>{{else}}<span class="mut">—</span>{{end}}</span>
   </a>
   {{end}}
-  <div class="r totalrow"><span class="b">All</span><span></span><span></span><span class="m ra">{{num .Facts.Messages}}</span><span></span><span></span></div>
+  <div class="r totalrow"><span class="b">All</span><span></span><span></span><span></span><span></span><span class="m ra">{{num .Facts.Messages}}</span><span></span><span class="m ra">{{if .PartitionTotals.HasDisk}}{{.PartitionTotals.Size}}{{end}}</span><span class="m ra">{{if .PartitionTotals.HasDisk}}{{.PartitionTotals.Segments}}{{end}}</span><span></span><span></span></div>
 </div>
 <div class="row g12 wrap callouts">
-  {{range .PartitionRows}}{{if .Held}}<div class="callout warn grow"><span class="b">Why p{{.Partition}}'s last stable offset is behind its end</span><span class="note">The last stable offset is the first offset of the oldest open transaction. A read-committed reader stops at <span class="m">{{num .Stable}}</span>; a read-uncommitted one reads to <span class="m">{{num .End}}</span>.</span></div>{{end}}{{end}}
+  {{range .PartitionRows}}{{if .Held}}<div class="callout warn grow" id="held-p{{.Partition}}"><span class="b">Why p{{.Partition}}'s last stable offset is behind its end</span><span class="note">The last stable offset is the first offset of the oldest open transaction. A read-committed reader stops at <span class="m">{{num .Stable}}</span>; a read-uncommitted one reads to <span class="m">{{num .End}}</span>.
+    {{range .Txns}}<br><span class="m b">{{if .TxnID}}{{.TxnID}}{{else}}producer {{.ProducerID}}{{end}}</span>, epoch {{.Epoch}}, has one open on p{{.Partition}} from <span class="m">{{num .Start}}</span>{{if not .Began.IsZero}}, begun {{when .Began "since"}} ago{{end}}.{{end}}
+    See <a href="{{topicURL $.Topic.Name}}?partition={{.Partition}}&amp;committed=1">the committed-only view</a>{{range .Txns}}{{if .TxnID}} and <a href="{{$.Prefix}}/cluster?view=transactions">the open transactions</a>{{end}}{{end}}.</span></div>{{end}}{{end}}
+  <div class="callout grow"><span class="b">Segments</span><span class="note">A partition starts a new segment at <span class="m">segment.bytes</span>{{if .SegmentBytes}} (<span class="m">{{.SegmentBytes}}</span> for this topic){{end}}. Retention drops whole closed segments, never the active one.</span></div>
   <div class="callout grow"><span class="b">Keys and partitions</span><span class="note">A keyed record goes to hash(key) mod {{.Topic.Partitions}} under the Java default partitioner. More partitions changes that. Adding them is below.</span></div>
 </div>
 {{template "topic_addparts" .}}
@@ -468,6 +529,7 @@
   </table>
 </div>
 <div class="note">Lag is the topic's end offset minus the group's committed offset, per partition. A group with no members and an old commit does not move until someone starts it. Open a group for its members and a reset.</div>
+{{range .Readers}}{{if and (eq .State "Empty") (gt .Total 0)}}<div class="note" id="idle-{{.Group}}"><a class="m b" href="{{.URL}}">{{.Group}}</a> has no members and an old commit, so its lag will not move until someone starts it. Open the group to reset its offsets.</div>{{end}}{{end}}
 {{else}}
 <div class="callout"><span class="b">No group has committed an offset here</span><span class="note">A group appears when a consumer commits. Until then nothing reads this topic through a group.</span></div>
 {{end}}
@@ -531,16 +593,71 @@
     </div>
   </form>
 </div>
-<div class="card" id="topic-config-others" style="--c: minmax(0, 260px) minmax(0, 1fr) 100px">
-  <div class="r h"><span>Key</span><span>Value</span><span>Source</span></div>
-  <div class="r"><span class="m b">topic id</span><span>{{template "copychip" dict "Label" "" "Value" .Topic.ID}}</span><span class="m mut">broker</span></div>
-  {{range .Config.Others}}
-  <div class="r"><span class="m b">{{.Name}}</span><span class="m">{{.Value}}</span><span><span class="pill">{{if .Own}}override{{else}}default{{end}}</span></span></div>
+<div class="row sb ce wrap" id="topic-config-head">
+  <span class="note">What DescribeConfigs returns for this topic. Edit a row to send IncrementalAlterConfigs. The last column says whether the broker acts on the key: {{.CfgTable.Acting}} of the {{.CfgTable.All}} do; the rest are stored and returned and change nothing.</span>
+  <nav class="row g8" aria-label="Which keys">
+    <a class="tag {{if eq .CfgTable.Show ""}}on{{end}}" href="{{topicURL .Topic.Name}}?tab=config">all {{.CfgTable.All}}</a>
+    <a class="tag {{if eq .CfgTable.Show "overrides"}}on{{end}}" href="{{topicURL .Topic.Name}}?tab=config&amp;show=overrides">overrides {{.CfgTable.Overrides}}</a>
+    <a class="tag {{if eq .CfgTable.Show "compaction"}}on{{end}}" href="{{topicURL .Topic.Name}}?tab=config&amp;show=compaction">compaction {{.CfgTable.Compact}}</a>
+  </nav>
+</div>
+<div class="card" id="topic-config-others" style="--c: minmax(0, 250px) minmax(0, 1fr) 90px 60px minmax(0, 1.4fr)">
+  <div class="r h"><span>Key</span><span>Value</span><span>Source</span><span>Edit</span><span>Broker</span></div>
+  <div class="r"><span class="m b">topic id</span><span>{{template "copychip" dict "Label" "" "Value" .Topic.ID}}</span><span class="m mut">broker</span><span></span><span></span></div>
+  {{range .CfgTable.Rows}}
+  <div class="r{{if .Editing}} editing{{end}}" id="cfg-row-{{.Key}}">
+    <span class="m b">{{.Key}}</span>
+    <span class="m">{{.Value}}{{if .Human}} <span class="mut">({{.Human}})</span>{{end}}</span>
+    <span><span class="pill">{{if .Own}}override{{else}}default{{end}}</span></span>
+    <span>{{if .Editing}}<span class="note">editing</span>{{else}}<a class="btn sm" href="{{topicURL $.Topic.Name}}?tab=config&amp;edit={{.Key}}{{if $.CfgTable.Show}}&amp;show={{$.CfgTable.Show}}{{end}}#cfg-edit" aria-label="Edit {{.Key}}">Edit</a>{{end}}</span>
+    <span class="note"><span class="b {{if .Acts}}ok{{else}}mut{{end}}">{{if .Acts}}acts{{else}}kept{{end}}</span>, {{.Why}}</span>
+  </div>
+  {{if .Editing}}{{template "cfg_edit" $}}{{end}}
   {{end}}
 </div>
-<div class="note">Source: <span class="b">default</span> is the broker's value, <span class="b">override</span> is set on this topic and survives a restart. Other Kafka topic settings are stored and reported, and change nothing here.{{if .Config.Compact}} A record with no key is refused on a compacted topic; the offsets of dropped records stay as gaps.{{end}}</div>
+<div class="note">Source: <span class="b">default</span> is the broker's value, <span class="b">override</span> is set on this topic and survives a restart. Other Kafka topic settings are stored and reported, and change nothing here. The broker lists the same keys Kafka does; its defaults for <span class="m">retention.ms</span>, <span class="m">segment.bytes</span> and <span class="m">min.cleanable.dirty.ratio</span> differ on purpose (see the limitations page).{{if .Config.Compact}} A record with no key is refused on a compacted topic; the offsets of dropped records stay as gaps.{{end}}</div>
+<form class="cfgform card pad" id="cfg-free" hx-post="{{topicURL .Topic.Name}}/config/-" hx-disabled-elt="find button[type=submit]">
+  <div class="row ce g8 wrap">
+    <div class="field"><label for="cfg-free-key">Set another key</label><input class="input mono" id="cfg-free-key" name="key" placeholder="retention.ms" autocomplete="off" spellcheck="false" required></div>
+    <div class="field"><label for="cfg-free-value">Value</label><input class="input mono" id="cfg-free-value" name="value" autocomplete="off" spellcheck="false" required></div>
+    <button type="submit" class="btn">Save override</button>
+  </div>
+  <div class="err form-err" data-err-slot hidden role="alert"></div>
+</form>
 </div>
 {{end}}
+
+{{/* cfg_edit (Tp-19): the row being edited, under it: the value, what it was, what it becomes, and what that changes. */}}
+{{define "cfg_edit"}}{{with .CfgTable}}
+<form class="cfgform pad" id="cfg-edit" hx-post="{{topicURL $.Topic.Name}}/config/{{.EditRow.Key}}" hx-disabled-elt="find button[type=submit]">
+  <div class="row ce g8 wrap">
+    <label class="b m" for="cfg-edit-value">{{.EditRow.Key}} =</label>
+    <input class="input mono" id="cfg-edit-value" name="value" value="{{.EditRow.Value}}" autocomplete="off" spellcheck="false" autofocus hx-get="{{topicURL $.Topic.Name}}/config/{{.EditRow.Key}}" hx-trigger="input changed delay:250ms" hx-disabled-elt="unset" hx-confirm="unset" hx-target="#cfg-preview" hx-select="#cfg-preview" hx-swap="outerHTML">
+    {{if eq (settingUnit .EditRow.Key) "ms"}}<span class="note">Type milliseconds or use <span class="m">ms</span> <span class="m">s</span> <span class="m">m</span> <span class="m">h</span> <span class="m">d</span>, as <span class="m">1d</span>.</span>{{end}}
+    {{if eq (settingUnit .EditRow.Key) "bytes"}}<span class="note">Type bytes or use <span class="m">KB</span> <span class="m">MB</span> <span class="m">GB</span>, as <span class="m">64MB</span>.</span>{{end}}
+  </div>
+  {{template "cfg_preview" (dict "P" .Before "Topic" $.Topic)}}
+  <div class="err form-err" data-err-slot hidden role="alert"></div>
+  <div class="cfgfoot">
+    {{if .EditRow.Own}}<button type="submit" name="reset" value="1" class="btn" formnovalidate>Reset to default</button>{{end}}
+    <a class="btn" href="{{topicURL $.Topic.Name}}?tab=config">Cancel</a>
+    <button type="submit" class="btn pri">Save override</button>
+  </div>
+</form>
+{{end}}{{end}}
+
+{{define "cfg_preview"}}{{with .P}}
+<div id="cfg-preview" class="col g8">
+  {{if .Error}}<div class="note bad" role="status">{{.Error}}</div>{{else}}
+  <div class="row g12 wrap">
+    <div class="col g4"><span class="cap">Before</span><span class="m">{{.Before}}{{if .BeforeHuman}} <span class="mut">({{.BeforeHuman}})</span>{{end}}</span><span class="note">source: {{.BeforeSource}}</span></div>
+    <div class="col g4"><span class="cap">After</span><span class="m">{{.After}}{{if .AfterHuman}} <span class="mut">({{.AfterHuman}})</span>{{end}}</span><span class="note">source: override on this topic</span></div>
+  </div>
+  {{if .Affects}}<div class="callout"><span class="b">What it affects</span><span class="note">{{.Affects}}</span></div>{{end}}
+  {{if .Call}}<span class="note" id="cfg-call">{{.Call}}</span>{{end}}
+  {{end}}
+</div>
+{{end}}{{end}}
 
 {{define "topic_schema"}}
 <div class="card" id="topic-schemas" style="--c: minmax(0, 1fr) 100px 80px">
@@ -552,25 +669,38 @@
 <div class="note">A topic's key and value schemas are the subjects named <span class="m">&lt;topic&gt;-key</span> and <span class="m">&lt;topic&gt;-value</span>. Open one for its versions, what changed and its compatibility level.</div>
 {{end}}
 
-{{/* topic_addparts: growing a topic. Partitions only ever increase, and a record's
-     partition is its key's hash modulo the count, so the warning is the point. */}}
-{{define "topic_addparts"}}
+{{/* topic_addparts (Tp-17): growing a topic. The form asks the new TOTAL (TOP-30), shows
+     what that makes of the partitions, and says what it changes. Partitions only
+     ever increase, and a record's partition is its key's hash modulo the count, so
+     the warning is the point. A total at or below the present one is sent as asked:
+     the broker's refusal is shown in its own words. */}}
+{{define "topic_addparts"}}{{with .AddParts}}
 <details class="cfg" id="topic-addparts" {{if .Open}}open{{end}}>
   <summary>
     {{icon "plus"}}
-    <span class="cfgsum"><b>Partitions</b> · <span class="mono"><b>{{.Topic.Partitions}}</b></span> · add more</span>
+    <span class="cfgsum"><b>Partitions</b> · <span class="mono"><b>{{.Now}}</b></span> · add more</span>
     <span class="twist">{{icon "chevron"}}</span>
   </summary>
-  <form class="cfgform" hx-post="{{topicURL .Topic.Name}}/partitions" hx-disabled-elt="find button[type=submit]" data-confirm-url="{{confirmURL "topic.partitions" "name" .Topic.Name}}" data-confirm-title="{{(index .Confirm "topic.partitions").Title}}" data-confirm-verb="{{(index .Confirm "topic.partitions").Verb}}" hx-confirm="{{(index .Confirm "topic.partitions").Text}}">
-    <div class="field narrow"><label for="f-addparts">Add</label><input class="input mono" id="f-addparts" name="add" type="number" min="1" value="1" required aria-describedby="f-addparts-teach"><p class="teach" id="f-addparts-teach">{{teach "broker" "max-partitions"}}</p></div>
-    <div class="err form-err" data-err-slot hidden role="alert"></div>
+  <form class="cfgform" hx-post="{{topicURL $.Topic.Name}}/partitions" hx-disabled-elt="find button[type=submit]" data-confirm-url="{{confirmURL "topic.partitions" "name" $.Topic.Name}}" data-confirm-title="{{(index $.Confirm "topic.partitions").Title}}" data-confirm-verb="{{(index $.Confirm "topic.partitions").Verb}}" hx-confirm="{{(index $.Confirm "topic.partitions").Text}}">
+    <div class="field narrow"><label for="f-addparts">Total partitions</label><input class="input mono" id="f-addparts" name="total" type="number" min="1" value="{{.Total}}" required aria-describedby="f-addparts-teach" hx-get="{{topicURL $.Topic.Name}}?tab=partitions&amp;add=1" hx-trigger="input changed delay:250ms" hx-disabled-elt="unset" hx-confirm="unset" hx-target="#addparts-preview" hx-select="#addparts-preview" hx-swap="outerHTML"><p class="teach" id="f-addparts-teach">{{teach "broker" "max-partitions"}}</p></div>
+    <div id="addparts-preview" class="col g8">
+      {{if gt .Total .Now}}<span class="note">now {{.Now}}, so {{range $i, $p := .More}}{{if $i}}{{if eq (add $i 1) (len $.AddParts.More)}} and {{else}}, {{end}}{{end}}<span class="m">p{{$p}}</span>{{end}} {{if gt (len .More) 1}}are{{else}}is{{end}} created empty</span>
+      <div class="row ce g4 wrap">{{range .Fewer}}<span class="tag">p{{.}}</span>{{end}}<span class="mut">→</span>{{range .Fewer}}<span class="tag">p{{.}}</span>{{end}}{{range .More}}<span class="tag on">p{{.}}</span>{{end}}</div>
+      <span class="note">Partitions can only be added, never removed or merged. Existing records stay where they are.</span>
+      <div class="callout warn"><span class="b">Keyed ordering changes</span><span class="note">A key hashes to a partition by hash mod the partition count. With <span class="m">{{.Total}}</span>, a key can land on a different partition than before, so new records for it are no longer after its old ones on the same partition. Order per key holds only within one partition.</span></div>
+      {{else}}<div class="callout"><span class="b">{{if eq .Total .Now}}The same number{{else}}Fewer partitions{{end}}</span><span class="note">This topic has {{.Now}} partitions and {{.Total}} is {{if eq .Total .Now}}what it has{{else}}fewer{{end}}. Send it and the broker answers; partitions cannot be removed.</span></div>{{end}}
+      <div class="callout"><span class="b">Who picks them up</span><span class="note">A consumer or producer learns of new partitions when it next refreshes the topic's metadata; a group then divides them among its members.
+        {{if .Readers}}Groups reading this topic: {{range $i, $g := .Readers}}{{if $i}}, {{end}}<a class="m" href="{{$g.URL}}">{{$g.Group}}</a> ({{$g.Protocol}}, {{$g.State}}){{end}}.{{else}}No group has committed an offset here.{{end}}</span></div>
     <div class="cfgfoot">
-      <span class="note">Now {{.Topic.Partitions}}. Consumers pick the new partitions up on their own; records already written stay where they are.</span>
-      <button type="submit" class="btn pri">Add partitions</button>
+      <span class="note">Now {{.Now}}.</span>
+      <a class="btn" href="{{topicURL $.Topic.Name}}?tab=partitions">Cancel</a>
+      <button type="submit" class="btn pri">{{if gt .Total .Now}}Add {{sub .Total .Now}} partition{{if gt (sub .Total .Now) 1}}s{{end}}{{else}}Add partitions{{end}}</button>
     </div>
-  </form>
+      </div>
+    <div class="err form-err" data-err-slot hidden role="alert"></div>
+</form>
 </details>
-{{end}}
+{{end}}{{end}}
 
 {{/* inspector_message is the body of the inspector for a record (Sy-02): its key,
      schema and trace as a list, its value as code, its headers, and what can be done

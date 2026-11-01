@@ -165,7 +165,7 @@ func TestPartitionsConfirmSentence(t *testing.T) {
 		t.Errorf("%q / %q", s.Verb, segsText(s.Body))
 	}
 	s = spec.Say(confirmFacts{Name: "t", Partitions: 4})
-	if s.Verb != "Add partitions" || !strings.HasPrefix(segsText(s.Body), `Add the number of partitions entered to "t", which has 4 partitions now?`) {
+	if s.Verb != "Add partitions" || !strings.HasPrefix(segsText(s.Body), `Grow "t", which has 4 partitions now, to the total entered?`) {
 		t.Errorf("%q / %q", s.Verb, segsText(s.Body))
 	}
 }

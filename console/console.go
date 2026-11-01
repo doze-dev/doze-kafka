@@ -14,6 +14,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"github.com/doze-dev/doze-kafka/internal/settings"
 	"html/template"
 	"io"
 	"log/slog"
@@ -468,6 +469,10 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 			return url.QueryEscape(joinKey(group, strconv.FormatUint(seq, 10)))
 		},
 		"txnKey": func(id string) string { return url.QueryEscape(id) },
+		"settingUnit": func(key string) string {
+			s, _ := settings.Lookup(settings.Topic, key)
+			return s.Unit
+		},
 		"dict": func(kv ...any) map[string]any {
 			m := make(map[string]any, len(kv)/2)
 			for i := 0; i+1 < len(kv); i += 2 {

@@ -73,7 +73,7 @@ var formFields = map[string]formField{
 	// Settings: each has a record, and the template shows its teaching line.
 	"partitions":  {Kind: settings.Broker, Name: "max-partitions"},
 	"replication": {Kind: settings.Broker, Name: "replication-factor"},
-	"add":         {Kind: settings.Broker, Name: "max-partitions"},
+	"total":       {Kind: settings.Broker, Name: "max-partitions"},
 	"level":       {Kind: settings.Registry, Family: true},
 	"offset":      {Kind: settings.Group, Name: "new-offset"},
 

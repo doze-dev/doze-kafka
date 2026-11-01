@@ -1669,3 +1669,6 @@ progress.gr-used{height:8px;border:0;border-radius:2px;background:var(--line2);a
 progress.gr-used::-webkit-progress-bar{background:var(--line2);border-radius:2px}
 progress.gr-used::-webkit-progress-value{background:var(--ink);border-radius:2px}
 progress.gr-used::-moz-progress-bar{background:var(--ink);border-radius:2px}
+
+/* Topics, slice 4: the Config tab's row being edited (Tp-19). */
+.card .r.editing { background: var(--sel, rgba(120, 140, 255, .08)); }

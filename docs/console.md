@@ -113,6 +113,35 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   same trace in every topic, in order, with the groups that have read each. See
   [Observability](observability.md).
 
+### Partitions, config and the other tab states (Tp-16 to Tp-30)
+
+- **Partitions** lists, for each partition, its leader (from Metadata), start, end, high mark,
+  messages, last stable offset, size on disk, segments, the active segment and the newest
+  write. Size, segments and the active segment are read from the data directory the console was
+  told; without it the columns say so. A transaction holding the last stable offset back is named
+  (DescribeProducers for the producer and where its transaction began, the transaction
+  coordinator for its transactional id) with a link to the committed-only view and to the
+  Cluster page's open transactions; there is no page for a single transaction.
+- **Add partitions** asks for the new total, as `CreatePartitions` does. It previews the new
+  partitions, warns that a key may hash elsewhere, lists the groups reading the topic, and sends a
+  total at or below the present one as it is: the broker's `INVALID_PARTITIONS` is shown in its own words.
+- **Config** lists every key the broker reports (33, the same as Kafka's) with its value, source and
+  whether the broker acts on it, read from the settings table. Edit one row at a time: Before, After
+  and what it affects (for retention, how the sweep judges a segment) appear as you type, and the
+  request is shown (`IncrementalAlterConfigs SET`). A refusal is the broker's, with the valid range
+  from the table or, for a name the broker does not know, the nearest names.
+- **Cleaner** (a compacted topic) shows the state, when it last cleaned, records removed in the last
+  pass and since the partition was opened, and how far each partition has been cleaned. It needs the
+  broker in the same process; the totals start again at a restart. The dirty ratio, tombstones kept and keys
+  held are not reported by the broker and are not shown.
+- **Readers** lists the groups with a committed offset on the topic with their lag per partition and
+  links to them; **Who is writing** is the traffic recorder's. A client the broker refused on the
+  topic is named above the tape with the rule that decided it, by the Access checker's reading of the
+  stored ACLs. A topic with nothing in it offers its first record and the console-producer command; a
+  log whose start has moved names the groups committed below it; a paused tape counts the records that
+  arrive; a topic that is not there offers its nearest names, a way to create it and the clients refused
+  for asking for it. The console keeps no history of config changes, so it never says what moved a log start.
+
 ## Consumer groups
 
 - State (Stable, Rebalancing, Empty…), protocol (classic or KIP-848) and members.

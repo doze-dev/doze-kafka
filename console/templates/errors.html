@@ -17,9 +17,21 @@
     <section class="card pad col g8" aria-label="Did you mean">
       <h2 class="h2">Did you mean</h2>
       <div class="didyoumean col g8">
-        {{range .Suggestions}}<a class="well row ce g8 sb suggestion" href="{{.URL}}"><span class="m b">{{.Name}}</span></a>{{end}}
+        {{range .Suggestions}}<a class="well row ce g8 sb suggestion" href="{{.URL}}"><span class="m b">{{.Name}}</span>{{if .Detail}}<span class="note">{{.Detail}}</span>{{end}}</a>{{end}}
       </div>
     </section>
+    {{end}}
+    {{if .TopicName}}
+    <p class="note" id="nf-count">The broker has {{.TopicCount}} topic{{if ne .TopicCount 1}}s{{end}} and none has this name. A link that was valid earlier may point at a topic that has since been deleted.</p>
+    <section class="card pad col g8" id="nf-create" aria-label="Create it instead">
+      <h2 class="h2">Create it instead</h2>
+      <a class="btn pri" href="{{.CreateURL}}">Create topic {{.TopicName}}</a>
+    </section>
+    {{if .Why}}<section class="card pad col g8" id="nf-why" aria-label="Why it happened">
+      <h2 class="h2">Why it happened</h2>
+      {{range .Why}}<p class="note"><a class="m b" href="{{$.Prefix}}/traffic?q={{.Client}}">{{.Client}}</a> sent <span class="m">{{.API}}</span> for this name at <span class="m">{{when .When "clock"}}</span> and was refused with <span class="m">UNKNOWN_TOPIC_OR_PARTITION</span>.</p>{{end}}
+      <span class="note">Taken from the requests the broker kept in memory; the topic did not exist, and what the client asked for decides whether it is created.</span>
+    </section>{{end}}
     {{end}}
     <div class="err-acts row g8">
       {{if .Back}}<a class="btn" href="{{.Back}}">← Back to the list</a>{{end}}

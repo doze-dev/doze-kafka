@@ -90,7 +90,7 @@ func TestConfirmLiveSentences(t *testing.T) {
 	}
 	for _, add := range []string{"0", "-1", "x", ""} {
 		_, got = confirmOf(t, c, "topic.partitions?name=orders&add="+add)
-		if got["verb"] != "Add partitions" || !strings.Contains(got["text"].(string), "Add the number of partitions entered") {
+		if got["verb"] != "Add partitions" || !strings.Contains(got["text"].(string), `Grow "orders", which has 2 partitions now, to the total entered?`) {
 			t.Errorf("add=%q: %v", add, got)
 		}
 	}

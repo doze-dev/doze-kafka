@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // What a topic takes on disk. Kafka's way to ask is DescribeLogDirs, which this broker
@@ -23,6 +24,18 @@ type topicDisk struct {
 	// Bases are the base offsets of each partition's oldest segment (-1: none), by
 	// partition: where the bytes on disk begin.
 	Bases []int64
+	// Parts is each partition's own files, for the Partitions tab.
+	Parts []partDisk
+}
+
+// partDisk is one partition's directory: every file's bytes, how many segments, and
+// the newest segment (the active one) with its size and when it was last written.
+type partDisk struct {
+	Bytes       int64
+	Segments    int
+	Active      string // file name of the segment with the highest base offset, "" when none.
+	ActiveBytes int64
+	Written     time.Time // the active segment's modification time: when the broker last wrote to it.
 }
 
 // topicDisk reads a topic's partition directories. ok is false when the console was
@@ -32,7 +45,11 @@ func (c *Console) topicDisk(topic string, partitions int) (topicDisk, bool) {
 	if dir == "" || partitions <= 0 {
 		return topicDisk{}, false
 	}
-	d := topicDisk{Bases: make([]int64, partitions)}
+	topActive := make([]int64, partitions)
+	for i := range topActive {
+		topActive[i] = -1
+	}
+	d := topicDisk{Bases: make([]int64, partitions), Parts: make([]partDisk, partitions)}
 	for p := 0; p < partitions; p++ {
 		base := topic + "-" + strconv.Itoa(p)
 		if !filepath.IsLocal(base) || strings.ContainsAny(topic, `/\`) {
@@ -49,10 +66,17 @@ func (c *Console) topicDisk(topic string, partitions int) (topicDisk, bool) {
 				continue
 			}
 			d.Bytes += info.Size()
+			d.Parts[p].Bytes += info.Size()
 			if name, ok := strings.CutSuffix(e.Name(), ".log"); ok {
 				d.LogBytes += info.Size()
-				if off, err := strconv.ParseInt(name, 10, 64); err == nil && (d.Bases[p] < 0 || off < d.Bases[p]) {
+				d.Parts[p].Segments++
+				off, err := strconv.ParseInt(name, 10, 64)
+				if err == nil && (d.Bases[p] < 0 || off < d.Bases[p]) {
 					d.Bases[p] = off
+				}
+				if err == nil && off >= topActive[p] {
+					topActive[p] = off
+					d.Parts[p].Active, d.Parts[p].ActiveBytes, d.Parts[p].Written = e.Name(), info.Size(), info.ModTime()
 				}
 			}
 		}

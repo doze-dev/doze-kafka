@@ -242,7 +242,7 @@ var confirmTable = []confirmSpec{
 				say.Verb = "Add " + nounCount(f.Add, "partition", "partitions")
 				say.Body = []confirmSeg{txt(fmt.Sprintf("Add %s to %q, which has %s now, %d after? ", nounCount(f.Add, "partition", "partitions"), f.Name, nounCount(f.Partitions, "partition", "partitions"), f.Partitions+f.Add))}
 			} else {
-				say.Body = []confirmSeg{txt(fmt.Sprintf("Add the number of partitions entered to %q, which has %s now? ", f.Name, nounCount(f.Partitions, "partition", "partitions")))}
+				say.Body = []confirmSeg{txt(fmt.Sprintf("Grow %q, which has %s now, to the total entered? ", f.Name, nounCount(f.Partitions, "partition", "partitions")))}
 			}
 			say.Body = append(say.Body, txt("They cannot be removed afterwards, and a key may hash to a different partition than before, so records with the same key stop being ordered together across the change."))
 			return say

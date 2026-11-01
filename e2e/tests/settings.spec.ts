@@ -45,7 +45,8 @@ test('a topic that is not compacted says nothing about compaction, and the other
   await request.post('new/topic', { form: { name, partitions: '1' } });
   await page.goto(`topics/${name}?tab=config`);
   await expect(page.locator('#topic-facts')).toContainText('delete, not compacted');
-  await expect(page.locator('#topic-config-others')).toContainText('index.interval.bytes'); // cleanup.policy is a field of the form above, not one of the others.
+  await expect(page.locator('#topic-config-others')).toContainText('index.interval.bytes'); // every key the broker reports is listed (Tp-18), the form's own included.
   await expect(page.locator('#topic-config-others .pill').first()).toHaveText('default');
+  await expect(page.locator('#topic-config-others')).toContainText('cleanup.policy');
   await expect(page.locator('#topic-config')).toContainText('Other Kafka topic settings are stored and reported, and change nothing here.');
 });

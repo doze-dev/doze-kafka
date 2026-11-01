@@ -257,7 +257,6 @@ func stampedBatch(ts int64, payload []byte) []byte {
 // TOP-3: a segment is old by the largest timestamp of its records, not by when it
 // was written. Records stamped two days ago (a replay, a backfill) under a one-day
 // retention are deleted at the next sweep even though the files are minutes old.
-// claim: topics TOP-3
 func TestRetentionJudgesASegmentByItsRecordsTimestamps(t *testing.T) {
 	p, err := openPartition(t.TempDir(), ManagerOptions{SegmentBytes: 512, IndexIntervalBytes: 4096})
 	if err != nil {
@@ -282,7 +281,7 @@ func TestRetentionJudgesASegmentByItsRecordsTimestamps(t *testing.T) {
 }
 
 // The same data with fresh timestamps is kept, and a segment of records that carry
-// no timestamp (-1) is judged by when it was written, as Kafka does.
+// no timestamp (-1) is judged by when it was written.
 func TestRetentionKeepsFreshRecordsAndFallsBackWhenThereIsNoTimestamp(t *testing.T) {
 	p, err := openPartition(t.TempDir(), ManagerOptions{SegmentBytes: 512, IndexIntervalBytes: 4096})
 	if err != nil {

@@ -58,6 +58,7 @@ func Routes() []RouteInfo {
 
 const (
 	specTopics   = "topics.spec.ts"
+	specTopicsB  = "topics-boards2.spec.ts"
 	specMessages = "messages.spec.ts"
 	specCompose  = "compose.spec.ts"
 	specGroups   = "groups.spec.ts"
@@ -115,6 +116,9 @@ func (c *Console) routeTable() []routeRow {
 		post("/topics/{name}/purge", specTopics, "delete its records", c.topicPurge),
 		post("/topics/{name}/partitions", specTopics, "grow it; never shrinks", c.topicPartitions),
 		post("/topics/{name}/config", specTopics, "its own retention and segment size", c.topicConfig),
+		get("/topics/{name}/config/{key}", specTopicsB, "Tp-19's Before, After and What it affects, as a value is typed", c.topicConfigPreview),
+		post("/topics/{name}/config/{key}", specTopicsB, "set one key, or reset it to the broker's default; the broker's refusal is shown as it said it (Tp-20)", c.topicConfigKey),
+		get("/topics/{name}/new", specTopicsB, "how many records arrived since a paused view stopped (Tp-26)", c.topicNew),
 		get("/topics/{name}/tape", specMessages, "HTMX partial, polled", c.topicTape),
 		post("/topics/{name}/produce", specCompose, "send a record", c.topicProduce),
 		post("/topics/{name}/compose/preview", specCompose, "what a send would do, checked as it is typed; it is a POST for the size of a value, and writes nothing", c.topicComposePreview),

@@ -281,7 +281,23 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 		data["PartitionRange"] = partitionRange(detail.Partitions)
 		switch tab {
 		case "partitions":
-			data["PartitionRows"] = c.partitionRows(ctx, name, bounds)
+			rows, tot := c.partitionRows(ctx, name, bounds)
+			data["PartitionRows"], data["PartitionTotals"] = rows, tot
+			data["DataDir"] = c.facts.DataDir
+			data["SegmentBytes"] = configShown(detail.Config, "segment.bytes")
+			data["AddParts"] = c.addPartsView(r, detail.Partitions, c.topicReaders(ctx, name, bounds))
+		case "config":
+			q := r.URL.Query()
+			t := c.configTable(detail.Config, q.Get("show"), q.Get("edit"))
+			if t.EditRow != nil {
+				single := c.singleSegments(name, int(detail.Partitions))
+				typed := q.Get("value")
+				if typed == "" {
+					typed = t.EditRow.Value
+				}
+				t.Before = c.configPreview(detail.Config, t.EditRow.Key, typed, single, int(detail.Partitions))
+			}
+			data["CfgTable"] = t
 		case "readers":
 			data["Readers"] = c.topicReaders(ctx, name, bounds)
 			data["Writers"] = c.topicWriters(name)
@@ -302,7 +318,9 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 		data["Search"], data["PartitionRange"], data["Rows"] = found, partitionRange(detail.Partitions), found.Rows
 		if bounds, err := c.be.PartitionBounds(ctx, name, detail.Partitions); err == nil {
 			data["Facts"] = c.topicSummary(ctx, detail, bounds)
+			data["Bounds"] = bounds
 		}
+		c.messageStates(ctx, name, detail, partition, data)
 		c.composerSchemas(r, name, data)
 		c.render(w, r, "topic_detail", data)
 		return
@@ -330,6 +348,7 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 	if bounds, ok := tape["Bounds"].([]PartitionBound); ok {
 		data["Facts"] = c.topicSummary(ctx, detail, bounds)
 	}
+	c.messageStates(ctx, name, detail, partition, data)
 	c.composerSchemas(r, name, data)
 	if atNote != "" && tape["JumpNote"] == "" {
 		data["JumpNote"] = atNote
@@ -463,8 +482,9 @@ func (c *Console) topicTabLinks(name string, partition int32, tab string, hasSch
 	return out
 }
 
-// partitionRow is one partition on the Partitions tab: what the broker reports about
-// where its log starts and ends and how far a read-committed consumer may read.
+// partitionRow is one partition on the Partitions tab (Tp-16): where its log starts and
+// ends, who leads it, how far a read-committed consumer may read, what it takes on
+// disk, and the transactions open on it.
 type partitionRow struct {
 	Partition int32
 	Start     int64
@@ -474,19 +494,63 @@ type partitionRow struct {
 	Held      bool  // an open transaction holds it behind the end.
 	Newest    time.Time
 	HasNewest bool
+	Leader    string // "broker 1", or "" when Metadata did not say.
+	Txns      []openTxn
+	// The files, when the console was told the data directory.
+	HasDisk     bool
+	Size        string
+	Segments    int
+	Active      string
+	ActiveSize  string
+	SizeBytes   int64
+	Written     time.Time
+	WrittenKnow bool
 }
 
-func (c *Console) partitionRows(ctx context.Context, topic string, bounds []PartitionBound) []partitionRow {
+// partitionTotals is the All row.
+type partitionTotals struct {
+	HasDisk  bool
+	Size     string
+	Segments int
+}
+
+func (c *Console) partitionRows(ctx context.Context, topic string, bounds []PartitionBound) ([]partitionRow, partitionTotals) {
 	rows := make([]partitionRow, len(bounds))
+	leads, _ := c.be.PartitionLeads(ctx, topic)
+	txns, _ := c.be.TopicOpenTxns(ctx, topic, int32(len(bounds)))
+	disk, hasDisk := c.topicDisk(topic, len(bounds))
+	var tot partitionTotals
+	tot.HasDisk = hasDisk
+	var total int64
 	for i, b := range bounds {
 		r := partitionRow{Partition: b.Partition, Start: b.Earliest, End: b.Latest, Count: b.Count(), Stable: b.Latest, Newest: b.Newest, HasNewest: !b.Newest.IsZero()}
 		if st, err := c.be.StableOffset(ctx, topic, b.Partition); err == nil && st >= 0 && st < b.Latest {
 			r.Stable, r.Held = st, true
 		}
+		if l, ok := leads[b.Partition]; ok && l.Leader >= 0 {
+			r.Leader = "broker " + itoa32(l.Leader)
+		}
+		for _, t := range txns {
+			if t.Partition == b.Partition {
+				r.Txns = append(r.Txns, t)
+			}
+		}
+		if hasDisk && int(b.Partition) < len(disk.Parts) {
+			d := disk.Parts[b.Partition]
+			r.HasDisk, r.Size, r.SizeBytes, r.Segments = true, diskSize(d.Bytes), d.Bytes, d.Segments
+			if d.Active != "" {
+				r.Active, r.ActiveSize, r.Written, r.WrittenKnow = d.Active, diskSize(d.ActiveBytes), d.Written, true
+			}
+			total += d.Bytes
+			tot.Segments += d.Segments
+		}
 		rows[i] = r
 	}
-	return rows
+	tot.Size = diskSize(total)
+	return rows, tot
 }
+
+func itoa32(n int32) string { return strconv.Itoa(int(n)) }
 
 // readerRow is a group reading a topic, with its lag on each partition.
 type readerRow struct {

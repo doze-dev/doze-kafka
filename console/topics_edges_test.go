@@ -138,7 +138,18 @@ func TestPartitionRowsShowTheStableOffset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rows := c.partitionRows(ctx, "pr", bounds)
+	rows, tot := c.partitionRows(ctx, "pr", bounds)
+	if !tot.HasDisk || tot.Segments != 3 {
+		t.Errorf("totals %+v: the data directory is known and each partition has one segment", tot)
+	}
+	if len(rows[1].Txns) != 1 || rows[1].Txns[0].Start != 0 || rows[1].Txns[0].TxnID == "" || len(rows[0].Txns) != 0 {
+		t.Errorf("the open transaction on partition 1, from DescribeProducers: %+v", rows[1].Txns)
+	}
+	for _, r := range rows {
+		if r.Leader == "" || !r.HasDisk || r.Segments != 1 || !strings.HasSuffix(r.Active, ".log") {
+			t.Errorf("partition %d: leader %q, disk %v, segments %d, active %q", r.Partition, r.Leader, r.HasDisk, r.Segments, r.Active)
+		}
+	}
 	if len(rows) != 3 {
 		t.Fatalf("%d rows", len(rows))
 	}
