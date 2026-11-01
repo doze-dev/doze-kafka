@@ -18,6 +18,8 @@ here is byte-identical in both (the hashes are in `SHA256SUMS`).
   Message: an entry with `per` is checked against them) or names (Tp-14 Go to
   offset). Tp-05, Tp-06 and Tp-14 were read at 1792149264-d921 only. The Traffic boards (Main,
   Traf-02 to Traf-12) were copied from the same artifact's `project/` folder, unmodified;
+
+Topic-page boards Tp-07 to Tp-13 (message, compose, partitions, config and the empty states) were read at 1792149264-d921 only, copied unchanged.
   the artifact version they were read at was not recorded.
 
 A board is a static page: it links `./support.js` (the design runtime, which these

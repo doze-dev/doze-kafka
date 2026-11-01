@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Produce with schema</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./con.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.app{--bg:#f3f3f0;--card:#ffffff;--ink:#17191c;--mut:#565b63;--line:#d9d8d2;--line2:#e9e8e3;--sel:#e9e8e2;--well:#f7f7f4;
+--ok:#166b3f;--warn:#855000;--bad:#b3251b;--deny:#673c9c;--okbg:#e3f1e8;--warnbg:#f6ecd6;--badbg:#f8e3e0;--denybg:#ece4f6;
+box-sizing:border-box;width:1440px;height:900px;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);
+font:400 13px/20px 'IBM Plex Sans',system-ui,sans-serif;overflow:hidden;font-feature-settings:'tnum' 1}
+.app.dark{--bg:#111315;--card:#191c1f;--ink:#e9eaeb;--mut:#a3a9b0;--line:#2d3136;--line2:#23272b;--sel:#262a2f;--well:#15181a;
+--ok:#5fca8f;--warn:#e0b060;--bad:#ff8a7e;--deny:#c3a3f2;--okbg:#17301f;--warnbg:#33290f;--badbg:#3a1a17;--denybg:#2a2040}
+.app *{box-sizing:border-box}
+.app button,.app input,.app select,.app textarea{font:inherit;color:inherit;margin:0}
+.app h1,.app h2,.app h3,.app p{margin:0}
+.m{font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace;font-size:12px}
+.mut{color:var(--mut)}.b{font-weight:600}.i{font-style:italic}.ra{text-align:right}.nw{white-space:nowrap}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.deny{color:var(--deny)}
+.row{display:flex;gap:12px}.col{display:flex;flex-direction:column}.ce{align-items:center}.sb{justify-content:space-between}
+.grow{flex:1;min-width:0;min-height:0}.g4{gap:4px}.g6{gap:6px}.g8{gap:8px}.g16{gap:16px}.g20{gap:20px}.wrap{flex-wrap:wrap}
+.el{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top{flex:none;height:44px;display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--card);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:600;width:182px}
+.logo{width:18px;height:18px;border-radius:4px;background:var(--ink);color:var(--card);display:flex;align-items:center;justify-content:center;font:700 11px/1 'IBM Plex Mono',monospace}
+.jump{flex:none;width:420px;height:28px;display:flex;align-items:center;gap:8px;padding:0 8px 0 10px;border:1px solid var(--line);border-radius:4px;background:var(--well);color:var(--mut)}
+.body{flex:1;min-height:0;display:flex}
+.rail{flex:none;width:196px;background:var(--card);border-right:1px solid var(--line);padding:10px 8px;display:flex;flex-direction:column;gap:1px;overflow:hidden}
+.nav{display:flex;align-items:center;gap:9px;height:28px;padding:0 8px;border-radius:4px;color:var(--ink);text-decoration:none}
+.nav.on{background:var(--sel);font-weight:600}
+.nav .n{margin-left:auto;color:var(--mut);font:400 11px/1 'IBM Plex Mono',monospace}
+.cap{font:600 10px/16px 'IBM Plex Sans',sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--mut)}
+.rail .cap{padding:10px 8px 3px}
+.sv{flex:none;width:18px;height:18px;border-radius:4px;background:var(--c,#6b7688);color:#fff;display:inline-flex;align-items:center;justify-content:center;font:700 9px/1 'IBM Plex Mono',monospace;letter-spacing:-.02em}
+.sv.sm{width:14px;height:14px;border-radius:3px;font-size:8px}
+.dot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}.dot.off{background:var(--line)}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;padding:16px 20px 0;gap:12px;overflow:hidden}
+.insp{flex:none;width:400px;background:var(--card);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
+.insp .hd{padding:12px 16px 10px;border-bottom:1px solid var(--line2);display:flex;flex-direction:column;gap:4px}
+.insp .bd{padding:12px 16px;display:flex;flex-direction:column;gap:12px;flex:1;min-height:0;overflow:hidden}
+.list{flex:none;width:248px;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
+.list .li{display:flex;align-items:center;gap:8px;height:30px;padding:0 12px;border-bottom:1px solid var(--line2)}
+.list .li.on{background:var(--sel);font-weight:600}
+.dock{flex:none;background:var(--card);border-top:1px solid var(--line);display:flex;flex-direction:column}
+.dock .dh{height:30px;display:flex;align-items:center;gap:12px;padding:0 14px;border-bottom:1px solid var(--line2)}
+.keys{flex:none;height:28px;display:flex;align-items:center;gap:18px;padding:0 14px;background:var(--card);border-top:1px solid var(--line);color:var(--mut);font-size:12px;white-space:nowrap}
+.k{display:inline-block;min-width:18px;padding:0 5px;margin-right:6px;border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;background:var(--well);color:var(--ink);font:500 11px/16px 'IBM Plex Mono',monospace;text-align:center}
+.r{display:grid;grid-template-columns:var(--c);column-gap:14px;align-items:center;min-height:28px;padding:0 12px;border-bottom:1px solid var(--line2)}
+.r>*{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.r.h{min-height:26px;background:var(--well);color:var(--mut);font:600 10px/16px 'IBM Plex Sans',sans-serif;letter-spacing:.09em;text-transform:uppercase;border-bottom:1px solid var(--line)}
+.r.on{background:var(--sel)}
+.r.kid{color:var(--mut)}
+.tree{color:var(--line);font-family:'IBM Plex Mono',monospace}
+.card{background:var(--card);border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.pad{padding:12px 14px}
+.well{background:var(--well);border:1px solid var(--line2);border-radius:4px}
+.pill{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;border-radius:3px;border:1px solid var(--line);background:var(--card);font-size:12px;white-space:nowrap}
+.pill.ok{background:var(--okbg);border-color:transparent}.pill.warn{background:var(--warnbg);border-color:transparent}
+.pill.bad{background:var(--badbg);border-color:transparent}.pill.deny{background:var(--denybg);border-color:transparent}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 11px;border-radius:4px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-weight:500;white-space:nowrap;cursor:pointer}
+.btn.pri{background:var(--ink);border-color:var(--ink);color:var(--card)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.sm{height:24px;padding:0 8px;font-size:12px}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--mut)}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line)}
+.tab{height:30px;display:flex;align-items:center;gap:6px;padding:0 11px;color:var(--mut);border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
+.tab.on{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--card)}
+.seg>*{height:24px;display:flex;align-items:center;padding:0 9px;font-size:12px;color:var(--mut);border-right:1px solid var(--line)}
+.seg>*:last-child{border-right:0}.seg>.on{background:var(--ink);color:var(--card)}
+.inp{height:28px;padding:0 9px;border:1px solid var(--line);border-radius:4px;background:var(--card);color:var(--ink);width:100%}
+.code{font:400 12px/19px 'IBM Plex Mono',ui-monospace,Menlo,monospace;background:var(--well);border:1px solid var(--line2);border-radius:4px;padding:10px 12px;white-space:pre;overflow:hidden;margin:0}
+.code .s{color:var(--ok)}.code .n{color:var(--warn)}.code .kw{color:var(--deny)}.code .c{color:var(--mut)}
+.kv{display:grid;grid-template-columns:var(--c,96px 1fr);column-gap:12px;row-gap:5px}
+.kv>:nth-child(odd){color:var(--mut)}
+.h1{font:600 18px/24px 'IBM Plex Sans',sans-serif}
+.h2{font:600 14px/20px 'IBM Plex Sans',sans-serif}
+.facts{display:flex;border:1px solid var(--line);border-radius:4px;background:var(--card);overflow:hidden}
+.facts>div{padding:7px 14px 8px;border-right:1px solid var(--line2);display:flex;flex-direction:column}
+.facts>div:last-child{border-right:0;flex:1}
+.lane{position:relative;height:8px;background:var(--line2);border-radius:2px}
+.lane>div{position:absolute;top:0;height:8px;border-radius:2px;background:var(--ink)}
+.lane>div.kid{background:var(--mut)}.lane>div.bad{background:var(--bad)}
+.note{font-size:12px;color:var(--mut)}
+.callout{border:1px solid var(--line);border-radius:4px;background:var(--card);padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.callout.bad{background:var(--badbg);border-color:transparent}.callout.deny{background:var(--denybg);border-color:transparent}
+.callout.warn{background:var(--warnbg);border-color:transparent}.callout.ok{background:var(--okbg);border-color:transparent}
+.modal{position:absolute;background:var(--card);border:1px solid var(--line);border-radius:6px;box-shadow:0 18px 50px rgba(0,0,0,.22)}
+.scrim{position:absolute;inset:0;background:rgba(20,22,25,.34)}
+.tag{font:500 11px/1 'IBM Plex Mono',monospace;color:var(--mut)}
+.box{position:absolute;border:1px solid var(--line);border-radius:4px;background:var(--card);padding:7px 10px;display:flex;flex-direction:column;gap:1px}
+.wire{position:absolute;background:var(--mut)}
+.app a{color:inherit;text-decoration:underline;text-decoration-color:#a8a8a1;text-underline-offset:2px}
+.app a.nav,.app a.tab,.app a.btn,.app a.callout,.app a.well{text-decoration:none}
+.g12{gap:12px}
+.callout.bad,.callout.deny,.callout.warn,.callout.ok{color:var(--ink)}
+.num{flex:none;width:20px;height:20px;border-radius:50%;background:#17191c;color:#fff;display:inline-flex;align-items:center;justify-content:center;font:700 11px/1 'IBM Plex Mono',monospace}
+.spark{display:inline-flex;align-items:flex-end;gap:1px;height:16px}.spark i{display:block;width:3px;background:var(--mut);border-radius:1px}
+.tick{display:inline-block;width:3px;border-radius:1px;background:var(--ink)}
+.c-tp{--c:#2f6bff}.c-gr{--c:#00857a}.c-sc{--c:#a83bf0}.c-tr{--c:#c85f0a}.c-ac{--c:#d02f25}.c-cl{--c:#5b6678}.c-tc{--c:#d6247a}
+.rail.c{width:48px;padding:10px 0;align-items:center;gap:4px}
+.rail.c .nav{padding:0 5px}
+.tag.new{color:var(--deny);border:1px solid var(--deny);border-radius:3px;padding:1px 5px;font-size:10px}
+.tag.real{color:var(--ok);border:1px solid var(--ok);border-radius:3px;padding:1px 5px;font-size:10px}
+.tag.gone{color:var(--bad);border:1px solid var(--bad);border-radius:3px;padding:1px 5px;font-size:10px}
+</style>
+</helmet>
+<div class="app">
+
+<div class="top">
+<div class="brand" style="width: auto"><span class="logo">z</span><span>doze-kafka</span><span class="mut" style="font-weight: 400">harbour</span></div>
+<div class="jump"><span class="grow">Jump to a topic, group or subject, or do something…</span><span class="k" style="margin: 0">⌘K</span></div>
+<div class="grow"></div>
+<span class="pill"><span class="dot"></span><span class="m">127.0.0.1:9092</span></span>
+<span class="pill">Kafka 4.0 compat</span>
+</div>
+
+<div class="body">
+
+<nav class="rail" aria-label="Sections">
+<span class="cap" style="padding-top: 2px">Observe</span>
+<a class="nav" href="Main.dc.html"><span class="sv c-tr">TR</span>Traffic<span class="n">5 open</span></a>
+<a class="nav" href="Tc-Home.dc.html"><span class="sv c-tc">TC</span>Trace</a>
+<span class="cap">Data</span>
+<a class="nav on" href="Tp-Home.dc.html"><span class="sv c-tp">TP</span>Topics<span class="n">7</span></a>
+<a class="nav" href="Gr-Home.dc.html"><span class="sv c-gr">GR</span>Groups<span class="n">4</span></a>
+<a class="nav" href="Sc-Home.dc.html"><span class="sv c-sc">SC</span>Schemas<span class="n">5</span></a>
+<span class="cap">Broker</span>
+<a class="nav" href="Ac-Home.dc.html"><span class="sv c-ac">AC</span>Access</a>
+<a class="nav" href="Cl-Home.dc.html"><span class="sv c-cl">CL</span>Cluster</a>
+<div class="grow"></div>
+<a class="nav" href="Cn-01-Bootstrap.dc.html"><span class="sv" style="--c: var(--mut)">⇢</span>Connect an app</a>
+</nav>
+
+<aside class="list" aria-label="Topics">
+<div class="row sb ce" style="padding: 10px 12px; border-bottom: 1px solid var(--line2)"><span class="cap">Topics · 7 · messages</span><button class="btn sm" aria-label="New topic">+ New</button></div>
+<a class="li on" style="text-decoration: none" href="Tp-05-Messages.dc.html"><span class="m el grow">harbour.checkout.orders</span><span class="m mut">14,429</span></a>
+<a class="li" style="text-decoration: none" href="Tp-05-Messages.dc.html"><span class="m el grow">harbour.checkout.orders.dlq</span><span class="m warn">23</span></a>
+<a class="li" style="text-decoration: none" href="Tp-05-Messages.dc.html"><span class="m el grow">harbour.depot.dispatch</span><span class="m mut">2,118</span></a>
+<a class="li" style="text-decoration: none" href="Tp-05-Messages.dc.html"><span class="m el grow">harbour.loyalty.points</span><span class="m mut">8,640</span></a>
+<a class="li" style="text-decoration: none" href="Tp-09-Message-Tombstone.dc.html"><span class="m el grow">harbour.inventory.levels</span><span class="m mut">612</span></a>
+<a class="li" style="text-decoration: none" href="Tp-05-Messages.dc.html"><span class="m el grow">harbour.audit.events</span><span class="m mut">1,204</span></a>
+<a class="li" style="text-decoration: none" href="Tp-05-Messages.dc.html"><span class="m el grow">harbour.checkout.orders.retry</span><span class="m mut">41</span></a>
+</aside>
+
+<main class="main" style="gap: 8px">
+<div class="row sb ce">
+<div class="col"><h1 class="h1 m" style="font-size: 18px; font-weight: 600">harbour.checkout.orders</h1></div>
+<div class="row g8 ce"><button class="btn pri">Produce</button><button class="btn" aria-label="More actions">···</button></div>
+</div>
+<div class="row ce g8 wrap"><span class="m">3 partitions</span><span class="mut">·</span><span class="m">14,429 messages</span><span class="mut">·</span><span class="m">value: Avro, subject harbour.checkout.orders-value, latest v3</span></div>
+<div class="tabs"><span class="tab on">Messages</span><a class="tab" href="Tp-05-Messages.dc.html">Partitions</a><a class="tab" href="Gr-Home.dc.html">Readers</a><a class="tab" href="Tp-03-Create-Config.dc.html">Config</a><a class="tab" href="Ac-Home.dc.html">Access</a></div>
+
+<div class="card" style="--c: 66px 24px 112px 124px 1fr">
+<div class="r h"><span class="ra">Offset</span><span>P</span><span>Time</span><span>Key</span><span>Value</span></div>
+<div class="r"><span class="m ra">4,811</span><span class="m">1</span><span class="m">14:36:21</span><span class="m">HRB-2026-04811</span><span class="m el">{"orderId":"HRB-2026-04811","lines":3,"total":84.20,"currency":"EUR"}</span></div>
+<div class="r"><span class="m ra">4,801</span><span class="m">2</span><span class="m">14:36:09</span><span class="m">HRB-2026-04809</span><span class="m el">Avro · schema 3 · {"orderId":"HRB-2026-04809","lines":5,…</span></div>
+</div>
+
+<div class="card" style="flex: 1; display: flex; flex-direction: column">
+<div class="row sb ce" style="padding: 8px 14px; border-bottom: 1px solid var(--line2)"><span class="row ce g8"><span class="h2">Send a message</span><span class="m mut">to harbour.checkout.orders</span></span><span class="note">value is encoded with the registry's schema</span></div>
+<div class="row g16" style="padding: 12px 14px; flex: 1">
+<div class="col g12" style="width: 560px">
+<div class="row g12">
+<div class="col g4" style="width: 160px"><span class="b">Partition</span><span class="seg" style="width: fit-content"><span class="on">Auto, by key</span><span>Fixed</span></span></div>
+<div class="col g4 grow"><label class="b" for="c-key">Key</label><input class="inp m" id="c-key" value="HRB-2026-04812"></div>
+</div>
+<div class="col g4"><label class="b" for="c-sub">Schema subject</label>
+<select class="inp m" id="c-sub"><option>encode with harbour.checkout.orders-value (v3, Avro)</option><option>No schema, send the bytes as typed</option></select>
+<span class="note">Write the value as JSON. It is checked against the subject's latest schema and sent in the registry's framing. The subject is the one this topic is linked to.</span></div>
+<div class="col g4"><label class="b" for="c-val">Value, as JSON</label>
+<textarea class="inp m" id="c-val" rows="6" style="height: 118px; padding: 8px 9px; line-height: 19px">{"orderId":"HRB-2026-04812","lines":2,"total":44.10,"currency":"EUR"}</textarea>
+<span class="note ok">Valid against harbour.checkout.orders-value v3: orderId string, lines int, total double, currency string. <span class="tag new">new</span> live check; today the broker checks on send.</span></div>
+</div>
+<div class="col g12 grow">
+<div class="col g4"><span class="cap">Encoded preview · 33 B</span>
+<pre class="code"><span class="c">0000</span>  <span class="kw">00</span> <span class="n">00 00 00 03</span> 1c 48 52  42 2d 32 30 32 36 2d 30
+<span class="c">0010</span>  34 38 31 32 04 cd cc cc  cc cc 0c 46 40 06 45 55
+<span class="c">0020</span>  52</pre>
+<span class="note"><span class="m kw">00</span> magic · <span class="m n">00 00 00 03</span> schema id 3 · then the Avro body, 28 B</span></div>
+<div class="kv" style="--c: 120px 1fr; row-gap: 3px"><span>Resulting schema id</span><span class="m b">3</span><span>Key</span><span class="m">14 B, plain text</span><span>Value</span><span class="m">33 B on disk</span></div>
+<div class="callout"><span class="b">If it does not match</span><span class="note">A missing field or a wrong type is refused before anything is sent, with the registry's own message. Nothing reaches the topic.</span></div>
+<div class="callout"><span class="b">Not registered yet?</span><span class="note">Add the schema on the Schemas page first. The picker lists subjects that exist: 5 on this broker.</span></div>
+</div>
+</div>
+<div class="row sb ce" style="padding: 8px 14px; border-top: 1px solid var(--line2); background: var(--well)"><span class="note">Lands on p1 by key. Acks 1.</span><span class="row g8 ce"><button class="btn">Clear</button><button class="btn pri">Send message</button></span></div>
+</div>
+<div class="dock" style="margin: 0 -20px">
+<div class="dh"><span class="cap">The wire, underneath</span><span class="grow"></span><span class="pill ok"><span class="dot"></span>live</span></div>
+<div class="r" style="--c: 92px 120px 100px 1fr 60px; min-height: 24px"><span class="m">14:36:21.402</span><span class="m">checkout-api</span><span class="m b">Produce</span><span class="m mut el">p1 · offset 4,811</span><span class="m ok">ok</span></div>
+</div>
+</main>
+
+</div>
+
+<div class="keys"><span><span class="k">Tab</span>next field</span><span><span class="k">⌘↵</span>send</span><span><span class="k">Esc</span>collapse</span></div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
