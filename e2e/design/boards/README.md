@@ -12,7 +12,7 @@ here is byte-identical in both (the hashes are in `SHA256SUMS`).
 - `<Board>.dc.html`: one board each. Only the boards a committed spec compares or an
   allow-list entry cites are here: Main and Traf-02 to Traf-12 (the Traffic boards,
   measured by `traffic/`), Sy-01 to Sy-08, the section homes (Tp-Home,
-  Gr-Home, Sc-Home, Tc-Home, Ac-Home, Cl-Home), Tp-24, the Access boards the Access
+  Gr-Home, Sc-Home, Tc-Home, Ac-Home, Cl-Home), Tp-01 to Tp-04 (none, create, create with settings, create refused) and Tp-24, the Access boards the Access
   home builds from (Ac-03 Create, Ac-05 Check), and the topic page's own boards that
   the Sy allow-list measures where the boards disagree (Tp-05 Messages, Tp-06
   Message: an entry with `per` is checked against them) or names (Tp-14 Go to
