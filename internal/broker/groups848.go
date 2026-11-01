@@ -29,7 +29,7 @@ func (b *Broker) handleConsumerGroupHeartbeat(ctx context.Context, req *protocol
 	hr.SubscribedTopicNames = slices.DeleteFunc(slices.Clone(hr.SubscribedTopicNames), func(t string) bool {
 		return !b.canTopic(req.Conn, t, opDescribe)
 	})
-	res := b.cg848.heartbeat(hr, clientRef{req.Header.ClientID, req.Conn.RemoteHost()})
+	res := b.cg848.heartbeat(hr, clientOf(req))
 
 	resp.ErrorCode = res.errorCode
 	if res.errorMsg != "" {

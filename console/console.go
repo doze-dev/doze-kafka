@@ -42,6 +42,7 @@ type Console struct {
 	log         *slog.Logger // where the console reports its own failures (Options.Logger).
 	be          *backend
 	reg         *registryClient     // nil when there is no schema registry to talk to.
+	inspector   GroupInspector      // nil when the broker's group memory is not available to this console.
 	traffic     TrafficSource       // nil when the broker's traffic is not available to this console.
 	metrics     ClientMetricsSource // nil when clients' own metrics are not available.
 	dock        DockSource          // nil: the dock is built from traffic, or not offered.
@@ -103,6 +104,9 @@ type Options struct {
 	// membership changes. Nil, the Traffic section is not offered: the console cannot
 	// see the wire of a broker it is not part of.
 	Traffic TrafficSource
+	// Groups is the broker's group memory (members' hosts, heartbeats, timeouts,
+	// leader). Nil, the console cannot see it and the pages say so.
+	Groups GroupInspector
 	// Dock is what the wire dock under a topic, group or subject reads. Nil, it is
 	// built from Traffic (which can answer for a topic or a group); with neither, no
 	// dock is shown.
@@ -185,6 +189,7 @@ func New(opts Options) (*Console, error) {
 	c.be = be
 	c.reg = newRegistryClient(opts.RegistryURL, opts.RegistryUser, opts.RegistryPass, opts.RegistryTLS)
 	c.traffic = opts.Traffic
+	c.inspector = opts.Groups
 	c.metrics = opts.ClientMetrics
 	c.traceHeader = strings.TrimSpace(opts.TraceHeader)
 	c.dock = opts.Dock

@@ -242,7 +242,13 @@ type group struct {
 // clientRef says who a member is: the client.id it connected with and the host it
 // connected from. A group's members are otherwise only opaque generated ids, which
 // tells nobody which of their applications is which.
-type clientRef struct{ clientID, host string }
+type clientRef struct {
+	clientID, host string
+	// addr is the connection's address with its port, software the name and version
+	// its ApiVersions announced and principal who it authenticated as: what the
+	// console's group inspector shows (groupinspect.go). Empty when not known.
+	addr, software, principal string
+}
 
 type groupMember struct {
 	client         clientRef
@@ -255,7 +261,9 @@ type groupMember struct {
 	sessionTimeout time.Duration
 	session        expiry // evicts the member if it stops heartbeating.
 	joinResult     chan joinResult
-	awaitingJoin   bool // a JoinGroup is parked on joinResult.
+	joinedAt       time.Time // when this member first armed its session (groupinspect.go).
+	lastHeartbeat  time.Time // the last time its session was refreshed: a join, a sync or a heartbeat.
+	awaitingJoin   bool      // a JoinGroup is parked on joinResult.
 
 	// rebalanceTimeout is how long this member says it may take to rejoin a
 	// rebalance (the client's max.poll.interval.ms). Zero means "not stated",
@@ -1020,6 +1028,11 @@ func (gm *groupManager) resetSession(g *group, m *groupMember) {
 	if timeout <= 0 {
 		timeout = defaultSessionTimeout
 	}
+	now := time.Now()
+	if m.joinedAt.IsZero() {
+		m.joinedAt = now
+	}
+	m.lastHeartbeat = now
 	m.session.arm(timeout, func(gen uint64) { gm.sessionExpired(g, m, gen) })
 }
 

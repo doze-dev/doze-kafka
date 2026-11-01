@@ -133,7 +133,7 @@ func (b *Broker) handleJoinGroup(ctx context.Context, req *protocol.Request, jr 
 	// A group running under KIP-848 takes a classic client in as one of its members
 	// (the migration policy's default, groupmigrate.go); otherwise the classic
 	// coordinator claims the id on join (groupClaims).
-	who := clientRef{req.Header.ClientID, req.Conn.RemoteHost()}
+	who := clientOf(req)
 	res, taken := b.cg848.classicJoin(jr, who)
 	if !taken {
 		var err error
@@ -261,4 +261,10 @@ func (b *Broker) handleLeaveGroup(ctx context.Context, req *protocol.Request, lr
 		resp.Members = append(resp.Members, m)
 	}
 	return nil
+}
+
+// clientOf is who a request came from.
+func clientOf(req *protocol.Request) clientRef {
+	return clientRef{clientID: req.Header.ClientID, host: req.Conn.RemoteHost(), addr: req.Conn.RemoteAddr(),
+		software: req.Conn.ClientSoftware(), principal: req.Conn.Principal()}
 }

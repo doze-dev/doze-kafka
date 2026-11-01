@@ -44,7 +44,7 @@ func (r *expiryRig) join848(t *testing.T, group, member, topic string) cg848Resu
 	req.RebalanceTimeoutMillis = 60_000
 	req.SubscribedTopicNames = []string{topic}
 	req.Topics = []kmsg.ConsumerGroupHeartbeatRequestTopic{}
-	res := r.b.cg848.heartbeat(req, clientRef{"c", "h"})
+	res := r.b.cg848.heartbeat(req, clientRef{clientID: "c", host: "h"})
 	if res.errorCode != 0 {
 		t.Fatalf("848 join: %+v", res)
 	}
@@ -62,7 +62,7 @@ func (r *expiryRig) hb848(group, member string, epoch int32, owned map[[16]byte]
 			req.Topics = append(req.Topics, rt)
 		}
 	}
-	return r.b.cg848.heartbeat(req, clientRef{"c", "h"})
+	return r.b.cg848.heartbeat(req, clientRef{clientID: "c", host: "h"})
 }
 
 func joinReqSeat(group, member string, session, rebalance time.Duration, ptype string, meta []byte) *kmsg.JoinGroupRequest {
@@ -78,7 +78,7 @@ func joinReqSeat(group, member string, session, rebalance time.Duration, ptype s
 
 func (r *expiryRig) classicJoinSeat(t *testing.T, group, member string, session, rebalance time.Duration, topic string) joinResult {
 	t.Helper()
-	res, handled := r.b.cg848.classicJoin(joinReqSeat(group, member, session, rebalance, "consumer", subscriptionBytes(topic)), clientRef{"c", "h"})
+	res, handled := r.b.cg848.classicJoin(joinReqSeat(group, member, session, rebalance, "consumer", subscriptionBytes(topic)), clientRef{clientID: "c", host: "h"})
 	if !handled {
 		t.Fatal("the consumer group did not take the classic join")
 	}
@@ -90,11 +90,11 @@ func (r *expiryRig) classicJoinSeat(t *testing.T, group, member string, session,
 func (r *expiryRig) holding(t *testing.T, group, topic string, session, rebalance time.Duration, partitions ...int32) (string, int32) {
 	t.Helper()
 	ctx := context.Background()
-	first, err := r.b.groups.join(ctx, joinReqSeat(group, "", session, rebalance, "consumer", subscriptionBytes(topic)), clientRef{"c", "h"})
+	first, err := r.b.groups.join(ctx, joinReqSeat(group, "", session, rebalance, "consumer", subscriptionBytes(topic)), clientRef{clientID: "c", host: "h"})
 	if err != nil || first.errorCode != kerr.MemberIDRequired.Code {
 		t.Fatalf("first join: %v %+v", err, first)
 	}
-	res, err := r.b.groups.join(ctx, joinReqSeat(group, first.memberID, session, rebalance, "consumer", subscriptionBytes(topic)), clientRef{"c", "h"})
+	res, err := r.b.groups.join(ctx, joinReqSeat(group, first.memberID, session, rebalance, "consumer", subscriptionBytes(topic)), clientRef{clientID: "c", host: "h"})
 	if err != nil || res.errorCode != 0 {
 		t.Fatalf("join: %v %+v", err, res)
 	}
@@ -408,7 +408,7 @@ func TestMixedGroupEmptiedGroupIsClaimedAgain(t *testing.T) {
 	req.RebalanceTimeoutMillis = 60_000
 	req.SubscribedTopicNames = []string{"t"}
 	req.Topics = []kmsg.ConsumerGroupHeartbeatRequestTopic{}
-	if got := r.b.cg848.heartbeat(req, clientRef{"c", "h"}); got.errorCode != 0 {
+	if got := r.b.cg848.heartbeat(req, clientRef{clientID: "c", host: "h"}); got.errorCode != 0 {
 		t.Fatalf("a consumer-protocol member joining a classic group of consumers: %+v", got)
 	}
 	if m := r.members("consumers"); len(m) != 2 || !m[classic] || m["new"] {
@@ -418,7 +418,7 @@ func TestMixedGroupEmptiedGroupIsClaimedAgain(t *testing.T) {
 	empty("connect")
 	classicJoin("connect", "connect")
 	req.Group, req.MemberID = "connect", "new"
-	if got := r.b.cg848.heartbeat(req, clientRef{"c", "h"}); got.errorCode != kerr.GroupIDNotFound.Code {
+	if got := r.b.cg848.heartbeat(req, clientRef{clientID: "c", host: "h"}); got.errorCode != kerr.GroupIDNotFound.Code {
 		t.Errorf("a consumer-protocol member joining a classic group that is not of consumers: %+v", got)
 	}
 	if m := r.members("connect"); len(m) != 0 {
