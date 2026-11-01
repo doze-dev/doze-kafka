@@ -84,7 +84,7 @@ export async function startWorld(base: number, prefix: string): Promise<World> {
 
   const startBroker = async () => {
     broker = spawn(bin, ['--listen', kafka, '--console-addr', `127.0.0.1:${p.console}`, '--schema-registry-addr', `127.0.0.1:${p.registry}`,
-      '--data-dir', data, '--consumer-session-timeout', '6s'],
+      '--data-dir', data, '--consumer-session-timeout', '6s', '--name', 'depot'],  // a set name: the console labels the broker with it, and the default comes from the checkout's folder
     // DESIGN_CONSOLE_DEV=1 (up.ts, for working on the pages) reads the templates and
     // static files from console/ as they are edited.
     { cwd: ROOT, env: { ...process.env, DOZE_ZONE: 'off', DOZE_KAFKA_CONSOLE_PREFIX: prefix, ...(process.env.DESIGN_CONSOLE_DEV ? { DOZE_KAFKA_CONSOLE_DEV: join(ROOT, 'console') } : {}) }, stdio: 'ignore' });

@@ -133,7 +133,20 @@ SASL is on (doze-kafka provisions it a private one at start-up).
 
 - A **Timeline** of what the group's coordinator did (joins, rebalances, expiries,
   generations), newest first: the answer to "why does my consumer keep rebalancing".
+  It has filters (all, rebalances, members, problems), counts the rebalances of the last hour
+  and names a group that rebalances over and over. The broker keeps the last 200 events of each
+  group, in memory.
   See [Observability](observability.md).
+- While a classic group rebalances, the Members tab shows who has rejoined and how long is left
+  of the rebalance timeout; a consumer-protocol group shows each member's target and current
+  assignment (the coordinator's record, not the member's report); a classic group shows its
+  generation, leader and timeouts. These come from the broker's memory, so they are empty after
+  a restart and the page says when it cannot see them.
+- An empty group's offsets expire after `offsets-retention` (default 7 days): the Lag tab shows
+  when, counted as the broker counts it. With retention 0 it says offsets are kept for ever.
+- The console cannot know a consumer's `isolation.level` or its client settings (a Fetch or a
+  heartbeat does not carry them): where an open transaction holds records back it says what
+  each isolation level would see, and does not say which the group uses.
 
 ## Traffic
 

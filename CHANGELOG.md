@@ -11,6 +11,37 @@ here that contains "server API"; `task api` fails without it.
 - Console, topic page (Tp-05): a topic of several partitions opens on every partition merged, newest first (the newest 30 of each, and the page says when that is less than the topic holds); the tape has a lane for each partition on a time axis; the records have Offset, P, Time, Key, Value and Hdr columns; the facts are a row (partitions, messages and size on disk, retention, cleanup policy, last write); the neighbours are one well; the button reads "Produce"; Try it has a partition and an acks choice. A partition's own page is `?partition=N`.
 - Console, messages tape: a gap in the offsets is drawn as a transaction marker only where a control batch is; an offset compaction removed is no longer called a marker. An empty (not null) key is hashed to a partition like any key, and the composer can send one ("empty key, not null"; "Edit a copy" keeps it).
 - Console, create topic: the page is drawn to the design (Tp-01 to Tp-04). The settings open from "Set…" (the name and partitions you typed carry over, and the page can be opened with them in its address), the form offers `cleanup.policy`, a refusal is shown as the design draws it with the broker's own wording, and an empty broker's Topics page is the design's.
+- Groups, the functional boards (Gr-04, 05, 09 to 14, 16 to 18): the Timeline says how long a
+  member was silent before it expired, that it said goodbye, and how long a rebalance waited;
+  has the filters all / rebalances / members / problems, "rebalanced N times in the last hour"
+  and, for a group rebalancing over and over, the pill "rebalancing every N s" with the gaps
+  between expiries. Each group keeps its own 200 events, so a noisy group does not push out a
+  quiet one (GRP-24). A group in PreparingRebalance shows who has rejoined and the time left of
+  the rebalance timeout (there is no cap on it; GRP-25), a consumer-protocol group its target
+  and current assignment per member (the coordinator's record; GRP-20), a classic group its
+  generation, protocol, leader and timeouts. A group with members and no commits lists the
+  partitions it owns with "no commit yet" instead of a lag; an offset past the log end gets the
+  arithmetic for resetting; a leftover offset of a deleted topic says what Kafka does (drops it a
+  moment later; claim G2). Records past the last stable offset are named with the open
+  transaction holding them (the console says it cannot tell the group's isolation level;
+  GRP-18). A refused group names the operation its API needs, not Read for everything
+  (GRP-21). The offsets-retention countdown is the broker's own: `broker.OffsetExpiry` gives
+  the time each offset expires by the rules of the sweep (GRP-19). OffsetDelete of a group with
+  members now refuses only the topics a member is subscribed to (GRP-4, recorded:
+  `offset-delete-subscribed`, claim G7); the group snapshot gained the rebalance deadline, who
+  has rejoined, and per-member state and assignments.
+- Groups: the Offsets tab is the reset form (Gr-06): earliest, latest, a timestamp (the first
+  record at or after it, per partition, by ListOffsets) or specific offsets, for all topics or
+  one, with a preview (committed now, after, lag after; `POST /groups/{id}/reset/preview`, which
+  sends nothing). A group with members is refused with the way out (Gr-07), and the range of one
+  partition's offset is the console's own rule, said as such (GRP-15, GRP-16). Delete group and
+  Remove offset confirm with counts and consequences (Gr-15, GRP-32).
+- Groups: the group page's Lag and Members tabs follow Gr-02 and Gr-03. The sentence under the
+  title takes the generation, the leader and the timeouts from the coordinator's memory (a
+  consumer-protocol group says it has no leader and no per-member timeouts, and the console says
+  when it cannot see that memory); the Owner column names members by id; the Members tab shows host
+  with port, leader and heartbeat age; a member's inspector shows host:port, software, timeouts,
+  heartbeat, joined and the offered protocols. Keys 1-4 open the tabs and r resets offsets.
 - Names: a by-name address is printed only when something answers at it. The start-up
   summary, `doze-kafka env` and the console and registry URLs used to give the name
   whenever it resolved on the machine; on a Mac a name can go on resolving after the
@@ -674,3 +705,4 @@ here that contains "server API"; `task api` fails without it.
   returned types from `internal/` that a caller outside the module could not
   name; this module's own commands read them through `internal/serverhook`.
 - server API: the exported surface is now pinned (`task api`).
+- Groups: with no group on the broker the page is the design's Gr-01 (the commands name this broker and one of its topics, the keys strip is g g, jump, keys) and fills in by itself within 3 s when a group appears.

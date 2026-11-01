@@ -576,7 +576,7 @@ func TestOneOffsetCanBeSetOrRemoved(t *testing.T) {
 
 	// The page offers it, per row, and names the range.
 	page := req(t, c, "GET", "/_console/groups/g?tab=offsets", nil).Body.String()
-	for _, want := range []string{`hx-post="/_console/groups/g/offset"`, `hx-post="/_console/groups/g/offset/delete"`, `aria-label="New offset, from 0 to 10"`, `<option value="b">b</option>`} {
+	for _, want := range []string{`hx-post="/_console/groups/g/offset"`, `hx-post="/_console/groups/g/offset/delete"`, `aria-label="New offset, from 0 to 10"`, `<option value="b">b (1 partition)</option>`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the group page is missing %q", want)
 		}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"slices"
 	"strconv"
 	"sync"
@@ -235,6 +236,7 @@ type group struct {
 	holding      bool              // the initial rebalance delay is running: wait for it even if everyone has joined.
 	holdJoined   bool              // a member the group did not have joined during this window of the delay.
 	holdLeft     time.Duration     // what the rebalance timeout leaves for further windows.
+	rebalanceAt  time.Time         // when the rebalance in progress began (zero when none is).
 	pendingSync  map[string]chan syncResult
 	join         expiry // how long the rebalance waits for members to rejoin.
 }
@@ -242,7 +244,13 @@ type group struct {
 // clientRef says who a member is: the client.id it connected with and the host it
 // connected from. A group's members are otherwise only opaque generated ids, which
 // tells nobody which of their applications is which.
-type clientRef struct{ clientID, host string }
+type clientRef struct {
+	clientID, host string
+	// addr is the connection's address with its port, software the name and version
+	// its ApiVersions announced and principal who it authenticated as: what the
+	// console's group inspector shows (groupinspect.go). Empty when not known.
+	addr, software, principal string
+}
 
 type groupMember struct {
 	client         clientRef
@@ -252,10 +260,13 @@ type groupMember struct {
 	assignment     []byte               // from the leader's SyncGroup.
 	previous       []byte               // what it held in the generation before this one; read only until the leader's SyncGroup.
 	rejoined       bool
+	rejoinedAt     time.Time // when it sent the JoinGroup the present rebalance is waiting on.
 	sessionTimeout time.Duration
 	session        expiry // evicts the member if it stops heartbeating.
 	joinResult     chan joinResult
-	awaitingJoin   bool // a JoinGroup is parked on joinResult.
+	joinedAt       time.Time // when this member first armed its session (groupinspect.go).
+	lastHeartbeat  time.Time // the last time its session was refreshed: a join, a sync or a heartbeat.
+	awaitingJoin   bool      // a JoinGroup is parked on joinResult.
 
 	// rebalanceTimeout is how long this member says it may take to rejoin a
 	// rebalance (the client's max.poll.interval.ms). Zero means "not stated",
@@ -483,6 +494,7 @@ func (gm *groupManager) join(ctx context.Context, r *kmsg.JoinGroupRequest, who 
 		g.holdJoined = true
 	}
 	m.rejoined = true
+	m.rejoinedAt = time.Now()
 	m.awaitingJoin = true
 	m.joinResult = make(chan joinResult, 1)
 	gm.resetSession(g, m)
@@ -737,7 +749,7 @@ func (gm *groupManager) leave(r *kmsg.LeaveGroupRequest) []leaveResult {
 				}
 			}
 			if id != "" && g.members[id] != nil {
-				gm.emit(g, "left", id, "client "+g.members[id].client.clientID+" left the group", "")
+				gm.emit(g, "left", id, "client "+g.members[id].client.clientID+" said goodbye (LeaveGroup)", "")
 				gm.removeMember(g, id)
 				res.memberID, res.errorCode = id, errNone
 				removed = true
@@ -812,8 +824,10 @@ func (gm *groupManager) getOrCreate(id string) *group {
 
 func (g *group) beginRebalance() {
 	g.state = statePreparingRebalance
+	g.rebalanceAt = time.Now()
 	for _, m := range g.members {
 		m.rejoined = false
+		m.rejoinedAt = time.Time{}
 	}
 	// Followers parked in SyncGroup are waiting for an assignment the leader has
 	// not delivered, and this rebalance supersedes the generation it belongs to.
@@ -939,6 +953,11 @@ func (g *group) becomeEmpty() {
 
 // completeJoin closes the rebalance and forgets the group if nobody was left.
 func (gm *groupManager) completeJoin(g *group) {
+	waited := time.Duration(0)
+	if !g.rebalanceAt.IsZero() {
+		waited = time.Since(g.rebalanceAt)
+	}
+	g.rebalanceAt = time.Time{}
 	for _, id := range g.completeJoin() {
 		gm.emit(g, "dropped", id, "did not rejoin before the rebalance timeout", "")
 	}
@@ -947,7 +966,7 @@ func (gm *groupManager) completeJoin(g *group) {
 		return
 	}
 	gm.emit(g, "generation", g.leader,
-		plural(len(g.members), "member")+", leader "+g.leader+", protocol "+g.protocol, "")
+		plural(len(g.members), "member")+", leader "+g.leader+", protocol "+g.protocol+waitedText(waited), "")
 	// Every member's session starts afresh with the new generation. A member was
 	// last heard from when it sent its JoinGroup, possibly a whole rebalance ago;
 	// without this its timer could fire in the moment between its join being
@@ -1020,6 +1039,11 @@ func (gm *groupManager) resetSession(g *group, m *groupMember) {
 	if timeout <= 0 {
 		timeout = defaultSessionTimeout
 	}
+	now := time.Now()
+	if m.joinedAt.IsZero() {
+		m.joinedAt = now
+	}
+	m.lastHeartbeat = now
 	m.session.arm(timeout, func(gen uint64) { gm.sessionExpired(g, m, gen) })
 }
 
@@ -1042,7 +1066,7 @@ func (gm *groupManager) sessionExpired(g *group, m *groupMember, gen uint64) {
 		gm.resetSession(g, m)
 		return
 	}
-	gm.emit(g, "expired", id, "client "+m.client.clientID+" sent no heartbeat within its session timeout", "")
+	gm.emit(g, "expired", id, "client "+m.client.clientID+" sent no heartbeat for "+silence(m.lastHeartbeat, m.sessionTimeout)+" (its session timeout)", "")
 	gm.removeMember(g, id)
 	gm.rebalanceAfterChange(g, "a member's session expired")
 }
@@ -1197,4 +1221,24 @@ func plural(n int, one string) string {
 		return "1 " + one
 	}
 	return strconv.Itoa(n) + " " + one + "s"
+}
+
+// silence is how long a member had been silent when its session ran out, as the
+// timeline words it: "10.0 s". The last time it was heard from, else the session
+// timeout it had (the timer ran for exactly that long).
+func silence(last time.Time, session time.Duration) string {
+	d := session
+	if !last.IsZero() {
+		d = time.Since(last)
+	}
+	return fmt.Sprintf("%.1f s", d.Seconds())
+}
+
+// waitedText is the rebalance's wait for its members, appended to the generation
+// event: "; waited 3.0 s for the members to rejoin". Nothing when it did not wait.
+func waitedText(d time.Duration) string {
+	if d <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("; waited %.1f s for the members to rejoin", d.Seconds())
 }

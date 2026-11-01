@@ -29,7 +29,7 @@ func TestRouteTableIsWellFormed(t *testing.T) {
 				t.Errorf("%s is marked as mutating: a GET that does work is a design decision to make in the open, not a flag", key)
 			}
 		case "POST":
-			if !r.Mutates {
+			if !r.Mutates && !strings.Contains(r.Note, "sends nothing") {
 				t.Errorf("%s is a POST that does not say it mutates", key)
 			}
 		default:

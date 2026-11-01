@@ -102,7 +102,7 @@ func TestConfirmLiveSentences(t *testing.T) {
 		t.Errorf("a topic that is not there: %d", code)
 	}
 	code, got = confirmOf(t, c, "group.delete?group=g")
-	if code != 200 || !strings.Contains(got["text"].(string), `Delete group "g" and its 1 committed offset on 1 topic?`) {
+	if code != 200 || !strings.Contains(got["text"].(string), "This removes the group and its 1 committed offset on orders.") {
 		t.Errorf("group: %d %v", code, got)
 	}
 	if _, got = confirmOf(t, c, "group.reset.latest?group=g"); !strings.Contains(got["text"].(string), "This moves 1 offset of its 1") {
@@ -112,7 +112,7 @@ func TestConfirmLiveSentences(t *testing.T) {
 		t.Errorf("a missing group: %d", code)
 	}
 	code, got = confirmOf(t, c, "group.offset.delete?group=g&topic=orders&partition=0")
-	if code != 200 || !strings.Contains(got["text"].(string), "orders partition 0 (it is at 1)") {
+	if code != 200 || !strings.Contains(got["text"].(string), "Remove the offset of orders partition 0") || !strings.Contains(got["text"].(string), "read up to 1 on this one partition") {
 		t.Errorf("offset: %d %v", code, got)
 	}
 	for q, want := range map[string]int{"group.offset.delete?group=g&topic=orders&partition=1": 404, "group.offset.delete?group=g&topic=orders&partition=x": 400, "group.offset.delete?group=g&topic=other&partition=0": 404} {

@@ -13,12 +13,12 @@ func TestGroupConfirmsCountWhatAResetMoves(t *testing.T) {
 		{Topic: "b", Committed: 3, Earliest: 3, Latest: 3},   // at both.
 		{Topic: "gone", Committed: 9, Deleted: true},         // a reset skips it.
 	}
-	v := groupConfirms("g", rows)
+	v := groupConfirms("g", rows, 0)
 	if len(v) != 3 {
 		t.Fatalf("%d confirms", len(v))
 	}
 	del := v["group.delete"].Text
-	if !strings.Contains(del, `Delete group "g" and its 5 committed offsets on 3 topics?`) {
+	if !strings.Contains(del, `This removes the group and its 5 committed offsets on a, b and gone.`) {
 		t.Errorf("delete: %s", del)
 	}
 	e := v["group.reset.earliest"].Text
@@ -29,11 +29,11 @@ func TestGroupConfirmsCountWhatAResetMoves(t *testing.T) {
 	if !strings.Contains(l, "This moves 2 offsets of its 5") || !strings.Contains(l, "counted over all 3 topics") {
 		t.Errorf("latest: %s", l)
 	}
-	one := groupConfirms("g", rows[:1])
+	one := groupConfirms("g", rows[:1], 0)
 	if txt := one["group.reset.earliest"].Text; !strings.Contains(txt, "This moves 1 offset of its 1") || strings.Contains(txt, "counted over") {
 		t.Errorf("one row: %s", txt)
 	}
-	if txt := groupConfirms("g", nil)["group.delete"].Text; !strings.Contains(txt, "no committed offsets") {
+	if txt := groupConfirms("g", nil, 0)["group.delete"].Text; !strings.Contains(txt, "no committed offsets") {
 		t.Errorf("no rows: %s", txt)
 	}
 	if v["group.reset.earliest"].Title != "Reset to earliest" || v["group.reset.latest"].Verb != "Reset offsets" {
@@ -82,8 +82,16 @@ func TestConfirmURLAndLookup(t *testing.T) {
 }
 
 func TestOffsetDeleteConfirm(t *testing.T) {
-	v := offsetDeleteConfirm("g", "orders", 2, 17)
-	if !strings.Contains(v.Text, `Remove the committed offset of "g" for orders partition 2 (it is at 17)?`) {
-		t.Errorf("%s", v.Text)
+	v := offsetDeleteConfirm("g", "orders", 2, 17, 3)
+	for _, want := range []string{"Remove the offset of orders partition 2", "read up to 17 on this one partition", "The other 2 stay", "Nothing in the topic changes", "Allowed while the group is Empty"} {
+		if !strings.Contains(v.Text, want) {
+			t.Errorf("lacks %q: %s", want, v.Text)
+		}
+	}
+	if v.Say.Call != "OffsetDelete" {
+		t.Errorf("call %q", v.Say.Call)
+	}
+	if last := offsetDeleteConfirm("g", "orders", 2, 17, 1).Text; !strings.Contains(last, "last offset") {
+		t.Errorf("the last offset: %s", last)
 	}
 }

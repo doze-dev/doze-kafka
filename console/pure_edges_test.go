@@ -80,10 +80,10 @@ func TestScopeNoteOnlyForSeveralTopics(t *testing.T) {
 	if got := del(confirmFacts{Name: "g"}); !strings.Contains(got, "no committed offsets") {
 		t.Errorf("%s", got)
 	}
-	if got := del(confirmFacts{Name: "g", Offsets: 1, Topics: 1}); !strings.Contains(got, "its 1 committed offset on 1 topic?") {
+	if got := del(confirmFacts{Name: "g", Offsets: 1, Topics: 1}); !strings.Contains(got, "its 1 committed offset on 1 topic.") {
 		t.Errorf("%s", got)
 	}
-	if got := del(confirmFacts{Name: "g", Offsets: 5, Topics: 2}); !strings.Contains(got, "its 5 committed offsets on 2 topics?") {
+	if got := del(confirmFacts{Name: "g", Offsets: 5, Topics: 2}); !strings.Contains(got, "its 5 committed offsets on 2 topics.") {
 		t.Errorf("%s", got)
 	}
 }

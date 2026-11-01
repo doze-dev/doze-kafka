@@ -93,6 +93,12 @@ func TestTheKeyMapHasNoDuplicatesAndTheHelpOverlayListsEveryKey(t *testing.T) {
 		if k.Target == "/traffic" {
 			continue // only where there is traffic; the plain test console has none.
 		}
+		if notInSheet[k.Action] {
+			if strings.Contains(help, k.Label) {
+				t.Errorf("the help overlay lists %q, which only a page's strip names", k.Label)
+			}
+			continue
+		}
 		caps := ""
 		for _, f := range strings.Fields(k.Show) {
 			caps += `<span class="kbd">` + f + `</span>`

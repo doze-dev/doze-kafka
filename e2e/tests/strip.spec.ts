@@ -33,7 +33,7 @@ test.afterAll(() => { hold?.kill('SIGTERM'); });
 
 const PAGES = [
   '', 'topics', 'topics/seed-orders', 'topics/seed-orders?tab=partitions', 'topics/seed-orders?tab=config',
-  'groups', 'groups/g-lag', 'groups/g-lag?tab=offsets', 'schemas', 'schemas/seed-events-value',
+  'groups', 'groups/g-lag', 'groups/g-lag?tab=offsets', 'groups/strip-hold-group?tab=members', 'schemas', 'schemas/seed-events-value',
   'trace', 'traffic', 'traffic?view=clients', 'access', 'access/check?principal=User:ANONYMOUS&operation=read&resource=topic&name=seed-orders',
   'new/acl', 'cluster', 'connect', 'new/topic', 'new/schema',
 ];
@@ -43,7 +43,7 @@ type Hint = { keys: string[]; label: string };
 async function hints(page: Page): Promise<Hint[]> {
   return page.evaluate(() => Array.from(document.querySelectorAll<HTMLElement>('#keys > span')).filter((s) => s.offsetParent !== null).map((s) => ({
     keys: Array.from(s.querySelectorAll('.kbd')).map((k) => (k.textContent || '').trim()),
-    label: Array.from(s.childNodes).filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent).join('').trim(),
+    label: Array.from(s.childNodes).filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent).join('').trim().replace(/^–/, ''),
   })));
 }
 
@@ -102,7 +102,19 @@ async function effect(page: Page, path: string, h: Hint) {
       if (second !== first) expect(back, where).toBe(first);
       return;
     }
-    case 'open': case 'open subject': case 'open client': case 'follow':
+    case 'tabs': {
+      // 1 to 4 are the tabs by number: 2 is the second tab, which is the Members tab.
+      await press(page, ['2']);
+      await expect(page, where).toHaveURL(/[?&]tab=members/);
+      await press(page, ['1']);
+      await expect(page, where).not.toHaveURL(/[?&]tab=/);
+      return;
+    }
+    case 'reset offsets':
+      await press(page, ['r']);
+      await expect(page, where).toHaveURL(/[?&]tab=offsets#reset/);
+      return;
+    case 'open': case 'open subject': case 'open client': case 'open member': case 'follow':
       return opens(page, where);
     case 'close panel': case 'close':
       await opens(page, where);

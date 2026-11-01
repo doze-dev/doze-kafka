@@ -11,6 +11,7 @@ package serverhook
 import (
 	"log/slog"
 
+	"github.com/doze-dev/doze-kafka/internal/broker"
 	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/internal/telemetry"
 	"github.com/doze-dev/doze-kafka/internal/traffic"
@@ -30,6 +31,9 @@ var (
 	// ClientMetrics returns the server's client-telemetry store, or nil when client
 	// telemetry is off. The argument is a *server.Server.
 	ClientMetrics func(srv any) *telemetry.Store
+	// Groups returns the server's group inspector: a read-only snapshot of what the
+	// two group coordinators hold in memory (GRP-22). The argument is a *server.Server.
+	Groups func(srv any) broker.GroupInspector
 	// CheckOffsets applies the offsets retention of a *server.Server now, as its
 	// scheduled check does, and returns once it has.
 	CheckOffsets func(srv any)

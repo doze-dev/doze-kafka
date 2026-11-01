@@ -20,7 +20,7 @@ func (r *expiryRig) parkedJoin(t *testing.T, group, member string) <-chan joinRe
 	t.Helper()
 	out := make(chan joinResult, 1)
 	go func() {
-		res, _ := r.b.groups.join(context.Background(), joinReqSeat(group, member, rigClassicSession, rigClassicSession, "consumer", subscriptionBytes("a")), clientRef{"c", "h"})
+		res, _ := r.b.groups.join(context.Background(), joinReqSeat(group, member, rigClassicSession, rigClassicSession, "consumer", subscriptionBytes("a")), clientRef{clientID: "c", host: "h"})
 		out <- res
 	}()
 	r.waitFor(t, "the JoinGroup to be parked", func() bool {
@@ -55,7 +55,7 @@ func answer[T any](t *testing.T, what string, ch <-chan T) T {
 // newClassicID is the first half of a v7 join: the id the coordinator hands out.
 func (r *expiryRig) newClassicID(t *testing.T, group string) string {
 	t.Helper()
-	first, err := r.b.groups.join(context.Background(), joinReqSeat(group, "", rigClassicSession, rigClassicSession, "consumer", subscriptionBytes("a")), clientRef{"c", "h"})
+	first, err := r.b.groups.join(context.Background(), joinReqSeat(group, "", rigClassicSession, rigClassicSession, "consumer", subscriptionBytes("a")), clientRef{clientID: "c", host: "h"})
 	if err != nil || first.errorCode != kerr.MemberIDRequired.Code {
 		t.Fatalf("first join: %v %+v", err, first)
 	}
@@ -113,7 +113,7 @@ func TestUpgradeBetweenJoinAndSyncKeepsWhatTheMembersHeld(t *testing.T) {
 	a, _ := r.holding(t, "g", "a", rigClassicSession, rigClassicSession, 0, 1, 2, 3)
 	b := r.newClassicID(t, "g")
 	parkedB := r.parkedJoin(t, "g", b)
-	ja, err := r.b.groups.join(context.Background(), joinReqSeat("g", a, rigClassicSession, rigClassicSession, "consumer", subscriptionBytes("a")), clientRef{"c", "h"})
+	ja, err := r.b.groups.join(context.Background(), joinReqSeat("g", a, rigClassicSession, rigClassicSession, "consumer", subscriptionBytes("a")), clientRef{clientID: "c", host: "h"})
 	if err != nil || ja.errorCode != 0 || ja.generation != 2 {
 		t.Fatalf("A's rejoin: %v %+v", err, ja)
 	}

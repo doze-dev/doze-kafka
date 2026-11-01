@@ -49,7 +49,7 @@ func (r *expiryRig) seatJoin(t *testing.T, group, member string, instance *strin
 	t.Helper()
 	req := joinReqSeat(group, member, rigClassicSession, rigClassicSession, "consumer", meta)
 	req.InstanceID = instance
-	res, handled := r.b.cg848.classicJoin(req, clientRef{"c", "h"})
+	res, handled := r.b.cg848.classicJoin(req, clientRef{clientID: "c", host: "h"})
 	if !handled {
 		t.Fatal("the consumer group did not take the classic join")
 	}

@@ -106,6 +106,10 @@ func (c *Conn) RemoteHost() string {
 	return "/" + host
 }
 
+// RemoteAddr is the peer's address with its port ("127.0.0.1:53712"), which RemoteHost
+// leaves out.
+func (c *Conn) RemoteAddr() string { return c.raw.RemoteAddr().String() }
+
 // AnonymousPrincipal is who a connection is when nothing authenticated it: every
 // connection when SASL is off, so an ACL can still name them.
 const AnonymousPrincipal = "User:ANONYMOUS"

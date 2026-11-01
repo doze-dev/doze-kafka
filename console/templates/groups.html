@@ -5,7 +5,7 @@
   <div class="row sb ce list-h"><span class="cap">Consumer groups</span><span class="cap">Lag</span></div>
   <div class="list-filter"><input class="inp m" type="search" placeholder="Filter groups" aria-label="Filter Groups" data-filter-target=".list .li" data-filter-none="#list-none" spellcheck="false" autocomplete="off"></div>
   <div class="list-scroll">
-    {{if not .Groups}}<div class="note list-note"><b>{{t "groups.none.title"}}</b><br>{{t "groups.none.hint"}}</div>{{end}}
+    {{if not .Groups}}<div class="col g4 list-none"><span class="b">No groups</span><span class="note">Nothing exists yet. This is not a filter result.</span></div>{{end}}
     {{range .Groups}}
     <a class="li {{if eq .ID $.Sel}}on{{end}}" href="{{.URL}}" data-name="{{.ID}}"{{if eq .ID $.Sel}} aria-current="page"{{end}}>
       <span class="dot {{groupDot .State}}" title="{{.State}}"></span>
@@ -22,7 +22,8 @@
 {{/* Gr-Home: every group, how far behind each is, and which need a look. */}}
 {{define "groups_home"}}{{template "shell_top" .}}
   {{template "group_lp" (dict "Groups" .Groups "Sel" "")}}
-  <main class="main" id="detail">
+  <main class="main{{if not .Groups}} gr-none{{end}}" id="detail">
+    {{if .Groups}}
     <div class="row sb ce idband">
       <div class="col"><h1 class="h1">Groups</h1><span class="note">Everything that has joined or committed to this broker. Committed offsets survive a restart; members do not.</span></div>
       <div class="row ce g8"><span class="pill ok" data-live-state><span class="dot" aria-hidden="true"></span><span data-live-state-l>live</span></span></div>
@@ -31,8 +32,35 @@
     {{template "groups_live" .}}
     <div class="grow"></div>
     <div class="note footnote">Select a group to open it. Press <span class="kbd">⌘K</span> to jump to one by name.</div>
+    {{else}}
+    {{template "groups_none" .}}
+    {{end}}
   </main>
 {{template "shell_bottom" .}}{{end}}
+
+{{/* Gr-01: no group has joined or committed. Not a filter result, and not created here. */}}
+{{define "groups_none"}}
+    <div class="row sb ce idband" id="groups-none-root" data-groups-watch="{{.Prefix}}/live/groups">
+      <div class="col"><h1 class="h1">Groups</h1><span class="note">Nothing exists yet</span></div>
+      <div class="row ce g8"><span class="pill ok" data-live-state><span class="dot" aria-hidden="true"></span><span data-live-state-l>live</span></span></div>
+    </div>
+    <div class="card pad col g12 none-card">
+      <span class="h2">No consumer group has joined or committed</span>
+      <span class="note">A group is not something you create. It exists from the moment a consumer with a <span class="m">group.id</span> joins, or commits an offset. Start any consumer and this page fills in by itself, within 3 seconds.</span>
+      <div class="col g6"><span class="cap">The shortest way to see one</span>
+<pre class="code"><span class="c"># Kafka's own console consumer; --group is what makes it a group</span>
+kafka-console-consumer.sh --bootstrap-server {{.Bootstrap}} \
+  --topic {{.SampleTopic}} --group g-first-try --from-beginning</pre></div>
+      <div class="col g6"><span class="cap">Or from kcat</span>
+<pre class="code">kcat -b {{.Bootstrap}} -G g-first-try {{.SampleTopic}}</pre></div>
+      <div class="row ce g8"><a class="btn pri w5" href="{{.Prefix}}/connect">Connect an app</a><a class="btn w5" href="{{.Prefix}}/topics">Open topics</a><span class="note">the bootstrap page has the line for your client</span></div>
+    </div>
+    <div class="row g12 none-card">
+      <div class="callout grow"><span class="b">What you will see first</span><span class="note">The consumer joins (<span class="m">JoinGroup</span>), the group goes <span class="m">PreparingRebalance</span> then <span class="m">Stable</span>, and a row appears with its members and lag. Offsets appear after the first commit.</span></div>
+      <div class="callout grow"><span class="b">Why it may stay empty</span><span class="note">A producer-only app never makes a group. A consumer using <span class="m">assign()</span> without a <span class="m">group.id</span> does not either.</span></div>
+    </div>
+    <div class="grow"></div>
+{{end}}
 
 {{/* Gr-Home's summary, filters, table and callouts: polled every 3 s (live/groups), as
      the board says. What is typed in the filter and the kind chosen stay through a poll. */}}
@@ -95,6 +123,13 @@
 {{/* group_live is the polled unit: the title, the sentence, the neighbours, the tabs
      and what the tab holds. A form in it names its tab (hx-vals), so what it answers
      with is the same tab. */}}
+{{/* The group's neighbours (Gr-02): a bare well with its cap, each name a link, and the way
+     into a trace. */}}
+{{define "group_neighbours"}}<div class="well row ce g16 wrap nbwell" id="neighbours"><span class="cap">Neighbours</span>
+{{range $c := .Neighbours}}{{range $c.Links}}<a class="row ce g6" href="{{.URL}}"{{if .Open}} data-inspector-open hx-get="{{.Open}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"{{end}}>{{if eq .Kind "topic"}}<span class="sv sm c-tp" aria-hidden="true">TP</span>{{else if eq .Kind "subject"}}<span class="sv sm c-sc" aria-hidden="true">SC</span>{{else if eq .Kind "group"}}<span class="sv sm c-gr" aria-hidden="true">GR</span>{{else}}<span class="sv sm c-tr" aria-hidden="true">TR</span>{{end}}<span class="note">{{lower $c.Verb}}</span><span class="m">{{.Name}}</span></a>{{end}}{{end}}
+<a class="row ce g6" href="{{.Prefix}}/trace"><span class="sv sm c-tc" aria-hidden="true">TC</span><span class="note">follow</span><span class="m">a trace id</span></a>
+</div>{{end}}
+
 {{define "group_live"}}
 <div class="stack" id="group-live" data-live="{{groupURL .Group.ID}}/live?tab={{.Tab}}" data-hash="{{.Hash}}" data-live-ms="3000">
     <div class="row sb ce idband">
@@ -103,6 +138,7 @@
         <span class="pill">{{protoLabel .Group.Protocol}}</span>
         <span class="pill {{if eq .Group.State "Stable"}}ok{{else if eq .Group.State "Dead"}}bad{{else if eq .Group.State "Empty"}}{{else}}warn{{end}}"><span class="dot {{if eq .Group.State "Empty"}}off{{else if eq .Group.State "Dead"}}bad{{else if ne .Group.State "Stable"}}warn{{end}}" aria-hidden="true"></span>{{.Group.State}}</span>
         {{if .Group.Assignor}}<span class="pill mono" title="the assignor the broker uses for this group">{{.Group.Assignor}}</span>{{end}}
+        {{if .TL.Flap}}<span class="pill warn" id="flap-pill" title="{{.TL.Flap.Count}} rebalances in the last {{.TL.Flap.Window}}, from the events the broker still holds"><span class="dot warn" aria-hidden="true"></span>rebalancing every {{.TL.Flap.Every}}</span>{{end}}
       </div>
       <div class="row ce g8 idband-acts">
         <a class="btn pri" href="{{groupURL .Group.ID}}?tab=offsets#reset">Reset offsets…</a>
@@ -116,9 +152,11 @@
       </div>
     </div>
 
-    <p class="facts-line" id="group-facts">{{if .Members}}{{len .Members}} member{{if ne (len .Members) 1}}s{{end}}{{if .Generation}} on generation <span class="m">{{.Generation}}</span>{{end}}{{else}}No members{{end}}{{if .Offsets}}, {{if .Members}}reading{{else}}holding offsets on{{end}} <span class="m">{{len .Offsets}}</span> partition{{if ne (len .Offsets) 1}}s{{end}} of {{len .Topics}} topic{{if ne (len .Topics) 1}}s{{end}}, {{if .AnyAhead}}ahead of the log end somewhere{{if gt .TotalLag 0}} and <span class="m warn">{{num .TotalLag}}</span> records behind elsewhere{{end}}{{else if eq .TotalLag 0}}<span class="m ok">caught up</span>{{else}}<span class="m warn">{{num .TotalLag}}</span> record{{if ne .TotalLag 1}}s{{end}} behind in total{{if .Largest}} (the largest is <span class="m">{{.Largest.Topic}} p{{.Largest.Partition}}</span> at <span class="m">{{num .Largest.Lag}}</span>){{end}}{{end}}{{else if .Members}}, with no committed offset yet{{end}}.</p>
+    <div class="note" id="group-facts">{{if eq .Tab "members"}}{{template "group_facts_members" .}}{{else if eq .Tab "offsets"}}{{template "group_facts_offsets" .}}{{else}}{{template "group_facts_lag" .}}{{end}}</div>
 
-    {{template "neighbours" .}}
+    {{if .Rebalance}}<div class="callout warn" id="rebalance-banner"><span class="b">A rebalance is under way</span><span class="note">{{if .Rebalance.Waiting}}The group is waiting for <span class="m">{{.Rebalance.Waiting}}</span> of its <span class="m">{{.Rebalance.Total}}</span> member{{if ne .Rebalance.Total 1}}s{{end}} to rejoin.{{else}}Every member has rejoined; the group is about to form its next generation.{{end}} Generation <span class="m">{{.Rebalance.Next}}</span> is formed when they have, or when the wait ends. <a href="{{groupURL .Group.ID}}?tab=members">Who has rejoined</a></span></div>{{end}}
+
+    {{template "group_neighbours" .}}
 
     <nav class="tabs" aria-label="Group views">
       {{range .Tabs}}<a class="tab {{if .On}}on{{end}}" href="{{.URL}}"{{if .On}} aria-current="page"{{end}}>{{.Label}}{{if .Count}} <span class="m mut">{{.Count}}</span>{{end}}</a>{{end}}
@@ -131,10 +169,24 @@
 </div>
 {{end}}
 
+{{/* The sentence under the title. The generation is the coordinator's (the snapshot), and
+     nothing here is a client's setting: how often a client commits is its own. */}}
+{{define "group_facts_lag"}}{{if .Members}}{{len .Members}} member{{if ne (len .Members) 1}}s{{end}}{{if .Generation}} on {{.GenLabel}} <span class="m">{{.Generation}}</span>{{end}}{{else}}No members{{end}}{{if .Offsets}}, {{if .Members}}reading{{else}}holding offsets on{{end}} <span class="m">{{len .Offsets}}</span> partition{{if ne (len .Offsets) 1}}s{{end}} of {{len .Topics}} topic{{if ne (len .Topics) 1}}s{{end}}, {{if .AnyAhead}}ahead of the log end somewhere{{if gt .TotalLag 0}} and <span class="m warn">{{num .TotalLag}}</span> records behind elsewhere{{end}}{{else if eq .TotalLag 0}}<span class="m ok">caught up</span>{{else}}<span class="m warn">{{num .TotalLag}}</span> record{{if ne .TotalLag 1}}s{{end}} behind in total{{if .Largest}} (the largest is <span class="m">{{if gt (len .Topics) 1}}{{.Largest.Topic}} {{end}}p{{.Largest.Partition}}</span> at <span class="m">{{num .Largest.Lag}}</span>){{end}}{{end}}{{else if .Members}}, with no committed offset yet{{end}}.{{end}}
+
+{{/* Members: the leader and the timeouts are what the coordinator holds (GRP-22). A
+     consumer-protocol group has neither, and the sentence says so. */}}
+{{define "group_facts_members"}}{{if .Members}}{{len .Members}} member{{if ne (len .Members) 1}}s{{end}}{{if .Generation}} on {{.GenLabel}} <span class="m">{{.Generation}}</span>{{end}}{{else}}No members{{end}}{{if .Facts.Unavailable}}. This console cannot see the broker's group memory, so the leader and the timeouts are not shown.{{else if .Facts.Leader}}; the leader is <span class="m">{{.Facts.Leader}}</span>{{if .Facts.Session}}. Session timeout <span class="m">{{.Facts.Session}}</span>, rebalance timeout <span class="m">{{.Facts.Rebalance}}</span>{{end}}.{{else if .Members}}; {{if eq .Group.Protocol "848"}}the consumer protocol has no leader and no per-member timeouts: the broker assigns{{else}}none of them is the leader yet{{end}}.{{else}}.{{end}}{{end}}
+
 {{/* Gr-02, Lag: where each partition stands, and how far behind. */}}
 {{define "group_lag"}}
+{{template "group_denied" .}}
 {{if .Offsets}}
-<div class="card" id="lag-table" style="--c: minmax(0, 1.5fr) minmax(0, 1fr) 90px 90px minmax(0, 1fr) 70px">
+{{if .Ahead}}<div class="callout warn" id="ahead-note"><span class="row sb ce"><span class="b">Ahead of log end on <span class="m">{{.Ahead.N}}</span> of <span class="m">{{.Ahead.Of}}</span> partition{{if ne .Ahead.Of 1}}s{{end}}</span><a class="btn sm" href="{{groupURL .Group.ID}}?tab=offsets#reset">Reset offsets…</a></span>
+  <span class="note">A committed offset beyond the end of the log means the group was left at a position the topic has not reached. When a consumer starts it asks Fetch for an offset that does not exist, gets <span class="m">OFFSET_OUT_OF_RANGE</span>, and falls back to <span class="m">auto.offset.reset</span>. Resetting to earliest or latest makes that choice on purpose.</span>
+  <span class="note">There is no lag number for these rows: lag would be negative, which says nothing useful. Suggested: reset to <span class="m">latest</span> to follow new records, or <span class="m">earliest</span> to re-read the <span class="m">{{num .Ahead.Exist}}</span> that exist on {{if eq .Ahead.N 1}}it{{else}}them{{end}}.</span></div>{{end}}
+{{template "group_expiry" .}}
+{{template "group_held" .}}
+<div class="card" id="lag-table">
   <div class="r h"><span>Topic · partition</span><span>Owner</span><span class="ra">Committed</span><span class="ra">Log end</span><span>Lag</span><span class="ra"></span></div>
   {{range .Offsets}}
   <div class="r">
@@ -143,21 +195,57 @@
     <span class="m ra">{{num .Committed}}</span>
     <span class="m ra">{{if .Deleted}}<span class="mut">—</span>{{else}}{{num .Latest}}{{end}}</span>
     <span class="row ce g8">{{if .Deleted}}<span class="note bad" title="The topic no longer exists; this offset is a leftover">topic deleted</span>
-      {{else if .Ahead}}<span class="note warn" title="The committed offset is beyond the end of the log, usually because the topic was purged or recreated. The consumer will see an out-of-range error and reset.">ahead of log end by {{num .AheadBy}}</span>
+      {{else if .Ahead}}<span class="note warn" title="The committed offset is beyond the end of the log: it was committed or set past the last record. A consumer starting from it is told OFFSET_OUT_OF_RANGE by Fetch and falls back to auto.offset.reset.">ahead of log end by {{num .AheadBy}}</span>
       {{else}}<span class="lane grow"><div class="{{if .Trimmed}}bad{{end}}" style="width: {{if eq .Lag 0}}0{{else}}{{.LagPercent}}{{end}}%"></div></span>{{if .Trimmed}}<span class="note bad" title="Records between this offset and the start of the log were deleted by retention before the group read them">lost to retention</span>{{end}}{{end}}</span>
     <span class="m ra {{if .Deleted}}mut{{else if .Ahead}}warn{{else if gt .Lag 0}}warn{{else}}ok{{end}}">{{if or .Deleted .Ahead}}—{{else}}{{num .Lag}}{{end}}</span>
   </div>
   {{end}}
   <div class="r totalrow"><span class="b">Total</span><span></span><span class="m ra">{{num .TotalCommitted}}</span><span class="m ra">{{num .TotalLogEnd}}</span><span class="note">lag is log end minus committed</span><span class="m ra b {{if gt .TotalLag 0}}warn{{else}}ok{{end}}">{{num .TotalLag}}</span></div>
 </div>
-<div class="row ce g8"><span class="pill ok"><span class="dot" aria-hidden="true"></span>live</span><span class="note">refreshes every 3 s. A bar is that partition's lag against the log, not a rate. Lag is not a number the broker reports: it is <b>log end &minus; committed</b>, worked out here the way <span class="m">kafka-consumer-groups.sh</span> does.</span></div>
+{{if .LeftTopics}}<div class="callout" id="leftover-note"><span class="b">Why {{if eq .LeftN 1}}this row is{{else}}these rows are{{end}} here</span>
+  <span class="note">{{if eq (len .LeftTopics) 1}}The topic <span class="m">{{index .LeftTopics 0}}</span> was{{else}}These topics were{{end}} deleted, and the group still holds {{.LeftN}} offset{{if ne .LeftN 1}}s{{end}} on {{if eq .LeftN 1}}it{{else}}them{{end}}. Kafka drops the offsets of a deleted topic, a moment after the topic goes and not at once; this broker drops them in the same step, so a leftover row can only come from a data directory written by an earlier version of it. The row has no log end and no link, and it does not count toward the lag above. Removing it only forgets that offset (the group's other offsets stay), as <span class="m">kafka-consumer-groups.sh --delete-offsets</span> does; it is on the <a href="{{groupURL .Group.ID}}?tab=offsets">Offsets tab</a>. A new topic of the same name starts empty.</span></div>{{end}}
+<div class="row ce g8"><span class="pill ok"><span class="dot" aria-hidden="true"></span>live</span><span class="note" title="Lag is not a number the broker reports: it is log end minus committed, worked out here the way kafka-consumer-groups.sh does.">refreshes every 3 s. A bar is that partition's lag against the log, not a rate.</span></div>
 {{else if .Members}}
-<div class="callout"><span class="b">No committed offsets yet</span><span class="note">This group has members but has not committed any offsets, so there is no lag to show. Offsets appear after a consumer's first commit (with <span class="m">enable.auto.commit</span> that is a few seconds after it starts polling).</span></div>
+<div class="callout" id="no-commits"><span class="b">No commits yet is not lag 0</span><span class="note">Lag needs a committed offset to measure from. This group has not committed any, so the console shows nothing instead of a misleading <span class="m">0</span>. Offsets appear after the consumer's first commit: with <span class="m">enable.auto.commit</span> that is a few seconds after it starts polling.</span></div>
+{{if .NoCommitRows}}<div class="card" id="nocommit-table">
+  <div class="r h"><span>Topic · partition</span><span>Owner</span><span class="ra">Log end</span><span class="ra">Committed</span></div>
+  {{range .NoCommitRows}}<div class="r"><span class="m el"><a href="{{.TopicURL}}">{{.Topic}}</a> · {{.Partition}}</span><span class="m el">{{.Owner}}</span><span class="m ra">{{if .HasEnd}}{{num .LogEnd}}{{else}}<span class="mut">—</span>{{end}}</span><span class="note ra">no commit yet</span></div>{{end}}
+</div>
+<div class="row ce g8"><span class="pill ok"><span class="dot" aria-hidden="true"></span>live</span><span class="note">checks again every 3 s; this table fills in on the first OffsetCommit.</span></div>{{else}}
+<div class="note">The members own no partitions yet, so there is nothing to list.</div>{{end}}
 {{else}}
 <div class="callout"><span class="b">No members and no offsets</span><span class="note">No members connected. Offsets, if any were committed before, are still held: they are durable even when the group is empty.</span></div>
 {{end}}
 {{template "group_tryit" .}}
 {{end}}
+
+{{/* Gr-16: a refused client, in the broker's words and with the operation the API needs (GRP-21). */}}
+{{define "group_denied"}}{{with .Denied}}
+<div class="callout deny" id="denied-note"><span class="row sb ce wrap"><span class="b">Refused <span class="m deny">{{.Error}}</span></span>{{if .CheckURL}}<a class="btn sm" href="{{.CheckURL}}">Check {{.Principal}} on this group</a>{{end}}</span>
+  <span class="note"><span class="m">{{.API}}{{if .Version}} v{{.Version}}{{end}}</span> at {{when .At "clockms"}} from <span class="m">{{if .Client}}{{.Client}}{{else}}a client with no client id{{end}}</span>{{if .Principal}} as <span class="m">{{.Principal}}</span>{{end}}. {{.Count}} refused request{{if ne .Count 1}}s{{end}} {{.Over}}, from {{.Clients}} client{{if ne .Clients 1}}s{{end}}.</span>
+  <span class="note">{{if .Unknown}}The console does not know which ACL operation this request needs.{{else}}Rule: <span class="m">{{.API}}</span> needs <span class="m">{{.Needs}}</span> on this group. A DENY matches one operation exactly, so a DENY of a different operation (a <span class="m">Read</span> deny does not refuse a <span class="m">Describe</span>) would not have refused it: look for an ACL that denies <span class="m">{{.Needs}}</span> here, or for no ACL that allows it when the broker denies by default. A deny wins over any allow. Real Kafka answers the same call with the same error, so the app will keep failing until the ACL changes, not until it retries.{{end}}</span>
+  {{if .ACLs}}<div class="card"><div class="r h"><span>Principal</span><span>Operation</span><span>Name</span><span>Host</span><span>Permission</span></div>{{range .ACLs}}<div class="r"><span class="m el">{{.Principal}}</span><span class="m">{{.Operation}}</span><span class="m el">{{.Name}}{{if eq .Pattern "prefixed"}}*{{end}}</span><span class="m">{{.Host}}</span><span class="m {{if eq .Permission "deny"}}bad{{else}}ok{{end}}">{{.Permission}}</span></div>{{end}}</div>
+  <span class="note">The ACLs on this group that name this principal or <span class="m">User:*</span>. Edit them in <a href="{{$.Prefix}}/access">Access</a>.</span>{{else}}<span class="note">No ACL on this group names this principal, so a default-deny broker refuses it for want of an Allow.</span>{{end}}</div>
+{{end}}{{end}}
+
+{{/* Gr-18: the offsets retention, only as far as the broker computes it (GRP-19). */}}
+{{define "group_expiry"}}{{with .Expiry}}
+{{if .Forever}}<div class="note" id="expiry-note">This broker keeps committed offsets for ever: <span class="m">offsets-retention</span> is 0, so nothing here expires.</div>
+{{else if .None}}<div class="note" id="expiry-note">Committed offsets expire <span class="m">{{.Retention}}</span> after they are no longer wanted (<span class="m">offsets.retention.minutes</span>), but none of this group's does as things stand: a group with members keeps the offsets of the topics they read.</div>
+{{else}}<div class="callout" id="expiry-note"><span class="row sb ce wrap"><span class="b">Offsets are kept for now</span><span class="m warn">expire {{when .At "datetime"}} · {{.In}}</span></span>
+  {{if .Used}}<div class="row ce g8"><span class="note">Empty since {{when .EmptySince "datetime"}}</span><progress class="gr-used grow" value="{{.Pct}}" max="100"></progress><span class="note">{{.Used}} of {{.Of}} used</span></div>{{end}}
+  <span class="note">The broker keeps an empty group's committed offsets for <span class="m">{{.Retention}}</span> (<span class="m">offsets.retention.minutes</span>), counted from the moment the group became empty; a group that never had a member counts each offset from its own commit. After that they are deleted and the group disappears from this list. A consumer that joins before then resumes from these offsets; after, from <span class="m">auto.offset.reset</span>. The broker checks every {{.Interval}}, so this is the earliest it can happen; {{.Count}} offset{{if ne .Count 1}}s{{end}} of this group will expire.</span></div>{{end}}
+{{end}}{{end}}
+
+{{/* Gr-14: records past the last stable offset. The console does not know the group's isolation level. */}}
+{{define "group_held"}}{{with .Held}}
+<div class="callout warn" id="held-note"><span class="b">{{num .Total}} record{{if ne .Total 1}}s{{end}} held back by an open transaction</span>
+  <span class="note">With <span class="m">read_committed</span> the broker will not hand out records at or after the first offset of an open transaction. A consumer reading that way stops at the last stable offset; one reading <span class="m">read_uncommitted</span> goes to the log end. The console cannot tell which this group does (a Fetch carries no group id), so the lag below is measured to the log end. Measured to the last stable offset it would be as the last column says.</span>
+  <div class="card"><div class="r h"><span>Topic · partition</span><span class="ra">Last stable</span><span class="ra">Log end</span><span class="ra">Held</span><span class="ra">Lag to last stable</span></div>
+  {{range .Rows}}<div class="r"><span class="m el"><a href="{{.TopicURL}}">{{.Topic}}</a> · {{.Partition}}</span><span class="m ra">{{num .Stable}}</span><span class="m ra">{{num .LogEnd}}</span><span class="m ra warn">{{num .Held}}</span><span class="m ra">{{num .Behind}}</span></div>{{end}}</div>
+  {{range .Txns}}<span class="note">Open transaction <span class="m">{{.ID}}</span> · producer id <span class="m">{{.ProducerID}}</span>, epoch <span class="m">{{.Epoch}}</span>{{if .OpenFor}} · open for {{.OpenFor}}{{end}} · on <span class="m">{{range $i, $p := .Partitions}}{{if $i}}, {{end}}{{$p}}{{end}}</span></span>{{end}}
+  <span class="note">When the transaction commits or aborts, the last stable offset moves and the records appear (or are skipped).</span></div>
+{{end}}{{end}}
 
 {{/* Gr-02, Try it: the fields OffsetCommit takes, for one partition. Disabled, and
      saying why, while members are connected, as the Offsets tab is. It holds the
@@ -186,47 +274,133 @@
 {{/* Gr-03, Members. */}}
 {{define "group_members"}}
 {{if .Members}}
-<div class="card" id="members-table" style="--c: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.6fr)">
-  <div class="r h"><span>Member</span><span>Client</span><span>Host</span><span>Assigned</span></div>
+<div class="card" id="members-table">
+  <div class="r h"><span>Member</span><span>Client</span><span>Host</span><span>Assigned</span><span class="ra">Heartbeat</span></div>
   {{range .Members}}
-  <div class="r" id="mb-{{.ID}}" tabindex="0" role="button" data-inspector-open
+  <div class="r" id="mb-{{.ID}}" tabindex="0" role="button" data-row data-inspector-open data-open-keys="member:{{.Key}}"
       hx-get="{{$.Prefix}}/inspect/member?key={{memberKey $.Group.ID .ID}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
-    <span class="m b" title="{{.ID}}">{{.Label}}{{if and .ClientID (ne .Label .ID)}} <span class="mut">· {{.ID}}</span>{{end}}</span>
-    <span class="m">{{if .ClientID}}{{.ClientID}}{{else}}<span class="mut">—</span>{{end}}</span>
-    <span class="m">{{if .Host}}{{.Host}}{{else}}<span class="mut">—</span>{{end}}</span>
+    <span class="m b el" title="{{.ID}}">{{.ID}}{{if .Leader}} <span class="tag">leader</span>{{end}}</span>
+    <span class="m el">{{if .ClientID}}{{.ClientID}}{{else}}<span class="mut">—</span>{{end}}</span>
+    <span class="m el">{{if .Addr}}{{.Addr}}{{else if .Host}}{{.Host}}{{else}}<span class="mut">—</span>{{end}}</span>
     <span class="m el">{{range $i, $a := .Assigned}}{{if $i}} · {{end}}{{$a.Topic}}:{{$a.Parts}}{{end}}{{if not .Assigned}}<span class="mut">none yet</span>{{end}}</span>
+    <span class="m ra {{if .HeartbeatOK}}ok{{end}}"{{if not .Heartbeat.IsZero}} title="{{whenText .Heartbeat "clockms"}}"{{end}}>{{if .HeartbeatAgo}}{{.HeartbeatAgo}}{{else}}<span class="mut">—</span>{{end}}</span>
   </div>
   {{end}}
 </div>
 <div class="note">An assignment reads as <span class="m">topic:partitions</span>. Select a member to open it on the right. Members are in memory only: after a broker restart they are rebuilt as clients reconnect.</div>
+{{template "group_members_more" .}}
 {{else}}
 <div class="callout"><span class="b">No members connected</span><span class="note">Offsets, if any were committed before, are still held: they are durable even when the group is empty.</span></div>
 {{end}}
 {{end}}
 
-{{/* Offsets: change what the group has committed. An active group is refused first,
-     as real Kafka refuses it, so every control is disabled while members are connected. */}}
-{{define "group_offsets"}}
-<div class="callout{{if .CanAct}}{{else}} warn{{end}}" id="reset">
-  <div class="row sb ce wrap g8">
-    <span class="b">Reset offsets</span>
-    <div class="row ce g8 wrap">
-      {{if gt (len .Topics) 1}}
-      <label class="scope"><span class="sr-only">Which offsets to reset</span>
-        <select class="input" id="reset-scope" name="topic" {{if not .CanAct}}disabled{{end}}>
-          <option value="">all topics</option>
-          {{range .Topics}}<option value="{{.}}">{{.}}</option>{{end}}
-        </select></label>
-      {{else}}{{/* One topic: no choice to offer, and the buttons still send the scope they include (all of them). */}}<input type="hidden" id="reset-scope" name="topic" value="">
-      {{end}}
-      <button type="button" class="btn" {{if not (and .CanAct .Offsets)}}disabled title="{{if .Members}}Stop the group's {{len .Members}} consumer{{if ne (len .Members) 1}}s{{end}} first{{else}}No committed offsets to reset{{end}}"{{end}}
-        hx-post="{{groupURL .Group.ID}}/reset" hx-include="#reset-scope" hx-vals='{"to":"earliest","tab":"offsets"}' data-confirm-url="{{confirmURL "group.reset.earliest" "group" .Group.ID}}" data-confirm-title="{{(index .Confirm "group.reset.earliest").Title}}" data-confirm-verb="{{(index .Confirm "group.reset.earliest").Verb}}" hx-confirm="{{(index .Confirm "group.reset.earliest").Text}}" hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this">{{icon "skip-back"}} Reset to earliest</button>
-      <button type="button" class="btn" {{if not (and .CanAct .Offsets)}}disabled{{end}}
-        hx-post="{{groupURL .Group.ID}}/reset" hx-include="#reset-scope" hx-vals='{"to":"latest","tab":"offsets"}' data-confirm-url="{{confirmURL "group.reset.latest" "group" .Group.ID}}" data-confirm-title="{{(index .Confirm "group.reset.latest").Title}}" data-confirm-verb="{{(index .Confirm "group.reset.latest").Verb}}" hx-confirm="{{(index .Confirm "group.reset.latest").Text}}" hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this">{{icon "skip-forward"}} Reset to latest</button>
-    </div>
-  </div>
-  <span class="note">{{if .CanAct}}No member is connected, so the offsets can be moved. The change applies at once and cannot be undone.{{else}}{{if .Members}}{{len .Members}} member{{if ne (len .Members) 1}}s are{{else}} is{{end}} connected: stop the group's consumers first.{{else}}The group is not empty.{{end}} Real Kafka refuses to move an active group's offsets, and so does this.{{end}}</span>
+{{/* Gr-05, Gr-12, Gr-13: what the coordinator holds beyond the member rows. Each block is
+     there only when the broker holds it; the page says where it does not. */}}
+{{define "group_members_more"}}
+{{if .Rebalance}}
+<div class="card pad col g6" id="rebalance-wait">
+  <div class="row sb ce"><span class="h2">Waiting for members to rejoin</span><span class="m {{if .Rebalance.Late}}bad{{else}}warn{{end}}" id="rebalance-left">{{if .Rebalance.Left}}{{.Rebalance.Left}} left{{if .Rebalance.Of}} of {{.Rebalance.Of}}{{end}}{{else}}no deadline{{end}}</span></div>
+  <span class="note">{{if .Rebalance.Holding}}The group is in its initial rebalance delay (<span class="m">group.initial.rebalance.delay.ms</span>): it waits for more members to start before it forms a generation, and another delay begins each time a new member joins, up to the rebalance timeout.{{else}}The rebalance timeout is <span class="m">{{.Rebalance.Of}}</span>: the longest any member asked for (its <span class="m">max.poll.interval.ms</span>; a member that stated none counts as its session timeout). A member that has not sent JoinGroup by then is dropped from the group and the rest carry on.{{end}}</span>
+  <div class="r h"><span>Member</span><span>Client</span><span>Host</span><span>Joined generation {{.Rebalance.Next}}?</span></div>
+  {{range .Rebalance.Rows}}<div class="r"><span class="m el">{{.ID}}</span><span class="m el">{{if .Client}}{{.Client}}{{else}}<span class="mut">—</span>{{end}}</span><span class="m el">{{if .Addr}}{{.Addr}}{{else}}<span class="mut">—</span>{{end}}</span>
+    <span class="m el {{if .Rejoined}}ok{{else}}warn{{end}}">{{if .Rejoined}}rejoined {{whenText .At "clockms"}}{{else}}not yet{{if .HeartbeatAgo}} · last heartbeat {{.HeartbeatAgo}}{{end}}{{end}}</span></div>{{end}}
+  <span class="note">Members learn about the rebalance from their next heartbeat, which answers <span class="m">REBALANCE_IN_PROGRESS</span>. They then send JoinGroup. Healthy clients take a few seconds.</span>
 </div>
+{{end}}
+{{if .Handoffs}}
+<div class="card pad col g6" id="handoff-table">
+  <span class="h2">Target and current assignment</span>
+  <div class="r h"><span>Member</span><span>State</span><span>Epoch</span><span>Target assignment</span><span>Current assignment</span></div>
+  {{range .Handoffs}}<div class="r"><span class="m el" title="{{.ID}}">{{.ID}}</span><span class="m {{if .Reconciling}}warn{{else}}ok{{end}}">{{.State}}</span><span class="m">{{.Epoch}}</span><span class="m el">{{if .Target}}{{.Target}}{{else}}<span class="mut">none</span>{{end}}</span>
+    <span class="m el">{{if .Current}}{{.Current}}{{else}}<span class="mut">none yet</span>{{end}}{{if .Releasing}} <span class="note">(releasing {{.Releasing}})</span>{{end}}{{if .Waiting}} <span class="note">(waiting for {{.Waiting}})</span>{{end}}</span></div>{{end}}
+  <span class="note">Target is what the broker wants the member to own. Current is the coordinator's record of what the member may consume, plus what it was told to give up and has not yet: it is not read from the member, which reports its own set only in its next heartbeat. When they differ the member is <span class="m">RECONCILING</span>: partitions move one at a time, and a partition is never given to its new owner until the old one has released it.</span>
+</div>
+<div class="callout" id="handoff-example"><span class="b">What reconciling looks like <span class="tag">example, not this group</span></span><span class="note">A second consumer joins at epoch 12, so the group moves to epoch 13. The first member shows <span class="m">RECONCILING</span> with target <span class="m">orders:0,1</span> and current <span class="m">orders:0,1,2</span> (releasing 2); the new one shows target <span class="m">orders:2</span> and current none yet (waiting for 2). Once the first acknowledges, both read <span class="m">STABLE</span>.</span></div>
+{{end}}
+{{if .ClassicFacts}}
+<div class="card pad col g6" id="classic-facts">
+  <span class="h2">The group</span>
+  <div class="kv kv-group">
+    <span>Protocol</span><span>classic <span class="note">JoinGroup, SyncGroup, Heartbeat</span></span>
+    <span>Generation</span><span class="m">{{.ClassicFacts.Generation}}</span>
+    <span>Protocol type</span><span class="m">{{.ClassicFacts.ProtocolType}}</span>
+    <span>Protocol name</span><span class="m">{{if .ClassicFacts.Protocol}}{{.ClassicFacts.Protocol}}{{else}}<span class="mut">not chosen yet</span>{{end}}{{if .ClassicFacts.Offered}} <span class="note">(chosen from {{.ClassicFacts.Offered}})</span>{{end}}</span>
+    <span>Leader</span><span class="m">{{if .ClassicFacts.Leader}}{{.ClassicFacts.Leader}}{{else}}<span class="mut">none yet</span>{{end}}</span>
+    <span>Session timeout</span><span class="m">{{if .ClassicFacts.Session}}{{.ClassicFacts.Session}}{{else}}<span class="mut">—</span>{{end}} <span class="note">asked by each client</span></span>
+    <span>Rebalance timeout</span><span class="m">{{if .ClassicFacts.Rebalance}}{{.ClassicFacts.Rebalance}}{{else}}<span class="mut">not stated (JoinGroup v0)</span>{{end}}</span>
+  </div>
+  <span class="note">The group has a <span class="m">generation</span> that goes up on every rebalance; a stale member gets <span class="m">ILLEGAL_GENERATION</span> and must rejoin. Every member stops and rejoins together (unless it uses cooperative-sticky). Session timeouts come from each client. A group on KIP-848 has an <span class="m">epoch</span> per member and no leader.</span>
+</div>
+{{end}}
+{{end}}
+
+{{/* The sentence on the Offsets tab (Gr-06, Gr-07, Gr-08): whether the offsets can be moved, and why. */}}
+{{define "group_facts_offsets"}}{{if .Members}}{{len .Members}} member{{if ne (len .Members) 1}}s{{end}}{{if .Generation}} on {{.GenLabel}} <span class="m">{{.Generation}}</span>{{end}}{{if .Offsets}}, {{if .AnyAhead}}ahead of the log end somewhere{{else if eq .TotalLag 0}}<span class="m ok">caught up</span>{{else}}<span class="m warn">{{num .TotalLag}}</span> record{{if ne .TotalLag 1}}s{{end}} behind{{end}}{{end}}. Offsets can only be changed while the group has no members.
+{{else if not .Offsets}}No members and no committed offsets: there is nothing to reset.
+{{else if .CanAct}}No members; offsets kept on <span class="m">{{len .Offsets}}</span> partition{{if ne (len .Offsets) 1}}s{{end}} of {{if eq (len .Topics) 1}}one topic{{else}}<span class="m">{{len .Topics}}</span> topics{{end}}, {{if .AnyAhead}}ahead of the log end somewhere{{else if eq .TotalLag 0}}<span class="m ok">caught up</span>{{else}}<span class="m warn">{{num .TotalLag}}</span> record{{if ne .TotalLag 1}}s{{end}} behind{{end}}. Resetting is allowed because the group is <span class="m">Empty</span>.
+{{else}}The group is <span class="m">{{.Group.State}}</span>: offsets can only be changed while it is Empty.{{end}}{{end}}
+
+{{/* Gr-07: the refusal, with the way out. The same block is the answer to a reset sent to a group
+     that gained a member since the page was drawn (a 400 the page swaps in, X-Doze-Refusal). */}}
+{{define "group_refused"}}
+{{template "refusal" (dict "Refusal" .Refusal)}}
+<div class="card pad col g12" id="reset-steps">
+  <span class="h2">What to do</span>
+  <div class="row g12 stepr"><span class="stepn">1</span><div class="col"><span class="b">Stop the {{.Steps.Count}} consumer{{if ne .Steps.Count 1}}s{{end}} that use{{if eq .Steps.Count 1}}s{{end}} this group</span><span class="note">{{if .Steps.SameApp}}All {{lower (countWord .Steps.Count)}} are the app <span class="m">{{index .Steps.Clients 0}}</span>{{else if .Steps.Clients}}{{range $i, $c := .Steps.Clients}}{{if $i}}, {{end}}<span class="m">{{$c}}</span>{{end}}{{end}}{{if .Steps.Addrs}}{{if .Steps.Clients}}: {{end}}{{range $i, $a := .Steps.Addrs}}{{if $i}}, {{end}}<span class="m">{{$a}}</span>{{end}}{{end}}{{if or .Steps.Clients .Steps.Addrs}}. {{end}}A consumer that closes cleanly sends LeaveGroup, which makes the group Empty at once.</span></div></div>
+  <div class="row g12 stepr"><span class="stepn">2</span><div class="col"><span class="b">Or wait for them to expire</span><span class="note">A consumer that just disappears is evicted after its session timeout{{if .Steps.Session}} of <span class="m">{{.Steps.Session}}</span>{{end}}. Watch it on the <a href="{{groupURL .Group.ID}}?tab=timeline">Timeline</a>.</span></div></div>
+  <div class="row g12 stepr"><span class="stepn">3</span><div class="col"><span class="b">Reset, then start them again</span><span class="note">They resume from the new offsets. This tab shows the reset form once the group is Empty.</span></div></div>
+  <div class="row ce g8"><a class="btn" href="{{groupURL .Group.ID}}?tab=members">Show the {{.Steps.Count}} member{{if ne .Steps.Count 1}}s{{end}}</a><a class="btn" href="{{groupURL .Group.ID}}?tab=timeline">Watch the timeline</a></div>
+</div>
+{{end}}
+
+{{/* Gr-06: the preview. Committed now, after the reset, lag after: from the plan the reset itself
+     writes, and it sends nothing. In "specific offsets" the After column is the inputs. */}}
+{{define "group_reset_preview"}}
+<div class="col g8 grow" id="reset-preview" aria-live="polite">
+  <div class="row sb ce"><span class="b">Preview</span><span class="note">committed now, then after the reset. Nothing has changed yet.</span></div>
+  <div class="card" id="reset-table">
+    <div class="r h"><span>Partition</span><span class="ra">Committed now</span><span class="ra">After reset</span><span class="ra">Lag after</span></div>
+    {{range .Preview.Rows}}
+    <div class="r"><span class="m el">{{if $.Preview.Multi}}{{.Topic}} · {{end}}{{.Partition}}</span><span class="m ra">{{num .Committed}}</span>
+      {{if $.Preview.Specific}}<span class="ra"><input class="inp m rst-off" name="{{.Field}}" form="reset-form" inputmode="numeric" autocomplete="off" value="{{.After}}" data-latest="{{.Latest}}" aria-label="New offset for {{if $.Preview.Multi}}{{.Topic}} {{end}}partition {{.Partition}}, from {{.Earliest}} to {{.Latest}}" title="From {{.Earliest}} (the oldest record) to {{.Latest}} (the end)"></span>
+      {{else}}<span class="m ra b" title="{{.Note}}">{{if .Changed}}{{num .Committed}} → {{num .After}}{{else}}{{num .After}}{{end}}{{if .Note}} <span class="mut">*</span>{{end}}</span>{{end}}
+      <span class="m ra {{if gt .LagAfter 0}}warn{{else}}ok{{end}}" data-lag-after>{{num .LagAfter}}</span></div>
+    {{end}}
+    <div class="r totalrow"><span class="b">Total</span><span></span><span></span><span class="m ra b {{if gt .Preview.LagAfter 0}}warn{{else}}ok{{end}}" data-lag-total>{{num .Preview.LagAfter}}</span></div>
+  </div>
+  <div class="note">{{segs .Preview.Sentence}}{{range .Preview.Rows}}{{if .Note}} <span class="mut">*</span> Partition {{.Partition}}: {{.Note}}.{{end}}{{end}}</div>
+</div>
+{{if .Swap}}<span id="reset-count" hx-swap-oob="true">{{.Preview.Count}}</span>{{end}}
+{{end}}
+
+{{/* Offsets: change what the group has committed. The reset form is Gr-06; a group with members
+     gets Gr-07's refusal in its place; one partition's offset is set or removed in its row (Gr-08). */}}
+{{define "group_offsets"}}
+<div id="reset-result">{{if .Refusal}}{{template "group_refused" .}}{{end}}</div>
+{{if .Reset}}
+{{$f := .Reset}}
+<div class="row g16 resetrow" x-data="{to:'earliest', held:false}" @input="held=true" @change="held=true" :data-hold-live="held ? '' : null">
+  <form class="card pad col g12 resetform" id="reset-form"
+        hx-post="{{groupURL .Group.ID}}/reset" hx-vals='{"tab":"offsets"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]"
+        data-confirm-url="{{confirmURL "group.reset" "group" .Group.ID}}" data-confirm-title="Reset offsets" data-confirm-verb="Reset offsets" hx-confirm="{{(index .Confirm "group.reset.earliest").Text}}">
+    <span class="h2">Reset offsets</span>
+    <fieldset class="col g8 resetmode">
+      <legend class="cap">Move every partition to</legend>
+      <label class="row ce g8"><input type="radio" name="to" value="earliest" x-model="to" checked> <span class="b">earliest</span><span class="note">the oldest retained record</span></label>
+      <label class="row ce g8"><input type="radio" name="to" value="latest" x-model="to"> <span class="b">latest</span><span class="note">the end of the log</span></label>
+      <label class="row ce g8"><input type="radio" name="to" value="timestamp" x-model="to"> <span class="b">a timestamp</span><input class="inp m rst-at" id="reset-at" name="at" value="{{$f.At}}" aria-label="Timestamp" autocomplete="off" spellcheck="false" @focus="to='timestamp'; $dispatch('change')"></label>
+      <label class="row ce g8"><input type="radio" name="to" value="offsets" x-model="to"> <span class="b">specific offsets</span><span class="note">edit one row at a time</span></label>
+    </fieldset>
+    <label class="col g4"><span class="cap">Topic</span>
+      <select class="inp m" name="topic" aria-label="Topic">{{range $f.Scopes}}<option value="{{.Topic}}"{{if eq .Topic $f.Topic}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
+    <div class="row ce g8"><button class="btn pri" type="submit"><span>Apply: reset <span id="reset-count">{{if $f.Preview}}{{$f.Preview.Count}}{{end}}</span></span></button><a class="btn w5" href="{{groupURL .Group.ID}}">Cancel</a></div>
+    <span class="note">Consumers that join later start from the new offsets. Nothing is deleted from the topic.</span>
+    <div class="err form-err" data-err-slot hidden role="alert"></div>
+  </form>
+  <span hidden hx-post="{{groupURL .Group.ID}}/reset/preview" hx-include="#reset-form" hx-trigger="change from:#reset-form, change from:.rst-off, input from:#reset-at delay:500ms" hx-target="#reset-preview" hx-select="unset" hx-swap="outerHTML"></span>
+  {{if $f.Preview}}{{template "group_reset_preview" (dict "Preview" $f.Preview "Group" .Group)}}{{else}}<div class="col g8 grow" id="reset-preview"><div class="callout"><span class="b">Nothing to preview</span><span class="note">{{$f.PreviewErr}}</span></div></div>{{end}}
+</div>
+{{end}}
 
 {{if .Offsets}}
 <div class="tbl-wrap" id="offsets-table">
@@ -249,7 +423,7 @@
           <button type="button" class="btn sm danger" aria-label="Remove the offset for {{.Topic}} partition {{.Partition}}"
             hx-post="{{groupURL $.Group.ID}}/offset/delete" hx-vals='{"topic":"{{.Topic}}","partition":"{{.Partition}}","tab":"offsets"}' hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
             data-confirm-url="{{confirmURL "group.offset.delete" "group" $.Group.ID "topic" .Topic "partition" .Partition}}" data-confirm-title="Remove offset" data-confirm-verb="Remove"
-            hx-confirm="{{(confirmOffset $.Group.ID .Topic .Partition .Committed).Text}}">Remove</button>
+            hx-confirm="{{(confirmOffset $.Group.ID .Topic .Partition .Committed (len $.Offsets)).Text}}">Remove</button>
         </div>
         {{if not .Deleted}}
         <form class="rowset" x-show="e" x-cloak @keydown.escape.stop="e=false" hx-post="{{groupURL $.Group.ID}}/offset" hx-target="#group-live" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]">
@@ -278,12 +452,26 @@
      when each generation began. Kept in memory for the life of the broker only. */}}
 {{define "group_timeline"}}
 {{if .HasTimeline}}
+{{if .TL.Held}}
+<div class="row sb ce wrap" id="timeline-head">
+  <span class="note" id="timeline-count">{{if .TL.Rebalances}}In the last hour the group rebalanced <span class="m">{{.TL.Rebalances}}</span> time{{if ne .TL.Rebalances 1}}s{{end}}{{if .TL.Reasons}}, each time for a reason you can see below{{end}}.{{else}}The group has not rebalanced in the last hour.{{end}} The broker keeps the last {{.TL.Held}}{{if .TL.Full}} (its limit: <span class="m">200</span> per group; older events are gone){{end}} group event{{if ne .TL.Held 1}}s{{end}} of this group, in memory{{if not .TL.Full}}, since {{whenText .TL.Since "clockms"}}{{end}}.</span>
+  <nav class="seg" aria-label="Filter the timeline" id="timeline-chips">{{range .TL.Chips}}<a class="{{if .On}}on{{end}}" href="{{.URL}}"{{if .On}} aria-current="true"{{end}}>{{.Label}}</a>{{end}}</nav>
+</div>
 {{if .Timeline}}
 <ol class="timeline" id="group-timeline">
   {{range .Timeline}}<li class="tl tl-{{.Tone}}"><div class="tl-row" id="ev-{{.Seq}}" tabindex="0" role="button" data-inspector-open
     hx-get="{{$.Prefix}}/inspect/event?key={{eventKey $.Group.ID .Seq}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"><span class="tl-t mono">{{when .Time "clockms"}}</span><span class="tl-k">{{.Label}}</span>{{if .Member}}<span class="tl-m mono" title="{{.Member}}">{{.Member}}</span>{{end}}<span class="tl-d">{{.Detail}}</span>{{if .Generation}}<span class="tl-g mono">gen {{.Generation}}</span>{{end}}</div></li>{{end}}
 </ol>
-<div class="note">What the coordinator did, newest first, since the broker started. In memory only.</div>
+{{else}}<div class="note" id="timeline-none">No event of this kind is held for the group.</div>{{end}}
+<div class="note">What the coordinator did, newest first. Read it from the bottom up: what happened, then what the group did about it.</div>
+{{if .TL.Flap}}{{if .TL.Flap.Gaps}}
+<div class="callout warn" id="flap-pattern"><span class="b">The pattern: expired, then joined, then expired</span>
+  <span class="note">Gaps between expiries: <span class="m">{{range $i, $g := .TL.Flap.Gaps}}{{if $i}}, {{end}}{{$g}}{{end}}</span>.{{if .TL.Flap.Steady}} A steady period usually points at the app, not the network.{{end}} The member stops heartbeating for longer than its session timeout.</span></div>
+<div class="callout" id="flap-where"><span class="b">Where to look</span>
+  <span class="note">Compare the member's <span class="m">session.timeout.ms</span> and <span class="m">heartbeat.interval.ms</span> with how long one batch takes to process. If a handler runs longer than <span class="m">max.poll.interval.ms</span> between polls, the client leaves on its own, which shows as <span class="m">left</span>, not expired. A paused JVM or a blocked event loop shows as expired. The broker does not know a client's settings, so they are not shown here.</span></div>
+{{end}}{{end}}
+<div class="callout" id="timeline-reading"><span class="b">Reading it</span>
+  <span class="note">Each <span class="m">rebalance</span> row says why{{if .TL.Reasons}}: in the last hour {{range $i, $r := .TL.Reasons}}{{if $i}}, {{end}}{{$r.Reason}} <span class="m">×{{$r.N}}</span>{{end}}{{end}}. A group rebalances when you start or stop a consumer, and that is not a problem. A loop of <span class="m">session expired</span> then <span class="m">joined</span> would be one.</span></div>
 {{else}}
 <div class="callout"><span class="b">Nothing has happened in this group since the broker started</span><span class="note">Members joining, leaving or timing out, and each new generation, appear here as they happen.</span></div>
 {{end}}

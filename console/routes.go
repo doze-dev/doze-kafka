@@ -78,6 +78,9 @@ func (c *Console) routeTable() []routeRow {
 	post := func(path, test, note string, h http.HandlerFunc) routeRow {
 		return routeRow{Method: "POST", Path: path, Mutates: true, Test: test, Note: note, handler: h}
 	}
+	// withoutMutating marks a POST that carries a form too big for an address and
+	// changes nothing (the Groups reset's preview).
+	withoutMutating := func(r routeRow) routeRow { r.Mutates = false; return r }
 	static := get("/static/", specShell, "the embedded assets", func(w http.ResponseWriter, r *http.Request) {
 		http.StripPrefix(c.prefix+"/", c.staticHandler()).ServeHTTP(w, r)
 	})
@@ -145,6 +148,7 @@ func (c *Console) routeTable() []routeRow {
 		get("/groups/{id}", specGroups, "one group", c.groupDetail),
 		get("/groups/{id}/live", specGroups, "HTMX partial, polled", c.groupLive),
 		post("/groups/{id}/reset", specGroups, "move the group's offsets", c.groupReset),
+		withoutMutating(post("/groups/{id}/reset/preview", specGroups, "the reset as it would be: committed now, after, lag after; sends nothing", c.groupResetPreview)),
 		post("/groups/{id}/offset", specGroups, "one partition's committed offset", c.groupOffsetSet),
 		post("/groups/{id}/offset/delete", specGroups, "remove one committed offset", c.groupOffsetDelete),
 		post("/groups/{id}/delete", specGroups, "delete the group", c.groupDelete),

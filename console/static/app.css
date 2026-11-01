@@ -1631,3 +1631,41 @@ html[data-paused] #inspector[data-traffic-kept] .tf-kept { display: block; }
 #resend-note:empty { display: none; }
 #resend-note .callout { margin-bottom: 8px; }
 tr.copied td { background: var(--okbg); }
+/* ---- Groups (Gr-01 .. Gr-18) ---- */
+.none-card { max-width: 760px; }
+.list-none { padding: 18px 14px; }
+.main.gr-none { gap: 12px; }
+
+.code .c { color: var(--mut); }
+
+/* Gr-02, Gr-03: the group page. */
+.nbwell { padding: 6px 10px; }
+.nbwell a:hover { text-decoration: underline; }
+#lag-table { --c: 150px 130px 90px 90px 1fr 56px; }
+#members-table { --c: 150px 110px 130px 1fr 70px; }
+.memberwell { padding: 7px 10px; }
+.memberb .code { margin: 0; }
+
+/* Gr-06 (the reset form and its preview), Gr-07 (the refusal and the way out), Gr-08, Gr-15. */
+.resetrow { align-items: flex-start; }
+.resetform { width: 380px; flex: none; }
+.resetmode { border: 0; padding: 0; margin: 0; min-width: 0; }
+.resetmode legend { padding: 0; }
+.resetform .rst-at { width: 190px; }
+#reset-table { --c: 84px 1fr 1fr 110px; }
+#reset-table .rst-off { width: 100%; max-width: 120px; text-align: right; }
+.stepr { align-items: flex-start; }
+.stepn { flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: var(--bg); display: inline-flex; align-items: center; justify-content: center; font-family: var(--mono); font-weight: 700; font-size: var(--fs-xs); line-height: 1; }
+#reset-result:empty { display: none; }
+#reset-result { display: flex; flex-direction: column; gap: 10px; }
+.confirm-notes { display: flex; flex-direction: column; gap: 12px; }
+.confirm-notes[hidden] { display: none; }
+.confirm-call { margin-right: auto; align-self: center; }
+.resetmode input[type=radio] { font: inherit; color: inherit; margin: 0; }
+
+/* Groups: the functional boards (Gr-13 card, Gr-18 countdown). */
+.kv.kv-group{--c:160px 1fr}
+progress.gr-used{height:8px;border:0;border-radius:2px;background:var(--line2);accent-color:var(--ink);appearance:none;-webkit-appearance:none}
+progress.gr-used::-webkit-progress-bar{background:var(--line2);border-radius:2px}
+progress.gr-used::-webkit-progress-value{background:var(--ink);border-radius:2px}
+progress.gr-used::-moz-progress-bar{background:var(--ink);border-radius:2px}

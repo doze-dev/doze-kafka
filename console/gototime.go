@@ -107,6 +107,9 @@ type atResult struct {
 	View  *jumpView
 }
 
+// utcStamp writes a time the way a sentence that quotes one does: "2026-10-07 10:30:00 UTC".
+func utcStamp(t time.Time) string { return t.UTC().Format("2006-01-02 15:04:05") + " UTC" }
+
 // atParam resolves ?at= into the tape's jump: the offset to go to, and the note to
 // show. asked is false when the box was not used.
 func (c *Console) atParam(r *http.Request, topic string, partition int32) (jump int64, note string, asked bool, err error) {
@@ -127,7 +130,7 @@ func (c *Console) atResolve(r *http.Request, topic string, partition int32) (atR
 	if err != nil {
 		return atResult{Jump: -1, Asked: true}, err
 	}
-	stamp := t.Format("2006-01-02 15:04:05 UTC")
+	stamp := utcStamp(t)
 	tail := c.topicURL(topic) + "?partition=" + strconv.Itoa(int(partition))
 	if !found {
 		earliest, latest, _ := c.be.PartitionOffsets(r.Context(), topic, partition)

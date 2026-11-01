@@ -105,7 +105,9 @@ func TestGroupPageShowsMembersOwnersAndLinks(t *testing.T) {
 		t.Error("the assignment is printed as a Go slice")
 	}
 	// The owner of each partition is shown beside it.
-	if strings.Count(body, `<span class="m el">billing-service</span>`) < 1 {
+	// Gr-02's Owner column names the member by its id.
+	ms := groupPage(t, c, "billing", "")["Members"].([]memberView)
+	if len(ms) != 1 || strings.Count(body, `<span class="m el">`+ms[0].ID+`</span>`) < 1 {
 		t.Error("each partition's owner should be shown")
 	}
 }
@@ -154,7 +156,7 @@ func TestGroupEdgeStatesAreExplained(t *testing.T) {
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		body = req(t, c, "GET", "/_console/groups/fresh", nil).Body.String()
-		if strings.Contains(body, "No committed offsets yet") {
+		if strings.Contains(body, "No commits yet is not lag 0") {
 			return
 		}
 		time.Sleep(150 * time.Millisecond)
@@ -181,7 +183,7 @@ func TestResetAndDeleteAnInactiveGroup(t *testing.T) {
 	if offs, _ := c.be.GroupOffsets(context.Background(), "idle"); offs[0].Committed != 0 {
 		t.Fatalf("after reset to earliest the committed offset is %d, want 0", offs[0].Committed)
 	}
-	if code, body := post("/_console/groups/idle/reset", url.Values{"to": {"sideways"}}); code != 400 || !strings.Contains(body, "earliest or latest") {
+	if code, body := post("/_console/groups/idle/reset", url.Values{"to": {"sideways"}}); code != 400 || !strings.Contains(body, "specific offsets") {
 		t.Errorf("a bad target: %d %q", code, body)
 	}
 
@@ -249,6 +251,55 @@ func TestClusterPageShowsRealAPIsAndConfig(t *testing.T) {
 	for _, want := range []string{"DeleteGroups", "OffsetDelete", "ConsumerGroupHeartbeat", "Produce <span class=\"apiv\">v3–", "Broker configuration", "log.retention.bytes", "auto.create.topics.enable", "All limits</a>"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the cluster page is missing %q", want)
+		}
+	}
+}
+
+// The Members tab and the member's inspector take host:port, leader, timeouts and the
+// heartbeat from the coordinator's snapshot (GRP-22), and say so when it holds none.
+func TestMembersTabReadsTheCoordinatorsSnapshot(t *testing.T) {
+	c, addr := newTestConsoleAddr(t)
+	topicWith(t, c, "orders", 2, 3)
+	cl, err := kgo.NewClient(kgo.SeedBrokers(addr), kgo.ClientID("snap-client"), kgo.ConsumerGroup("snapg"), kgo.ConsumeTopics("orders"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cl.Close()
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+		defer cancel()
+		cl.PollFetches(ctx)
+	}()
+	var id string
+	deadline := time.Now().Add(8 * time.Second)
+	for id == "" {
+		if d, err := c.be.DescribeGroup(context.Background(), "snapg"); err == nil && len(d.Members) == 1 && len(d.Members[0].Assigned["orders"]) == 2 {
+			id = d.Members[0].ID
+		} else if time.Now().After(deadline) {
+			t.Fatal("the member never showed")
+		} else {
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
+	// No snapshot available: the page says the leader and the timeouts are not shown.
+	body := readable(req(t, c, "GET", "/_console/groups/snapg?tab=members", nil).Body.String())
+	if !strings.Contains(body, "cannot see the broker's group memory") {
+		t.Errorf("without a snapshot the sentence should say so:\n%s", body)
+	}
+	c.inspector = fakeInspector{"snapg": {ID: "snapg", Kind: "classic", State: "Stable", Generation: 7, Leader: id, Members: []MemberSnapshot{{
+		ID: id, ClientID: "snap-client", Addr: "127.0.0.1:55173", Software: "franz-go 1.18", Leader: true,
+		SessionTimeout: 45 * time.Second, RebalanceTimeout: 30 * time.Second, Protocols: []string{"range", "cooperative-sticky"},
+		Joined: time.Now().Add(-time.Minute), LastHeartbeat: time.Now().Add(-2 * time.Second)}}}}
+	body = readable(req(t, c, "GET", "/_console/groups/snapg?tab=members", nil).Body.String())
+	for _, want := range []string{"on generation 7", "the leader is " + id, "Session timeout 45 s, rebalance timeout 30 s", "127.0.0.1:55173", "leader", "s ago"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the members tab lacks %q:\n%s", want, body)
+		}
+	}
+	insp := readable(req(t, c, "GET", "/_console/inspect/member?key="+url.QueryEscape(joinKey("snapg", id)), nil).Body.String())
+	for _, want := range []string{"127.0.0.1:55173", "franz-go 1.18", "45 s", "30 s", "protocols range, cooperative-sticky", "Joined"} {
+		if !strings.Contains(insp, want) {
+			t.Errorf("the member's inspector lacks %q:\n%s", want, insp)
 		}
 	}
 }

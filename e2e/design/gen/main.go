@@ -35,6 +35,10 @@
 //	member <group> <topic> classic|next
 //	                              a consumer in the group: the classic protocol, or
 //	                              KIP-848 (kgo.ServerSideBalancer)
+//	idle <topic> <parts> <group>  a topic of that many partitions (partition p gets 100+10p
+//	                              records), and the group's offsets on it, committed as no
+//	                              member would (generation -1) 4+3p records short of each
+//	                              end: a group with offsets and nobody in it (Gr-06)
 //	reporter <group> <topic>      a classic consumer that reports its metrics (KIP-714)
 //	                              under the Java consumer's names, every interval the
 //	                              broker asks for
@@ -62,6 +66,7 @@ import (
 	"time"
 
 	"github.com/doze-dev/doze-kafka/internal/telemetry"
+	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
@@ -266,6 +271,10 @@ func main() {
 		seed(ctx, addr, id)
 	case "producer":
 		producer(ctx, addr, id, a)
+	case "produce":
+		produceN(ctx, addr, id, a)
+	case "idle":
+		idle(ctx, addr, id, a)
 	case "member":
 		member(ctx, addr, id, a[0], a[1], a[2], nil)
 	case "reporter":
@@ -414,8 +423,20 @@ func member(ctx context.Context, addr, id, group, topic, proto string, extra fun
 		kgo.OnPartitionsRevoked(func(_ context.Context, _ *kgo.Client, m map[string][]int32) {
 			l.write(map[string]any{"ev": "note", "what": "revoked", "parts": m})
 		}))
+	hold := os.Getenv("HOLD") != ""
+	if hold {
+		// A held consumer (Groups boards): it joins, takes what is on the topic,
+		// commits it, and stops polling. The group keeps its member (heartbeats run
+		// on their own), so what is produced after is lag.
+		opts = append(opts, kgo.DisableAutoCommit())
+		readyOnce.Do(func() {}) // holdMember says ready, once it holds
+	}
 	var cl *kgo.Client
 	cl, l = client(addr, id, opts...)
+	if hold {
+		holdMember(ctx, cl, l)
+		return
+	}
 	if extra != nil {
 		go extra(ctx, cl, l)
 	}
@@ -526,4 +547,99 @@ func quiet(ctx context.Context, addr, id string) {
 			return
 		}
 	}
+}
+
+// holdMember is a member that has taken what is there, committed it, and is silent:
+// it polls until a poll finds nothing, commits, writes "held" to its ledger, and waits.
+func holdMember(ctx context.Context, cl *kgo.Client, l *ledger) {
+	got, empty := 0, 0
+	for ctx.Err() == nil {
+		pctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		fs := cl.PollFetches(pctx)
+		cancel()
+		got += fs.NumRecords()
+		if _, gen := cl.GroupMetadata(); fs.NumRecords() > 0 || gen == 0 {
+			empty = 0
+		} else if empty++; empty >= 2 {
+			break
+		}
+	}
+	if err := cl.CommitUncommittedOffsets(ctx); err != nil {
+		l.write(map[string]any{"ev": "note", "what": "commit-error", "err": err.Error()})
+	}
+	l.write(map[string]any{"ev": "note", "what": "held", "n": got})
+	fmt.Println("ready")
+	<-ctx.Done()
+	cl.Close()
+}
+
+// produceN writes n records to the topic, round-robin over its partitions, and says
+// ready; the ledger lists each record's partition and offset.
+func produceN(ctx context.Context, addr, id string, a []string) {
+	topic := a[0]
+	var n int
+	fmt.Sscan(a[1], &n)
+	cl, l := client(addr, id, kgo.RecordPartitioner(kgo.RoundRobinPartitioner()), kgo.ProducerLinger(0))
+	defer cl.Close()
+	for i := 0; i < n; i++ {
+		r := &kgo.Record{Topic: topic, Key: fmt.Appendf(nil, "k-%04d", i), Value: fmt.Appendf(nil, `{"n":%d}`, i)}
+		res := cl.ProduceSync(ctx, r)
+		must(res.FirstErr())
+		l.write(map[string]any{"ev": "note", "what": "produced", "p": res[0].Record.Partition, "off": res[0].Record.Offset})
+	}
+	fmt.Println("ready")
+	<-ctx.Done()
+}
+
+// idle makes a group with committed offsets and no member: the Empty group of Gr-06 to Gr-08 and
+// Gr-15. Partition p of the topic holds 100+10p records and the group is 4+3p behind there, so every
+// partition has its own lag and the total is a sum nothing rounds. The ledger holds both lists.
+func idle(ctx context.Context, addr, id string, a []string) {
+	topic, group := a[0], a[2]
+	var parts int
+	fmt.Sscan(a[1], &parts)
+	cl, l := client(addr, id, kgo.RecordPartitioner(kgo.ManualPartitioner()), kgo.ProducerLinger(0))
+	defer cl.Close()
+	ct := kmsg.NewPtrCreateTopicsRequest()
+	rt := kmsg.NewCreateTopicsRequestTopic()
+	rt.Topic, rt.NumPartitions, rt.ReplicationFactor = topic, int32(parts), 1
+	ct.Topics = append(ct.Topics, rt)
+	cr, err := ct.RequestWith(ctx, cl)
+	must(err)
+	for _, t := range cr.Topics {
+		if t.ErrorCode != 0 && t.ErrorCode != kerr.TopicAlreadyExists.Code {
+			must(fmt.Errorf("create %s: error %d", t.Topic, t.ErrorCode))
+		}
+	}
+	var ends, committed []int64
+	oc := kmsg.NewPtrOffsetCommitRequest()
+	oc.Group, oc.Generation = group, -1
+	ot := kmsg.NewOffsetCommitRequestTopic()
+	ot.Topic = topic
+	for p := 0; p < parts; p++ {
+		end := int64(100 + 10*p)
+		recs := make([]*kgo.Record, end)
+		for i := range recs {
+			recs[i] = &kgo.Record{Topic: topic, Partition: int32(p), Key: fmt.Appendf(nil, "k-%d-%04d", p, i), Value: fmt.Appendf(nil, `{"p":%d,"n":%d}`, p, i)}
+		}
+		must(cl.ProduceSync(ctx, recs...).FirstErr())
+		ends = append(ends, end)
+		committed = append(committed, end-int64(4+3*p))
+		op := kmsg.NewOffsetCommitRequestTopicPartition()
+		op.Partition, op.Offset = int32(p), end-int64(4+3*p)
+		ot.Partitions = append(ot.Partitions, op)
+	}
+	oc.Topics = append(oc.Topics, ot)
+	resp, err := oc.RequestWith(ctx, cl)
+	must(err)
+	for _, t := range resp.Topics {
+		for _, p := range t.Partitions {
+			if p.ErrorCode != 0 {
+				must(fmt.Errorf("commit p%d: error %d", p.Partition, p.ErrorCode))
+			}
+		}
+	}
+	l.write(map[string]any{"ev": "note", "what": "idle", "topic": topic, "group": group, "ends": ends, "committed": committed})
+	fmt.Println("ready")
+	<-ctx.Done()
 }

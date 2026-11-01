@@ -71,11 +71,35 @@ func (b *Broker) deleteGroup(id string) int16 {
 	return errNone
 }
 
+// subscribedTo says whether a topic is one a member of the group reads, for OffsetDelete.
+// A classic member's subscription is read from its JoinGroup metadata (the consumer
+// protocol's), a consumer-protocol member's from its heartbeat. Where it cannot be read
+// (a group of another protocol type, a rebalance in progress, metadata that does not
+// decode) every topic counts as read, which is the safe answer.
+func (b *Broker) subscribedTo(group string) func(topic string) bool {
+	all := func(string) bool { return true }
+	b.cg848.mu.Lock()
+	if g := b.cg848.groups[group]; g != nil && len(g.members) > 0 {
+		live := g.subscription()
+		b.cg848.mu.Unlock()
+		return live
+	}
+	b.cg848.mu.Unlock()
+	b.groups.mu.Lock()
+	defer b.groups.mu.Unlock()
+	if g := b.groups.groups[group]; g != nil && len(g.members) > 0 {
+		if live := g.subscription(); live != nil {
+			return live
+		}
+		return all
+	}
+	return func(string) bool { return false }
+}
+
 // handleOffsetDelete removes a group's committed offsets for named partitions —
-// how a tool "resets" a consumer to the auto.offset.reset position. The classic
-// protocol's subscriptions are opaque bytes to a relay, so whether a live member
-// reads a topic cannot be told; any group with live members is treated as
-// subscribed and refused (GROUP_SUBSCRIBED_TO_TOPIC), which is the safe answer.
+// how a tool "resets" a consumer to the auto.offset.reset position. A group with
+// members refuses the topics a member is subscribed to (GROUP_SUBSCRIBED_TO_TOPIC) and
+// removes the others (recorded: offset-delete-subscribed, claim G7).
 func (b *Broker) handleOffsetDelete(ctx context.Context, req *protocol.Request, odr *kmsg.OffsetDeleteRequest, resp *kmsg.OffsetDeleteResponse) error {
 	if !b.canGroup(req.Conn, odr.Group, opDelete) {
 		resp.ErrorCode = kerr.GroupAuthorizationFailed.Code
@@ -90,7 +114,7 @@ func (b *Broker) handleOffsetDelete(ctx context.Context, req *protocol.Request, 
 		resp.ErrorCode = kerr.GroupIDNotFound.Code
 		return nil
 	}
-	active := b.groupIsActive(odr.Group)
+	subscribed := b.subscribedTo(odr.Group)
 
 	for _, t := range odr.Topics {
 		rt := kmsg.NewOffsetDeleteResponseTopic()
@@ -102,7 +126,7 @@ func (b *Broker) handleOffsetDelete(ctx context.Context, req *protocol.Request, 
 			switch {
 			case !b.canTopic(req.Conn, t.Topic, opRead):
 				rp.ErrorCode = kerr.TopicAuthorizationFailed.Code
-			case active:
+			case subscribed(t.Topic):
 				rp.ErrorCode = kerr.GroupSubscribedToTopic.Code
 			case (!topicOK || p.Partition < 0 || p.Partition >= topic.Partitions) && !b.hasOffset(odr.Group, t.Topic, p.Partition):
 				rp.ErrorCode = kerr.UnknownTopicOrPartition.Code

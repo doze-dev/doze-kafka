@@ -348,7 +348,7 @@ func run(ctx context.Context, st startup, logger *slog.Logger, out io.Writer) er
 		if cfg.ConsoleAddr == "" {
 			cfg.ConsoleAddr = consoleAddrFor(z.ip())
 		}
-		closeConsole, consoleAddr, err := startConsole(ctx, cfg, bind.ln.Addr(), logger, consoleUser, consolePass, consoleMech, registryForConsole, ready.registryURL, consolefeed.Traffic(serverhook.Traffic(srv)), consolefeed.ClientMetrics(serverhook.ClientMetrics(srv)))
+		closeConsole, consoleAddr, err := startConsole(ctx, cfg, bind.ln.Addr(), logger, consoleUser, consolePass, consoleMech, registryForConsole, ready.registryURL, consolefeed.Traffic(serverhook.Traffic(srv)), consolefeed.ClientMetrics(serverhook.ClientMetrics(srv)), consolefeed.Groups(serverhook.Groups(srv)))
 		if err != nil {
 			return err
 		}
@@ -537,7 +537,7 @@ func provisionConsoleCredential(cfg *config.Config) (user, pass, mech string, er
 // returns, so a port that is already taken is reported as the error it is. It
 // returns a func that shuts the console down (the caller defers it) and the
 // address the listener actually got.
-func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger *slog.Logger, user, pass, mech, registryURL, registryPublic string, traffic console.TrafficSource, clientMetrics console.ClientMetricsSource) (func(), string, error) {
+func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger *slog.Logger, user, pass, mech, registryURL, registryPublic string, traffic console.TrafficSource, clientMetrics console.ClientMetricsSource, groups console.GroupInspector) (func(), string, error) {
 	dialAddr, err := consoleDialAddr(cfg, bound)
 	if err != nil {
 		return nil, "", err
@@ -571,7 +571,7 @@ func startConsole(ctx context.Context, cfg config.Config, bound net.Addr, logger
 		AllowedHosts: consoleHosts(cfg), Prefix: cfg.ConsolePrefix, Logger: logger,
 		// With SASL the console reaches the registry as the same user it reaches the broker.
 		RegistryURL: registryURL, RegistryUser: user, RegistryPass: pass, RegistryTLS: registryTLS,
-		Traffic: traffic, TraceHeader: cfg.TraceHeader, ClientMetrics: clientMetrics,
+		Traffic: traffic, TraceHeader: cfg.TraceHeader, ClientMetrics: clientMetrics, Groups: groups,
 		Facts: console.BrokerFacts{
 			Workspace: workspaceLabel(cfg.InstanceName()), KafkaMajor: cfg.Version,
 			DataDir: cfg.DataDir, SASLMechanisms: cfg.SASLMechanisms, RegistryURL: registryPublic, RegistryBuiltIn: registryURL != "",

@@ -68,7 +68,7 @@ func TestEverySelectionRendersThroughTheInspectorContract(t *testing.T) {
 		{KindMessage, "/_console/topics/orders/message?partition=0&offset=1", "P0 · offset 1", "1", []string{"Timestamp", "Send again"}},
 		{KindRequest, "/_console/inspect/request?key=" + reqKey, "Produce v9", "request:" + reqKey, []string{"billing", "1 partition, 2.0 KiB"}},
 		{KindClient, "/_console/inspect/client?key=1", "billing", "client:1", []string{"apache-kafka-java 3.7.0", "billing-workers", "Its requests"}},
-		{KindMember, "/_console/inspect/member?key=" + url.QueryEscape(joinKey("billing", memberID)), "billing-service", "member:" + joinKey("billing", memberID), []string{"Assigned partitions", "orders", "0–1"}},
+		{KindMember, "/_console/inspect/member?key=" + url.QueryEscape(joinKey("billing", memberID)), "billing-service", "member:" + joinKey("billing", memberID), []string{"Assignment", "Subscription", "orders", "0–1"}},
 		{KindSubject, "/_console/inspect/subject?key=orders-value", "orders-value", "subject:orders-value", []string{"Compatibility", "Avro"}},
 		{KindTransaction, "/_console/inspect/transaction?key=inspect-txn", "inspect-txn", "transaction:inspect-txn", []string{"tx-0", "Ongoing"}},
 		{KindEvent, "/_console/inspect/event?key=" + url.QueryEscape(joinKey("billing-workers", "3")), "session expired", "event:" + joinKey("billing-workers", "3"), []string{"no heartbeat within its session timeout"}},
