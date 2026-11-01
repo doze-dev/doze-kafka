@@ -16,7 +16,9 @@ here is byte-identical in both (the hashes are in `SHA256SUMS`).
   home builds from (Ac-03 Create, Ac-05 Check), and the topic page's own boards that
   the Sy allow-list measures where the boards disagree (Tp-05 Messages, Tp-06
   Message: an entry with `per` is checked against them) or names (Tp-14 Go to
-  offset). Tp-05, Tp-06 and Tp-14 were read at 1792149264-d921 only. The Traffic boards (Main,
+  offset). The Groups boards (Gr-01 to Gr-18) are added slice by slice as the Groups
+  stage compares them; present so far: Gr-01 None, Gr-02 Lag, Gr-03 Members
+  (read at 1792149264-d921). Tp-05, Tp-06 and Tp-14 were read at 1792149264-d921 only. The Traffic boards (Main,
   Traf-02 to Traf-12) were copied from the same artifact's `project/` folder, unmodified;
   the artifact version they were read at was not recorded.
 
