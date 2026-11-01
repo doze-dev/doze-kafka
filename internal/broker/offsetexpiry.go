@@ -363,6 +363,22 @@ func (e *offsetExpiry) settle(id string, now int64) groupLiveness {
 // coordinators' locks and e.mu, so the members it sees, what they subscribe to and
 // the record are of one moment.
 func (e *offsetExpiry) rule(id string, now, retention int64) func(topic string, partition int32, committedAt int64) bool {
+	due := e.deadline(id, now, retention)
+	if due == nil {
+		return nil
+	}
+	return func(topic string, _ int32, committedAt int64) bool {
+		at, ok := due(topic, committedAt)
+		return ok && now >= at
+	}
+}
+
+// deadline is when each of the group's offsets expires, in unix milliseconds, by the
+// rules above: nil when nothing of the group expires now, and false for an offset that
+// does not (a topic its members are subscribed to). It is what rule judges by and what the
+// console shows as the countdown (GRP-19), so the two cannot disagree. Caller holds both
+// coordinators' locks and e.mu.
+func (e *offsetExpiry) deadline(id string, now, retention int64) func(topic string, committedAt int64) (int64, bool) {
 	b := e.b
 	var live func(topic string) bool
 	members := false
@@ -380,17 +396,17 @@ func (e *offsetExpiry) rule(id string, now, retention int64) func(topic string, 
 		// record does not know to have members: nothing is expired.
 		return nil
 	case members:
-		return func(topic string, _ int32, committedAt int64) bool {
-			return !live(topic) && now-committedAt >= retention
+		return func(topic string, committedAt int64) (int64, bool) {
+			return committedAt + retention, !live(topic)
 		}
 	case b.claims.ownerOf(id) != "":
 		return nil // held with no members: being joined, deleted or forgotten at this moment.
 	case st.Live:
 		return nil // the members it had when the broker stopped, or members not accounted for.
 	case st.EmptySince != 0:
-		return func(string, int32, int64) bool { return now-st.EmptySince >= retention }
+		return func(string, int64) (int64, bool) { return st.EmptySince + retention, true }
 	default:
-		return func(_ string, _ int32, committedAt int64) bool { return now-committedAt >= retention }
+		return func(_ string, committedAt int64) (int64, bool) { return committedAt + retention, true }
 	}
 }
 

@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"fmt"
 	"sort"
 	"time"
 )
@@ -32,6 +33,17 @@ type GroupSnapshot struct {
 	Epoch int32
 	// Leader is the member id leading a classic group; empty for a consumer group.
 	Leader string
+	// TargetEpoch is the epoch a consumer group's targets were last computed for.
+	TargetEpoch int32
+	// RebalanceTimeout is how long a classic group's rebalance waits for its members:
+	// the longest any member asked for, each falling back to its session timeout, then
+	// 30 s (GRP-25: there is no cap). RebalanceStarted and RebalanceDeadline are set
+	// only while the group is PreparingRebalance; Holding says the wait is the initial
+	// rebalance delay and the deadline is that delay's end, not the rebalance timeout's.
+	RebalanceTimeout  time.Duration
+	RebalanceStarted  time.Time
+	RebalanceDeadline time.Time
+	Holding           bool
 	// Members are ordered by member id.
 	Members []MemberSnapshot
 	// Taken is when the snapshot was made.
@@ -67,6 +79,26 @@ type MemberSnapshot struct {
 	Leader bool
 	// Epoch is the member epoch of a consumer-protocol member; zero for classic.
 	Epoch int32
+	// Rejoined says a classic member has sent the JoinGroup the present rebalance is
+	// waiting for, at RejoinedAt (GRP-22). Meaningless outside PreparingRebalance.
+	Rejoined   bool
+	RejoinedAt time.Time
+	// For a consumer-protocol member (GRP-20), the coordinator's record, not what the
+	// member reports: State is STABLE or RECONCILING, PrevEpoch the epoch it had before
+	// this one, Target what the assignor wants it to own, Current what it may consume
+	// now plus what it was told to give up and has not yet (Revoking).
+	State     string
+	PrevEpoch int32
+	Target    []TopicParts
+	Current   []TopicParts
+	Revoking  []TopicParts
+}
+
+// TopicParts is one topic's partitions, by topic name ("" when the topic is gone).
+type TopicParts struct {
+	Topic      string
+	TopicID    string
+	Partitions []int32
 }
 
 // GroupInspector is what the console reads group snapshots through.
@@ -101,11 +133,17 @@ func (gm *groupManager) inspect(now time.Time) []GroupSnapshot {
 	for id, g := range gm.groups {
 		s := GroupSnapshot{ID: id, Kind: "classic", State: g.state.String(), ProtocolType: g.protocolType,
 			ProtocolName: g.protocol, Generation: g.generation, Leader: g.leader, Taken: now}
+		if g.state == statePreparingRebalance {
+			s.RebalanceTimeout, s.RebalanceStarted, s.RebalanceDeadline, s.Holding = g.rebalanceTimeout(), g.rebalanceAt, g.join.due, g.holding
+		} else if len(g.members) > 0 {
+			s.RebalanceTimeout = g.rebalanceTimeout()
+		}
 		for _, mid := range sortedMemberIDs(g) {
 			m := g.members[mid]
 			ms := MemberSnapshot{ID: m.id, ClientID: m.client.clientID, Addr: m.client.addr, Host: m.client.host,
 				Software: m.client.software, Principal: m.client.principal, Joined: m.joinedAt, LastHeartbeat: m.lastHeartbeat,
-				SessionTimeout: m.sessionTimeout, RebalanceTimeout: m.rebalanceTimeout, Leader: m.id == g.leader}
+				SessionTimeout: m.sessionTimeout, RebalanceTimeout: m.rebalanceTimeout, Leader: m.id == g.leader,
+				Rejoined: g.state == statePreparingRebalance && m.rejoined, RejoinedAt: m.rejoinedAt}
 			if m.instanceID != nil {
 				ms.InstanceID = *m.instanceID
 			}
@@ -124,12 +162,21 @@ func (m *cg848Manager) inspect(now time.Time) []GroupSnapshot {
 	defer m.mu.Unlock()
 	out := make([]GroupSnapshot, 0, len(m.groups))
 	for id, g := range m.groups {
-		s := GroupSnapshot{ID: id, Kind: "consumer", State: g.stateName(), ProtocolType: "consumer", Epoch: g.epoch, Taken: now}
+		s := GroupSnapshot{ID: id, Kind: "consumer", State: g.stateName(), ProtocolType: "consumer", Epoch: g.epoch, TargetEpoch: g.targetEpoch, Taken: now}
 		for _, mid := range sortedKeys(g.members) {
 			mem := g.members[mid]
 			ms := MemberSnapshot{ID: mem.id, ClientID: mem.client.clientID, Addr: mem.client.addr, Host: mem.client.host,
 				Software: mem.client.software, Principal: mem.client.principal, Joined: mem.joinedAt, LastHeartbeat: mem.lastHeartbeat,
-				RebalanceTimeout: mem.rebalanceTimeout, Epoch: mem.epoch}
+				RebalanceTimeout: mem.rebalanceTimeout, Epoch: mem.epoch, PrevEpoch: mem.prevEpoch,
+				State: "STABLE", Target: m.topicParts(mem.target), Revoking: m.topicParts(mem.revoking)}
+			if mem.left || mem.epoch != g.targetEpoch || len(mem.revoking) > 0 || !mem.assigned.equal(mem.target) {
+				ms.State = "RECONCILING"
+			}
+			cur := mem.assigned.clone()
+			for p := range mem.revoking {
+				cur[p] = struct{}{}
+			}
+			ms.Current = m.topicParts(cur)
 			if mem.instanceID != nil {
 				ms.InstanceID = *mem.instanceID
 			}
@@ -142,6 +189,19 @@ func (m *cg848Manager) inspect(now time.Time) []GroupSnapshot {
 			s.Members = append(s.Members, ms)
 		}
 		out = append(out, s)
+	}
+	return out
+}
+
+// topicParts renders a set of partitions by topic name. Caller holds m.mu.
+func (m *cg848Manager) topicParts(a tpSet) []TopicParts {
+	var out []TopicParts
+	for _, t := range a.byTopic() {
+		tp := TopicParts{TopicID: fmt.Sprintf("%x", t.topic[:]), Partitions: t.parts}
+		if topic, ok, err := m.meta.TopicByID(t.topic); err == nil && ok {
+			tp.Topic = topic.Name
+		}
+		out = append(out, tp)
 	}
 	return out
 }

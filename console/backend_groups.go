@@ -622,3 +622,35 @@ func (b *backend) TopicConsumers(ctx context.Context, topic string) ([]TopicCons
 	}
 	return out, nil
 }
+
+// StableEnds is the last stable offset of each partition of a topic: how far a
+// read_committed consumer may read. It equals the log end where no transaction is open.
+func (b *backend) StableEnds(ctx context.Context, topic string, partitions int32) ([]int64, error) {
+	req := kmsg.NewPtrListOffsetsRequest()
+	req.ReplicaID, req.IsolationLevel = -1, 1
+	rt := kmsg.NewListOffsetsRequestTopic()
+	rt.Topic = topic
+	for p := int32(0); p < partitions; p++ {
+		rp := kmsg.NewListOffsetsRequestTopicPartition()
+		rp.Partition, rp.Timestamp = p, -1
+		rt.Partitions = append(rt.Partitions, rp)
+	}
+	req.Topics = []kmsg.ListOffsetsRequestTopic{rt}
+	resp, err := req.RequestWith(ctx, b.cl)
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.Topics) != 1 {
+		return nil, fmt.Errorf("unexpected ListOffsets response shape")
+	}
+	out := make([]int64, partitions)
+	for _, p := range resp.Topics[0].Partitions {
+		if p.ErrorCode != 0 {
+			return nil, kerr.ErrorForCode(p.ErrorCode)
+		}
+		if p.Partition >= 0 && p.Partition < partitions {
+			out[p.Partition] = p.Offset
+		}
+	}
+	return out, nil
+}

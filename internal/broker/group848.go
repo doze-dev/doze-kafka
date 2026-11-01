@@ -664,7 +664,7 @@ func (m *cg848Manager) sessionExpired(g *cg848Group, mem *cg848Member, gen uint6
 	if m.stopped || g.members[mem.id] != mem || !mem.session.current(gen) {
 		return
 	}
-	m.emit(g, "expired", mem.id, "a member sent no heartbeat within its session timeout", "")
+	m.emit(g, "expired", mem.id, "a member sent no heartbeat for "+silence(mem.lastHeartbeat, m.sessionTimeout)+" (its session timeout)", "")
 	m.removeMember(g, mem.id)
 	m.bumpForRemoval(g, "a member's session expired")
 	m.maybeDowngrade(g)

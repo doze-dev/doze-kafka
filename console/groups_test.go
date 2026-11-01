@@ -156,7 +156,7 @@ func TestGroupEdgeStatesAreExplained(t *testing.T) {
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		body = req(t, c, "GET", "/_console/groups/fresh", nil).Body.String()
-		if strings.Contains(body, "No committed offsets yet") {
+		if strings.Contains(body, "No commits yet is not lag 0") {
 			return
 		}
 		time.Sleep(150 * time.Millisecond)

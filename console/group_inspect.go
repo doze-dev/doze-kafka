@@ -30,6 +30,20 @@ type GroupSnapshot struct {
 	Leader       string
 	Members      []MemberSnapshot
 	Taken        time.Time
+	// TargetEpoch is the epoch a consumer group's targets were last computed for. The
+	// rebalance fields are set while a classic group is PreparingRebalance (GRP-25).
+	TargetEpoch       int32
+	RebalanceTimeout  time.Duration
+	RebalanceStarted  time.Time
+	RebalanceDeadline time.Time
+	Holding           bool
+}
+
+// TopicParts is one topic's partitions in a snapshot.
+type TopicParts struct {
+	Topic      string
+	TopicID    string
+	Partitions []int32
 }
 
 // MemberSnapshot is one member of a GroupSnapshot.
@@ -48,6 +62,15 @@ type MemberSnapshot struct {
 	Protocols        []string
 	Leader           bool
 	Epoch            int32
+	// Classic, while a rebalance waits (GRP-22, GRP-25).
+	Rejoined   bool
+	RejoinedAt time.Time
+	// Consumer protocol (GRP-20): the coordinator's record.
+	State     string
+	PrevEpoch int32
+	Target    []TopicParts
+	Current   []TopicParts
+	Revoking  []TopicParts
 }
 
 // InspectState says whether a snapshot could be had and whether it holds the group.

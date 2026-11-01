@@ -304,7 +304,39 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 		rows = append(rows, row)
 	}
 
-	timeline := c.groupTimeline(id)
+	now := time.Now()
+	show := r.FormValue("show")
+	if _, ok := timelineKinds[show]; !ok {
+		show = "all"
+	}
+	var tlv timelineView
+	if c.traffic != nil {
+		tlv = buildTimeline(c.traffic.GroupEvents(id, 0), show, now, c.groupURL(id))
+	}
+	timeline := tlv.Rows
+	rebalance := rebalanceOf(insp, now)
+	var noCommits []noCommitRow
+	if len(offsets) == 0 && len(members) > 0 {
+		for _, m := range members {
+			for _, a := range m.Assigned {
+				if _, ok := bounds[a.Topic]; !ok {
+					if n, err := c.be.PartitionCount(ctx, a.Topic); err == nil {
+						bounds[a.Topic], _ = c.be.PartitionBounds(ctx, a.Topic, n)
+					}
+				}
+			}
+		}
+		noCommits = c.noCommitRows(detail.Members, members, bounds)
+	}
+	leftTopics, leftN := leftoverTopics(rows)
+	var held *heldView
+	var expiry *expiryView
+	var denied *deniedView
+	if tab == "lag" {
+		held = heldBackOf(c, ctx, rows, now)
+		expiry = c.expiryOf(id, len(rows) > 0, now)
+		denied = c.deniedOf(ctx, id, now)
+	}
 
 	h := fnv.New64a()
 	fmt.Fprint(h, detail.State, "|")
@@ -319,6 +351,26 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 
 	for _, e := range timeline {
 		fmt.Fprint(h, e.Seq, ";")
+	}
+	fmt.Fprint(h, "|", show, len(noCommits))
+	if held != nil {
+		fmt.Fprint(h, "|held", held.Total, len(held.Txns))
+	}
+	if expiry != nil {
+		fmt.Fprint(h, "|exp", expiry.In, expiry.Used, expiry.None, expiry.Forever)
+	}
+	if denied != nil {
+		fmt.Fprint(h, "|den", denied.Count, denied.At.UnixNano())
+	}
+	if rebalance != nil {
+		fmt.Fprint(h, "|rb", rebalance.Waiting, rebalance.Left)
+		for _, rr := range rebalance.Rows {
+			fmt.Fprint(h, rr.ID, rr.Rejoined, rr.HeartbeatAgo)
+		}
+	}
+	handoffs := handoffsOf(insp)
+	for _, ho := range handoffs {
+		fmt.Fprint(h, "|ho", ho.ID, ho.State, ho.Epoch, ho.Target, ho.Current)
 	}
 
 	// The generation is what the coordinator holds now (the snapshot); only a console
@@ -367,7 +419,8 @@ func (c *Console) groupData(r *http.Request, id string) (map[string]any, error) 
 	canAct := detail.State == "Empty" && len(detail.Members) == 0
 	facts := groupFacts(insp, members)
 	out := map[string]any{
-		"Timeline": timeline, "HasTimeline": c.traffic != nil, "Group": detail, "Members": members, "Offsets": rows, "TotalLag": totalLag, "AnyAhead": anyAhead,
+		"Timeline": timeline, "HasTimeline": c.traffic != nil, "TL": tlv, "Rebalance": rebalance, "NoCommitRows": noCommits,
+		"Ahead": aheadOf(rows), "Held": held, "Expiry": expiry, "Denied": denied, "LeftTopics": leftTopics, "LeftN": leftN, "Handoffs": handoffs, "ClassicFacts": classicOf(insp), "Group": detail, "Members": members, "Offsets": rows, "TotalLag": totalLag, "AnyAhead": anyAhead,
 		"TotalCommitted": totalCommitted, "TotalLogEnd": totalLogEnd, "Generation": generation, "GenLabel": genLabel,
 		"Facts":     facts,
 		"Topics":    topics,
