@@ -1519,3 +1519,10 @@ html[data-paused] #inspector[data-traffic-kept] .tf-kept { display: block; }
   .tf-filter > .grow, .tf-filter > .note { display: none; }
   .main.tf > .row.sb { flex-wrap: wrap; }
 }
+
+/* ---- Groups (Gr-01 .. Gr-18) ---- */
+.none-card { max-width: 760px; }
+.list-none { padding: 18px 14px; }
+.main.gr-none { gap: 12px; }
+
+.code .c { color: var(--mut); }

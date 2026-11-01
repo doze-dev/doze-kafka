@@ -159,7 +159,7 @@ func TestEmptyListsSayWhy(t *testing.T) {
 		}
 	}
 	groups := req(t, c, "GET", "/_console/groups", nil).Body.String()
-	if !strings.Contains(groups, "No consumer groups yet") || !strings.Contains(groups, "group.id") {
+	if !strings.Contains(groups, "No consumer group has joined or committed") || !strings.Contains(groups, "group.id") || !strings.Contains(groups, "--bootstrap-server") {
 		t.Error("an empty broker's group list should explain how a group appears")
 	}
 	// Groups cannot be created from the console, so the footer must not offer it.

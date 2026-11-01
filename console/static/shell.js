@@ -1887,3 +1887,15 @@
     });
   });
 })();
+
+// Gr-01: a page that says no group exists looks every 3 s whether one does now, and
+// reloads when it does ("this page fills in by itself, within 3 seconds").
+(function groupsWatchNone() {
+  var root = document.getElementById("groups-none-root");
+  if (!root) return;
+  var url = root.getAttribute("data-groups-watch");
+  setInterval(function () {
+    fetch(url, { headers: { "HX-Request": "true" }, credentials: "same-origin" }).then(function (r) { return r.ok ? r.text() : ""; })
+      .then(function (t) { if (t.indexOf('id="groups-summary"') >= 0) location.reload(); }).catch(function () {});
+  }, 3000);
+})();

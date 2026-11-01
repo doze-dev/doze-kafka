@@ -20,6 +20,9 @@ func (c *Console) groups(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data["LiveHash"], _ = c.liveHash("groups_live", data)
+	if len(data["Groups"].([]groupRow)) == 0 {
+		data["View"] = "groups_none"
+	}
 	c.render(w, r, "groups_home", data)
 }
 
@@ -53,7 +56,17 @@ func (c *Console) groupsHomeData(r *http.Request) (map[string]any, error) {
 			need = append(need, g)
 		}
 	}
-	return map[string]any{"Groups": rows, "Page": "groups", "Title": "Groups",
+	// Gr-01's commands name this broker and, when it has one, a topic that exists.
+	sample := "<topic>"
+	if tps, err := c.be.ListTopics(r.Context()); err == nil {
+		for _, t := range tps {
+			if !strings.HasPrefix(t.Name, "__") {
+				sample = t.Name
+				break
+			}
+		}
+	}
+	return map[string]any{"Groups": rows, "Page": "groups", "Title": "Groups", "Bootstrap": c.be.displayAddr(), "SampleTopic": sample,
 		"WithMembers": withMembers, "MemberCount": members, "TotalLag": lag, "NeedALook": need}, nil
 }
 

@@ -151,6 +151,9 @@ func pageHints(view string) []keyHint {
 			wide(keyHint{Keys: []string{"g", "t"}, Label: "topics"}), wide(keyHint{Keys: []string{"p"}, Label: "produce"}), wide(hintHelp), narrow(hintJump)}
 	case "groups":
 		return []keyHint{hintMove, hintOpen, hintFilter, hintJump}
+	case "groups_none":
+		// Gr-01: no group yet, so nothing to move over or open: g g, jump, keys.
+		return []keyHint{{Keys: []string{"g", "g"}, Label: "groups"}, hintJump, {Keys: []string{"?"}, Label: "keys"}}
 	case "group":
 		return []keyHint{hintMove, hintOpen, hintClose, {Keys: []string{"g", "g"}, Label: "groups"}, hintHelp}
 	case "schemas":

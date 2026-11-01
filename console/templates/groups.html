@@ -5,7 +5,7 @@
   <div class="row sb ce list-h"><span class="cap">Consumer groups</span><span class="cap">Lag</span></div>
   <div class="list-filter"><input class="inp m" type="search" placeholder="Filter groups" aria-label="Filter Groups" data-filter-target=".list .li" data-filter-none="#list-none" spellcheck="false" autocomplete="off"></div>
   <div class="list-scroll">
-    {{if not .Groups}}<div class="note list-note"><b>{{t "groups.none.title"}}</b><br>{{t "groups.none.hint"}}</div>{{end}}
+    {{if not .Groups}}<div class="col g4 list-none"><span class="b">No groups</span><span class="note">Nothing exists yet. This is not a filter result.</span></div>{{end}}
     {{range .Groups}}
     <a class="li {{if eq .ID $.Sel}}on{{end}}" href="{{.URL}}" data-name="{{.ID}}"{{if eq .ID $.Sel}} aria-current="page"{{end}}>
       <span class="dot {{groupDot .State}}" title="{{.State}}"></span>
@@ -22,7 +22,8 @@
 {{/* Gr-Home: every group, how far behind each is, and which need a look. */}}
 {{define "groups_home"}}{{template "shell_top" .}}
   {{template "group_lp" (dict "Groups" .Groups "Sel" "")}}
-  <main class="main" id="detail">
+  <main class="main{{if not .Groups}} gr-none{{end}}" id="detail">
+    {{if .Groups}}
     <div class="row sb ce idband">
       <div class="col"><h1 class="h1">Groups</h1><span class="note">Everything that has joined or committed to this broker. Committed offsets survive a restart; members do not.</span></div>
       <div class="row ce g8"><span class="pill ok" data-live-state><span class="dot" aria-hidden="true"></span><span data-live-state-l>live</span></span></div>
@@ -31,8 +32,35 @@
     {{template "groups_live" .}}
     <div class="grow"></div>
     <div class="note footnote">Select a group to open it. Press <span class="kbd">⌘K</span> to jump to one by name.</div>
+    {{else}}
+    {{template "groups_none" .}}
+    {{end}}
   </main>
 {{template "shell_bottom" .}}{{end}}
+
+{{/* Gr-01: no group has joined or committed. Not a filter result, and not created here. */}}
+{{define "groups_none"}}
+    <div class="row sb ce idband" id="groups-none-root" data-groups-watch="{{.Prefix}}/live/groups">
+      <div class="col"><h1 class="h1">Groups</h1><span class="note">Nothing exists yet</span></div>
+      <div class="row ce g8"><span class="pill ok" data-live-state><span class="dot" aria-hidden="true"></span><span data-live-state-l>live</span></span></div>
+    </div>
+    <div class="card pad col g12 none-card">
+      <span class="h2">No consumer group has joined or committed</span>
+      <span class="note">A group is not something you create. It exists from the moment a consumer with a <span class="m">group.id</span> joins, or commits an offset. Start any consumer and this page fills in by itself, within 3 seconds.</span>
+      <div class="col g6"><span class="cap">The shortest way to see one</span>
+<pre class="code"><span class="c"># Kafka's own console consumer; --group is what makes it a group</span>
+kafka-console-consumer.sh --bootstrap-server {{.Bootstrap}} \
+  --topic {{.SampleTopic}} --group g-first-try --from-beginning</pre></div>
+      <div class="col g6"><span class="cap">Or from kcat</span>
+<pre class="code">kcat -b {{.Bootstrap}} -G g-first-try {{.SampleTopic}}</pre></div>
+      <div class="row ce g8"><a class="btn pri w5" href="{{.Prefix}}/connect">Connect an app</a><a class="btn w5" href="{{.Prefix}}/topics">Open topics</a><span class="note">the bootstrap page has the line for your client</span></div>
+    </div>
+    <div class="row g12 none-card">
+      <div class="callout grow"><span class="b">What you will see first</span><span class="note">The consumer joins (<span class="m">JoinGroup</span>), the group goes <span class="m">PreparingRebalance</span> then <span class="m">Stable</span>, and a row appears with its members and lag. Offsets appear after the first commit.</span></div>
+      <div class="callout grow"><span class="b">Why it may stay empty</span><span class="note">A producer-only app never makes a group. A consumer using <span class="m">assign()</span> without a <span class="m">group.id</span> does not either.</span></div>
+    </div>
+    <div class="grow"></div>
+{{end}}
 
 {{/* Gr-Home's summary, filters, table and callouts: polled every 3 s (live/groups), as
      the board says. What is typed in the filter and the kind chosen stay through a poll. */}}

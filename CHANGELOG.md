@@ -669,3 +669,4 @@ here that contains "server API"; `task api` fails without it.
   returned types from `internal/` that a caller outside the module could not
   name; this module's own commands read them through `internal/serverhook`.
 - server API: the exported surface is now pinned (`task api`).
+- Groups: with no group on the broker the page is the design's Gr-01 (the commands name this broker and one of its topics, the keys strip is g g, jump, keys) and fills in by itself within 3 s when a group appears.
