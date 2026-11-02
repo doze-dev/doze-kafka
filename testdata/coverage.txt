@@ -63,6 +63,7 @@ server 93.9 linux
 # Packages with no tests, and why none:
 # no-tests: e2e/connopt: the browser suite's connection options (plain, or SASL over TLS by the run's identity); exercised by every helper the suite starts, in both identities
 # no-tests: e2e/errnames: prints kerr's error names for the Traffic boards spec, which compares them with the Result column; the spec is its test
+# no-tests: e2e/gfix: commits one offset for a group with no member, for groups-boards.spec.ts (Gr-10's ahead-of-the-log states), which asserts what the page then says about it
 # no-tests: e2e/hold: a consumer the browser suite keeps alive for live pages; the specs that start it fail if it does not print ready and stay in its group
 # no-tests: e2e/identity: runs the browser suite against the second identity (e2e.yml, task test:e2e:identity); that run is its test
 # no-tests: e2e/put: writes one record with a chosen timestamp for time.spec.ts, which asserts the shown time
