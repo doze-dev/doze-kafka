@@ -398,6 +398,12 @@
   document.addEventListener("click", function (e) {
     var el = e.target.closest("[data-copy]");
     if (!el) return;
+    // An item chosen from the inspector's Copy menu closes the menu (through its own button,
+    // which owns the state).
+    if (el.closest(".tp-copymenu")) {
+      var toggle = document.getElementById("inspector-copy");
+      if (toggle && toggle.getAttribute("aria-expanded") === "true") toggle.click();
+    }
     copyText(el.getAttribute("data-copy")).then(
       function () { toast("Copied"); },
       function () { toast("This browser would not copy that; select the text and copy it by hand.", "err"); });
