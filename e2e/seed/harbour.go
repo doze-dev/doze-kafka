@@ -303,7 +303,7 @@ func seedHarbour(ctx context.Context, addr, registryURL string) error {
 func seedHarbourLedger(ctx context.Context, addr string, at func() time.Time) error {
 	newTx := func(id string) (*kgo.Client, error) {
 		return newKgo(kgo.SeedBrokers(addr), kgo.ClientID("harbour-billing-sync"), kgo.TransactionalID(id),
-			kgo.TransactionTimeout(10*time.Minute), kgo.RecordPartitioner(kgo.ManualPartitioner()))
+			kgo.TransactionTimeout(seedTxnTimeout), kgo.RecordPartitioner(kgo.ManualPartitioner()))
 	}
 	write := func(cl *kgo.Client, v string) error {
 		return cl.ProduceSync(ctx, &kgo.Record{Topic: "harbour-ledger", Partition: 0, Key: []byte("invoice"), Value: []byte(v), Timestamp: at()}).FirstErr()
