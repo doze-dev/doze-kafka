@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/doze-dev/doze-kafka/internal/config"
 	"github.com/doze-dev/doze-kafka/internal/kmsg"
@@ -245,6 +246,11 @@ func payloadBatch(pid int64, epoch int16, seq int32, attrs uint16, payload strin
 	binary.BigEndian.PutUint32(b[8:], uint32(len(b)-12))
 	b[16] = 2
 	binary.BigEndian.PutUint16(b[21:], attrs)
+	// A real producer stamps its records; retention judges a record by this stamp (a zero one
+	// is 1970, and a test that sets a one-day retention would see every record expire).
+	now := uint64(time.Now().UnixMilli())
+	binary.BigEndian.PutUint64(b[27:], now) // base timestamp.
+	binary.BigEndian.PutUint64(b[35:], now) // max timestamp.
 	binary.BigEndian.PutUint64(b[43:], uint64(pid))
 	binary.BigEndian.PutUint16(b[51:], uint16(epoch))
 	binary.BigEndian.PutUint32(b[53:], uint32(seq))

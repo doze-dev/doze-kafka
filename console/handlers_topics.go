@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"maps"
 	"math"
 	"net/http"
@@ -735,6 +736,11 @@ func (c *Console) topicProduce(w http.ResponseWriter, r *http.Request) {
 	maps.Copy(data, tape)
 	c.withLiveFacts(ctx, name, data)
 	c.partial(w, "tape_and_table", data)
+	// The empty topic's first-record form replaced the page's own tape with this one; its
+	// empty-state card goes with it (htmx names the element that made the request).
+	if r.Header.Get("HX-Trigger") == "first-record" {
+		_, _ = io.WriteString(w, `<div id="topic-empty" hx-swap-oob="delete"></div>`)
+	}
 }
 
 func (c *Console) topicMessage(w http.ResponseWriter, r *http.Request) {

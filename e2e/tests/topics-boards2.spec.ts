@@ -200,6 +200,8 @@ test('Tp-27: an empty topic says so, writes its first record from the page and o
   await empty.getByRole('button', { name: 'Send record' }).click();
   await expect(page.locator('#messages-table tbody tr')).toHaveCount(1);
   await expect(page.locator('#topic-empty')).toHaveCount(0);
+  // One tape, not the response's beside the page's own (one id, two regions, the live poll filling one).
+  await expect(page.locator('#tape-and-table')).toHaveCount(1);
 });
 
 test('Tp-28: a search that matches nothing says only the search found nothing, and clears', async ({ page, request, uniqueName }) => {

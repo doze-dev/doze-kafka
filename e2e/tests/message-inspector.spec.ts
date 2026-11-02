@@ -53,7 +53,11 @@ test('the Copy menu opens in flow under the actions, copies, and Esc closes only
   expect(m!.y).toBeGreaterThan(acts!.y + acts!.height - 1); // under the actions, not over them.
   await menu.getByRole('menuitem', { name: /^Copy key/ }).click();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('ord_8905');
+  // Copying closes the menu; a click on the button while it is still closing would toggle it
+  // shut again, so wait until it is gone before opening it a second time.
+  await expect(menu).toBeHidden();
   await btn.click();
+  await expect(menu).toBeVisible();
   await menu.getByRole('menuitem', { name: 'Copy as kafka-console-producer' }).focus();
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();

@@ -4,19 +4,19 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 27956338,
+      "binaryBytes": 28415122,
       "idleHeapBytes": 1368256,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
-      "recorded": "2026-10-29",
+      "recorded": "2026-11-02",
       "where": "macOS 27, Apple M-series, native"
     },
     "linux/arm64": {
-      "binaryBytes": 27132064,
+      "binaryBytes": 27590816,
       "idleHeapBytes": 1365104,
       "idleHeapNoiseBytes": 7160,
       "go": "go1.27.3",
-      "recorded": "2026-10-29",
+      "recorded": "2026-11-02",
       "where": "golang:1.27 container, linux/arm64, native on Apple M-series (Docker VM)"
     }
   },
@@ -138,6 +138,20 @@
       "from": 1343248,
       "to": 1365104,
       "reason": "the merge of main 3ca2610 (62fc8bc..3ca2610: Go outside tests +12,102/-1,713, console templates and static +1,461/-730): the Traffic pages drawn as their boards (b2f6b38) and their states, the palette, keys, themes and first run held to Sy-05..08 (1403730), the homes as their boards (d92207c), group ordering, rebalance delay and targets computed by heartbeat (e1243a8, 626cfd8, 2419271), per-client request rates (91c8330); the larger code and templates weigh in the binary; what in the idle heap grew was not attributed"
+    },
+    {
+      "date": "2026-11-02",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 27956338,
+      "to": 28415122,
+      "reason": "the Groups and Topics console pages (19 and 31 boards' worth of handlers, templates, copy and the group/log inspectors), the 33-key topic config table, the composer and message views: 458,784 bytes (1.6%) of new console code; which part grew by how much was not measured"
+    },
+    {
+      "date": "2026-11-02",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27132064,
+      "to": 27590816,
+      "reason": "the Groups and Topics console pages (19 and 31 boards' worth of handlers, templates, copy and the group/log inspectors), the 33-key topic config table, the composer and message views: new console code; which part grew by how much was not measured"
     }
   ]
 }

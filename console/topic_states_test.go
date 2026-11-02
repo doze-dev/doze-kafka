@@ -3,6 +3,7 @@ package console
 import (
 	"context"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -300,4 +301,41 @@ func TestRefusedClientNamesTheDenyThatDecided(t *testing.T) {
 		API: "Produce", Version: 9, Topics: []string{"harbour.den"}, Error: "TOPIC_AUTHORIZATION_FAILED", Class: "denied", Count: 1}}}
 	body := page(t, c, "/_console/topics/harbour.den")
 	needs(t, body, `id="topic-denied-rule"`, "Which rule decided", "deny User:loyalty write topic harbour. (prefixed)", "decided this one")
+}
+
+// The empty topic's first-record form replaces the page's own tape-and-table and takes the
+// empty-state card away with it. It used to swap a second #tape-and-table in beside the first
+// (two regions with one id; the live poll filled only one): found by the e2e spec Tp-27 on
+// a loaded runner, about one run in four.
+func TestFirstRecordFromTheEmptyCardReplacesTheTapeAndDeletesTheCard(t *testing.T) {
+	c := newTestConsole(t)
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"nil"}, "partitions": {"1"}})
+
+	empty := page(t, c, "/_console/topics/nil")
+	needs(t, empty, `id="topic-empty"`, `id="first-record"`, `hx-target="#tape-and-table"`)
+	if strings.Contains(empty, `hx-target="#topic-empty"`) {
+		t.Error("the first-record form still targets the card, so the response lands beside the page's own tape")
+	}
+
+	send := func(trigger string) string {
+		form := url.Values{"partition": {"0"}, "partition_ctx": {"0"}, "acks": {"1"}, "key": {"k1"}, "value": {"hello"}}
+		r := httptest.NewRequest("POST", "/_console/topics/nil/produce", strings.NewReader(form.Encode()))
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		r.Header.Set("HX-Request", "true")
+		if trigger != "" {
+			r.Header.Set("HX-Trigger", trigger)
+		}
+		r.Host = "127.0.0.1:9093"
+		rec := httptest.NewRecorder()
+		serveInto(t, c, rec, r)
+		if rec.Code != 200 {
+			t.Fatalf("produce: %d %s", rec.Code, rec.Body)
+		}
+		return rec.Body.String()
+	}
+	first := send("first-record")
+	needs(t, first, `id="tape-and-table"`, `id="topic-empty" hx-swap-oob="delete"`)
+	if again := send(""); strings.Contains(again, `hx-swap-oob="delete"`) {
+		t.Error("an ordinary produce deletes the empty card too")
+	}
 }

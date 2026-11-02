@@ -236,6 +236,7 @@ func TestStartTraceKeepsReusesAndForgetsJobs(t *testing.T) {
 		t.Error("a scan still running is not reused for the same question")
 	}
 	newest := c.startTrace("stale-trace", tpOffset{}, at, time.Minute)
+	defer waitJob(t, newest) // a scan left running reads the package variables the next test sets.
 	if newest == stale || newest.trace != "stale-trace" {
 		t.Error("a scan finished long ago answers a reload")
 	}
@@ -252,7 +253,9 @@ func TestStartTraceKeepsReusesAndForgetsJobs(t *testing.T) {
 	if ms, _ := strconv.ParseInt(m[1], 10, 64); ms < now.UnixMilli() || ms > time.Now().UnixMilli()+1 {
 		t.Errorf("job id carries %d, not the time in milliseconds (%d)", ms, now.UnixMilli())
 	}
-	if id := c.startTrace("another", tpOffset{}, at, time.Minute).id; !strings.HasSuffix(id, "-2") {
+	another := c.startTrace("another", tpOffset{}, at, time.Minute)
+	defer waitJob(t, another)
+	if id := another.id; !strings.HasSuffix(id, "-2") {
 		t.Errorf("the second new job is %s, want sequence 2", id)
 	}
 }
@@ -279,6 +282,7 @@ func TestStartTraceDropsTheOldestPastTheLimit(t *testing.T) {
 	if c.traces.get(oldest) != nil || c.traces.get(j.id) == nil {
 		t.Errorf("the oldest job %s survives or the new one is missing", oldest)
 	}
+	waitJob(t, j)
 }
 
 // Reading the planned ranges: only what is inside them, every partition counted as it
