@@ -61,6 +61,14 @@ func (a *API) dozeRoutes() {
 		}
 		writeJSON(w, 200, out)
 	})
+	a.mux.HandleFunc("GET /_doze/subjects/{subject}/versions/{version}/resolved", func(w http.ResponseWriter, r *http.Request) {
+		v, e := a.reg.Resolved(r.PathValue("subject"), r.PathValue("version"))
+		if e != nil {
+			writeErr(w, e)
+			return
+		}
+		writeJSON(w, 200, v)
+	})
 	a.mux.HandleFunc("GET /_doze/requests", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		before, _ := strconv.ParseUint(q.Get("before"), 10, 64)

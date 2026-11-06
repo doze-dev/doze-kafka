@@ -142,3 +142,46 @@ func (r *Registry) levelFor(subject, asked string) string {
 	defer r.mu.Unlock()
 	return r.effectiveCompat(subject)
 }
+
+// Resolved is a version with what its references bring in: for Avro, the schema with
+// the referenced types written out (avroInline); for every type, each schema reached
+// through references with its text.
+type Resolved struct {
+	SchemaType string        `json:"schemaType"`
+	Schema     string        `json:"schema"`
+	Inlined    bool          `json:"inlined"` // Schema has the referenced types written out
+	References []ResolvedRef `json:"references"`
+}
+
+// ResolvedRef is one schema a version reaches through its references.
+type ResolvedRef struct {
+	Name    string `json:"name"`
+	Subject string `json:"subject"`
+	Version int    `json:"version"`
+	Schema  string `json:"schema"`
+}
+
+// Resolved answers for one version of a subject.
+func (r *Registry) Resolved(subject, version string) (Resolved, *Error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	vr, e := r.versionLocked(subject, version, true)
+	if e != nil {
+		return Resolved{}, e
+	}
+	s := r.schemas[vr.ID]
+	refs, e := r.resolve(s.References)
+	if e != nil {
+		return Resolved{}, e
+	}
+	out := Resolved{SchemaType: s.Type, Schema: s.Schema, References: []ResolvedRef{}}
+	for _, rf := range refs {
+		out.References = append(out.References, ResolvedRef{Name: rf.Name, Subject: rf.Subject, Version: rf.Version, Schema: rf.Text})
+	}
+	if s.Type == TypeAvro && len(refs) > 0 {
+		if text, err := avroInline(s.Schema, refs); err == nil {
+			out.Schema, out.Inlined = text, true
+		}
+	}
+	return out, nil
+}

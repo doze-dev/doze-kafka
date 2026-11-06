@@ -255,7 +255,7 @@ func TestCheckAtLevel(t *testing.T) {
 func TestExtensionRoutesAreAuthenticated(t *testing.T) {
 	r, _ := openReg(t)
 	api := NewAPI(r, Options{AllowedHosts: testHosts, Auth: func(u, p string) bool { return p == "pw" }})
-	for _, c := range [][2]string{{"GET", "/_doze/overview"}, {"GET", "/_doze/requests"}, {"GET", "/_doze/subjects/x/versions/1"}, {"POST", "/_doze/subjects/x/check"}} {
+	for _, c := range [][2]string{{"GET", "/_doze/overview"}, {"GET", "/_doze/requests"}, {"GET", "/_doze/subjects/x/versions/1"}, {"GET", "/_doze/subjects/x/versions/1/resolved"}, {"POST", "/_doze/subjects/x/check"}} {
 		req := httptest.NewRequest(c[0], c[1], strings.NewReader(schemaBody(avroUser1)))
 		req.Header.Set("Content-Type", contentType)
 		rec := httptest.NewRecorder()
@@ -263,5 +263,40 @@ func TestExtensionRoutesAreAuthenticated(t *testing.T) {
 		if rec.Code != http.StatusUnauthorized {
 			t.Errorf("%s %s without credentials: %d, want 401", c[0], c[1], rec.Code)
 		}
+	}
+}
+
+// The resolved view writes a referenced type out where it is first used and names it
+// after that, through a reference's own references, keeping docs and defaults; the
+// result is the same schema (it parses, and is compatible both ways with the
+// original). (SCH-22, board Sc-10)
+func TestInlineAvro(t *testing.T) {
+	r, _ := openReg(t)
+	mustRegister(t, r, "geo", avroIn(`{"type":"record","name":"Geo","namespace":"com.acme.geo","fields":[{"name":"lat","type":"double"}]}`))
+	mustRegister(t, r, "address", SchemaInput{Schema: `{"type":"record","name":"Address","namespace":"com.acme","doc":"where","fields":[{"name":"city","type":"string","default":"?"},{"name":"at","type":"com.acme.geo.Geo"}]}`,
+		References: []Reference{{Name: "com.acme.geo.Geo", Subject: "geo", Version: 1}}})
+	person := SchemaInput{Schema: `{"type":"record","name":"Person","namespace":"com.acme","fields":[{"name":"home","type":"Address"},{"name":"work","type":["null","com.acme.Address"],"default":null}]}`,
+		References: []Reference{{Name: "com.acme.Address", Subject: "address", Version: 1}}}
+	mustRegister(t, r, "person", person)
+
+	got, e := r.Resolved("person", "latest")
+	if e != nil {
+		t.Fatal(e)
+	}
+	s := got.Schema
+	if strings.Count(s, `"fields"`) != 3 || !strings.Contains(s, `"name":"com.acme.Address"`) || !strings.Contains(s, `"doc":"where"`) ||
+		!strings.Contains(s, `"default":"?"`) || !strings.Contains(s, `"name":"com.acme.geo.Geo"`) || !strings.Contains(s, `["null","Address"]`) {
+		t.Errorf("the resolved view: %s", s)
+	}
+	alone, err := parseSchema(TypeAvro, s, nil)
+	if err != nil {
+		t.Fatalf("the resolved view does not parse on its own: %v\n%s", err, s)
+	}
+	orig, _ := r.parseStored(mustRegister(t, r, "person", person))
+	if rs := compare(alone, orig, CompatFull); len(rs) != 0 {
+		t.Errorf("the resolved view is not the same schema: %v", rs)
+	}
+	if len(got.References) != 2 {
+		t.Errorf("the references listed: %+v", got.References)
 	}
 }
