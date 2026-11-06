@@ -433,30 +433,43 @@ func (r *Registry) effectiveMode(subject string) string {
 // compatibleWith tells whether `p` may follow the live versions of a subject at the
 // given level, and why not.
 func (r *Registry) compatibleWith(subject string, p parsedSchema, level string) []string {
+	var all []string
+	for _, f := range r.findings(p, level, r.versionsAt(subject, level)) {
+		all = append(all, f.Messages()...)
+	}
+	return all
+}
+
+// versionsAt are the live versions of a subject a new schema is compared with at a
+// level: the latest, or all of them for a transitive level.
+func (r *Registry) versionsAt(subject, level string) []*versionRec {
+	versions := r.live(subject)
+	if len(versions) > 1 && !strings.HasSuffix(level, "_TRANSITIVE") {
+		versions = versions[len(versions)-1:]
+	}
+	return versions
+}
+
+// findings compares p with each of the versions at a level: the one engine behind a
+// register's 409 and a check's answer (SCH-34).
+func (r *Registry) findings(p parsedSchema, level string, against []*versionRec) []CompatFinding {
 	if level == CompatNone {
 		return nil
 	}
-	var all []string
-	versions := r.live(subject)
-	if len(versions) == 0 {
-		return nil
-	}
-	transitive := strings.HasSuffix(level, "_TRANSITIVE")
-	if !transitive {
-		versions = versions[len(versions)-1:]
-	}
 	base := strings.TrimSuffix(level, "_TRANSITIVE")
-	for _, vr := range versions {
+	var out []CompatFinding
+	for _, vr := range against {
 		old, err := r.parseStored(vr.ID)
 		if err != nil {
-			all = append(all, fmt.Sprintf("existing schema version %d cannot be read: %v", vr.Version, err))
+			out = append(out, CompatFinding{Version: vr.Version, Old: r.schemas[vr.ID].Schema, Level: level,
+				Reasons: []string{fmt.Sprintf("existing schema version %d cannot be read: %v", vr.Version, err)}})
 			continue
 		}
 		if msgs := compare(p, old, base); len(msgs) > 0 {
-			all = append(all, CompatFinding{Version: vr.Version, Old: r.schemas[vr.ID].Schema, Level: level, Reasons: msgs}.Messages()...)
+			out = append(out, CompatFinding{Version: vr.Version, Old: r.schemas[vr.ID].Schema, Level: level, Reasons: msgs})
 		}
 	}
-	return all
+	return out
 }
 
 func (r *Registry) parseStored(id int) (parsedSchema, error) {
@@ -1015,13 +1028,8 @@ func (r *Registry) CheckCompatible(subject, version string, in SchemaInput, norm
 		return nil, perr
 	}
 	level := r.effectiveCompat(subject)
-	var against []*versionRec
-	if version == "" {
-		against = r.live(subject)
-		if level != CompatNone && !strings.HasSuffix(level, "_TRANSITIVE") && len(against) > 1 {
-			against = against[len(against)-1:]
-		}
-	} else {
+	against := r.versionsAt(subject, level)
+	if version != "" {
 		vr, err := r.versionLocked(subject, version, false)
 		if err != nil {
 			if err.Code == codeSubjectNotFound {
@@ -1036,22 +1044,7 @@ func (r *Registry) CheckCompatible(subject, version string, in SchemaInput, norm
 		}
 		against = []*versionRec{vr}
 	}
-	if level == CompatNone {
-		return nil, nil
-	}
-	base := strings.TrimSuffix(level, "_TRANSITIVE")
-	var out []CompatFinding
-	for _, vr := range against {
-		old, err := r.parseStored(vr.ID)
-		if err != nil {
-			out = append(out, CompatFinding{Version: vr.Version, Old: r.schemas[vr.ID].Schema, Level: level, Reasons: []string{err.Error()}})
-			continue
-		}
-		if msgs := compare(p, old, base); len(msgs) > 0 {
-			out = append(out, CompatFinding{Version: vr.Version, Old: r.schemas[vr.ID].Schema, Level: level, Reasons: msgs})
-		}
-	}
-	return out, nil
+	return r.findings(p, level, against), nil
 }
 
 // CompatFinding is one existing version a schema is not compatible with, and why.
