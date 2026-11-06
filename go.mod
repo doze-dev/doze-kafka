@@ -12,7 +12,7 @@ require (
 	github.com/doze-dev/doze-names v0.1.1-0.20261010121557-dc00aeec3013
 	github.com/golang/snappy v1.0.0
 	github.com/hamba/avro/v2 v2.31.0
-	github.com/klauspost/compress v1.20.1
+	github.com/klauspost/compress v1.20.2
 	github.com/pierrec/lz4/v4 v4.1.33
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/twmb/franz-go v1.22.1
