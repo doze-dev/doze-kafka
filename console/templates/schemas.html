@@ -63,7 +63,8 @@
 {{define "schemas_off"}}{{template "shell_top" .}}
   <main class="main" id="detail">
     <div class="row sb ce idband"><div class="col"><h1 class="h1">Schemas</h1><span class="note">No schema registry is connected to this console.</span></div></div>
-    <div class="callout" role="note"><span class="note">doze-kafka serves a Confluent-compatible schema registry beside the broker (<code>--schema-registry</code>, on by default). Start it, or give the console one, to see subjects, versions and decoded messages here.</span></div>
+    {{if .Reason}}<div class="callout" role="alert" data-registry-off-reason><span class="note">The schema registry did not start: its records in meta.db could not be read ({{.Reason}}). The broker runs without it, and nothing in meta.db was changed.</span></div>
+    {{else}}<div class="callout" role="note"><span class="note">doze-kafka serves a Confluent-compatible schema registry beside the broker (<code>--schema-registry</code>, on by default). Start it, or give the console one, to see subjects, versions and decoded messages here.</span></div>{{end}}
   </main>
 {{template "shell_bottom" .}}{{end}}
 

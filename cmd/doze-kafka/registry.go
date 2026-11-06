@@ -43,7 +43,7 @@ func registryAddrFor(ip string) string { return net.JoinHostPort(ip, strconv.Ito
 func startRegistry(ctx context.Context, cfg config.Config, srv *server.Server, logger *slog.Logger) (func(), string, error) {
 	handler, err := srv.SchemaRegistry()
 	if err != nil {
-		return nil, "", err
+		return nil, "", registryUnreadable{err}
 	}
 	ln, err := zoneListen(cfg.SchemaRegistryAddr)
 	if err != nil {
@@ -141,3 +141,11 @@ func (z *zone) routeRegistry(logger *slog.Logger, instance, registryAddr string)
 		time.Sleep(20 * time.Millisecond)
 	}
 }
+
+// registryUnreadable is a registry whose store could not be read. The broker starts
+// without it rather than not at all: Kafka is the job, the registry a side feature
+// (SCH-13).
+type registryUnreadable struct{ err error }
+
+func (e registryUnreadable) Error() string { return e.err.Error() }
+func (e registryUnreadable) Unwrap() error { return e.err }

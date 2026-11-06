@@ -43,6 +43,7 @@ type Console struct {
 	log         *slog.Logger // where the console reports its own failures (Options.Logger).
 	be          *backend
 	reg         *registryClient     // nil when there is no schema registry to talk to.
+	regOff      string              // why the registry asked for did not start (Options.RegistryOffReason).
 	inspector   GroupInspector      // nil when the broker's group memory is not available to this console.
 	logs        LogSource           // nil when the broker's log cleaner is not available to this console.
 	traffic     TrafficSource       // nil when the broker's traffic is not available to this console.
@@ -92,6 +93,9 @@ type Options struct {
 	// Schemas section, links a topic to its subjects, shows registry-encoded payloads
 	// as the JSON they mean and can produce them. Empty, none of that appears.
 	RegistryURL string
+	// RegistryOffReason, when the registry was asked for and could not start, says
+	// why; the Schemas page shows it.
+	RegistryOffReason string
 	// RegistryUser and RegistryPass are HTTP basic credentials for the registry, when
 	// it requires them.
 	RegistryUser, RegistryPass string
@@ -193,6 +197,7 @@ func New(opts Options) (*Console, error) {
 	}
 	c.be = be
 	c.reg = newRegistryClient(opts.RegistryURL, opts.RegistryUser, opts.RegistryPass, opts.RegistryTLS)
+	c.regOff = opts.RegistryOffReason
 	c.traffic = opts.Traffic
 	c.inspector = opts.Groups
 	c.logs = opts.Logs

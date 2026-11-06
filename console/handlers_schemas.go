@@ -31,7 +31,7 @@ func (c *Console) registryOff(w http.ResponseWriter, r *http.Request) bool {
 		c.fail(w, r, fmt.Errorf("%w: no schema registry is connected to this console", errNotFound))
 		return true
 	}
-	c.render(w, r, "schemas_off", map[string]any{"Page": "schemas", "Title": "Schemas"})
+	c.render(w, r, "schemas_off", map[string]any{"Page": "schemas", "Title": "Schemas", "Reason": c.regOff})
 	return true
 }
 

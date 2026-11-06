@@ -188,3 +188,17 @@ func TestOldCanonicalFormsAreStillFound(t *testing.T) {
 		t.Errorf("after a permanent delete the schema came back as id 1")
 	}
 }
+
+// A record the registry cannot read stops it opening, and the error names the record,
+// so whoever starts it can say which one. (SCH-13; the broker carries on without the
+// registry: cmd/doze-kafka TestBrokerStartsWithAnUnreadableRegistry.)
+func TestOpenWithABadRecord(t *testing.T) {
+	st := NewMemoryStorage()
+	if err := st.Apply(map[string][]byte{schemaKey(1): []byte("not json")}, nil); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Open(st)
+	if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("%q", schemaKey(1))) {
+		t.Errorf("Open with an unreadable record: %v, want an error naming %q", err, schemaKey(1))
+	}
+}

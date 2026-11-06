@@ -12,11 +12,11 @@ All seven P1 findings are closed: SCH-1, 2, 3, 4, 5, 6, 7. Rows 1 to 5 of sectio
 - Also fixed on the way: Avro unnamed types drop doc/aliases/name; Protobuf json_name and multi-option printing; stored schemas indexed under the current canonical form so an upgrade does not mint new ids; JSON Schema reference names scoped per schema; /schemas offset and limit; fetchMaxId; a flaky storage retention test (CI); the lightness binary budgets raised with reasons.
 
 ### Not done yet in Stage 5 (in plan order)
-1. SCH-14 / SCH-34: one selection loop for register and check, and the property test that they agree. Recorded on the way: Confluent's check ignores READONLY, so the READONLY warning belongs to the console (SCH-14's console part).
+1. SCH-14's console part: the READONLY warning on the check form (the registry part, SCH-34, is done: one selection loop, TestCheckEqualsRegister; Confluent's check ignores READONLY, recorded).
 2. Row 6, backend for the boards: SCH-20 (createdAt, by, from, agent on versions; setAt on level and mode), SCH-21 (request ring and `GET /_doze/requests`), SCH-22 (check at another level, Avro inliner), SCH-23 (`GET /_doze/overview`).
 3. Row 7, console registry client: SCH-15, 16, 17, 24 (structured refusals, delete semantics, client-soft-deleted subjects, decode reasons and backoff). SCH-8's console bound must be the console's own (Confluent ignores limit on /subjects).
 4. Row 8: topic scan (SCH-25, 26). Row 9: the 19 boards (SCH-19, 30 to 33). Row 10: compat cells (Java naming strategies, Python Protobuf with an import, READONLY, kcat, UIs), fuzz targets (SCH-28), e2e to 20 tests. Row 11: mutation, coverage floors, documents, actual time.
-5. SCH-13 (an unreadable record should not stop the broker), SCH-35/36 small ones.
+5. SCH-35/36, small ones. (SCH-13 done: the broker starts with the registry off and says why.)
 
 ### For the owner to decide
 - Nothing blocking. Re-estimate after Stage 5: rows 1 to 5 took one long session (2026-11-06/07) against 13 planned half-days.

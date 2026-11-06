@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"github.com/doze-dev/doze-kafka/internal/config"
+	"github.com/doze-dev/doze-kafka/internal/storage/meta"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -228,5 +231,46 @@ func TestRegistryTimesOutSlowAndIdleClients(t *testing.T) {
 			}
 			break
 		}
+	}
+}
+
+// A registry record that cannot be read does not take Kafka down: the broker starts
+// with the registry off, the summary and the Schemas page say why, and meta.db is left
+// as it was. (SCH-13)
+func TestBrokerStartsWithAnUnreadableRegistry(t *testing.T) {
+	data := t.TempDir()
+	st, err := meta.Open(filepath.Join(data, config.MetaDBFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bad := map[string][]byte{"schema\x000000000001": []byte("not json")}
+	if err := st.RegistryApply(bad, nil); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+
+	out, stop := start(t, "--data-dir", data)
+	waitFor(t, "the summary", func() bool { return strings.Contains(out.String(), "doze-kafka is up") })
+	if !strings.Contains(out.String(), "registry  off") {
+		t.Errorf("the summary does not say the registry is off:\n%s", out.String())
+	}
+	m := regexp.MustCompile(`console   (http://\S+)`).FindStringSubmatch(out.String())
+	if m == nil {
+		t.Fatalf("no console in the summary:\n%s", out.String())
+	}
+	if code, body := call(t, "GET", strings.TrimSuffix(m[1], "/")+"/_console/schemas", "", "", ""); code != 200 || !strings.Contains(body, "data-registry-off-reason") || !strings.Contains(body, "schema") {
+		t.Errorf("the Schemas page: %d, want the reason the registry is off:\n%.400s", code, body)
+	}
+	if err := stop(); err != nil {
+		t.Fatal(err)
+	}
+	st, err = meta.Open(filepath.Join(data, config.MetaDBFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	all, _ := st.RegistryAll()
+	if string(all["schema\x000000000001"]) != "not json" {
+		t.Errorf("the unreadable record was changed: %q", all["schema\x000000000001"])
 	}
 }
