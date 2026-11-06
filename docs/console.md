@@ -40,13 +40,42 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   topic.
 - **Send a message** from the dock at the bottom. Closed, it is one row: a key, a
   value and Send (the partition chosen by the key, acks 1). `p` or its title opens the
-  whole form: key, value, headers, partition (or "auto", which partitions by key
-  exactly as a real client does), acks, each acknowledgement saying what this broker
-  does for it (`all` is answered once the partition is on disk). The composer stays
-  open while you change partition and closes when you move to another topic. Values
-  can be sent as text, JSON, base64, or a tombstone. **Send again** on any record
-  produces an exact copy (the same key, value and headers, byte for byte), and
-  **Edit a copy** opens the composer filled in with it, to change first.
+  whole form (Tp-10): the partition (Auto, by key, or Fixed), the key (optional; `b64`
+  for binary bytes, `empty` for a key of zero bytes, which is not the same as no key),
+  the acknowledgment (each saying what this broker does for it; `all` is answered once
+  the partition is on disk), the value (JSON, checked as you type, Text, or Null for a
+  tombstone; `b64` for binary bytes) and headers as rows or as one JSON array. A card,
+  **What will be sent**, says as you type which partition the key lands on (the same
+  murmur2 a Java client uses), what the key, value and headers weigh, and what the
+  batch weighs; asking writes nothing (`POST /topics/{name}/compose/preview`). With a
+  schema subject chosen the value is written as JSON, checked against the subject's
+  latest schema, shown as the bytes it becomes (the registry's framing and schema id)
+  and sent encoded (Tp-11). The send is one raw Produce request: the page shows what
+  the broker answered, with its own message where it gave one, and what the console
+  knows about the request (the batch size, the topic's `max.message.bytes`) as the
+  console's. With acks 0 the broker answers nothing and closes the connection on a
+  refused batch, so the page says the record was not delivered; a bad header is caught
+  in the form before any request (Tp-12). The composer stays open while you change
+  partition and closes when you move to another topic. **Send again** on any record
+  produces an exact copy (the same key, value and headers, byte for byte, as a plain
+  batch with no producer id) and sets it beside the original, read back from the
+  broker, with the groups that will read it again (Tp-13). **Edit a copy** opens the
+  composer filled in with it, to change first.
+- **A record's bytes** (Tp-07 to Tp-09): a value that is not text is shown as hex and
+  base64, and the page says why it is not decoded (its first byte is not the registry's
+  0x00 marker); a value framed with a schema id the registry does not hold says so; a
+  registry value is shown Decoded with its schema id and subject, or Raw with the
+  framing explained. Null and empty are told apart for the key and the value, with the
+  nearest offset of each in the 201 records around the one open; for a tombstone on a
+  compacted topic the page lists the key's records still on disk (up to 3,000 read) and
+  says what the cleaner does with them; records compaction has already removed cannot be
+  listed.
+- **Go to offset** and **Go to time** (Tp-14, Tp-15): an offset the log does not hold
+  says "Offset N is past the end (latest is M)" and keeps the newest records in view; a
+  time lands on the first record at or after it (a ListOffsets by time) and says so; a
+  time before the first record lands on it ("nothing that early"); a time after the last
+  record is answered -1 by the broker (recorded), and the console then shows the newest
+  records, which is the console's rule.
 - **Consumed by** lists the groups reading the topic, with their lag.
 - **Settings** shows what is in force for the topic (how long records are kept, how
   much, and the segment size), marks the ones that are the topic's own, and lets you
@@ -79,10 +108,39 @@ SASL is on (doze-kafka provisions it a private one at start-up).
   its groups' committed offsets, so a group that had read everything carries on with
   the next record. **Delete** removes the topic. Both ask first, naming the action.
 
-- **Follow this trace**, in the inspector of a record that carries a trace id
+- **Follow this message**, in the inspector of a record that carries a trace id
   (`traceparent`, B3, or the header named by `--trace-header`): every record of the
   same trace in every topic, in order, with the groups that have read each. See
   [Observability](observability.md).
+
+### Partitions, config and the other tab states (Tp-16 to Tp-30)
+
+- **Partitions** lists, for each partition, its leader (from Metadata), start, end, high mark,
+  messages, last stable offset, size on disk, segments, the active segment and the newest
+  write. Size, segments and the active segment are read from the data directory the console was
+  told; without it the columns say so. A transaction holding the last stable offset back is named
+  (DescribeProducers for the producer and where its transaction began, the transaction
+  coordinator for its transactional id) with a link to the committed-only view and to the
+  Cluster page's open transactions; there is no page for a single transaction.
+- **Add partitions** asks for the new total, as `CreatePartitions` does. It previews the new
+  partitions, warns that a key may hash elsewhere, lists the groups reading the topic, and sends a
+  total at or below the present one as it is: the broker's `INVALID_PARTITIONS` is shown in its own words.
+- **Config** lists every key the broker reports (33, the same as Kafka's) with its value, source and
+  whether the broker acts on it, read from the settings table. Edit one row at a time: Before, After
+  and what it affects (for retention, how the sweep judges a segment) appear as you type, and the
+  request is shown (`IncrementalAlterConfigs SET`). A refusal is the broker's, with the valid range
+  from the table or, for a name the broker does not know, the nearest names.
+- **Cleaner** (a compacted topic) shows the state, when it last cleaned, records removed in the last
+  pass and since the partition was opened, and how far each partition has been cleaned. It needs the
+  broker in the same process; the totals start again at a restart. The dirty ratio, tombstones kept and keys
+  held are not reported by the broker and are not shown.
+- **Readers** lists the groups with a committed offset on the topic with their lag per partition and
+  links to them; **Who is writing** is the traffic recorder's. A client the broker refused on the
+  topic is named above the tape with the rule that decided it, by the Access checker's reading of the
+  stored ACLs. A topic with nothing in it offers its first record and the console-producer command; a
+  log whose start has moved names the groups committed below it; a paused tape counts the records that
+  arrive; a topic that is not there offers its nearest names, a way to create it and the clients refused
+  for asking for it. The console keeps no history of config changes, so it never says what moved a log start.
 
 ## Consumer groups
 
@@ -104,7 +162,20 @@ SASL is on (doze-kafka provisions it a private one at start-up).
 
 - A **Timeline** of what the group's coordinator did (joins, rebalances, expiries,
   generations), newest first: the answer to "why does my consumer keep rebalancing".
+  It has filters (all, rebalances, members, problems), counts the rebalances of the last hour
+  and names a group that rebalances over and over. The broker keeps the last 200 events of each
+  group, in memory.
   See [Observability](observability.md).
+- While a classic group rebalances, the Members tab shows who has rejoined and how long is left
+  of the rebalance timeout; a consumer-protocol group shows each member's target and current
+  assignment (the coordinator's record, not the member's report); a classic group shows its
+  generation, leader and timeouts. These come from the broker's memory, so they are empty after
+  a restart and the page says when it cannot see them.
+- An empty group's offsets expire after `offsets-retention` (default 7 days): the Lag tab shows
+  when, counted as the broker counts it. With retention 0 it says offsets are kept for ever.
+- The console cannot know a consumer's `isolation.level` or its client settings (a Fetch or a
+  heartbeat does not carry them): where an open transaction holds records back it says what
+  each isolation level would see, and does not say which the group uses.
 
 ## Traffic
 
@@ -178,6 +249,21 @@ the same: a title, a body and a close control. With nothing selected it says wha
 can select here. The selection is in the address (`?open=`), so a refresh or a shared
 link reopens it, Back returns to the previous selection (or to none), and `Esc`
 closes it and puts focus back on the row.
+
+A record's inspector (400 px) names its timestamp (to the millisecond, with how long
+ago) and how the broker stamped it (CreateTime or LogAppendTime), its key and size, the
+size of its value and of its headers (the bytes of their keys and values), and who
+**wrote it**: the client the Traffic recorder saw send the Produce request that holds
+it, with its transactional id when it had one. The recorder keeps only the last
+requests, and leaves out the console's own connections, so an older record, or one the
+console wrote itself, says "not known" (it is never guessed). The value has a
+Text / Hex / Base64 switch; **Send again**, **Edit a copy…** and **Copy** are under it.
+The Copy menu copies the key, the value (as JSON, when it is) or its base64, downloads
+the value, and writes the `kafka-console-producer.sh` command that produces the record,
+only where that tool can say it exactly (text without tabs or line breaks, a key that is
+not empty, a value that is not null, plain headers; it chooses the partition itself, by
+the key): otherwise the item is off and its hover says why. With the inspector open the
+records table gives up its Time and Hdr columns.
 
 ## Pages and tabs
 

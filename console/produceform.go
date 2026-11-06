@@ -75,6 +75,8 @@ func parseProduceForm(r *http.Request, partitions int32) (produceInput, error) {
 			return in, err
 		}
 		in.Key = key
+	} else if r.FormValue("key_empty") == "1" {
+		in.Key = []byte{} // an empty key is not a null one (TOP-13).
 	}
 
 	if r.FormValue("tombstone") == "1" {

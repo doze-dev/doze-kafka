@@ -30,7 +30,7 @@ test('the composer sends text, JSON, a key and headers', async ({ page, createTo
   await page.getByLabel('Header key').fill('source');
   await page.getByLabel('Header value', { exact: true }).fill('e2e');
   await setEditor('{"id": 1}');
-  await expect(page.locator('.cm-valid')).toContainText('valid JSON');
+  await expect(page.locator('#compose-valid')).toContainText('Valid JSON, 9 B');
   await page.getByRole('button', { name: 'Send message' }).click();
   await waitForToast();
   await waitForLive((t) => t.includes('order-1'));
@@ -43,9 +43,10 @@ test('invalid JSON is flagged as it is typed, and a null value needs no body', a
   await createTopic(uniqueName('json'));
   await page.locator('#compose-head').click();
   await setEditor('{"id": ');
-  await expect(page.locator('.cm-valid')).toHaveClass(/bad/);
-  await page.getByLabel('null value (tombstone)').check();
-  await expect(page.locator('.cm-valid')).toContainText('null value');
+  await expect(page.locator('#compose-valid')).toHaveClass(/bad/);
+  await expect(page.locator('#compose-valid')).toContainText('Not valid JSON');
+  await page.getByRole('button', { name: 'Null (tombstone)' }).click();
+  await expect(page.locator('#compose-valid')).toContainText('Null value');
   await page.getByRole('button', { name: 'Send message' }).click();
   expect(await waitForToast()).toContain('Sent to partition 0');
 });
@@ -68,7 +69,7 @@ test('holding Cmd+Enter sends once', async ({ page, createTopic, uniqueName, set
   await createTopic(uniqueName('held'));
   await page.locator('#compose-head').click();
   await setEditor('held');
-  await page.locator('#compose-panel .cm-editor').click();
+  await page.locator('#f-value').click();
   await page.keyboard.down('Meta');
   for (let i = 0; i < 8; i++) await page.keyboard.down('Enter');
   await page.keyboard.up('Enter');
@@ -96,7 +97,7 @@ test('the composer stays open across a change of partition and closes on another
 test('an open composer never covers the messages', async ({ page }) => {
   for (const height of [900, 700, 560]) {
     await page.setViewportSize({ width: 1280, height });
-    await page.goto('topics/seed-orders');
+    await page.goto('topics/seed-orders?partition=0');
     await page.locator('#compose-head').click();
     const r = await page.evaluate(() => {
       const wb = document.querySelector('main.workbench')!;
@@ -113,12 +114,12 @@ test('an open composer never covers the messages', async ({ page }) => {
 test('sending to another partition keeps the view and says where it went', async ({ page, createTopic, uniqueName, setEditor, waitForToast }) => {
   await createTopic(uniqueName('part'), 3);
   await page.locator('#compose-head').click();
+  await page.getByRole('button', { name: 'Fixed' }).click();
   await page.locator('#f-partition').selectOption('2');
   await setEditor('elsewhere');
   await page.getByRole('button', { name: 'Send message' }).click();
   const toast = await waitForToast();
   expect(toast).toContain('partition 2');
-  expect(toast).toContain('you are viewing partition 0');
-  await expect(page.locator('.ptab.on')).toContainText('P0');
-  await expect(page.locator('.secrow .cap')).toContainText('partition 0');
+  await expect(page.locator('.ptab.on')).toContainText('All'); // the default view is every partition, merged.
+  await expect(page.locator('.secrow .cap')).toContainText('all partitions');
 });

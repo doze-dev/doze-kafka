@@ -56,7 +56,7 @@ test('the forms log nothing when they are used', async ({ page, createTopic, uni
   await page.goto('new/topic');
   expected = `POST ${PREFIX}/new/topic`;
   await page.locator('#f-name').fill('bad name!');
-  await page.getByRole('button', { name: 'Create topic' }).click();
+  await page.locator('#create-topic').getByRole('button', { name: 'Create topic' }).click();
   await expect(page.locator('[data-err-slot]')).toContainText('invalid topic name');
   expected = '';
   await createTopic(uniqueName('forms'));

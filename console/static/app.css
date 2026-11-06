@@ -380,7 +380,6 @@ span.num {
 .insp {
   width: 400px; background: var(--card); border-left: 1px solid var(--line); display: flex; flex-direction: column; overflow-y: auto; min-height: 0;
 }
-.insp[data-kind="message"] { width: 420px; }
 .insp-default, .insp-sel { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 .insp .hd .h2 { min-width: 0; overflow-wrap: anywhere; } /* a 249-character topic in a heading breaks in the panel */
 .mw0 { min-width: 0; }
@@ -799,10 +798,13 @@ table.msg-table td, table.msg-table th { padding-left: 7px; padding-right: 7px; 
 table.msg-table td:first-child, table.msg-table th:first-child { padding-left: 12px; }
 table.msg-table td:last-child, table.msg-table th:last-child { padding-right: 12px; }
 table.msg-table td { padding-bottom: 3px; font-size: var(--fs-sm); }
-table.msg-table .col-p { width: 45px; }          /* 26 + 12 + 7 */
-table.msg-table th:nth-child(2) { width: 86px; } /* 72 + 14: the board's 62 holds 4,789, not 1,234,567 */
-table.msg-table th:nth-child(3) { width: 134px; } /* 120 + 14 */
-table.msg-table th:nth-child(5) { width: 81px; }  /* 62 + 7 + 12 */
+/* Tp-05's tracks: Offset, P, Time, Key, Value, Hdr. */
+table.msg-table th:nth-child(1) { width: 85px; } /* 66 + 12 + 7: the board's 66, which holds 4,811 */
+table.msg-table th:nth-child(2) { width: 38px; }  /* 24 + 14 */
+table.msg-table th:nth-child(3) { width: 126px; } /* 112 + 14 */
+table.msg-table th:nth-child(4) { width: 138px; } /* 124 + 14 */
+table.msg-table th:nth-child(6) { width: 55px; }  /* 36 + 7 + 12 */
+.cell-time { font-family: var(--mono); font-size: var(--fs-sm); white-space: nowrap; }
 table.msg-table td { overflow: hidden; text-overflow: ellipsis; }
 .cell-key { font-family: var(--mono); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cell-key.none { color: var(--muted-foreground); font-style: italic; font-family: var(--sans); }
@@ -820,7 +822,8 @@ table.msg-table td { overflow: hidden; text-overflow: ellipsis; }
 
 .pager { display: inline-flex; align-items: center; gap: 12px; }
 .pagelink { color: var(--foreground); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
-.tbl-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 12px; font-size: var(--fs-xs); color: var(--muted-foreground); border-top: 1px solid var(--border); background: var(--muted); white-space: nowrap; }
+.tbl-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 0 12px; min-height: 24px; font-size: var(--fs-md); color: var(--ink); border-top: 1px solid var(--line2); white-space: nowrap; } /* Tp-05's last row: notes, not a band */
+.tbl-foot .note, .tbl-foot .pager { font-size: var(--fs-sm); color: var(--mut); }
 
 /* ---------- inspector / palette / confirm (all .overlay, shown via [hidden]) ---------- */
 .overlay { position: fixed; inset: 0; background: var(--scrim); z-index: 40; display: grid; place-items: start center; padding: 12vh 16px 16px; }
@@ -1050,7 +1053,9 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .nbnote { display: none; } /* how the neighbours are counted waits for the wide page */
   .neighbours { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
   .neighbours a.well { flex: none; }
-  .insp[data-kind="message"] .insp-sel .inspector-b > :not(:first-child):not(:nth-child(2)) { grid-column: 1 / -1; }
+  .insp[data-kind="message"] .insp-sel .inspector-b > :not(.tp-fields):not(.tp-val) { grid-column: 1 / -1; }
+  .insp[data-kind="message"] .insp-sel .inspector-b > .tp-fields { grid-column: 1; grid-row: 1; }
+  .insp[data-kind="message"] .insp-sel .inspector-b > .tp-val { grid-column: 2; grid-row: 1; } /* Sy-03: the fields and the value side by side */
   .tape-strip, .tape-foot { display: none; }
   .backrow { display: flex; }
   /* Sy-03's back is a.btn.sm, a link drawn as a button: 500, "‹ Topics" one run of text. */
@@ -1117,9 +1122,9 @@ form.htmx-request .btn.pri::after { content: ""; width: 11px; height: 11px; marg
   .tbl-wrap table.tbl td.cell-key { grid-column: 1; grid-row: 1; font-weight: 600; max-width: none; }
   .tbl-wrap table.tbl td.cell-offset { grid-column: 2; grid-row: 1; text-align: right; color: var(--mut); }
   .tbl-wrap table.tbl td.cell-val { grid-column: 1 / -1; grid-row: 2; }
-  .tbl-wrap table.tbl td.cell-age { display: block; grid-column: 1 / -1; grid-row: 3; text-align: left; color: var(--mut); font-family: var(--sans); font-size: var(--fs-sm); }
-  .tbl-wrap table.tbl td.cell-age::after { content: " ago"; }
-  .tbl-wrap table.tbl td.cell-age:has(time[data-now])::after { content: none; }
+  .tbl-wrap table.tbl td.cell-time { display: block; grid-column: 1 / -1; grid-row: 3; text-align: left; color: var(--mut); font-family: var(--sans); font-size: var(--fs-sm); }
+  .tbl-wrap table.tbl td.cell-time::after { content: ""; }
+  .tbl-wrap table.tbl tbody tr:not(.txnmark) td.cell-hdr { display: none; }
   .tbl-wrap table.tbl tbody tr:not(.txnmark) td.col-p { display: none; } /* (the cell rule above is more specific than a bare td.col-p) */
   /* Sy-04's cards: each record its own bordered card, the open one ringed in ink. */
   .tbl-wrap:has(#messages-table) { border: 0; background: none; overflow: visible; }
@@ -1519,3 +1524,151 @@ html[data-paused] #inspector[data-traffic-kept] .tf-kept { display: block; }
   .tf-filter > .grow, .tf-filter > .note { display: none; }
   .main.tf > .row.sb { flex-wrap: wrap; }
 }
+
+/* ---------- Topics: the create form (Tp-02, Tp-03, Tp-04) ---------- */
+.tp-left { width: 600px; flex: none; } .tp-left.open { width: 640px; }
+.tp-w150 { width: 150px; } .tp-w110 { width: 110px; }
+.tp-hint, .tp-light { font-weight: 400; }
+.tp-pt { padding-top: 22px; }
+.tp-create .inp[aria-invalid="true"] { border-color: var(--deny); }
+.tp-taken { margin: 0; }
+.tp-hide, .app a.tp-hide { text-decoration: none; }
+.tp-none { margin-top: 40px; align-self: center; width: 640px; max-width: 100%; padding: 28px 32px; gap: 14px; }
+.tp-list-none { padding: 18px 14px; }
+.tp-settings { margin: 0; }
+
+/* ---------- Topics: the topic page (Tp-05, Tp-06) ---------- */
+.tp-contents { display: contents; }
+.tp-neighbours { padding: 5px 10px; }
+.tryit .quick .quick-part { width: 128px; flex: none; }
+
+.tp-tape { padding: 8px 12px 6px; display: flex; flex-direction: column; gap: 12px; }
+.tp-tape-h { margin-bottom: -8px; }
+.tp-lane-p { width: 20px; flex: none; } .tp-lane-n { width: 76px; flex: none; }
+.tp-lane { position: relative; height: 24px; border-bottom: 1px solid var(--line); }
+.tp-lane .tick { position: absolute; bottom: 0; width: 3px; border-radius: 1px; background: var(--ink); }
+.tp-axis { font-size: var(--fs-xs); }
+
+/* ---------- Topics: the message inspector (Tp-06) ----------
+   400 px. Its head is the board's: the kind and the small step and close controls on
+   one row, the title under it, the topic under that. The fields are 82 px and the rest;
+   the Copy menu is a card in flow under the actions. With it open the table gives up its
+   Time and Hdr columns (they are the inspector's Timestamp and Headers). */
+@media (min-width: 1101px) {
+  .inspector-h[data-inspector-kind="message"] { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: center; }
+  .inspector-h[data-inspector-kind="message"] > div:first-child { display: contents; }
+  .inspector-h[data-inspector-kind="message"] .cap { grid-column: 1; grid-row: 1; justify-self: start; }
+  .inspector-h[data-inspector-kind="message"] .inspector-nav { grid-column: 2; grid-row: 1; gap: 4px; }
+  .inspector-h[data-inspector-kind="message"] #inspector-title { grid-column: 1 / -1; grid-row: 2; }
+  .inspector-h[data-inspector-kind="message"] .inspector-sub { grid-column: 1 / -1; grid-row: 3; }
+  body:has(#inspector:not([hidden])) #messages-table :is(th.col-time, td.cell-time, th.col-hdr, td.cell-hdr) { display: none; }
+  /* Tp-06's tracks: 54 (which holds 4,811 in the room it has), 20, 90, and the rest; each is its track plus the cell's padding. */
+  body:has(#inspector:not([hidden])) table.msg-table th:nth-child(1) { width: 73px; }
+  body:has(#inspector:not([hidden])) table.msg-table th:nth-child(2) { width: 34px; }
+  body:has(#inspector:not([hidden])) table.msg-table th:nth-child(4) { width: 104px; }
+}
+@media (max-width: 1100px) { .insp-sel .insp-close .close-x { display: none; } } /* the word closes it there (Sy-03, Sy-04) */
+.tp-msg > .tp-fields { --c: 82px 1fr; }
+.tp-msg > .inspector-acts { margin-top: 0; }
+.tp-msg .seg.fmt { margin-left: 0; }
+.hdrkv { --c: 100px 1fr; row-gap: 2px; }
+.hdrkv > :nth-child(even) { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tp-copymenu { width: 250px; margin-left: 100px; box-shadow: 0 8px 24px rgba(0, 0, 0, .14); }
+.tp-copymenu .btn { justify-content: flex-start; border-radius: 0; }
+.tp-copymenu .btn.sb { justify-content: space-between; }
+.tp-copymenu .btn:disabled { opacity: .5; cursor: default; }
+
+/* ---------- Topics: slice 3 (Tp-07 to Tp-15) ---------- */
+/* Tp-07, Tp-09: the legend and the key's history are cards of rows; their notes wrap. */
+.tp-legend-card { --c: 80px 1fr 96px; }
+.tp-history .tp-legend-card { --c: 52px 90px 1fr; }
+.tp-legend-card .r { min-height: 30px; padding-block: 4px; align-items: start; }
+.tp-legend-card .r > * { white-space: normal; overflow-wrap: anywhere; }
+.tp-legend-card .r.on { background: var(--sel); }
+.tp-legend-card .r.on:has(.pill), .tp-legend-card .r.deny { background: var(--denybg); }
+.tp-b64 { gap: 8px; }
+.tp-b64 .m { min-width: 0; }
+.tp-legend .note, .tp-raw .note { overflow-wrap: anywhere; }
+.tp-framing { gap: 2px; }
+.refusal-facts { display: block; margin-top: 2px; }
+
+/* Tp-10, Tp-11, Tp-12: the open composer. Closed it is Sy-01's row (above); open, the bar
+   becomes the card's head (title, topic, note, fold control) and the form is the board's
+   two columns, 520 px and the rest, over a well foot. */
+.dock-bar .open-only { display: none; }
+:root[data-dock="open"] .tryit { padding: 0; gap: normal; }
+:root[data-dock="open"] .dock-bar { padding: 8px 14px; border-bottom: 1px solid var(--line2); justify-content: space-between; border-radius: 0; gap: 12px; }
+:root[data-dock="open"] .dock-bar > :not(.open-only) { display: none; }
+:root[data-dock="open"] .dock-bar .open-only { display: flex; }
+:root[data-dock="open"] .dock-bar:hover .h2 { text-decoration: underline; text-underline-offset: 2px; }
+:root[data-dock="open"] .dock-form { margin: 0; padding: 0; border-top: 0; }
+.tp-compose { display: flex; flex-direction: column; }
+.tp-cp-body { padding: 12px 14px; flex: 1; }
+.tp-cp-left { width: 520px; flex: none; }
+.tp-cp-part { width: 230px; flex: none; }
+.tp-cp-opt { font-weight: 400; }
+.tp-cp-acks { padding-top: 6px; }
+.tp-fit { width: fit-content; }
+.tp-cp-ta.inp.m { height: 130px; padding: 8px 9px; line-height: 19px; resize: vertical; }
+.tp-cp-hk { width: 140px; flex: none; }
+.tp-cp-sent { --c: 90px 1fr; row-gap: 2px; }
+.tp-cp-foot { padding: 8px 14px; border-top: 1px solid var(--line2); background: var(--well); }
+.tp-cp-err { margin: 0 14px 12px; }
+.tp-tag { cursor: pointer; }
+.tp-tag.on { color: var(--ink); text-decoration: underline; }
+.tp-tag:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.tp-ord1 { order: 1; } .tp-ord2 { order: 2; } .tp-ord3 { order: 3; }
+.tp-compose .note.ok { color: var(--ok-foreground); }
+.tp-compose .note.bad { color: var(--bad-foreground); }
+@media (max-width: 1100px) { .tp-cp-body { flex-direction: column; } .tp-cp-left { width: auto; } }
+.tp-cp-subject { min-width: 0; }
+.tp-jump { flex-direction: row; align-items: center; gap: 12px; margin: 0 0 8px; }
+.tp-jump .grow { min-width: 0; }
+.tp-resend { gap: 12px; }
+.tp-resend-where { --c: 74px 1fr 1fr; }
+.tp-resend-same { --c: 74px 1fr 60px; }
+.tp-resend-card .r { min-height: 30px; }
+#resend-note:empty { display: none; }
+#resend-note .callout { margin-bottom: 8px; }
+tr.copied td { background: var(--okbg); }
+/* ---- Groups (Gr-01 .. Gr-18) ---- */
+.none-card { max-width: 760px; }
+.list-none { padding: 18px 14px; }
+.main.gr-none { gap: 12px; }
+
+.code .c { color: var(--mut); }
+
+/* Gr-02, Gr-03: the group page. */
+.nbwell { padding: 6px 10px; }
+.nbwell a:hover { text-decoration: underline; }
+#lag-table { --c: 150px 130px 90px 90px 1fr 56px; }
+#members-table { --c: 150px 110px 130px 1fr 70px; }
+.memberwell { padding: 7px 10px; }
+.memberb .code { margin: 0; }
+
+/* Gr-06 (the reset form and its preview), Gr-07 (the refusal and the way out), Gr-08, Gr-15. */
+.resetrow { align-items: flex-start; }
+.resetform { width: 380px; flex: none; }
+.resetmode { border: 0; padding: 0; margin: 0; min-width: 0; }
+.resetmode legend { padding: 0; }
+.resetform .rst-at { width: 190px; }
+#reset-table { --c: 84px 1fr 1fr 110px; }
+#reset-table .rst-off { width: 100%; max-width: 120px; text-align: right; }
+.stepr { align-items: flex-start; }
+.stepn { flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: var(--bg); display: inline-flex; align-items: center; justify-content: center; font-family: var(--mono); font-weight: 700; font-size: var(--fs-xs); line-height: 1; }
+#reset-result:empty { display: none; }
+#reset-result { display: flex; flex-direction: column; gap: 10px; }
+.confirm-notes { display: flex; flex-direction: column; gap: 12px; }
+.confirm-notes[hidden] { display: none; }
+.confirm-call { margin-right: auto; align-self: center; }
+.resetmode input[type=radio] { font: inherit; color: inherit; margin: 0; }
+
+/* Groups: the functional boards (Gr-13 card, Gr-18 countdown). */
+.kv.kv-group{--c:160px 1fr}
+progress.gr-used{height:8px;border:0;border-radius:2px;background:var(--line2);accent-color:var(--ink);appearance:none;-webkit-appearance:none}
+progress.gr-used::-webkit-progress-bar{background:var(--line2);border-radius:2px}
+progress.gr-used::-webkit-progress-value{background:var(--ink);border-radius:2px}
+progress.gr-used::-moz-progress-bar{background:var(--ink);border-radius:2px}
+
+/* Topics, slice 4: the Config tab's row being edited (Tp-19). */
+.card .r.editing { background: var(--sel, rgba(120, 140, 255, .08)); }

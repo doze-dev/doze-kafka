@@ -12,13 +12,26 @@ here is byte-identical in both (the hashes are in `SHA256SUMS`).
 - `<Board>.dc.html`: one board each. Only the boards a committed spec compares or an
   allow-list entry cites are here: Main and Traf-02 to Traf-12 (the Traffic boards,
   measured by `traffic/`), Sy-01 to Sy-08, the section homes (Tp-Home,
-  Gr-Home, Sc-Home, Tc-Home, Ac-Home, Cl-Home), Tp-24, the Access boards the Access
+  Gr-Home, Sc-Home, Tc-Home, Ac-Home, Cl-Home), Tp-01 to Tp-04 (none, create, create with settings, create refused) and Tp-24, the Access boards the Access
   home builds from (Ac-03 Create, Ac-05 Check), and the topic page's own boards that
   the Sy allow-list measures where the boards disagree (Tp-05 Messages, Tp-06
   Message: an entry with `per` is checked against them) or names (Tp-14 Go to
-  offset). Tp-05, Tp-06 and Tp-14 were read at 1792149264-d921 only. The Traffic boards (Main,
+  offset). The Groups boards (Gr-01 to Gr-18) are added slice by slice as the Groups
+  stage compares them; present so far: Gr-01 None, Gr-02 Lag, Gr-03 Members
+  (read at 1792149264-d921). Tp-05, Tp-06 and Tp-14 were read at 1792149264-d921 only. The Traffic boards (Main,
   Traf-02 to Traf-12) were copied from the same artifact's `project/` folder, unmodified;
+
+Topic-page boards Tp-23 to Tp-30 (less Tp-24) (message, compose, partitions, config and the empty states) were read at 1792149264-d921 only, copied unchanged.
+
+Topic-page boards Tp-19 to Tp-22 (message, compose, partitions, config and the empty states) were read at 1792149264-d921 only, copied unchanged.
+
+Topic-page boards Tp-15 to Tp-18 (message, compose, partitions, config and the empty states) were read at 1792149264-d921 only, copied unchanged.
+
+Topic-page boards Tp-07 to Tp-13 (message, compose, partitions, config and the empty states) were read at 1792149264-d921 only, copied unchanged.
   the artifact version they were read at was not recorded.
+  The Groups boards Gr-04 to Gr-18 were read at 1792149264-d921, each verified by its
+  sha256 from the artifact's file list (Gr-15 differs from its siblings by one
+  `style="position: relative"` on `.app`, for its two dialogs).
 
 A board is a static page: it links `./support.js` (the design runtime, which these
 boards do not need: they have no holes to fill; the gate serves an empty file in its

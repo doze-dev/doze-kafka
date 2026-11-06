@@ -1,23 +1,23 @@
 {
   "build": "CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w' ./cmd/doze-kafka",
-  "run": "GOMAXPROCS=2 doze-kafka --listen 127.0.0.1:0 --console-addr 127.0.0.1:0 --schema-registry-addr 127.0.0.1:0 --data-dir \u003cempty\u003e --pprof-addr 127.0.0.1:\u003cfree\u003e; heap = HeapAlloc of the third /debug/pprof/heap?gc=1, one second after pprof answers",
+  "run": "GOMAXPROCS=2 doze-kafka --listen 127.0.0.1:0 --console-addr 127.0.0.1:0 --schema-registry-addr 127.0.0.1:0 --data-dir <empty> --pprof-addr 127.0.0.1:<free>; heap = HeapAlloc of the third /debug/pprof/heap?gc=1, one second after pprof answers",
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 27956338,
+      "binaryBytes": 28415122,
       "idleHeapBytes": 1368256,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
-      "recorded": "2026-10-29",
+      "recorded": "2026-11-02",
       "where": "macOS 27, Apple M-series, native"
     },
     "linux/arm64": {
-      "binaryBytes": 27132064,
-      "idleHeapBytes": 1365104,
+      "binaryBytes": 27590816,
+      "idleHeapBytes": 1374400,
       "idleHeapNoiseBytes": 7160,
       "go": "go1.27.3",
-      "recorded": "2026-10-29",
-      "where": "golang:1.27 container, linux/arm64, native on Apple M-series (Docker VM)"
+      "recorded": "2026-11-02",
+      "where": "golang:1.27 container, linux/arm64, native on Apple M-series (Docker VM); idleHeapBytes from GitHub's linux/arm64 runner (CI run 41501006646)"
     }
   },
   "carries": [
@@ -138,6 +138,27 @@
       "from": 1343248,
       "to": 1365104,
       "reason": "the merge of main 3ca2610 (62fc8bc..3ca2610: Go outside tests +12,102/-1,713, console templates and static +1,461/-730): the Traffic pages drawn as their boards (b2f6b38) and their states, the palette, keys, themes and first run held to Sy-05..08 (1403730), the homes as their boards (d92207c), group ordering, rebalance delay and targets computed by heartbeat (e1243a8, 626cfd8, 2419271), per-client request rates (91c8330); the larger code and templates weigh in the binary; what in the idle heap grew was not attributed"
+    },
+    {
+      "date": "2026-11-02",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 27956338,
+      "to": 28415122,
+      "reason": "the Groups and Topics console pages (19 and 31 boards' worth of handlers, templates, copy and the group/log inspectors), the 33-key topic config table, the composer and message views: 458,784 bytes (1.6%) of new console code; which part grew by how much was not measured"
+    },
+    {
+      "date": "2026-11-02",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27132064,
+      "to": 27590816,
+      "reason": "the Groups and Topics console pages (19 and 31 boards' worth of handlers, templates, copy and the group/log inspectors), the 33-key topic config table, the composer and message views: new console code; which part grew by how much was not measured"
+    },
+    {
+      "date": "2026-11-03",
+      "key": "linux/arm64 idleHeapBytes",
+      "from": 1365104,
+      "to": 1374400,
+      "reason": "GitHub's linux/arm64 runner measures 1,374,400 (PR 3, CI run 41501006646, job Lightness budget (linux/arm64)), 9,296 above the 1,365,104 recorded in a local golang container on Apple silicon (the gate runs on the runner, so its figure is the budget); the new console code and the environment both contribute and how much each was not separated"
     }
   ]
 }

@@ -4,6 +4,7 @@ import { dirname } from 'node:path';
 import { BASE_URL, IDENTITY, KAFKA_ADDR, REGISTRY_URL } from './playwright.config';
 import { ADDR_FILE } from './addr';
 import { resetSeen } from './route-gate';
+import { pruneOldBinaries } from './prune';
 
 // The broker's address when its listener picked its own port: the console says it
 // on the Cluster page ("node 1 · 127.0.0.1:41873").
@@ -17,6 +18,7 @@ async function boundAddress(): Promise<string> {
 // Runs once the broker is up: puts the data the read-only specs look at in it
 // (see seed/main.go). Specs that change things make their own topics.
 export default async function globalSetup() {
+  pruneOldBinaries();
   resetSeen(); // the route gate counts this run's requests, not the last one's.
   let addr = KAFKA_ADDR;
   if (IDENTITY) {

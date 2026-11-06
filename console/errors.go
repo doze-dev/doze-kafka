@@ -75,6 +75,9 @@ func (c *Console) failResource(w http.ResponseWriter, r *http.Request, err error
 	f.Message = fmt.Sprintf("There is no %s named %q on this broker.", kind, name)
 	page := errorPage{Section: kind + "s", Back: c.prefix + "/" + kind + "s"}
 	page.Suggestions = c.suggest(r.Context(), kind, name)
+	if kind == "topic" {
+		c.topicNotFound(r.Context(), name, &page)
+	}
 	c.renderError(w, r, f, page)
 }
 
@@ -83,14 +86,21 @@ type errorPage struct {
 	Section     string // "topics" or "groups": which rail item stays lit.
 	Back        string
 	Suggestions []suggestion
+	// For a topic that is not there (Tp-29): how many topics there are, an offer to
+	// create it, and the refused requests the recorder holds that named it.
+	TopicName  string
+	TopicCount int
+	CreateURL  string
+	Why        []whyRow
 }
 
-type suggestion struct{ Name, URL string }
+type suggestion struct{ Name, URL, Detail string }
 
 func (c *Console) renderError(w http.ResponseWriter, r *http.Request, f Refusal, p errorPage) {
 	data := f.data(map[string]any{
 		"Title": f.Heading, "Heading": f.Heading, "Message": f.Message, "Kind": string(f.Kind),
 		"Status": f.Status, "Suggestions": p.Suggestions, "Back": p.Back, "Retry": f.Retry,
+		"TopicName": p.TopicName, "TopicCount": p.TopicCount, "CreateURL": p.CreateURL, "Why": p.Why,
 		"Page": p.Section, "View": "error",
 	})
 	if p.Section == "" {
@@ -163,7 +173,7 @@ func (c *Console) closeNames(names []string, name string, urlFor func(string) st
 		if len(out) == 3 {
 			break
 		}
-		out = append(out, suggestion{s.name, urlFor(s.name)})
+		out = append(out, suggestion{Name: s.name, URL: urlFor(s.name)})
 	}
 	return out
 }

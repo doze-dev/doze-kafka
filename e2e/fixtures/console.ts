@@ -94,10 +94,8 @@ export const test = base.extend<Fixtures>({
 
   setEditor: async ({ page }, use) => {
     await use(async (value) => {
-      await page.evaluate((v) => {
-        const ta = document.querySelector('#f-value') as HTMLTextAreaElement;
-        (window as any).dozeEditor.set(ta, v);
-      }, value);
+      // The composer's value is a plain textarea (Tp-10): filling it is typing it.
+      await page.locator('#f-value').fill(value);
     });
   },
 
@@ -114,7 +112,7 @@ export const test = base.extend<Fixtures>({
       await page.goto('new/topic');
       await page.locator('#f-name').fill(name);
       await page.locator('#f-partitions').fill(String(partitions));
-      await page.getByRole('button', { name: 'Create topic' }).click();
+      await page.locator('#create-topic').getByRole('button', { name: 'Create topic' }).click();
       await expect(page.locator('.idband h1')).toHaveText(name);
     });
   },

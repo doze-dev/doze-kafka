@@ -55,7 +55,18 @@ type confirmFacts struct {
 	Version               int
 	NewLatest             int // the version that is latest once Version is deleted; 0 when none is left.
 	Committed             int64
-	ResetTarget           string // "earliest" or "latest".
+	ResetTarget           string // "earliest", "latest", "timestamp" or "offsets".
+	ResetAt               string // the time a timestamp reset goes to, as written.
+	OffsetTopics          []string
+	Members               int // members a group has now.
+}
+
+// confirmNote is a callout under a confirm's sentence (Gr-15): what is and is not touched.
+type confirmNote struct {
+	Head string       `json:"head"`
+	Name string       `json:"name,omitempty"` // the Kafka answer the note names, in the mono face.
+	Body []confirmSeg `json:"body"`
+	Deny bool         `json:"deny,omitempty"`
 }
 
 // confirmSeg is a run of a confirm's text: plain, in the mono face (a name, a
@@ -79,6 +90,8 @@ type confirmSay struct {
 	Title string
 	Body  []confirmSeg
 	Rows  []confirmLine
+	Notes []confirmNote
+	Call  string // the request the verb sends, beside the buttons ("OffsetDelete").
 	Verb  string
 }
 
@@ -95,6 +108,12 @@ func (s confirmSay) Text() string {
 		b.WriteString(": ")
 		b.WriteString(segsText(r.Value))
 		b.WriteString(".")
+	}
+	for _, n := range s.Notes {
+		b.WriteString(" ")
+		b.WriteString(n.Head)
+		b.WriteString(": ")
+		b.WriteString(segsText(n.Body))
 	}
 	return b.String()
 }
@@ -223,7 +242,7 @@ var confirmTable = []confirmSpec{
 				say.Verb = "Add " + nounCount(f.Add, "partition", "partitions")
 				say.Body = []confirmSeg{txt(fmt.Sprintf("Add %s to %q, which has %s now, %d after? ", nounCount(f.Add, "partition", "partitions"), f.Name, nounCount(f.Partitions, "partition", "partitions"), f.Partitions+f.Add))}
 			} else {
-				say.Body = []confirmSeg{txt(fmt.Sprintf("Add the number of partitions entered to %q, which has %s now? ", f.Name, nounCount(f.Partitions, "partition", "partitions")))}
+				say.Body = []confirmSeg{txt(fmt.Sprintf("Grow %q, which has %s now, to the total entered? ", f.Name, nounCount(f.Partitions, "partition", "partitions")))}
 			}
 			say.Body = append(say.Body, txt("They cannot be removed afterwards, and a key may hash to a different partition than before, so records with the same key stop being ordered together across the change."))
 			return say
@@ -231,12 +250,33 @@ var confirmTable = []confirmSpec{
 	},
 	{
 		ID: "group.delete", Method: "POST", Path: "/groups/{id}/delete",
-		Say: sentence("Delete group", "Delete group", func(f confirmFacts) string {
+		Say: func(f confirmFacts) confirmSay {
+			say := confirmSay{Title: "Delete group " + f.Name, Verb: "Delete group", Call: "DeleteGroups, sent by the console"}
 			if f.Offsets == 0 {
-				return fmt.Sprintf("Delete group %q? It has no committed offsets.", f.Name)
+				say.Body = []confirmSeg{txt("Delete group "), mono(f.Name), txt("? It has no committed offsets.")}
+			} else {
+				say.Body = []confirmSeg{txt("This removes the group and its " + nounCount(f.Offsets, "committed offset", "committed offsets") + " on ")}
+				if len(f.OffsetTopics) > 0 {
+					say.Body = append(say.Body, monoNames(f.OffsetTopics)...)
+				} else {
+					say.Body = append(say.Body, txt(nounCount(f.Topics, "topic", "topics")))
+				}
+				say.Body = append(say.Body, txt(". "))
+				if f.Unread > 0 {
+					say.Body = append(say.Body, mono(num(f.Unread)), txt(" records it had not read stay in the topic. "))
+				}
+				say.Body = append(say.Body, txt("A consumer that joins with this group id later starts from its "), mono("auto.offset.reset"), txt("."))
 			}
-			return fmt.Sprintf("Delete group %q and its %s on %s?", f.Name, nounCount(f.Offsets, "committed offset", "committed offsets"), nounCount(f.Topics, "topic", "topics"))
-		}),
+			// claim: groups.md G1
+			note := confirmNote{Head: "Only Empty groups", Name: "NON_EMPTY_GROUP", Deny: true}
+			if f.Members == 0 {
+				note.Body = []confirmSeg{txt("This group is Empty, so it can be deleted. With even one member connected, Kafka refuses the same call with "), mono("NON_EMPTY_GROUP"), txt(": stop the consumers first.")}
+			} else {
+				note.Body = []confirmSeg{txt("This group has " + nounCount(f.Members, "member", "members") + " now, so Kafka refuses the call with "), mono("NON_EMPTY_GROUP"), txt(": stop the consumers first.")}
+			}
+			say.Notes = []confirmNote{note}
+			return say
+		},
 	},
 	{
 		ID: "group.reset.earliest", Method: "POST", Path: "/groups/{id}/reset",
@@ -253,11 +293,35 @@ var confirmTable = []confirmSpec{
 		}),
 	},
 	{
-		ID: "group.offset.delete", Method: "POST", Path: "/groups/{id}/offset/delete",
-		Say: sentence("Remove offset", "Remove", func(f confirmFacts) string {
-			return fmt.Sprintf("Remove the committed offset of %q for %s partition %d (it is at %d)? A consumer will start there from its auto.offset.reset policy.",
-				f.Name, f.Topic, f.Partition, f.Committed)
+		ID: "group.reset.timestamp", Method: "POST", Path: "/groups/{id}/reset",
+		Say: sentence("Reset to a time", "Reset offsets", func(f confirmFacts) string {
+			return fmt.Sprintf("Reset the committed offsets of %q to the first record at or after %s? This moves %s of its %d%s; its consumers will resume from there.",
+				f.Name, f.ResetAt, nounCount(f.Moves, "offset", "offsets"), f.Offsets, scopeNote(f))
 		}),
+	},
+	{
+		ID: "group.reset.offsets", Method: "POST", Path: "/groups/{id}/reset",
+		Say: sentence("Set offsets", "Set offsets", func(f confirmFacts) string {
+			return fmt.Sprintf("Set %s of %q to the numbers entered? The group's other offsets stay; its consumers will resume from the new ones.",
+				nounCount(f.Moves, "offset", "offsets"), f.Name)
+		}),
+	},
+	{
+		ID: "group.offset.delete", Method: "POST", Path: "/groups/{id}/offset/delete",
+		Say: func(f confirmFacts) confirmSay {
+			say := confirmSay{Title: fmt.Sprintf("Remove the offset of %s partition %d", f.Topic, f.Partition), Verb: "Remove offset", Call: "OffsetDelete"}
+			say.Body = []confirmSeg{txt("The group "), mono(f.Name), txt(" forgets that it had read up to "), mono(num(f.Committed)), txt(" on this one partition. ")}
+			if f.Offsets > 1 {
+				say.Body = append(say.Body, txt(fmt.Sprintf("The other %d stay. When a consumer next joins, partition %d starts from ", f.Offsets-1, f.Partition)), mono("auto.offset.reset"),
+					txt(" (earliest or latest, whichever the client is set to), while the others resume."))
+			} else {
+				say.Body = append(say.Body, txt("It is the group's last offset, so the group has none left. When a consumer next joins, partition "+strconv.Itoa(int(f.Partition))+" starts from "), mono("auto.offset.reset"),
+					txt(" (earliest or latest, whichever the client is set to)."))
+			}
+			say.Notes = []confirmNote{{Head: "Nothing in the topic changes", Body: []confirmSeg{txt("Only the group's bookkeeping is removed. This is what "), mono("kafka-consumer-groups.sh --delete-offsets"),
+				txt(" does. Allowed while the group is Empty: the broker refuses an offset of a group that has members.")}}}
+			return say
+		},
 	},
 	{
 		ID: "schema.version.delete", Method: "POST", Path: "/schemas/{subject}/delete",
@@ -514,16 +578,22 @@ func (c *Console) topicConfirms(ctx context.Context, name string, partitions int
 }
 
 // groupConfirms are the confirms of a group's page, from the offsets the page
-// already computed.
-func groupConfirms(id string, rows []groupLagRow) map[string]confirmView {
-	f := confirmFacts{Name: id}
+// already computed and the members it has now.
+func groupConfirms(id string, rows []groupLagRow, members int) map[string]confirmView {
+	f := confirmFacts{Name: id, Members: members}
 	topics := map[string]bool{}
 	var toEarliest, toLatest int
 	for _, r := range rows {
 		f.Offsets++
+		if !topics[r.Topic] {
+			f.OffsetTopics = append(f.OffsetTopics, r.Topic)
+		}
 		topics[r.Topic] = true
 		if r.Deleted {
 			continue // a reset skips an offset whose topic is gone.
+		}
+		if !r.Ahead {
+			f.Unread += r.Lag
 		}
 		if r.Committed != r.Earliest {
 			toEarliest++
@@ -532,6 +602,7 @@ func groupConfirms(id string, rows []groupLagRow) map[string]confirmView {
 			toLatest++
 		}
 	}
+	sort.Strings(f.OffsetTopics)
 	f.Topics = len(topics)
 	e, l := f, f
 	e.Moves, l.Moves = toEarliest, toLatest
@@ -542,9 +613,10 @@ func groupConfirms(id string, rows []groupLagRow) map[string]confirmView {
 	}
 }
 
-// offsetDeleteConfirm is the confirm of one row's Remove.
-func offsetDeleteConfirm(group, topic string, partition int32, committed int64) confirmView {
-	return viewOf("group.offset.delete", confirmFacts{Name: group, Topic: topic, Partition: partition, Committed: committed})
+// offsetDeleteConfirm is the confirm of one row's Remove; offsets is how many the
+// group holds, this one included.
+func offsetDeleteConfirm(group, topic string, partition int32, committed int64, offsets int) confirmView {
+	return viewOf("group.offset.delete", confirmFacts{Name: group, Topic: topic, Partition: partition, Committed: committed, Offsets: offsets})
 }
 
 // subjectConfirms are the confirms of a subject's page: all of it, and the version
@@ -598,6 +670,15 @@ func (c *Console) confirmLive(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		views = data["Confirm"].(map[string]confirmView)
+	case "group.reset":
+		// The reset form's own confirm: the mode, the topic and the typed time or offsets
+		// arrive with the request, and the sentence counts what that plan moves.
+		v, err := c.groupResetConfirm(r, q.Get("group"))
+		if err != nil {
+			c.fail(w, r, err)
+			return
+		}
+		id, views = v.id, map[string]confirmView{v.id: v.view}
 	case "group.offset.delete":
 		group, topic := q.Get("group"), q.Get("topic")
 		p, perr := strconv.Atoi(q.Get("partition"))
@@ -612,7 +693,7 @@ func (c *Console) confirmLive(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, o := range offs {
 			if o.Topic == topic && int(o.Partition) == p {
-				views = map[string]confirmView{id: offsetDeleteConfirm(group, topic, o.Partition, o.Committed)}
+				views = map[string]confirmView{id: offsetDeleteConfirm(group, topic, o.Partition, o.Committed, len(offs))}
 			}
 		}
 		if views == nil {
@@ -642,5 +723,5 @@ func (c *Console) confirmLive(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
-	json.NewEncoder(w).Encode(map[string]any{"text": v.Text, "title": v.Title, "verb": v.Verb, "body": v.Say.Body, "rows": v.Say.Rows})
+	json.NewEncoder(w).Encode(map[string]any{"text": v.Text, "title": v.Title, "verb": v.Verb, "body": v.Say.Body, "rows": v.Say.Rows, "notes": v.Say.Notes, "call": v.Say.Call})
 }

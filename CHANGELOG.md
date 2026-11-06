@@ -6,6 +6,43 @@ here that contains "server API"; `task api` fails without it.
 
 ## Unreleased
 
+- Console, topic tabs (Tp-16 to Tp-30): the Partitions tab shows leader, high mark, size, segments, the active segment and the open transaction holding the last stable offset (DescribeProducers); Add partitions asks the new total, previews it and shows the broker's two refusals (TOP-30); the Config tab lists all 33 keys with source and whether the broker acts on each, edits one key with Before, After and what it affects, and shows a refusal with the valid range or the nearest key name (TOP-7); a compacted topic has a cleaner card (TOP-28); the Messages tab names an open transaction, a refused client and the rule that decided it, an empty topic, a log whose start moved and the groups behind it, and counts records that arrive while paused; the not-found page offers sizes, a create link and who was refused. Broker: `DescribeConfigs` of a topic lists the 33 keys Kafka does, with Kafka's defaults except three (TOP-2, recorded as `topic-config-keys`); age retention judges a segment by the largest timestamp of its records,, and no longer keeps back records stamped long ago because their file is new (TOP-3); the log cleaner's totals are kept since the partition was opened. Checked by `e2e/tests/topics-boards2.spec.ts`.
+- Console, composer and message boards (Tp-07 to Tp-15): the open composer is drawn to Tp-10 (partition, key, acknowledgment, value mode JSON, Text or Null, headers as rows or as JSON, and a "What will be sent" card the broker's own partitioner and the batch's own size answer as you type; with a schema subject the value is written as JSON, checked against the subject and shown as the bytes it becomes, Tp-11). A send is one raw uncompressed Produce request, so a refusal shows the broker's code, Kafka's sentence and the broker's own message where it sent one, with what the console knows (the batch size, the topic's `max.message.bytes`) kept apart as the console's (TOP-10); with acks 0 a refused batch, which the broker answers by closing the connection, says "Not delivered" (TOP-16); a bad header is caught in the form before any request (Tp-12). A batch over 512 KiB is gzipped, so a record that is stored large because it arrived compressed can be sent again (TOP-11). Send again shows the original and the copy side by side, the copy read back from the broker, and which groups will read it again (Tp-13, TOP-36). The inspector says why a value is bytes (its first byte is not the registry's 0x00), names a schema id the registry does not hold (TOP-38), shows a registry value Decoded or Raw with the framing explained, tells null from empty (key and value) with the nearest offset of each, and for a tombstone on a compacted topic lists the key's records still on disk and what the cleaner does with them (Tp-07 to Tp-09). Go to offset past the end says "Offset N is past the end (latest is M)"; go to time says what it landed on (ListOffsets by time) and, for a time before the first record or after the last, what the console does (Tp-14, Tp-15). Tp-10 is held to its board by the design gate; the others are checked by `e2e/tests/topics-boards.spec.ts`.
+- Console, message inspector (Tp-06): 400 px wide, with the kind and the older, newer and close controls on one row, the title and topic under them; fields for Timestamp (to the millisecond, and how long ago), Type (CreateTime or LogAppendTime, from the batch), Key with its size, Sizes (value and headers) and Written by (the client, and transactional id, of the Produce request in the traffic recorder that holds the record; "not known" when the recorder does not, never a guess); Follow this message (to Trace) with what it does; headers as a list; the value with a Text / Hex / Base64 switch; Send again, Edit a copy… and a Copy menu (key, value as JSON, base64, download, and a `kafka-console-producer` command only where that tool can say the record exactly). With a record open the table drops its Time and Hdr columns. The time formatter gains `datetimems`, and a time written as "ago" no longer shows the clock instead.
+- Console, topic page (Tp-05): a topic of several partitions opens on every partition merged, newest first (the newest 30 of each, and the page says when that is less than the topic holds); the tape has a lane for each partition on a time axis; the records have Offset, P, Time, Key, Value and Hdr columns; the facts are a row (partitions, messages and size on disk, retention, cleanup policy, last write); the neighbours are one well; the button reads "Produce"; Try it has a partition and an acks choice. A partition's own page is `?partition=N`.
+- Console, messages tape: a gap in the offsets is drawn as a transaction marker only where a control batch is; an offset compaction removed is no longer called a marker. An empty (not null) key is hashed to a partition like any key, and the composer can send one ("empty key, not null"; "Edit a copy" keeps it).
+- Console, create topic: the page is drawn to the design (Tp-01 to Tp-04). The settings open from "Set…" (the name and partitions you typed carry over, and the page can be opened with them in its address), the form offers `cleanup.policy`, a refusal is shown as the design draws it with the broker's own wording, and an empty broker's Topics page is the design's.
+- Groups, the functional boards (Gr-04, 05, 09 to 14, 16 to 18): the Timeline says how long a
+  member was silent before it expired, that it said goodbye, and how long a rebalance waited;
+  has the filters all / rebalances / members / problems, "rebalanced N times in the last hour"
+  and, for a group rebalancing over and over, the pill "rebalancing every N s" with the gaps
+  between expiries. Each group keeps its own 200 events, so a noisy group does not push out a
+  quiet one (GRP-24). A group in PreparingRebalance shows who has rejoined and the time left of
+  the rebalance timeout (there is no cap on it; GRP-25), a consumer-protocol group its target
+  and current assignment per member (the coordinator's record; GRP-20), a classic group its
+  generation, protocol, leader and timeouts. A group with members and no commits lists the
+  partitions it owns with "no commit yet" instead of a lag; an offset past the log end gets the
+  arithmetic for resetting; a leftover offset of a deleted topic says what Kafka does (drops it a
+  moment later; claim G2). Records past the last stable offset are named with the open
+  transaction holding them (the console says it cannot tell the group's isolation level;
+  GRP-18). A refused group names the operation its API needs, not Read for everything
+  (GRP-21). The offsets-retention countdown is the broker's own: `broker.OffsetExpiry` gives
+  the time each offset expires by the rules of the sweep (GRP-19). OffsetDelete of a group with
+  members now refuses only the topics a member is subscribed to (GRP-4, recorded:
+  `offset-delete-subscribed`, claim G7); the group snapshot gained the rebalance deadline, who
+  has rejoined, and per-member state and assignments.
+- Groups: the Offsets tab is the reset form (Gr-06): earliest, latest, a timestamp (the first
+  record at or after it, per partition, by ListOffsets) or specific offsets, for all topics or
+  one, with a preview (committed now, after, lag after; `POST /groups/{id}/reset/preview`, which
+  sends nothing). A group with members is refused with the way out (Gr-07), and the range of one
+  partition's offset is the console's own rule, said as such (GRP-15, GRP-16). Delete group and
+  Remove offset confirm with counts and consequences (Gr-15, GRP-32).
+- Groups: the group page's Lag and Members tabs follow Gr-02 and Gr-03. The sentence under the
+  title takes the generation, the leader and the timeouts from the coordinator's memory (a
+  consumer-protocol group says it has no leader and no per-member timeouts, and the console says
+  when it cannot see that memory); the Owner column names members by id; the Members tab shows host
+  with port, leader and heartbeat age; a member's inspector shows host:port, software, timeouts,
+  heartbeat, joined and the offered protocols. Keys 1-4 open the tabs and r resets offsets.
 - Names: a by-name address is printed only when something answers at it. The start-up
   summary, `doze-kafka env` and the console and registry URLs used to give the name
   whenever it resolved on the machine; on a Mac a name can go on resolving after the
@@ -669,3 +706,4 @@ here that contains "server API"; `task api` fails without it.
   returned types from `internal/` that a caller outside the module could not
   name; this module's own commands read them through `internal/serverhook`.
 - server API: the exported surface is now pinned (`task api`).
+- Groups: with no group on the broker the page is the design's Gr-01 (the commands name this broker and one of its topics, the keys strip is g g, jump, keys) and fills in by itself within 3 s when a group appears.

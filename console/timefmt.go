@@ -20,21 +20,23 @@ import (
 
 // Time styles. shell.js implements the same set.
 const (
-	StyleClock    = "clock"    // 15:04:05
-	StyleClockMs  = "clockms"  // 15:04:05.000
-	StyleDateTime = "datetime" // 2006-01-02 15:04:05
-	StyleDate     = "date"     // 2006-01-02
-	StyleAgo      = "ago"      // 3m ago, counted in the browser
-	StyleSince    = "since"    // 3m 10s, counted in the browser
+	StyleClock      = "clock"      // 15:04:05
+	StyleClockMs    = "clockms"    // 15:04:05.000
+	StyleDateTime   = "datetime"   // 2006-01-02 15:04:05
+	StyleDateTimeMs = "datetimems" // 2006-01-02 15:04:05.000
+	StyleDate       = "date"       // 2006-01-02
+	StyleAgo        = "ago"        // 3m ago, counted in the browser
+	StyleSince      = "since"      // 3m 10s, counted in the browser
 )
 
 var timeStyles = map[string]string{
-	StyleClock:    "15:04:05",
-	StyleClockMs:  "15:04:05.000",
-	StyleDateTime: "2006-01-02 15:04:05",
-	StyleDate:     "2006-01-02",
-	StyleAgo:      "",
-	StyleSince:    "",
+	StyleClock:      "15:04:05",
+	StyleClockMs:    "15:04:05.000",
+	StyleDateTime:   "2006-01-02 15:04:05",
+	StyleDateTimeMs: "2006-01-02 15:04:05.000",
+	StyleDate:       "2006-01-02",
+	StyleAgo:        "",
+	StyleSince:      "",
 }
 
 // whenText is the server's own text for a moment: UTC, and it says so. It is the

@@ -62,6 +62,19 @@ export const TOPIC_PAGE: Probe[] = [
   { el: 'inspector', board: 'aside.insp', live: 'aside.insp:not([hidden])' },
 ];
 
+/**
+ * Tp-05 draws the body of the page again, later than Sy-01: the facts as a row of
+ * spans, the neighbours as one well, the records with Time and Hdr columns, Try it as a
+ * strip. The topics gate (topics/) measures those against Tp-05; Sy-01 and Sy-02 keep
+ * measuring the rest.
+ */
+export const SUPERSEDED_BY_TP05 = new Set([
+  'facts', 'neighbours', 'neighbour', 'neighbour note', 'neighbour chip',
+  'records', 'records head', 'records head cell', 'record', 'record open', 'record offset', 'record key', 'record value', 'record age',
+  'composer', 'composer title', 'composer note', 'composer key', 'composer value', 'composer send',
+]);
+export const TOPIC_COMMON: Probe[] = TOPIC_PAGE.filter((p) => !SUPERSEDED_BY_TP05.has(p.el));
+
 /** The inspector's message, as Sy-02 draws it. */
 export const MESSAGE: Probe[] = [
   { el: 'inspector head', board: '.insp .hd', live: '#inspector .inspector-h' },

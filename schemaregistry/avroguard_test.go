@@ -227,9 +227,12 @@ func TestRandomBytesNeverCostMoreThanTheyWeigh(t *testing.T) {
 	for _, s := range fuzzAvroSchemas {
 		codecs = append(codecs, mustCodec(t, TypeAvro, s))
 	}
-	values := 4000
+	// The bound catches a value whose claimed lengths cost far more than its bytes,
+	// which takes minutes or runs out of memory. Under -race with coverage a shared CI
+	// runner has taken 23 s for what takes 0.5 s here, so the bound there is wider.
+	values, bound := 4000, 20*time.Second
 	if raceOn {
-		values = 400
+		values, bound = 400, 90*time.Second
 	}
 	start := time.Now()
 	for range values {
@@ -239,7 +242,7 @@ func TestRandomBytesNeverCostMoreThanTheyWeigh(t *testing.T) {
 			c.Decode(wire(body))
 		}
 	}
-	if took := time.Since(start); took > 20*time.Second {
+	if took := time.Since(start); took > bound {
 		t.Errorf("%d short random values against %d schemas took %s", values, len(codecs), took)
 	}
 }

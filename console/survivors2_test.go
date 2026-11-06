@@ -370,8 +370,9 @@ func TestMemberWithoutAClientIDIsNamedByItsID(t *testing.T) {
 			}
 			label := shortID(m.ID)
 			body := readable(req(t, c, "GET", "/_console/inspect/member?key="+joinKey("anon-g", m.ID), nil).Body.String())
-			if !strings.Contains(body, label) {
-				t.Errorf("the member is not named by its short id %q:\n%s", label, body)
+			// Gr-03 names a member by its id in full, as the board does.
+			if !strings.Contains(body, m.ID) {
+				t.Errorf("the member is not named by its id %q:\n%s", m.ID, body)
 			}
 			data := groupPage(t, c, "anon-g", "")
 			if ms := data["Members"].([]memberView); len(ms) != 1 || ms[0].Label != label {

@@ -194,6 +194,37 @@ func (p *Partition) setCleanedTo(offset int64) error {
 	return nil
 }
 
+// CleanTotals is what the cleaner's passes added up to since the partition was opened.
+// A restart starts them again: nothing is written to disk (TOP-28).
+type CleanTotals struct {
+	Passes         int
+	RecordsRemoved int64
+	MarkersRemoved int64
+}
+
+// CleanStats is the cleaner's state for one partition, for a page that shows it.
+type CleanStats struct {
+	// Running is true while a pass is under way.
+	Running bool
+	// Last is the most recent pass that cleaned something; Last.Ran is false before one.
+	Last CleanResult
+	// Since is what every pass since the partition was opened removed.
+	Since CleanTotals
+	// CleanedTo is the offset below which the log has been cleaned.
+	CleanedTo int64
+}
+
+// CleanStats reports the cleaner's state without waiting for a pass in progress.
+func (p *Partition) CleanStats() CleanStats {
+	running := !p.cleaning.TryLock()
+	if !running {
+		p.cleaning.Unlock()
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return CleanStats{Running: running, Last: p.lastClean, Since: p.cleanTotals, CleanedTo: p.cleanedToLocked()}
+}
+
 // LastClean is the most recent pass that did anything or looked.
 func (p *Partition) LastClean() CleanResult {
 	p.mu.Lock()
@@ -394,6 +425,9 @@ func (p *Partition) Compact(pol CompactionPolicy, now time.Time) (CleanResult, e
 	}
 	p.mu.Lock()
 	p.lastClean = res
+	p.cleanTotals.Passes++
+	p.cleanTotals.RecordsRemoved += res.RecordsRemoved
+	p.cleanTotals.MarkersRemoved += res.MarkersRemoved
 	p.mu.Unlock()
 	return res, nil
 }

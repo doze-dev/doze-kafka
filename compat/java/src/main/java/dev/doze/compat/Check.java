@@ -287,10 +287,13 @@ public class Check {
     s2.start();
     Map<String, Long> second;
     long end = System.nanoTime() + Duration.ofSeconds(60).toNanos();
-    do { second = counts(out, 8); } while (!Long.valueOf(5).equals(second.get("the")) && System.nanoTime() < end);
+    // The words land on two partitions, committed by two threads in separate transactions,
+    // so wait for every count checked, not only 'the'.
+    java.util.function.Predicate<Map<String, Long>> restored = m ->
+        Long.valueOf(5).equals(m.get("the")) && Long.valueOf(2).equals(m.get("dog")) && Long.valueOf(1).equals(m.get("end"));
+    do { second = counts(out, 8); } while (!restored.test(second) && System.nanoTime() < end);
     s2.close(Duration.ofSeconds(20));
-    check(Long.valueOf(5).equals(second.get("the")) && Long.valueOf(2).equals(second.get("dog")) && Long.valueOf(1).equals(second.get("end")),
-        "word counts after restoring state from the changelog: " + second);
+    check(restored.test(second), "word counts after restoring state from the changelog: " + second);
     ok("streams: a new instance restores its state from the compacted changelog and carries on");
   }
 }

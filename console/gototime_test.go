@@ -54,14 +54,14 @@ func TestGoToTime(t *testing.T) {
 		return req(t, c, "GET", "/_console/topics/when?at="+url.QueryEscape(at), nil).Body.String()
 	}
 	body := page("1h")
-	if !strings.Contains(body, "Showing from the first message at or after") || !strings.Contains(body, "(offset 0)") {
+	if !strings.Contains(body, "Nothing that early: showing from the start") || !strings.Contains(body, "starts at offset 0") {
 		t.Errorf("an hour ago: no landing note\n%s", noteOf(body))
 	}
 	if !strings.Contains(body, `id="jump-at"`) {
 		t.Error("the page has no go-to-time box")
 	}
 	future := strconv.FormatInt(time.Now().Add(time.Hour).UnixMilli(), 10)
-	if body := page(future); !strings.Contains(body, "No message on this partition is at or after") {
+	if body := page(future); !strings.Contains(body, "No record at or after") || !strings.Contains(body, "The broker answers -1") {
 		t.Errorf("an hour from now: %s", noteOf(body))
 	}
 	if body := page("whenever"); !strings.Contains(body, "That is not a time") {

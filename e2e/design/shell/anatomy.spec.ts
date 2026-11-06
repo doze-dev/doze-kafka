@@ -3,7 +3,7 @@ import { BASE_URL } from '../../playwright.config';
 import { livePage, runBoard } from '../lib/gate';
 import { SHELL } from '../lib/probes';
 import { openBoard, openLive } from '../lib/render';
-import { dropMarkers, MESSAGE, openMessage, recordOpen, TOPIC, TOPIC_PAGE, TRACED } from '../lib/topic';
+import { dropMarkers, openMessage, recordOpen, TOPIC, TOPIC_COMMON, TRACED } from '../lib/topic';
 import { ALLOW } from './allow';
 
 // Sy-01 (the anatomy of a page) and Sy-02 (the same page in dark, a message open)
@@ -17,8 +17,8 @@ test('Sy-01 matches a live topic page', async ({ browser }) => {
   test.setTimeout(120_000);
   const out = await runBoard(browser, {
     id: 'Sy-01', file: 'Sy-01-Anatomy', boardState: dropMarkers,
-    live: livePage(BASE_URL, `/topics/${TOPIC}`, openMessage),
-    probes: [...SHELL, ...TOPIC_PAGE], allow: ALLOW,
+    live: livePage(BASE_URL, `/topics/${TOPIC}?partition=0`, openMessage),
+    probes: [...SHELL, ...TOPIC_COMMON], allow: ALLOW,
   });
   expect(out.text, out.text).toBe('');
 });
@@ -29,7 +29,7 @@ test('Sy-01 matches a live topic page', async ({ browser }) => {
 for (const theme of ['light', 'dark'] as const) {
   test(`Sy-01: the table's cells carry the board's fill, rules and header type (${theme})`, async ({ browser }) => {
     const board = await openBoard(browser, 'Sy-01-Anatomy', 1440, theme);
-    const live = await openLive(browser, `${BASE_URL}topics/${TOPIC}`, 1440, theme);
+    const live = await openLive(browser, `${BASE_URL}topics/${TOPIC}?partition=0`, 1440, theme);
     await openMessage(live);
     try {
       const style = (page: Page, sel: string) => page.locator(sel).first().evaluate((e) => {
@@ -67,7 +67,7 @@ test('Sy-02 matches a live topic page in dark, a message open', async ({ browser
   const out = await runBoard(browser, {
     id: 'Sy-02', file: 'Sy-02-Dark', places: [{ size: 1440, theme: 'dark' }],
     live: livePage(BASE_URL, TRACED, recordOpen),
-    probes: [...SHELL, ...TOPIC_PAGE, ...MESSAGE], allow: ALLOW,
+    probes: [...SHELL, ...TOPIC_COMMON], allow: ALLOW, // the inspector's parts are Tp-06's now: the topics gate measures them against it
   });
   expect(out.text, out.text).toBe('');
 });

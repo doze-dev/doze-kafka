@@ -2,6 +2,7 @@ package log
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -12,7 +13,7 @@ import (
 // returns the batch size in bytes.
 func fillSegments(t *testing.T, p *Partition, count int) int {
 	t.Helper()
-	batch := makeBatch(1, make([]byte, 200)) // 227 bytes on disk.
+	batch := stampedBatch(-1, make([]byte, 200)) // 227 bytes on disk; no timestamp, so age is when it was written.
 	for range count {
 		if _, err := p.Append(batch); err != nil {
 			t.Fatalf("append: %v", err)
@@ -242,5 +243,76 @@ func TestRetentionTrimsPartitionsThatAreNotOpen(t *testing.T) {
 	}
 	if _, err := p2.Read(p2.LogStartOffset(), 1<<20); err != nil {
 		t.Errorf("the first retained offset is not readable: %v", err)
+	}
+}
+
+// stampedBatch is makeBatch with its records stamped at ts (milliseconds).
+func stampedBatch(ts int64, payload []byte) []byte {
+	b := makeBatch(1, payload)
+	binary.BigEndian.PutUint64(b[batchMaxTimestampOff:], uint64(ts))
+	sealCRC(b)
+	return b
+}
+
+// TOP-3: a segment is old by the largest timestamp of its records, not by when it
+// was written. Records stamped two days ago (a replay, a backfill) under a one-day
+// retention are deleted at the next sweep even though the files are minutes old.
+func TestRetentionJudgesASegmentByItsRecordsTimestamps(t *testing.T) {
+	p, err := openPartition(t.TempDir(), ManagerOptions{SegmentBytes: 512, IndexIntervalBytes: 4096})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.close()
+	twoDays := time.Now().Add(-48 * time.Hour).UnixMilli()
+	for range 20 {
+		if _, err := p.Append(stampedBatch(twoDays, make([]byte, 200))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(p.segments) < 3 {
+		t.Fatalf("expected several segments, got %d", len(p.segments))
+	}
+	if err := (RetentionPolicy{MaxAge: 24 * time.Hour}).Enforce(p); err != nil {
+		t.Fatal(err)
+	}
+	if len(p.segments) != 1 || p.LogStartOffset() == 0 {
+		t.Fatalf("segments=%d logStart=%d: old-stamped sealed segments were kept because their files are new", len(p.segments), p.LogStartOffset())
+	}
+}
+
+// The same data with fresh timestamps is kept, and a segment of records that carry
+// no timestamp (-1) is judged by when it was written.
+func TestRetentionKeepsFreshRecordsAndFallsBackWhenThereIsNoTimestamp(t *testing.T) {
+	p, err := openPartition(t.TempDir(), ManagerOptions{SegmentBytes: 512, IndexIntervalBytes: 4096})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.close()
+	now := time.Now().UnixMilli()
+	for range 20 {
+		if _, err := p.Append(stampedBatch(now, make([]byte, 200))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	n := len(p.segments)
+	if err := (RetentionPolicy{MaxAge: 24 * time.Hour}).Enforce(p); err != nil || len(p.segments) != n {
+		t.Fatalf("fresh records: segments %d -> %d, err %v", n, len(p.segments), err)
+	}
+
+	q, err := openPartition(t.TempDir(), ManagerOptions{SegmentBytes: 512, IndexIntervalBytes: 4096})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer q.close()
+	for range 20 {
+		if _, err := q.Append(stampedBatch(-1, make([]byte, 200))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < len(q.segments)-1; i++ {
+		q.segments[i].lastModified = time.Now().Add(-48 * time.Hour)
+	}
+	if err := (RetentionPolicy{MaxAge: 24 * time.Hour}).Enforce(q); err != nil || len(q.segments) != 1 {
+		t.Fatalf("no timestamp: segments=%d err=%v", len(q.segments), err)
 	}
 }

@@ -115,3 +115,23 @@ func idempotentWriteFromTopicWrite(e *Env) {
 	e.Use("bob")
 	e.Do("bob-init-producer-id", init(), 4)
 }
+
+func init() {
+	Scenarios = append(Scenarios,
+		Scenario{Name: "topic-config-keys", Run: topicConfigKeys, Known: []Known{
+			{Step: "describe-all", Limitation: "DescribeConfigs of a topic lists the same 33 keys as Kafka"},
+		}},
+	)
+}
+
+// topicConfigKeys is TOP-2: a DescribeConfigs of a topic that names no key answers
+// every key Kafka has for a topic, each with its default and its source, not only
+// the ones the topic sets.
+func topicConfigKeys(e *Env) {
+	e.Do("create", createTopics(false, newTopic("tck", 1, 1)), 7)
+	d := kmsg.NewPtrDescribeConfigsRequest()
+	r := kmsg.NewDescribeConfigsRequestResource()
+	r.ResourceType, r.ResourceName = kmsg.ConfigResourceTypeTopic, "tck"
+	d.Resources = append(d.Resources, r)
+	e.Do("describe-all", d, 4)
+}

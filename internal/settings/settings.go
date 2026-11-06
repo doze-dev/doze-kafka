@@ -358,6 +358,8 @@ func topicSettings() []Setting {
 	}
 	choice := func(s Setting, choices ...string) Setting { s.Choices = choices; return s }
 	def := func(s Setting, f func(config.Config) string) Setting { s.Default = f; return s }
+	// dv gives a record a fixed default, as Kafka reports it (conformance/recordings/topic-config-keys.json).
+	dv := func(s Setting, v string) Setting { return def(s, func(config.Config) string { return v }) }
 
 	out := []Setting{
 		func() Setting {
@@ -375,20 +377,21 @@ func topicSettings() []Setting {
 		// Kafka does (produce.go; recorded: produce-decompressed-size). What a producer
 		// sends is stored as it came: it is not re-compressed (docs/limitations.md).
 		// The record said "stored only" from before either existed.
-		choice(t("compression.type", "", "", oneOf("uncompressed", "zstd", "lz4", "snappy", "gzip", "producer"), Applied,
+		dv(choice(t("compression.type", "", "", oneOf("uncompressed", "zstd", "lz4", "snappy", "gzip", "producer"), Applied,
 			"log cleaner (the codec it rewrites in), produce handler (uncompressed: MESSAGE_TOO_LARGE by inflated size)",
 			"the codec of records the cleaner rewrites; uncompressed also holds a compressed batch to max.message.bytes as it inflates"),
-			"uncompressed", "zstd", "lz4", "snappy", "gzip", "producer"),
-		stored("compression.gzip.level", "", "-1 or more", isInt(-1), "gzip level when the broker compresses"),
-		stored("compression.lz4.level", "", "1 or more", isInt(1), "lz4 level when the broker compresses"),
-		stored("compression.zstd.level", "", "-131072 or more", isInt(-131072), "zstd level when the broker compresses"),
-		compacted("delete.retention.ms", "ms", "0 or more", isInt(0), "how long a tombstone survives a compaction pass"),
-		stored("file.delete.delay.ms", "ms", "0 or more", isInt(0), "delay before a deleted segment's file is removed"),
-		stored("flush.messages", "records", "1 or more", isInt(1), "force an fsync after this many records"),
-		stored("flush.ms", "ms", "0 or more", isInt(0), "force an fsync after this long"),
+			"uncompressed", "zstd", "lz4", "snappy", "gzip", "producer"), "producer"),
+		dv(stored("compression.gzip.level", "", "-1 or more", isInt(-1), "gzip level when the broker compresses"), "-1"),
+		dv(stored("compression.lz4.level", "", "1 or more", isInt(1), "lz4 level when the broker compresses"), "9"),
+		dv(stored("compression.zstd.level", "", "-131072 or more", isInt(-131072), "zstd level when the broker compresses"), "3"),
+		dv(compacted("delete.retention.ms", "ms", "0 or more", isInt(0), "how long a tombstone survives a compaction pass"), "86400000"),
+		dv(stored("file.delete.delay.ms", "ms", "0 or more", isInt(0), "delay before a deleted segment's file is removed"), "60000"),
+		dv(stored("flush.messages", "records", "1 or more", isInt(1), "force an fsync after this many records"), "9223372036854775807"),
+		dv(stored("flush.ms", "ms", "0 or more", isInt(0), "force an fsync after this long"), "9223372036854775807"),
 		func() Setting {
 			s := stored("follower.replication.throttled.replicas", "", "", nil, "replicas whose replication is throttled")
 			s.List = true
+			s.Default = func(config.Config) string { return "" }
 			return s
 		}(),
 		def(stored("index.interval.bytes", "bytes", "0 or more", isInt(0), "how often an index entry is added"),
@@ -396,11 +399,12 @@ func topicSettings() []Setting {
 		func() Setting {
 			s := stored("leader.replication.throttled.replicas", "", "", nil, "replicas whose replication is throttled")
 			s.List = true
+			s.Default = func(config.Config) string { return "" }
 			return s
 		}(),
-		stored("local.retention.bytes", "bytes", "-2 or more", isInt(-2), "tiered storage: size kept locally"),
-		stored("local.retention.ms", "ms", "-2 or more", isInt(-2), "tiered storage: age kept locally"),
-		compacted("max.compaction.lag.ms", "ms", "1 or more", isInt(1), "the longest a record may stay uncompacted"),
+		dv(stored("local.retention.bytes", "bytes", "-2 or more", isInt(-2), "tiered storage: size kept locally"), "-2"),
+		dv(stored("local.retention.ms", "ms", "-2 or more", isInt(-2), "tiered storage: age kept locally"), "-2"),
+		dv(compacted("max.compaction.lag.ms", "ms", "1 or more", isInt(1), "the longest a record may stay uncompacted"), "9223372036854775807"),
 		func() Setting {
 			s := t("max.message.bytes", "bytes", "0 or more", isInt(0), Applied, "produce handler (MESSAGE_TOO_LARGE)", "refuse a record batch larger than this")
 			s.Default = func(c config.Config) string { return strconv.FormatInt(c.MessageMaxBytes, 10) }
@@ -418,15 +422,16 @@ func topicSettings() []Setting {
 		func() Setting {
 			s := compacted("min.cleanable.dirty.ratio", "ratio", "0 to 1", isFloat(0, 1), "share of the log that must be dirty before a compaction pass")
 			s.DefaultNote = "0: a segment is cleaned as soon as it has rolled"
+			s.Default = func(config.Config) string { return "0" }
 			s.KafkaDefault = "0.5"
 			return s
 		}(),
-		compacted("min.compaction.lag.ms", "ms", "0 or more", isInt(0), "the shortest a record stays uncompacted"),
-		stored("min.insync.replicas", "replicas", "1 or more", isInt(1), "acks=all needs this many in-sync replicas (there is one)"),
-		stored("preallocate", "", "true or false", isBool, "preallocate a segment's file"),
-		stored("remote.log.copy.disable", "", "true or false", isBool, "tiered storage"),
-		stored("remote.log.delete.on.disable", "", "true or false", isBool, "tiered storage"),
-		stored("remote.storage.enable", "", "true or false", isBool, "tiered storage"),
+		dv(compacted("min.compaction.lag.ms", "ms", "0 or more", isInt(0), "the shortest a record stays uncompacted"), "0"),
+		dv(stored("min.insync.replicas", "replicas", "1 or more", isInt(1), "acks=all needs this many in-sync replicas (there is one)"), "1"),
+		dv(stored("preallocate", "", "true or false", isBool, "preallocate a segment's file"), "false"),
+		dv(stored("remote.log.copy.disable", "", "true or false", isBool, "tiered storage"), "false"),
+		dv(stored("remote.log.delete.on.disable", "", "true or false", isBool, "tiered storage"), "false"),
+		dv(stored("remote.storage.enable", "", "true or false", isBool, "tiered storage"), "false"),
 		def(t("retention.bytes", "bytes", "-1 or more", isInt(-1), Applied, "retention sweep", "delete the oldest segments once a partition exceeds this (-1: no limit)"),
 			func(c config.Config) string { return limit(c.RetentionBytes) }),
 		func() Setting {
@@ -441,10 +446,10 @@ func topicSettings() []Setting {
 			s.KafkaDefault = "1073741824 (1 GiB), minimum 1048576"
 			return s
 		}(),
-		stored("segment.index.bytes", "bytes", "4 or more", isInt(4), "size of a segment's offset index"),
-		stored("segment.jitter.ms", "ms", "0 or more", isInt(0), "random delay added to a segment roll"),
-		stored("segment.ms", "ms", "1 or more", isInt(1), "roll a segment after this long"),
-		stored("unclean.leader.election.enable", "", "true or false", isBool, "elect an out-of-sync replica (there is one replica)"),
+		dv(stored("segment.index.bytes", "bytes", "4 or more", isInt(4), "size of a segment's offset index"), "10485760"),
+		dv(stored("segment.jitter.ms", "ms", "0 or more", isInt(0), "random delay added to a segment roll"), "0"),
+		dv(stored("segment.ms", "ms", "1 or more", isInt(1), "roll a segment after this long"), "604800000"),
+		dv(stored("unclean.leader.election.enable", "", "true or false", isBool, "elect an out-of-sync replica (there is one replica)"), "false"),
 	}
 	for i := range out {
 		if out[i].Check == nil {

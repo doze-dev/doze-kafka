@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kmsg"
@@ -245,42 +246,81 @@ type OffsetTarget struct {
 	Offset    int64
 }
 
-// requireIdle refuses to change the offsets of a group that has members: they
-// would commit over the change, or be fenced by it.
+// groupNotEmpty is the refusal of a change to the offsets of a group that has
+// members: they would commit over the change, or be fenced by it.
+//
+// claim: groups.md G5
+type groupNotEmpty struct {
+	Group   string
+	Members int
+}
+
+func (e *groupNotEmpty) Error() string {
+	return fmt.Sprintf("the group has %d active member%s; stop its consumers before changing its offsets", e.Members, plural(e.Members))
+}
+func (e *groupNotEmpty) Is(target error) bool { return target == errBadInput }
+
+// requireIdle refuses to change the offsets of a group that has members.
 func (b *backend) requireIdle(ctx context.Context, id string) error {
 	d, err := b.DescribeGroup(ctx, id)
 	if err != nil {
 		return err
 	}
 	if len(d.Members) > 0 {
-		return badInput("the group has %d active member%s; stop its consumers before changing its offsets", len(d.Members), plural(len(d.Members)))
+		return &groupNotEmpty{Group: id, Members: len(d.Members)}
 	}
 	return nil
 }
 
-// ResetGroupOffsets moves an inactive group's committed offsets to the earliest or
-// the latest position: all of them, or only those on one topic when topic is set.
-// It reports how many were moved.
-func (b *backend) ResetGroupOffsets(ctx context.Context, id, to, topic string) (int, error) {
-	if to != "earliest" && to != "latest" {
-		return 0, fmt.Errorf("%w: reset to earliest or latest, not %q", errBadInput, to)
-	}
-	if err := b.requireIdle(ctx, id); err != nil {
-		return 0, err
+// TopicPartition names one partition of one topic.
+type TopicPartition struct {
+	Topic     string
+	Partition int32
+}
+
+// ResetSpec is what a reset asks for. To is "earliest", "latest", "timestamp" (the
+// first record at or after At, per partition) or "offsets" (the named partitions to
+// the given offsets; the others stay). Topic limits it to one topic; empty is every
+// topic the group has offsets on.
+type ResetSpec struct {
+	To      string
+	Topic   string
+	At      time.Time
+	Offsets map[TopicPartition]int64
+}
+
+// ResetRow is one partition of a reset: where the group stands, where it would stand,
+// and the bounds both are read against.
+type ResetRow struct {
+	Topic                       string
+	Partition                   int32
+	Committed, Earliest, Latest int64
+	After                       int64
+	Moves                       bool   // the reset writes this partition.
+	Note                        string // what the row needs said (no record at or after the time).
+}
+
+// PlanReset works out a reset from what the broker holds and sends nothing: it is
+// the preview, and ApplyReset writes what it returns. Partitions are those the group
+// has committed offsets on, on topics that still exist.
+func (b *backend) PlanReset(ctx context.Context, id string, spec ResetSpec) ([]ResetRow, error) {
+	switch spec.To {
+	case "earliest", "latest", "timestamp", "offsets":
+	default:
+		return nil, badInput("reset to earliest, latest, a timestamp or specific offsets, not %q", spec.To)
 	}
 	offsets, err := b.GroupOffsets(ctx, id)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	if len(offsets) == 0 {
-		return 0, badInput("the group has no committed offsets to reset")
+		return nil, badInput("the group has no committed offsets to reset")
 	}
-
 	bounds := map[string][]PartitionBound{}
-	var targets []OffsetTarget
+	var rows []ResetRow
 	onTopic := 0
 	for _, o := range offsets {
-		if topic != "" && o.Topic != topic {
+		if spec.Topic != "" && o.Topic != spec.Topic {
 			continue
 		}
 		onTopic++
@@ -291,25 +331,100 @@ func (b *backend) ResetGroupOffsets(ctx context.Context, id, to, topic string) (
 				continue // a deleted topic's offset is left alone.
 			}
 			if bounds[o.Topic], err = b.PartitionBounds(ctx, o.Topic, parts); err != nil {
-				return 0, err
+				return nil, err
 			}
 		}
 		if o.Partition < 0 || int(o.Partition) >= len(bounds[o.Topic]) {
 			continue
 		}
-		target := bounds[o.Topic][o.Partition].Latest
-		if to == "earliest" {
-			target = bounds[o.Topic][o.Partition].Earliest
+		bd := bounds[o.Topic][o.Partition]
+		row := ResetRow{Topic: o.Topic, Partition: o.Partition, Committed: o.Committed, Earliest: bd.Earliest, Latest: bd.Latest, Moves: true}
+		switch spec.To {
+		case "earliest":
+			row.After = bd.Earliest
+		case "latest":
+			row.After = bd.Latest
+		case "timestamp":
+			off, _, found, err := b.OffsetAtTime(ctx, o.Topic, o.Partition, spec.At.UnixMilli())
+			if err != nil {
+				return nil, err
+			}
+			row.After = off
+			if !found {
+				row.After, row.Note = bd.Latest, "no record at or after that time: the end of the log"
+			}
+		case "offsets":
+			want, named := spec.Offsets[TopicPartition{o.Topic, o.Partition}]
+			row.After, row.Moves = o.Committed, named && want != o.Committed
+			if named {
+				if err := offsetInRange(want, o.Topic, o.Partition, bd.Earliest, bd.Latest); err != nil {
+					return nil, err
+				}
+				row.After = want
+			}
 		}
-		targets = append(targets, OffsetTarget{o.Topic, o.Partition, target})
+		rows = append(rows, row)
 	}
 	switch {
-	case topic != "" && onTopic == 0:
-		return 0, badInput("the group has no committed offsets on topic %q", topic)
-	case len(targets) == 0:
-		return 0, badInput("none of those offsets are on topics that still exist")
+	case spec.Topic != "" && onTopic == 0:
+		return nil, badInput("the group has no committed offsets on topic %q", spec.Topic)
+	case len(rows) == 0:
+		return nil, badInput("none of those offsets are on topics that still exist")
+	}
+	return rows, nil
+}
+
+// offsetInRange is the console's rule for an offset it is asked to commit (GRP-15):
+// from the first retained record to the end of the log. It is the console's own: an
+// OffsetCommit is accepted by Kafka at any offset (recorded, offsetcommit-generations
+// #commit-offset-past-end), and OFFSET_OUT_OF_RANGE is what the group's next Fetch
+// would answer (claims/api.md V7), so the rule is said without a Kafka name.
+func offsetInRange(offset int64, topic string, partition int32, earliest, latest int64) error {
+	if offset >= earliest && offset <= latest {
+		return nil
+	}
+	return &ruledError{
+		msg: fmt.Sprintf("Offset %d is outside partition %d of %s.", offset, partition, topic),
+		rule: fmt.Sprintf("A committed offset must lie between the first retained record (%d) and the end of the log (%d, where there is nothing left to read). "+
+			"Kafka would accept any number in a commit, and the group's next Fetch would then be answered OFFSET_OUT_OF_RANGE, so the console checks the range before it sends.",
+			earliest, latest),
+	}
+}
+
+// ApplyReset writes a reset: the plan's partitions that move, as the console (generation
+// -1), after checking that no member is there to commit over it. It reports how many
+// offsets it wrote.
+func (b *backend) ApplyReset(ctx context.Context, id string, spec ResetSpec) (int, error) {
+	if spec.To != "earliest" && spec.To != "latest" && spec.To != "timestamp" && spec.To != "offsets" {
+		return 0, badInput("reset to earliest, latest, a timestamp or specific offsets, not %q", spec.To)
+	}
+	if err := b.requireIdle(ctx, id); err != nil {
+		return 0, err
+	}
+	rows, err := b.PlanReset(ctx, id, spec)
+	if err != nil {
+		return 0, err
+	}
+	var targets []OffsetTarget
+	for _, r := range rows {
+		if r.Moves {
+			targets = append(targets, OffsetTarget{r.Topic, r.Partition, r.After})
+		}
+	}
+	if len(targets) == 0 {
+		return 0, badInput("no offset was changed: every partition is already where you asked")
 	}
 	return b.commitOffsets(ctx, id, targets)
+}
+
+// ResetGroupOffsets moves an inactive group's committed offsets to the earliest or
+// the latest position: all of them, or only those on one topic when topic is set.
+// It reports how many were moved.
+func (b *backend) ResetGroupOffsets(ctx context.Context, id, to, topic string) (int, error) {
+	if to != "earliest" && to != "latest" {
+		return 0, fmt.Errorf("%w: reset to earliest or latest, not %q", errBadInput, to)
+	}
+	return b.ApplyReset(ctx, id, ResetSpec{To: to, Topic: topic})
 }
 
 // SetGroupOffset writes one committed offset of an inactive group. to is
@@ -336,9 +451,8 @@ func (b *backend) SetGroupOffset(ctx context.Context, id, topic string, partitio
 	case "latest":
 		offset = latest
 	case "":
-		if offset < earliest || offset > latest {
-			return 0, badInput("offset %d is outside partition %d of %q, which holds %d to %d (%d is the end: nothing left to read)",
-				offset, partition, topic, earliest, latest, latest)
+		if err := offsetInRange(offset, topic, partition, earliest, latest); err != nil {
+			return 0, err
 		}
 	default:
 		return 0, badInput("set an offset to earliest, latest or a number, not %q", to)
@@ -504,6 +618,38 @@ func (b *backend) TopicConsumers(ctx context.Context, topic string) ([]TopicCons
 		}
 		if on {
 			out = append(out, TopicConsumer{Group: g.ID, Protocol: g.Protocol, State: g.State, Members: g.Members, Lag: lag})
+		}
+	}
+	return out, nil
+}
+
+// StableEnds is the last stable offset of each partition of a topic: how far a
+// read_committed consumer may read. It equals the log end where no transaction is open.
+func (b *backend) StableEnds(ctx context.Context, topic string, partitions int32) ([]int64, error) {
+	req := kmsg.NewPtrListOffsetsRequest()
+	req.ReplicaID, req.IsolationLevel = -1, 1
+	rt := kmsg.NewListOffsetsRequestTopic()
+	rt.Topic = topic
+	for p := int32(0); p < partitions; p++ {
+		rp := kmsg.NewListOffsetsRequestTopicPartition()
+		rp.Partition, rp.Timestamp = p, -1
+		rt.Partitions = append(rt.Partitions, rp)
+	}
+	req.Topics = []kmsg.ListOffsetsRequestTopic{rt}
+	resp, err := req.RequestWith(ctx, b.cl)
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.Topics) != 1 {
+		return nil, fmt.Errorf("unexpected ListOffsets response shape")
+	}
+	out := make([]int64, partitions)
+	for _, p := range resp.Topics[0].Partitions {
+		if p.ErrorCode != 0 {
+			return nil, kerr.ErrorForCode(p.ErrorCode)
+		}
+		if p.Partition >= 0 && p.Partition < partitions {
+			out[p.Partition] = p.Offset
 		}
 	}
 	return out, nil

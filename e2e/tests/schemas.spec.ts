@@ -136,7 +136,7 @@ test('a topic links its schema, and its records are shown as the JSON they mean'
   await expect(inspector.locator('.kv')).toContainText('Avro · schema');
   await expect(inspector.locator('.kv a')).toContainText('seed-events-value v1');
   // The bytes are still there to read.
-  await inspector.getByRole('button', { name: 'Hex', exact: true }).click();
+  await inspector.getByRole('button', { name: 'Raw', exact: true }).click();
   await expect(inspector.locator('.hexbox')).toContainText('00 00 00 00');
 });
 
@@ -159,17 +159,17 @@ test('the composer writes a record encoded with the topic\'s schema, and says wh
 
   await page.goto('new/topic');
   await page.locator('#f-name').fill(topic);
-  await page.getByRole('button', { name: 'Create topic' }).click();
+  await page.locator('#create-topic').getByRole('button', { name: 'Create topic' }).click();
   await expect(page.locator('.idband h1')).toHaveText(topic);
   // Nothing is written yet: a subject named like the topic says nothing about its records.
   await expect(page.locator('#topic-facts')).not.toContainText('schema');
 
   await page.locator('#compose-head').click();
-  const pick = page.locator('select[name="schema_subject"]');
+  const pick = page.locator('#c-sub');
   await expect(pick).toHaveValue(`${topic}-value`); // the topic's own subject is chosen for you.
   await send('{"id": "not a number"}');
-  await expect(page.locator('#compose-body .err')).toBeVisible();
-  await expect(page.locator('#compose-body .err')).toContainText('does not fit');
+  await expect(page.locator('#compose-body [data-err-slot]')).toBeVisible();
+  await expect(page.locator('#compose-body [data-err-slot]')).toContainText('does not fit');
   await setEditor('{"id": 123}');
   await page.getByRole('button', { name: 'Send message' }).click();
   const row = page.locator('tr[id^="msg-"]').first();
@@ -177,10 +177,10 @@ test('the composer writes a record encoded with the topic\'s schema, and says wh
   await expect(row.locator('.cell-val')).not.toHaveClass(/binary/);
   // The stored record is Confluent's wire format: magic byte, schema id, Avro.
   await row.click();
-  await page.locator('#inspector').getByRole('button', { name: 'Hex', exact: true }).click();
+  await page.locator('#inspector').getByRole('button', { name: 'Raw', exact: true }).click();
   await expect(page.locator('#inspector .hexbox')).toContainText('00 00 00 00');
   // Edit a copy brings the JSON back, with the subject chosen again.
   await page.locator('#inspector-edit').click();
-  await expect(page.locator('select[name="schema_subject"]')).toHaveValue(`${topic}-value`);
-  await expect(page.locator('#compose-panel .cm-editor')).toContainText('"id"');
+  await expect(page.locator('#c-sub')).toHaveValue(`${topic}-value`);
+  await expect(page.locator('#f-value')).toHaveValue(/"id"/);
 });

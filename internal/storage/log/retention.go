@@ -1,6 +1,7 @@
 package log
 
 import (
+	"encoding/binary"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -23,7 +24,8 @@ type RetentionPolicy struct {
 func (rp RetentionPolicy) enabled() bool { return rp.MaxBytes > 0 || rp.MaxAge > 0 }
 
 // Enforce deletes whole, oldest, non-active segments that violate the policy:
-// first by age (a sealed segment whose last write predates the MaxAge cutoff),
+// first by age (a sealed segment whose largest record timestamp predates the MaxAge
+// cutoff; one that holds no timestamp is judged by when it was last written),
 // then by total size (while the partition exceeds MaxBytes). It advances the
 // log-start offset as segments fall away.
 func (rp RetentionPolicy) Enforce(p *Partition) error {
@@ -35,7 +37,7 @@ func (rp RetentionPolicy) Enforce(p *Partition) error {
 
 	if rp.MaxAge > 0 {
 		cutoff := time.Now().Add(-rp.MaxAge)
-		for len(p.segments) > 1 && p.segments[0].lastModified.Before(cutoff) {
+		for len(p.segments) > 1 && p.segments[0].age().Before(cutoff) {
 			if err := p.dropOldestLocked(); err != nil {
 				return err
 			}
@@ -85,7 +87,7 @@ func (rp RetentionPolicy) enforceDir(dir string) error {
 		if err != nil {
 			return err
 		}
-		segs = append(segs, seg{base, info.Size(), info.ModTime()})
+		segs = append(segs, seg{base, info.Size(), fileAge(filepath.Join(dir, segmentName(base)+".log"), info.ModTime())})
 		total += info.Size()
 	}
 	cutoff := time.Now().Add(-rp.MaxAge)
@@ -142,4 +144,44 @@ func (m *Manager) EnforceClosedRetention() error {
 		m.mu.Unlock()
 	}
 	return firstErr
+}
+
+// age is the time a sealed segment is judged old by: the largest timestamp of its
+// records, or, when no record has
+// one, the time it was last written. Records stamped long ago (a replay, a mirror,
+// a backfill) are old at the next sweep however new the file is.
+func (s *Segment) age() time.Time {
+	if err := s.extendScan(); err == nil && s.ts.max >= 0 {
+		return time.UnixMilli(s.ts.max)
+	}
+	return s.lastModified
+}
+
+// fileAge is age for a segment file that is not open: the same rule read from the
+// batch headers alone.
+func fileAge(path string, mtime time.Time) time.Time {
+	f, err := os.Open(path)
+	if err != nil {
+		return mtime
+	}
+	defer f.Close()
+	maxTs := int64(noTimestamp)
+	var header [batchFullHeaderBytes]byte
+	for pos := int64(0); ; {
+		if _, err := f.ReadAt(header[:], pos); err != nil {
+			break
+		}
+		info, ok := parseHeader(header[:])
+		if !ok || info.totalBytes < batchFullHeaderBytes {
+			break
+		}
+		if m := int64(binary.BigEndian.Uint64(header[batchMaxTimestampOff:])); m > maxTs {
+			maxTs = m
+		}
+		pos += info.totalBytes
+	}
+	if maxTs >= 0 {
+		return time.UnixMilli(maxTs)
+	}
+	return mtime
 }

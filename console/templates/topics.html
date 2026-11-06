@@ -3,9 +3,9 @@
 {{define "topic_lp"}}
 <aside class="list" aria-label="Topics" data-list="topics">
   <div class="row sb ce list-h ruled"><span class="cap">Topics · {{len .List}} · messages</span><a class="btn sm" href="{{newTopicURL}}" data-create aria-label="New topic">+ New</a></div>
-  <div class="list-filter"><input class="inp m" type="search" placeholder="Filter topics" aria-label="Filter Topics" data-filter-target=".list .li" data-filter-none="#list-none" spellcheck="false" autocomplete="off"></div>
+  {{if .List}}<div class="list-filter"><input class="inp m" type="search" placeholder="Filter topics" aria-label="Filter Topics" data-filter-target=".list .li" data-filter-none="#list-none" spellcheck="false" autocomplete="off"></div>{{end}}
   <div class="list-scroll">
-    {{if not .List}}<div class="note list-note"><b>{{t "topics.none.title"}}</b><br>{{t "topics.none.hint"}}</div>{{end}}
+    {{if not .List}}<div class="col g4 tp-list-none"><span class="b">{{t "topics.none.title"}}</span><span class="note">{{t "topics.none.hint"}}</span></div>{{end}}
     {{range .List}}
     <a class="li {{if eq .Name $.Sel}}on{{end}}" href="{{topicURL .Name}}" data-name="{{.Name}}"{{if eq .Name $.Sel}} aria-current="page"{{end}}>
       <span class="grow el m">{{.Name}}</span><span class="m {{if needsLook .Name .Msgs}}warn{{else}}mut{{end}}" data-n>{{num .Msgs}}</span>
@@ -74,12 +74,12 @@
     {{else}}
     {{/* Tp-01: the broker is up and nothing is on it. It says so, says what it is not
          (a filter, a permission), and gives the same creation as a shell command. */}}
-    <div class="card pad col g8" id="topics-none">
-      <div class="col"><span class="cap">Nothing exists</span><h2 class="h2">This broker has no topics.</h2></div>
-      <p class="note">It is running and answering at <span class="m">{{.Facts.Bootstrap}}</span>; there is just nothing on it. This is not a filter and not a permissions problem. Make a topic here, or point an app at the broker: {{if .AutoCreate}}a producer that names a new topic creates it with {{.AutoParts}} partition{{if ne .AutoParts 1}}s{{end}} (auto-create is on).{{else}}a producer that names a topic that does not exist is refused, because auto-create is off, so make it first.{{end}}</p>
-      <div class="row ce g8"><a class="btn pri" href="{{newTopicURL}}">Create topic</a><span class="note">or run the same thing from a shell</span></div>
+    <div class="card pad col tp-none" id="topics-none">
+      <div class="col g4"><span class="cap">Nothing exists</span><h2 class="h1">This broker has no topics.</h2>
+      <span class="mut">It is running and answering at <span class="m">{{.Facts.Bootstrap}}</span>; there is just nothing on it. This is not a filter and not a permissions problem. Make a topic here, or point an app at the broker: {{if .AutoCreate}}a producer that names a new topic creates it with {{.AutoParts}} partition{{if ne .AutoParts 1}}s{{end}} (auto-create is on).{{else}}a producer that names a topic that does not exist is refused, because auto-create is off, so make it first.{{end}}</span></div>
+      <div class="row g8 ce"><a class="btn pri w5" href="{{newTopicURL}}">Create topic</a><span class="note">or run the same thing from a shell</span></div>
       <pre class="code">{{.Command}}</pre>
-      <p class="note">{{if .Facts.SASL}}<span class="m">client.properties</span> carries the {{index .Facts.Mechanisms 0}} login. {{end}}The console makes exactly the same CreateTopics request.</p>
+      <span class="note">{{if .Facts.SASL}}<span class="m">client.properties</span> carries the {{index .Facts.Mechanisms 0}} login. {{end}}The console makes exactly the same CreateTopics request.</span>
     </div>
     {{end}}
 {{end}}
@@ -90,49 +90,80 @@
      broker. */}}
 {{define "topic_create"}}{{template "shell_top" .}}
   {{template "topic_lp" (dict "List" .List "Sel" "")}}
-  <main class="main" id="detail">
+  <main class="main gap12" id="detail">
     <div class="backrow"><a class="btn sm" href="{{.Prefix}}/topics">‹ Topics</a></div>
     <div class="row sb ce idband">
-      <div class="col"><h1 class="h1">Create topic</h1><span class="note">Makes a new topic with the same CreateTopics request kafka-topics.sh sends.</span></div>
+      <div class="col"><h1 class="h1">Create topic</h1><span class="note">{{if .Open}}Settings are open. Anything left blank follows the broker.{{else}}Makes a new topic with the same CreateTopics request kafka-topics.sh sends.{{end}}</span></div>
+      <div class="row g8 ce"><a class="btn w5" href="{{.Prefix}}/topics">Cancel</a><button class="btn pri" type="submit" form="create-topic">Create topic</button></div>
     </div>
-    <form class="form-page" id="create-topic" hx-post="{{newTopicURL}}" hx-disabled-elt="find button[type=submit]">
-      <div class="card form-sec"><div class="panel-h"><h2>General</h2></div><div class="form-b">
-        <div class="field" x-data='{taken: {{.TakenJSON}}, v: {{.PrefillJSON}}}'>
-          <label for="f-name">Topic name <span class="hint">{{topicNameRule}}</span></label>
-          <input class="input mono" id="f-name" name="name" value="{{.Prefill}}" placeholder="orders.created" required maxlength="{{topicNameMax}}" autocomplete="off" autofocus x-model="v" :aria-invalid="taken.includes(v) ? 'true' : null" aria-describedby="f-name-taken">
-          <p class="teach bad" id="f-name-taken" x-show="taken.includes(v)" x-cloak role="status"><span class="m" x-text="v"></span> {{takenRule}}</p>
+    <form class="row g16 tp-create" id="create-topic" hx-post="{{newTopicURL}}" hx-disabled-elt="find button[type=submit]" x-data='{taken: {{.TakenJSON}}, v: {{.PrefillJSON}}, n: {{.Parts}}, policy: "{{range .Config.Settings}}{{if eq .Key "cleanup.policy"}}{{.Own}}{{end}}{{end}}"}'>
+      <div class="col g12 tp-left{{if .Open}} open{{end}}">
+        {{if .Open}}
+        <div class="card pad row g16 ce">
+          <div class="col g4 grow"><label class="b" for="f-name">Topic name</label>{{template "topic_create_name" .}}</div>
+          <div class="col g4 tp-w110"><label class="b" for="f-partitions">Partitions</label>{{template "topic_create_parts" .}}</div>
+          <div class="col g4 tp-w110"><label class="b" for="f-replication">Replication</label><input class="inp m" id="f-replication" name="replication" value="1" disabled></div>
         </div>
-        <div class="field narrow"><label for="f-partitions">Partitions</label><input class="input mono" id="f-partitions" name="partitions" type="number" min="1"{{if .MaxParts}} max="{{.MaxParts}}"{{end}} value="1" required aria-describedby="f-partitions-teach"><p class="teach" id="f-partitions-teach">{{teach "broker" "max-partitions"}}</p></div>
-        <div class="field narrow"><label for="f-replication">Replication factor</label><input class="input mono" id="f-replication" name="replication" type="number" value="1" disabled aria-describedby="f-replication-teach"><p class="teach" id="f-replication-teach">{{teach "broker" "replication-factor"}}</p></div>
-      </div></div>
-      <div class="card form-sec"><div class="panel-h"><h2>Settings <span class="sz">optional. Retention, segment size and the rest; blank follows the broker's setting</span></h2></div><div class="form-b">
-        {{template "topic_settings_fields" .Config}}
-        <p class="note">Retention is delete-only and works in whole segments: a partition is trimmed when a full segment falls outside the limit, so a smaller segment size makes it act sooner. You can change these later from the topic's page.</p>
-      </div></div>
-      <div class="err form-err" data-err-slot hidden role="alert"></div>
-      <div class="det-foot">
-        <a class="btn" href="{{.Prefix}}/topics">Cancel</a>
-        <button class="btn pri" type="submit">Create topic</button>
+        {{else}}
+        <div class="card pad col g12">
+          <span class="h2">General</span>
+          <div class="col g4"><label class="b" for="f-name">Topic name <span class="note tp-hint">{{topicNameRule}}</span></label>{{template "topic_create_name" .}}</div>
+          <div class="row g16">
+            <div class="col g4 tp-w150"><label class="b" for="f-partitions">Partitions</label>{{template "topic_create_parts" .}}</div>
+            <div class="col g4 grow"><span class="note tp-pt" id="f-partitions-teach">{{teach "broker" "max-partitions"}}</span></div>
+          </div>
+          <div class="row g16">
+            <div class="col g4 tp-w150"><label class="b" for="f-replication">Replication factor</label><input class="inp m" id="f-replication" name="replication" value="1" disabled></div>
+            <div class="col g4 grow"><span class="note tp-pt" id="f-replication-teach">{{teach "broker" "replication-factor"}}</span></div>
+          </div>
+        </div>
+        {{end}}
+        <p class="teach bad tp-taken" id="f-name-taken" x-show="taken.includes(v)" x-cloak role="status"><span class="m" x-text="v"></span> {{takenRule}}</p>
+        <div data-err-slot data-err-html hidden role="alert"></div>
+        {{if .Open}}
+        <div class="card pad col g12 tp-settings">
+          <div class="row sb ce"><span class="h2">Settings <span class="note tp-light">optional, blank follows the broker</span></span><a class="note tp-hide" href="{{.Prefix}}/new/topic">hide</a></div>
+          {{range .ConfigRows}}<div class="row g12">{{range .}}{{template "topic_create_field" .}}{{end}}</div>
+          {{end}}
+          <span class="note">Retention is delete-only and works in whole segments: a partition is trimmed when a full segment falls outside the limit, so a smaller segment size makes it act sooner.</span>
+        </div>
+        {{else}}
+        <div class="card pad row sb ce"><div class="col"><span class="h2">Settings</span><span class="note">Retention, segment size and compaction. Blank follows the broker's setting.</span></div><a class="btn" href="{{.SetURL}}" data-tp-set>Set…</a></div>
+        {{end}}
+        <div class="row g8 ce"><button class="btn pri" type="submit">Create topic</button><a class="btn ghost w5" href="{{.Prefix}}/topics">Cancel</a>{{if not .Open}}<span class="note">Esc cancels</span>{{end}}</div>
       </div>
-      {{/* The command follows the form: the server builds it (it knows how "7d" and
-           "1MB" are written for Kafka), so the page does not carry a second parser. */}}
-      <section class="card pad col g8" aria-label="The same thing, from a shell">
-        <div class="row sb ce"><h2 class="h2">The same thing, from a shell</h2><span class="note">Updates as you type. Copy it to repeat this elsewhere.</span></div>
-        <div id="shell-preview-wrap" hx-disabled-elt="unset" hx-get="{{.Prefix}}/new/topic/shell" hx-trigger="input from:#create-topic delay:200ms" hx-include="#create-topic" hx-target="this" hx-select="unset" hx-swap="innerHTML">{{template "shell_preview" .}}</div>
-      </section>
+      <div class="col g12 grow">
+        {{/* The command follows the form: the server builds it (it knows how "7d" and
+             "1MB" are written for Kafka), so the page does not carry a second parser. */}}
+        <div class="card pad col g8" aria-label="The same thing, from a shell"><span class="cap">The same thing, from a shell</span>
+          <div id="shell-preview-wrap" class="col g8" hx-disabled-elt="unset" hx-get="{{.Prefix}}/new/topic/shell" hx-trigger="input from:#create-topic delay:200ms" hx-include="#create-topic" hx-target="this" hx-select="unset" hx-swap="innerHTML">{{template "shell_preview" .}}</div>
+          <span class="note">{{if .Open}}Only the settings you filled in appear.{{else}}Updates as you type. Copy it to repeat this elsewhere.{{end}}</span></div>
+        <div class="callout warn" x-show="policy === 'compact'"{{if ne (index .Config.Settings 4).Own "compact"}} x-cloak{{end}}><span class="b">cleanup.policy=compact refuses keyless records</span><span class="note">The broker keeps the latest record of each key. A record with no key is refused there. Fine for state like inventory levels, wrong for an event log.</span></div>
+        {{if .Open}}<div class="callout"><span class="b">Change them later</span><span class="note">The settings can be edited from the topic's Config tab.</span></div>
+        {{else}}<div class="callout"><span class="b">What happens next</span><span class="note">The topic appears in the list with 0 messages. Producers can write at once; no group reads it yet.{{if .HasRegistry}} A schema subject is only attached if you register one on the Schemas page.{{end}}</span></div>{{end}}
+        {{if .Taken}}<div class="callout"><span class="b">Names that already exist</span><span class="note"><span class="m">{{index .Taken 0}}</span>{{if gt (len .Taken) 1}} and {{sub (len .Taken) 1}} other{{if gt (len .Taken) 2}}s{{end}}{{end}} {{if gt (len .Taken) 1}}are{{else}}is{{end}} taken. The form says so before you send, and the broker would answer TOPIC_ALREADY_EXISTS.</span></div>{{end}}
+      </div>
     </form>
-    <div class="row g12 wrap callouts">
-      <div class="callout grow"><span class="b">What happens next</span><span class="note">The topic appears in the list with 0 messages. Producers can write at once; no group reads it yet.{{if .HasRegistry}} A schema subject is only attached if you register one on the Schemas page.{{end}}</span></div>
-      {{if .Taken}}<div class="callout grow"><span class="b">Names that already exist</span><span class="note"><span class="m">{{index .Taken 0}}</span>{{if gt (len .Taken) 1}} and {{sub (len .Taken) 1}} other{{if gt (len .Taken) 2}}s{{end}}{{end}} {{if gt (len .Taken) 1}}are{{else}}is{{end}} taken. The form says so before you send, and the broker would answer TOPIC_ALREADY_EXISTS.</span></div>{{end}}
-    </div>
   </main>
 {{template "shell_bottom" .}}{{end}}
+
+{{define "topic_create_name"}}<input class="inp m" id="f-name" name="name" value="{{.Prefill}}" placeholder="orders.created" required maxlength="{{topicNameMax}}" autocomplete="off" autofocus x-model="v" :aria-invalid="taken.includes(v) ? 'true' : null" aria-describedby="f-name-taken">{{end}}
+{{define "topic_create_parts"}}<input class="inp m" id="f-partitions" name="partitions" type="number" min="1"{{if .MaxParts}} max="{{.MaxParts}}"{{end}} value="{{.Parts}}" required x-model="n" aria-describedby="f-partitions-teach">{{end}}
+{{define "topic_create_field"}}<div class="col g4 grow"><label class="b m" for="cfg-{{.Key}}">{{.Key}}</label>
+  {{if .Options}}{{$own := .Own}}<select class="inp m" id="cfg-{{.Key}}" name="{{.Key}}"{{if eq .Key "cleanup.policy"}} x-model="policy"{{end}}><option value="">broker default</option>{{range .Options}}<option value="{{.}}"{{if eq . $own}} selected{{end}}>{{.}}</option>{{end}}</select>
+  {{else}}<input class="inp m" id="cfg-{{.Key}}" name="{{.Key}}" value="{{.Own}}" placeholder="broker default" autocomplete="off" spellcheck="false">{{end}}
+  <span class="note">{{.Hint}}</span></div>{{end}}
 
 {{define "shell_preview"}}<pre class="code" id="shell-preview">{{.Command}}</pre>{{if .Note}}<span class="note bad">{{.Note}}</span>{{end}}{{end}}
 
 {{/* One topic (Sy-01): its name and one action; the facts as a sentence; its
      neighbours as links; tabs; what the tab holds; try it; and, under the page, the
      wire. */}}
+{{/* Tp-05's neighbours: one well, "Written by", "Read by" and "Schema" each with their
+     links and a chip for what kind of thing it is. Where the broker does not know a
+     side (no traffic recorder, so no writers), the sentence under it says so. */}}
+{{define "topic_neighbours"}}{{if .Neighbours}}<div class="well row ce g12 wrap tp-neighbours" id="neighbours">{{range $i, $c := .Neighbours}}{{if $i}}<span class="mut">·</span>{{end}}<span class="note">{{$c.Verb}}</span>{{range $c.Links}}<a class="row ce g4" href="{{.URL}}"{{if .Open}} data-inspector-open hx-get="{{.Open}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-boost="false"{{end}}>{{if eq .Kind "group"}}<span class="sv sm c-gr" aria-hidden="true">GR</span>{{else if eq .Kind "topic"}}<span class="sv sm c-tp" aria-hidden="true">TP</span>{{else if eq .Kind "subject"}}<span class="sv sm c-sc" aria-hidden="true">SC</span>{{else}}<span class="sv sm c-tr" aria-hidden="true">TR</span>{{end}}<span class="m">{{.Name}}</span></a>{{end}}{{end}}</div>{{if .NeighboursNote}}<div class="note nbnote" id="neighbours-note">{{.NeighboursNote}}</div>{{end}}{{end}}{{end}}
+
 {{define "topic_detail"}}{{template "shell_top" .}}
   {{template "topic_lp" (dict "List" .List "Sel" .Topic.Name)}}
   <main class="main workbench gap8" id="detail">
@@ -141,7 +172,7 @@
     <div class="row sb ce idband">
       <h1 class="h1 m">{{.Topic.Name}}</h1>
       <div class="row g8 ce idband-acts">
-        <button type="button" class="btn pri" id="produce-open" data-compose-open>Produce a message</button>
+        <button type="button" class="btn pri" id="produce-open" data-compose-open>Produce</button>
         <div class="more"><button type="button" class="btn" aria-label="More actions" title="More actions" aria-expanded="false" data-more>···</button>
           <div class="menu" role="group" aria-label="More actions" hidden>
             <button class="btn" hx-disabled-elt="this" hx-post="{{topicURL .Topic.Name}}/purge" data-confirm-url="{{confirmURL "topic.purge" "name" .Topic.Name}}" data-confirm-title="{{(index .Confirm "topic.purge").Title}}" data-confirm-verb="{{(index .Confirm "topic.purge").Verb}}" hx-confirm="{{(index .Confirm "topic.purge").Text}}">{{icon "eraser"}} Purge</button>
@@ -152,16 +183,17 @@
     </div>
 
     {{with .Facts}}
-    <p class="facts-line" id="topic-facts">{{.Partitions}} partition{{if ne .Partitions 1}}s{{end}}, {{template "facts_messages" .}}{{if eq .Retention "no time limit"}}, kept with no time limit{{else if .Retention}}, kept <span class="m">{{.Retention}}</span>{{end}}{{if .Compact}}, compacted{{end}}{{template "facts_newest" .}}.</p>
+    <div class="row ce g8 wrap" id="topic-facts"><span class="m">{{.Partitions}} partition{{if ne .Partitions 1}}s{{end}}</span><span class="mut">·</span>{{template "facts_messages" .}}<span class="mut">·</span><span class="m">retention {{if .Retention}}{{.Retention}}{{else}}not known{{end}}</span><span class="mut">·</span><span class="m">{{.PolicyText}}</span>{{template "facts_newest" .}}</div>
     {{end}}
 
-    {{template "neighbours" .}}
+    {{template "topic_neighbours" .}}
 
     <nav class="tabs" aria-label="Topic views">
       {{range .Tabs}}<a class="tab {{if .On}}on{{end}}" href="{{.URL}}"{{if .On}} aria-current="page"{{end}}>{{.Label}}{{if .Count}} <span class="m mut">{{.Count}}</span>{{end}}</a>{{end}}
     </nav>
 
-    {{if eq .Tab "messages"}}{{template "tape_and_table" .}}
+    <div id="resend-note" role="status"></div>
+    {{if eq .Tab "messages"}}{{template "topic_states" .}}{{template "tape_and_table" .}}
     {{else if eq .Tab "partitions"}}{{template "topic_partitions" .}}
     {{else if eq .Tab "readers"}}{{template "topic_readers" .}}
     {{else if eq .Tab "config"}}{{template "topic_config" .}}
@@ -176,75 +208,78 @@
         <span class="sub">the same fields the Produce API has</span>
         <span class="kbd">p</span>
         <span class="twist">{{icon "chevron"}}</span>
+        {{/* Tp-10: open, the bar is the composer's head: its title, the topic, the note and the fold control. */}}
+        <span class="open-only row ce g8"><span class="h2">Send a message</span><span class="m mut">to {{.Topic.Name}}</span></span>
+        <span class="open-only row ce g8"><span class="note">the same fields the Produce API has</span><span class="btn sm ghost" aria-label="Collapse composer">▾</span></span>
       </button>
       {{/* Sy-01 part 7 (and Tp-05's Try it row): closed, the composer is still a key, a
            value and Send. The partition is chosen by the key and acks is 1, as the open
            form's defaults; p or the bar opens the whole form. */}}
-      <form class="quick" id="compose-quick" hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" {{if eq .Tab "messages"}}hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML"{{else}}hx-swap="none"{{end}} @htmx:after-request="if($event.detail.xhr.status < 400){$el.reset()}" x-data>
-        <input type="hidden" name="partition_ctx" value="{{.Partition}}">
-        <div class="row g8">
+      <form class="quick" id="compose-quick" x-data="{acks:'1'}" hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" {{if eq .Tab "messages"}}hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML"{{else}}hx-swap="none"{{end}} @htmx:after-request="if($event.detail.xhr.status < 400){$el.reset();acks='1'}" x-data>
+        <input type="hidden" name="partition_ctx" value="{{if .Merged}}all{{else}}{{.Partition}}{{end}}">
+        <div class="row g8 ce">
+          <select class="inp m quick-part" name="partition" aria-label="Partition"><option value="auto">Auto (by key)</option>{{range $i := .PartitionRange}}<option value="{{$i}}">P{{$i}}</option>{{end}}</select>
           <input class="inp m quick-key" name="key" aria-label="Key (optional)" placeholder="key" autocomplete="off">
           <input class="inp m grow" name="value" aria-label="Value" placeholder='{"orderId": "ord_8901"}' autocomplete="off">
+          <span class="seg" role="group" aria-label="Acknowledgment">{{range acksChoices}}<button type="button" :class="acks==='{{.Value}}'&&'on'" :aria-pressed="acks==='{{.Value}}'" @click="acks='{{.Value}}'" aria-label="{{.Aria}}">{{if eq .Value "1"}}acks {{end}}{{.Value}}</button>{{end}}<input type="hidden" name="acks" :value="acks"></span>
           <button class="btn pri" type="submit">Send</button>
         </div>
         <div class="err form-err" data-err-slot hidden role="alert"></div>
       </form>
       <div class="dock-form" id="compose-body">
-        <form hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" {{if eq .Tab "messages"}}hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML"{{else}}hx-swap="none"{{end}} x-data="{hdrs:[], acks:'1', keyB64:false, valB64:false, tomb:false}" x-effect="window.dozeEditor && dozeEditor.setValidate($refs.value, !(valB64 || tomb), tomb ? 'null value — nothing is sent' : (valB64 ? 'base64 — sent as raw bytes' : ''))" @htmx:after-request="if($event.detail.xhr.status < 400){window.dozeEditor?dozeEditor.set($refs.value,''):$refs.value.value='';$refs.key.value='';hdrs=[];keyB64=false;valB64=false;tomb=false}">
-          <input type="hidden" name="partition_ctx" value="{{.Partition}}">
-          <div class="crow">
-            <div class="field w-part">
-              <label for="f-partition">Partition</label>
-              <select class="input" id="f-partition" name="partition">
-                <option value="auto">Auto (by key)</option>
-                {{range $i := .PartitionRange}}<option value="{{$i}}" {{if eq $i $.Partition}}selected{{end}}>P{{$i}}</option>{{end}}
-              </select>
-            </div>
-            <div class="field">
-              <span class="lbl"><label for="f-key">Key</label> <span class="hint">optional</span>
-                <button type="button" class="b64tog" :class="keyB64&&'on'" :aria-pressed="keyB64" @click="keyB64=!keyB64" aria-label="b64 key: the key is base64" title="The key is base64 for binary bytes">b64</button></span>
-              <input class="input mono" id="f-key" name="key" x-ref="key" placeholder="e.g. ord_8901" autocomplete="off">
-              <input type="hidden" name="key_enc" :value="keyB64 ? 'base64' : 'text'">
-            </div>
-            <div class="field w-acks">
-              <span class="lbl" id="l-acks">Acknowledgment</span>
-              <div class="seg" role="group" aria-labelledby="l-acks">
-                {{range acksChoices}}<button type="button" :class="acks==='{{.Value}}'&&'on'" :aria-pressed="acks==='{{.Value}}'" @click="acks='{{.Value}}'" aria-label="{{.Aria}}">{{.Value}}</button>{{end}}
-                <input type="hidden" name="acks" :value="acks">
+        <form class="tp-compose" id="compose-form" hx-post="{{topicURL .Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" {{if eq .Tab "messages"}}hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML"{{else}}hx-swap="none"{{end}}
+          x-data="topicsCompose({preview: '{{topicURL .Topic.Name}}/compose/preview', parts: {{.Topic.Partitions}}, fixed: {{if ge .Partition 0}}{{.Partition}}{{else}}0{{end}}, subject: '{{.DefaultSubject}}', subjects: {{if .SchemaSubjects}}true{{else}}false{{end}}, partNote: '{{.PartNote}}'})"
+          @htmx:before-request="beforeSend($event)" @htmx:after-request="if($event.detail.xhr.status < 400 && $event.detail.elt === $el){ reset() }">
+          <input type="hidden" name="partition_ctx" value="{{if .Merged}}all{{else}}{{.Partition}}{{end}}">
+          <input type="hidden" name="partition" :value="part === 'auto' ? 'auto' : fixed">
+          <input type="hidden" name="acks" :value="acks">
+          <input type="hidden" name="key_enc" :value="keyB64 ? 'base64' : 'text'">
+          <input type="hidden" name="key_empty" :value="keyEmpty ? '1' : ''">
+          <input type="hidden" name="value_enc" :value="valB64 ? 'base64' : 'text'">
+          <input type="hidden" name="tombstone" :value="mode === 'null' ? '1' : ''">
+          <input type="hidden" name="headers" :value="headersWire()">
+          <input type="hidden" name="schema_subject" :value="subject">
+          <div class="row g16 tp-cp-body">
+            <div class="col g12 tp-cp-left">
+              <div class="row g12">
+                <div class="col g4 tp-cp-part"><span class="b" id="l-part">Partition</span>
+                  <span class="seg" role="group" aria-labelledby="l-part"><button type="button" :class="part==='auto'&&'on'" :aria-pressed="part==='auto'" @click="part='auto'">Auto, by key</button><button type="button" :class="part==='fixed'&&'on'" :aria-pressed="part==='fixed'" @click="part='fixed'">Fixed</button></span>
+                  <select class="inp m" id="f-partition" aria-label="Partition number" x-show="part==='fixed'" x-model.number="fixed" x-cloak>{{range $i := .PartitionRange}}<option value="{{$i}}">P{{$i}}</option>{{end}}</select>
+                  <span class="note" x-text="pv.partNote || partNote"></span></div>
+                <div class="col g4 grow"><label class="b" for="f-key">Key <span class="note tp-cp-opt">optional</span> <span role="button" tabindex="0" class="tag tp-tag" :class="keyB64&&'on'" :aria-pressed="keyB64" @click="keyB64=!keyB64" @keydown.enter.prevent="keyB64=!keyB64" @keydown.space.prevent="keyB64=!keyB64" aria-label="b64 key: the key is base64" title="The key is base64 for binary bytes">b64</span> <span role="button" tabindex="0" class="tag tp-tag" :class="keyEmpty&&'on'" :aria-pressed="keyEmpty" @click="keyEmpty=!keyEmpty" @keydown.enter.prevent="keyEmpty=!keyEmpty" @keydown.space.prevent="keyEmpty=!keyEmpty" aria-label="empty key, not null" title="Send a key of zero bytes, which is not the same as no key">empty</span></label>
+                  <input class="inp m" id="f-key" name="key" x-model="key" x-ref="key" :disabled="keyEmpty" placeholder="e.g. ord_8901" autocomplete="off" spellcheck="false">
+                  <span class="b tp-cp-acks" id="l-acks">Acknowledgment</span>
+                  <span class="seg tp-fit" role="group" aria-labelledby="l-acks">{{range acksChoices}}<button type="button" :class="acks==='{{.Value}}'&&'on'" :aria-pressed="acks==='{{.Value}}'" @click="acks='{{.Value}}'" aria-label="{{.Aria}}">{{.Value}}</button>{{end}}</span></div>
               </div>
+              <div class="col g4 tp-cp-subject" :class="subject ? 'tp-ord1' : 'tp-ord3'" {{if not .SchemaSubjects}}hidden{{end}}><label class="b" for="c-sub">{{if .SchemaSubjects}}Schema subject{{end}}</label>
+                <select class="inp m" id="c-sub" aria-label="Schema subject" x-model="subject"><option value="">No schema, send the bytes as typed</option>{{range .SchemaSubjects}}<option value="{{.}}"{{if eq . $.DefaultSubject}} selected{{end}}>encode with {{.}}</option>{{end}}</select>
+                <span class="note" x-show="subject">Write the value as JSON. It is checked against the subject's latest schema and sent in the registry's framing.</span></div>
+              <div class="col g4 tp-ord2"><div class="row sb ce"><label class="b" for="f-value"><span x-text="subject ? 'Value, as JSON' : 'Value'">Value</span> <span role="button" tabindex="0" class="tag tp-tag" x-show="!subject" :class="valB64&&'on'" :aria-pressed="valB64" @click="valB64=!valB64" @keydown.enter.prevent="valB64=!valB64" @keydown.space.prevent="valB64=!valB64" aria-label="b64 value: the value is base64" title="The value is base64 for binary bytes">b64</span></label>
+                  <span class="seg" role="group" aria-label="Value mode" x-show="!subject"><button type="button" :class="mode==='json'&&'on'" :aria-pressed="mode==='json'" @click="mode='json'">JSON</button><button type="button" :class="mode==='text'&&'on'" :aria-pressed="mode==='text'" @click="mode='text'">Text</button><button type="button" :class="mode==='null'&&'on'" :aria-pressed="mode==='null'" @click="mode='null'">Null (tombstone)</button></span></div>
+                <textarea class="inp m tp-cp-ta" id="f-value" name="value" rows="6" x-ref="value" x-model="value" :disabled="mode==='null' && !subject" placeholder='{"orderId": "ord_8901"}' spellcheck="false"></textarea>
+                <span class="note" id="compose-valid" :class="validity.cls" aria-live="polite" x-text="validity.text"></span></div>
+            </div>
+            <div class="col g12 grow">
+              <div class="col g4"><span class="b" id="l-hdrs">Headers <span class="note tp-cp-opt">optional</span></span>
+                <div class="col g4" role="group" aria-labelledby="l-hdrs" x-show="!hdrJSON">
+                  <template x-for="(h,i) in hdrs" :key="i"><div class="row g8"><input class="inp m tp-cp-hk" x-model="h.k" aria-label="Header key" placeholder="key" autocomplete="off" spellcheck="false"><input class="inp m grow" x-model="h.v" aria-label="Header value" placeholder="value" autocomplete="off" spellcheck="false"><button type="button" class="btn sm" :class="h.b64 ? 'pri' : ''" :aria-pressed="!!h.b64" @click="h.b64=!h.b64" aria-label="b64 header value: the value is base64">b64</button><button type="button" class="btn sm ghost" aria-label="Remove header" @click="hdrs.splice(i,1)">×</button></div></template>
+                </div>
+                <input class="inp m" x-show="hdrJSON" x-model="hdrText" aria-label="Headers as JSON" :aria-invalid="!!hdrError" placeholder='[{"k":"source","v":"console"}]' autocomplete="off" spellcheck="false">
+                <div class="row g8"><button type="button" class="btn sm tp-fit" x-show="!hdrJSON" @click="hdrs.push({k:'',v:'',b64:false})">+ Add header</button>
+                  <span class="seg" role="group" aria-label="Headers as"><button type="button" :class="!hdrJSON&&'on'" :aria-pressed="!hdrJSON" @click="headersAs(false)">Rows</button><button type="button" :class="hdrJSON&&'on'" :aria-pressed="hdrJSON" @click="headersAs(true)">JSON</button></span></div></div>
+              <div class="col g4" x-show="pv.schema && pv.schema.ok"><span class="cap" x-text="'Encoded preview · ' + (pv.schema ? pv.schema.size : 0) + ' B'"></span>
+                <pre class="code" x-text="pv.schema ? pv.schema.hex : ''"></pre>
+                <span class="note"><span class="m">00</span> magic · <span class="m" x-text="pv.schema ? pv.schema.bytes : ''"></span> schema id <span x-text="pv.schema ? pv.schema.id : ''"></span> · then the <span x-text="pv.schema ? pv.schema.type : ''"></span> body, <span x-text="pv.schema ? pv.schema.body : ''"></span> B</span></div>
+              <div class="col g4"><span class="cap">What will be sent</span>
+                <div class="kv m tp-cp-sent"><span>Topic</span><span>{{.Topic.Name}}</span><span>Partition</span><span x-text="pv.partition || '…'">…</span><span>Key</span><span x-text="pv.key || '…'">…</span><span>Value</span><span x-text="pv.value || '…'">…</span><span>Headers</span><span x-text="pv.headers || '…'">…</span><span>Batch</span><span x-text="pv.batch || '…'">…</span><template x-if="subject && pv.schema && pv.schema.ok"><span>Schema id</span></template><template x-if="subject && pv.schema && pv.schema.ok"><span class="b" x-text="pv.schema.id"></span></template></div></div>
+              <div class="callout" x-show="!subject"><span class="b">Sent as the console, not as another client</span><span class="note">The broker sees client {{clientID}}; the Traffic page leaves the console's own requests out, so Written by says not known for this record.{{if .SchemaSubjects}} A topic with a schema subject can be written encoded: pick one under the value.{{end}}</span></div>
+{{if .SchemaSubjects}}              <div class="callout" x-show="subject"><span class="b">If it does not match</span><span class="note">A missing field or a wrong type is refused before anything is sent, with the registry's own message. Nothing reaches the topic.</span></div>
+              <div class="callout" x-show="subject">{{/* the picker lists the subjects that exist */}}<span class="b">Not registered yet?</span><span class="note">Add the schema on the Schemas page first. The picker lists subjects that exist: {{len .SchemaSubjects}} on this broker.</span></div>{{end}}
             </div>
           </div>
-          <div class="crow body">
-            <div class="field w-value" :class="tomb && 'dimmed'">
-              <span class="lbl"><label for="f-value">Value</label>
-                <button type="button" class="b64tog" :class="valB64&&'on'" :aria-pressed="valB64" @click="valB64=!valB64" aria-label="b64 value: the value is base64" title="The value is base64 for binary bytes">b64</button>
-                <label class="chk"><input type="checkbox" name="tombstone" value="1" x-model="tomb"> null value (tombstone)</label>
-                {{if .SchemaSubjects}}<label class="schema-pick"><span class="sr-only">Encode the value with a registered schema</span><select class="input" name="schema_subject" x-ref="schema" title="Write the value as JSON and send it encoded with this subject's latest schema">
-                  <option value="">No schema</option>{{range .SchemaSubjects}}<option value="{{.}}" {{if eq . $.DefaultSubject}}selected{{end}}>encode with {{.}}</option>{{end}}</select></label>{{end}}</span>
-              <textarea class="input mono" id="f-value" name="value" x-ref="value" data-editor="json" rows="4" placeholder='{"orderId": "ord_8901"}'></textarea>
-              <input type="hidden" name="value_enc" :value="valB64 ? 'base64' : 'text'">
-            </div>
-            <div class="field w-hdrs">
-              <span class="lbl" id="l-hdrs">Headers <span class="hint">optional</span></span>
-              <div class="hdr-rows" role="group" aria-labelledby="l-hdrs">
-                <template x-for="(h,i) in hdrs" :key="i">
-                  <div class="hdr-row">
-                    <input class="input mono hk" placeholder="key" aria-label="Header key" x-model="h.k">
-                    <input class="input mono" placeholder="value" aria-label="Header value" x-model="h.v">
-                    <button type="button" class="b64tog" :class="h.b64&&'on'" :aria-pressed="!!h.b64" @click="h.b64=!h.b64" aria-label="b64 header value: the value is base64" title="The value is base64 for binary bytes">b64</button>
-                    <button type="button" class="icon-btn" title="Remove" aria-label="Remove header" @click="hdrs.splice(i,1)">{{icon "x"}}</button>
-                  </div>
-                </template>
-              </div>
-              <button type="button" class="btn sm" @click="hdrs.push({k:'',v:'',b64:false})">+ Add header</button>
-              <input type="hidden" name="headers" :value="JSON.stringify(hdrs)">
-            </div>
-          </div>
-          <div class="err form-err" data-err-slot hidden role="alert"></div>
-          <div class="dock-foot">
-            {{range acksChoices}}<span class="ackscaption" x-show="acks==='{{.Value}}'">{{.Say}}</span>{{end}}
-            <button class="btn pri" type="submit">{{icon "send"}} Send message</button>
-          </div>
+          <div class="err form-err tp-cp-err" data-err-slot data-err-html hidden role="alert"></div>
+          <div class="row sb ce tp-cp-foot"><span class="note" x-show="subject" x-text="pv.lands"></span>{{range acksChoices}}<span class="note ackscaption" x-show="!subject && acks==='{{.Value}}'">{{.Say}}</span>{{end}}
+            <span class="row g8 ce"><button type="button" class="btn" @click="reset()">Clear</button><button class="btn pri" type="submit">Send message</button></span></div>
         </form>
       </div>
     </div>
@@ -254,65 +289,135 @@
 
 {{/* The parts of the facts sentence that move as records arrive. The tape's answer
      carries them out of band (FactsLive), so the sentence moves with the tape. */}}
-{{define "facts_messages"}}<span id="facts-messages"><span class="m">{{num .Messages}}</span> message{{if ne .Messages 1}}s{{end}}</span>{{end}}
-{{define "facts_messages_oob"}}<span id="facts-messages" hx-swap-oob="true"><span class="m">{{num .Messages}}</span> message{{if ne .Messages 1}}s{{end}}</span>{{end}}
-{{define "facts_newest"}}<span id="facts-newest">{{template "facts_newest_in" .}}</span>{{end}}
-{{define "facts_newest_oob"}}<span id="facts-newest" hx-swap-oob="true">{{template "facts_newest_in" .}}</span>{{end}}
-{{define "facts_newest_in"}}{{if .HasNewest}}, newest <span class="m">{{when .Newest "clock"}}</span>{{if .SchemaType}}, {{if eq .SchemaType "Avro"}}an{{else}}a{{end}} {{.SchemaType}} value with schema <a class="m" href="{{.SubjectURL}}">{{.Subject}}</a> <span class="m">v{{.SchemaVer}}</span>{{end}}{{end}}{{end}}
+{{define "facts_messages"}}<span class="m" id="facts-messages">{{template "facts_messages_in" .}}</span>{{end}}
+{{define "facts_messages_oob"}}<span class="m" id="facts-messages" hx-swap-oob="true">{{template "facts_messages_in" .}}</span>{{end}}
+{{define "facts_messages_in"}}{{num .Messages}} message{{if ne .Messages 1}}s{{end}}{{if .HasSize}}, {{.Size}}{{end}}{{end}}
+{{define "facts_newest"}}<span id="facts-newest" class="tp-contents">{{template "facts_newest_in" .}}</span>{{end}}
+{{define "facts_newest_oob"}}<span id="facts-newest" class="tp-contents" hx-swap-oob="true">{{template "facts_newest_in" .}}</span>{{end}}
+{{define "facts_newest_in"}}{{if .HasNewest}}<span class="mut">·</span><span class="m">last write {{when .Newest "clock"}}, {{when .Newest "since"}} ago</span>{{if .SchemaType}}<span class="mut">·</span><span class="m">{{if eq .SchemaType "Avro"}}an{{else}}a{{end}} {{.SchemaType}} value with schema <a class="m" href="{{.SubjectURL}}">{{.Subject}}</a> <span class="m">v{{.SchemaVer}}</span></span>{{end}}{{end}}{{end}}
+
+{{/* The partition choice: tabs, or a select for many partitions. */}}
+{{define "tape_parts"}}
+    {{if .PartSelect}}
+    <label class="psel-wrap"><span class="sr-only">Partition</span>
+      <select class="input psel" onchange="location.href=this.value">
+        <option value="{{topicURL $.Topic.Name}}" {{if $.Merged}}selected{{end}}>All partitions</option>
+        {{range .Bounds}}<option value="{{topicURL $.Topic.Name}}?partition={{.Partition}}" {{if eq .Partition $.Partition}}selected{{end}}>P{{.Partition}} · {{.Count}} record{{if ne .Count 1}}s{{end}}</option>{{end}}
+      </select></label>
+    {{else}}
+    <div class="ptabs" role="group" aria-label="Partitions">
+      {{if gt (len .Bounds) 1}}<a class="ptab {{if .Merged}}on{{end}}" href="{{topicURL $.Topic.Name}}" title="the newest records of every partition, merged, newest first"{{if .Merged}} aria-current="true"{{end}}>All</a>{{end}}
+      {{range .Bounds}}<a class="ptab {{if eq .Partition $.Partition}}on{{end}}" href="{{topicURL $.Topic.Name}}?partition={{.Partition}}" title="partition {{.Partition}} · {{.Count}} record{{if ne .Count 1}}s{{end}} · offsets {{.Earliest}}–{{.Latest}}" {{if eq .Partition $.Partition}}aria-current="true"{{end}}>P{{.Partition}}{{if gt .Count 0}}<span class="pc">{{.Count}}</span>{{end}}</a>{{end}}
+    </div>
+    {{end}}
+{{end}}
+
+{{/* topic_states: the cards above the tape. Each exists only when its state does. */}}
+{{define "topic_states"}}
+{{with .Denied}}<div class="callout bad" id="topic-denied" role="status"><span class="b">Refused</span> <span class="m">{{.Error}}</span> <span class="note">{{when .When "clockms"}}</span>
+  <span class="note"><span class="m b">{{.Client}}</span> ({{.Principal}}, {{.Remote}}) sent <span class="m">{{.API}} v{{.Version}}</span>{{if .Parts}} for <span class="m">{{.Parts}}</span>{{end}} and the broker said no. Nothing was written. {{if gt .Count 1}}{{.Count}} such requests are among those the broker kept. {{end}}A refused produce adds nothing to the log.</span>
+  {{if .Rules}}<div class="col g4" id="topic-denied-rule"><span class="b">Which rule decided</span>
+    {{if .By}}<span class="note"><span class="m">{{.By.Permission}} {{.By.Principal}} {{.By.Operation}} {{.By.Resource}} {{.By.Name}} ({{.By.Pattern}})</span> decided this one.</span>
+    {{else}}<span class="note">No stored ACL matches: the broker's default decided{{if not .Allowed}}, and it refuses{{end}}.</span>{{end}}
+    <a class="m" href="{{.CheckURL}}">Check this in Access</a></div>
+  {{else}}<span class="note">The console could not read the ACLs, so it cannot say which rule decided.</span>{{end}}
+</div>{{end}}
+{{with .Cleaner}}<div class="card pad col g8" id="topic-cleaner"><div class="row sb ce"><span class="h2">Cleaner</span><span class="note">{{.Scope}}</span></div>
+  {{if .Seen}}
+  <div class="row g12 wrap">
+    <div class="col g4"><span class="cap">State</span><span class="m">{{if .Running}}running{{else}}idle{{end}}</span></div>
+    <div class="col g4"><span class="cap">Last cleaned</span><span class="m">{{if .Ran}}{{when .LastAt "clock"}} <span class="mut">({{when .LastAt "since"}} ago)</span>{{else}}not since the broker started{{end}}</span></div>
+    <div class="col g4"><span class="cap">Records removed</span><span class="m">{{if .Ran}}{{num .LastRemoved}} in the last pass, {{num .TotalRemoved}} since start{{else}}none since start{{end}}</span></div>
+    <div class="col g4"><span class="cap">Cleaned to</span><span class="m">{{.CleanedTo}}</span></div>
+  </div>
+  <span class="note">Counts begin again when the broker restarts; nothing is written to disk. The dirty ratio, the tombstones kept and the number of keys held are not something the broker reports, so they are not shown.</span>
+  {{else}}<span class="note">The console cannot see the cleaner here: the broker it reads is not in this process, and Kafka has no request that reports it.</span>{{end}}
+  <span class="note">The newest segment is the active one and is left alone, so its older duplicate keys stay until it rolls. See <a href="{{.ConfigURL}}">the compaction keys</a>. A compacted topic refuses a record with no key. Offsets jump where the cleaner removed the older record of a key: gaps are normal here, not lost data.</span>
+</div>{{end}}
+{{with .TxnHold}}<div class="callout warn" id="topic-txnhold"><span class="b">Last stable offset is {{num .Stable}} on p{{.Partition}}</span><span class="note">Records from <span class="m">{{num .Stable}}</span> to the end <span class="m">{{num .End}}</span> belong to an open transaction{{range .Txns}}, <span class="m b">{{if .TxnID}}{{.TxnID}}{{else}}producer {{.ProducerID}}{{end}}</span> (epoch {{.Epoch}}, from {{num .Start}}){{end}}, so a read_committed reader of p{{.Partition}} waits there. Dividers are commit and abort markers; they take an offset but are not records. <a href="{{.CommitURL}}">The committed-only view</a> shows what such a reader sees. The open transactions are listed on <a href="{{.Cluster}}">the Cluster page</a>; there is no page for a single transaction.</span></div>{{end}}
+{{with .Empty}}<div class="card pad col g8" id="topic-empty"><span class="h2">Nothing has been written to this topic yet</span>
+  <span class="note">The topic exists and works; it just holds no records. Start offset 0, end offset 0. This is not a filter and nothing was deleted. The tape fills in here the moment something is produced.</span>
+  <form class="col g8" id="first-record" hx-post="{{topicURL $.Topic.Name}}/produce" hx-disabled-elt="find button[type=submit]" hx-target="#tape-and-table" hx-select="#tape-and-table" hx-swap="outerHTML">
+    <input type="hidden" name="partition_ctx" value="0"><input type="hidden" name="acks" value="1">
+    <div class="row g8 wrap ce">
+      <div class="field"><label for="fr-partition">Partition</label><select class="input mono" id="fr-partition" name="partition"><option value="auto">auto</option>{{range .Partitions}}<option value="{{.}}">{{.}}</option>{{end}}</select></div>
+      <div class="field grow"><label for="fr-key">Key</label><input class="input mono" id="fr-key" name="key" autocomplete="off"></div>
+      <div class="field grow"><label for="fr-value">Value</label><input class="input mono" id="fr-value" name="value" autocomplete="off"></div>
+      <button type="submit" class="btn pri">Send record</button>
+    </div>
+    <div class="err form-err" data-err-slot hidden role="alert"></div>
+  </form>
+  <span class="note">The first record lands at offset 0.</span>
+  <span class="cap">Or from a client</span>
+  {{if .SASL}}<span class="note"># client.properties holds the SASL login</span>{{end}}
+  <pre class="code">{{.Command}}</pre>
+</div>{{end}}
+{{with .LogMoved}}<div class="callout" id="log-moved"><span class="b">The log on p{{.Partition}} now starts at offset {{num .Start}}</span><span class="note">Offsets 0 to {{num .Gone}} are gone: retention, a purge or DeleteRecords moves the start. Asking for an older offset shows from {{num .Start}} and says so. The log ends at {{num .End}}. The console does not keep a history of config changes, so it cannot say which of them moved the start.</span>
+  {{if .Behind}}
+  <div class="tbl-wrap" id="behind-start"><table class="tbl"><thead><tr><th>Group</th><th class="num">Committed on p{{.Partition}}</th><th class="num">Log start</th><th class="num">Behind start by</th><th>Next fetch</th></tr></thead><tbody>
+    {{range .Behind}}<tr><td class="m b"><a href="{{.URL}}">{{.Group}}</a> <span class="mut">{{.State}}</span></td><td class="m num">{{num .Committed}}</td><td class="m num">{{num .Start}}</td><td class="m num warn">{{num .Behind}}</td><td class="m">a fetch at {{num .Committed}} is below the start: <span class="bad">OFFSET_OUT_OF_RANGE</span>; the consumer's auto.offset.reset decides, or it stops with an error</td></tr>{{end}}
+  </tbody></table></div>
+  <span class="note">Only groups with a commit below the new start are hit. Reset a group's offsets from its page.</span>
+  {{else}}<span class="note">No group has a commit below the start.</span>{{end}}
+</div>{{end}}
+{{end}}
 
 {{/* tape_and_table is the live-polled unit: the tick strip + message table
      together, so a new message appearing updates both from one partial. With
      .Search set it shows what a search found instead, and does not poll. */}}
 {{define "tape_and_table"}}
-<div class="tapetable" id="tape-and-table" {{if not .Search}}data-msg-base="{{topicURL .Topic.Name}}/message?partition={{.Partition}}" {{if .AtTail}}data-live="{{topicURL .Topic.Name}}/tape?partition={{.Partition}}{{if .CommittedOnly}}&amp;committed=1{{end}}" data-hash="{{.Hash}}" data-live-ms="2500"{{end}}{{end}}>
+<div class="tapetable" id="tape-and-table"{{if .OOB}} hx-swap-oob="outerHTML"{{end}} {{if not .Search}}data-msg-base="{{topicURL .Topic.Name}}/message?partition={{if .Merged}}all{{else}}{{.Partition}}{{end}}" {{if .AtTail}}data-live="{{topicURL .Topic.Name}}/tape?partition={{if .Merged}}all{{else}}{{.Partition}}{{end}}{{if .CommittedOnly}}&amp;committed=1{{end}}" data-hash="{{.Hash}}" data-live-ms="2500"{{end}}{{end}}>
+  {{if and .AtTail (not .Search)}}<div class="callout warn paused-only" role="status" id="topic-paused" data-new-url="{{topicURL .Topic.Name}}/new" data-ends="{{range $i, $b := .Bounds}}{{if $i}},{{end}}{{$b.Partition}}:{{$b.Latest}}{{end}}"><span><span class="b">Paused.</span> <span class="m" data-topic-new-n>0</span> new record<span data-topic-new-s>s</span> since <span class="m" data-paused-since></span>. The view stays where it was and the selected record stays selected; new records are counted here, not inserted under you.</span><button type="button" class="btn pri sm" data-topic-resume>Resume live</button></div>{{end}}
   {{if not .Search}}
+  {{if .Merged}}
+  <div class="tape-panel tp-tape">
+    <div class="row sb ce tp-tape-h"><span class="row ce g8"><span class="cap">The tape</span><span class="note">each mark is one record on disk, taller is bigger</span></span>
+      <span class="row ce g8"><button type="button" class="livetoggle" data-live-toggle aria-pressed="false" title="Pause live updates"><span class="livedot" aria-hidden="true"></span><span class="livetoggle-l">Live</span></button><span class="m mut" title="Where the next message will be written, on each partition">log end {{.LogEnds}}</span></span></div>
+    {{range .Lanes}}<div class="row ce g8"><span class="m mut tp-lane-p">p{{.Partition}}</span><div class="grow tp-lane">{{range .Ticks}}<i class="tick" style="left:{{printf "%.2f" .Pct}}%;height:{{.H}}px"></i>{{end}}</div><span class="m mut ra tp-lane-n">{{num .Count}} rec</span></div>
+    {{end}}{{if .Axis}}<div class="row ce g8"><span class="tp-lane-p"></span><div class="grow row sb m mut tp-axis">{{range .Axis}}<span>{{when . "clock"}}</span>{{end}}<span>now</span></div><span class="tp-lane-n"></span></div>{{end}}
+  </div>
+  {{else}}
   <div class="tape-panel">
   <div class="tape-head">
     <span class="cap">The tape</span>
-    {{if .PartSelect}}
-    <label class="psel-wrap"><span class="sr-only">Partition</span>
-      <select class="input psel" onchange="location.href=this.value">
-        {{range .Bounds}}<option value="{{topicURL $.Topic.Name}}?partition={{.Partition}}" {{if eq .Partition $.Partition}}selected{{end}}>P{{.Partition}} · {{.Count}} record{{if ne .Count 1}}s{{end}}</option>{{end}}
-      </select></label>
-    {{else}}
-    <div class="ptabs" role="group" aria-label="Partitions">
-      {{range .Bounds}}<a class="ptab {{if eq .Partition $.Partition}}on{{end}}" href="{{topicURL $.Topic.Name}}?partition={{.Partition}}" title="partition {{.Partition}} · {{.Count}} record{{if ne .Count 1}}s{{end}} · offsets {{.Earliest}}–{{.Latest}}" {{if eq .Partition $.Partition}}aria-current="true"{{end}}>P{{.Partition}}{{if gt .Count 0}}<span class="pc">{{.Count}}</span>{{end}}</a>{{end}}
-    </div>
-    {{end}}
+    {{template "tape_parts" .}}
     <div class="tape-head-spacer"></div>
     {{if .AtTail}}<button type="button" class="livetoggle" data-live-toggle aria-pressed="false" title="Pause live updates"><span class="livedot" aria-hidden="true"></span><span class="livetoggle-l">Live</span></button>{{else}}<span class="pinned mono">pinned to history</span>{{end}}
-    <div class="counter" title="The log-end offset: where the next message will be written"><span class="lbl">log end</span><span class="mono">{{printf "%07d" .Latest}}</span></div>
+    {{if .Merged}}<div class="counter" title="Where the next message will be written, on each partition"><span class="lbl">log end</span><span class="mono">{{.LogEnds}}</span></div>{{else}}<div class="counter" title="The log-end offset: where the next message will be written"><span class="lbl">log end</span><span class="mono">{{printf "%07d" .Latest}}</span></div>{{end}}
   </div>
   <div class="tape-strip">
-    {{if .Messages}}{{range .Messages}}<button type="button" tabindex="-1" class="tick {{if .Hot}}hot{{end}}" style="height:{{.TickHeight}}px" aria-label="Scroll to offset {{.Offset}}" title="offset {{.Offset}}{{if not .Key.Null}} · {{.Key.Preview}}{{end}} · {{.Value.SizeText}}" onclick="document.getElementById('msg-{{.Offset}}')?.scrollIntoView({block:'center',behavior:'smooth'})"></button>{{end}}
+    {{if .Messages}}{{range .Messages}}<button type="button" tabindex="-1" class="tick {{if .Hot}}hot{{end}}" style="height:{{.TickHeight}}px" aria-label="Scroll to offset {{.Offset}}" title="offset {{.Offset}}{{if not .Key.Null}} · {{.Key.Preview}}{{end}} · {{.Value.SizeText}}" onclick="document.getElementById('{{if $.Merged}}hit-{{.Partition}}-{{end}}{{if not $.Merged}}msg-{{end}}{{.Offset}}')?.scrollIntoView({block:'center',behavior:'smooth'})"></button>{{end}}
     {{else}}<div class="tape-empty">No messages on this partition yet.</div>{{end}}
   </div>
   <div class="tape-foot">
-    <span>{{if .Messages}}offsets <b class="mono">{{.WindowFrom}}</b> – <b class="mono">{{.WindowLast}}</b> · {{end}}each mark is one record on disk, taller is bigger, newest on the right</span>
+    <span>{{if and .Messages (not .Merged)}}offsets <b class="mono">{{.WindowFrom}}</b> – <b class="mono">{{.WindowLast}}</b> · {{end}}each mark is one record on disk, taller is bigger, newest on the right</span>
     <span class="mono" title="The offsets currently retained on this partition. A compacted topic and a transaction marker leave gaps, so this can be more than the number of records.">{{.Count}} record{{if ne .Count 1}}s{{end}}</span>
   </div>
   </div>
   {{end}}
+  {{end}}
 
   <div class="secrow">
-    <span class="cap">{{if .Search}}{{if .Search.Query}}Search{{else}}Latest{{end}} · {{if .Search.All}}all partitions{{else}}partition {{.Partition}}{{end}}{{else}}Messages · partition {{.Partition}}{{end}}</span>
+    <span class="cap">{{if .Search}}{{if .Search.Query}}Search{{else}}Latest{{end}} · {{if .Search.All}}all partitions{{else}}partition {{.Partition}}{{end}}{{else if .Merged}}Messages · all partitions{{else}}Messages · partition {{.Partition}}{{end}}</span>
+    {{if and .Merged (not .Search)}}{{template "tape_parts" .}}{{end}}
     <form class="find" method="get" action="{{topicURL .Topic.Name}}" role="search">
-      <input type="hidden" name="partition" value="{{.Partition}}">
+      <input type="hidden" name="partition" value="{{if .Merged}}0{{else}}{{.Partition}}{{end}}">
       <input class="input" id="find-q" name="q" type="search" placeholder="Search keys, values, headers" aria-label="Search this topic's records" autocomplete="off" data-filter-target="" {{if .Search}}value="{{.Search.Query}}"{{end}}>
-      <label class="chk" title="Search every partition's newest records, and show them together"><input type="checkbox" id="find-all" name="all" value="1" {{if and .Search .Search.All}}checked{{end}}> all partitions</label>
+      <label class="chk" title="Search every partition's newest records, and show them together"><input type="checkbox" id="find-all" name="all" value="1" {{if or .Merged (and .Search .Search.All)}}checked{{end}}> all partitions</label>
       <button type="submit" class="btn sm jump-go">Search</button>
       {{if .Search}}<a class="btn sm jump-go" href="{{.Search.ClearURL}}">Clear</a>{{end}}
     </form>
-    {{if not .Search}}
+    {{if .Merged}}<span class="note">Pick a partition above to go to an offset or a time.</span>{{end}}
+    {{if and (not .Search) (not .Merged)}}
     <form class="jump" method="get" action="{{topicURL .Topic.Name}}">
       <input type="hidden" name="partition" value="{{.Partition}}">
-      <label for="jump-to">go to offset</label>
+      <label for="jump-to">Go to offset</label>
       <input class="input mono" id="jump-to" name="jump" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. {{if gt .Latest 0}}{{.Latest}}{{else}}0{{end}}" autocomplete="off">
       <button type="submit" class="btn sm jump-go">Go</button>
     </form>
     <form class="jump" method="get" action="{{topicURL .Topic.Name}}">
       <input type="hidden" name="partition" value="{{.Partition}}">
-      <label for="jump-at">go to time</label>
+      <label for="jump-at">Go to time</label>
       <input class="input mono" id="jump-at" name="at" placeholder="15m, 2h, or 2026-10-07 10:30 (UTC)" autocomplete="off">
       <button type="submit" class="btn sm jump-go">Go</button>
     </form>
@@ -320,37 +425,40 @@
     {{end}}
   </div>
   {{if .Search}}<div class="jumpnote" role="status">{{icon "info"}} <span>{{.Search.Note}}{{if .Search.OlderURL}} <a class="pagelink" href="{{.Search.OlderURL}}">Search older records</a>{{end}}</span></div>{{end}}
-  {{if .JumpNote}}<div class="jumpnote" role="status">{{icon "info"}} {{.JumpNote}}</div>{{end}}
+  {{if .Jump}}{{with .Jump}}<div class="callout {{.Tone}} tp-jump" role="status" id="jump-msg" x-data="{o: true}" x-show="o"><span class="b">{{.Title}}</span><span class="note grow">{{.Note}}</span>{{if .OpenURL}}<a class="btn sm" href="{{.OpenURL}}" hx-boost="false">Open it</a>{{end}}{{if .LatestURL}}<a class="btn sm pri" href="{{.LatestURL}}">{{.LatestLabel}}</a>{{end}}<button type="button" class="btn sm ghost" @click="o = false">Dismiss</button></div>{{end}}
+  {{else if .JumpNote}}<div class="jumpnote" role="status">{{icon "info"}} {{.JumpNote}}</div>{{end}}
   <div class="tbl-wrap">
     {{/* Sy-01's table: P, Offset, Key, Value, Age. The time of day is the Age's tooltip
          and the inspector's Timestamp, the headers are the inspector's (their number is
          the value's tooltip), so nothing a record has is out of reach. */}}
     <table class="tbl msg-table" id="messages-table">
-      <thead><tr><th class="col-p">P</th><th>Offset</th><th>Key</th><th>Value</th><th class="num">Age</th></tr></thead>
+      <thead><tr><th class="num">Offset</th><th class="col-p">P</th><th class="col-time">Time</th><th>Key</th><th>Value</th><th class="num col-hdr">Hdr</th></tr></thead>
       <tbody>
         {{range .Rows}}
         {{if .Marker}}
         <tr class="txnmark" id="mark-{{.Offset}}">
-          <td class="m col-p">{{.Partition}}</td><td class="cell-offset">{{.Offset}}</td>
-          <td colspan="3" class="txnmark-l"title="A commit or abort ends a transaction here. It takes an offset and is not a record.">transaction marker</td>
+          <td class="cell-offset num">{{.Offset}}</td><td class="m col-p">{{.Partition}}</td>
+          <td colspan="4" class="txnmark-l"title="A commit or abort ends a transaction here. It takes an offset and is not a record.">transaction marker</td>
         </tr>
         {{else}}
-        <tr id="{{if $.Search}}hit-{{.Partition}}-{{.Offset}}{{else}}msg-{{.Offset}}{{end}}" class="{{if and (not $.Search) (eq .Offset $.HL)}}hl{{end}}{{if .Txn}} txn-{{.Txn}}{{end}}" {{if and (not $.Search) (eq .Offset $.HL)}}data-hl{{end}} tabindex="0" role="button" data-inspector-open{{if not $.Search}} data-open-keys="{{.Offset}}"{{end}} hx-get="{{topicURL $.Topic.Name}}/message?partition={{.Partition}}&offset={{.Offset}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
+        <tr id="{{if or $.Search $.Merged}}hit-{{.Partition}}-{{.Offset}}{{else}}msg-{{.Offset}}{{end}}" class="{{if and (not $.Search) (eq .Offset $.HL)}}hl{{end}}{{if and (not $.Search) (eq .Offset $.Copied)}} copied{{end}}{{if .Txn}} txn-{{.Txn}}{{end}}" {{if and (not $.Search) (eq .Offset $.HL)}}data-hl{{end}} tabindex="0" role="button" data-inspector-open{{if not (or $.Search $.Merged)}} data-open-keys="{{.Offset}}"{{end}} hx-get="{{topicURL $.Topic.Name}}/message?partition={{.Partition}}&offset={{.Offset}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">
+          <td class="cell-offset num"><span class="p-inline">p{{.Partition}} · </span>{{num .Offset}}</td>
           <td class="m col-p">{{.Partition}}</td>
-          <td class="cell-offset"><span class="p-inline">p{{.Partition}} · </span>{{num .Offset}}</td>
-          <td class="cell-key {{if or .Key.Null .Key.Empty}}none{{end}}" title="{{if .Key.Null}}null key{{else}}{{.Key.Preview}} · {{.Key.SizeText}}{{end}}">{{if .Key.Null}}no key{{else}}{{.Key.Preview}}{{end}}</td>
-          <td class="cell-val {{if .Value.Binary}}binary{{end}} {{if .Value.Null}}tomb{{end}}" title="{{.Value.SizeText}}{{if .Headers}} · {{len .Headers}} header{{if ne (len .Headers) 1}}s{{end}}{{end}}">{{if .Txn}}<span class="txnbadge txnbadge-{{.Txn}}" title="{{if eq .Txn "open"}}Part of a transaction that has not ended; a read-committed consumer cannot see it yet.{{else}}Part of a transaction that aborted; a read-committed consumer never sees it.{{end}}">{{.Txn}}</span> {{end}}{{if or .Value.Binary .Value.Null .Value.Empty}}<span class="vspecial">{{.Value.Preview}}</span>{{else}}{{jsonTint .Value.Preview}}{{end}}</td>
-          <td class="cell-age num mut">{{when .Timestamp "since"}}</td>
+          <td class="cell-time m">{{when .Timestamp "clock"}} <span class="mut">· {{when .Timestamp "since"}}</span></td>
+          <td class="cell-key {{if or .Key.Null .Key.Empty}}none{{end}}" title="{{if .Key.Null}}null key{{else}}{{.Key.Preview}} · {{.Key.SizeText}}{{end}}">{{if .Key.Null}}no key{{else if .Key.Empty}}"" (empty){{else}}{{.Key.Preview}}{{end}}</td>
+          <td class="cell-val {{if .Value.Binary}}binary{{end}} {{if .Value.Null}}tomb{{end}}" title="{{.Value.SizeText}}">{{if .Txn}}<span class="txnbadge txnbadge-{{.Txn}}" title="{{if eq .Txn "open"}}Part of a transaction that has not ended; a read-committed consumer cannot see it yet.{{else}}Part of a transaction that aborted; a read-committed consumer never sees it.{{end}}">{{.Txn}}</span> {{end}}{{if .Value.Null}}<span class="vspecial"><span class="b">tombstone</span> · null value</span>{{else if .Value.Empty}}<span class="vspecial">empty value · 0 B, a record, not a delete</span>{{else if .Value.Binary}}<span class="vspecial">{{.Value.Preview}}</span>{{else}}{{if .Value.Schema}}<span class="mut">{{.Value.Schema.TypeLabel}} · schema {{.Value.Schema.ID}} · </span>{{end}}{{jsonTint .Value.Preview}}{{end}}</td>
+          <td class="cell-hdr num m">{{len .Headers}}</td>
         </tr>
         {{end}}
         {{else}}
-        <tr><td colspan="5" class="empty">{{if .Search}}{{if .Search.Query}}Nothing in the records that were read contains “{{.Search.Query}}”.{{else}}No records.{{end}}{{else if gt .Earliest 0}}{{t "messages.retention" .Earliest}}{{else}}{{t "messages.none"}}{{end}}</td></tr>
+        <tr><td colspan="6" class="empty">{{if .Search}}{{if .Search.Query}}<span id="search-empty">Nothing in the records that were read contains “{{.Search.Query}}”.{{if gt .Facts.Messages 0}} The topic is not empty, and nothing was deleted: only this search matched nothing.{{end}} Keys, values and headers are matched as text, ignoring case. {{.Search.Note}} <a class="btn sm jump-go" href="{{.Search.ClearURL}}">Show all records</a>{{if .Search.OlderURL}} <a class="btn sm jump-go" href="{{.Search.OlderURL}}">Search further back</a>{{end}}</span>{{else}}No records.{{end}}{{else if gt .Earliest 0}}{{t "messages.retention" .Earliest}}{{else}}{{t "messages.none"}}{{end}}</td></tr>
         {{end}}
       </tbody>
     </table>
     <div class="tbl-foot">
-      <span>{{if .Rows}}{{len .Rows}} shown{{else}}No messages{{end}}</span>
-      {{if not .Search}}
+      <span class="note">{{if .Merged}}{{.MergedNote}}{{else if .Rows}}{{len .Rows}} shown{{else}}No messages{{end}}</span>
+      {{if .Merged}}<span class="pager"><span title="Where the next message will be written, on each partition">log end {{.LogEnds}}</span></span>
+      {{else if not .Search}}
       <span class="pager">
         {{if .HasOlder}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.OlderFrom}}{{if .CommittedOnly}}&amp;committed=1{{end}}">← Older</a>{{end}}
         {{if .HasNewer}}<a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}&from={{.NewerFrom}}{{if .CommittedOnly}}&amp;committed=1{{end}}">Newer</a><a class="pagelink" href="{{topicURL .Topic.Name}}?partition={{.Partition}}{{if .CommittedOnly}}&amp;committed=1{{end}}">Latest →</a>{{end}}
@@ -363,29 +471,39 @@
 {{with .FactsLive}}{{template "facts_messages_oob" .}}{{template "facts_newest_oob" .}}{{end}}
 {{end}}
 
-{{/* Partitions (Tp-16): where each partition's log starts and ends, and how far a
-     read-committed consumer may read. Size, segments and the active segment are not
-     columns because the broker does not report them over the wire. */}}
+{{/* Partitions (Tp-16): where each partition's log starts and ends, who leads it,
+     how far a read-committed consumer may read, what it takes on disk, and the
+     transactions open on it. Disk columns need the data directory; without it they
+     say so instead of showing nothing. */}}
 {{define "topic_partitions"}}
 <div class="row sb ce wrap">
-  <span class="note">One broker, so every partition is led here and the high watermark is the end of the log.</span>
+  <span class="note">One broker, so every partition is led here and the high watermark is the end of the log. {{if .PartitionTotals.HasDisk}}Sizes are bytes on disk under <span class="m">{{.DataDir}}</span>.{{else}}Size, segments and the active segment are not shown: this console was not told where the broker keeps its data.{{end}}</span>
+  <a class="btn sm" href="{{topicURL .Topic.Name}}?tab=partitions&amp;add=1#topic-addparts">Add partitions</a>
 </div>
-<div class="card" id="partitions-table" style="--c: 56px 100px 100px 100px 120px minmax(0, 1fr)">
-  <div class="r h"><span>Part.</span><span class="ra">Start</span><span class="ra">End</span><span class="ra">Messages</span><span class="ra">Last stable</span><span>Newest write</span></div>
+<div class="card" id="partitions-table" style="--c: 44px 70px 80px 80px 80px 80px 90px 80px 70px minmax(0, 1fr) 150px">
+  <div class="r h"><span>Part.</span><span>Leader</span><span class="ra">Start</span><span class="ra">End</span><span class="ra">High mark</span><span class="ra">Messages</span><span class="ra">Last stable</span><span class="ra">Size</span><span class="ra">Segments</span><span>Active segment</span><span>Newest write</span></div>
   {{range .PartitionRows}}
   <a class="r" href="{{topicURL $.Topic.Name}}?partition={{.Partition}}" data-row>
     <span class="m b">p{{.Partition}}</span>
+    <span class="m">{{if .Leader}}{{.Leader}}{{else}}<span class="mut">—</span>{{end}}</span>
     <span class="m ra">{{num .Start}}</span>
+    <span class="m ra">{{num .End}}</span>
     <span class="m ra">{{num .End}}</span>
     <span class="m ra">{{num .Count}}</span>
     <span class="m ra {{if .Held}}warn{{end}}">{{num .Stable}}</span>
+    <span class="m ra">{{if .HasDisk}}{{.Size}}{{else}}<span class="mut">—</span>{{end}}</span>
+    <span class="m ra">{{if .HasDisk}}{{.Segments}}{{else}}<span class="mut">—</span>{{end}}</span>
+    <span class="m">{{if .Active}}{{.Active}} · {{.ActiveSize}}{{else}}<span class="mut">—</span>{{end}}</span>
     <span class="m">{{if .HasNewest}}{{when .Newest "clock"}} <span class="mut">· {{when .Newest "ago"}}</span>{{else}}<span class="mut">—</span>{{end}}</span>
   </a>
   {{end}}
-  <div class="r totalrow"><span class="b">All</span><span></span><span></span><span class="m ra">{{num .Facts.Messages}}</span><span></span><span></span></div>
+  <div class="r totalrow"><span class="b">All</span><span></span><span></span><span></span><span></span><span class="m ra">{{num .Facts.Messages}}</span><span></span><span class="m ra">{{if .PartitionTotals.HasDisk}}{{.PartitionTotals.Size}}{{end}}</span><span class="m ra">{{if .PartitionTotals.HasDisk}}{{.PartitionTotals.Segments}}{{end}}</span><span></span><span></span></div>
 </div>
 <div class="row g12 wrap callouts">
-  {{range .PartitionRows}}{{if .Held}}<div class="callout warn grow"><span class="b">Why p{{.Partition}}'s last stable offset is behind its end</span><span class="note">The last stable offset is the first offset of the oldest open transaction. A read-committed reader stops at <span class="m">{{num .Stable}}</span>; a read-uncommitted one reads to <span class="m">{{num .End}}</span>.</span></div>{{end}}{{end}}
+  {{range .PartitionRows}}{{if .Held}}<div class="callout warn grow" id="held-p{{.Partition}}"><span class="b">Why p{{.Partition}}'s last stable offset is behind its end</span><span class="note">The last stable offset is the first offset of the oldest open transaction. A read-committed reader stops at <span class="m">{{num .Stable}}</span>; a read-uncommitted one reads to <span class="m">{{num .End}}</span>.
+    {{range .Txns}}<br><span class="m b">{{if .TxnID}}{{.TxnID}}{{else}}producer {{.ProducerID}}{{end}}</span>, epoch {{.Epoch}}, has one open on p{{.Partition}} from <span class="m">{{num .Start}}</span>{{if not .Began.IsZero}}, begun {{when .Began "since"}} ago{{end}}.{{end}}
+    See <a href="{{topicURL $.Topic.Name}}?partition={{.Partition}}&amp;committed=1">the committed-only view</a>{{range .Txns}}{{if .TxnID}} and <a href="{{$.Prefix}}/cluster?view=transactions">the open transactions</a>{{end}}{{end}}.</span></div>{{end}}{{end}}
+  <div class="callout grow"><span class="b">Segments</span><span class="note">A partition starts a new segment at <span class="m">segment.bytes</span>{{if .SegmentBytes}} (<span class="m">{{.SegmentBytes}}</span> for this topic){{end}}. Retention drops whole closed segments, never the active one.</span></div>
   <div class="callout grow"><span class="b">Keys and partitions</span><span class="note">A keyed record goes to hash(key) mod {{.Topic.Partitions}} under the Java default partitioner. More partitions changes that. Adding them is below.</span></div>
 </div>
 {{template "topic_addparts" .}}
@@ -411,6 +529,7 @@
   </table>
 </div>
 <div class="note">Lag is the topic's end offset minus the group's committed offset, per partition. A group with no members and an old commit does not move until someone starts it. Open a group for its members and a reset.</div>
+{{range .Readers}}{{if and (eq .State "Empty") (gt .Total 0)}}<div class="note" id="idle-{{.Group}}"><a class="m b" href="{{.URL}}">{{.Group}}</a> has no members and an old commit, so its lag will not move until someone starts it. Open the group to reset its offsets.</div>{{end}}{{end}}
 {{else}}
 <div class="callout"><span class="b">No group has committed an offset here</span><span class="note">A group appears when a consumer commits. Until then nothing reads this topic through a group.</span></div>
 {{end}}
@@ -474,16 +593,71 @@
     </div>
   </form>
 </div>
-<div class="card" id="topic-config-others" style="--c: minmax(0, 260px) minmax(0, 1fr) 100px">
-  <div class="r h"><span>Key</span><span>Value</span><span>Source</span></div>
-  <div class="r"><span class="m b">topic id</span><span>{{template "copychip" dict "Label" "" "Value" .Topic.ID}}</span><span class="m mut">broker</span></div>
-  {{range .Config.Others}}
-  <div class="r"><span class="m b">{{.Name}}</span><span class="m">{{.Value}}</span><span><span class="pill">{{if .Own}}override{{else}}default{{end}}</span></span></div>
+<div class="row sb ce wrap" id="topic-config-head">
+  <span class="note">What DescribeConfigs returns for this topic. Edit a row to send IncrementalAlterConfigs. The last column says whether the broker acts on the key: {{.CfgTable.Acting}} of the {{.CfgTable.All}} do; the rest are stored and returned and change nothing.</span>
+  <nav class="row g8" aria-label="Which keys">
+    <a class="tag {{if eq .CfgTable.Show ""}}on{{end}}" href="{{topicURL .Topic.Name}}?tab=config">all {{.CfgTable.All}}</a>
+    <a class="tag {{if eq .CfgTable.Show "overrides"}}on{{end}}" href="{{topicURL .Topic.Name}}?tab=config&amp;show=overrides">overrides {{.CfgTable.Overrides}}</a>
+    <a class="tag {{if eq .CfgTable.Show "compaction"}}on{{end}}" href="{{topicURL .Topic.Name}}?tab=config&amp;show=compaction">compaction {{.CfgTable.Compact}}</a>
+  </nav>
+</div>
+<div class="card" id="topic-config-others" style="--c: minmax(0, 250px) minmax(0, 1fr) 90px 60px minmax(0, 1.4fr)">
+  <div class="r h"><span>Key</span><span>Value</span><span>Source</span><span>Edit</span><span>Broker</span></div>
+  <div class="r"><span class="m b">topic id</span><span>{{template "copychip" dict "Label" "" "Value" .Topic.ID}}</span><span class="m mut">broker</span><span></span><span></span></div>
+  {{range .CfgTable.Rows}}
+  <div class="r{{if .Editing}} editing{{end}}" id="cfg-row-{{.Key}}">
+    <span class="m b">{{.Key}}</span>
+    <span class="m">{{.Value}}{{if .Human}} <span class="mut">({{.Human}})</span>{{end}}</span>
+    <span><span class="pill">{{if .Own}}override{{else}}default{{end}}</span></span>
+    <span>{{if .Editing}}<span class="note">editing</span>{{else}}<a class="btn sm" href="{{topicURL $.Topic.Name}}?tab=config&amp;edit={{.Key}}{{if $.CfgTable.Show}}&amp;show={{$.CfgTable.Show}}{{end}}#cfg-edit" aria-label="Edit {{.Key}}">Edit</a>{{end}}</span>
+    <span class="note"><span class="b {{if .Acts}}ok{{else}}mut{{end}}">{{if .Acts}}acts{{else}}kept{{end}}</span>, {{.Why}}</span>
+  </div>
+  {{if .Editing}}{{template "cfg_edit" $}}{{end}}
   {{end}}
 </div>
-<div class="note">Source: <span class="b">default</span> is the broker's value, <span class="b">override</span> is set on this topic and survives a restart. Other Kafka topic settings are stored and reported, and change nothing here.{{if .Config.Compact}} A record with no key is refused on a compacted topic; the offsets of dropped records stay as gaps.{{end}}</div>
+<div class="note">Source: <span class="b">default</span> is the broker's value, <span class="b">override</span> is set on this topic and survives a restart. Other Kafka topic settings are stored and reported, and change nothing here. The broker lists the same keys Kafka does; its defaults for <span class="m">retention.ms</span>, <span class="m">segment.bytes</span> and <span class="m">min.cleanable.dirty.ratio</span> differ on purpose (see the limitations page).{{if .Config.Compact}} A record with no key is refused on a compacted topic; the offsets of dropped records stay as gaps.{{end}}</div>
+<form class="cfgform card pad" id="cfg-free" hx-post="{{topicURL .Topic.Name}}/config/-" hx-disabled-elt="find button[type=submit]">
+  <div class="row ce g8 wrap">
+    <div class="field"><label for="cfg-free-key">Set another key</label><input class="input mono" id="cfg-free-key" name="key" placeholder="retention.ms" autocomplete="off" spellcheck="false" required></div>
+    <div class="field"><label for="cfg-free-value">Value</label><input class="input mono" id="cfg-free-value" name="value" autocomplete="off" spellcheck="false" required></div>
+    <button type="submit" class="btn">Save override</button>
+  </div>
+  <div class="err form-err" data-err-slot hidden role="alert"></div>
+</form>
 </div>
 {{end}}
+
+{{/* cfg_edit (Tp-19): the row being edited, under it: the value, what it was, what it becomes, and what that changes. */}}
+{{define "cfg_edit"}}{{with .CfgTable}}
+<form class="cfgform pad" id="cfg-edit" hx-post="{{topicURL $.Topic.Name}}/config/{{.EditRow.Key}}" hx-disabled-elt="find button[type=submit]">
+  <div class="row ce g8 wrap">
+    <label class="b m" for="cfg-edit-value">{{.EditRow.Key}} =</label>
+    <input class="input mono" id="cfg-edit-value" name="value" value="{{.EditRow.Value}}" autocomplete="off" spellcheck="false" autofocus hx-get="{{topicURL $.Topic.Name}}/config/{{.EditRow.Key}}" hx-trigger="input changed delay:250ms" hx-disabled-elt="unset" hx-confirm="unset" hx-target="#cfg-preview" hx-select="#cfg-preview" hx-swap="outerHTML">
+    {{if eq (settingUnit .EditRow.Key) "ms"}}<span class="note">Type milliseconds or use <span class="m">ms</span> <span class="m">s</span> <span class="m">m</span> <span class="m">h</span> <span class="m">d</span>, as <span class="m">1d</span>.</span>{{end}}
+    {{if eq (settingUnit .EditRow.Key) "bytes"}}<span class="note">Type bytes or use <span class="m">KB</span> <span class="m">MB</span> <span class="m">GB</span>, as <span class="m">64MB</span>.</span>{{end}}
+  </div>
+  {{template "cfg_preview" (dict "P" .Before "Topic" $.Topic)}}
+  <div class="err form-err" data-err-slot hidden role="alert"></div>
+  <div class="cfgfoot">
+    {{if .EditRow.Own}}<button type="submit" name="reset" value="1" class="btn" formnovalidate>Reset to default</button>{{end}}
+    <a class="btn" href="{{topicURL $.Topic.Name}}?tab=config">Cancel</a>
+    <button type="submit" class="btn pri">Save override</button>
+  </div>
+</form>
+{{end}}{{end}}
+
+{{define "cfg_preview"}}{{with .P}}
+<div id="cfg-preview" class="col g8">
+  {{if .Error}}<div class="note bad" role="status">{{.Error}}</div>{{else}}
+  <div class="row g12 wrap">
+    <div class="col g4"><span class="cap">Before</span><span class="m">{{.Before}}{{if .BeforeHuman}} <span class="mut">({{.BeforeHuman}})</span>{{end}}</span><span class="note">source: {{.BeforeSource}}</span></div>
+    <div class="col g4"><span class="cap">After</span><span class="m">{{.After}}{{if .AfterHuman}} <span class="mut">({{.AfterHuman}})</span>{{end}}</span><span class="note">source: override on this topic</span></div>
+  </div>
+  {{if .Affects}}<div class="callout"><span class="b">What it affects</span><span class="note">{{.Affects}}</span></div>{{end}}
+  {{if .Call}}<span class="note" id="cfg-call">{{.Call}}</span>{{end}}
+  {{end}}
+</div>
+{{end}}{{end}}
 
 {{define "topic_schema"}}
 <div class="card" id="topic-schemas" style="--c: minmax(0, 1fr) 100px 80px">
@@ -495,85 +669,159 @@
 <div class="note">A topic's key and value schemas are the subjects named <span class="m">&lt;topic&gt;-key</span> and <span class="m">&lt;topic&gt;-value</span>. Open one for its versions, what changed and its compatibility level.</div>
 {{end}}
 
-{{/* topic_addparts: growing a topic. Partitions only ever increase, and a record's
-     partition is its key's hash modulo the count, so the warning is the point. */}}
-{{define "topic_addparts"}}
+{{/* topic_addparts (Tp-17): growing a topic. The form asks the new TOTAL (TOP-30), shows
+     what that makes of the partitions, and says what it changes. Partitions only
+     ever increase, and a record's partition is its key's hash modulo the count, so
+     the warning is the point. A total at or below the present one is sent as asked:
+     the broker's refusal is shown in its own words. */}}
+{{define "topic_addparts"}}{{with .AddParts}}
 <details class="cfg" id="topic-addparts" {{if .Open}}open{{end}}>
   <summary>
     {{icon "plus"}}
-    <span class="cfgsum"><b>Partitions</b> · <span class="mono"><b>{{.Topic.Partitions}}</b></span> · add more</span>
+    <span class="cfgsum"><b>Partitions</b> · <span class="mono"><b>{{.Now}}</b></span> · add more</span>
     <span class="twist">{{icon "chevron"}}</span>
   </summary>
-  <form class="cfgform" hx-post="{{topicURL .Topic.Name}}/partitions" hx-disabled-elt="find button[type=submit]" data-confirm-url="{{confirmURL "topic.partitions" "name" .Topic.Name}}" data-confirm-title="{{(index .Confirm "topic.partitions").Title}}" data-confirm-verb="{{(index .Confirm "topic.partitions").Verb}}" hx-confirm="{{(index .Confirm "topic.partitions").Text}}">
-    <div class="field narrow"><label for="f-addparts">Add</label><input class="input mono" id="f-addparts" name="add" type="number" min="1" value="1" required aria-describedby="f-addparts-teach"><p class="teach" id="f-addparts-teach">{{teach "broker" "max-partitions"}}</p></div>
-    <div class="err form-err" data-err-slot hidden role="alert"></div>
+  <form class="cfgform" hx-post="{{topicURL $.Topic.Name}}/partitions" hx-disabled-elt="find button[type=submit]" data-confirm-url="{{confirmURL "topic.partitions" "name" $.Topic.Name}}" data-confirm-title="{{(index $.Confirm "topic.partitions").Title}}" data-confirm-verb="{{(index $.Confirm "topic.partitions").Verb}}" hx-confirm="{{(index $.Confirm "topic.partitions").Text}}">
+    <div class="field narrow"><label for="f-addparts">Total partitions</label><input class="input mono" id="f-addparts" name="total" type="number" min="1" value="{{.Total}}" required aria-describedby="f-addparts-teach" hx-get="{{topicURL $.Topic.Name}}?tab=partitions&amp;add=1" hx-trigger="input changed delay:250ms" hx-disabled-elt="unset" hx-confirm="unset" hx-target="#addparts-preview" hx-select="#addparts-preview" hx-swap="outerHTML"><p class="teach" id="f-addparts-teach">{{teach "broker" "max-partitions"}}</p></div>
+    <div id="addparts-preview" class="col g8">
+      {{if gt .Total .Now}}<span class="note">now {{.Now}}, so {{range $i, $p := .More}}{{if $i}}{{if eq (add $i 1) (len $.AddParts.More)}} and {{else}}, {{end}}{{end}}<span class="m">p{{$p}}</span>{{end}} {{if gt (len .More) 1}}are{{else}}is{{end}} created empty</span>
+      <div class="row ce g4 wrap">{{range .Fewer}}<span class="tag">p{{.}}</span>{{end}}<span class="mut">→</span>{{range .Fewer}}<span class="tag">p{{.}}</span>{{end}}{{range .More}}<span class="tag on">p{{.}}</span>{{end}}</div>
+      <span class="note">Partitions can only be added, never removed or merged. Existing records stay where they are.</span>
+      <div class="callout warn"><span class="b">Keyed ordering changes</span><span class="note">A key hashes to a partition by hash mod the partition count. With <span class="m">{{.Total}}</span>, a key can land on a different partition than before, so new records for it are no longer after its old ones on the same partition. Order per key holds only within one partition.</span></div>
+      {{else}}<div class="callout"><span class="b">{{if eq .Total .Now}}The same number{{else}}Fewer partitions{{end}}</span><span class="note">This topic has {{.Now}} partitions and {{.Total}} is {{if eq .Total .Now}}what it has{{else}}fewer{{end}}. Send it and the broker answers; partitions cannot be removed.</span></div>{{end}}
+      <div class="callout"><span class="b">Who picks them up</span><span class="note">A consumer or producer learns of new partitions when it next refreshes the topic's metadata; a group then divides them among its members.
+        {{if .Readers}}Groups reading this topic: {{range $i, $g := .Readers}}{{if $i}}, {{end}}<a class="m" href="{{$g.URL}}">{{$g.Group}}</a> ({{$g.Protocol}}, {{$g.State}}){{end}}.{{else}}No group has committed an offset here.{{end}}</span></div>
     <div class="cfgfoot">
-      <span class="note">Now {{.Topic.Partitions}}. Consumers pick the new partitions up on their own; records already written stay where they are.</span>
-      <button type="submit" class="btn pri">Add partitions</button>
+      <span class="note">Now {{.Now}}.</span>
+      <a class="btn" href="{{topicURL $.Topic.Name}}?tab=partitions">Cancel</a>
+      <button type="submit" class="btn pri">{{if gt .Total .Now}}Add {{sub .Total .Now}} partition{{if gt (sub .Total .Now) 1}}s{{end}}{{else}}Add partitions{{end}}</button>
     </div>
-  </form>
+      </div>
+    <div class="err form-err" data-err-slot hidden role="alert"></div>
+</form>
 </details>
-{{end}}
+{{end}}{{end}}
 
 {{/* inspector_message is the body of the inspector for a record (Sy-02): its key,
      schema and trace as a list, its value as code, its headers, and what can be done
      with it. The header (kind, title, Older, Newer, Close) is the inspector contract
      in inspector.html. */}}
 {{define "inspector_message"}}
-<div class="inspector-b">
-  <div class="kv" style="--c: 84px 1fr">
-    <span>Timestamp</span><span class="m">{{when .Msg.Timestamp "datetime"}}</span>
-    <span>Key</span><span class="m">
-      {{if .Key.Null}}<span class="mut">null</span>{{else if .Key.Empty}}<span class="mut">"" (empty)</span>
-      {{else if .Key.Binary}}{{.Key.Preview}} <button type="button" class="copy-btn" data-copy="{{.Key.B64}}" title="Copy as base64" aria-label="Copy as base64">{{icon "copy"}}</button>
-      {{else}}{{template "kvcopy" .Key.Text}}{{end}}
-      {{if and (not .Key.Null) (not .Key.Empty)}}<span class="sz">{{.Key.SizeText}}</span>{{end}}</span>
-    {{with .Value.Schema}}<span>Schema</span><span class="m">{{.TypeLabel}} · schema {{.ID}}{{if .Subject}} · {{if .URL}}<a href="{{.URL}}">{{.Subject}} v{{.Version}}</a>{{else}}{{.Subject}}{{end}}{{end}}</span>{{end}}
-    {{with .Trace}}<span>Trace</span><span class="m" title="{{.Kind}}">{{.ID}}</span>{{end}}
+<div class="inspector-b tp-msg" x-data="{menu: false}" @click.outside="menu = false">
+  <div class="kv tp-fields">
+    <span>Timestamp</span><span class="m">{{when .Msg.Timestamp "datetimems"}} <span class="mut">· {{when .Msg.Timestamp "ago"}}</span></span>
+    <span>Type</span><span class="m">{{.TimestampType}}</span>
+    <span>Key</span><span class="m">{{if .Key.Null}}<span class="mut">null</span>{{else if .Key.Empty}}<span class="mut">"" (empty)</span>{{else if .Key.Binary}}{{.Key.Preview}}{{else}}{{.Key.Text}}{{end}}{{if and (not .Key.Null) (not .Key.Empty)}} <span class="mut">· {{.Key.SizeText}}</span>{{end}}</span>
+    <span>Sizes</span><span class="m">value {{if .Value.Null}}null{{else}}{{.Value.SizeText}}{{end}} · headers {{if .Headers}}{{.HeadersSize}}{{else}}none{{end}}</span>
+    <span>Written by</span><span class="m">{{if .Writer.Known}}{{.Writer.Client}}{{if .Writer.Tx}} <span class="mut">· tx {{.Writer.Tx}}</span>{{end}}{{else}}<span class="mut" title="{{.Writer.Why}}">not known</span>{{end}}</span>
+    {{with .Value.Schema}}<span>Schema</span><span class="m">{{.TypeLabel}} · schema {{.ID}}{{if .Subject}} · {{if .URL}}<a href="{{.URL}}">{{.Subject}} v{{.Version}}</a>{{else}}{{.Subject}}{{end}}{{end}}</span><span>Value</span><span class="m">{{$.Value.SizeText}} on disk <span class="mut">· {{$.BodySize}} after the 5-byte framing</span></span>{{end}}
   </div>
 
-  <div x-data="{f: '{{if .Value.Binary}}hex{{else}}text{{end}}'}" class="col g8">
+  {{if .Trace}}<div class="row ce g8"><a class="btn w5" id="inspector-trace" href="{{.TraceURL}}">Follow this message</a><span class="note">traces it from produce to every fetch and commit</span></div>
+  {{else}}<div class="note">It carries no trace id, so there is nothing to follow.</div>{{end}}
+
+  <div class="col g4"><span class="cap">Headers{{if .Headers}} · {{len .Headers}}{{end}}</span>
+  {{if .Headers}}<div class="kv m hdrkv">{{range .Headers}}<span>{{.Key}}</span><span class="el">{{if .V.Null}}<span class="mut">null</span>{{else if .V.Empty}}<span class="mut">""</span>{{else if .V.Binary}}{{.V.Preview}}{{else}}{{.V.Text}}{{end}}</span>{{end}}</div>
+  {{else}}<div class="note">No headers on this record.</div>{{end}}</div>
+
+  <div x-data="{f: '{{if .Value.Binary}}hex{{else}}text{{end}}'}" class="col g4 tp-val">
     <div class="row sb ce">
-      <span class="cap">Value · {{if or .Value.Null .Value.Empty}}<span class="sz">{{if .Value.Null}}null — a tombstone{{else}}empty{{end}}</span>{{else}}<span class="sz">{{.Value.SizeText}}{{if .Value.Binary}} · binary{{else if .Value.Pretty}} · JSON{{end}}</span>{{end}}</span>
-      {{if not (or .Value.Null .Value.Empty)}}<span class="row ce g6">
-      <span class="seg fmt" role="group" aria-label="Value format">
-        {{if not .Value.Binary}}<button type="button" :class="f==='text'&&'on'" :aria-pressed="f==='text'" @click="f='text'">Text</button>{{end}}
+      <span class="cap">Value{{if .Value.Schema}}, decoded{{else}} · {{if or .Value.Null .Value.Empty}}<span class="sz">{{if .Value.Null}}null — a tombstone{{else}}empty{{end}}</span>{{else}}<span class="sz">{{.Value.SizeText}}{{if .Value.Binary}} · binary{{else if .Value.Pretty}} · JSON{{end}}</span>{{end}}{{end}}</span>
+      {{if .Value.Null}}<span class="pill deny">null, a tombstone</span>
+      {{else if not .Value.Empty}}<span class="seg fmt" role="group" aria-label="Value format">
+        {{if .Value.Schema}}<button type="button" :class="f==='text'&&'on'" :aria-pressed="f==='text'" @click="f='text'">Decoded</button><button type="button" :class="f==='hex'&&'on'" :aria-pressed="f==='hex'" @click="f='hex'">Raw</button>
+        {{else}}{{if not .Value.Binary}}<button type="button" :class="f==='text'&&'on'" :aria-pressed="f==='text'" @click="f='text'">Text</button>{{end}}
         <button type="button" :class="f==='hex'&&'on'" :aria-pressed="f==='hex'" @click="f='hex'">Hex</button>
-        {{if .Value.B64}}<button type="button" :class="f==='b64'&&'on'" :aria-pressed="f==='b64'" @click="f='b64'">Base64</button>{{end}}
-      </span>
-      {{if .Value.B64}}<button type="button" class="copy-btn" data-copy="{{.Value.B64}}" title="Copy as base64" aria-label="Copy as base64">{{icon "copy"}}</button>{{end}}</span>{{end}}
+        {{if .Value.B64}}<button type="button" :class="f==='b64'&&'on'" :aria-pressed="f==='b64'" @click="f='b64'">Base64</button>{{end}}{{end}}
+      </span>{{end}}
     </div>
-    {{if or .Value.Null .Value.Empty}}
-    <div class="valuebox dim">{{if .Value.Null}}This record has a null value.{{else}}This record has an empty value.{{end}}</div>
+    {{if .Value.Null}}
+    <div class="callout deny"><span class="b">This record has a null value.</span><span class="note">Not an empty string and not zero bytes: the value is absent.{{if .Compacted}} It says "this key is deleted".{{else}} This topic is not compacted, so nothing is deleted by it: it is a record with no value.{{end}}</span></div>
+    {{else if .Value.Empty}}
+    <div class="valuebox dim">This record has an empty value: zero bytes, a record and not a delete.</div>
     {{else}}
     {{if not .Value.Binary}}<pre class="code" x-show="f==='text'">{{jsonTint .Value.Text}}</pre>{{end}}
-    <pre class="code hexbox" x-show="f==='hex'" {{if not .Value.Binary}}style="display:none"{{end}}>{{.Value.Hex}}</pre>
+    {{if not .Value.Schema}}<pre class="code hexbox" x-show="f==='hex'" {{if not .Value.Binary}}style="display:none"{{end}}>{{.Value.Hex}}</pre>
     {{if .Value.B64}}<pre class="code" x-show="f==='b64'" style="display:none">{{.Value.B64}}</pre>{{end}}
-    {{if .Value.Truncated}}<div class="honest note-gap">{{icon "info"}}<div>Showing the start of a {{.Value.SizeText}} value. Download it for the rest.</div></div>{{else if .Value.HexCut}}<div class="honest note-gap" x-show="f==='hex'" style="display:none">{{icon "info"}}<div>The hex view shows the first 16 KB of {{.Value.SizeText}}.</div></div>{{end}}
+    {{if and .Value.Binary .Value.B64}}<div class="row sb ce tp-b64" x-show="f==='hex'"><span class="note">Base64 view:</span><span class="m el">{{.Value.B64}}</span></div>{{end}}
+    {{if .Value.Truncated}}<div class="honest note-gap">{{icon "info"}}<div>Showing the start of a {{.Value.SizeText}} value. Download it for the rest.</div></div>{{else if .Value.HexCut}}<div class="honest note-gap" x-show="f==='hex'" style="display:none">{{icon "info"}}<div>The hex view shows the first 16 KB of {{.Value.SizeText}}.</div></div>{{end}}{{end}}
+    {{if .Value.Schema}}<span class="note" x-show="f==='text'">Decoded by {{.Registry}}. Switch to Raw to see the bytes as the broker stores them.</span>
+    <div class="col g4 tp-raw" x-show="f==='hex'" x-cloak><span class="cap">Raw, {{.Value.SizeText}} · the registry framing</span>
+      <pre class="code hexbox">{{.Value.Hex}}</pre>
+      <div class="col tp-framing"><span class="note"><span class="m">00</span> magic byte, always zero</span><span class="note"><span class="m">{{.FrameBytes}}</span> schema id {{.FrameID}}, four bytes, big-endian</span><span class="note">the rest, {{.BodySize}}, is the {{.Value.Schema.TypeLabel}} body{{if eq .Value.Schema.Type "PROTOBUF"}} (its message index first){{end}}</span></div></div>{{end}}
     {{end}}
   </div>
 
-  <span class="cap">Headers{{if .Headers}} · {{len .Headers}}{{end}}</span>
-  {{if .Headers}}<div class="hdrlist">{{range .Headers}}<div class="hdrpair"><span class="hk">{{.Key}}</span><span class="dim">=</span><span class="hv">{{if .V.Null}}<span class="dim">null</span>{{else if .V.Empty}}<span class="dim">""</span>{{else if .V.Binary}}{{.V.Preview}}{{else}}{{.V.Text}}{{end}}</span></div>{{end}}</div>
-  {{else}}<div class="note">No headers on this record.</div>{{end}}
-
   {{with .Value.Schema}}<div class="callout ok"><span class="b">Decoded with schema {{if .Subject}}{{.Subject}} {{end}}{{if .Version}}v{{.Version}}{{end}}</span><span class="note">The record carries schema id {{.ID}}; its bytes were read with that schema.</span></div>{{end}}
 
-  <div class="inspector-acts">
-    {{with .Trace}}<a class="btn pri" id="inspector-trace" href="{{$.TraceURL}}">Follow this trace</a>{{end}}
-    <button type="button" class="btn" data-close-inspector-on-success
+  {{with .Value.Frame}}<div class="callout{{if eq .Kind "unknown"}} warn{{end}}">
+    {{if eq .Kind "none"}}<span class="b">Not readable as text, so shown as bytes</span><span class="note">The first byte is {{.First}}, not the registry's 0x00 marker, so this was not written with a registry schema and is not decoded. Download value gives the exact {{$.Value.SizeText}}.</span>
+    {{else if eq .Kind "unknown"}}<span class="b">Schema id {{.ID}} is not registered</span><span class="note">The value starts with the registry's 0x00 marker and the id {{.ID}}, but this registry has no schema with that id ({{.Err}}), so it is shown as bytes.</span>
+    {{else if eq .Kind "unread"}}<span class="b">The registry could not be asked</span><span class="note">The value starts with the registry's 0x00 marker and the id {{.ID}}. Reading schema {{.ID}} failed: {{.Err}}</span>
+    {{else if eq .Kind "mismatch"}}<span class="b">The body does not fit schema {{.ID}}</span><span class="note">The value starts with the registry's 0x00 marker and the id {{.ID}}, but its body does not decode with that schema: {{.Err}}</span>
+    {{else}}<span class="b">Not readable as text, so shown as bytes</span><span class="note">The first byte is {{.First}}. This console has no schema registry connected, so nothing is decoded. Download value gives the exact {{$.Value.SizeText}}.</span>{{end}}
+  </div>{{end}}
+
+  {{with .Legend}}<div class="col g4 tp-legend"><span class="cap">{{.Cap}}</span>
+    <div class="card tp-legend-card">{{range .Rows}}<div class="r{{if .This}} on{{end}}"><span class="m {{.Class}}">{{.Label}}</span><span class="note">{{.Note}}</span><span class="m mut ra">{{.Offset}}</span></div>{{end}}</div>
+    <span class="note">{{.Note}}</span></div>{{end}}
+
+  {{with .History}}<div class="col g4 tp-history"><span class="cap">What compaction will do with {{.Key}}</span>
+    <div class="card tp-legend-card">{{range .Rows}}<div class="r{{if .Deny}} on{{end}}"><span class="m ra">{{.Offset}}</span><span class="m el">{{.Value}}</span><span class="note">{{.Note}}</span></div>{{end}}</div>
+    <span class="note">{{.Summary}} Records of this key that compaction has already removed are offsets that are not there, so they cannot be listed. The cleaner keeps the latest record of each key and drops older ones in the background, never the newest segment.</span></div>{{end}}
+
+  <div class="row g8 ce inspector-acts">
+    <button type="button" class="btn w5"
       hx-post="{{topicURL .Topic}}/resend" hx-vals='{"partition":"{{.Partition}}","offset":"{{.Msg.Offset}}"}'
-      hx-target="#tape-and-table" hx-select="unset" hx-swap="outerHTML" hx-disabled-elt="this"
+      hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-disabled-elt="this"
       title="Produce an exact copy of this record (same key, value and headers, byte for byte) to partition {{.Partition}}">Send again</button>
     {{if .CanEdit}}
     <button type="button" class="btn" id="inspector-edit"
-      data-key="{{.EditKey}}" data-key-enc="{{.EditKeyEnc}}" data-value="{{.EditValue}}" data-value-enc="{{.EditValueEnc}}"
+      data-key="{{.EditKey}}" data-key-enc="{{.EditKeyEnc}}" data-key-empty="{{if .Key.Empty}}1{{end}}" data-value="{{.EditValue}}" data-value-enc="{{.EditValueEnc}}"
       data-headers="{{.EditHeaders}}" data-schema="{{.EditSchema}}" data-partition="{{.Partition}}" data-tombstone="{{if .Value.Null}}1{{end}}"
       title="Open the composer with this record's contents, to change and send">Edit a copy…</button>
     {{else}}
     <span class="sz">Too large to edit in the browser.</span>
     {{end}}
-    {{if not (or .Value.Null .Value.Empty)}}<a class="btn" href="{{topicURL .Topic}}/message/raw?partition={{.Partition}}&offset={{.Msg.Offset}}&field=value" download hx-boost="false">Download value</a>{{end}}
+    <button type="button" class="btn" id="inspector-copy" aria-haspopup="menu" :aria-expanded="menu" @click="menu = !menu">Copy ▾</button>
+  </div>
+  <div class="card col tp-copymenu" role="menu" aria-label="Copy" x-show="menu" x-cloak @keydown.escape.stop="menu = false">
+    {{if not (or .Key.Null .Key.Empty)}}{{if .Key.Binary}}{{if .Key.B64}}<button type="button" class="btn ghost sb" role="menuitem" data-copy="{{.Key.B64}}">Copy key as base64</button>{{end}}
+    {{else if not .Key.Truncated}}<button type="button" class="btn ghost sb" role="menuitem" data-copy="{{.Key.Text}}">Copy key<span class="m el">{{.Key.Text}}</span></button>{{end}}{{end}}
+    {{if and (not (or .Value.Null .Value.Empty .Value.Binary .Value.Truncated)) .Value.Text}}<button type="button" class="btn ghost" role="menuitem" data-copy="{{.Value.Text}}">{{if .Value.Pretty}}Copy value as JSON{{else}}Copy value{{end}}</button>{{end}}
+    {{if and .Value.B64 (not (or .Value.Null .Value.Empty))}}<button type="button" class="btn ghost" role="menuitem" data-copy="{{.Value.B64}}">Copy value as base64</button>{{end}}
+    {{if not (or .Value.Null .Value.Empty)}}<a class="btn ghost sb" role="menuitem" href="{{topicURL .Topic}}/message/raw?partition={{.Partition}}&offset={{.Msg.Offset}}&field=value" download hx-boost="false">Download value ({{.Value.SizeText}})</a>{{end}}
+    {{if .Producer.Cmd}}<button type="button" class="btn ghost" role="menuitem" data-copy="{{.Producer.Cmd}}">Copy as kafka-console-producer</button>
+    {{else}}<button type="button" class="btn ghost" role="menuitem" disabled title="{{.Producer.Why}}">Copy as kafka-console-producer</button>{{end}}
   </div>
 </div>
 {{end}}
+
+{{/* Send again's answer (Tp-13): the panel, then the page's tape and the note above it, carried out of band. */}}
+{{define "resend_response"}}{{template "inspector" .}}<div id="resend-note" hx-swap-oob="true" role="status"><div class="callout ok"><span><span class="b">Sent again.</span> {{.Note}}</span></div></div>{{with .Tape}}{{template "tape_and_table" .}}{{end}}{{end}}
+
+{{define "inspector_resend"}}{{with .Resend}}
+<div class="inspector-b tp-resend">
+  <div class="card tp-resend-card tp-resend-where">
+    <div class="r h"><span></span><span>Original</span><span>Copy</span></div>
+    <div class="r"><span class="note">Offset</span><span class="m">{{num .Orig.Offset}}</span><span class="m b">{{num .Copy.Offset}}</span></div>
+    <div class="r"><span class="note">Partition</span><span class="m">{{.Orig.Partition}}</span><span class="m">{{.Copy.Partition}}</span></div>
+    <div class="r"><span class="note">Timestamp</span><span class="m">{{when .Orig.Timestamp "clockms"}}</span><span class="m">{{when .Copy.Timestamp "clockms"}}</span></div>
+  </div>
+  <div class="card tp-resend-card tp-resend-same">
+    <div class="r h"><span>Bytes</span><span>What</span><span class="ra">Same</span></div>
+    {{range .Rows}}<div class="r"><span class="note">{{.Label}}</span><span class="m el">{{.What}}</span><span class="m ra {{if .Same}}ok{{else}}bad{{end}}">{{if .Same}}equal{{else}}differs{{end}}</span></div>{{end}}
+  </div>
+  {{if .Headers}}<div class="col g4"><span class="cap">Headers carried over</span>
+    <div class="kv m hdrkv">{{range .Headers}}<span>{{.Key}}</span><span class="el">{{if .V.Null}}<span class="mut">null</span>{{else if .V.Empty}}<span class="mut">""</span>{{else if .V.Binary}}{{.V.Preview}}{{else}}{{.V.Text}}{{end}}</span>{{end}}</div>
+    <span class="note">Not rewritten: the copy has the headers the original has{{if .TraceID}}, so it carries the same trace id{{end}}.</span></div>{{end}}
+  <div class="callout"><span class="b">Byte for byte, except when</span><span class="note">The offset and the timestamp are new. The key, the value and every header are copied from the stored record, not re-typed, so binary values and schema ids survive. The copy is a plain batch: it carries no producer id or sequence and is not part of a transaction, whatever the original was.</span></div>
+  {{if .Readers}}<div class="callout warn"><span class="b">Readers will see it again</span>
+    <span class="note">{{range $i, $r := .Readers}}{{if $i}} {{end}}<a href="{{$r.URL}}">{{$r.Group}}</a> {{if $r.Read}}has committed past offset {{num $.Resend.Orig.Offset}}, so it has read the original and will read the copy too.{{else}}has not reached the original yet, so it will read both.{{end}}{{end}}</span></div>{{end}}
+  <div class="row g8 ce">
+    <button type="button" class="btn pri" hx-get="{{topicURL .Topic}}/message?partition={{.Partition}}&offset={{.Copy.Offset}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML">Open the copy</button>
+    {{if .TraceID}}<a class="btn" href="{{.TraceURL}}">Follow the copy</a>{{end}}
+    <button type="button" class="btn" hx-post="{{topicURL .Topic}}/resend" hx-vals='{"partition":"{{.Partition}}","offset":"{{.Orig.Offset}}"}' hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" hx-disabled-elt="this">Send again</button>
+  </div>
+</div>
+{{end}}{{end}}

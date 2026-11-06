@@ -200,15 +200,22 @@ implement it.
   records stay as gaps, so a count of offsets can exceed the number of records. A compacted
   topic refuses a record with no key. (Committed offsets are stored in the metadata
   database, not in a compacted `__consumer_offsets` topic.)
-- **Topic configuration: five settings act, the rest are kept.** A topic's own
-  `retention.ms`, `retention.bytes` and `segment.bytes`, given at `CreateTopics` or
-  changed later with `AlterConfigs` / `IncrementalAlterConfigs`, are in force for that
-  topic and override the broker's. `max.message.bytes` refuses a larger record batch
+- **Topic configuration: some settings act, the rest are kept.** The settings table
+  (`internal/settings`) says which, and the console's Config tab shows its reading in a
+  column beside every key: `cleanup.policy`, `compression.type`, `max.message.bytes`,
+  `message.timestamp.type`, `message.timestamp.after.max.ms`, `message.timestamp.before.max.ms`,
+  `retention.bytes`, `retention.ms` and `segment.bytes` act, and `delete.retention.ms`,
+  `max.compaction.lag.ms`, `min.cleanable.dirty.ratio` and `min.compaction.lag.ms` act
+  on a topic whose `cleanup.policy` compacts. Given at `CreateTopics` or changed later
+  with `AlterConfigs` / `IncrementalAlterConfigs`, they are in force for that topic and
+  override the broker's. `max.message.bytes` refuses a larger record batch
   (`MESSAGE_TOO_LARGE`), and `message.timestamp.type=LogAppendTime` stamps records
   with the broker's clock; these two apply only where a topic sets them, and there is
   no broker-wide batch limit below the 100 MiB request cap. Every other Kafka topic
   config is validated, stored and reported by `DescribeConfigs`, and changes nothing.
-  `segment.bytes` must be at least 1024. The broker's own configuration cannot be altered over the wire: it comes
+  `segment.bytes` must be at least 1024. Age retention judges a closed segment by the
+  largest timestamp among its records, and by when it was written only if none has one.
+  The broker's own configuration cannot be altered over the wire: it comes
   from flags and the config file, and a request to change it is refused.
 - **ACLs: users only; no quotas.** ACLs are enforced, with Kafka's rules (see
   [Authorization](authorization.md)), but principals are `User:` names only and hosts
@@ -288,6 +295,11 @@ implement it.
 - **DescribeConfigs does not say a config's type** (`ConfigType` is UNKNOWN, 0); Kafka
   names it (`LIST` for `cleanup.policy`, `conformance/recordings/list-config-append.json`).
   Names, values and sources are Kafka's.
+- **DescribeConfigs of a topic lists the same 33 keys as Kafka** (`conformance/recordings/topic-config-keys.json`),
+  in name order where Kafka's is hash order, with three values that differ on purpose:
+  `retention.ms` (-1, keep for ever, where Kafka keeps 7 days), `segment.bytes` (128 MiB,
+  where Kafka's is 1 GiB) and `min.cleanable.dirty.ratio` (0, a rolled segment is cleaned at once,
+  where Kafka's is 0.5). `internal/broker/describeconfigs_all_test.go` compares the two.
 - **An empty cleanup.policy is refused** with `INVALID_CONFIG`. Kafka 4.3.1 takes it
   (SUBTRACT `delete` from an unset `cleanup.policy` leaves `""`, recorded in
   `list-config-append`), for a log that is neither deleted nor compacted; this broker's

@@ -455,11 +455,31 @@ func (c *Console) msgView(ctx context.Context, topic string, m Message) msgView 
 //
 //fuzz:not-a-parser hands the record value to registryClient.decode and lays out the JSON that comes back; it reads no bytes itself
 func (c *Console) readThroughRegistry(ctx context.Context, topic string, v bytesView, raw []byte) bytesView {
-	if c.reg == nil || v.Null || v.Empty {
+	if v.Null || v.Empty {
 		return v
 	}
-	d, ok := c.reg.decode(ctx, topic, raw)
-	if !ok {
+	first := fmt.Sprintf("0x%02x", raw[0])
+	if c.reg == nil {
+		if v.Binary {
+			v.Frame = &frameView{Kind: "noregistry", First: first}
+		}
+		return v
+	}
+	d, state, derr := c.reg.decodeState(ctx, topic, raw)
+	switch state {
+	case notFramed:
+		if v.Binary {
+			v.Frame = &frameView{Kind: "none", First: first}
+		}
+		return v
+	case framedUnknown:
+		v.Frame = &frameView{Kind: "unknown", First: first, ID: d.ID, Err: derr.Error()}
+		return v
+	case framedUnread:
+		v.Frame = &frameView{Kind: "unread", First: first, ID: d.ID, Err: derr.Error()}
+		return v
+	case framedMismatch:
+		v.Frame = &frameView{Kind: "mismatch", First: first, ID: d.ID, Err: derr.Error()}
 		return v
 	}
 	text := d.JSON
@@ -485,6 +505,9 @@ func (c *Console) tag(d decoded) *schemaTag {
 // composerSchemas adds the subjects the composer can encode a value with, and the one
 // to start on: the topic's own value subject, when it has one.
 func (c *Console) composerSchemas(r *http.Request, topic string, data map[string]any) {
+	if pr, ok := data["PartitionRange"].([]int32); ok {
+		data["PartNote"] = c.partitionNote(int32(len(pr)), nil)
+	}
 	if c.reg == nil {
 		return
 	}

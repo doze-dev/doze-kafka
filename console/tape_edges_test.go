@@ -98,7 +98,7 @@ func TestTapeWindowsAndPaging(t *testing.T) {
 		t.Errorf("jump to the newest: %v %v %v %v", d["JumpNote"], d["HL"], d["AtTail"], d["WindowFrom"])
 	}
 	d = f.tape(t, "tw", 0, 1, 20, 7, 130, false)
-	if d["JumpNote"] != "Offset 130 has not been written yet (the newest is 129) — showing the latest messages." || d["AtTail"] != true || d["HL"] != int64(-1) {
+	if d["JumpNote"] != "Offset 130 is past the end (latest is 130)" || d["AtTail"] != true || d["HL"] != int64(-1) {
 		t.Errorf("jump to the end: %v %v %v", d["JumpNote"], d["AtTail"], d["HL"])
 	}
 	if d = f.tape(t, "tw", 0, 1, -1, -1, jumpMalformed, false); d["JumpNote"] != "That is not an offset. Type a whole number, 0 or more." || d["AtTail"] != true {

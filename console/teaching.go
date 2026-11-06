@@ -73,17 +73,19 @@ var formFields = map[string]formField{
 	// Settings: each has a record, and the template shows its teaching line.
 	"partitions":  {Kind: settings.Broker, Name: "max-partitions"},
 	"replication": {Kind: settings.Broker, Name: "replication-factor"},
-	"add":         {Kind: settings.Broker, Name: "max-partitions"},
+	"total":       {Kind: settings.Broker, Name: "max-partitions"},
 	"level":       {Kind: settings.Registry, Family: true},
 	"offset":      {Kind: settings.Group, Name: "new-offset"},
 
 	// Not settings: what is being written, or which thing is being looked at.
 	"name":           {Not: "the name of the topic being created, or the resource an ACL or a check is about"},
 	"topic":          {Not: "which topic of a group an action is about"},
+	"to":             {Not: "where a reset moves the offsets to: earliest, latest, a time or specific offsets"},
 	"partition":      {Not: "which partition of a topic a request is for"},
 	"partition_ctx":  {Not: "the partition the page is showing, carried through a form"},
 	"key":            {Not: "a record's key"},
 	"key_enc":        {Not: "how a record's key is encoded"},
+	"key_empty":      {Not: "whether a record's key is empty and not null"},
 	"value":          {Not: "a record's value"},
 	"value_enc":      {Not: "how a record's value is encoded"},
 	"tombstone":      {Not: "whether a record's value is null"},
@@ -125,9 +127,12 @@ var unnamedFields = map[string]string{
 	"Filter Schemas":    "narrows the list pane; sends nothing",
 	"Filter groups":     "narrows the groups table; sends nothing",
 	"Jump to a topic, group, subject or action": "the palette's search; sends nothing",
-	"Header key":   "a record header's key, sent with its value in the form's headers",
-	"Header value": "a record header's value, sent with its key in the form's headers",
-	"psel":         "picks the partition the page shows: a link, not a field",
+	"Header key":       "a record header's key, sent with its value in the form's headers",
+	"Header value":     "a record header's value, sent with its key in the form's headers",
+	"psel":             "picks the partition the page shows: a link, not a field",
+	"Partition number": "the composer's fixed partition, sent as the form's partition",
+	"Headers as JSON":  "the composer's headers written as one JSON array, sent as the form's headers",
+	"Schema subject":   "the subject the composer encodes the value with, sent as the form's schema_subject",
 }
 
 // acksChoice is one acknowledgement the produce form can ask for, and what it does on
@@ -139,9 +144,9 @@ type acksChoice struct{ Value, Aria, Say string }
 
 func acksChoices() []acksChoice {
 	return []acksChoice{
-		{"1", "acks 1: the broker confirms the write", "Written to the page cache before acknowledging."},
-		{"0", "acks 0: no confirmation", "Fire-and-forget — the broker sends no response at all."},
-		{"all", "acks all: confirmed after it is on disk", "Fsynced to disk before acknowledging. Slower, durable."},
+		{"1", "acks 1: the broker confirms the write", "Written to the page cache before acknowledging (acks 1)."},
+		{"0", "acks 0: no confirmation", "Fire-and-forget: the broker sends no response at all (acks 0)."},
+		{"all", "acks all: confirmed after it is on disk", "Fsynced to disk before acknowledging (acks all). Slower, durable."},
 	}
 }
 

@@ -204,11 +204,17 @@ func seedGroupTimeline(ctx context.Context, addr string) error {
 	return nil
 }
 
+// seedTxnTimeout is how long the seeded open transactions stay open: the broker's maximum
+// (Kafka's transaction.max.timeout.ms, 15 minutes). The browser suite needs them open while
+// it runs, and the broker aborts one at its timeout; a pass that spent ten minutes before its
+// last tests (slow builds and seeding on a loaded runner) found them gone.
+const seedTxnTimeout = 15 * time.Minute
+
 // seedTransactions writes seed-txn: an aborted transaction, a committed one and one that
 // is left open, each from the same producer except the open one.
 func seedTransactions(ctx context.Context, addr string) error {
 	newTx := func(id string) (*kgo.Client, error) {
-		return newKgo(kgo.SeedBrokers(addr), kgo.TransactionalID(id), kgo.TransactionTimeout(10*time.Minute), kgo.RecordPartitioner(kgo.ManualPartitioner()))
+		return newKgo(kgo.SeedBrokers(addr), kgo.TransactionalID(id), kgo.TransactionTimeout(seedTxnTimeout), kgo.RecordPartitioner(kgo.ManualPartitioner()))
 	}
 	write := func(cl *kgo.Client, v string) error {
 		return cl.ProduceSync(ctx, &kgo.Record{Topic: "seed-txn", Partition: 0, Value: []byte(v)}).FirstErr()

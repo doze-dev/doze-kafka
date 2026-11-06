@@ -4,7 +4,7 @@ test('a topic is created with its partitions and shows them', async ({ page, cre
   const name = uniqueName('made');
   await createTopic(name, 3);
   await expect(page.locator('#topic-facts')).toContainText('3 partitions');
-  await expect(page.locator('.ptab')).toHaveCount(3);
+  await expect(page.locator('.ptab')).toHaveCount(4); // All, then one for each partition.
   await expect(page.locator('.list .li.on')).toHaveAttribute('data-name', name);
   await expect(page.locator('#flashbar')).toContainText('Topic created');
   expect(page.url()).not.toContain('flash='); // the one-shot banner is not left in the address bar to replay.
@@ -13,16 +13,16 @@ test('a topic is created with its partitions and shows them', async ({ page, cre
 test('a bad name or partition count is explained beside the form, and nothing is created', async ({ page }) => {
   await page.goto('new/topic');
   await page.locator('#f-name').fill('bad name!');
-  await page.getByRole('button', { name: 'Create topic' }).click();
+  await page.locator('#create-topic').getByRole('button', { name: 'Create topic' }).click();
   await expect(page.locator('[data-err-slot]')).toContainText('invalid topic name');
   await expect(page.locator('#f-name')).toHaveValue('bad name!'); // what was typed is still there.
   await page.locator('#f-name').fill('seed-orders');
-  await page.getByRole('button', { name: 'Create topic' }).click();
+  await page.locator('#create-topic').getByRole('button', { name: 'Create topic' }).click();
   await expect(page.locator('[data-err-slot]')).toContainText(`a topic named "seed-orders" already exists`);
   await page.locator('#f-name').fill('fine-name');
   await page.locator('#f-partitions').evaluate((el: HTMLInputElement) => { el.type = 'text'; });
   await page.locator('#f-partitions').fill('abc');
-  await page.getByRole('button', { name: 'Create topic' }).click();
+  await page.locator('#create-topic').getByRole('button', { name: 'Create topic' }).click();
   await expect(page.locator('[data-err-slot]')).toContainText('not a number of partitions');
   await page.goto('topics');
   await expect(page.locator('.list .li[data-name="fine-name"]')).toHaveCount(0);
@@ -83,7 +83,7 @@ test('Purge empties a topic but keeps its settings; Delete removes it', async ({
   await expect(page.locator('#confirm-yes')).toHaveText('Purge 1 record');
   await confirmDialog('accept');
   await expect(page.locator('.tape-empty')).toBeVisible();
-  await expect(page.locator('#topic-facts')).toContainText('kept 3 d'); // a purge used to drop the topic's own settings.
+  await expect(page.locator('#topic-facts')).toContainText('retention 3 d'); // a purge used to drop the topic's own settings.
   await page.getByRole('button', { name: 'More actions' }).click();
   await page.getByRole('button', { name: 'Delete' }).first().click();
   await confirmDialog('accept');
@@ -92,7 +92,7 @@ test('Purge empties a topic but keeps its settings; Delete removes it', async ({
 });
 
 test('moving between topics keeps the list where it was, and nothing moves after it appears', async ({ page }) => {
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   await page.evaluate(() => {
     (window as any).__shifts = [];
     new PerformanceObserver((l) => { for (const e of l.getEntries() as any[]) if (!e.hadRecentInput) (window as any).__shifts.push(e.value); }).observe({ type: 'layout-shift' });
@@ -117,39 +117,40 @@ test('moving between topics keeps the list where it was, and nothing moves after
 test('partitions are added after a warning, the tabs grow, and a bad number is explained in place', async ({ page, createTopic, uniqueName, confirmDialog }) => {
   const name = uniqueName('grow');
   await createTopic(name, 2);
-  await expect(page.locator('.ptab')).toHaveCount(2);
+  await expect(page.locator('.ptab')).toHaveCount(3);
 
   await page.getByRole('link', { name: /Partitions/ }).click();
   await page.locator('#topic-addparts summary').click();
+  const add = page.locator('#topic-addparts').getByRole('button', { name: /^Add (\d+ partitions?|partitions)$/ });
   await page.locator('#f-addparts').evaluate((el: HTMLInputElement) => { el.type = 'text'; }); // past the browser's own check.
   await page.locator('#f-addparts').fill('x');
-  await page.locator('#topic-addparts').getByRole('button', { name: 'Add partitions' }).click();
+  await add.click();
   await confirmDialog('accept');
-  await expect(page.locator('#topic-addparts [data-err-slot]')).toContainText('how many partitions to add');
+  await expect(page.locator('#topic-addparts [data-err-slot]')).toContainText('the number of partitions the topic should have in total');
   await expect(page.locator('#partitions-table a.r')).toHaveCount(2);
 
   await page.locator('#f-addparts').evaluate((el: HTMLInputElement) => { el.type = 'number'; });
-  await page.locator('#f-addparts').fill('2');
-  await page.locator('#topic-addparts').getByRole('button', { name: 'Add partitions' }).click();
+  await page.locator('#f-addparts').fill('4');
+  await expect(page.locator('#topic-addparts').getByRole('button', { name: 'Add 2 partitions' })).toBeVisible(); // the preview has caught up.
+  await add.click();
   await expect(page.locator('#confirm')).toContainText('cannot be removed'); // the cost is said before it is paid.
-  await expect(page.locator('#confirm')).toContainText('which has 2 partitions now, 4 after'); // and how many, as typed.
-  await expect(page.locator('#confirm-yes')).toHaveText('Add 2 partitions');
+  await expect(page.locator('#confirm')).toContainText('which has 2 partitions now'); // and how many it has.
   await confirmDialog('accept');
   await expect(page.locator('#flashbar')).toContainText('Topic now has 4 partitions');
   await expect(page.locator('#topic-facts')).toContainText('4 partitions');
-  await expect(page.locator('.ptab')).toHaveCount(4);
+  await expect(page.locator('#partitions-table a.r')).toHaveCount(4); // the Partitions tab stays open, with the new ones in it.
 });
 
 test('go to time lands on the first message at or after it, and explains an empty or bad answer', async ({ page }) => {
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   await page.locator('#jump-at').fill('1d');
   await page.locator('form.jump', { has: page.locator('#jump-at') }).getByRole('button', { name: 'Go' }).click();
-  await expect(page.locator('.jumpnote')).toContainText('first message at or after');
+  await expect(page.locator('#jump-msg')).toContainText('Nothing that early');
   await expect(page.locator('tr.hl')).toHaveCount(1); // the landing row is highlighted.
 
   await page.locator('#jump-at').fill('2999-01-01');
   await page.locator('form.jump', { has: page.locator('#jump-at') }).getByRole('button', { name: 'Go' }).click();
-  await expect(page.locator('.jumpnote')).toContainText('No message on this partition is at or after');
+  await expect(page.locator('#jump-msg')).toContainText('No record at or after');
 
   await page.locator('#jump-at').fill('whenever');
   await page.locator('form.jump', { has: page.locator('#jump-at') }).getByRole('button', { name: 'Go' }).click();
@@ -188,7 +189,7 @@ test('transactions on the tape: aborted and open records are marked, markers are
 test('a refusal stays when the form\'s preview refreshes after it', async ({ page }) => {
   await page.goto('new/topic');
   await page.locator('#f-name').fill('bad name!');
-  await page.getByRole('button', { name: 'Create topic' }).click();
+  await page.locator('#create-topic').getByRole('button', { name: 'Create topic' }).click();
   await page.waitForTimeout(1200); // the preview's request (200 ms after typing) has come and gone.
   await expect(page.locator('[data-err-slot]')).toContainText('invalid topic name');
 });

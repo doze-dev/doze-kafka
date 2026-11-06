@@ -480,3 +480,31 @@ func TestOnlyABrokerWithAConsoleKeepsATrafficRecord(t *testing.T) {
 		t.Error("--console=false still keeps a traffic record")
 	}
 }
+
+// The command line reads group memory, the log cleaner and the clients' own metrics through
+// hooks on the server it built; a broker answers all three.
+func TestTheHooksReachTheBrokerBehindTheServer(t *testing.T) {
+	srv, err := server.New(server.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	groups := serverhook.Groups(srv)
+	if groups == nil {
+		t.Fatal("no group inspector behind the server")
+	}
+	if len(groups.InspectGroups()) != 0 {
+		t.Error("a fresh broker holds groups")
+	}
+	if _, ok := groups.InspectGroup("nobody"); ok {
+		t.Error("a group nobody made is found")
+	}
+	logs := serverhook.Logs(srv)
+	if logs == nil {
+		t.Fatal("no log inspector behind the server")
+	}
+	if _, ok := logs.CleanerInfo("nothing", 0); ok {
+		t.Error("a partition nobody made has a cleaner")
+	}
+	_ = serverhook.ClientMetrics(srv) // nil while client telemetry has no console to serve it; the call is the point.
+}

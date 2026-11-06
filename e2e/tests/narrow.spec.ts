@@ -68,7 +68,7 @@ for (const width of [960, 390]) {
 // theme switch (Sy-07) is at the foot of the menu, and the wire is the wide page's.
 test('at 390 the top bar has the dot, the menu has the theme switch, and a topic draws no wire', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   const dot = page.locator('#live-pill .dot');
   await expect(dot).toBeVisible();
   expect((await dot.boundingBox())!.width).toBe(7);
@@ -80,7 +80,7 @@ test('at 390 the top bar has the dot, the menu has the theme switch, and a topic
   // Cards: each record bordered, with no line beyond its key and offset, its value and its age.
   const card = page.locator('#messages-table tbody tr:not(.txnmark)').first();
   const lines = await card.evaluate((tr) => Array.from(tr.children).filter((c) => (c as HTMLElement).offsetParent !== null).map((c) => (c as HTMLElement).className));
-  expect(lines).toEqual(['cell-offset', 'cell-key', 'cell-val', 'cell-age num mut'].map((c) => expect.stringContaining(c.split(' ')[0])));
+  expect(lines).toEqual(['cell-offset', 'cell-time', 'cell-key', 'cell-val'].map((c) => expect.stringContaining(c.split(' ')[0])));
   await expect(card).toHaveCSS('border-top-width', '1px');
   await page.locator('#menu-btn').click();
   const sw = page.locator('nav.rail .rail-theme');
@@ -129,7 +129,7 @@ test('a topic opened on a phone is its own screen, with a way back to the list',
 
 test('an open composer joins the page instead of covering a small screen', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 700 });
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   await page.locator('#compose-head').click();
   const dock = await page.locator('#compose-panel').evaluate((el) => getComputedStyle(el).position);
   expect(dock).toBe('static');

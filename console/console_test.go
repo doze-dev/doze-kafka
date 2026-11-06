@@ -144,7 +144,7 @@ func TestTopicLifecycle(t *testing.T) {
 		t.Fatalf("detail: status %d: %s", rec.Code, rec.Body)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"orders.created", "3 partition", "No messages on this partition yet", "Produce a message"} {
+	for _, want := range []string{"orders.created", "3 partition", "No messages on this partition yet", ">Produce<"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("detail missing %q", want)
 		}
@@ -182,7 +182,7 @@ func TestProduceAndTape(t *testing.T) {
 	body := rec.Body.String()
 	// The value renders JSON-tinted: key and number tokens each wrapped in a
 	// tint span, with the raw text HTML-escaped inside.
-	for _, want := range []string{"msg-0", "k1", `<span class="jt-k">&#34;a&#34;</span>`, `<span class="jt-n">1</span>`, `title="7 B · 1 header"`} {
+	for _, want := range []string{"msg-0", "k1", `<span class="jt-k">&#34;a&#34;</span>`, `<span class="jt-n">1</span>`, `class="cell-hdr num m">1</td>`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("tape/table response missing %q:\n%s", want, body)
 		}

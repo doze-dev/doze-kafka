@@ -56,6 +56,10 @@ var keyMap = []keyBinding{
 	{"Enter", "↵", "open", "Open the row on the right", ScopeLists, ""},
 	{"Escape", "esc", "close", "Close the panel, clear the filter", ScopeLists, ""},
 	{"/", "/", "filter", "Filter this table", ScopeLists, ""},
+	{"1", "1", "tab-n", "First tab (on a group)", ScopeLists, ""},
+	{"2", "2", "tab-n", "Second tab (on a group)", ScopeLists, ""},
+	{"3", "3", "tab-n", "Third tab (on a group)", ScopeLists, ""},
+	{"4", "4", "tab-n", "Fourth tab (on a group)", ScopeLists, ""},
 	{"]", "]", "tab-next", "Next tab", ScopeLists, ""},
 	{"[", "[", "tab-prev", "Previous tab", ScopeLists, ""},
 
@@ -64,6 +68,7 @@ var keyMap = []keyBinding{
 	{"p", "p", "pause", "Pause or resume the live view", ScopePage, ""},
 	{"c", "c", "create", "Create (on Topics, Subjects, Access); connect an app (on an empty Traffic); copy the bootstrap address (on Cluster)", ScopePage, ""},
 	{"p", "p", "produce", "Produce (on a topic)", ScopePage, ""},
+	{"r", "r", "reset-offsets", "Reset offsets (on a group)", ScopePage, ""},
 	{"r", "r", "retry", "Retry now, when the broker is lost (on Traffic)", ScopePage, ""},
 	{"e", "e", "errors", "Errors only, and back (on Traffic)", ScopePage, ""},
 	{"u", "u", "unfold", "Unfold the open folded row (on Traffic)", ScopePage, ""},
@@ -77,6 +82,11 @@ var keyMap = []keyBinding{
 	{"Tab", "Tab", "trap", "Move between the controls of a dialog", ScopeDialogs, ""},
 	{" ", "Space", "open-row", "Open a focused row", ScopeDialogs, ""},
 }
+
+// notInSheet are the actions a page's strip names (Gr-02, Gr-03 draw "1-4 tabs" and
+// "r reset offsets") and Sy-06's sheet does not list: the sheet is the board's three
+// columns, and the board's group strips carry these two.
+var notInSheet = map[string]bool{"tab-n": true, "reset-offsets": true}
 
 // keymapJSON is the table for shell.js.
 func keymapJSON() template.JS {
@@ -95,7 +105,7 @@ func keyGroups() []keyGroup {
 	for _, scope := range []string{ScopeGoTo, ScopeLists, ScopePage} {
 		g := keyGroup{Scope: scope}
 		for _, k := range keyMap {
-			if k.Scope == scope {
+			if k.Scope == scope && !notInSheet[k.Action] {
 				g.Keys = append(g.Keys, k)
 			}
 		}
@@ -114,6 +124,8 @@ type keyHint struct {
 	// Width says at which widths: "" all, "wide" above 1100 px (Sy-01's strip),
 	// "narrow" at 1100 and below (Sy-03's).
 	Width string
+	// Join is drawn between the keys: "–" for "1–4" (the tabs).
+	Join string
 }
 
 func wide(h keyHint) keyHint   { h.Width = "wide"; return h }
@@ -126,6 +138,7 @@ var (
 	hintJump   = keyHint{Keys: []string{"⌘K"}, Label: "jump or act"}
 	hintClose  = keyHint{Keys: []string{"esc"}, Label: "close panel"}
 	hintHelp   = keyHint{Keys: []string{"?"}, Label: "all keys"}
+	hintTabs   = keyHint{Keys: []string{"1", "4"}, Label: "tabs", Join: "–"}
 )
 
 // pageHints are the hints each kind of page draws at its foot. Every key named here is
@@ -151,6 +164,15 @@ func pageHints(view string) []keyHint {
 			wide(keyHint{Keys: []string{"g", "t"}, Label: "topics"}), wide(keyHint{Keys: []string{"p"}, Label: "produce"}), wide(hintHelp), narrow(hintJump)}
 	case "groups":
 		return []keyHint{hintMove, hintOpen, hintFilter, hintJump}
+	case "groups_none":
+		// Gr-01: no group yet, so nothing to move over or open: g g, jump, keys.
+		return []keyHint{{Keys: []string{"g", "g"}, Label: "groups"}, hintJump, {Keys: []string{"?"}, Label: "keys"}}
+	case "group_lag":
+		// Gr-02.
+		return []keyHint{hintMove, hintTabs, {Keys: []string{"r"}, Label: "reset offsets"}, hintFilter, hintJump}
+	case "group_members":
+		// Gr-03: j k over the members, ↵ opens one on the right.
+		return []keyHint{hintMove, {Keys: []string{"↵"}, Label: "open member"}, {Keys: []string{"esc"}, Label: "close"}, hintTabs, hintJump}
 	case "group":
 		return []keyHint{hintMove, hintOpen, hintClose, {Keys: []string{"g", "g"}, Label: "groups"}, hintHelp}
 	case "schemas":

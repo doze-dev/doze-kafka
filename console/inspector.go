@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -52,6 +51,7 @@ type inspectorNav struct {
 	Label    string // aria-label: "Older record".
 	Title    string
 	Glyph    string
+	Text     string // the glyph as text, where the board draws it so (the message's ↑ and ↓).
 	URL      string // where the control fetches; empty means disabled.
 	Disabled bool
 }
@@ -124,6 +124,11 @@ func (c *Console) inspectURL(kind, key string) string {
 
 // inspect renders one selection through the inspector contract.
 func (c *Console) inspect(w http.ResponseWriter, v inspectorView) {
+	c.partial(w, "inspector", c.inspectData(v))
+}
+
+// inspectData is the data the inspector template reads for a selection.
+func (c *Console) inspectData(v inspectorView) map[string]any {
 	data := map[string]any{}
 	for k, val := range v.Body {
 		data[k] = val
@@ -141,7 +146,7 @@ func (c *Console) inspect(w http.ResponseWriter, v inspectorView) {
 	}
 	data["InspStatus"], data["InspStatusTone"], data["InspStatusKind"], data["InspSubTime"] = v.Status, v.StatusTone, v.StatusKind, v.SubTime
 	data["InspNav"], data["InspGone"], data["InspGoneMsg"], data["InspOpen"] = v.Nav, v.Gone, v.GoneMsg, open
-	c.partial(w, "inspector", data)
+	return data
 }
 
 // inspectRoute answers GET {prefix}/inspect/{kind}?key=…, the one address every
@@ -189,26 +194,35 @@ func (c *Console) inspectMember(w http.ResponseWriter, r *http.Request, key stri
 		c.failResource(w, r, err, "group", group)
 		return
 	}
-	v := inspectorView{Kind: KindMember, Key: key, Title: shortID(member), Sub: group, Body: map[string]any{"Group": group, "GroupURL": c.groupURL(group)}}
-	for _, m := range detail.Members {
-		if m.ID != member {
+	v := inspectorView{Kind: KindMember, Key: key, Title: member, Sub: group, Body: map[string]any{"Group": group, "GroupURL": c.groupURL(group)}}
+	// The page's own data is the one source: the member, what it owns, the lag on it.
+	data, err := c.groupData(r, group)
+	if err != nil {
+		c.failResource(w, r, err, "group", group)
+		return
+	}
+	for _, mv := range data["Members"].([]memberView) {
+		if mv.ID != member {
 			continue
 		}
-		mv := memberView{ID: m.ID, ClientID: m.ClientID, Host: m.Host, Label: m.ClientID}
-		if mv.Label == "" {
-			mv.Label = shortID(m.ID)
+		var mine, total int64
+		for _, row := range data["Offsets"].([]groupLagRow) {
+			if row.Owner == mv.ID && !row.Deleted && !row.Ahead {
+				mine += row.Lag
+			}
 		}
-		topics := make([]string, 0, len(m.Assigned))
-		for t := range m.Assigned {
-			topics = append(topics, t)
-		}
-		sort.Strings(topics)
-		for _, t := range topics {
-			mv.Assigned = append(mv.Assigned, assignView{Topic: t, TopicURL: c.topicURL(t), Parts: partRanges(m.Assigned[t])})
-		}
-		v.Title = mv.Label
+		total = data["TotalLag"].(int64)
+		v.Title = mv.ID
 		v.Body["M"] = mv
+		v.Body["Gen"], v.Body["GenLabel"] = data["Generation"], data["GenLabel"]
+		v.Body["MineLag"], v.Body["TotalLag"] = mine, total
+		v.Body["EventsURL"] = c.groupURL(group) + "?tab=timeline"
+		if mv.ClientID != "" {
+			v.Body["RequestsURL"] = c.prefix + "/traffic?" + TrafficFilter{Client: mv.ClientID}.query()
+		}
 		v.Body["State"], v.Body["Protocol"] = detail.State, protoLabelOf(detail.Protocol)
+		v.Body["Consumer"] = detail.Protocol == "848"
+		v.Body["Unseen"] = !c.hasGroupInspector()
 		c.inspect(w, v)
 		return
 	}

@@ -112,3 +112,69 @@ func TestBrokerSettingsStateTheirDefaults(t *testing.T) {
 		}
 	}
 }
+
+// Every key that has a default holds a default its own rule accepts: a default the broker
+// would refuse is a key nobody can leave alone.
+func TestEveryTopicDefaultIsAValueItsOwnRuleAccepts(t *testing.T) {
+	cfg := config.Default()
+	n := 0
+	for _, s := range All(Topic) {
+		v, ok := s.DefaultValue(cfg)
+		if !ok {
+			continue
+		}
+		n++
+		if err := ValidateTopic(map[string]string{s.Name: v}); err != nil {
+			t.Errorf("%s: its default %q is refused: %v", s.Name, v, err)
+		}
+	}
+	if n < 20 {
+		t.Errorf("only %d topic keys have a default", n)
+	}
+}
+
+func TestNamesAreSortedAndComeFromTheTable(t *testing.T) {
+	names := Names(Topic)
+	if len(names) != len(All(Topic)) || len(names) < 30 {
+		t.Fatalf("%d names for %d settings", len(names), len(All(Topic)))
+	}
+	for i := 1; i < len(names); i++ {
+		if names[i-1] >= names[i] {
+			t.Errorf("%q is before %q", names[i-1], names[i])
+		}
+	}
+	found := false
+	for _, n := range names {
+		found = found || n == "retention.ms"
+	}
+	if !found {
+		t.Error("retention.ms is not named")
+	}
+}
+
+func TestEveryEffectHasItsOwnPhrase(t *testing.T) {
+	seen := map[string]Effect{}
+	for _, e := range []Effect{Applied, AppliedCompacted, Stored, StartupOnly, NotImplemented, Informational} {
+		p := e.Phrase()
+		if p == "" {
+			t.Errorf("%q has no phrase", e)
+		}
+		if other, dup := seen[p]; dup {
+			t.Errorf("%q and %q both say %q", e, other, p)
+		}
+		seen[p] = e
+	}
+}
+
+func TestCleanupPolicyTakesDeleteCompactOrBoth(t *testing.T) {
+	for _, ok := range []string{"delete", "compact", "compact,delete", "delete, compact"} {
+		if err := ValidateTopic(map[string]string{"cleanup.policy": ok}); err != nil {
+			t.Errorf("%q refused: %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"", "tiered", "delete,tiered", "compact;delete"} {
+		if err := ValidateTopic(map[string]string{"cleanup.policy": bad}); err == nil {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+}

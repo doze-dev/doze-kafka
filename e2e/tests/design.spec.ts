@@ -216,8 +216,8 @@ test('a fresh empty broker lands on "Your broker is up", with the three steps', 
     await expect(page.locator('nav.rail a[href$="/traffic"] .n')).toHaveText('0 open');
     // Tp-01: the empty Topics page says nothing exists, what it is not, and the shell command.
     await page.goto(`${base}topics`);
-    await expect(page.locator('.list .list-note').first()).toContainText('No topics');
-    await expect(page.locator('.list .list-note').first()).toContainText('Nothing exists on this broker yet.');
+    await expect(page.locator('.list .tp-list-none')).toContainText('No topics');
+    await expect(page.locator('.list .tp-list-none')).toContainText('Nothing exists on this broker yet.');
     await expect(page.locator('#topics-none')).toContainText('This broker has no topics.');
     await expect(page.locator('#topics-none')).toContainText('This is not a filter and not a permissions problem.');
     await expect(page.locator('#topics-none pre.code')).toContainText(/kafka-topics\.sh --bootstrap-server 127\.0\.0\.1:\d+ \\\n\s+--create --topic orders\.created/);
@@ -236,15 +236,20 @@ test('a fresh empty broker lands on "Your broker is up", with the three steps', 
     for (const h of help) expect(h, 'help text').not.toMatch(/unit:|range:|; applied/);
     await expect(page.getByText('What happens next')).toBeVisible();
     await expect(page.locator('#shell-preview')).toContainText('--partitions 1 --replication-factor 1');
+    await page.waitForFunction(() => !!(document.querySelector('#create-topic') as any)?._x_dataStack); // the form's own script has set its fields up
     await page.locator('#f-name').fill('first-topic');
     await page.locator('#f-partitions').fill('3');
+    await page.getByRole('link', { name: 'Set…' }).click(); // Tp-03: the settings open, with what was typed carried over.
+    await expect(page).toHaveURL(/settings=1/);
+    await expect(page.locator('#f-name')).toHaveValue('first-topic');
+    await expect(page.locator('#f-partitions')).toHaveValue('3');
     await page.locator('#cfg-segment\\.bytes').fill('1MB');
     await expect(page.locator('#shell-preview')).toContainText('--create --topic first-topic');
     await expect(page.locator('#shell-preview')).toContainText('--partitions 3 --replication-factor 1');
     await expect(page.locator('#shell-preview')).toContainText('--config segment.bytes=1048576');
     // Creating a topic ends it.
     await page.locator('#f-name').fill('first-topic');
-    await page.getByRole('button', { name: 'Create topic' }).click();
+    await page.locator('#create-topic').getByRole('button', { name: 'Create topic' }).click();
     await expect(page).toHaveURL(/topics\/first-topic/);
     await page.goto(base);
     await expect(page.locator('h1')).not.toHaveText('Your broker is up');
@@ -269,7 +274,7 @@ test('the inspector is in flow: it takes room from the page, covers nothing, and
   const box = await panel.boundingBox();
   expect(after!.width).toBeLessThan(before!.width); // it took room from the page,
   expect(after!.x + after!.width).toBeLessThanOrEqual(box!.x + 1); // and does not overlap it,
-  expect(box!.width).toBe(420); // at the width Sy-02 draws it,
+  expect(box!.width).toBe(400); // at the width Tp-06 draws it,
   expect(await panel.evaluate((el) => getComputedStyle(el).position)).not.toMatch(/fixed|absolute/);
   // Nothing is drawn over the content: no overlay, no scrim, no dialog.
   await expect(page.locator('#inspector-overlay, .scrim')).toHaveCount(0);
@@ -279,7 +284,7 @@ test('the inspector is in flow: it takes room from the page, covers nothing, and
   await expect(panel.locator('.inspector-h .cap')).toHaveText('Message');
   await expect(panel.locator('.kv').first()).toContainText('Key');
   await expect(panel.locator('pre.code').first()).toBeVisible();
-  await expect(panel.getByRole('link', { name: 'Follow this trace' })).toBeVisible();
+  await expect(panel.getByRole('link', { name: 'Follow this message' })).toBeVisible();
   // Esc puts the page back as it was.
   await page.keyboard.press('Escape');
   await expect(panel).toBeHidden();
@@ -325,7 +330,7 @@ test('a topic page is the board: one sentence, one action and ···, neighbours
   await expect(head.locator('h1')).toHaveText('seed-orders');
   // One solid primary button, and the destructive actions are under ···.
   await expect(head.locator('.btn.pri')).toHaveCount(1);
-  await expect(head.locator('.btn.pri')).toHaveText('Produce a message');
+  await expect(head.locator('.btn.pri')).toHaveText('Produce');
   await expect(page.getByRole('button', { name: 'Delete', exact: true })).toBeHidden();
   await page.getByRole('button', { name: 'More actions' }).click();
   await expect(page.getByRole('button', { name: 'Purge' })).toBeVisible();
@@ -334,10 +339,10 @@ test('a topic page is the board: one sentence, one action and ···, neighbours
   await expect(page.getByRole('button', { name: 'Delete', exact: true })).toBeHidden();
   // Facts: a sentence, not a strip of boxes.
   const facts = page.locator('#topic-facts');
-  await expect(facts).toHaveText(/^3 partitions, [\d,]+ messages?, .*\.$/);
-  expect(await facts.evaluate((el) => el.tagName)).toBe('P');
+  await expect(facts).toHaveText(/^3 partitions·[\d,]+ messages?.*·retention .*·.*compacted/);
+  expect(await facts.evaluate((el) => el.tagName)).toBe('DIV');
   // Neighbours: linked wells.
-  await expect(page.locator('#neighbours a.well').first()).toBeVisible();
+  await expect(page.locator('#neighbours a').first()).toBeVisible();
   // Tabs, in the board's order.
   await expect(page.locator('main .tabs .tab')).toHaveText([/^Messages/, /^Partitions/, /^Readers/, /^Config/]);
   await expect(page.locator('main .tabs .tab.on')).toHaveText(/^Messages/);
@@ -737,29 +742,28 @@ test('every .btn is weight 400, <button> or <a>; the links the boards draw as li
   await expect(page.locator('main a.btn', { hasText: 'Connect an app' }).first()).toHaveCSS('font-weight', '500');
 });
 
-test('Sy-01: the record table is P, Offset, Key, Value, Age, in rows of 28 with the offset a plain 12 px mono', async ({ page }) => {
+test('Sy-01: the record table is Offset, P, Time, Key, Value, Hdr, in rows of 28 with the offset a plain 12 px mono', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('topics/seed-orders?partition=0');
   const table = page.locator('#messages-table');
-  await expect(table.locator('thead th')).toHaveText(['P', 'Offset', 'Key', 'Value', 'Age']);
+  await expect(table.locator('thead th')).toHaveText(['Offset', 'P', 'Time', 'Key', 'Value', 'Hdr']);
   const row = table.locator('tbody tr[id^="msg-"]').first();
   expect((await row.boundingBox())!.height).toBe(28);
   const off = row.locator('.cell-offset');
   await expect(off).toHaveCSS('font-family', /Plex Mono/);
   await expect(off).toHaveCSS('font-size', '12px');
   await expect(off).toHaveCSS('font-weight', '400');
-  // The board's columns: 26 62 120 1fr 62 with 14 px between (the offset is 72: the
-  // board's 62 holds 4,789, not 1,234,567).
+  // Tp-05's columns: 66 24 112 124 1fr 36 with 14 px between.
   const tracks = await table.locator('thead th').evaluateAll((ths) => ths.map((th) => {
     const cs = getComputedStyle(th);
     return Math.round(th.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
   }));
-  expect([tracks[0], tracks[1], tracks[2], tracks[4]]).toEqual([26, 72, 120, 62]);
+  expect([tracks[0], tracks[1], tracks[2], tracks[3], tracks[5]]).toEqual([66, 24, 112, 124, 36]);
   // Nothing a record has is out of reach: the age says the moment on hover, and the
   // headers and the timestamp are the inspector's.
-  await expect(row.locator('.cell-age time')).toHaveAttribute('title', /\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3} UTC$/);
-  const withHeaders = table.locator('tbody tr[id^="msg-"] .cell-val[title*="header"]').first();
-  await expect(withHeaders).toHaveAttribute('title', /\d+ headers?$/);
+  await expect(row.locator('.cell-time time').first()).toHaveAttribute('title', /\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3} UTC$/);
+  const withHeaders = table.locator('tbody tr[id^="msg-"]', { has: page.locator('.cell-hdr', { hasNotText: /^0$/ }) }).first();
+  await expect(withHeaders.locator('.cell-hdr')).toHaveText(/^[1-9]\d*$/); // the number of headers the record carries.
   await withHeaders.click();
   await expect(page.locator('#inspector')).toContainText('Headers ·');
   await expect(page.locator('#inspector')).toContainText('Timestamp');
@@ -862,7 +866,7 @@ test('Cl-Home: the compacted partitions are counted from the topics\' own cleanu
 // is the one that was meant.
 test('the message tape draws its own marks, which the inspector\'s fold ticks do not restyle', async ({ page }) => {
   await useTheme(page, 'light');
-  await page.goto('topics/seed-orders?tab=messages');
+  await page.goto('topics/seed-orders?tab=messages&partition=0');
   const strip = page.locator('.tape-strip');
   await expect(strip.locator('.tick').first()).toBeVisible();
   // An older record's mark: the input colour (the line token), 8 px, rounded on top.
@@ -890,8 +894,7 @@ test('the message tape draws its own marks, which the inspector\'s fold ticks do
 // Tp-02 stacks the form's cards 12 px apart.
 test('Tp-02: the create form\'s cards are 12 px apart', async ({ page }) => {
   await page.goto('new/topic');
-  const cards = page.locator('#create-topic .form-sec');
-  await expect(cards.first()).toHaveCSS('margin-bottom', '12px');
+  const cards = page.locator('#create-topic .tp-left > .card');
   const a = (await cards.nth(0).boundingBox())!;
   const b = (await cards.nth(1).boundingBox())!;
   expect(Math.round(b.y - (a.y + a.height))).toBe(12);

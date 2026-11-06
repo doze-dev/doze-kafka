@@ -116,7 +116,7 @@ func TestUnlimitedRetentionIsSaidOnce(t *testing.T) {
 	c := newTestConsole(t)
 	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"forever"}, "partitions": {"1"}, "retention.ms": {"-1"}})
 	page := readable(req(t, c, "GET", "/_console/topics/forever", nil).Body.String())
-	if !strings.Contains(page, "kept with no time limit") || strings.Contains(page, "no  limit") {
+	if !strings.Contains(page, "retention no time limit") || strings.Contains(page, "no  limit") {
 		t.Errorf("facts: %s", between(page, "1 partition", "."))
 	}
 }

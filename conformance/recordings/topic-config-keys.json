@@ -1,0 +1,431 @@
+{
+  "scenario": "topic-config-keys",
+  "kafka": "apache/kafka:4.3.1",
+  "steps": [
+    {
+      "label": "create",
+      "api": "CreateTopics",
+      "version": 7,
+      "request": {
+        "TimeoutMillis": 15000,
+        "Topics": [
+          {
+            "Configs": null,
+            "NumPartitions": 1,
+            "ReplicaAssignment": null,
+            "ReplicationFactor": 1,
+            "Topic": "tck"
+          }
+        ],
+        "ValidateOnly": false
+      },
+      "response": {
+        "ThrottleMillis": 0,
+        "Topics": [
+          {
+            "ConfigErrorCode": 0,
+            "Configs": [],
+            "ErrorCode": 0,
+            "ErrorMessage": null,
+            "NumPartitions": 1,
+            "ReplicationFactor": 1,
+            "Topic": "tck",
+            "TopicID": "\u003ctopic-id:1\u003e"
+          }
+        ]
+      }
+    },
+    {
+      "label": "describe-all",
+      "api": "DescribeConfigs",
+      "version": 4,
+      "request": {
+        "IncludeDocumentation": false,
+        "IncludeSynonyms": false,
+        "Resources": [
+          {
+            "ConfigNames": null,
+            "ResourceName": "tck",
+            "ResourceType": "TOPIC"
+          }
+        ]
+      },
+      "response": {
+        "Resources": [
+          {
+            "Configs": [
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "STRING",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "compression.type",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "producer"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "BOOLEAN",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "remote.log.delete.on.disable",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "false"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LIST",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "leader.replication.throttled.replicas",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": ""
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "BOOLEAN",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "remote.storage.enable",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "false"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "INT",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "min.insync.replicas",
+                "ReadOnly": false,
+                "Source": "DYNAMIC_DEFAULT_BROKER_CONFIG",
+                "Value": "1"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LONG",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "segment.jitter.ms",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "0"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "BOOLEAN",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "remote.log.copy.disable",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "false"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LONG",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "local.retention.ms",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "-2"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LIST",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "cleanup.policy",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "delete"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LONG",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "flush.ms",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "9223372036854775807"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LIST",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "follower.replication.throttled.replicas",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": ""
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "INT",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "compression.lz4.level",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "9"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "INT",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "segment.bytes",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "1073741824"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LONG",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "retention.ms",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "604800000"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "INT",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "compression.gzip.level",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "-1"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LONG",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "flush.messages",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "9223372036854775807"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "INT",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "compression.zstd.level",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "3"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LONG",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "max.compaction.lag.ms",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "9223372036854775807"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LONG",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "file.delete.delay.ms",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "60000"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "INT",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "max.message.bytes",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "1048588"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LONG",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "min.compaction.lag.ms",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "0"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "STRING",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "message.timestamp.type",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "CreateTime"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LONG",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "local.retention.bytes",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "-2"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "BOOLEAN",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "preallocate",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "false"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "INT",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "index.interval.bytes",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "4096"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "DOUBLE",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "min.cleanable.dirty.ratio",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "0.5"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "BOOLEAN",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "unclean.leader.election.enable",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "false"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LONG",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "retention.bytes",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "-1"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LONG",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "delete.retention.ms",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "86400000"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LONG",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "message.timestamp.after.max.ms",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "3600000"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LONG",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "message.timestamp.before.max.ms",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "9223372036854775807"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "LONG",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "segment.ms",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "604800000"
+              },
+              {
+                "ConfigSynonyms": null,
+                "ConfigType": "INT",
+                "Documentation": null,
+                "IsDefault": false,
+                "IsSensitive": false,
+                "Name": "segment.index.bytes",
+                "ReadOnly": false,
+                "Source": "DEFAULT_CONFIG",
+                "Value": "10485760"
+              }
+            ],
+            "ErrorCode": 0,
+            "ErrorMessage": "",
+            "ResourceName": "tck",
+            "ResourceType": "TOPIC"
+          }
+        ],
+        "ThrottleMillis": 0
+      }
+    }
+  ]
+}

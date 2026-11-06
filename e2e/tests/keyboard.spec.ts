@@ -25,7 +25,7 @@ test('j, k and Enter walk the rows; "/" filters; Enter on a focused button is th
   await expect(page.locator('.list .li:not([hidden])')).toHaveCount(1);
   await page.keyboard.press('Escape'); // clears the filter, as the keys board says.
   await expect(page.locator('.list input[data-filter-target]')).toHaveValue('');
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   await page.locator('body').click({ position: { x: 700, y: 400 } });
   await page.keyboard.press('j'); await page.keyboard.press('j');
   await page.getByRole('button', { name: 'More actions' }).click();
@@ -36,7 +36,7 @@ test('j, k and Enter walk the rows; "/" filters; Enter on a focused button is th
 });
 
 test('while a dialog is open nothing else answers the keyboard, and dialogs do not stack', async ({ page }) => {
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   await page.getByRole('button', { name: 'More actions' }).click();
   await page.getByRole('button', { name: 'Delete' }).first().click();
   await expect(page.locator('#confirm')).toBeVisible();
@@ -49,11 +49,11 @@ test('while a dialog is open nothing else answers the keyboard, and dialogs do n
 });
 
 test('the inspector is the page\'s own: its keys keep working beside it, and Esc closes it', async ({ page }) => {
-  await page.goto('topics/seed-orders');
+  await page.goto('topics/seed-orders?partition=0');
   await page.locator('#msg-5').click();
   await expect(page.locator('#inspector-title')).toHaveAttribute('data-offset', '5');
   // Not a dialog: it does not hold the keyboard. j still moves the page's rows.
-  await page.locator('body').click({ position: { x: 700, y: 560 } });
+  await page.locator('main h1').click();
   await page.keyboard.press('j');
   await expect(page.locator('tr.cursor')).toHaveCount(1);
   await page.keyboard.press('Escape');

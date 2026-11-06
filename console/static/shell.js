@@ -307,6 +307,9 @@
     var elt = (e.detail.requestConfig && e.detail.requestConfig.elt) || e.detail.elt;
     var form = elt && elt.closest ? elt.closest("form") : null;
     var slot = form && form.querySelector("[data-err-slot]");
+    var xhr = e.detail.xhr;
+    // A form that takes the refusal as drawn (topicsRefusal) gets the server's markup.
+    if (slot && slot.hasAttribute("data-err-html") && xhr && /data-refusal-kind/.test(xhr.responseText || "")) { topicsRefusal(form, slot, xhr.responseText); return; }
     if (slot) { slot.textContent = msg; slot.hidden = false; return; }
     toast(msg.length > 140 ? msg.slice(0, 140) + "…" : msg, "err");
   }
@@ -326,6 +329,8 @@
     if (xhr && xhr.getResponseHeader("X-Doze-Page") === "error") {
       e.detail.shouldSwap = true;
       e.detail.isError = false;
+    } else if (xhr && xhr.getResponseHeader("X-Doze-Refusal") && !isLivePoll(e)) {
+      groupsRefusalSwap(e); // a refusal the page keeps in place (Gr-07), not a toast.
     } else if (xhr && xhr.status >= 400 && !isLivePoll(e) && !isInspectorRequest(e)) {
       // A refusal (A2: Kafka's 4xx) or a failure, from something the person did: it
       // is said where they are looking, and is the answer, not an error of the page's.
@@ -393,6 +398,12 @@
   document.addEventListener("click", function (e) {
     var el = e.target.closest("[data-copy]");
     if (!el) return;
+    // An item chosen from the inspector's Copy menu closes the menu (through its own button,
+    // which owns the state).
+    if (el.closest(".tp-copymenu")) {
+      var toggle = document.getElementById("inspector-copy");
+      if (toggle && toggle.getAttribute("aria-expanded") === "true") toggle.click();
+    }
     copyText(el.getAttribute("data-copy")).then(
       function () { toast("Copied"); },
       function () { toast("This browser would not copy that; select the text and copy it by hand.", "err"); });
@@ -412,26 +423,13 @@
     setDock(true);
     var form = panel.querySelector("#compose-body form");
     var st = window.Alpine ? Alpine.$data(form) : null;
-    var key = form.querySelector('input[name="key"]');
-    if (key) key.value = b.getAttribute("data-key") || "";
-    var sel = form.querySelector('select[name="partition"]');
-    if (sel) sel.value = b.getAttribute("data-partition");
-    // A record read through the registry is edited as JSON and sent encoded again.
-    var sp = form.querySelector('select[name="schema_subject"]');
-    if (sp) sp.value = b.getAttribute("data-schema") || "";
-    var ta = form.querySelector('textarea[name="value"]');
-    var val = b.getAttribute("data-value") || "";
-    if (ta && window.dozeEditor) dozeEditor.set(ta, val); else if (ta) ta.value = val;
-    if (st) {
-      st.keyB64 = b.getAttribute("data-key-enc") === "base64";
-      st.valB64 = b.getAttribute("data-value-enc") === "base64";
-      st.tomb = b.getAttribute("data-tombstone") === "1";
-      try {
-        st.hdrs = JSON.parse(b.getAttribute("data-headers") || "[]").map(function (r) {
-          return { k: r.k, v: r.v, b64: !!r.b64 };
-        });
-      } catch (err) { st.hdrs = []; }
-    }
+    var hdrs = [];
+    try { hdrs = JSON.parse(b.getAttribute("data-headers") || "[]").map(function (r) { return { k: r.k, v: r.v, b64: !!r.b64 }; }); } catch (err) { hdrs = []; }
+    if (st) st.fill({
+      key: b.getAttribute("data-key") || "", keyB64: b.getAttribute("data-key-enc") === "base64", keyEmpty: b.getAttribute("data-key-empty") === "1",
+      value: b.getAttribute("data-value") || "", valB64: b.getAttribute("data-value-enc") === "base64", tombstone: b.getAttribute("data-tombstone") === "1",
+      hdrs: hdrs, subject: b.getAttribute("data-schema") || "", partition: parseInt(b.getAttribute("data-partition"), 10) || 0,
+    });
     focusComposer();
   });
 
@@ -517,6 +515,21 @@
       rows.appendChild(l); rows.appendChild(v);
     });
     rows.hidden = !(say.rows && say.rows.length);
+    // Callouts under the sentence (Gr-15: what the call touches, and what it does not).
+    var notes = document.getElementById("confirm-notes"), call = document.getElementById("confirm-call");
+    if (notes) {
+      notes.textContent = "";
+      (say.notes || []).forEach(function (n) {
+        var box = document.createElement("div"), head = document.createElement("div"), b = document.createElement("span"), body = document.createElement("span");
+        box.className = "callout" + (n.deny ? " deny" : ""); box.setAttribute("role", "note");
+        head.className = "row ce g8"; b.className = "b"; b.textContent = n.head; head.appendChild(b);
+        if (n.name) { var nm = document.createElement("span"); nm.className = "m"; nm.textContent = n.name; head.appendChild(nm); }
+        body.className = "note"; segs(body, n.body);
+        box.appendChild(head); box.appendChild(body); notes.appendChild(box);
+      });
+      notes.hidden = !(say.notes && say.notes.length);
+    }
+    if (call) { call.textContent = say.call || ""; call.hidden = !say.call; }
     var yes = document.getElementById("confirm-yes"), no = document.getElementById("confirm-no");
     yes.textContent = say.verb || "Confirm";
     box.hidden = false;
@@ -1013,6 +1026,10 @@
     // ] and [ move along the page's tabs.
     "tab-next": function () { return stepTab(1); },
     "tab-prev": function () { return stepTab(-1); },
+    // 1 to 4: the page's tabs by number (a group: Lag, Members, Timeline, Offsets).
+    "tab-n": function (e) { return groupsTabN(e.key); },
+    // r: a group's Reset offsets, the button of its title row.
+    "reset-offsets": function () { return groupsResetOffsets(); },
     // Esc closes the panel; with none open it clears the page's own filter.
     close: function (e) {
       if (inspectorIsOpen()) { closeInspector(); e.preventDefault(); return; }
@@ -1449,6 +1466,7 @@
     switch (style) {
       case "clockms": return clock + "." + pad(d.getMilliseconds(), 3);
       case "datetime": return date + " " + clock;
+      case "datetimems": return date + " " + clock + "." + pad(d.getMilliseconds(), 3);
       case "date": return date;
     }
     return clock;
@@ -1476,7 +1494,7 @@
     else if (style === "since") el.textContent = spanText(Date.now() - ms);
     // "just now" takes no "ago" after it where a page adds one (a phone's card).
     if (style === "since") el.toggleAttribute("data-now", el.textContent === "just now");
-    else el.textContent = local(ms, style);
+    else if (style !== "ago") el.textContent = local(ms, style);
     // On hover: the moment in this browser's zone, then the same instant in UTC.
     var utc = new Date(ms).toISOString().replace("T", " ").replace("Z", " UTC");
     el.title = local(ms, "datetime") + "." + pad(d.getMilliseconds(), 3) + " " + (zoneName() ? zoneName() + " " : "") + "(" + offsetText(d) + ") · " + utc;
@@ -1574,6 +1592,21 @@
         document.querySelectorAll("[data-new-s], [data-new-s2]").forEach(function (el) { el.textContent = s; });
       }).catch(function () { setDisconnected(true, "can't reach the broker", live); });
   }
+  // A paused topic page asks how many records have arrived since it paused (Tp-26):
+  // the broker's log ends now against the ones the page was showing.
+  function topicsCountMissed() {
+    var banner = document.getElementById("topic-paused");
+    if (!banner) return;
+    var base = banner.getAttribute("data-new-url"), ends = banner.getAttribute("data-ends");
+    if (!base || !ends) return;
+    fetch(base + "?ends=" + encodeURIComponent(ends), { headers: { Accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j) return;
+        document.querySelectorAll("[data-topic-new-n]").forEach(function (el) { el.textContent = String(j.n); });
+        document.querySelectorAll("[data-topic-new-s]").forEach(function (el) { el.textContent = j.n === 1 ? "" : "s"; });
+      }).catch(function () {});
+  }
   function setPaused(p) {
     var was = livePaused;
     livePaused = p;
@@ -1588,7 +1621,8 @@
         el.textContent = since && Number(since) > 0 ? clockText(Number(since)) : clockText(Date.now());
       });
       countMissed();
-      if (!pausedTimer) pausedTimer = setInterval(countMissed, 2500);
+      topicsCountMissed();
+      if (!pausedTimer) pausedTimer = setInterval(function () { countMissed(); topicsCountMissed(); }, 2500);
     } else if (!p && pausedTimer) {
       clearInterval(pausedTimer);
       pausedTimer = null;
@@ -1614,7 +1648,7 @@
     trafficSync();
   }
   document.addEventListener("click", function (e) {
-    if (e.target.closest("[data-live-toggle]")) setPaused(!livePaused);
+    if (e.target.closest("[data-live-toggle], [data-topic-resume]")) setPaused(!livePaused);
   });
   var liveTimers = [];
   // The element a region's poll is sent from: an empty one of its own, so that no poll
@@ -1887,3 +1921,80 @@
     });
   });
 })();
+
+// ---------- topics: the create form's refusal (Tp-04) ----------
+// The server answers a refused create with its refusal partial (a template of ours,
+// every value escaped); it is shown as drawn, and the name field is marked when the
+// refusal is about the name.
+function topicsRefusal(form, slot, html) {
+  slot.innerHTML = html;
+  slot.hidden = false;
+  var r = slot.querySelector("[data-refusal-name]");
+  var name = r ? r.getAttribute("data-refusal-name") : "";
+  var field = form.querySelector("#f-name");
+  if (field && (name === "INVALID_TOPIC_EXCEPTION" || name === "TOPIC_ALREADY_EXISTS")) field.setAttribute("aria-invalid", "true");
+}
+
+// "Set…" opens the create form's settings (Tp-03) and carries over what has been typed:
+// it reads the fields as they are when it is clicked.
+document.addEventListener("click", function (e) {
+  var a = e.target && e.target.closest ? e.target.closest("a[data-tp-set]") : null;
+  if (!a) return;
+  var name = document.getElementById("f-name"), parts = document.getElementById("f-partitions");
+  var u = new URL(a.href, location.href);
+  if (name && name.value) u.searchParams.set("name", name.value);
+  if (parts && parts.value) u.searchParams.set("partitions", parts.value);
+  e.preventDefault();
+  e.stopPropagation();
+  location.assign(u.toString());
+}, true);
+// Gr-01: a page that says no group exists looks every 3 s whether one does now, and
+// reloads when it does ("this page fills in by itself, within 3 seconds").
+(function groupsWatchNone() {
+  var root = document.getElementById("groups-none-root");
+  if (!root) return;
+  var url = root.getAttribute("data-groups-watch");
+  setInterval(function () {
+    fetch(url, { headers: { "HX-Request": "true" }, credentials: "same-origin" }).then(function (r) { return r.ok ? r.text() : ""; })
+      .then(function (t) { if (t.indexOf('id="groups-summary"') >= 0) location.reload(); }).catch(function () {});
+  }, 3000);
+})();
+
+// Groups: 1 to 4 open the group's tabs by number; r follows its Reset offsets button.
+function groupsTabN(key) {
+  var tabs = Array.prototype.filter.call(document.querySelectorAll("#group-live nav.tabs a.tab"), function (t) { return t.offsetParent !== null; });
+  var to = tabs[parseInt(key, 10) - 1];
+  if (!to) return false;
+  to.click();
+}
+function groupsResetOffsets() {
+  var b = document.querySelector("#group-live .idband-acts a.btn.pri");
+  if (!b) return false;
+  b.click();
+}
+
+// Gr-07: a reset the console refused (the group has members) is drawn where the page keeps
+// its refusals, #reset-result, whether the form that asked was the page's or a preview.
+function groupsRefusalSwap(e) {
+  var slot = document.getElementById("reset-result");
+  if (!slot) return;
+  e.detail.shouldSwap = true;
+  e.detail.isError = false;
+  e.detail.target = slot;
+}
+
+// Gr-06, "specific offsets": the Lag after column follows what is typed, from the log end
+// each row carries; the broker's own numbers are in the page, the sum is the page's.
+document.addEventListener("input", function (e) {
+  var inp = e.target;
+  if (!inp.classList || !inp.classList.contains("rst-off")) return;
+  var row = inp.closest(".r"), cell = row && row.querySelector("[data-lag-after]");
+  var v = inp.value.trim(), n = /^\d+$/.test(v) ? parseInt(v, 10) : NaN, latest = parseInt(inp.getAttribute("data-latest"), 10);
+  if (cell && !isNaN(n) && !isNaN(latest)) {
+    cell.textContent = Math.max(0, latest - n).toLocaleString("en-US");
+    cell.className = "m ra " + (latest - n > 0 ? "warn" : "ok");
+  }
+  var total = 0, sum = document.querySelector("#reset-table [data-lag-total]");
+  document.querySelectorAll("#reset-table [data-lag-after]").forEach(function (c) { total += parseInt(c.textContent.replace(/,/g, ""), 10) || 0; });
+  if (sum) sum.textContent = total.toLocaleString("en-US");
+});

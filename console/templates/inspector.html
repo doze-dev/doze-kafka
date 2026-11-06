@@ -12,13 +12,18 @@
     {{if or .InspSub (not .InspSubTime.IsZero)}}<span class="inspector-sub mono">{{if not .InspSubTime.IsZero}}{{when .InspSubTime "clockms"}}{{if .InspSub}} · {{end}}{{end}}{{.InspSub}}</span>{{end}}
   </div>
   <div class="inspector-nav">
+    {{if eq .InspKind "message"}}{{/* Tp-06: the controls are the board's small ghost buttons with their glyphs as text */}}
+    {{range .InspNav}}<button type="button" class="btn sm ghost insp-step" aria-label="{{.Label}}" title="{{.Title}}" {{if .Disabled}}disabled{{else}}hx-get="{{.URL}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"{{end}}>{{.Text}}</button>{{end}}
+    <button type="button" class="btn sm ghost insp-close" aria-label="Close inspector, esc" title="Close (esc)" data-inspector-close><span class="close-x" aria-hidden="true">×</span><span class="close-t" aria-hidden="true"><span class="close-esc">esc</span><span class="close-word">Close</span></span></button>
+    {{else}}
     {{range .InspNav}}<button type="button" class="icon-btn insp-step" aria-label="{{.Label}}" title="{{.Title}}" {{if .Disabled}}disabled{{else}}hx-get="{{.URL}}" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML"{{end}}>{{icon .Glyph}}</button>{{end}}
     <button type="button" class="icon-btn insp-close" aria-label="Close, esc" title="Close (esc)" data-inspector-close>{{icon "x"}}<span class="close-t" aria-hidden="true"><span class="close-esc">esc</span><span class="close-word">Close</span></span></button>
+    {{end}}
   </div>
 </div>
 {{if .InspGone}}
 <div class="inspector-b"><div class="note">{{.InspGoneMsg}} Close this and choose another.</div></div>
-{{else if eq .InspKind "message"}}{{template "inspector_message" .}}
+{{else if eq .InspKind "message"}}{{if .Resend}}{{template "inspector_resend" .}}{{else}}{{template "inspector_message" .}}{{end}}
 {{else if eq .InspKind "member"}}{{template "inspector_member" .}}
 {{else if eq .InspKind "subject"}}{{template "inspector_subject" .}}
 {{else if eq .InspKind "transaction"}}{{template "inspector_transaction" .}}
@@ -27,19 +32,28 @@
 {{end}}
 {{end}}
 
+{{/* Gr-03: a member, from the coordinator's memory (GRP-22). What it does not hold for a
+     consumer-protocol (KIP-848) member, it says: nothing here is made up. */}}
 {{define "inspector_member"}}
-<div class="inspector-b">
-  <div class="kv" style="--c: 108px 1fr">
-    <span>Member id</span><span>{{template "kvcopy" .M.ID}}</span>
-    <span>Group</span><span class="m"><a href="{{.GroupURL}}">{{.Group}}</a> <span class="badge {{stateBadge .State}}">{{.State}}</span> <span class="note">{{.Protocol}}</span></span>
-    <span>Client</span><span class="m">{{if .M.ClientID}}{{.M.ClientID}}{{else}}<span class="mut">none sent</span>{{end}}</span>
-    <span>Host</span><span class="m">{{if .M.Host}}{{.M.Host}}{{else}}<span class="mut">unknown</span>{{end}}</span>
+<div class="inspector-b memberb">
+  <div class="kv" style="--c: 120px 1fr">
+    <span>Client id</span><span class="m">{{if .M.ClientID}}{{.M.ClientID}}{{else}}<span class="mut">none sent</span>{{end}}</span>
+    <span>Host</span><span class="m">{{if .M.Addr}}{{.M.Addr}}{{else if .M.Host}}{{.M.Host}}{{else}}<span class="mut">unknown</span>{{end}}{{if .M.Principal}} <span class="mut">({{.M.Principal}})</span>{{end}}</span>
+    <span>Software</span><span class="m">{{if .M.Software}}{{.M.Software}}{{else if .M.Snap}}<span class="mut">not sent</span>{{else}}<span class="mut">not held</span>{{end}}</span>
+    <span>{{if eq .GenLabel "epoch"}}Epoch{{else}}Generation{{end}}</span><span class="m">{{if .Gen}}{{.Gen}}{{else}}<span class="mut">none yet</span>{{end}}</span>
+    <span>Session timeout</span><span class="m">{{if .M.Session}}{{.M.Session}}{{else}}<span class="mut">{{if .Consumer}}set on the group, not by the member{{else}}not held{{end}}</span>{{end}}</span>
+    <span>Rebalance timeout</span><span class="m">{{if .M.Rebalance}}{{.M.Rebalance}}{{else}}<span class="mut">{{if .Consumer}}set on the group, not by the member{{else}}not held{{end}}</span>{{end}}</span>
+    <span>Last heartbeat</span><span class="m{{if .M.HeartbeatOK}} ok{{end}}">{{if .M.Heartbeat.IsZero}}<span class="mut">none seen</span>{{else}}{{when .M.Heartbeat "clockms"}} · {{.M.HeartbeatAgo}}{{end}}</span>
+    <span>Joined</span><span class="m">{{if .M.Joined.IsZero}}<span class="mut">not held</span>{{else}}{{when .M.Joined "clockms"}}{{end}}</span>
+    <span>Leader</span><span class="m">{{if .M.Leader}}yes{{else if .Consumer}}<span class="mut">the consumer protocol has none</span>{{else}}no{{end}}</span>
   </div>
-  <span class="cap">Assigned partitions</span>
-  <div class="kv" style="--c: 1fr auto">
-    {{range .M.Assigned}}<span class="m"><a href="{{.TopicURL}}">{{.Topic}}</a></span><span class="m">{{.Parts}}</span>
+  <div class="col g4"><span class="cap">Subscription</span>
+<pre class="code">{{if .M.Protocols}}protocols {{range $i, $p := .M.Protocols}}{{if $i}}, {{end}}{{$p}}{{end}}{{else if .Consumer}}protocols <span class="c">none: the consumer protocol sends no list</span>{{else}}protocols <span class="c">not held</span>{{end}}</pre></div>
+  <div class="col g4"><span class="cap">Assignment</span>
+    {{range .M.Assigned}}<div class="well row sb ce memberwell"><a class="m" href="{{.TopicURL}}">{{.Topic}}</a><span class="m">{{.Parts}}</span></div>
     {{else}}<span class="note">Nothing is assigned to this member yet.</span>{{end}}
-  </div>
+    {{if .M.Assigned}}<span class="note">lag on this member: <span class="m {{if .MineLag}}warn{{else}}ok{{end}}">{{num .MineLag}}</span> of {{num .TotalLag}}</span>{{end}}</div>
+  <div class="row g8"><a class="btn w5" href="{{.EventsURL}}">Its events</a>{{if .RequestsURL}}<a class="btn w5" href="{{.RequestsURL}}">Its requests</a>{{end}}</div>
 </div>
 {{end}}
 

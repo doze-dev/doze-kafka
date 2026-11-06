@@ -27,7 +27,7 @@ var lessons = map[string]func(config.Config) string{
 		"On an uncompressed topic a compressed batch is held to max.message.bytes at the size it inflates to. " +
 		"A batch is stored as the producer sent it: it is not re-compressed on the way in."),
 	key(Broker, "replication-factor"): fixed("Always 1. This is one broker with no followers to copy to. A request for more is accepted and the topic is made with its one replica; a single Apache Kafka broker would answer INVALID_REPLICATION_FACTOR."),
-	key(Group, "new-offset"):          fixed("An offset below the log start or above the log end is refused before it is sent. The log end itself means nothing is left to read."),
+	key(Group, "new-offset"):          fixed("The console refuses an offset below the first retained record or above the log end before it sends one. The log end itself means nothing is left to read."),
 	key(Broker, "max-partitions"): func(c config.Config) string {
 		const tail = "Partitions can be added later and never removed; a key may then hash to a different partition."
 		if c.MaxPartitions > 0 {

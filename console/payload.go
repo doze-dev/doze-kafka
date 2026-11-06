@@ -40,10 +40,23 @@ type bytesView struct {
 	HexCut    bool   // the hex dump shows less than the whole value.
 	Preview   string // one line, for the table.
 
+	// Frame says what became of the registry's framing, where the value was read through
+	// a registry (or could have been): why a value is shown as bytes and not decoded.
+	Frame *frameView
+
 	// Schema is set when the bytes were written by a registry-aware serializer and
 	// Text/Preview are the JSON they decode to. Raw stays empty and B64 stays the
 	// stored bytes, so "Send again" and "Edit a copy" still carry the record exactly.
 	Schema *schemaTag
+}
+
+// frameView is the answer to "was this written with a registry schema, and was it
+// decoded": what the inspector says under a value that is not text (Tp-07, Tp-08).
+type frameView struct {
+	Kind  string // "none" (first byte is not 0x00), "unknown" (framed, id not registered), "unread" (the registry could not be asked), "mismatch" (known id, body does not fit), "noregistry".
+	First string // the first byte, as "0x0a".
+	ID    int    // the schema id the framing names, when framed.
+	Err   string // the registry's or the codec's own words, for unread and mismatch.
 }
 
 // schemaTag says which registered schema a value was decoded with.
@@ -155,9 +168,9 @@ func binaryPreview(b []byte) string {
 	}
 	more := ""
 	if len(b) > n {
-		more = " …"
+		more = "…"
 	}
-	return fmt.Sprintf("⟨binary · %s⟩ %s%s", humanBytes(len(b)), strings.Join(parts, " "), more)
+	return fmt.Sprintf("binary · %s · %s%s", humanBytes(len(b)), strings.Join(parts, " "), more)
 }
 
 // oneLine collapses a value to a single bounded line without splitting a rune.

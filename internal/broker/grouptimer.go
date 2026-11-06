@@ -18,6 +18,9 @@ import "time"
 type expiry struct {
 	timer *time.Timer
 	gen   uint64
+	// due is when the running timer fires (zero when none runs): the deadline the
+	// console shows as "time left" (GRP-25).
+	due time.Time
 }
 
 // arm starts (or restarts) the timer: fire runs after d, with this arming's
@@ -26,6 +29,7 @@ func (e *expiry) arm(d time.Duration, fire func(gen uint64)) {
 	e.stop()
 	gen := e.gen
 	e.timer = time.AfterFunc(d, func() { fire(gen) })
+	e.due = time.Now().Add(d)
 }
 
 // stop cancels the timer and makes any callback already on its way stale.
@@ -34,6 +38,7 @@ func (e *expiry) stop() {
 		e.timer.Stop()
 		e.timer = nil
 	}
+	e.due = time.Time{}
 	e.gen++
 }
 

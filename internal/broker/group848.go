@@ -214,6 +214,9 @@ type cg848Member struct {
 	// kept alive and told what to do by the classic APIs (groupmigrate.go).
 	classic *classicSeat
 
+	joinedAt      time.Time // when this member first armed its session (groupinspect.go).
+	lastHeartbeat time.Time // the last time its session was refreshed.
+
 	session expiry // evicts the member if it stops heartbeating.
 	revoke  expiry // fences it if it does not give up revoked partitions in time.
 }
@@ -645,6 +648,11 @@ func (m *cg848Manager) resetSession(g *cg848Group, mem *cg848Member) {
 	if mem.classic != nil && mem.classic.session > 0 {
 		timeout = mem.classic.session // the one its JoinGroup asked for.
 	}
+	now := time.Now()
+	if mem.joinedAt.IsZero() {
+		mem.joinedAt = now
+	}
+	mem.lastHeartbeat = now
 	mem.session.arm(timeout, func(gen uint64) { m.sessionExpired(g, mem, gen) })
 }
 
@@ -656,7 +664,7 @@ func (m *cg848Manager) sessionExpired(g *cg848Group, mem *cg848Member, gen uint6
 	if m.stopped || g.members[mem.id] != mem || !mem.session.current(gen) {
 		return
 	}
-	m.emit(g, "expired", mem.id, "a member sent no heartbeat within its session timeout", "")
+	m.emit(g, "expired", mem.id, "a member sent no heartbeat for "+silence(mem.lastHeartbeat, m.sessionTimeout)+" (its session timeout)", "")
 	m.removeMember(g, mem.id)
 	m.bumpForRemoval(g, "a member's session expired")
 	m.maybeDowngrade(g)

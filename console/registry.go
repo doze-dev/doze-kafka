@@ -425,25 +425,51 @@ type decoded struct {
 	Version int
 }
 
+// framing says what became of a value the registry was asked to read (TOP-38).
+type framing int
+
+const (
+	notFramed      framing = iota // the first byte is not the registry's 0x00, or there are fewer than five bytes.
+	framedDecoded                 // framed, the id is registered, the body decoded with its schema.
+	framedUnknown                 // framed with an id the registry does not have.
+	framedUnread                  // framed, but the registry could not be asked (it is down, or refused).
+	framedMismatch                // framed with a known id, but the body does not decode with that schema.
+)
+
 // decode reads a value written by a registry-aware serializer. ok is false for
 // anything else (a plain string, a binary of another kind, an id the registry does not
 // know), which is then shown as it always was.
 //
 //fuzz:not-a-parser looks up the codec for the id and hands the value to schemaregistry.WireID and Codec.Decode, which parse it and are fuzzed there (FuzzDecode)
 func (rc *registryClient) decode(ctx context.Context, topic string, value []byte) (decoded, bool) {
+	d, state, _ := rc.decodeState(ctx, topic, value)
+	return d, state == framedDecoded
+}
+
+// decodeState is decode that says why a value was not decoded: it was not framed at all,
+// or it was framed with an id the registry does not hold, or the registry could not be
+// asked, or the body does not fit the schema the id names. The error is the reason in
+// the registry's or the codec's own words.
+//
+//fuzz:not-a-parser see decode
+func (rc *registryClient) decodeState(ctx context.Context, topic string, value []byte) (decoded, framing, error) {
 	id, ok := schemaregistry.WireID(value)
 	if !ok {
-		return decoded{}, false
+		return decoded{}, notFramed, nil
 	}
 	e, err := rc.codecFor(ctx, id, topic)
 	if err != nil {
-		return decoded{}, false
+		var re *regError
+		if errors.As(err, &re) && re.Status == http.StatusNotFound {
+			return decoded{ID: id}, framedUnknown, err
+		}
+		return decoded{ID: id}, framedUnread, err
 	}
 	j, err := e.codec.Decode(value)
 	if err != nil {
-		return decoded{}, false
+		return decoded{ID: id, Subject: e.subject, Version: e.version, Type: e.codec.Type(), TypeLbl: typeLabel(e.codec.Type())}, framedMismatch, err
 	}
-	return decoded{JSON: j, Type: e.codec.Type(), TypeLbl: typeLabel(e.codec.Type()), ID: id, Subject: e.subject, Version: e.version}, true
+	return decoded{JSON: j, Type: e.codec.Type(), TypeLbl: typeLabel(e.codec.Type()), ID: id, Subject: e.subject, Version: e.version}, framedDecoded, nil
 }
 
 // encode writes JSON text as a record value under the latest version of a subject.
