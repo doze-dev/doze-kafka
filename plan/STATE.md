@@ -1,18 +1,26 @@
-# State (updated 2026-11-06)
+# State (updated 2026-11-07)
 
-Stages 3 (Topics) and 4 (Groups) are merged to main (PR #3, 2026-11-06, all CI green after fixing three flaky tests and moving klauspost/compress to v1.20.2 for GO-2026-6865). Stage 5 (Schemas) started on branch `schemas-stage5` with the owner's approval.
+Stages 3 (Topics) and 4 (Groups) are merged to main (PR #3, 2026-11-06). Stage 5 (Schemas) is in progress on branch `schemas-stage5`, draft PR #4 (open as a draft only so CI runs; not to be merged until the stage is done).
 
-## Stage 5, Schemas (plan/stages/schemas.md)
-- Done, row 1 and part of row 3 (red first, then fixed): SCH-1 (diamond references resolved once each, cap 1,000 schemas), SCH-2 (JSON nesting of Avro and JSON Schema schemas capped at 256; Protobuf measured linear and left alone), SCH-3 (bodies 8 MiB, 64 KiB for /config and /mode, 413), SCH-12 (one registry per Server), SCH-18 (subject over 16 KiB is 42207; the exact rule waits for R7). Tests: `schemaregistry/bounds_test.go`, `server` TestSchemaRegistryIsOneInstance.
-- Closed before this stage by the foundation: SCH-4 (Host guard, internal/hostguard) and SCH-11 (registry serves https with the broker's certificate).
-- Known residue of SCH-2: a wide Avro schema at depth 128 costs about 0.6 ms per deep field (8 MiB body, about 1.6 s worst case) because the comparison is hamba's and cannot be interrupted; row 4 (our own Avro checker for SCH-6's structured reasons) removes it.
-- Done, row 2 (most of it): recorded R1 to R4, R6 to R8, R10, R12 to R14 and one found on the way (avro-attributes-on-unnamed-types) against cp-schema-registry 7.7.1 with apache/kafka 4.3.1 (Docker network `sr-rec`, containers `sr-rec-kafka`, `sr-rec-sr` on 127.0.0.1:18081; `SR_RECORD_ONLY` records named scripts only). Replay is green: every difference fixed or listed in `knownDifferences` with its reason and in docs/schema-registry.md. Fixed from them: SCH-5 (415), SCH-31 (READONLY refuses level change), READONLY answers a held schema, soft delete drops level and mode, subject rules (42208), /schemas offset and limit, fetchMaxId, verbose empty messages, 40402 on a missing subject's version, JSON Schema reference names scoped per schema, no depth limit on references beyond 1,000 schemas, Avro unnamed types drop doc/aliases/name. Answers that change the plan: Confluent ignores limit/offset on /subjects (SCH-8's console bound must be the console's own); its compatibility check ignores READONLY (SCH-14 is a console matter, the registry check stays as is); ids are never reused and version numbers are (R1 matches already).
-- Done: R11 recorded (`protobuf-descriptor-with-import`, with json_name and multi-option printing found on the way) and SCH-7 fixed; stored schemas are also indexed under the current canonical form (`indexCurrentForms`), so an upgrade does not give a re-registered schema a new id.
-- Done: R5 recorded (`basic-authentication`; second container `sr-rec-sra` on 127.0.0.1:18082, alice:alice-secret, JAAS files copied in with docker cp because Docker Desktop does not share the scratchpad; `SR_RECORD_AUTH_URL`), SCH-9 (one log record per request), SCH-27 (server test of the wiring; docs say authenticates, does not authorise), SCH-38 (slowed repeated failures).
-- Still to record: R9 (Confluent's verbose reasons for every incompatible corpus pair, for SCH-6).
-- Still to add from SCH-7: the compat cell (Python ProtobufSerializer on a message importing another file).
-- Done: SCH-10 (registry read timeout 30 s, idle 2 min; header bytes stay at Go's 1 MiB default, which a 16 KiB subject escaped three times fits).
-- Next: R9 and SCH-6 (row 4), with SCH-14/SCH-34 (one selection loop for register and check).
+## Stage 5, Schemas (plan/stages/schemas.md): where it stands
+All seven P1 findings are closed: SCH-1, 2, 3, 4, 5, 6, 7. Rows 1 to 5 of section 11 are done (the plan's "smallest useful cut"), with these P2/P3 findings closed as well: SCH-9, 10, 11, 12, 18, 27, 31, 37 (subject rules), 38.
+
+- Bounds (row 1, 3): references resolved once each (cap 1,000 schemas, no depth cap); Avro and JSON Schema nesting capped at 256 JSON levels; bodies 20 MiB for schemas, 64 KiB for /config and /mode (413); subjects over 16 KiB or with control characters or named __GLOBAL refused (42208); one registry per Server; read timeout 30 s, idle 2 min. Tests: `schemaregistry/bounds_test.go`, `server` TestSchemaRegistryIsOneInstance, `cmd` TestRegistryTimesOutSlowAndIdleClients.
+- Recordings (row 2): R1 to R14 all recorded against cp-schema-registry 7.7.1 on apache/kafka 4.3.1: 14 new scripts in `schemaregistry/testdata/conformance` (`scenarios_stage5_test.go`, `scenarios_protodeps_test.go`) and R9 as `testdata/compat/*-reasons.json`. Replay is green; every deliberate difference is in `knownDifferences` (conformance) or `corpusReasonDifferences` (reasons) with its reason, and in docs/schema-registry.md "Where it differs".
+- Reasons (row 4, SCH-6): 2,287 of 2,291 recorded refusals give Confluent's reasons word for word (Avro all 501; JSON Schema 1,043 of 1,045; Protobuf 739 of 741); the conformance replay compares 409 details and verbose messages in full. Avro now uses our port of Avro's SchemaCompatibility (`avrocompat.go`), not hamba's check.
+- Content type, READONLY, auth (row 5): 415 for non-JSON bodies (blocks cross-origin form posts); READONLY answers a held schema with its id and refuses a level change; soft delete drops level and mode; basic auth recorded; one log record per request; failed sign-ins slowed after five.
+- Also fixed on the way: Avro unnamed types drop doc/aliases/name; Protobuf json_name and multi-option printing; stored schemas indexed under the current canonical form so an upgrade does not mint new ids; JSON Schema reference names scoped per schema; /schemas offset and limit; fetchMaxId; a flaky storage retention test (CI); the lightness binary budgets raised with reasons.
+
+### Not done yet in Stage 5 (in plan order)
+1. SCH-14 / SCH-34: one selection loop for register and check, and the property test that they agree. Recorded on the way: Confluent's check ignores READONLY, so the READONLY warning belongs to the console (SCH-14's console part).
+2. Row 6, backend for the boards: SCH-20 (createdAt, by, from, agent on versions; setAt on level and mode), SCH-21 (request ring and `GET /_doze/requests`), SCH-22 (check at another level, Avro inliner), SCH-23 (`GET /_doze/overview`).
+3. Row 7, console registry client: SCH-15, 16, 17, 24 (structured refusals, delete semantics, client-soft-deleted subjects, decode reasons and backoff). SCH-8's console bound must be the console's own (Confluent ignores limit on /subjects).
+4. Row 8: topic scan (SCH-25, 26). Row 9: the 19 boards (SCH-19, 30 to 33). Row 10: compat cells (Java naming strategies, Python Protobuf with an import, READONLY, kcat, UIs), fuzz targets (SCH-28), e2e to 20 tests. Row 11: mutation, coverage floors, documents, actual time.
+5. SCH-13 (an unreadable record should not stop the broker), SCH-35/36 small ones.
+
+### For the owner to decide
+- Nothing blocking. Re-estimate after Stage 5: rows 1 to 5 took one long session (2026-11-06/07) against 13 planned half-days.
+- Docker: containers `sr-rec-kafka`, `sr-rec-sr` (127.0.0.1:18081) and `sr-rec-sra` (127.0.0.1:18082, basic auth) on network `sr-rec` are still running for further recordings; `docker rm -f sr-rec-kafka sr-rec-sr sr-rec-sra && docker network rm sr-rec` removes them.
 
 ## Earlier state (2026-10-29)
 
