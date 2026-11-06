@@ -146,6 +146,8 @@ func (c *Console) schemaCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 // schemaFromForm reads a schema text, its type and any references from a form.
+//
+//fuzz:parser class=console-forms FuzzSchemaForms
 func schemaFromForm(r *http.Request) (schemaBody, error) {
 	text := strings.TrimSpace(r.FormValue("schema"))
 	if text == "" {

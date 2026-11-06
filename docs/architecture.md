@@ -154,6 +154,7 @@ something else, is still its author's to mark.
 | A JSON document to encode under a schema (the console's compose panel) | `schemaregistry` | `FuzzEncode` |
 | The version in a registry path | `schemaregistry` | `FuzzVersionPath` |
 | The console's form inputs and query strings | `console` (driven through its handler) | `FuzzConsoleForms` |
+| The console's Schemas forms, with a registry beside it (register, check, level, delete; a references list typed as JSON) | `console` | `FuzzSchemaForms` |
 | Trace headers in a record (W3C `traceparent`, B3, the configured header) | `console` | `FuzzTraceHeaders` |
 | The Host header (the DNS-rebinding guard of the console and of the schema registry) | `internal/hostguard` | `FuzzHostGuard` |
 
@@ -161,8 +162,8 @@ Not yet covered, with the reason: the console reads a classic group member's
 assignment bytes inline in `describeGroupClassic` (`console/backend_groups.go`),
 with the Kafka client library's decoder, behind a DescribeGroups call; a target
 for it needs a group whose leader sends fuzzed bytes, and is owed to the Groups
-stage. The console's schema forms (`/schemas/…`) need a registry behind the
-console, which `FuzzConsoleForms` does not start.
+stage. (The console's schema forms, which need a registry behind the console that
+`FuzzConsoleForms` does not start, have `FuzzSchemaForms`.)
 
 ## Why this stays small
 
