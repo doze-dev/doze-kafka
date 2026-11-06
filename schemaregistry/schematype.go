@@ -28,6 +28,13 @@ type resolvedRef struct {
 	Reference
 	Type string
 	Text string
+	// Node names the schema the reference reaches (its subject and version), and Refs
+	// what that schema's own reference names reach, by node. Direct marks a reference
+	// the schema being parsed makes itself. Without them (a caller that knows only
+	// names) every name means one schema wherever it is used.
+	Node   string
+	Refs   map[string]string
+	Direct bool
 }
 
 // parsedSchema is a schema the registry has read and can compare. Its Go type is

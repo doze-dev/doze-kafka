@@ -107,15 +107,15 @@ func TestBodiesAreBounded(t *testing.T) {
 			t.Errorf("PUT %s with a 20 MiB body: %d %s, want 413", path, rec.Code, rec.Body)
 		}
 	}
-	// A schema body past the 8 MiB limit is refused as too large, not reported as
+	// A schema body past the 20 MiB limit is refused as too large, not reported as
 	// broken JSON.
-	huge := `{"schema":"` + strings.Repeat("x", 9<<20) + `"}`
+	huge := `{"schema":"` + strings.Repeat("x", 21<<20) + `"}`
 	req := httptest.NewRequest(http.MethodPost, "/subjects/x/versions", strings.NewReader(huge))
 	req.Header.Set("Content-Type", contentType)
 	rec := httptest.NewRecorder()
 	api.ServeHTTP(rec, req)
 	if rec.Code != http.StatusRequestEntityTooLarge {
-		t.Errorf("POST a 9 MiB schema: %d %.200s, want 413", rec.Code, rec.Body)
+		t.Errorf("POST a 21 MiB schema: %d %.200s, want 413", rec.Code, rec.Body)
 	}
 }
 
@@ -137,11 +137,11 @@ func TestSubjectLengthIsBounded(t *testing.T) {
 		t.Errorf("the refusal is %d bytes: it echoes the subject", rec.Body.Len())
 	}
 	// Nor can a level or a mode be stored under one.
-	if e := r.SetCompat(long, "FULL"); e == nil || e.Code != codeInvalidRequest {
-		t.Errorf("a level for a 40,000-character subject: %v, want %d", e, codeInvalidRequest)
+	if e := r.SetCompat(long, "FULL"); e == nil || e.Code != codeInvalidSubject {
+		t.Errorf("a level for a 40,000-character subject: %v, want %d", e, codeInvalidSubject)
 	}
-	if e := r.SetMode(long, "READONLY"); e == nil || e.Code != codeInvalidRequest {
-		t.Errorf("a mode for a 40,000-character subject: %v, want %d", e, codeInvalidRequest)
+	if e := r.SetMode(long, "READONLY"); e == nil || e.Code != codeInvalidSubject {
+		t.Errorf("a mode for a 40,000-character subject: %v, want %d", e, codeInvalidSubject)
 	}
 	// A 255-character subject is ordinary.
 	mustRegister(t, r, strings.Repeat("s", 255), avroIn(`"string"`))

@@ -138,14 +138,20 @@ func fingerprint(typ, schema string, refs []Reference) string {
 
 // maxSubjectLen is the longest subject the registry stores. A subject is part of
 // every storage key that names it, and bbolt's keys end at 32 KiB; refusing a longer
-// one before any work answers a bad request and not a store failure. Confluent's own
-// limit is not recorded (recording queue R7).
+// one before any work answers a bad request and not a store failure. (Confluent's
+// HTTP server refuses a path past about 8 KiB with 414 before its registry sees it;
+// recorded: subject-names.)
 const maxSubjectLen = 16 << 10
 
-// subjectTooLong refuses a subject past maxSubjectLen, without repeating it.
-func subjectTooLong(subject string) *Error {
+// checkSubject refuses a subject Confluent's registry refuses (recorded:
+// subject-names: a control character, or the name it keeps for the global level),
+// and one too long to store, without repeating it.
+func checkSubject(subject string) *Error {
 	if len(subject) > maxSubjectLen {
-		return newErr(422, codeInvalidRequest, "Subject is %d bytes long; the longest this registry stores is %d", len(subject), maxSubjectLen)
+		return newErr(422, codeInvalidSubject, "The specified subject is not valid: it is %d bytes long, and the longest this registry stores is %d", len(subject), maxSubjectLen)
+	}
+	if subject == "__GLOBAL" || strings.IndexFunc(subject, func(c rune) bool { return c < 0x20 || c == 0x7f }) >= 0 {
+		return newErr(422, codeInvalidSubject, "The specified subject '%s' is not a valid.", subject)
 	}
 	return nil
 }
@@ -243,39 +249,45 @@ const maxResolvedSchemas = 1000
 //fuzz:parser FuzzRegisterReferences
 func (r *Registry) resolve(refs []Reference) ([]resolvedRef, *Error) {
 	var out []resolvedRef
-	seen := map[string]bool{}     // (subject, version, name) already in out
+	seen := map[string]int{}      // (subject, version, name) -> its index in out
 	followed := map[string]bool{} // (subject, version) whose own references are in out
-	var walk func(refs []Reference, depth int) *Error
-	walk = func(refs []Reference, depth int) *Error {
-		if depth > 32 {
-			return errInvalidSchema("Invalid schema: references are nested too deeply")
-		}
+	nodeOf := func(ref Reference) string { return fmt.Sprintf("%s\x00%d", ref.Subject, ref.Version) }
+	// No limit on depth beyond the one on distinct schemas: Confluent takes a chain of
+	// 40 (recorded: nested-references), and a chain cannot be longer than the schemas
+	// it names.
+	var walk func(refs []Reference, direct bool) *Error
+	walk = func(refs []Reference, direct bool) *Error {
 		for _, ref := range refs {
 			vr := r.find(ref.Subject, ref.Version)
 			if vr == nil || vr.Deleted {
 				return errInvalidSchema("Invalid schema: reference %q: subject '%s' version %d was not found", ref.Name, ref.Subject, ref.Version)
 			}
 			s := r.schemas[vr.ID]
-			node := fmt.Sprintf("%s\x00%d", ref.Subject, ref.Version)
+			node := nodeOf(ref)
 			if !followed[node] {
 				if len(followed) >= maxResolvedSchemas {
 					return errInvalidSchema("Invalid schema: references name more than %d schemas", maxResolvedSchemas)
 				}
 				followed[node] = true
-				if err := walk(s.References, depth+1); err != nil {
+				if err := walk(s.References, false); err != nil {
 					return err
 				}
 			}
 			key := node + "\x00" + ref.Name
-			if seen[key] {
+			if i, ok := seen[key]; ok {
+				out[i].Direct = out[i].Direct || direct
 				continue
 			}
-			seen[key] = true
-			out = append(out, resolvedRef{Reference: ref, Type: s.Type, Text: s.Schema})
+			own := map[string]string{}
+			for _, sub := range s.References {
+				own[sub.Name] = nodeOf(sub)
+			}
+			seen[key] = len(out)
+			out = append(out, resolvedRef{Reference: ref, Type: s.Type, Text: s.Schema, Node: node, Refs: own, Direct: direct})
 		}
 		return nil
 	}
-	if err := walk(refs, 0); err != nil {
+	if err := walk(refs, true); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -459,7 +471,7 @@ func (r *Registry) Register(subject string, in SchemaInput, normalize bool) (Reg
 	if subject == "" {
 		return RegisterResult{}, newErr(422, codeInvalidRequest, "Subject may not be empty")
 	}
-	if e := subjectTooLong(subject); e != nil {
+	if e := checkSubject(subject); e != nil {
 		return RegisterResult{}, e
 	}
 	r.mu.Lock()
@@ -475,7 +487,23 @@ func (r *Registry) Register(subject string, in SchemaInput, normalize bool) (Reg
 		return RegisterResult{ID: v.ID, Latest: &v}, nil
 	}
 	if r.effectiveMode(subject) == ModeReadOnly {
-		return RegisterResult{}, newErr(422, codeOperationNotPermitted, "Subject %s is in read-only mode", subject)
+		// A schema the subject already holds is answered with its id, as Confluent does
+		// (recorded: readonly-subject): a serializer that registers before every first
+		// send keeps working against a read-only subject. Anything else is refused,
+		// whether or not it parses.
+		refused := newErr(422, codeOperationNotPermitted, "Subject %s is in read-only mode", subject)
+		p, canon, perr := r.prepare(in, normalize)
+		if perr != nil {
+			return RegisterResult{}, refused
+		}
+		if id, ok := r.byPrint[fingerprint(p.Type(), canon, in.References)]; ok {
+			for _, v := range r.subj[subject] {
+				if v.ID == id && !v.Deleted {
+					return RegisterResult{ID: id}, nil
+				}
+			}
+		}
+		return RegisterResult{}, refused
 	}
 	p, canon, perr := r.prepare(in, normalize)
 	if perr != nil {
@@ -662,6 +690,13 @@ func (r *Registry) SchemaByID(id int) (SchemaView, *Error) {
 		return SchemaView{}, errSchemaIDNotFound(id)
 	}
 	return SchemaView{ID: 0, SchemaType: typeField(s.Type), References: s.References, Schema: s.Schema}, nil
+}
+
+// MaxID is the highest schema id this registry has given out.
+func (r *Registry) MaxID() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.nextID - 1
 }
 
 // IDSubjects lists the subject-versions that hold a schema id.
@@ -894,17 +929,17 @@ func (r *Registry) DeleteSubject(subject string, permanent bool) ([]int, *Error)
 	for _, id := range gone {
 		b.del(schemaKey(id))
 	}
-	if permanent {
-		b.del(keyConfig + subject)
-		b.del(keyMode + subject)
-	}
+	// The subject's own level and mode go with it, on the soft delete already
+	// (recorded: permanent-delete-rules).
+	b.del(keyConfig + subject)
+	b.del(keyMode + subject)
 	if err := r.commit(b); err != nil {
 		return nil, err
 	}
+	delete(r.compat, subject)
+	delete(r.modes, subject)
 	if permanent {
 		delete(r.subj, subject)
-		delete(r.compat, subject)
-		delete(r.modes, subject)
 		r.dropSchemas(gone)
 	} else {
 		for _, v := range targets {
@@ -936,6 +971,11 @@ func (r *Registry) CheckCompatible(subject, version string, in SchemaInput, norm
 		vr, err := r.versionLocked(subject, version, false)
 		if err != nil {
 			if err.Code == codeSubjectNotFound {
+				// No subject: anything fits its latest, but a numbered version is
+				// missing like any other (recorded: compatibility-of-missing).
+				if n, perr := strconv.Atoi(version); perr == nil && n > 0 {
+					return nil, errVersionNotFound(subject, n)
+				}
 				return nil, nil
 			}
 			return nil, err
@@ -1001,11 +1041,15 @@ func (r *Registry) SetCompat(subject, level string) *Error {
 	if !compatLevels[level] {
 		return newErr(422, codeInvalidCompatibility, "Invalid compatibility level. Valid values are none, backward, forward, full, backward_transitive, forward_transitive, and full_transitive")
 	}
-	if e := subjectTooLong(subject); e != nil {
+	if e := checkSubject(subject); e != nil {
 		return e
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	// A read-only subject's level does not change either (recorded: readonly-subject).
+	if subject != "" && r.effectiveMode(subject) == ModeReadOnly {
+		return newErr(422, codeOperationNotPermitted, "Subject %s is in read-only mode", subject)
+	}
 	b := newBatch()
 	b.put(keyConfig+subject, level)
 	if err := r.commit(b); err != nil {
@@ -1057,7 +1101,7 @@ func (r *Registry) SetMode(subject, mode string) *Error {
 	if mode != ModeReadWrite && mode != ModeReadOnly {
 		return newErr(422, codeInvalidMode, "Invalid mode. Valid values are READWRITE and READONLY")
 	}
-	if e := subjectTooLong(subject); e != nil {
+	if e := checkSubject(subject); e != nil {
 		return e
 	}
 	r.mu.Lock()

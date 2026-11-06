@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"mime"
 	"net/http"
 	"strconv"
 	"strings"
@@ -68,6 +69,10 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if (r.Method == http.MethodPost || r.Method == http.MethodPut) && !acceptedBodyType(r.Header.Get("Content-Type")) {
+		writeErr(w, newErr(http.StatusUnsupportedMediaType, codeUnsupportedMediaType, "HTTP 415 Unsupported Media Type"))
+		return
+	}
 	limit := int64(maxSchemaBody)
 	if strings.HasPrefix(r.URL.Path, "/config") || strings.HasPrefix(r.URL.Path, "/mode") {
 		limit = maxSettingBody
@@ -76,10 +81,35 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	a.mux.ServeHTTP(&statusFixer{ResponseWriter: w}, r)
 }
 
-// Request bodies are read up to a limit: a schema with its references, or a level or
-// a mode, which is a few bytes.
+// acceptedBodyType tells whether a POST or PUT body of this Content-Type is read, as
+// Confluent's registry decides (recorded: content-types): no type, JSON, the
+// registry's own types and application/octet-stream are; text/plain, XML, form and
+// multipart bodies get 415. The three a web page may send to another site without
+// asking first (text/plain, form-urlencoded, multipart) are among those refused, so a
+// page cannot register schemas in a developer's registry.
+func acceptedBodyType(ct string) bool {
+	if strings.TrimSpace(ct) == "" {
+		return true
+	}
+	mt, _, err := mime.ParseMediaType(ct)
+	if err != nil {
+		return false
+	}
+	switch mt {
+	case "application/json", "application/octet-stream",
+		"application/vnd.schemaregistry+json", "application/vnd.schemaregistry.v1+json":
+		return true
+	}
+	return false
+}
+
+// Request bodies are read up to a limit. A schema with its references may be as large
+// as Confluent's registry takes (recorded: large-bodies, a 9 MiB schema registered;
+// its JSON parser refuses a string past 20,000,000 characters). A level or a mode is
+// a few bytes, where Confluent reads 20 MiB of padding and ignores it: here that is
+// refused (413), so nobody's memory goes to a body nothing reads.
 const (
-	maxSchemaBody  = 8 << 20
+	maxSchemaBody  = 20 << 20
 	maxSettingBody = 64 << 10
 )
 
@@ -146,6 +176,21 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeErr(w http.ResponseWriter, e *Error) {
 	writeJSON(w, e.Status, e)
+}
+
+// page applies the offset and limit parameters to a list, as Confluent does for
+// GET /schemas (recorded: limit-and-offset; it ignores them on /subjects and on a
+// subject's versions, and so does this registry). A missing, negative or unreadable
+// offset is 0; a limit that is not positive is no limit.
+func page[T any](all []T, r *http.Request) []T {
+	q := r.URL.Query()
+	if off, err := strconv.Atoi(q.Get("offset")); err == nil && off > 0 {
+		all = all[min(off, len(all)):]
+	}
+	if lim, err := strconv.Atoi(q.Get("limit")); err == nil && lim > 0 && lim < len(all) {
+		all = all[:lim]
+	}
+	return all
 }
 
 func boolParam(r *http.Request, name string) bool {
@@ -278,7 +323,8 @@ func (a *API) routes() {
 	})
 
 	handle("GET /schemas", func(w http.ResponseWriter, r *http.Request) *Error {
-		writeJSON(w, 200, a.reg.AllSchemas(prefixParam(r), boolParam(r, "latestOnly"), boolParam(r, "deleted")))
+		all := a.reg.AllSchemas(prefixParam(r), boolParam(r, "latestOnly"), boolParam(r, "deleted"))
+		writeJSON(w, 200, page(all, r))
 		return nil
 	})
 	handle("GET /schemas/types", func(w http.ResponseWriter, r *http.Request) *Error {
@@ -300,6 +346,13 @@ func (a *API) routes() {
 		v, e := a.reg.SchemaByID(id)
 		if e != nil {
 			return e
+		}
+		if boolParam(r, "fetchMaxId") {
+			writeJSON(w, 200, struct {
+				SchemaView
+				MaxID int `json:"maxId"`
+			}{v, a.reg.MaxID()})
+			return nil
 		}
 		writeJSON(w, 200, v)
 		return nil
@@ -364,8 +417,8 @@ func (a *API) routes() {
 			return e
 		}
 		out := map[string]any{"is_compatible": len(found) == 0}
-		if boolParam(r, "verbose") && len(found) > 0 {
-			var msgs []string
+		if boolParam(r, "verbose") {
+			msgs := []string{} // an empty list when it fits, as Confluent sends it.
 			for _, f := range found {
 				msgs = append(msgs, f.Messages()...)
 			}

@@ -131,7 +131,9 @@ Deliberately, and each is pinned by a test:
 | Protobuf a parser would reject | its parser is lenient: an `extend` of a type that was never imported, a method named like a message | rejected as invalid (422) |
 | Verbose compatibility reasons | its checker's wording | the same shape; the three trailing lines (`oldSchemaVersion`, `oldSchema`, `validateFields`/`compatibility`) are identical, the reasons are worded by this implementation |
 | Avro with `normalize=true` | Avro's normalizer | key order and namespaces as Avro writes them, custom attributes sorted |
-| Limits | not recorded | a request body is at most 8 MiB (a schema with its references) or 64 KiB (`/config`, `/mode`), past which the answer is 413 with error code 413; the JSON of an Avro or JSON Schema schema nests at most 256 levels (422, 42201: comparing deeper schemas costs the square of their depth); a subject is at most 16 KiB (422, 42207); one schema's references name at most 1,000 distinct schemas, each followed once however often it is named |
+| Limits | a schema body is read up to its JSON parser's 20,000,000-character string (400 past it); a level or a mode body is read whole, 20 MiB included; a path past about 8 KiB is 414 | a schema body is at most 20 MiB and a level or a mode body 64 KiB, past which the answer is 413 with error code 413; the JSON of an Avro or JSON Schema schema nests at most 256 levels (422, 42201: comparing deeper schemas costs the square of their depth); a subject is at most 16 KiB (422, 42208); one schema's references name at most 1,000 distinct schemas, each followed once however often it is named |
+| Metadata endpoints (`/v1/metadata/id`, `/v1/metadata/version`), `GET /contexts` | served | 404 |
+| Its own 500s: `format=serialized` on an id, a lookup in a soft-deleted subject | 500 | the parameter is ignored; the subject's 404 |
 
 ## Avro payloads and the decoder
 

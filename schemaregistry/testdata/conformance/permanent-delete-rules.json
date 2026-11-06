@@ -1,0 +1,131 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/pr/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/pr",
+    "body": "{\"compatibility\":\"FULL\"}",
+    "status": 200,
+    "response": {
+      "compatibility": "FULL"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/mode/pr",
+    "body": "{\"mode\":\"READWRITE\"}",
+    "status": 200,
+    "response": {
+      "mode": "READWRITE"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/pr?permanent=true",
+    "status": 404,
+    "response": {
+      "error_code": 40405,
+      "message": "Subject 'pr' was not deleted first before being permanently deleted"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/pr/versions/1?permanent=true",
+    "status": 404,
+    "response": {
+      "error_code": 40407,
+      "message": "Subject 'pr' Version 1 was not deleted first before being permanently deleted"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/pr/versions/latest?permanent=true",
+    "status": 404,
+    "response": {
+      "error_code": 40407,
+      "message": "Subject 'pr' Version 1 was not deleted first before being permanently deleted"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/pr",
+    "status": 200,
+    "response": [
+      1
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/config/pr",
+    "status": 404,
+    "response": {
+      "error_code": 40408,
+      "message": "Subject 'pr' does not have subject-level compatibility configured"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/mode/pr",
+    "status": 404,
+    "response": {
+      "error_code": 40409,
+      "message": "Subject 'pr' does not have subject-level mode configured"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects?deleted=true",
+    "status": 200,
+    "response": [
+      "pr"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/pr?permanent=true",
+    "status": 200,
+    "response": [
+      1
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/config/pr",
+    "status": 404,
+    "response": {
+      "error_code": 40408,
+      "message": "Subject 'pr' does not have subject-level compatibility configured"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/mode/pr",
+    "status": 404,
+    "response": {
+      "error_code": 40409,
+      "message": "Subject 'pr' does not have subject-level mode configured"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/pr?permanent=true",
+    "status": 404,
+    "response": {
+      "error_code": 40401,
+      "message": "Subject 'pr' not found."
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects?deleted=true",
+    "status": 200,
+    "response": []
+  }
+]

@@ -1,0 +1,208 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/lo1/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/lo2/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/lo3/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/lo3/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/lo3/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null},{\\\"name\\\":\\\"age\\\",\\\"type\\\":[\\\"null\\\",\\\"int\\\"],\\\"default\\\":null}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 3
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects",
+    "status": 200,
+    "response": [
+      "lo1",
+      "lo2",
+      "lo3"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects?limit=2",
+    "status": 200,
+    "response": [
+      "lo1",
+      "lo2",
+      "lo3"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects?limit=2\u0026offset=1",
+    "status": 200,
+    "response": [
+      "lo1",
+      "lo2",
+      "lo3"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects?offset=2",
+    "status": 200,
+    "response": [
+      "lo1",
+      "lo2",
+      "lo3"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects?offset=10",
+    "status": 200,
+    "response": [
+      "lo1",
+      "lo2",
+      "lo3"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects?limit=0",
+    "status": 200,
+    "response": [
+      "lo1",
+      "lo2",
+      "lo3"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects?limit=-1",
+    "status": 200,
+    "response": [
+      "lo1",
+      "lo2",
+      "lo3"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects?offset=-1",
+    "status": 200,
+    "response": [
+      "lo1",
+      "lo2",
+      "lo3"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects?limit=abc",
+    "status": 200,
+    "response": [
+      "lo1",
+      "lo2",
+      "lo3"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/lo3/versions?limit=1",
+    "status": 200,
+    "response": [
+      1,
+      2,
+      3
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/lo3/versions?limit=2\u0026offset=1",
+    "status": 200,
+    "response": [
+      1,
+      2,
+      3
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/schemas?limit=1",
+    "status": 200,
+    "response": [
+      {
+        "subject": "lo1",
+        "version": 1,
+        "id": 1,
+        "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/schemas?limit=2\u0026offset=1",
+    "status": 200,
+    "response": [
+      {
+        "subject": "lo2",
+        "version": 1,
+        "id": 1,
+        "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+      },
+      {
+        "subject": "lo3",
+        "version": 1,
+        "id": 1,
+        "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/schemas?latestOnly=true\u0026limit=2",
+    "status": 200,
+    "response": [
+      {
+        "subject": "lo1",
+        "version": 1,
+        "id": 1,
+        "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+      },
+      {
+        "subject": "lo2",
+        "version": 1,
+        "id": 1,
+        "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+      }
+    ]
+  }
+]

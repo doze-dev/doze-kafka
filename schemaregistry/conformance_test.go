@@ -34,6 +34,9 @@ type scriptStep struct {
 	Method string `json:"method"`
 	Path   string `json:"path"`
 	Body   string `json:"body,omitempty"`
+	// ContentType is the header a step sends with its body: empty for the registry's
+	// own type, "none" for no header at all.
+	ContentType string `json:"contentType,omitempty"`
 }
 
 type recordedStep struct {
@@ -49,12 +52,41 @@ type scenario struct {
 	cleanup []scriptStep
 }
 
-func get(path string) scriptStep { return scriptStep{"GET", path, ""} }
-func del(path string) scriptStep { return scriptStep{"DELETE", path, ""} }
+func get(path string) scriptStep { return scriptStep{Method: "GET", Path: path} }
+func del(path string) scriptStep { return scriptStep{Method: "DELETE", Path: path} }
 func post(path, body string) scriptStep {
-	return scriptStep{"POST", path, body}
+	return scriptStep{Method: "POST", Path: path, Body: body}
 }
-func put(path, body string) scriptStep { return scriptStep{"PUT", path, body} }
+func put(path, body string) scriptStep { return scriptStep{Method: "PUT", Path: path, Body: body} }
+
+// withType is a step that sends its body under another Content-Type ("none": no header).
+func withType(st scriptStep, ct string) scriptStep { st.ContentType = ct; return st }
+
+// padRef in a body is replaced, when the step is sent, by that many "x": a large body
+// without a large script or recording.
+var padRef = regexp.MustCompile(`@PAD\((\d+)\)`)
+
+func expandPad(body string) string {
+	return padRef.ReplaceAllStringFunc(body, func(m string) string {
+		n, _ := strconv.Atoi(padRef.FindStringSubmatch(m)[1])
+		return strings.Repeat("x", n)
+	})
+}
+
+// sendType sets the Content-Type a step asks for on req.
+func sendType(req *http.Request, body, ct string) {
+	switch {
+	case ct == "none":
+	case ct != "":
+		req.Header.Set("Content-Type", ct)
+	case body != "":
+		req.Header.Set("Content-Type", contentType)
+	}
+}
+
+// maxRecordedBody bounds a recorded response: an answer that echoes a large body is
+// kept as its status, its error code and its first and last bytes.
+const maxRecordedBody = 4096
 
 func schemaBody(schema string) string {
 	b, _ := json.Marshal(map[string]string{"schema": schema})
@@ -72,14 +104,12 @@ func refBody(typ, schema string, refs ...Reference) string {
 }
 
 // doer sends a request to some registry and returns the status and body.
-type doer func(method, path, body string) (int, string)
+type doer func(method, path, body, ct string) (int, string)
 
 func httpDoer(base string) doer {
-	return func(method, path, body string) (int, string) {
+	return func(method, path, body, ct string) (int, string) {
 		req, _ := http.NewRequest(method, base+path, strings.NewReader(body))
-		if body != "" {
-			req.Header.Set("Content-Type", contentType)
-		}
+		sendType(req, body, ct)
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return 0, err.Error()
@@ -91,11 +121,9 @@ func httpDoer(base string) doer {
 }
 
 func recorderDoer(h http.Handler) doer {
-	return func(method, path, body string) (int, string) {
+	return func(method, path, body, ct string) (int, string) {
 		req := httptest.NewRequest(method, path, strings.NewReader(body))
-		if body != "" {
-			req.Header.Set("Content-Type", contentType)
-		}
+		sendType(req, body, ct)
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
 		return rec.Code, rec.Body.String()
@@ -108,14 +136,14 @@ var atRef = regexp.MustCompile(`@(\d+)`)
 func probe(do doer, n int) int {
 	subject := "zz-probe"
 	body := schemaBody(fmt.Sprintf(`{"type":"record","name":"Probe%d","fields":[]}`, n))
-	status, resp := do("POST", "/subjects/"+subject+"/versions", body)
+	status, resp := do("POST", "/subjects/"+subject+"/versions", body, "")
 	if status != 200 {
 		panic(fmt.Sprintf("probe failed: %d %s", status, resp))
 	}
 	var out struct{ ID int }
 	json.Unmarshal([]byte(resp), &out)
-	do("DELETE", "/subjects/"+subject, "")
-	do("DELETE", "/subjects/"+subject+"?permanent=true", "")
+	do("DELETE", "/subjects/"+subject, "", "")
+	do("DELETE", "/subjects/"+subject+"?permanent=true", "", "")
 	return out.ID
 }
 
@@ -130,19 +158,33 @@ func run(do doer, sc scenario, probeN int) []recordedStep {
 	}
 	var out []recordedStep
 	for _, st := range sc.steps {
-		path, body := sub(st.Path), sub(st.Body)
-		status, resp := do(st.Method, path, body)
-		out = append(out, recordedStep{scriptStep: st, Status: status, Response: relativize(path, resp, base)})
+		path, body := sub(st.Path), expandPad(sub(st.Body))
+		status, resp := do(st.Method, path, body, st.ContentType)
+		out = append(out, recordedStep{scriptStep: st, Status: status, Response: relativize(path, clip(resp), base)})
 	}
 	for _, st := range sc.cleanup {
-		do(st.Method, sub(st.Path), sub(st.Body))
+		do(st.Method, sub(st.Path), expandPad(sub(st.Body)), st.ContentType)
 	}
 	return out
 }
 
+// clip keeps a long answer's error code and its ends, so a reply that echoes a
+// megabyte body is recorded, and compared, as its shape.
+func clip(body string) string {
+	if len(body) <= maxRecordedBody {
+		return body
+	}
+	var e struct {
+		Code *int `json:"error_code"`
+	}
+	json.Unmarshal([]byte(body), &e)
+	b, _ := json.Marshal(map[string]any{"clipped": len(body), "error_code": e.Code, "head": body[:200], "tail": body[len(body)-200:]})
+	return string(b)
+}
+
 var (
 	idInMessage = regexp.MustCompile(`(Schema )(\d+)( not found)`)
-	idField     = regexp.MustCompile(`("id":)(\d+)`)
+	idField     = regexp.MustCompile(`("(?:id|maxId)":)(\d+)`)
 )
 
 // relativize turns a response body into JSON with ids expressed as offsets from base.
@@ -186,7 +228,16 @@ func TestRecordConformance(t *testing.T) {
 	if err := os.MkdirAll(conformanceDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	only := map[string]bool{}
+	for _, n := range strings.Split(os.Getenv("SR_RECORD_ONLY"), ",") {
+		if n != "" {
+			only[n] = true
+		}
+	}
 	for i, sc := range scenarios {
+		if len(only) > 0 && !only[sc.name] {
+			continue
+		}
 		got := run(do, sc, 1000+i)
 		b, _ := json.MarshalIndent(got, "", "  ")
 		if err := os.WriteFile(filepath.Join(conformanceDir, sc.name+".json"), append(b, '\n'), 0o644); err != nil {
@@ -200,6 +251,32 @@ func TestRecordConformance(t *testing.T) {
 // repeats them.
 var knownDifferences = map[string]string{
 	"modes/9": "IMPORT mode is not supported, so the list of valid modes does not name it.",
+
+	"readonly-subject/12": "IMPORT mode is not supported: refused as an invalid mode (42204), where Confluent refuses it while subjects exist (42205).",
+	"readonly-subject/13": "IMPORT mode is not supported, forced or not.",
+	"readonly-subject/14": "READONLY_OVERRIDE mode is not supported.",
+	"readonly-subject/15": "Follows from steps 13 and 14: the mode stayed READONLY.",
+	"readonly-subject/16": "IMPORT mode is not supported: refused as an invalid mode.",
+	"readonly-subject/17": "IMPORT mode is not supported, forced or not.",
+	"readonly-subject/18": "Follows from step 17: the global mode stayed READWRITE.",
+
+	"subject-names/3":  "Confluent's HTTP server refuses a path past about 8 KiB (414) before its registry sees it; this one takes a subject up to 16 KiB.",
+	"subject-names/7":  "Contexts are not supported: :.ctx:orders is a subject of that name in the one registry, so its id is the registry's next and not the context's first.",
+	"subject-names/9":  "Contexts are not supported: :*: is a subject of that name.",
+	"subject-names/12": "Contexts are not supported: GET /contexts is 404.",
+
+	"large-bodies/2": "A body past 20 MiB is refused as too large (413); Confluent's JSON parser refuses a string past 20,000,000 characters (400).",
+	"large-bodies/3": "A config or mode body is at most 64 KiB (413): Confluent reads 20 MiB of padding and ignores it.",
+	"large-bodies/4": "A config or mode body is at most 64 KiB (413).",
+	"large-bodies/5": "A config or mode body is at most 64 KiB (413).",
+
+	"unserved-routes-and-parameters/1":  "Contexts are not supported: GET /contexts is 404.",
+	"unserved-routes-and-parameters/2":  "The metadata endpoints are not served: there is no Kafka cluster id or registry cluster to name.",
+	"unserved-routes-and-parameters/3":  "The metadata endpoints are not served.",
+	"unserved-routes-and-parameters/8":  "format=serialized on an id is a 500 in Confluent; here the parameter is ignored and the schema is answered.",
+	"unserved-routes-and-parameters/12": "A lookup in a soft-deleted subject is a 500 in Confluent; here it is the subject's 404.",
+
+	"unknown-id/1": "GET /schemas/ids/{unknown}/schema is a 500 in Confluent; here it is 404 with 40403.",
 }
 
 func TestConformance(t *testing.T) {
@@ -254,13 +331,14 @@ func differ(want, got recordedStep) string {
 				}
 				wmsg, _ := wm["message"].(string)
 				gmsg, _ := gm["message"].(string)
+				full := wmsg
 				if i := strings.Index(wmsg, ", details:"); i >= 0 {
 					wmsg = wmsg[:i]
 					if j := strings.Index(gmsg, ", details:"); j >= 0 {
 						gmsg = gmsg[:j]
 					}
 				}
-				if strings.Contains(wm["message"].(string), "Invalid schema") {
+				if strings.Contains(full, "Invalid schema") {
 					wmsg, gmsg = "Invalid schema", gmsgPrefix(gmsg, "Invalid schema")
 				}
 				if wmsg != gmsg {

@@ -1,0 +1,156 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/up/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/contexts",
+    "status": 200,
+    "response": [
+      ".",
+      "*",
+      ".ctx"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/v1/metadata/id",
+    "status": 200,
+    "response": {
+      "scope": {
+        "path": [],
+        "clusters": {
+          "kafka-cluster": "5L6g3nShT-eMCtK--X86sw",
+          "schema-registry-cluster": "schema-registry"
+        }
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1/metadata/version",
+    "status": 200,
+    "response": {
+      "version": "7.7.1",
+      "commitId": "b4110e23a6954a2bb3d4f664e81eba351e94fa2d"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/guids/00000000-0000-0000-0000-000000000000",
+    "status": 404,
+    "response": {
+      "error_code": 404,
+      "message": "HTTP 404 Not Found"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@1?fetchMaxId=true",
+    "status": 200,
+    "response": {
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}",
+      "maxId": 1
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@1?subject=up",
+    "status": 200,
+    "response": {
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@1?subject=nobody",
+    "status": 200,
+    "response": {
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@1?format=serialized",
+    "status": 500,
+    "response": {
+      "error_code": 500,
+      "message": "Internal Server Error"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/up/versions/1?format=serialized",
+    "status": 200,
+    "response": {
+      "subject": "up",
+      "version": 1,
+      "id": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/up?deleted=true",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "subject": "up",
+      "version": 1,
+      "id": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/up",
+    "status": 200,
+    "response": [
+      1
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/up",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 500,
+    "response": {
+      "error_code": 500,
+      "message": "Internal Server Error"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/up?deleted=true",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "subject": "up",
+      "version": 1,
+      "id": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects?deletedOnly=true",
+    "status": 200,
+    "response": [
+      "up"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects?deleted=true\u0026deletedOnly=true",
+    "status": 200,
+    "response": [
+      "up"
+    ]
+  }
+]

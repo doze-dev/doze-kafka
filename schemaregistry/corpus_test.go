@@ -50,19 +50,19 @@ func handWritten(typ string) []corpusCase {
 // verdictOf asks a registry, over HTTP, whether new may follow old at a level.
 func verdictOf(do doer, typ, old, new, level string) string {
 	const subject = "zz-corpus"
-	do("DELETE", "/subjects/"+subject, "")
-	do("DELETE", "/subjects/"+subject+"?permanent=true", "")
-	do("PUT", "/config/"+subject, `{"compatibility":"NONE"}`)
+	do("DELETE", "/subjects/"+subject, "", "")
+	do("DELETE", "/subjects/"+subject+"?permanent=true", "", "")
+	do("PUT", "/config/"+subject, `{"compatibility":"NONE"}`, "")
 	defer func() {
-		do("DELETE", "/subjects/"+subject, "")
-		do("DELETE", "/subjects/"+subject+"?permanent=true", "")
-		do("DELETE", "/config/"+subject, "")
+		do("DELETE", "/subjects/"+subject, "", "")
+		do("DELETE", "/subjects/"+subject+"?permanent=true", "", "")
+		do("DELETE", "/config/"+subject, "", "")
 	}()
-	if st, _ := do("POST", "/subjects/"+subject+"/versions", typedBody(typ, old)); st != 200 {
+	if st, _ := do("POST", "/subjects/"+subject+"/versions", typedBody(typ, old), ""); st != 200 {
 		return "invalid"
 	}
-	do("PUT", "/config/"+subject, fmt.Sprintf(`{"compatibility":%q}`, level))
-	st, body := do("POST", "/compatibility/subjects/"+subject+"/versions/latest", typedBody(typ, new))
+	do("PUT", "/config/"+subject, fmt.Sprintf(`{"compatibility":%q}`, level), "")
+	st, body := do("POST", "/compatibility/subjects/"+subject+"/versions/latest", typedBody(typ, new), "")
 	if st != 200 {
 		return "invalid"
 	}
