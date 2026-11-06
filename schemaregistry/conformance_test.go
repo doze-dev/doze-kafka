@@ -37,12 +37,17 @@ type scriptStep struct {
 	// ContentType is the header a step sends with its body: empty for the registry's
 	// own type, "none" for no header at all.
 	ContentType string `json:"contentType,omitempty"`
+	// Auth is the user:password a step sends as basic authentication: empty for the
+	// scenario's own, "none" for no Authorization header.
+	Auth string `json:"auth,omitempty"`
 }
 
 type recordedStep struct {
 	scriptStep
 	Status   int             `json:"status"`
 	Response json.RawMessage `json:"response"` // JSON, or a JSON string holding a non-JSON body.
+	// Challenge is the WWW-Authenticate header's scheme, lower-cased, when there is one.
+	Challenge string `json:"challenge,omitempty"`
 }
 
 type scenario struct {
@@ -50,6 +55,10 @@ type scenario struct {
 	steps []scriptStep
 	// cleanup are requests run after the script (not recorded) to leave the registry empty.
 	cleanup []scriptStep
+	// auth is the user:password every request sends unless a step says otherwise; a
+	// scenario with one is recorded against SR_RECORD_AUTH_URL, a registry that
+	// requires it, and replayed against one that does.
+	auth string
 }
 
 func get(path string) scriptStep { return scriptStep{Method: "GET", Path: path} }
@@ -71,6 +80,22 @@ func expandPad(body string) string {
 		n, _ := strconv.Atoi(padRef.FindStringSubmatch(m)[1])
 		return strings.Repeat("x", n)
 	})
+}
+
+// sendAuth sets the basic authentication a step asks for on req.
+func sendAuth(req *http.Request, auth string) {
+	if auth == "" || auth == "none" {
+		return
+	}
+	u, p, _ := strings.Cut(auth, ":")
+	req.SetBasicAuth(u, p)
+}
+
+// challengeOf is the scheme of a WWW-Authenticate header, lower-cased: what a client
+// keys on. The realm is the server's own name and is not compared.
+func challengeOf(h http.Header) string {
+	scheme, _, _ := strings.Cut(h.Get("WWW-Authenticate"), " ")
+	return strings.ToLower(scheme)
 }
 
 // sendType sets the Content-Type a step asks for on req.
@@ -106,27 +131,45 @@ func refBody(typ, schema string, refs ...Reference) string {
 // doer sends a request to some registry and returns the status and body.
 type doer func(method, path, body, ct string) (int, string)
 
-func httpDoer(base string) doer {
+// authDoer is a doer that also sends credentials and reports the challenge.
+type authDoer func(method, path, body, ct, auth string) (int, string, string)
+
+func (d authDoer) as(auth string) doer {
 	return func(method, path, body, ct string) (int, string) {
+		st, b, _ := d(method, path, body, ct, auth)
+		return st, b
+	}
+}
+
+func httpDoer(base string) doer { return httpAuthDoer(base).as("") }
+
+func httpAuthDoer(base string) authDoer {
+	return func(method, path, body, ct, auth string) (int, string, string) {
 		req, _ := http.NewRequest(method, base+path, strings.NewReader(body))
 		sendType(req, body, ct)
+		sendAuth(req, auth)
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			return 0, err.Error()
+			return 0, err.Error(), ""
 		}
 		defer resp.Body.Close()
 		b, _ := io.ReadAll(resp.Body)
-		return resp.StatusCode, string(b)
+		return resp.StatusCode, string(b), challengeOf(resp.Header)
 	}
 }
 
 func recorderDoer(h http.Handler) doer {
-	return func(method, path, body, ct string) (int, string) {
+	return recorderAuthDoer(h).as("")
+}
+
+func recorderAuthDoer(h http.Handler) authDoer {
+	return func(method, path, body, ct, auth string) (int, string, string) {
 		req := httptest.NewRequest(method, path, strings.NewReader(body))
 		sendType(req, body, ct)
+		sendAuth(req, auth)
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
-		return rec.Code, rec.Body.String()
+		return rec.Code, rec.Body.String(), challengeOf(rec.Header())
 	}
 }
 
@@ -148,7 +191,8 @@ func probe(do doer, n int) int {
 }
 
 // run plays a scenario and returns what came back, with ids made relative to the base.
-func run(do doer, sc scenario, probeN int) []recordedStep {
+func run(ad authDoer, sc scenario, probeN int) []recordedStep {
+	do := ad.as(sc.auth)
 	base := probe(do, probeN)
 	sub := func(s string) string {
 		return atRef.ReplaceAllStringFunc(s, func(m string) string {
@@ -159,8 +203,12 @@ func run(do doer, sc scenario, probeN int) []recordedStep {
 	var out []recordedStep
 	for _, st := range sc.steps {
 		path, body := sub(st.Path), expandPad(sub(st.Body))
-		status, resp := do(st.Method, path, body, st.ContentType)
-		out = append(out, recordedStep{scriptStep: st, Status: status, Response: relativize(path, clip(resp), base)})
+		auth := st.Auth
+		if auth == "" {
+			auth = sc.auth
+		}
+		status, resp, challenge := ad(st.Method, path, body, st.ContentType, auth)
+		out = append(out, recordedStep{scriptStep: st, Status: status, Response: relativize(path, clip(resp), base), Challenge: challenge})
 	}
 	for _, st := range sc.cleanup {
 		do(st.Method, sub(st.Path), expandPad(sub(st.Body)), st.ContentType)
@@ -224,7 +272,7 @@ func TestRecordConformance(t *testing.T) {
 	if url == "" {
 		t.Skip("set SR_RECORD_URL to a Confluent Schema Registry to record the conformance scripts")
 	}
-	do := httpDoer(url)
+	authURL := os.Getenv("SR_RECORD_AUTH_URL")
 	if err := os.MkdirAll(conformanceDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +286,15 @@ func TestRecordConformance(t *testing.T) {
 		if len(only) > 0 && !only[sc.name] {
 			continue
 		}
-		got := run(do, sc, 1000+i)
+		target := url
+		if sc.auth != "" {
+			if authURL == "" {
+				t.Logf("%s needs SR_RECORD_AUTH_URL, a registry that requires %s: not recorded", sc.name, sc.auth)
+				continue
+			}
+			target = authURL
+		}
+		got := run(httpAuthDoer(target), sc, 1000+i)
 		b, _ := json.MarshalIndent(got, "", "  ")
 		if err := os.WriteFile(filepath.Join(conformanceDir, sc.name+".json"), append(b, '\n'), 0o644); err != nil {
 			t.Fatal(err)
@@ -276,6 +332,9 @@ var knownDifferences = map[string]string{
 	"unserved-routes-and-parameters/8":  "format=serialized on an id is a 500 in Confluent; here the parameter is ignored and the schema is answered.",
 	"unserved-routes-and-parameters/12": "A lookup in a soft-deleted subject is a 500 in Confluent; here it is the subject's 404.",
 
+	"basic-authentication/8": "Without credentials a PUT is 401 with an empty body in Confluent (its HTTP server's answer); here the 401 carries the registry's JSON error, as for every other method.",
+	"basic-authentication/9": "Without credentials a DELETE is 401 with an empty body in Confluent; here the JSON error.",
+
 	"unknown-id/1": "GET /schemas/ids/{unknown}/schema is a 500 in Confluent; here it is 404 with 40403.",
 }
 
@@ -294,7 +353,12 @@ func TestConformance(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got := run(recorderDoer(NewAPI(reg, Options{AllowedHosts: testHosts})), sc, 1000+i)
+			opts := Options{AllowedHosts: testHosts}
+			if sc.auth != "" {
+				wantUser, wantPass, _ := strings.Cut(sc.auth, ":")
+				opts.Auth = func(u, p string) bool { return u == wantUser && p == wantPass }
+			}
+			got := run(recorderAuthDoer(NewAPI(reg, opts)), sc, 1000+i)
 			if len(got) != len(want) {
 				t.Fatalf("%d steps played, %d recorded", len(got), len(want))
 			}
@@ -314,6 +378,9 @@ func TestConformance(t *testing.T) {
 // differ compares a recorded answer with ours. Error messages that carry the parser's
 // own wording after "details:" are compared only up to that point.
 func differ(want, got recordedStep) string {
+	if want.Challenge != got.Challenge {
+		return fmt.Sprintf("  WWW-Authenticate %q, Confluent sent %q", got.Challenge, want.Challenge)
+	}
 	if want.Status != got.Status {
 		return fmt.Sprintf("  status %d, Confluent answered %d\n  ours:      %s\n  Confluent: %s", got.Status, want.Status, got.Response, want.Response)
 	}

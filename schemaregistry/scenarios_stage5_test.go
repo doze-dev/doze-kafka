@@ -291,6 +291,31 @@ func init() {
 			},
 			cleanup: cleanupSubjects("un1", "un2", "un3", "un4", "un5", "un6", "un7"),
 		},
+		// R5: a registry that requires basic authentication. What it answers without
+		// credentials, with a wrong password and an unknown user, on every kind of
+		// route, and with the right ones.
+		scenario{
+			name: "basic-authentication",
+			auth: "alice:alice-secret",
+			steps: []scriptStep{
+				{Method: "GET", Path: "/", Auth: "none"},
+				{Method: "GET", Path: "/subjects", Auth: "none"},
+				{Method: "GET", Path: "/subjects", Auth: "alice:wrong"},
+				{Method: "GET", Path: "/subjects", Auth: "mallory:alice-secret"},
+				{Method: "GET", Path: "/subjects", Auth: ":"},
+				{Method: "GET", Path: "/no/such/route", Auth: "none"},
+				{Method: "GET", Path: "/schemas/ids/@999", Auth: "none"},
+				{Method: "POST", Path: "/subjects/ba/versions", Body: schemaBody(avroUser1), Auth: "none"},
+				{Method: "PUT", Path: "/config", Body: `{"compatibility":"FULL"}`, Auth: "none"},
+				{Method: "DELETE", Path: "/subjects/ba", Auth: "none"},
+				post("/subjects/ba/versions", schemaBody(avroUser1)),
+				get("/subjects"),
+				get("/"),
+				get("/no/such/route"),
+				{Method: "GET", Path: "/subjects/ba/versions", Auth: "alice:wrong"},
+			},
+			cleanup: cleanupSubjects("ba"),
+		},
 		// R14: an id nobody holds.
 		scenario{
 			name: "unknown-id",

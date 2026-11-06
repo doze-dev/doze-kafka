@@ -261,3 +261,25 @@ func TestSchemaRegistryIsOneInstance(t *testing.T) {
 		t.Errorf("the second handler does not see what the first registered: %s", got.body)
 	}
 }
+
+// With SASL on, the registry asks for the broker's users as HTTP basic credentials, on
+// every route including / and one that does not exist, whatever SASL mechanisms the
+// broker offers: a SCRAM-only broker's user signs in with the same password. (SCH-27)
+func TestSchemaRegistryAuthWiring(t *testing.T) {
+	srv := mustNew(t, server.Options{SASLMechanisms: []string{"SCRAM-SHA-256"}, Credentials: map[string]string{"alice": "alice-secret"}})
+	defer srv.Close()
+	addr := registryOf(t, srv)
+	for _, path := range []string{"/", "/subjects", "/no/such/route"} {
+		for _, creds := range [][]string{nil, {"alice", "wrong"}, {"mallory", "alice-secret"}} {
+			if got := askRegistry(t, addr, http.MethodGet, path, "127.0.0.1", "", creds...); got.code != 401 || got.challenge == "" {
+				t.Errorf("GET %s as %v: %d %q, want 401 with a challenge", path, creds, got.code, got.challenge)
+			}
+		}
+	}
+	if got := askRegistry(t, addr, http.MethodGet, "/subjects", "127.0.0.1", "", "alice", "alice-secret"); got.code != 200 {
+		t.Errorf("GET /subjects as alice: %d %s", got.code, got.body)
+	}
+	if got := askRegistry(t, addr, http.MethodGet, "/no/such/route", "127.0.0.1", "", "alice", "alice-secret"); got.code != 404 {
+		t.Errorf("an unknown route as alice: %d, want 404", got.code)
+	}
+}

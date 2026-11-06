@@ -175,6 +175,14 @@ speaks plain HTTP. `--schema-registry-tls=false` is for a proxy that terminates 
 itself; with it, a registry on an address other machines can reach is reported as a
 warning at start-up, because with SASL its requests carry the passwords in the clear.
 
+The registry **authenticates and does not authorise**: any user who signs in may
+register, change levels and modes, and delete any subject, whatever ACLs say about
+topics. Every route asks for a password, `/` and unknown paths included (as Confluent's
+does with basic authentication). A refused sign-in is logged at info with the user name
+it gave and the address it came from; after five in a row from one address each further
+refusal is answered more slowly (100 ms more each time, up to 2 s), and a successful
+sign-in clears the count.
+
 **The console** has no login of its own and is always plain HTTP. With SASL on it logs
 in to the broker as a user of its own, `__console`, with a random password made at
 start-up, and that user is a super user: no ACL refuses it. So anyone who can open the

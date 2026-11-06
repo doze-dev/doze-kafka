@@ -6,9 +6,12 @@ import (
 	"io"
 	"log/slog"
 	"mime"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/doze-dev/doze-kafka/internal/hostguard"
 )
@@ -35,13 +38,81 @@ type API struct {
 	reg  *Registry
 	opts Options
 	mux  *http.ServeMux
+	log  *slog.Logger
+
+	failMu sync.Mutex
+	fails  map[string]int      // failed sign-ins in a row, by client address
+	sleep  func(time.Duration) // time.Sleep; a test's own
 }
 
 // NewAPI builds the HTTP handler over a registry.
 func NewAPI(reg *Registry, opts Options) *API {
-	a := &API{reg: reg, opts: opts, mux: http.NewServeMux()}
+	log := opts.Logger
+	if log == nil {
+		log = slog.New(slog.DiscardHandler)
+	}
+	a := &API{reg: reg, opts: opts, mux: http.NewServeMux(), log: log, fails: map[string]int{}, sleep: time.Sleep}
 	a.routes()
 	return a
+}
+
+// Failed sign-ins from one address are answered at once up to freeFailures in a row;
+// after that each waits failureStep longer than the last, up to maxFailureWait, so
+// passwords cannot be tried at the speed of HTTP. A success clears the count.
+const (
+	freeFailures   = 5
+	failureStep    = 100 * time.Millisecond
+	maxFailureWait = 2 * time.Second
+	maxFailAddrs   = 4096 // addresses remembered; past this the counts start again
+)
+
+// failedSignIn counts a failure from addr and waits as long as its count says.
+func (a *API) failedSignIn(addr string) int {
+	a.failMu.Lock()
+	if len(a.fails) >= maxFailAddrs {
+		clear(a.fails)
+	}
+	a.fails[addr]++
+	n := a.fails[addr]
+	a.failMu.Unlock()
+	if n > freeFailures {
+		a.sleep(min(time.Duration(n-freeFailures)*failureStep, maxFailureWait))
+	}
+	return n
+}
+
+func (a *API) signedIn(addr string) {
+	a.failMu.Lock()
+	delete(a.fails, addr)
+	a.failMu.Unlock()
+}
+
+// clientAddr is the address a request came from, without its port.
+func clientAddr(r *http.Request) string {
+	if h, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return h
+	}
+	return r.RemoteAddr
+}
+
+// statusWriter remembers the status a handler wrote.
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusWriter) WriteHeader(code int) {
+	if s.status == 0 {
+		s.status = code
+	}
+	s.ResponseWriter.WriteHeader(code)
+}
+
+func (s *statusWriter) Write(b []byte) (int, error) {
+	if s.status == 0 {
+		s.status = http.StatusOK
+	}
+	return s.ResponseWriter.Write(b)
 }
 
 // Registry is the store behind the API.
@@ -56,6 +127,33 @@ func (a *API) Registry() *Registry { return a.reg }
 //
 //fuzz:parser class=registry-rest FuzzAPIBody
 func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	sw := &statusWriter{ResponseWriter: w}
+	a.serve(sw, r)
+	a.logRequest(r, sw.status, time.Since(start))
+}
+
+// logRequest writes one record per request: a server failure as a warning, a refused
+// sign-in, host or incompatible schema at info, anything else at debug. The user is
+// the one the request named; a password is never logged.
+func (a *API) logRequest(r *http.Request, status int, took time.Duration) {
+	level := slog.LevelDebug
+	switch {
+	case status >= 500:
+		level = slog.LevelWarn
+	case status == http.StatusUnauthorized, status == http.StatusForbidden, status == http.StatusConflict:
+		level = slog.LevelInfo
+	}
+	if !a.log.Enabled(r.Context(), level) {
+		return
+	}
+	user, _, _ := r.BasicAuth()
+	a.log.LogAttrs(r.Context(), level, "schema registry request",
+		slog.String("method", r.Method), slog.String("path", r.URL.Path), slog.Int("status", status),
+		slog.String("user", user), slog.String("from", clientAddr(r)), slog.Duration("took", took))
+}
+
+func (a *API) serve(w http.ResponseWriter, r *http.Request) {
 	if !hostguard.Allowed(r.Host, a.opts.AllowedHosts) {
 		writeErr(w, newErr(403, codeForbidden, "This schema registry does not answer to the host name %s. If that is a name you chose, start doze-kafka with --console-allow-host=%s (the registry answers to the same names as the console, and to --advertised-host).",
 			hostguard.Quote(r.Host), hostguard.Name(r.Host)))
@@ -64,10 +162,12 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if a.opts.Auth != nil {
 		u, p, ok := r.BasicAuth()
 		if !ok || !a.opts.Auth(u, p) {
+			a.failedSignIn(clientAddr(r))
 			w.Header().Set("WWW-Authenticate", `Basic realm="doze-kafka schema registry"`)
 			writeErr(w, newErr(401, codeUnauthorized, "Unauthorized"))
 			return
 		}
+		a.signedIn(clientAddr(r))
 	}
 	if (r.Method == http.MethodPost || r.Method == http.MethodPut) && !acceptedBodyType(r.Header.Get("Content-Type")) {
 		writeErr(w, newErr(http.StatusUnsupportedMediaType, codeUnsupportedMediaType, "HTTP 415 Unsupported Media Type"))
