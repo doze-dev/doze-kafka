@@ -4,7 +4,7 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 28533474,
+      "binaryBytes": 28550354,
       "idleHeapBytes": 1368256,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
@@ -12,7 +12,7 @@
       "where": "macOS 27, Apple M-series, native"
     },
     "linux/arm64": {
-      "binaryBytes": 27656352,
+      "binaryBytes": 27721888,
       "idleHeapBytes": 1374400,
       "idleHeapNoiseBytes": 7160,
       "go": "go1.27.3",
@@ -192,8 +192,29 @@
       "date": "2026-11-07",
       "key": "darwin/arm64 binaryBytes",
       "from": 28415122,
-      "to": 28533474,
-      "reason": "Stage 5 schema registry (schemas-stage5, 118,352 bytes or 0.42% over main 894c8b5): Avro compatibility ported from Avro's own reader/writer rules (avrocompat.go), Confluent's sentences for JSON Schema and Protobuf reasons, the request log and sign-in throttle, body and nesting limits, Protobuf descriptor imports compiled from references, stored schemas indexed under the current canonical form (66,848 together); the /_doze/ extension routes, overview, version metadata, request ring and check at a level with CompatReason (51,296); the console registry client's backoff and once-each reference walk (208); measured at each step on darwin/arm64 natively"
+      "to": 28550354,
+      "reason": "Stage 5 schema registry (schemas-stage5, 135,232 bytes or 0.48% over main 894c8b5): the resolved view with the Avro inliner (16,880); Avro compatibility ported from Avro's own reader/writer rules (avrocompat.go), Confluent's sentences for JSON Schema and Protobuf reasons, the request log and sign-in throttle, body and nesting limits, Protobuf descriptor imports compiled from references, stored schemas indexed under the current canonical form (66,848 together); the /_doze/ extension routes, overview, version metadata, request ring and check at a level with CompatReason (51,296); the console registry client's backoff and once-each reference walk (208); measured at each step on darwin/arm64 natively"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28533474,
+      "to": 28550354,
+      "reason": "The schema registry's resolved view, with the Avro inliner (avroinline.go, the Resolved route): 16,880 bytes"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27656352,
+      "to": 27721888,
+      "reason": "The schema registry's resolved view, with the Avro inliner: one more 64 KiB page of the linux/arm64 binary (built in golang:1.27.3 on linux/arm64)"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27590816,
+      "to": 27721888,
+      "reason": "Stage 5 schema registry (schemas-stage5) over main 894c8b5, two 64 KiB pages of the linux/arm64 binary: the same code as the darwin/arm64 raise from 28,415,122 to 28,550,354 of this date (one entry for the step the pull request's merge commit makes)"
     }
   ]
 }
