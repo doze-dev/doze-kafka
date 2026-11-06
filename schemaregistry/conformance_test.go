@@ -399,7 +399,7 @@ func differ(want, got recordedStep) string {
 				wmsg, _ := wm["message"].(string)
 				gmsg, _ := gm["message"].(string)
 				full := wmsg
-				if i := strings.Index(wmsg, ", details:"); i >= 0 {
+				if i := strings.Index(wmsg, ", details:"); i >= 0 && wm["error_code"] != float64(codeIncompatible) {
 					wmsg = wmsg[:i]
 					if j := strings.Index(gmsg, ", details:"); j >= 0 {
 						gmsg = gmsg[:j]
@@ -417,18 +417,8 @@ func differ(want, got recordedStep) string {
 	}
 	// A verbose compatibility check lists why in the checker's own words, then three
 	// fixed lines (the version compared, its text, the level); only those are compared.
-	if wm, ok := w.(map[string]any); ok {
-		if gm, ok := g.(map[string]any); ok {
-			wmsgs, _ := wm["messages"].([]any)
-			gmsgs, _ := gm["messages"].([]any)
-			if len(wmsgs) >= 3 && len(gmsgs) >= 3 {
-				if len(gmsgs) < 4 {
-					return "  no reason given with the verdict"
-				}
-				wm["messages"], gm["messages"] = wmsgs[len(wmsgs)-3:], gmsgs[len(gmsgs)-3:]
-			}
-		}
-	}
+	// The verbose messages are compared whole: the reasons are Confluent's
+	// (TestCorpusReasons), and so are the closing lines.
 	if !reflect.DeepEqual(w, g) {
 		var a, b bytes.Buffer
 		json.Indent(&a, got.Response, "    ", " ")

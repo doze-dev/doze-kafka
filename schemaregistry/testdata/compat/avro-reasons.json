@@ -1,0 +1,2047 @@
+{
+  "type": "AVRO",
+  "reasons": {
+    "add and remove field": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ]
+    },
+    "add field without default": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'b'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'b'}"
+      ]
+    },
+    "add union branch": {
+      "FORWARD": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The old schema is missing a type inside a union field at path '/fields/0/type/2' in the new schema', additionalInfo:'reader union lacking writer type: INT'}"
+      ],
+      "FULL": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The old schema is missing a type inside a union field at path '/fields/0/type/2' in the new schema', additionalInfo:'reader union lacking writer type: INT'}"
+      ]
+    },
+    "add union field without default": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'b'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'b'}"
+      ]
+    },
+    "array item demote": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type/items') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type/items') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ]
+    },
+    "array item promote": {
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type/items') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type/items') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ]
+    },
+    "array to map": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: MAP not compatible with writer type: ARRAY'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: ARRAY not compatible with writer type: MAP'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: ARRAY not compatible with writer type: MAP'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: MAP not compatible with writer type: ARRAY'}"
+      ]
+    },
+    "empty record add field": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the new schema has no default value and is missing in the old schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the new schema has no default value and is missing in the old schema', additionalInfo:'a'}"
+      ]
+    },
+    "enum add symbol": {
+      "FORWARD": [
+        "{errorType:'MISSING_ENUM_SYMBOLS', description:'The old schema is missing enum symbols '[C]' at path '/fields/0/type/symbols' in the new schema', additionalInfo:'[C]'}"
+      ],
+      "FULL": [
+        "{errorType:'MISSING_ENUM_SYMBOLS', description:'The old schema is missing enum symbols '[C]' at path '/fields/0/type/symbols' in the new schema', additionalInfo:'[C]'}"
+      ]
+    },
+    "enum remove symbol": {
+      "BACKWARD": [
+        "{errorType:'MISSING_ENUM_SYMBOLS', description:'The new schema is missing enum symbols '[C]' at path '/fields/0/type/symbols' in the old schema', additionalInfo:'[C]'}"
+      ],
+      "FULL": [
+        "{errorType:'MISSING_ENUM_SYMBOLS', description:'The new schema is missing enum symbols '[C]' at path '/fields/0/type/symbols' in the old schema', additionalInfo:'[C]'}"
+      ]
+    },
+    "enum rename": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/fields/0/type/name')', additionalInfo:'expected: E'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/fields/0/type/name')', additionalInfo:'expected: F'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/fields/0/type/name')', additionalInfo:'expected: F'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/fields/0/type/name')', additionalInfo:'expected: E'}"
+      ]
+    },
+    "enum to string": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: ENUM'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: ENUM not compatible with writer type: STRING'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: ENUM not compatible with writer type: STRING'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: ENUM'}"
+      ]
+    },
+    "fixed rename": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/fields/0/type/name')', additionalInfo:'expected: F'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/fields/0/type/name')', additionalInfo:'expected: G'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/fields/0/type/name')', additionalInfo:'expected: G'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/fields/0/type/name')', additionalInfo:'expected: F'}"
+      ]
+    },
+    "fixed size change": {
+      "BACKWARD": [
+        "{errorType:'FIXED_SIZE_MISMATCH', description:'The size of FIXED type field at path '/fields/0/type/size' in the new schema does not match with the old schema', additionalInfo:'expected: 4, found: 8'}"
+      ],
+      "FORWARD": [
+        "{errorType:'FIXED_SIZE_MISMATCH', description:'The size of FIXED type field at path '/fields/0/type/size' in the old schema does not match with the new schema', additionalInfo:'expected: 8, found: 4'}"
+      ],
+      "FULL": [
+        "{errorType:'FIXED_SIZE_MISMATCH', description:'The size of FIXED type field at path '/fields/0/type/size' in the old schema does not match with the new schema', additionalInfo:'expected: 8, found: 4'}",
+        "{errorType:'FIXED_SIZE_MISMATCH', description:'The size of FIXED type field at path '/fields/0/type/size' in the new schema does not match with the old schema', additionalInfo:'expected: 4, found: 8'}"
+      ]
+    },
+    "map value change": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type/values') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: INT'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type/values') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: STRING'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type/values') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: STRING'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type/values') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: INT'}"
+      ]
+    },
+    "map value promote": {
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type/values') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type/values') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ]
+    },
+    "narrow from union": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ]
+    },
+    "nested add field without default": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'y' at path '/fields/0/type/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'y'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'y' at path '/fields/0/type/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'y'}"
+      ]
+    },
+    "nested in array add field": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'y' at path '/fields/0/type/items/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'y'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'y' at path '/fields/0/type/items/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'y'}"
+      ]
+    },
+    "nested record type change": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: RECORD'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: RECORD not compatible with writer type: STRING'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: RECORD not compatible with writer type: STRING'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: RECORD'}"
+      ]
+    },
+    "nested remove field": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'y' at path '/fields/0/type/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'y'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'y' at path '/fields/0/type/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'y'}"
+      ]
+    },
+    "primitive int to long": {
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ]
+    },
+    "primitive long to int": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ]
+    },
+    "primitive string to int": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: STRING'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: INT'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: INT'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: STRING'}"
+      ]
+    },
+    "primitive to record": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: RECORD not compatible with writer type: STRING'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: RECORD'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: RECORD'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: RECORD not compatible with writer type: STRING'}"
+      ]
+    },
+    "promote boolean to int": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: BOOLEAN'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BOOLEAN not compatible with writer type: INT'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BOOLEAN not compatible with writer type: INT'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: BOOLEAN'}"
+      ]
+    },
+    "promote double to float": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: FLOAT not compatible with writer type: DOUBLE'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: FLOAT not compatible with writer type: DOUBLE'}"
+      ]
+    },
+    "promote float to double": {
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: FLOAT not compatible with writer type: DOUBLE'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: FLOAT not compatible with writer type: DOUBLE'}"
+      ]
+    },
+    "promote float to long": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: LONG not compatible with writer type: FLOAT'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: LONG not compatible with writer type: FLOAT'}"
+      ]
+    },
+    "promote int to boolean": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: BOOLEAN not compatible with writer type: INT'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: BOOLEAN'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: BOOLEAN'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: BOOLEAN not compatible with writer type: INT'}"
+      ]
+    },
+    "promote int to double": {
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: DOUBLE'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: DOUBLE'}"
+      ]
+    },
+    "promote int to float": {
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: FLOAT'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: FLOAT'}"
+      ]
+    },
+    "promote int to long": {
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ]
+    },
+    "promote int to string": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: INT'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: STRING'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: STRING'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: INT'}"
+      ]
+    },
+    "promote long to double": {
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: LONG not compatible with writer type: DOUBLE'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: LONG not compatible with writer type: DOUBLE'}"
+      ]
+    },
+    "promote long to float": {
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: LONG not compatible with writer type: FLOAT'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: LONG not compatible with writer type: FLOAT'}"
+      ]
+    },
+    "promote long to int": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ]
+    },
+    "promote string to int": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: STRING'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: INT'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: INT'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: STRING'}"
+      ]
+    },
+    "random 001": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 005": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: LONG not compatible with writer type: ARRAY'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: ARRAY not compatible with writer type: LONG'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: ARRAY not compatible with writer type: LONG'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: LONG not compatible with writer type: ARRAY'}"
+      ]
+    },
+    "random 006": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: BYTES not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: BYTES not compatible with writer type: LONG'}"
+      ],
+      "FORWARD": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The old schema is missing a type inside a union field at path '/fields/2/type' in the new schema', additionalInfo:'reader union lacking writer type: BYTES'}"
+      ],
+      "FULL": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The old schema is missing a type inside a union field at path '/fields/2/type' in the new schema', additionalInfo:'reader union lacking writer type: BYTES'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: BYTES not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: BYTES not compatible with writer type: LONG'}"
+      ]
+    },
+    "random 007": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'o' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'o'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'o' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'o'}"
+      ]
+    },
+    "random 010": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 011": {
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: LONG not compatible with writer type: DOUBLE'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: LONG not compatible with writer type: DOUBLE'}"
+      ]
+    },
+    "random 013": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'p'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'p'}"
+      ]
+    },
+    "random 015": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ]
+    },
+    "random 018": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 020": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'm' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'m'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'm' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'m'}"
+      ]
+    },
+    "random 021": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: DOUBLE not compatible with writer type: BOOLEAN'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BOOLEAN not compatible with writer type: DOUBLE'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BOOLEAN not compatible with writer type: DOUBLE'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: DOUBLE not compatible with writer type: BOOLEAN'}"
+      ]
+    },
+    "random 022": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'o' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'o'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'o' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'o'}"
+      ]
+    },
+    "random 023": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 026": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ]
+    },
+    "random 029": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: MAP not compatible with writer type: DOUBLE'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: DOUBLE not compatible with writer type: MAP'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: DOUBLE not compatible with writer type: MAP'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: MAP not compatible with writer type: DOUBLE'}"
+      ]
+    },
+    "random 030": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: ARRAY'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: ARRAY not compatible with writer type: INT'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: ARRAY not compatible with writer type: INT'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: ARRAY'}"
+      ]
+    },
+    "random 031": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'n' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'n'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'n' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'n'}"
+      ]
+    },
+    "random 032": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ]
+    },
+    "random 034": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 036": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ]
+    },
+    "random 037": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ]
+    },
+    "random 040": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}",
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'n' at path '/fields/3' in the new schema has no default value and is missing in the old schema', additionalInfo:'n'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}",
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'n' at path '/fields/3' in the new schema has no default value and is missing in the old schema', additionalInfo:'n'}"
+      ]
+    },
+    "random 044": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'n' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'n'}"
+      ],
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}",
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'n' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'n'}"
+      ]
+    },
+    "random 045": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/3/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: BOOLEAN not compatible with writer type: STRING'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/3/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: BOOLEAN'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/3/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: BOOLEAN'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/3/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: BOOLEAN not compatible with writer type: STRING'}"
+      ]
+    },
+    "random 047": {
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ]
+    },
+    "random 050": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ]
+    },
+    "random 055": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: FIXED not compatible with writer type: BYTES'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BYTES not compatible with writer type: FIXED'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BYTES not compatible with writer type: FIXED'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: FIXED not compatible with writer type: BYTES'}"
+      ]
+    },
+    "random 056": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'q' at path '/fields/3' in the new schema has no default value and is missing in the old schema', additionalInfo:'q'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'q' at path '/fields/3' in the new schema has no default value and is missing in the old schema', additionalInfo:'q'}"
+      ]
+    },
+    "random 057": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'c' at path '/fields/2' in the old schema has no default value and is missing in the new schema', additionalInfo:'c'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'c' at path '/fields/2' in the old schema has no default value and is missing in the new schema', additionalInfo:'c'}"
+      ]
+    },
+    "random 058": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ]
+    },
+    "random 061": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'c' at path '/fields/2' in the old schema has no default value and is missing in the new schema', additionalInfo:'c'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'c' at path '/fields/2' in the old schema has no default value and is missing in the new schema', additionalInfo:'c'}"
+      ]
+    },
+    "random 062": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 065": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 067": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: LONG not compatible with writer type: ENUM'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: ENUM not compatible with writer type: LONG'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: ENUM not compatible with writer type: LONG'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: LONG not compatible with writer type: ENUM'}"
+      ]
+    },
+    "random 069": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 070": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 072": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 076": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'd' at path '/fields/3' in the old schema has no default value and is missing in the new schema', additionalInfo:'d'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'd' at path '/fields/3' in the old schema has no default value and is missing in the new schema', additionalInfo:'d'}"
+      ]
+    },
+    "random 077": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'p'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'p'}"
+      ]
+    },
+    "random 078": {
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: LONG not compatible with writer type: NULL'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: LONG not compatible with writer type: NULL'}"
+      ]
+    },
+    "random 080": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: BYTES'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BYTES not compatible with writer type: INT'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BYTES not compatible with writer type: INT'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: BYTES'}"
+      ]
+    },
+    "random 081": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 085": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ]
+    },
+    "random 087": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 088": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: FIXED not compatible with writer type: MAP'}"
+      ],
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'c' at path '/fields/2' in the old schema has no default value and is missing in the new schema', additionalInfo:'c'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'c' at path '/fields/2' in the old schema has no default value and is missing in the new schema', additionalInfo:'c'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: FIXED not compatible with writer type: MAP'}"
+      ]
+    },
+    "random 095": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 098": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: LONG not compatible with writer type: ENUM'}"
+      ],
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: LONG not compatible with writer type: ENUM'}"
+      ]
+    },
+    "random 102": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ]
+    },
+    "random 106": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ]
+    },
+    "random 108": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'p'}"
+      ],
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}",
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'p'}"
+      ]
+    },
+    "random 110": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/fields/0/type/name')', additionalInfo:'expected: F1'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/fields/0/type/name')', additionalInfo:'expected: F0'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/fields/0/type/name')', additionalInfo:'expected: F0'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/fields/0/type/name')', additionalInfo:'expected: F1'}"
+      ]
+    },
+    "random 112": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}",
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'd' at path '/fields/3' in the old schema has no default value and is missing in the new schema', additionalInfo:'d'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}",
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'd' at path '/fields/3' in the old schema has no default value and is missing in the new schema', additionalInfo:'d'}"
+      ]
+    },
+    "random 114": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'q' at path '/fields/3' in the new schema has no default value and is missing in the old schema', additionalInfo:'q'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'q' at path '/fields/3' in the new schema has no default value and is missing in the old schema', additionalInfo:'q'}"
+      ]
+    },
+    "random 115": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 117": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ENUM not compatible with writer type: LONG'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: LONG not compatible with writer type: ENUM'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: LONG not compatible with writer type: ENUM'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ENUM not compatible with writer type: LONG'}"
+      ]
+    },
+    "random 118": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: INT'}"
+      ],
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: STRING'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: STRING'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: INT'}"
+      ]
+    },
+    "random 119": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'c' at path '/fields/2' in the old schema has no default value and is missing in the new schema', additionalInfo:'c'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'c' at path '/fields/2' in the old schema has no default value and is missing in the new schema', additionalInfo:'c'}"
+      ]
+    },
+    "random 120": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 122": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'm' at path '/fields/4' in the new schema has no default value and is missing in the old schema', additionalInfo:'m'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'm' at path '/fields/4' in the new schema has no default value and is missing in the old schema', additionalInfo:'m'}"
+      ]
+    },
+    "random 125": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}",
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}",
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ]
+    },
+    "random 127": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 129": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ENUM not compatible with writer type: BYTES'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BYTES not compatible with writer type: ENUM'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BYTES not compatible with writer type: ENUM'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ENUM not compatible with writer type: BYTES'}"
+      ]
+    },
+    "random 131": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ARRAY not compatible with writer type: LONG'}"
+      ],
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ARRAY not compatible with writer type: LONG'}"
+      ]
+    },
+    "random 133": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ]
+    },
+    "random 136": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ]
+    },
+    "random 137": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 139": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'p'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'p'}"
+      ]
+    },
+    "random 140": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 141": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 146": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'o' at path '/fields/3' in the new schema has no default value and is missing in the old schema', additionalInfo:'o'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'o' at path '/fields/3' in the new schema has no default value and is missing in the old schema', additionalInfo:'o'}"
+      ]
+    },
+    "random 147": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: MAP not compatible with writer type: BYTES'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BYTES not compatible with writer type: MAP'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BYTES not compatible with writer type: MAP'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: MAP not compatible with writer type: BYTES'}"
+      ]
+    },
+    "random 148": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: MAP not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: MAP not compatible with writer type: STRING'}"
+      ],
+      "FORWARD": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The old schema is missing a type inside a union field at path '/fields/0/type' in the new schema', additionalInfo:'reader union lacking writer type: MAP'}"
+      ],
+      "FULL": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The old schema is missing a type inside a union field at path '/fields/0/type' in the new schema', additionalInfo:'reader union lacking writer type: MAP'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: MAP not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: MAP not compatible with writer type: STRING'}"
+      ]
+    },
+    "random 154": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 156": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: LONG'}"
+      ],
+      "FORWARD": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The old schema is missing a type inside a union field at path '/fields/1/type' in the new schema', additionalInfo:'reader union lacking writer type: STRING'}"
+      ],
+      "FULL": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The old schema is missing a type inside a union field at path '/fields/1/type' in the new schema', additionalInfo:'reader union lacking writer type: STRING'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: LONG'}"
+      ]
+    },
+    "random 158": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/fields/2/type/name')', additionalInfo:'expected: E2'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/fields/2/type/name')', additionalInfo:'expected: E0'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/fields/2/type/name')', additionalInfo:'expected: E0'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/fields/2/type/name')', additionalInfo:'expected: E2'}"
+      ]
+    },
+    "random 160": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 161": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 162": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ARRAY not compatible with writer type: BOOLEAN'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BOOLEAN not compatible with writer type: ARRAY'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BOOLEAN not compatible with writer type: ARRAY'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ARRAY not compatible with writer type: BOOLEAN'}"
+      ]
+    },
+    "random 163": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ]
+    },
+    "random 164": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 167": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ENUM not compatible with writer type: LONG'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: LONG not compatible with writer type: ENUM'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: LONG not compatible with writer type: ENUM'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ENUM not compatible with writer type: LONG'}"
+      ]
+    },
+    "random 170": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'o' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'o'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'o' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'o'}"
+      ]
+    },
+    "random 174": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 175": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p' at path '/fields/5' in the new schema has no default value and is missing in the old schema', additionalInfo:'p'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p' at path '/fields/5' in the new schema has no default value and is missing in the old schema', additionalInfo:'p'}"
+      ]
+    },
+    "random 176": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: DOUBLE'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: DOUBLE'}"
+      ]
+    },
+    "random 178": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 180": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 181": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 184": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ]
+    },
+    "random 185": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 186": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'c' at path '/fields/2' in the old schema has no default value and is missing in the new schema', additionalInfo:'c'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'c' at path '/fields/2' in the old schema has no default value and is missing in the new schema', additionalInfo:'c'}"
+      ]
+    },
+    "random 187": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: MAP not compatible with writer type: ARRAY'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: ARRAY not compatible with writer type: MAP'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: ARRAY not compatible with writer type: MAP'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: MAP not compatible with writer type: ARRAY'}"
+      ]
+    },
+    "random 189": {
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ]
+    },
+    "random 190": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ]
+    },
+    "random 191": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: LONG not compatible with writer type: FIXED'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: FIXED not compatible with writer type: LONG'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: FIXED not compatible with writer type: LONG'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: LONG not compatible with writer type: FIXED'}"
+      ]
+    },
+    "random 192": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 194": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p' at path '/fields/5' in the new schema has no default value and is missing in the old schema', additionalInfo:'p'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p' at path '/fields/5' in the new schema has no default value and is missing in the old schema', additionalInfo:'p'}"
+      ]
+    },
+    "random 196": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'o' at path '/fields/3' in the new schema has no default value and is missing in the old schema', additionalInfo:'o'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'o' at path '/fields/3' in the new schema has no default value and is missing in the old schema', additionalInfo:'o'}"
+      ]
+    },
+    "random 197": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ]
+    },
+    "random 199": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'q' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'q'}"
+      ],
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'c' at path '/fields/2' in the old schema has no default value and is missing in the new schema', additionalInfo:'c'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'c' at path '/fields/2' in the old schema has no default value and is missing in the new schema', additionalInfo:'c'}",
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'q' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'q'}"
+      ]
+    },
+    "random 202": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: FIXED not compatible with writer type: MAP'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: MAP not compatible with writer type: FIXED'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: MAP not compatible with writer type: FIXED'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: FIXED not compatible with writer type: MAP'}"
+      ]
+    },
+    "random 204": {
+      "BACKWARD": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The new schema is missing a type inside a union field at path '/fields/0/type' in the old schema', additionalInfo:'reader union lacking writer type: FIXED'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: FIXED not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: FIXED not compatible with writer type: STRING'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: FIXED not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: FIXED not compatible with writer type: STRING'}",
+        "{errorType:'MISSING_UNION_BRANCH', description:'The new schema is missing a type inside a union field at path '/fields/0/type' in the old schema', additionalInfo:'reader union lacking writer type: FIXED'}"
+      ]
+    },
+    "random 205": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ARRAY not compatible with writer type: FIXED'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: FIXED not compatible with writer type: ARRAY'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: FIXED not compatible with writer type: ARRAY'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ARRAY not compatible with writer type: FIXED'}"
+      ]
+    },
+    "random 207": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ARRAY not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ARRAY not compatible with writer type: STRING'}"
+      ],
+      "FORWARD": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The old schema is missing a type inside a union field at path '/fields/2/type' in the new schema', additionalInfo:'reader union lacking writer type: ARRAY'}"
+      ],
+      "FULL": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The old schema is missing a type inside a union field at path '/fields/2/type' in the new schema', additionalInfo:'reader union lacking writer type: ARRAY'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ARRAY not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ARRAY not compatible with writer type: STRING'}"
+      ]
+    },
+    "random 210": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 213": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'p'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'p'}"
+      ]
+    },
+    "random 214": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'm' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'m'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'm' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'m'}"
+      ]
+    },
+    "random 217": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: BOOLEAN not compatible with writer type: LONG'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: LONG not compatible with writer type: BOOLEAN'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: LONG not compatible with writer type: BOOLEAN'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: BOOLEAN not compatible with writer type: LONG'}"
+      ]
+    },
+    "random 219": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: BYTES not compatible with writer type: BOOLEAN'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BOOLEAN not compatible with writer type: BYTES'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BOOLEAN not compatible with writer type: BYTES'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: BYTES not compatible with writer type: BOOLEAN'}"
+      ]
+    },
+    "random 220": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 221": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 222": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 224": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'n' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'n'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'n' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'n'}"
+      ]
+    },
+    "random 225": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: MAP not compatible with writer type: ENUM'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: ENUM not compatible with writer type: MAP'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: ENUM not compatible with writer type: MAP'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: MAP not compatible with writer type: ENUM'}"
+      ]
+    },
+    "random 227": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 228": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ]
+    },
+    "random 229": {
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ]
+    },
+    "random 230": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 232": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 234": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'p'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'p'}"
+      ]
+    },
+    "random 236": {
+      "BACKWARD": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The new schema is missing a type inside a union field at path '/fields/0/type' in the old schema', additionalInfo:'reader union lacking writer type: BYTES'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BYTES not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BYTES not compatible with writer type: LONG'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BYTES not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BYTES not compatible with writer type: LONG'}",
+        "{errorType:'MISSING_UNION_BRANCH', description:'The new schema is missing a type inside a union field at path '/fields/0/type' in the old schema', additionalInfo:'reader union lacking writer type: BYTES'}"
+      ]
+    },
+    "random 240": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 241": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ]
+    },
+    "random 242": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 243": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'n' at path '/fields/4' in the new schema has no default value and is missing in the old schema', additionalInfo:'n'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'n' at path '/fields/4' in the new schema has no default value and is missing in the old schema', additionalInfo:'n'}"
+      ]
+    },
+    "random 246": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 248": {
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ]
+    },
+    "random 250": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 251": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ]
+    },
+    "random 255": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 261": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 263": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: BYTES not compatible with writer type: FIXED'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: FIXED not compatible with writer type: BYTES'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: FIXED not compatible with writer type: BYTES'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/2/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: BYTES not compatible with writer type: FIXED'}"
+      ]
+    },
+    "random 264": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 269": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'z' at path '/fields/0' in the new schema has no default value and is missing in the old schema', additionalInfo:'z'}"
+      ],
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}",
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'z' at path '/fields/0' in the new schema has no default value and is missing in the old schema', additionalInfo:'z'}"
+      ]
+    },
+    "random 270": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 271": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'o' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'o'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}",
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'o' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'o'}"
+      ]
+    },
+    "random 272": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'o' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'o'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'o' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'o'}"
+      ]
+    },
+    "random 274": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 275": {
+      "BACKWARD": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The new schema is missing a type inside a union field at path '/fields/0/type' in the old schema', additionalInfo:'reader union lacking writer type: INT'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: STRING'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: STRING'}",
+        "{errorType:'MISSING_UNION_BRANCH', description:'The new schema is missing a type inside a union field at path '/fields/0/type' in the old schema', additionalInfo:'reader union lacking writer type: INT'}"
+      ]
+    },
+    "random 276": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ],
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: LONG'}"
+      ]
+    },
+    "random 277": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: MAP not compatible with writer type: BOOLEAN'}"
+      ],
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BOOLEAN not compatible with writer type: MAP'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: BOOLEAN not compatible with writer type: MAP'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: MAP not compatible with writer type: BOOLEAN'}"
+      ]
+    },
+    "random 280": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 286": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'n' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'n'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'n' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'n'}"
+      ]
+    },
+    "random 289": {
+      "BACKWARD": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The new schema is missing a type inside a union field at path '/fields/2/type' in the old schema', additionalInfo:'reader union lacking writer type: MAP'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: MAP not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: MAP not compatible with writer type: LONG'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: MAP not compatible with writer type: NULL'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: MAP not compatible with writer type: LONG'}",
+        "{errorType:'MISSING_UNION_BRANCH', description:'The new schema is missing a type inside a union field at path '/fields/2/type' in the old schema', additionalInfo:'reader union lacking writer type: MAP'}"
+      ]
+    },
+    "random 290": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'q' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'q'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'q' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'q'}"
+      ]
+    },
+    "random 292": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "random 293": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "random 294": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ]
+    },
+    "random 295": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: FIXED not compatible with writer type: MAP'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: MAP not compatible with writer type: FIXED'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: MAP not compatible with writer type: FIXED'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: FIXED not compatible with writer type: MAP'}"
+      ]
+    },
+    "random 297": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p2' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'p2'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'p2' at path '/fields/1' in the new schema has no default value and is missing in the old schema', additionalInfo:'p2'}"
+      ]
+    },
+    "random 298": {
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: LONG not compatible with writer type: DOUBLE'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: LONG not compatible with writer type: DOUBLE'}"
+      ]
+    },
+    "record rename": {
+      "BACKWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ],
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}",
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: R'}"
+      ]
+    },
+    "record rename with alias": {
+      "FORWARD": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ],
+      "FULL": [
+        "{errorType:'NAME_MISMATCH', description:'The name of the schema has changed (path '/name')', additionalInfo:'expected: S'}"
+      ]
+    },
+    "record to primitive": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: RECORD'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: RECORD not compatible with writer type: STRING'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: RECORD not compatible with writer type: STRING'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: RECORD'}"
+      ]
+    },
+    "recursive add field without default": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'w' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'w'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'w' at path '/fields/2' in the new schema has no default value and is missing in the old schema', additionalInfo:'w'}"
+      ]
+    },
+    "remove field": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'b' at path '/fields/1' in the old schema has no default value and is missing in the new schema', additionalInfo:'b'}"
+      ]
+    },
+    "remove union branch": {
+      "BACKWARD": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The new schema is missing a type inside a union field at path '/fields/0/type/2' in the old schema', additionalInfo:'reader union lacking writer type: INT'}"
+      ],
+      "FULL": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The new schema is missing a type inside a union field at path '/fields/0/type/2' in the old schema', additionalInfo:'reader union lacking writer type: INT'}"
+      ]
+    },
+    "rename field": {
+      "BACKWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'z' at path '/fields/0' in the new schema has no default value and is missing in the old schema', additionalInfo:'z'}"
+      ],
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}",
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'z' at path '/fields/0' in the new schema has no default value and is missing in the old schema', additionalInfo:'z'}"
+      ]
+    },
+    "rename field with alias": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "rename field with alias and default": {
+      "FORWARD": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ],
+      "FULL": [
+        "{errorType:'READER_FIELD_MISSING_DEFAULT_VALUE', description:'The field 'a' at path '/fields/0' in the old schema has no default value and is missing in the new schema', additionalInfo:'a'}"
+      ]
+    },
+    "string to enum": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ENUM not compatible with writer type: STRING'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: ENUM'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: ENUM'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: ENUM not compatible with writer type: STRING'}"
+      ]
+    },
+    "swap field types": {
+      "BACKWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: STRING'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: INT'}"
+      ],
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: INT'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: STRING'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: INT'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: INT not compatible with writer type: STRING'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/0/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: INT not compatible with writer type: STRING'}",
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/fields/1/type') of a field in the new schema does not match with the old schema', additionalInfo:'reader type: STRING not compatible with writer type: INT'}"
+      ]
+    },
+    "top-level enum add": {
+      "FORWARD": [
+        "{errorType:'MISSING_ENUM_SYMBOLS', description:'The old schema is missing enum symbols '[C]' at path '/symbols' in the new schema', additionalInfo:'[C]'}"
+      ],
+      "FULL": [
+        "{errorType:'MISSING_ENUM_SYMBOLS', description:'The old schema is missing enum symbols '[C]' at path '/symbols' in the new schema', additionalInfo:'[C]'}"
+      ]
+    },
+    "top-level union add": {
+      "FORWARD": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The old schema is missing a type inside a union field at path '/2' in the new schema', additionalInfo:'reader union lacking writer type: INT'}"
+      ],
+      "FULL": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The old schema is missing a type inside a union field at path '/2' in the new schema', additionalInfo:'reader union lacking writer type: INT'}"
+      ]
+    },
+    "top-level union remove": {
+      "BACKWARD": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The new schema is missing a type inside a union field at path '/2' in the old schema', additionalInfo:'reader union lacking writer type: INT'}"
+      ],
+      "FULL": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The new schema is missing a type inside a union field at path '/2' in the old schema', additionalInfo:'reader union lacking writer type: INT'}"
+      ]
+    },
+    "union demote branch": {
+      "BACKWARD": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The new schema is missing a type inside a union field at path '/fields/0/type/1' in the old schema', additionalInfo:'reader union lacking writer type: LONG'}"
+      ],
+      "FULL": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The new schema is missing a type inside a union field at path '/fields/0/type/1' in the old schema', additionalInfo:'reader union lacking writer type: LONG'}"
+      ]
+    },
+    "union promote branch": {
+      "FORWARD": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The old schema is missing a type inside a union field at path '/fields/0/type/1' in the new schema', additionalInfo:'reader union lacking writer type: LONG'}"
+      ],
+      "FULL": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The old schema is missing a type inside a union field at path '/fields/0/type/1' in the new schema', additionalInfo:'reader union lacking writer type: LONG'}"
+      ]
+    },
+    "union to union disjoint": {
+      "BACKWARD": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The new schema is missing a type inside a union field at path '/fields/0/type/0' in the old schema', additionalInfo:'reader union lacking writer type: INT'}"
+      ],
+      "FORWARD": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The old schema is missing a type inside a union field at path '/fields/0/type/0' in the new schema', additionalInfo:'reader union lacking writer type: BOOLEAN'}"
+      ],
+      "FULL": [
+        "{errorType:'MISSING_UNION_BRANCH', description:'The old schema is missing a type inside a union field at path '/fields/0/type/0' in the new schema', additionalInfo:'reader union lacking writer type: BOOLEAN'}",
+        "{errorType:'MISSING_UNION_BRANCH', description:'The new schema is missing a type inside a union field at path '/fields/0/type/0' in the old schema', additionalInfo:'reader union lacking writer type: INT'}"
+      ]
+    },
+    "widen to union": {
+      "FORWARD": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ],
+      "FULL": [
+        "{errorType:'TYPE_MISMATCH', description:'The type (path '/') of a field in the old schema does not match with the new schema', additionalInfo:'reader type: STRING not compatible with writer type: NULL'}"
+      ]
+    }
+  }
+}

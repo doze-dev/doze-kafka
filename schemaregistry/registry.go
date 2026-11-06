@@ -453,7 +453,7 @@ func (r *Registry) compatibleWith(subject string, p parsedSchema, level string) 
 			continue
 		}
 		if msgs := compare(p, old, base); len(msgs) > 0 {
-			all = append(all, CompatFinding{Version: vr.Version, Old: r.schemas[vr.ID].Schema, Level: base, Reasons: msgs}.Messages()...)
+			all = append(all, CompatFinding{Version: vr.Version, Old: r.schemas[vr.ID].Schema, Level: level, Reasons: msgs}.Messages()...)
 		}
 	}
 	return all
@@ -471,29 +471,37 @@ func (r *Registry) parseStored(id int) (parsedSchema, error) {
 
 // compare returns the reasons `newer` is not compatible with `older` under a
 // non-transitive level name (BACKWARD, FORWARD or FULL).
+//
+// At FULL the forward reasons (the old schema reading the new) come first, then the
+// backward ones, as Confluent lists them (recorded: testdata/compat/*-reasons.json).
 func compare(newer, older parsedSchema, level string) []string {
 	var msgs []string
-	if level == CompatBackward || level == CompatFull {
-		msgs = append(msgs, canRead(newer, older)...)
-	}
 	if level == CompatForward || level == CompatFull {
-		msgs = append(msgs, canRead(older, newer)...)
+		msgs = append(msgs, canRead(older, newer, "old", "new")...)
+	}
+	if level == CompatBackward || level == CompatFull {
+		msgs = append(msgs, canRead(newer, older, "new", "old")...)
 	}
 	return msgs
 }
 
-// canRead reports why a reader built for `reader` cannot read data written for `writer`.
-func canRead(reader, writer parsedSchema) []string {
+// canRead reports why a reader built for `reader` cannot read data written for
+// `writer`; readerIs and writerIs say which of them is the new schema and which the old.
+func canRead(reader, writer parsedSchema, readerIs, writerIs string) []string {
 	if reader.Type() != writer.Type() {
 		return []string{fmt.Sprintf("Incompatible because of different schema type: %s vs %s", reader.Type(), writer.Type())}
 	}
 	switch rd := reader.(type) {
 	case *avroSchema:
-		return avroCanRead(rd, writer.(*avroSchema))
+		var msgs []string
+		for _, in := range avroIncompatibilities(rd.schema, writer.(*avroSchema).schema) {
+			msgs = append(msgs, in.describe(readerIs, writerIs))
+		}
+		return msgs
 	case *jsonSchema:
-		return jsonCanRead(rd, writer.(*jsonSchema))
+		return jsonCanRead(rd, writer.(*jsonSchema), readerIs, writerIs)
 	case *protoSchema:
-		return protoCanRead(rd, writer.(*protoSchema))
+		return protoCanRead(rd, writer.(*protoSchema), readerIs, writerIs)
 	}
 	return nil
 }
@@ -1036,11 +1044,11 @@ func (r *Registry) CheckCompatible(subject, version string, in SchemaInput, norm
 	for _, vr := range against {
 		old, err := r.parseStored(vr.ID)
 		if err != nil {
-			out = append(out, CompatFinding{Version: vr.Version, Old: r.schemas[vr.ID].Schema, Level: base, Reasons: []string{err.Error()}})
+			out = append(out, CompatFinding{Version: vr.Version, Old: r.schemas[vr.ID].Schema, Level: level, Reasons: []string{err.Error()}})
 			continue
 		}
 		if msgs := compare(p, old, base); len(msgs) > 0 {
-			out = append(out, CompatFinding{Version: vr.Version, Old: r.schemas[vr.ID].Schema, Level: base, Reasons: msgs})
+			out = append(out, CompatFinding{Version: vr.Version, Old: r.schemas[vr.ID].Schema, Level: level, Reasons: msgs})
 		}
 	}
 	return out, nil
