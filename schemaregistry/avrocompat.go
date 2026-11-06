@@ -259,9 +259,9 @@ func writerField(writer *avro.RecordSchema, rf *avro.Field) *avro.Field {
 	return nil
 }
 
-// describe is Confluent's sentence for a finding, reader and writer named as the new
-// or the old schema.
-func (in avroIncompatibility) describe(readerIs, writerIs string) string {
+// reason is a finding with Confluent's sentence for it, reader and writer named as the
+// new or the old schema.
+func (in avroIncompatibility) reason(readerIs, writerIs string) CompatReason {
 	var d string
 	switch in.Type {
 	case "READER_FIELD_MISSING_DEFAULT_VALUE":
@@ -277,5 +277,6 @@ func (in avroIncompatibility) describe(readerIs, writerIs string) string {
 	case "MISSING_UNION_BRANCH":
 		d = fmt.Sprintf("The %s schema is missing a type inside a union field at path '%s' in the %s schema", readerIs, in.Path, writerIs)
 	}
-	return fmt.Sprintf("{errorType:'%s', description:'%s', additionalInfo:'%s'}", in.Type, d, in.Info)
+	return CompatReason{Type: in.Type, Path: in.Path, Description: d, Info: in.Info,
+		Text: fmt.Sprintf("{errorType:'%s', description:'%s', additionalInfo:'%s'}", in.Type, d, in.Info)}
 }

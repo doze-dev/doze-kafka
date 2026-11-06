@@ -69,11 +69,11 @@ func (d *protoDiff) add(typ, path, text string) {
 // The sentences below are written with the reader as the new schema; when the reader
 // is the old one (a FORWARD check) the two are named the other way round, as
 // Confluent names them (recorded: testdata/compat/protobuf-reasons.json).
-func protoCanRead(reader, writer *protoSchema, readerIs, writerIs string) []string {
+func protoCanRead(reader, writer *protoSchema, readerIs, writerIs string) []CompatReason {
 	d := &protoDiff{oldFile: writer.file, newFile: reader.file}
 	d.compareFiles(writer.file, reader.file)
 	names := strings.NewReplacer("new schema", readerIs+" schema", "old schema", writerIs+" schema")
-	var out []string
+	var out []CompatReason
 	for _, c := range d.changes {
 		text := c.text
 		if t, ok := protoSentences[c.typ]; ok {
@@ -84,7 +84,9 @@ func protoCanRead(reader, writer *protoSchema, readerIs, writerIs string) []stri
 			}
 			text = fmt.Sprintf(t, path)
 		}
-		out = append(out, fmt.Sprintf("{errorType:\"%s\", description:\"%s\"}", c.typ, names.Replace(text)))
+		desc := names.Replace(text)
+		out = append(out, CompatReason{Type: c.typ, Path: strings.ReplaceAll(c.path, ".", "/"), Description: desc,
+			Text: fmt.Sprintf("{errorType:\"%s\", description:\"%s\"}", c.typ, desc)})
 	}
 	return out
 }

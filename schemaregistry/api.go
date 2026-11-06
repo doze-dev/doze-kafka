@@ -43,6 +43,8 @@ type API struct {
 	failMu sync.Mutex
 	fails  map[string]int      // failed sign-ins in a row, by client address
 	sleep  func(time.Duration) // time.Sleep; a test's own
+
+	reqs requestRing // the newest requests (requests.go)
 }
 
 // NewAPI builds the HTTP handler over a registry.
@@ -130,7 +132,9 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	sw := &statusWriter{ResponseWriter: w}
 	a.serve(sw, r)
-	a.logRequest(r, sw.status, time.Since(start))
+	took := time.Since(start)
+	a.logRequest(r, sw.status, took)
+	a.record(r, sw.status, took)
 }
 
 // logRequest writes one record per request: a server failure as a warning, a refused
@@ -324,6 +328,7 @@ func readInput(r *http.Request) (SchemaInput, *Error) {
 
 func (a *API) routes() {
 	m := a.mux
+	defer a.dozeRoutes()
 	// handle wraps a handler that returns an error as the registry's JSON error.
 	handle := func(pattern string, h func(w http.ResponseWriter, r *http.Request) *Error) {
 		m.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
@@ -355,7 +360,7 @@ func (a *API) routes() {
 		if e != nil {
 			return e
 		}
-		res, e := a.reg.Register(r.PathValue("subject"), in, boolParam(r, "normalize"))
+		res, e := a.reg.RegisterFrom(r.PathValue("subject"), in, boolParam(r, "normalize"), originOf(r))
 		if e != nil {
 			return e
 		}

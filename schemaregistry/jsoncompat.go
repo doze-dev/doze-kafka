@@ -514,20 +514,22 @@ func compatibleDiff(o, u *jnode) bool {
 
 // jsonCanRead: a reader of `reader` reads what a writer of `writer` wrote when going
 // from writer to reader changes nothing incompatibly.
-func jsonCanRead(reader, writer *jsonSchema, readerIs, writerIs string) []string {
+func jsonCanRead(reader, writer *jsonSchema, readerIs, writerIs string) []CompatReason {
 	o, n := writer.node, reader.node
 	if o == nil || n == nil {
 		return nil
 	}
 	var d jdiff
 	d.compare(o, n, "#")
-	var msgs []string
+	var out []CompatReason
 	for _, c := range d.bad() {
+		desc := describeJSONChange(c, readerIs, writerIs)
 		// The closing quote is Confluent's own: a double quote opens the description
 		// and a single one closes it (recorded: testdata/compat/json-reasons.json).
-		msgs = append(msgs, fmt.Sprintf("{errorType:\"%s\", description:\"%s'}", c.typ, describeJSONChange(c, readerIs, writerIs)))
+		out = append(out, CompatReason{Type: c.typ, Path: c.path, Description: desc,
+			Text: fmt.Sprintf("{errorType:\"%s\", description:\"%s'}", c.typ, desc)})
 	}
-	return msgs
+	return out
 }
 
 // jsonSentences are Confluent's descriptions by change type, R the reader's side and W

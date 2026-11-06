@@ -135,6 +135,19 @@ Deliberately, and each is pinned by a test:
 | Metadata endpoints (`/v1/metadata/id`, `/v1/metadata/version`), `GET /contexts` | served | 404 |
 | Its own 500s: `format=serialized` on an id, a lookup in a soft-deleted subject | 500 | the parameter is ignored; the subject's 404 |
 
+## Extension routes (not Confluent paths)
+
+The console needs a few things Confluent's API does not carry. They are served under
+`/_doze/`, ask for the same credentials as every route, and no Confluent client calls
+them:
+
+| Route | Answers |
+|---|---|
+| `GET /_doze/overview` | every subject (soft-deleted ones included) with its type, live and deleted version counts, latest version and id, level and mode and whether each is its own, when they were set, when it last took a version; the global level and mode; the ids in use as ranges; the next free id |
+| `GET /_doze/subjects/{subject}/versions/{version}` | a version as `GET /subjects/{subject}/versions/{version}` gives it, deleted ones included, with when it was registered and the basic-authentication user, address and `User-Agent` of the request that registered it (none of these for a version registered before they were kept; none of them names a Kafka client) |
+| `POST /_doze/subjects/{subject}/check?level=&version=` | the compatibility check, at a level other than the subject's if asked (the subject's is not changed), with the versions compared and each reason taken apart: type, path, sentence, additional information |
+| `GET /_doze/requests?subject=&before=&limit=` | the newest of the last 2,000 requests the registry answered (method, path, status, duration, user, address, `User-Agent`, the subject or id the path names; never a body), newest first, by subject (a request by id counts for each subject holding it), with a cursor; the extension routes and requests marked `X-Doze-Own` (the console's) are not kept |
+
 ## Avro payloads and the decoder
 
 The registry's REST API never decodes Avro binary: it parses schema text and compares

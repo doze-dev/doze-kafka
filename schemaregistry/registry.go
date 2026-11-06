@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Storage is where the registry keeps its records: opaque keys and values, written
@@ -48,11 +49,13 @@ const defaultCompat = CompatBackward
 // Records. The key spaces are prefixes; \x00 separates the parts of a key, since a
 // subject name may contain anything else.
 const (
-	keySchema  = "schema\x00"  // schema\x00<id>             -> schemaRec
-	keyVersion = "version\x00" // version\x00<subject>\x00<n> -> versionRec
-	keyConfig  = "config\x00"  // config\x00<subject>         -> level ("" subject is the global one)
-	keyMode    = "mode\x00"    // mode\x00<subject>           -> mode
-	keyNextID  = "nextid"
+	keySchema   = "schema\x00"   // schema\x00<id>             -> schemaRec
+	keyVersion  = "version\x00"  // version\x00<subject>\x00<n> -> versionRec
+	keyConfig   = "config\x00"   // config\x00<subject>         -> level ("" subject is the global one)
+	keyMode     = "mode\x00"     // mode\x00<subject>           -> mode
+	keyConfigAt = "configat\x00" // configat\x00<subject>     -> when the level was set, Unix ms
+	keyModeAt   = "modeat\x00"   // modeat\x00<subject>       -> when the mode was set, Unix ms
+	keyNextID   = "nextid"
 )
 
 type schemaRec struct {
@@ -67,6 +70,19 @@ type versionRec struct {
 	Version int    `json:"version"`
 	ID      int    `json:"id"`
 	Deleted bool   `json:"deleted,omitempty"`
+	// Who registered it, when, from where and with what (SCH-20). A version stored
+	// before these were kept has none of them.
+	At    int64  `json:"at,omitempty"` // Unix milliseconds
+	By    string `json:"by,omitempty"` // the basic-authentication user
+	From  string `json:"from,omitempty"`
+	Agent string `json:"agent,omitempty"`
+}
+
+// Origin is who a request came from, as HTTP says: the user it signed in as, its
+// address and its User-Agent. None of them names a Kafka client; that is a guess the
+// console makes from the traffic it sees, and labels as one.
+type Origin struct {
+	User, From, Agent string
 }
 
 // Registry is the schema store and the rules around it. It is safe for concurrent use.
@@ -79,12 +95,16 @@ type Registry struct {
 	compat  map[string]string // subject ("" = global) -> level.
 	modes   map[string]string
 	nextID  int
+
+	compatAt, modeAt map[string]int64 // when a level or mode was set, Unix milliseconds
+	now              func() time.Time
 }
 
 // Open loads the registry from storage.
 func Open(st Storage) (*Registry, error) {
 	r := &Registry{st: st, schemas: map[int]*schemaRec{}, byPrint: map[string]int{}, subj: map[string][]*versionRec{},
-		compat: map[string]string{}, modes: map[string]string{}, nextID: 1}
+		compat: map[string]string{}, modes: map[string]string{}, nextID: 1,
+		compatAt: map[string]int64{}, modeAt: map[string]int64{}, now: time.Now}
 	all, err := st.LoadAll()
 	if err != nil {
 		return nil, fmt.Errorf("schema registry: load: %w", err)
@@ -108,6 +128,14 @@ func Open(st Storage) (*Registry, error) {
 			r.compat[strings.TrimPrefix(k, keyConfig)] = string(v)
 		case strings.HasPrefix(k, keyMode):
 			r.modes[strings.TrimPrefix(k, keyMode)] = string(v)
+		case strings.HasPrefix(k, keyConfigAt):
+			if ms, err := strconv.ParseInt(string(v), 10, 64); err == nil {
+				r.compatAt[strings.TrimPrefix(k, keyConfigAt)] = ms
+			}
+		case strings.HasPrefix(k, keyModeAt):
+			if ms, err := strconv.ParseInt(string(v), 10, 64); err == nil {
+				r.modeAt[strings.TrimPrefix(k, keyModeAt)] = ms
+			}
 		case k == keyNextID:
 			if n, err := strconv.Atoi(string(v)); err == nil {
 				r.nextID = n
@@ -461,12 +489,17 @@ func (r *Registry) findings(p parsedSchema, level string, against []*versionRec)
 	for _, vr := range against {
 		old, err := r.parseStored(vr.ID)
 		if err != nil {
+			d := fmt.Sprintf("existing schema version %d cannot be read: %v", vr.Version, err)
 			out = append(out, CompatFinding{Version: vr.Version, Old: r.schemas[vr.ID].Schema, Level: level,
-				Reasons: []string{fmt.Sprintf("existing schema version %d cannot be read: %v", vr.Version, err)}})
+				Reasons: []string{d}, Details: []CompatReason{{Type: "SCHEMA_UNREADABLE", Description: d, Text: d}}})
 			continue
 		}
-		if msgs := compare(p, old, base); len(msgs) > 0 {
-			out = append(out, CompatFinding{Version: vr.Version, Old: r.schemas[vr.ID].Schema, Level: level, Reasons: msgs})
+		if rs := compare(p, old, base); len(rs) > 0 {
+			f := CompatFinding{Version: vr.Version, Old: r.schemas[vr.ID].Schema, Level: level, Details: rs}
+			for _, x := range rs {
+				f.Reasons = append(f.Reasons, x.Text)
+			}
+			out = append(out, f)
 		}
 	}
 	return out
@@ -487,30 +520,42 @@ func (r *Registry) parseStored(id int) (parsedSchema, error) {
 //
 // At FULL the forward reasons (the old schema reading the new) come first, then the
 // backward ones, as Confluent lists them (recorded: testdata/compat/*-reasons.json).
-func compare(newer, older parsedSchema, level string) []string {
-	var msgs []string
+func compare(newer, older parsedSchema, level string) []CompatReason {
+	var out []CompatReason
 	if level == CompatForward || level == CompatFull {
-		msgs = append(msgs, canRead(older, newer, "old", "new")...)
+		out = append(out, canRead(older, newer, "old", "new")...)
 	}
 	if level == CompatBackward || level == CompatFull {
-		msgs = append(msgs, canRead(newer, older, "new", "old")...)
+		out = append(out, canRead(newer, older, "new", "old")...)
 	}
-	return msgs
+	return out
+}
+
+// CompatReason is one reason a schema may not follow another: Confluent's type for it,
+// the path in the schema it is about, its sentence and, for Avro, the names or types
+// involved. Text is the whole of it as Confluent writes it in a 409 or a verbose check.
+type CompatReason struct {
+	Type        string `json:"type"`
+	Path        string `json:"path,omitempty"`
+	Description string `json:"description"`
+	Info        string `json:"info,omitempty"`
+	Text        string `json:"-"`
 }
 
 // canRead reports why a reader built for `reader` cannot read data written for
 // `writer`; readerIs and writerIs say which of them is the new schema and which the old.
-func canRead(reader, writer parsedSchema, readerIs, writerIs string) []string {
+func canRead(reader, writer parsedSchema, readerIs, writerIs string) []CompatReason {
 	if reader.Type() != writer.Type() {
-		return []string{fmt.Sprintf("Incompatible because of different schema type: %s vs %s", reader.Type(), writer.Type())}
+		d := fmt.Sprintf("Incompatible because of different schema type: %s vs %s", reader.Type(), writer.Type())
+		return []CompatReason{{Type: "SCHEMA_TYPE_CHANGED", Description: d, Text: d}}
 	}
 	switch rd := reader.(type) {
 	case *avroSchema:
-		var msgs []string
+		var out []CompatReason
 		for _, in := range avroIncompatibilities(rd.schema, writer.(*avroSchema).schema) {
-			msgs = append(msgs, in.describe(readerIs, writerIs))
+			out = append(out, in.reason(readerIs, writerIs))
 		}
-		return msgs
+		return out
 	case *jsonSchema:
 		return jsonCanRead(rd, writer.(*jsonSchema), readerIs, writerIs)
 	case *protoSchema:
@@ -525,6 +570,11 @@ func canRead(reader, writer parsedSchema, readerIs, writerIs string) []string {
 //
 //fuzz:parser FuzzRegisterAndCompare, FuzzRegisterReferences, FuzzAPIBody
 func (r *Registry) Register(subject string, in SchemaInput, normalize bool) (RegisterResult, *Error) {
+	return r.RegisterFrom(subject, in, normalize, Origin{})
+}
+
+// RegisterFrom is Register for a request from o, which a new version keeps.
+func (r *Registry) RegisterFrom(subject string, in SchemaInput, normalize bool, o Origin) (RegisterResult, *Error) {
 	if subject == "" {
 		return RegisterResult{}, newErr(422, codeInvalidRequest, "Subject may not be empty")
 	}
@@ -566,7 +616,7 @@ func (r *Registry) Register(subject string, in SchemaInput, normalize bool) (Reg
 	if perr != nil {
 		return RegisterResult{}, perr
 	}
-	id, e := r.registerLocked(subject, in, p, canon)
+	id, e := r.registerLocked(subject, in, p, canon, o)
 	return RegisterResult{ID: id}, e
 }
 
@@ -577,7 +627,7 @@ type RegisterResult struct {
 	Latest *SchemaView
 }
 
-func (r *Registry) registerLocked(subject string, in SchemaInput, p parsedSchema, canon string) (int, *Error) {
+func (r *Registry) registerLocked(subject string, in SchemaInput, p parsedSchema, canon string, o Origin) (int, *Error) {
 	typ := p.Type()
 	fp := fingerprint(typ, canon, in.References)
 	var replaced []*versionRec // soft-deleted copies of this schema in the subject.
@@ -606,7 +656,7 @@ func (r *Registry) registerLocked(subject string, in SchemaInput, p parsedSchema
 	if vs := r.subj[subject]; len(vs) > 0 {
 		next = vs[len(vs)-1].Version + 1
 	}
-	vr := &versionRec{Subject: subject, Version: next, ID: id}
+	vr := &versionRec{Subject: subject, Version: next, ID: id, At: r.now().UnixMilli(), By: o.User, From: o.From, Agent: o.Agent}
 	b.put(versionKey(subject, next), vr)
 	// Registering a schema the subject had deleted does not bring the old version back:
 	// that version goes for good and the schema becomes a new, latest one.
@@ -1000,11 +1050,15 @@ func (r *Registry) DeleteSubject(subject string, permanent bool) ([]int, *Error)
 	// (recorded: permanent-delete-rules).
 	b.del(keyConfig + subject)
 	b.del(keyMode + subject)
+	b.del(keyConfigAt + subject)
+	b.del(keyModeAt + subject)
 	if err := r.commit(b); err != nil {
 		return nil, err
 	}
 	delete(r.compat, subject)
 	delete(r.modes, subject)
+	delete(r.compatAt, subject)
+	delete(r.modeAt, subject)
 	if permanent {
 		delete(r.subj, subject)
 		r.dropSchemas(gone)
@@ -1021,13 +1075,31 @@ func (r *Registry) DeleteSubject(subject string, permanent bool) ([]int, *Error)
 // fit, with the versions it was compared to. A subject that does not exist accepts
 // anything.
 func (r *Registry) CheckCompatible(subject, version string, in SchemaInput, normalize bool) ([]CompatFinding, *Error) {
+	return r.CheckAt(subject, version, in, normalize, "")
+}
+
+// CheckAt is CheckCompatible at a level other than the subject's ("" for its own),
+// which is left as it is (SCH-22).
+func (r *Registry) CheckAt(subject, version string, in SchemaInput, normalize bool, level string) ([]CompatFinding, *Error) {
+	_, f, e := r.checkAt(subject, version, in, normalize, level)
+	return f, e
+}
+
+// checkAt also returns the versions compared.
+func (r *Registry) checkAt(subject, version string, in SchemaInput, normalize bool, level string) ([]*versionRec, []CompatFinding, *Error) {
+	level = strings.ToUpper(level)
+	if level != "" && !compatLevels[level] {
+		return nil, nil, newErr(422, codeInvalidCompatibility, "Invalid compatibility level. Valid values are none, backward, forward, full, backward_transitive, forward_transitive, and full_transitive")
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	p, _, perr := r.prepare(in, normalize)
 	if perr != nil {
-		return nil, perr
+		return nil, nil, perr
 	}
-	level := r.effectiveCompat(subject)
+	if level == "" {
+		level = r.effectiveCompat(subject)
+	}
 	against := r.versionsAt(subject, level)
 	if version != "" {
 		vr, err := r.versionLocked(subject, version, false)
@@ -1036,15 +1108,15 @@ func (r *Registry) CheckCompatible(subject, version string, in SchemaInput, norm
 				// No subject: anything fits its latest, but a numbered version is
 				// missing like any other (recorded: compatibility-of-missing).
 				if n, perr := strconv.Atoi(version); perr == nil && n > 0 {
-					return nil, errVersionNotFound(subject, n)
+					return nil, nil, errVersionNotFound(subject, n)
 				}
-				return nil, nil
+				return nil, nil, nil
 			}
-			return nil, err
+			return nil, nil, err
 		}
 		against = []*versionRec{vr}
 	}
-	return r.findings(p, level, against), nil
+	return against, r.findings(p, level, against), nil
 }
 
 // CompatFinding is one existing version a schema is not compatible with, and why.
@@ -1052,7 +1124,8 @@ type CompatFinding struct {
 	Version int
 	Old     string
 	Level   string
-	Reasons []string
+	Reasons []string       // as Confluent writes them
+	Details []CompatReason // the same, taken apart
 }
 
 // Messages renders findings the way Confluent's verbose compatibility check does.
@@ -1098,11 +1171,14 @@ func (r *Registry) SetCompat(subject, level string) *Error {
 		return newErr(422, codeOperationNotPermitted, "Subject %s is in read-only mode", subject)
 	}
 	b := newBatch()
+	at := r.now().UnixMilli()
 	b.put(keyConfig+subject, level)
+	b.put(keyConfigAt+subject, strconv.FormatInt(at, 10))
 	if err := r.commit(b); err != nil {
 		return err
 	}
 	r.compat[subject] = level
+	r.compatAt[subject] = at
 	return nil
 }
 
@@ -1119,10 +1195,12 @@ func (r *Registry) DeleteCompat(subject string) (string, *Error) {
 	}
 	b := newBatch()
 	b.del(keyConfig + subject)
+	b.del(keyConfigAt + subject)
 	if err := r.commit(b); err != nil {
 		return "", err
 	}
 	delete(r.compat, subject)
+	delete(r.compatAt, subject)
 	return prev, nil
 }
 
@@ -1154,11 +1232,14 @@ func (r *Registry) SetMode(subject, mode string) *Error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	b := newBatch()
+	at := r.now().UnixMilli()
 	b.put(keyMode+subject, mode)
+	b.put(keyModeAt+subject, strconv.FormatInt(at, 10))
 	if err := r.commit(b); err != nil {
 		return err
 	}
 	r.modes[subject] = mode
+	r.modeAt[subject] = at
 	return nil
 }
 
@@ -1172,9 +1253,11 @@ func (r *Registry) DeleteMode(subject string) (string, *Error) {
 	}
 	b := newBatch()
 	b.del(keyMode + subject)
+	b.del(keyModeAt + subject)
 	if err := r.commit(b); err != nil {
 		return "", err
 	}
 	delete(r.modes, subject)
+	delete(r.modeAt, subject)
 	return prev, nil
 }
