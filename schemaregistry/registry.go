@@ -122,7 +122,43 @@ func Open(st Storage) (*Registry, error) {
 			r.nextID = id + 1
 		}
 	}
+	r.indexCurrentForms()
 	return r, nil
+}
+
+// indexCurrentForms makes a schema stored by an earlier version findable by the text
+// this version stores for it, where the two differ: an Avro primitive, array or map
+// with a doc or aliases (dropped now), a Protobuf field with several options or a
+// json_name (printed one to a line, json_name last). Without it the same schema
+// registered again after an upgrade would get a new id. Only text that can differ is
+// parsed, so a restart does not parse every schema.
+func (r *Registry) indexCurrentForms() {
+	for _, s := range r.schemas {
+		switch s.Type {
+		case TypeAvro:
+			if !strings.Contains(s.Schema, `"doc"`) && !strings.Contains(s.Schema, `"aliases"`) {
+				continue
+			}
+		case TypeProtobuf:
+			if !strings.Contains(s.Schema, ", ") && !strings.Contains(s.Schema, "json_name") {
+				continue
+			}
+		default:
+			continue
+		}
+		refs, rerr := r.resolve(s.References)
+		if rerr != nil {
+			continue
+		}
+		p, err := parseSchema(s.Type, s.Schema, refs)
+		if err != nil {
+			continue
+		}
+		fp := fingerprint(s.Type, p.Canonical(false), s.References)
+		if _, taken := r.byPrint[fp]; !taken {
+			r.byPrint[fp] = s.ID
+		}
+	}
 }
 
 func fingerprint(typ, schema string, refs []Reference) string {
@@ -877,8 +913,18 @@ func (r *Registry) removeVersion(subject string, version int) {
 func (r *Registry) dropSchemas(ids []int) {
 	for _, id := range ids {
 		if s := r.schemas[id]; s != nil {
-			delete(r.byPrint, fingerprint(s.Type, s.Schema, s.References))
 			delete(r.schemas, id)
+		}
+	}
+	// Every fingerprint that names a dropped id goes: the stored form's and the
+	// current form indexCurrentForms added for it.
+	gone := map[int]bool{}
+	for _, id := range ids {
+		gone[id] = true
+	}
+	for fp, id := range r.byPrint {
+		if gone[id] {
+			delete(r.byPrint, fp)
 		}
 	}
 }

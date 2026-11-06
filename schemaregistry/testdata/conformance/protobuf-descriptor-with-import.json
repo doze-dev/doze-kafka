@@ -1,0 +1,177 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/pdep/versions",
+    "body": "{\"schema\":\"syntax = \\\"proto3\\\"; package dep; message Addr { string city = 1; }\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pmain/versions",
+    "body": "{\"references\":[{\"name\":\"dep.proto\",\"subject\":\"pdep\",\"version\":1}],\"schema\":\"CgptYWluLnByb3RvEgNhcHAaCWRlcC5wcm90byInCgZQZXJzb24SHQoEaG9tZRgBIAEoCzIJLmRlcC5BZGRyUgRob21lYgZwcm90bzM=\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pmain/versions/latest",
+    "status": 200,
+    "response": {
+      "subject": "pmain",
+      "version": 1,
+      "id": 2,
+      "schemaType": "PROTOBUF",
+      "references": [
+        {
+          "name": "dep.proto",
+          "subject": "pdep",
+          "version": 1
+        }
+      ],
+      "schema": "syntax = \"proto3\";\npackage app;\n\nimport \"dep.proto\";\n\nmessage Person {\n  .dep.Addr home = 1 [json_name = \"home\"];\n}\n"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pmain",
+    "body": "{\"references\":[{\"name\":\"dep.proto\",\"subject\":\"pdep\",\"version\":1}],\"schema\":\"CgptYWluLnByb3RvEgNhcHAaCWRlcC5wcm90byInCgZQZXJzb24SHQoEaG9tZRgBIAEoCzIJLmRlcC5BZGRyUgRob21lYgZwcm90bzM=\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "subject": "pmain",
+      "version": 1,
+      "id": 2,
+      "schemaType": "PROTOBUF",
+      "references": [
+        {
+          "name": "dep.proto",
+          "subject": "pdep",
+          "version": 1
+        }
+      ],
+      "schema": "syntax = \"proto3\";\npackage app;\n\nimport \"dep.proto\";\n\nmessage Person {\n  .dep.Addr home = 1 [json_name = \"home\"];\n}\n"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/pmain/versions/latest",
+    "body": "{\"references\":[{\"name\":\"dep.proto\",\"subject\":\"pdep\",\"version\":1}],\"schema\":\"CgptYWluLnByb3RvEgNhcHAaCWRlcC5wcm90byInCgZQZXJzb24SHQoEaG9tZRgBIAEoCzIJLmRlcC5BZGRyUgRob21lYgZwcm90bzM=\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "is_compatible": true
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pnoref/versions",
+    "body": "{\"schema\":\"CgptYWluLnByb3RvEgNhcHAaCWRlcC5wcm90byInCgZQZXJzb24SHQoEaG9tZRgBIAEoCzIJLmRlcC5BZGRyUgRob21lYgZwcm90bzM=\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42201,
+      "message": "Invalid schema {subject=pnoref,version=0,id=-1,schemaType=PROTOBUF,references=[],metadata=null,ruleSet=null,schema=CgptYWluLnByb3RvEgNhcHAaCWRlcC5wcm90byInCgZQZXJzb24SHQoEaG9tZRgBIAEoCzIJLmRlcC5BZGRyUgRob21lYgZwcm90bzM=,schemaTags=null}, details: Could not resolve type: .dep.Addr"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pdepd/versions",
+    "body": "{\"schema\":\"CglkZXAucHJvdG8SA2RlcCIaCgRBZGRyEhIKBGNpdHkYASABKAlSBGNpdHliBnByb3RvMw==\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 3
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pdepd/versions/latest",
+    "status": 200,
+    "response": {
+      "subject": "pdepd",
+      "version": 1,
+      "id": 3,
+      "schemaType": "PROTOBUF",
+      "schema": "syntax = \"proto3\";\npackage dep;\n\nmessage Addr {\n  string city = 1 [json_name = \"city\"];\n}\n"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pmain2/versions",
+    "body": "{\"references\":[{\"name\":\"dep.proto\",\"subject\":\"pdepd\",\"version\":1}],\"schema\":\"CgptYWluLnByb3RvEgNhcHAaCWRlcC5wcm90byInCgZQZXJzb24SHQoEaG9tZRgBIAEoCzIJLmRlcC5BZGRyUgRob21lYgZwcm90bzM=\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 4
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pmain2/versions/latest",
+    "status": 200,
+    "response": {
+      "subject": "pmain2",
+      "version": 1,
+      "id": 4,
+      "schemaType": "PROTOBUF",
+      "references": [
+        {
+          "name": "dep.proto",
+          "subject": "pdepd",
+          "version": 1
+        }
+      ],
+      "schema": "syntax = \"proto3\";\npackage app;\n\nimport \"dep.proto\";\n\nmessage Person {\n  .dep.Addr home = 1 [json_name = \"home\"];\n}\n"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pdep/versions/1/referencedby",
+    "status": 200,
+    "response": [
+      2
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/popts/versions",
+    "body": "{\"schema\":\"CgpvcHRzLnByb3RvEgFvIjMKAU0SFwoDYV9iGAEgASgJOgJoaUICGAFSAmFCEhUKAW4YAiADKAVCAhABUgZjdXN0b20=\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 5
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/popts/versions/latest",
+    "status": 200,
+    "response": {
+      "subject": "popts",
+      "version": 1,
+      "id": 5,
+      "schemaType": "PROTOBUF",
+      "schema": "package o;\n\nmessage M {\n  optional string a_b = 1 [\n    deprecated = true,\n    default = \"hi\",\n    json_name = \"aB\"\n  ];\n  repeated int32 n = 2 [\n    packed = true,\n    json_name = \"custom\"\n  ];\n}\n"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ptext/versions",
+    "body": "{\"schema\":\"syntax = \\\"proto2\\\"; package t; message M { optional string b = 2 [default = \\\"hi\\\", deprecated = true]; optional int32 c = 3 [json_name = \\\"see\\\"]; repeated int32 d = 4 [packed = true, deprecated = false, json_name = \\\"dee\\\"]; }\",\"schemaType\":\"PROTOBUF\"}",
+    "status": 200,
+    "response": {
+      "id": 6
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/ptext/versions/latest",
+    "status": 200,
+    "response": {
+      "subject": "ptext",
+      "version": 1,
+      "id": 6,
+      "schemaType": "PROTOBUF",
+      "schema": "syntax = \"proto2\";\npackage t;\n\nmessage M {\n  optional string b = 2 [\n    deprecated = true,\n    default = \"hi\"\n  ];\n  optional int32 c = 3 [json_name = \"see\"];\n  repeated int32 d = 4 [\n    packed = true,\n    deprecated = false,\n    json_name = \"dee\"\n  ];\n}\n"
+    }
+  }
+]

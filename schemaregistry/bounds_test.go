@@ -146,3 +146,45 @@ func TestSubjectLengthIsBounded(t *testing.T) {
 	// A 255-character subject is ordinary.
 	mustRegister(t, r, strings.Repeat("s", 255), avroIn(`"string"`))
 }
+
+// A schema stored before the canonical form changed is found again when the same text
+// is registered after the change: the same id, no new version. (The Avro unnamed-type
+// attributes and the Protobuf field options were printed differently before.)
+func TestOldCanonicalFormsAreStillFound(t *testing.T) {
+	st := NewMemoryStorage()
+	old := map[string][]byte{
+		schemaKey(1):       []byte(`{"id":1,"type":"AVRO","schema":"{\"type\":\"string\",\"doc\":\"d\"}"}`),
+		versionKey("a", 1): []byte(`{"subject":"a","version":1,"id":1}`),
+		schemaKey(2):       []byte(`{"id":2,"type":"PROTOBUF","schema":"syntax = \"proto2\";\npackage t;\n\nmessage M {\n  optional string b = 2 [default = \"hi\", deprecated = true];\n}\n"}`),
+		versionKey("p", 1): []byte(`{"subject":"p","version":1,"id":2}`),
+		keyNextID:          []byte("3"),
+	}
+	if err := st.Apply(old, nil); err != nil {
+		t.Fatal(err)
+	}
+	r, err := Open(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id := mustRegister(t, r, "a", avroIn(`{"type":"string","doc":"d"}`)); id != 1 {
+		t.Errorf("the stored Avro schema registered again got id %d, want 1", id)
+	}
+	if id := mustRegister(t, r, "p", SchemaInput{SchemaType: TypeProtobuf, Schema: `syntax = "proto2"; package t; message M { optional string b = 2 [default = "hi", deprecated = true]; }`}); id != 2 {
+		t.Errorf("the stored Protobuf schema registered again got id %d, want 2", id)
+	}
+	for _, s := range []string{"a", "p"} {
+		if vs := r.live(s); len(vs) != 1 {
+			t.Errorf("subject %s has %d versions, want 1", s, len(vs))
+		}
+	}
+	// Deleted for good, the schema is gone under both forms: registered again it is new.
+	if _, e := r.DeleteSubject("a", false); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := r.DeleteSubject("a", true); e != nil {
+		t.Fatal(e)
+	}
+	if id := mustRegister(t, r, "a", avroIn(`{"type":"string","doc":"d"}`)); id == 1 {
+		t.Errorf("after a permanent delete the schema came back as id 1")
+	}
+}
