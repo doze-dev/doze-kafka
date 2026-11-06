@@ -1,9 +1,11 @@
 package server_test
 
 import (
+	"github.com/doze-dev/doze-kafka/internal/storage/meta"
 	"io"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -281,5 +283,24 @@ func TestSchemaRegistryAuthWiring(t *testing.T) {
 	}
 	if got := askRegistry(t, addr, http.MethodGet, "/no/such/route", "127.0.0.1", "", "alice", "alice-secret"); got.code != 404 {
 		t.Errorf("an unknown route as alice: %d, want 404", got.code)
+	}
+}
+
+// A registry record that cannot be read is SchemaRegistry's error, naming it; the
+// broker is not affected (cmd/doze-kafka starts without the registry then). (SCH-13)
+func TestSchemaRegistryWithAnUnreadableRecord(t *testing.T) {
+	dir := t.TempDir()
+	st, err := meta.Open(filepath.Join(dir, config.MetaDBFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.RegistryApply(map[string][]byte{"schema\x000000000001": []byte("not json")}, nil); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+	srv := mustNew(t, server.Options{DataDir: dir})
+	defer srv.Close()
+	if _, err := srv.SchemaRegistry(); err == nil || !strings.Contains(err.Error(), "0000000001") {
+		t.Errorf("SchemaRegistry over an unreadable record: %v", err)
 	}
 }

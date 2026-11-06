@@ -24,7 +24,7 @@ The registry, its recordings and the console's client are done to the plan; what
 ### For the owner to decide
 - The lightness idle-heap gate compares the largest of five starts. On CI (linux/arm64) the median was steady across Stage 5's commits (1,370,872 to 1,373,640, under the 1,374,400 budget) while the largest went from 1,374,136 to 1,384,824, and the one at 1,384,824 (commit 7842097) failed the gate with nothing grown. Gate on the median, or widen the allowance? Until then a failed heap check with a steady median is re-run, not re-recorded.
 - Nothing blocking. Re-estimate after Stage 5: rows 1 to 5 took one long session (2026-11-06/07) against 13 planned half-days.
-- Docker: containers `sr-rec-kafka`, `sr-rec-sr` (127.0.0.1:18081) and `sr-rec-sra` (127.0.0.1:18082, basic auth) on network `sr-rec` are still running for further recordings; `docker rm -f sr-rec-kafka sr-rec-sr sr-rec-sra && docker network rm sr-rec` removes them.
+- Docker: the recording containers were removed (2026-11-07). To record again: apache/kafka:4.3.1 and cp-schema-registry:7.7.1 on a shared network, the registry on 127.0.0.1:18081 (SR_RECORD_URL), and for `basic-authentication` a second one with a JAAS password file (alice:alice-secret) on another port (SR_RECORD_AUTH_URL); copy the JAAS files in with docker cp, Docker Desktop does not share the scratchpad.
 
 ## Earlier state (2026-10-29)
 
