@@ -131,6 +131,7 @@ Deliberately, and each is pinned by a test:
 | Protobuf a parser would reject | its parser is lenient: an `extend` of a type that was never imported, a method named like a message | rejected as invalid (422) |
 | Verbose compatibility reasons | its checker's wording | the same shape; the three trailing lines (`oldSchemaVersion`, `oldSchema`, `validateFields`/`compatibility`) are identical, the reasons are worded by this implementation |
 | Avro with `normalize=true` | Avro's normalizer | key order and namespaces as Avro writes them, custom attributes sorted |
+| Limits | not recorded | a request body is at most 8 MiB (a schema with its references) or 64 KiB (`/config`, `/mode`), past which the answer is 413 with error code 413; the JSON of an Avro or JSON Schema schema nests at most 256 levels (422, 42201: comparing deeper schemas costs the square of their depth); a subject is at most 16 KiB (422, 42207); one schema's references name at most 1,000 distinct schemas, each followed once however often it is named |
 
 ## Avro payloads and the decoder
 

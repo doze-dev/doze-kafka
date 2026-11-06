@@ -1,6 +1,14 @@
-# State (updated 2026-10-29)
+# State (updated 2026-11-06)
 
-Local main is ahead of origin and unpushed. Stages 0 to 2 fixed and merged after the verification pass. The mutation-survivor campaign is finished and merged; it is not to be extended (see below).
+Stages 3 (Topics) and 4 (Groups) are merged to main (PR #3, 2026-11-06, all CI green after fixing three flaky tests and moving klauspost/compress to v1.20.2 for GO-2026-6865). Stage 5 (Schemas) started on branch `schemas-stage5` with the owner's approval.
+
+## Stage 5, Schemas (plan/stages/schemas.md)
+- Done, row 1 and part of row 3 (red first, then fixed): SCH-1 (diamond references resolved once each, cap 1,000 schemas), SCH-2 (JSON nesting of Avro and JSON Schema schemas capped at 256; Protobuf measured linear and left alone), SCH-3 (bodies 8 MiB, 64 KiB for /config and /mode, 413), SCH-12 (one registry per Server), SCH-18 (subject over 16 KiB is 42207; the exact rule waits for R7). Tests: `schemaregistry/bounds_test.go`, `server` TestSchemaRegistryIsOneInstance.
+- Closed before this stage by the foundation: SCH-4 (Host guard, internal/hostguard) and SCH-11 (registry serves https with the broker's certificate).
+- Known residue of SCH-2: a wide Avro schema at depth 128 costs about 0.6 ms per deep field (8 MiB body, about 1.6 s worst case) because the comparison is hamba's and cannot be interrupted; row 4 (our own Avro checker for SCH-6's structured reasons) removes it.
+- Next: row 2, recordings R1 to R14 against cp-schema-registry 7.7.1 (decides SCH-5 content type, SCH-18 subject rules, SCH-31 READONLY config); then SCH-5 and SCH-7, the remaining P1s; then SCH-10 timeouts.
+
+## Earlier state (2026-10-29)
 
 ## Done since the last update
 - Mutation survivors: protocol and the small units 0 open; console 598 lived to 102 (all with reasons); broker data/admin/auth 0 open; broker groups 28 still open (24 in `groupmigrate.go`); storage log about 97 left (baseline stale, partly re-measured) and meta.

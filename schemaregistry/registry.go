@@ -136,6 +136,20 @@ func fingerprint(typ, schema string, refs []Reference) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+// maxSubjectLen is the longest subject the registry stores. A subject is part of
+// every storage key that names it, and bbolt's keys end at 32 KiB; refusing a longer
+// one before any work answers a bad request and not a store failure. Confluent's own
+// limit is not recorded (recording queue R7).
+const maxSubjectLen = 16 << 10
+
+// subjectTooLong refuses a subject past maxSubjectLen, without repeating it.
+func subjectTooLong(subject string) *Error {
+	if len(subject) > maxSubjectLen {
+		return newErr(422, codeInvalidRequest, "Subject is %d bytes long; the longest this registry stores is %d", len(subject), maxSubjectLen)
+	}
+	return nil
+}
+
 func versionKey(subject string, v int) string {
 	return fmt.Sprintf("%s%s\x00%010d", keyVersion, subject, v)
 }
@@ -218,13 +232,19 @@ func typeField(t string) string {
 	return t
 }
 
-// resolve follows references to the schemas they name, dependencies first. Following
-// stops at a cycle, which is reported.
+// maxResolvedSchemas bounds the distinct schemas one reference graph may name.
+const maxResolvedSchemas = 1000
+
+// resolve follows references to the schemas they name, dependencies first. Each
+// (subject, version) is followed once, so a graph that names the same schema from
+// many places (a diamond) costs its size and not its paths. Following stops at a
+// cycle, which is reported.
 //
 //fuzz:parser FuzzRegisterReferences
 func (r *Registry) resolve(refs []Reference) ([]resolvedRef, *Error) {
 	var out []resolvedRef
-	seen := map[string]bool{}
+	seen := map[string]bool{}     // (subject, version, name) already in out
+	followed := map[string]bool{} // (subject, version) whose own references are in out
 	var walk func(refs []Reference, depth int) *Error
 	walk = func(refs []Reference, depth int) *Error {
 		if depth > 32 {
@@ -236,10 +256,17 @@ func (r *Registry) resolve(refs []Reference) ([]resolvedRef, *Error) {
 				return errInvalidSchema("Invalid schema: reference %q: subject '%s' version %d was not found", ref.Name, ref.Subject, ref.Version)
 			}
 			s := r.schemas[vr.ID]
-			if err := walk(s.References, depth+1); err != nil {
-				return err
+			node := fmt.Sprintf("%s\x00%d", ref.Subject, ref.Version)
+			if !followed[node] {
+				if len(followed) >= maxResolvedSchemas {
+					return errInvalidSchema("Invalid schema: references name more than %d schemas", maxResolvedSchemas)
+				}
+				followed[node] = true
+				if err := walk(s.References, depth+1); err != nil {
+					return err
+				}
 			}
-			key := fmt.Sprintf("%s\x00%d\x00%s", ref.Subject, ref.Version, ref.Name)
+			key := node + "\x00" + ref.Name
 			if seen[key] {
 				continue
 			}
@@ -272,6 +299,10 @@ func (r *Registry) prepare(in SchemaInput, normalize bool) (parsedSchema, string
 	if strings.TrimSpace(in.Schema) == "" {
 		return nil, "", errInvalidSchema("Invalid schema: schema may not be empty")
 	}
+	if (typ == TypeAvro || typ == TypeJSON) && jsonDepth(in.Schema) > maxSchemaDepth {
+		// Said without the schema: echoing megabytes of brackets helps nobody.
+		return nil, "", errInvalidSchema("Invalid schema: nested more than %d levels deep", maxSchemaDepth)
+	}
 	refs, rerr := r.resolve(in.References)
 	if rerr != nil {
 		return nil, "", rerr
@@ -281,6 +312,37 @@ func (r *Registry) prepare(in SchemaInput, normalize bool) (parsedSchema, string
 		return nil, "", errInvalidSchema("Invalid schema %s, details: %v", describe(in), err)
 	}
 	return p, p.Canonical(normalize), nil
+}
+
+// maxSchemaDepth bounds how deeply the JSON of an Avro or JSON Schema schema nests.
+// Comparing two schemas costs the square of their depth in the Avro library and in
+// the JSON Schema compiler (3,000 levels took 18 s and 5 s, with the registry's lock
+// held); 256 levels, 128 nested Avro arrays, take a few milliseconds. Protobuf is not
+// bounded here: its parser and comparison are linear in depth.
+const maxSchemaDepth = 256
+
+// jsonDepth is the deepest nesting of objects and arrays in s, outside strings. It is
+// a scan, not a parse: text that is not JSON is left for the parser to refuse.
+func jsonDepth(s string) int {
+	depth, deepest, inString, escaped := 0, 0, false, false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case inString && escaped:
+			escaped = false
+		case inString && c == '\\':
+			escaped = true
+		case c == '"':
+			inString = !inString
+		case inString:
+		case c == '{' || c == '[':
+			depth++
+			deepest = max(deepest, depth)
+		case c == '}' || c == ']':
+			depth--
+		}
+	}
+	return deepest
 }
 
 func describe(in SchemaInput) string {
@@ -396,6 +458,9 @@ func canRead(reader, writer parsedSchema) []string {
 func (r *Registry) Register(subject string, in SchemaInput, normalize bool) (RegisterResult, *Error) {
 	if subject == "" {
 		return RegisterResult{}, newErr(422, codeInvalidRequest, "Subject may not be empty")
+	}
+	if e := subjectTooLong(subject); e != nil {
+		return RegisterResult{}, e
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -936,6 +1001,9 @@ func (r *Registry) SetCompat(subject, level string) *Error {
 	if !compatLevels[level] {
 		return newErr(422, codeInvalidCompatibility, "Invalid compatibility level. Valid values are none, backward, forward, full, backward_transitive, forward_transitive, and full_transitive")
 	}
+	if e := subjectTooLong(subject); e != nil {
+		return e
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	b := newBatch()
@@ -988,6 +1056,9 @@ func (r *Registry) SetMode(subject, mode string) *Error {
 	mode = strings.ToUpper(mode)
 	if mode != ModeReadWrite && mode != ModeReadOnly {
 		return newErr(422, codeInvalidMode, "Invalid mode. Valid values are READWRITE and READONLY")
+	}
+	if e := subjectTooLong(subject); e != nil {
+		return e
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()

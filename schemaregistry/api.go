@@ -2,6 +2,7 @@ package schemaregistry
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -67,7 +68,41 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	limit := int64(maxSchemaBody)
+	if strings.HasPrefix(r.URL.Path, "/config") || strings.HasPrefix(r.URL.Path, "/mode") {
+		limit = maxSettingBody
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	a.mux.ServeHTTP(&statusFixer{ResponseWriter: w}, r)
+}
+
+// Request bodies are read up to a limit: a schema with its references, or a level or
+// a mode, which is a few bytes.
+const (
+	maxSchemaBody  = 8 << 20
+	maxSettingBody = 64 << 10
+)
+
+// tooLarge is the answer to a body past its limit, or nil for any other read error.
+func tooLarge(err error) *Error {
+	var mb *http.MaxBytesError
+	if errors.As(err, &mb) {
+		return newErr(http.StatusRequestEntityTooLarge, http.StatusRequestEntityTooLarge, "The request body is larger than %d bytes", mb.Limit)
+	}
+	return nil
+}
+
+// decodeSetting reads the small JSON body of a config or mode change.
+//
+//fuzz:parser class=registry-rest FuzzAPIBody
+func decodeSetting(r *http.Request, v any) *Error {
+	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
+		if e := tooLarge(err); e != nil {
+			return e
+		}
+		return newErr(422, codeInvalidRequest, "Unrecognized token in the request body: %v", err)
+	}
+	return nil
 }
 
 // statusFixer turns the mux's own plain-text 404 and 405 into the registry's JSON.
@@ -129,8 +164,11 @@ func prefixParam(r *http.Request) string {
 //fuzz:parser class=registry-rest FuzzAPIBody
 func readInput(r *http.Request) (SchemaInput, *Error) {
 	var in SchemaInput
-	body, err := io.ReadAll(io.LimitReader(r.Body, 8<<20))
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		if e := tooLarge(err); e != nil {
+			return in, e
+		}
 		return in, newErr(422, codeInvalidRequest, "Could not read the request: %v", err)
 	}
 	if err := json.Unmarshal(body, &in); err != nil {
@@ -360,8 +398,8 @@ func (a *API) routes() {
 			var body struct {
 				Compatibility string `json:"compatibility"`
 			}
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				return newErr(422, codeInvalidRequest, "Unrecognized token in the request body: %v", err)
+			if e := decodeSetting(r, &body); e != nil {
+				return e
 			}
 			if body.Compatibility == "" {
 				writeJSON(w, 200, map[string]string{}) // as Confluent: nothing to set, nothing changed.
@@ -410,8 +448,8 @@ func (a *API) routes() {
 			var body struct {
 				Mode string `json:"mode"`
 			}
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				return newErr(422, codeInvalidRequest, "Unrecognized token in the request body: %v", err)
+			if e := decodeSetting(r, &body); e != nil {
+				return e
 			}
 			if e := a.reg.SetMode(subject(r), body.Mode); e != nil {
 				return e

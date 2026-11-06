@@ -240,3 +240,24 @@ func TestTheRegistryRefusesAForeignHostBeforeAskingForCredentials(t *testing.T) 
 		t.Errorf("the registry's own Host with the right credentials = %d %s, want 200 [] (the refused POST registered nothing)", a.code, a.body)
 	}
 }
+
+// Server.SchemaRegistry hands out one registry: two handlers from it are the same
+// store, so a schema registered through one has the same id through the other and
+// the two never give one id to different schemas. (SCH-12)
+func TestSchemaRegistryIsOneInstance(t *testing.T) {
+	srv := mustNew(t, server.Options{})
+	defer srv.Close()
+	a, b := registryOf(t, srv), registryOf(t, srv)
+	other := `{"schema":"{\"type\":\"record\",\"name\":\"Other\",\"fields\":[{\"name\":\"n\",\"type\":\"string\"}]}"}`
+	first := askRegistry(t, a, http.MethodPost, "/subjects/orders-value/versions", "127.0.0.1", orderSchema)
+	second := askRegistry(t, b, http.MethodPost, "/subjects/other-value/versions", "127.0.0.1", other)
+	if first.code != 200 || second.code != 200 {
+		t.Fatalf("register: %d %s; %d %s", first.code, first.body, second.code, second.body)
+	}
+	if first.body == second.body {
+		t.Errorf("two different schemas got the same answer %s", first.body)
+	}
+	if got := askRegistry(t, b, http.MethodGet, "/subjects", "127.0.0.1", ""); !strings.Contains(got.body, "orders-value") {
+		t.Errorf("the second handler does not see what the first registered: %s", got.body)
+	}
+}
