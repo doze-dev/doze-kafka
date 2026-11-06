@@ -19,6 +19,7 @@ All seven P1 findings are closed: SCH-1, 2, 3, 4, 5, 6, 7. Rows 1 to 5 of sectio
 5. SCH-35/36, small ones. (SCH-13 done: the broker starts with the registry off and says why.)
 
 ### For the owner to decide
+- The lightness idle-heap gate compares the largest of five starts. On CI (linux/arm64) the median was steady across Stage 5's commits (1,370,872 to 1,373,640, under the 1,374,400 budget) while the largest went from 1,374,136 to 1,384,824, and the one at 1,384,824 (commit 7842097) failed the gate with nothing grown. Gate on the median, or widen the allowance? Until then a failed heap check with a steady median is re-run, not re-recorded.
 - Nothing blocking. Re-estimate after Stage 5: rows 1 to 5 took one long session (2026-11-06/07) against 13 planned half-days.
 - Docker: containers `sr-rec-kafka`, `sr-rec-sr` (127.0.0.1:18081) and `sr-rec-sra` (127.0.0.1:18082, basic auth) on network `sr-rec` are still running for further recordings; `docker rm -f sr-rec-kafka sr-rec-sr sr-rec-sra && docker network rm sr-rec` removes them.
 
