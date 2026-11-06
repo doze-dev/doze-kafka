@@ -13,7 +13,7 @@
     },
     "linux/arm64": {
       "binaryBytes": 27721888,
-      "idleHeapBytes": 1374400,
+      "idleHeapBytes": 1383880,
       "idleHeapNoiseBytes": 7160,
       "go": "go1.27.3",
       "recorded": "2026-11-07",
@@ -215,6 +215,13 @@
       "from": 27590816,
       "to": 27721888,
       "reason": "Stage 5 schema registry (schemas-stage5) over main 894c8b5, two 64 KiB pages of the linux/arm64 binary: the same code as the darwin/arm64 raise from 28,415,122 to 28,550,354 of this date (one entry for the step the pull request's merge commit makes)"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "linux/arm64 idleHeapBytes",
+      "from": 1374400,
+      "to": 1383880,
+      "reason": "Stage 5 schema registry (schemas-stage5): GitHub's linux/arm64 runner measured a median of 1,370,872 to 1,373,640 over five starts up to commit 8669fb1, and 1,376,992 to 1,380,328 from 21f219d on (CI runs for f73f379, 21f219d, 250473c, 1b81377), after the /_doze/ extension routes and the JSON Schema and Protobuf sentence tables, which are built at package load (the request ring is empty at idle); the budget is the largest single start the runner measured, 1,383,880 (250473c), as the 2026-11-03 raise took the runner's figure"
     }
   ]
 }

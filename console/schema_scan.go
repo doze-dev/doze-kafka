@@ -57,6 +57,8 @@ func (s idScan) idUse(id int) *idUse {
 
 // scanSchemaIDs reads the newest records of each of a topic's partitions, within the
 // scan's budget, and counts the schema ids their values carry.
+//
+//fuzz:not-a-parser takes a topic name it is given by the console; the record values it reads go to schemaregistry.WireID, which is fuzzed there (FuzzDecode)
 func (c *Console) scanSchemaIDs(ctx context.Context, topic string) (idScan, error) {
 	s := idScan{Topic: topic}
 	d, err := c.be.DescribeTopic(ctx, topic)
