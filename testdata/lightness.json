@@ -4,19 +4,19 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 28415122,
+      "binaryBytes": 28481970,
       "idleHeapBytes": 1368256,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
-      "recorded": "2026-11-02",
+      "recorded": "2026-11-07",
       "where": "macOS 27, Apple M-series, native"
     },
     "linux/arm64": {
-      "binaryBytes": 27590816,
+      "binaryBytes": 27656352,
       "idleHeapBytes": 1374400,
       "idleHeapNoiseBytes": 7160,
       "go": "go1.27.3",
-      "recorded": "2026-11-02",
+      "recorded": "2026-11-07",
       "where": "golang:1.27 container, linux/arm64, native on Apple M-series (Docker VM); idleHeapBytes from GitHub's linux/arm64 runner (CI run 41501006646)"
     }
   },
@@ -159,6 +159,20 @@
       "from": 1365104,
       "to": 1374400,
       "reason": "GitHub's linux/arm64 runner measures 1,374,400 (PR 3, CI run 41501006646, job Lightness budget (linux/arm64)), 9,296 above the 1,365,104 recorded in a local golang container on Apple silicon (the gate runs on the runner, so its figure is the budget); the new console code and the environment both contribute and how much each was not separated"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28481970,
+      "reason": "Stage 5 schema registry (schemas-stage5): Avro compatibility ported from Avro's own reader/writer rules (avrocompat.go), Confluent's sentences for JSON Schema and Protobuf reasons, the request log and sign-in throttle, body and nesting limits, Protobuf descriptor imports compiled from references, and stored schemas indexed under the current canonical form: 66,848 bytes (0.24%) over main 894c8b5 on darwin/arm64; which part grew by how much was not measured"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27590816,
+      "to": 27656352,
+      "reason": "Stage 5 schema registry (schemas-stage5), the same code as the darwin/arm64 raise of this date: 65,536 bytes, one page of the linux/arm64 binary (built in golang:1.27.3 on linux/arm64, and measured the same by CI run 42275898340, job Lightness budget (linux/arm64), on the first commit that crossed it)"
     }
   ]
 }
