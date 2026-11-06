@@ -84,17 +84,25 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 2 -keyout "$WORK/key.pem" -out "
 HOST=127.0.0.1
 start() {
   local name=$1; shift
-  local kp rp cp; kp=$(free_port); rp=$(free_port); cp=$(free_port)
   local listen=127.0.0.1 extra=()
   if [ "$HOST" != 127.0.0.1 ]; then listen=0.0.0.0; extra=(--advertised-host "$HOST"); fi
-  BOOTSTRAP=$HOST:$kp; REGISTRY_URL=http://$HOST:$rp
-  # The console is on the host's loopback for every client: a script reads the Traffic
-  # page from there (the telemetry cells do).
-  CONSOLE_URL=http://127.0.0.1:$cp/_console
-  "$BIN" --listen "$listen:$kp" --console-addr "127.0.0.1:$cp" --schema-registry-addr "$listen:$rp" \
-    ${extra[@]+"${extra[@]}"} --data-dir "$WORK/$name" "$@" >"$WORK/$name.log" 2>&1 &
-  PIDS+=($!)
-  wait_port "$kp" || { echo "broker $name did not start:"; cat "$WORK/$name.log"; exit 2; }
+  # A free port is free when asked and may be taken before the broker binds it (a busy
+  # CI machine did that once): a start that fails for a taken port is tried again on
+  # new ports.
+  local kp rp cp attempt
+  for attempt in 1 2 3; do
+    kp=$(free_port); rp=$(free_port); cp=$(free_port)
+    BOOTSTRAP=$HOST:$kp; REGISTRY_URL=http://$HOST:$rp
+    # The console is on the host's loopback for every client: a script reads the
+    # Traffic page from there (the telemetry cells do).
+    CONSOLE_URL=http://127.0.0.1:$cp/_console
+    "$BIN" --listen "$listen:$kp" --console-addr "127.0.0.1:$cp" --schema-registry-addr "$listen:$rp" \
+      ${extra[@]+"${extra[@]}"} --data-dir "$WORK/$name" "$@" >"$WORK/$name.log" 2>&1 &
+    PIDS+=($!)
+    wait_port "$kp" && return 0
+    grep -q "address already in use" "$WORK/$name.log" || break
+  done
+  echo "broker $name did not start:"; cat "$WORK/$name.log"; exit 2
 }
 
 declare -a RESULTS
