@@ -84,7 +84,10 @@ func TestOnlyAnAdoptedConnectionIsTheProcessesOwn(t *testing.T) {
 	if err := Adopt(context.Background(), own); err != nil {
 		t.Fatalf("adopting a connection to this process's server: %v", err)
 	}
+	// The observer may hear of a request after its answer is read, so each request is
+	// waited for before the next is sent: otherwise the order heard is not the order sent.
 	beat(t, own, "anything-at-all")
+	observed(t, obs, 1)
 
 	foreign, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -92,6 +95,7 @@ func TestOnlyAnAdoptedConnectionIsTheProcessesOwn(t *testing.T) {
 	}
 	defer foreign.Close()
 	beat(t, foreign, "doze-kafka-console") // the name the console uses: it is only a name.
+	observed(t, obs, 2)
 	beat(t, own, "doze-kafka-console")
 
 	reqs := observed(t, obs, 3)
