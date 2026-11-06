@@ -4,7 +4,7 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 28481970,
+      "binaryBytes": 28533266,
       "idleHeapBytes": 1368256,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
@@ -173,6 +173,13 @@
       "from": 27590816,
       "to": 27656352,
       "reason": "Stage 5 schema registry (schemas-stage5), the same code as the darwin/arm64 raise of this date: 65,536 bytes, one page of the linux/arm64 binary (built in golang:1.27.3 on linux/arm64, and measured the same by CI run 42275898340, job Lightness budget (linux/arm64), on the first commit that crossed it)"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28481970,
+      "to": 28533266,
+      "reason": "Stage 5 schema registry, row 6 (85dd728): the /_doze/ extension routes (overview, version metadata, request ring, check at a level), the structured CompatReason beside Confluent's text, and the package-level sentence tables for JSON Schema and Protobuf reasons: binary 51,296 bytes over the 2026-11-07 record; idle heap median 1,372,960 over 20 starts against 1,371,224 earlier the same day (+1,736, the tables built at package load; the request ring is empty at idle)"
     }
   ]
 }
