@@ -14,6 +14,16 @@ import (
 	names "github.com/doze-dev/doze-names"
 )
 
+// How long the registry waits on a client. A request (headers and body, a schema of
+// up to 20 MiB) must arrive within registryReadTimeout, and a kept-alive connection
+// with no request is closed after registryIdleTimeout, so a client that sends headers
+// and then nothing does not hold a connection for good. Variables so a test can
+// shorten them.
+var (
+	registryReadTimeout = 30 * time.Second
+	registryIdleTimeout = 2 * time.Minute
+)
+
 // registryPort is Confluent's own.
 const registryPort = 8081
 
@@ -41,6 +51,7 @@ func startRegistry(ctx context.Context, cfg config.Config, srv *server.Server, l
 	}
 	httpSrv := &http.Server{
 		Handler: handler, ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout: registryReadTimeout, IdleTimeout: registryIdleTimeout,
 		// A failed handshake (a plain-HTTP client on the TLS port, a client that does
 		// not trust the certificate) is the client's business: at debug, in the
 		// process's own log format, rather than on the standard logger.

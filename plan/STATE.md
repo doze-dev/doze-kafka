@@ -10,7 +10,8 @@ Stages 3 (Topics) and 4 (Groups) are merged to main (PR #3, 2026-11-06, all CI g
 - Done: R11 recorded (`protobuf-descriptor-with-import`, with json_name and multi-option printing found on the way) and SCH-7 fixed; stored schemas are also indexed under the current canonical form (`indexCurrentForms`), so an upgrade does not give a re-registered schema a new id.
 - Still to record: R5 (basic auth: needs a registry started with a JAAS file), R9 (Confluent's verbose reasons for every incompatible corpus pair, for SCH-6).
 - Still to add from SCH-7: the compat cell (Python ProtobufSerializer on a message importing another file).
-- Next: SCH-10 timeouts, R5 with SCH-27/SCH-38, then R9 and SCH-6 (row 4).
+- Done: SCH-10 (registry read timeout 30 s, idle 2 min; header bytes stay at Go's 1 MiB default, which a 16 KiB subject escaped three times fits).
+- Next: R5 with SCH-27/SCH-38, then R9 and SCH-6 (row 4).
 
 ## Earlier state (2026-10-29)
 

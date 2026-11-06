@@ -188,3 +188,45 @@ func TestRegistryGetsItsOwnNameInTheZone(t *testing.T) {
 		t.Error("the registry's name outlived the instance")
 	}
 }
+
+// A client that sends a request's headers and then trickles nothing is cut off when
+// the read timeout passes, and an idle kept-alive connection is closed: neither holds
+// a connection for good. (SCH-10)
+func TestRegistryTimesOutSlowAndIdleClients(t *testing.T) {
+	defer func(r, i time.Duration) { registryReadTimeout, registryIdleTimeout = r, i }(registryReadTimeout, registryIdleTimeout)
+	registryReadTimeout, registryIdleTimeout = 300*time.Millisecond, 300*time.Millisecond
+	out, stop := start(t, "--data-dir", t.TempDir())
+	defer stop()
+	addr := strings.TrimPrefix(summaryRegistry(t, out), "http://")
+
+	slow, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer slow.Close()
+	io.WriteString(slow, "POST /subjects/x/versions HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{")
+	slow.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if _, err := io.ReadAll(slow); err != nil {
+		t.Errorf("a request whose body never came: %v, want the connection closed by the registry", err)
+	}
+
+	idle, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer idle.Close()
+	io.WriteString(idle, "GET /subjects HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+	idle.SetReadDeadline(time.Now().Add(5 * time.Second))
+	buf := make([]byte, 4096)
+	if _, err := idle.Read(buf); err != nil {
+		t.Fatalf("reading the answer: %v", err)
+	}
+	for {
+		if _, err := idle.Read(buf); err != nil {
+			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				t.Errorf("an idle kept-alive connection was still open after 5 s")
+			}
+			break
+		}
+	}
+}
