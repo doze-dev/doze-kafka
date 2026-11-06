@@ -48,10 +48,17 @@ final class SerdeCheck {
     return m;
   }
 
-  static <V> KafkaProducer<String, V> producer(Class<?> ser) {
+  static <V> KafkaProducer<String, V> producer(Class<?> ser, Object... kv) {
     Properties p = Check.with("key.serializer", StringSerializer.class.getName(), "value.serializer", ser.getName());
     registry().forEach(p::put);
+    for (int i = 0; i < kv.length; i += 2) p.put(kv[i], kv[i + 1]);
     return new KafkaProducer<>(p);
+  }
+
+  /** The RestClientException somewhere in e's causes, or null. */
+  static RestClientException restCause(Throwable e) {
+    for (Throwable t = e; t != null; t = t.getCause()) if (t instanceof RestClientException rce) return rce;
+    return null;
   }
 
   static <V> KafkaConsumer<String, V> consumer(Class<?> de, Object... kv) {
@@ -114,9 +121,54 @@ final class SerdeCheck {
         Throwable t = e; boolean conflict = false;
         while (t != null) { if (t instanceof RestClientException rce && rce.getStatus() == 409) conflict = true; t = t.getCause(); }
         check(conflict, "avro: an incompatible evolution should fail with 409, failed with " + e);
+        // The reason is Confluent's own, typed (SCH-6).
+        RestClientException rce = restCause(e);
+        check(rce != null && rce.getMessage().contains("READER_FIELD_MISSING_DEFAULT_VALUE") && rce.getMessage().contains("'/fields/2'"),
+            "avro: the 409 does not give Confluent's reason: " + (rce == null ? e : rce.getMessage()));
       }
     }
-    ok("Avro: a compatible evolution is accepted, an incompatible one is refused with 409");
+    ok("Avro: a compatible evolution is accepted, an incompatible one is refused with 409 and Confluent's reason");
+
+    // ---- Avro under RecordNameStrategy and TopicRecordNameStrategy (SCH-26)
+    Schema named = new Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Named" + tag + "\",\"namespace\":\"dev.doze\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}");
+    String[][] strategies = {
+        {"io.confluent.kafka.serializers.subject.RecordNameStrategy", "dev.doze.Named" + tag},
+        {"io.confluent.kafka.serializers.subject.TopicRecordNameStrategy", null}};
+    for (int i = 0; i < strategies.length; i++) {
+      String t = "ns" + i + "-" + tag;
+      try (Admin a = Admin.create(Check.base())) { a.createTopics(List.of(new NewTopic(t, 1, (short) 1))).all().get(20, TimeUnit.SECONDS); }
+      try (KafkaProducer<String, Object> p = producer(KafkaAvroSerializer.class, "value.subject.name.strategy", strategies[i][0])) {
+        GenericRecord r = new GenericData.Record(named);
+        r.put("id", 3L);
+        p.send(new ProducerRecord<>(t, "k", r)).get(10, TimeUnit.SECONDS);
+      }
+      try (KafkaConsumer<String, Object> c = consumer(KafkaAvroDeserializer.class)) {
+        List<ConsumerRecord<String, Object>> got = read(c, t, 1);
+        check(got.size() == 1 && Long.valueOf(3).equals(((GenericRecord) got.get(0).value()).get("id")), strategies[i][0] + ": read back " + got);
+      }
+      String subject = strategies[i][1] != null ? strategies[i][1] : t + "-dev.doze.Named" + tag;
+      check(sr.getAllSubjects().contains(subject), strategies[i][0] + ": no subject " + subject);
+    }
+    ok("Avro: RecordNameStrategy and TopicRecordNameStrategy register under the record's name and round trip");
+
+    // ---- a record framed with an id the registry does not hold: the deserializer says 40403
+    String unknown = "unk-" + tag;
+    try (Admin a = Admin.create(Check.base())) { a.createTopics(List.of(new NewTopic(unknown, 1, (short) 1))).all().get(20, TimeUnit.SECONDS); }
+    Properties raw = Check.with("key.serializer", StringSerializer.class.getName(), "value.serializer", org.apache.kafka.common.serialization.ByteArraySerializer.class.getName());
+    try (KafkaProducer<String, byte[]> p = new KafkaProducer<>(raw)) {
+      p.send(new ProducerRecord<>(unknown, "k", new byte[] {0, 0x7f, (byte) 0xff, (byte) 0xff, (byte) 0xf0, 2, 'h', 'i'})).get(10, TimeUnit.SECONDS);
+    }
+    try (KafkaConsumer<String, Object> c = consumer(KafkaAvroDeserializer.class)) {
+      c.subscribe(List.of(unknown));
+      Throwable failed = null;
+      long end = System.nanoTime() + Duration.ofSeconds(25).toNanos();
+      while (failed == null && System.nanoTime() < end) {
+        try { c.poll(Duration.ofMillis(500)); } catch (Exception e) { failed = e; }
+      }
+      RestClientException rce = restCause(failed);
+      check(rce != null && rce.getErrorCode() == 40403, "an unknown schema id: the deserializer failed with " + failed);
+    }
+    ok("an unknown schema id: the Avro deserializer fails with 40403");
 
     // ---- Protobuf: a DynamicMessage from a schema, round trip
     ProtobufSchema ps = new ProtobufSchema("syntax = \"proto3\";\nmessage Event { string name = 1; int64 at = 2; repeated string tags = 3; }\n");
