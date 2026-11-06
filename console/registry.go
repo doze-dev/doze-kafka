@@ -50,6 +50,11 @@ type registryClient struct {
 
 	mu     sync.Mutex
 	codecs map[int]*codecEntry
+	// While the registry cannot be reached, no id is asked of it until downUntil;
+	// each failed probe doubles the wait (from downFirst to downMost), any answer ends it.
+	downUntil time.Time
+	downFor   time.Duration
+	downErr   error
 }
 
 // codecEntry is what is known about one schema id for decoding payloads: its codec,
@@ -93,6 +98,10 @@ func (rc *registryClient) call(ctx context.Context, method, path string, body, o
 	if err != nil {
 		return err
 	}
+	// The console's own requests: doze-kafka's registry answers them and leaves them out
+	// of its request log, so the console's polling does not push out what clients asked
+	// (schemaregistry/requests.go). Another registry ignores the header.
+	req.Header.Set("X-Doze-Own", "1")
 	req.Header.Set("Content-Type", "application/vnd.schemaregistry.v1+json")
 	req.Header.Set("Accept", "application/vnd.schemaregistry.v1+json, application/json")
 	if rc.user != "" {
@@ -345,31 +354,64 @@ func (rc *registryClient) SubjectNames(ctx context.Context) []string {
 
 // codecFor prepares the decoder for a schema id, with the subject and version that
 // hold it (the one named like the topic when there is a choice).
+//
+// An id the registry answered for is kept (its schema never changes); one it does not
+// hold, or could not read, is asked again after unknownFor. While the registry cannot be
+// reached at all, no id is asked: one probe, then a wait that doubles (SCH-24), so a
+// table of a thousand rows is not a thousand requests to a registry that is down.
 func (rc *registryClient) codecFor(ctx context.Context, id int, topic string) (*codecEntry, error) {
 	rc.mu.Lock()
-	if e, ok := rc.codecs[id]; ok && (e.err == nil || time.Since(e.at) < 5*time.Second) {
+	if e, ok := rc.codecs[id]; ok && (e.err == nil || time.Since(e.at) < unknownFor) {
 		rc.mu.Unlock()
 		return e, e.err
+	}
+	if time.Now().Before(rc.downUntil) {
+		err := rc.downErr
+		rc.mu.Unlock()
+		return &codecEntry{err: err, at: time.Now()}, err
 	}
 	rc.mu.Unlock()
 
 	e := &codecEntry{at: time.Now()}
 	e.codec, e.subject, e.version, e.err = rc.buildCodec(ctx, id, topic)
 	rc.mu.Lock()
-	if len(rc.codecs) > 512 {
-		rc.codecs = map[int]*codecEntry{}
+	defer rc.mu.Unlock()
+	var re *regError
+	if e.err != nil && !errors.As(e.err, &re) {
+		// Not an answer from the registry: it is down or unreachable. Wait before the
+		// next probe, and do not remember the id as unknown.
+		rc.downFor = min(max(2*rc.downFor, downFirst), downMost)
+		rc.downUntil, rc.downErr = time.Now().Add(rc.downFor), e.err
+		return e, e.err
+	}
+	rc.downFor, rc.downUntil, rc.downErr = 0, time.Time{}, nil
+	if len(rc.codecs) >= maxCodecs {
+		// Full: the entry asked longest ago goes.
+		oldest, at := 0, time.Time{}
+		for k, v := range rc.codecs {
+			if at.IsZero() || v.at.Before(at) {
+				oldest, at = k, v.at
+			}
+		}
+		delete(rc.codecs, oldest)
 	}
 	rc.codecs[id] = e
-	rc.mu.Unlock()
 	return e, e.err
 }
+
+const (
+	maxCodecs  = 512
+	unknownFor = 30 * time.Second
+	downFirst  = time.Second
+	downMost   = 30 * time.Second
+)
 
 func (rc *registryClient) buildCodec(ctx context.Context, id int, topic string) (*schemaregistry.Codec, string, int, error) {
 	var s schemaVersion
 	if err := rc.call(ctx, "GET", fmt.Sprintf("/schemas/ids/%d", id), nil, &s); err != nil {
 		return nil, "", 0, err
 	}
-	refs, err := rc.resolve(ctx, s, 0)
+	refs, err := rc.resolve(ctx, s)
 	if err != nil {
 		return nil, "", 0, err
 	}
@@ -394,26 +436,51 @@ func (rc *registryClient) buildCodec(ctx context.Context, id int, topic string) 
 	return codec, subject, version, nil
 }
 
-// resolve follows a schema's references to their text, dependencies first.
-func (rc *registryClient) resolve(ctx context.Context, s schemaVersion, depth int) ([]schemaregistry.Ref, error) {
-	if depth > 16 {
-		return nil, errors.New("schema references are nested too deeply")
-	}
+// resolve follows a schema's references to their text, dependencies first. Each
+// (subject, version) is fetched and followed once, so a schema that names one many
+// times (a diamond) costs what it names and not its paths, and the bound is the
+// registry's own: at most maxResolved distinct schemas.
+func (rc *registryClient) resolve(ctx context.Context, s schemaVersion) ([]schemaregistry.Ref, error) {
 	var out []schemaregistry.Ref
-	for _, r := range s.References {
-		dep, err := rc.Version(ctx, r.Subject, r.Version)
-		if err != nil {
-			return nil, err
+	followed := map[string]bool{}
+	seen := map[string]bool{}
+	fetched := map[string]schemaVersion{}
+	var walk func(s schemaVersion) error
+	walk = func(s schemaVersion) error {
+		for _, r := range s.References {
+			node := fmt.Sprintf("%s\x00%d", r.Subject, r.Version)
+			dep, ok := fetched[node]
+			if !ok {
+				var err error
+				if dep, err = rc.Version(ctx, r.Subject, r.Version); err != nil {
+					return err
+				}
+				fetched[node] = dep
+			}
+			if !followed[node] {
+				if len(followed) >= maxResolved {
+					return fmt.Errorf("schema references name more than %d schemas", maxResolved)
+				}
+				followed[node] = true
+				if err := walk(dep); err != nil {
+					return err
+				}
+			}
+			if key := node + "\x00" + r.Name; !seen[key] {
+				seen[key] = true
+				out = append(out, schemaregistry.Ref{Name: r.Name, Type: dep.Type(), Text: dep.Schema})
+			}
 		}
-		inner, err := rc.resolve(ctx, dep, depth+1)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, inner...)
-		out = append(out, schemaregistry.Ref{Name: r.Name, Type: dep.Type(), Text: dep.Schema})
+		return nil
+	}
+	if err := walk(s); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
+
+// maxResolved is the registry's bound on the schemas one graph of references names.
+const maxResolved = 1000
 
 // decoded is a record value read through the registry.
 type decoded struct {
@@ -478,7 +545,7 @@ func (rc *registryClient) encode(ctx context.Context, subject, doc string) ([]by
 	if err != nil {
 		return nil, err
 	}
-	refs, err := rc.resolve(ctx, v, 0)
+	refs, err := rc.resolve(ctx, v)
 	if err != nil {
 		return nil, err
 	}
