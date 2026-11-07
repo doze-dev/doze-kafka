@@ -272,7 +272,7 @@ doze-kafka --data-dir {{.DataDir}} --schema-registry-addr {{.Example}}</pre>
         <div class="more"><button type="button" class="btn" aria-label="More actions" title="More actions" aria-expanded="false" data-more>···</button>
           <div class="menu" role="group" aria-label="More actions" hidden>
             <button class="btn danger" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" data-confirm-url="{{confirmURL "schema.delete" "subject" .Subject}}" data-confirm-title="{{(index .Confirm "schema.delete").Title}}" data-confirm-verb="{{(index .Confirm "schema.delete").Verb}}" hx-confirm="{{(index .Confirm "schema.delete").Text}}">{{icon "trash"}} Delete subject</button>
-            {{if gt (len .Versions) 1}}<button class="btn danger" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" hx-vals='{"version":"{{.Cur.Version}}"}' data-confirm-url="{{confirmURL "schema.version.delete" "subject" .Subject "version" .Cur.Version}}" data-confirm-title="{{(index .Confirm "schema.version.delete").Title}}" data-confirm-verb="{{(index .Confirm "schema.version.delete").Verb}}" hx-confirm="{{(index .Confirm "schema.version.delete").Text}}">{{icon "trash"}} Delete v{{.Cur.Version}}</button>{{end}}
+            {{if .Cur.Version}}<button class="btn danger" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" hx-vals='{"version":"{{.Cur.Version}}"}' data-confirm-url="{{confirmURL "schema.version.delete" "subject" .Subject "version" .Cur.Version}}" data-confirm-title="{{(index .Confirm "schema.version.delete").Title}}" data-confirm-verb="{{(index .Confirm "schema.version.delete").Verb}}" hx-confirm="{{(index .Confirm "schema.version.delete").Text}}">{{icon "trash"}} Delete v{{.Cur.Version}}</button>{{end}}
           </div>
         </div>
       </div>
@@ -512,6 +512,42 @@ doze-kafka --data-dir {{.DataDir}} --schema-registry-addr {{.Example}}</pre>
 {{else}}<div class="callout bad" role="alert"><div class="row ce g8"><span class="b">Would fail</span><span class="m">v{{.Latest}} at {{.Level}}</span></div><span class="note">{{.Why}}. Existing versions are not re-checked when the level changes; the next register is.</span></div>
 {{end}}
 {{end}}
+
+{{/* Sc-13: the registry refused the console (401). */}}
+{{define "schemas_denied"}}{{template "shell_top" .}}
+  <aside class="list" aria-label="Subjects">
+    <div class="list-filter list-filter-first"><input class="inp m" type="search" placeholder="Filter subjects" aria-label="Filter Schemas" disabled></div>
+    <div class="col g4 list-none sc-off-none"><span class="b">Subjects not loaded</span><span class="note">The registry answered 401, so there is no list to show. This is not an empty registry; it does not say what it holds to a caller it refuses.</span></div>
+  </aside>
+  <main class="main sc-main" id="detail">
+    <div class="row sb ce idband">
+      <div class="col"><h1 class="h1">Schemas</h1><span class="note">The {{if $.RegistryHost}}registry at <span class="m">{{.RegistryHost}}</span>{{else}}registry{{end}} is up and wants a user name and password.</span></div>
+      <div class="row g8 ce idband-acts"><a class="btn pri w5" href="{{prefix}}/schemas" data-retry-page>Try again</a></div>
+    </div>
+    <div class="callout deny" role="alert" data-refusal-kind="refused" data-refusal-source="registry" data-refusal-name="401">
+      <div class="row ce g8"><span class="b">Refused</span><span class="m">401 Unauthorized</span></div>
+      <span class="m sc-wrap">{{.Raw}}</span>
+      <span class="note">Rule: {{if .SASL}}SASL is on, so the registry requires HTTP basic authentication with the same user names and passwords as the broker.{{else}}the registry requires HTTP basic authentication.{{end}} A Confluent registry set up for basic auth refuses an unauthenticated or wrong-password call the same way. Nothing was changed.</span>
+    </div>
+    <div class="row g12">
+      <div class="card grow"><div class="pad col g8">
+        <span class="h2">The console's own sign-in</span>
+        <span class="note">{{if .User}}The console signs in to the registry as <span class="m">{{.User}}</span>, the user it reaches the broker as, and the registry refused it: the user may have been removed, or its password changed, since the broker started.{{else}}The console sent no user: the broker has SASL off, and this registry wants one.{{end}} It asks for no other.</span>
+        <div class="row g8"><a class="btn pri w5" href="{{prefix}}/schemas">Try again</a><a class="btn w5" href="{{prefix}}/access">Open Access to see the users</a></div>
+      </div></div>
+      <div class="col g8 sc-denied-side">
+        <div class="callout"><span class="b">If the refused call came from an app</span><span class="note">Give the serializer the same credentials it gives the broker.</span>
+          <pre class="code sc-snip"><span class="kw">schema.registry.url</span>={{.RegistryURL}}
+basic.auth.credentials.source=USER_INFO
+basic.auth.user.info={{.AppUser}}:&lt;password&gt;</pre></div>
+        <div class="callout"><span class="b">Check the same thing by hand</span><pre class="code sc-snip">curl -u {{.AppUser}}:&lt;password&gt; \
+  {{.RegistryURL}}/subjects</pre></div>
+      </div>
+    </div>
+    <div class="grow"></div>
+  </main>
+  {{template "wire_dock" .}}
+{{template "shell_bottom" .}}{{end}}
 
 {{/* Sc-16: a subject the registry does not have. */}}
 {{define "schema_notfound"}}{{template "shell_top" .}}

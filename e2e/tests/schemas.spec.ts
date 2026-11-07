@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/console';
+import { OwnBroker } from '../ownbroker';
 
 // The seed registers seed-events-value (Avro, two versions) and seed-proto-value
 // (Protobuf), and writes records encoded with them (see seed/main.go).
@@ -241,3 +242,172 @@ test('the composer writes a record encoded with the topic\'s schema, and says wh
   await expect(page.locator('#c-sub')).toHaveValue(`${topic}-value`);
   await expect(page.locator('#f-value')).toHaveValue(/"id"/);
 });
+
+/** Checks a draft and registers it, on the register page as it is. */
+async function checkAndRegister(page: import('@playwright/test').Page, answer: string | RegExp) {
+  await page.locator('#reg-acts').getByRole('button', { name: /Check/ }).click();
+  await expect(page.locator('#reg-answer')).toContainText(answer);
+  await page.locator('#reg-acts [data-register]').click();
+  await expect(page.locator('.flash')).toContainText('Schema registered');
+}
+
+test('a version is soft-deleted, the last one takes the subject to Soft-deleted, and it is deleted for good from there', async ({ page, uniqueName, confirmDialog }) => {
+  const subject = uniqueName('soft');
+  await registerFirst(page, subject, AVRO());
+  await page.getByRole('link', { name: 'Register new version' }).click();
+  await page.locator('#f-schema').fill(AVRO(`,{"name":"note","type":["null","string"],"default":null}`));
+  await checkAndRegister(page, 'Compatible');
+  // Sc-12 dialog 1: v2 goes, its id still resolves.
+  await page.getByRole('button', { name: 'More actions' }).click();
+  await page.getByRole('button', { name: 'Delete v2' }).click();
+  await expect(page.locator('#confirm-title')).toHaveText(`Soft delete version 2 of ${subject}`);
+  await expect(page.locator('#confirm-parts')).toContainText('still resolves');
+  await confirmDialog('accept');
+  await expect(page.locator('.flash')).toContainText('Version 2 soft-deleted');
+  await expect(page.locator('#subject-facts')).toContainText('1 version');
+  // The last version too: the subject is listed under Soft-deleted.
+  await page.getByRole('button', { name: 'More actions' }).click();
+  await page.getByRole('button', { name: 'Delete v1' }).click();
+  await expect(page.locator('#confirm-parts')).toContainText("the subject's last version");
+  await confirmDialog('accept');
+  await expect(page).toHaveURL(/\/schemas\?|\/schemas$/);
+  const gone = page.locator(`#list-deleted .li[data-name="${subject}"]`);
+  await expect(gone).toHaveCount(1);
+  // Delete for good: the permanent call alone, behind the name.
+  await gone.getByRole('button', { name: /Delete for good/ }).click();
+  await expect(page.locator('#confirm-lead')).toContainText('soft-deleted it already');
+  await page.locator('#confirm-type').fill(subject);
+  await confirmDialog('accept');
+  await expect(page.locator(`#list-deleted .li[data-name="${subject}"]`)).toHaveCount(0);
+});
+
+test('a reference is added on the register page, and the resolved view writes its type in', async ({ page, uniqueName }) => {
+  const key = uniqueName('refkey');
+  const keyType = `h.K${key.replace(/[^a-z0-9]/gi, '')}`;
+  await registerFirst(page, key, `{"type":"record","name":"K${key.replace(/[^a-z0-9]/gi, '')}","namespace":"h","fields":[{"name":"orderId","type":"string"}]}`);
+  const subject = uniqueName('refs');
+  await page.goto('new/schema');
+  await page.locator('#f-subject').fill(subject);
+  await page.locator('#f-schema').fill(`{"type":"record","name":"O","namespace":"h","fields":[{"name":"key","type":["null","${keyType}"],"default":null}]}`);
+  await page.getByRole('button', { name: 'Add reference' }).click();
+  const row = page.locator('#reg-refs .sc-ref-new');
+  await row.getByLabel('Name used in the schema').fill(keyType);
+  await row.getByLabel('Subject').fill(key);
+  await row.getByLabel('Version').fill('1');
+  await checkAndRegister(page, 'Parses');
+  // The next version starts with the reference, and shows the type written in.
+  await page.getByRole('link', { name: 'Register new version' }).click();
+  await expect(page.locator('#reg-refs')).toContainText(keyType);
+  await expect(page.locator('#reg-resolved')).toContainText('orderId');
+});
+
+test('a Protobuf subject: a new field number may follow, a changed type may not', async ({ page, uniqueName }) => {
+  const subject = uniqueName('proto');
+  const v1 = 'syntax = "proto3";\npackage p;\n\nmessage M {\n  string a = 1;\n}\n';
+  await page.goto('new/schema');
+  await page.locator('#f-subject').fill(subject);
+  await page.locator('.sc-seg label', { hasText: 'Protobuf' }).click();
+  await page.locator('#f-schema').fill(v1);
+  await checkAndRegister(page, 'Parses');
+  await expect(page.locator('.idband .pill')).toContainText('PROTOBUF');
+  await expect(page.locator('#subject-facts')).toContainText('1 message type: M');
+  await page.getByRole('link', { name: 'Register new version' }).click();
+  await page.locator('#f-schema').fill(v1.replace('}', '  string b = 2;\n}'));
+  await page.locator('#reg-acts').getByRole('button', { name: /Check/ }).click();
+  await expect(page.locator('#reg-answer')).toContainText('In Protobuf, adding a field with a new number is wire-compatible.');
+  await page.locator('#f-schema').fill(v1.replace('string a = 1', 'int64 a = 1'));
+  await page.locator('#reg-acts').getByRole('button', { name: /Check/ }).click();
+  await expect(page.locator('#reg-answer')).toContainText('Not compatible');
+});
+
+test('a JSON Schema subject draws its properties and validates a document', async ({ page, uniqueName }) => {
+  const subject = uniqueName('json');
+  await page.goto('new/schema');
+  await page.locator('#f-subject').fill(subject);
+  await page.locator('.sc-seg label', { hasText: 'JSON Schema' }).click();
+  await page.locator('#f-schema').fill('{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{"memberId":{"type":"string"},"points":{"type":"integer","minimum":0}},"required":["memberId"],"additionalProperties":false}');
+  await checkAndRegister(page, 'Parses');
+  await expect(page.locator('#subject-facts')).toContainText('1 required of 2 properties');
+  await expect(page.locator('.sc-props')).toContainText('integer, min 0');
+  await page.locator('#try-it [name=doc]').fill('{"memberId":"M-1","points":3}');
+  await page.locator('#try-it').getByRole('button', { name: 'Validate' }).click();
+  await expect(page.locator('#try-pill')).toContainText('valid');
+  await page.locator('#try-it [name=doc]').fill('{"points":3}');
+  await page.locator('#try-it').getByRole('button', { name: 'Validate' }).click();
+  await expect(page.locator('#try-pill')).toContainText('not valid');
+});
+
+test('a message with an id the registry never held is listed with the reason', async ({ page }) => {
+  // The harbour seed writes one record on harbour-manifests with id 9999.
+  await page.goto('schemas/harbour-manifests-value?tab=used');
+  await expect(page.locator('#subject-facts')).toContainText('id 9999, unknown here');
+  await expect(page.locator('#undecoded-why')).toContainText('40403');
+  const row = page.locator('#undecoded-table .r[data-row]').first();
+  await expect(row).toContainText('9999');
+  await row.click();
+  await expect(page.locator('#inspector')).toBeVisible();
+});
+
+test('the global level is set from a subject, and set back', async ({ page }) => {
+  await page.goto('schemas/seed-events-value?tab=compat');
+  await page.getByRole('radio', { name: 'FULL', exact: true }).check();
+  await page.locator('.sc-seg label', { hasText: 'Global default' }).click();
+  await page.getByRole('button', { name: 'Save level' }).click();
+  await expect(page.locator('#subject-facts')).toContainText('global default FULL');
+  await page.getByRole('radio', { name: 'BACKWARD', exact: true }).check();
+  await page.locator('.sc-seg label', { hasText: 'Global default' }).click();
+  await page.getByRole('button', { name: 'Save level' }).click();
+  await expect(page.locator('#subject-facts')).toContainText('global default BACKWARD');
+});
+
+test('the keys of a subject: j k to a version, ↵ opens it, d diffs, [ and ] step the pair, n registers', async ({ page }) => {
+  await page.goto('schemas/seed-events-value');
+  await page.keyboard.press('j');
+  await page.keyboard.press('j');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/version=1/);
+  await page.goto('schemas/seed-events-value');
+  await page.keyboard.press('d');
+  await expect(page).toHaveURL(/\/diff\?from=1&to=2/);
+  await page.keyboard.press('u');
+  await expect(page).toHaveURL(/layout=unified/);
+  await page.keyboard.press('Escape');
+  await expect(page).toHaveURL(/\/schemas\/seed-events-value$/);
+  await page.keyboard.press('n');
+  await expect(page).toHaveURL(/\/new\/schema\?subject=seed-events-value/);
+});
+
+for (const width of [960, 390]) {
+  test(`a subject and the register page fit at ${width} px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    for (const path of ['schemas/seed-events-value', 'new/schema?subject=seed-events-value', 'schemas/seed-events-value/diff']) {
+      await page.goto(path);
+      await expect(page.locator('main h1')).toBeVisible();
+      const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(over, `${path} at ${width}`).toBeLessThanOrEqual(1);
+    }
+  });
+}
+
+test('Try it encodes a value, and Raw is the registry\'s answer', async ({ page }) => {
+  await page.goto('schemas/seed-events-value');
+  await page.locator('#try-it').getByRole('button', { name: 'Encode' }).click();
+  await expect(page.locator('#try-result')).toContainText('bytes: magic byte 0');
+  await page.getByRole('link', { name: 'Raw', exact: true }).click();
+  await expect(page.locator('#raw')).toContainText('"subject": "seed-events-value"');
+});
+
+test.describe('on a broker started with the registry off', () => {
+  const off = new OwnBroker('schemas-spec-off', 90, ['--schema-registry=false']);
+  test.beforeAll(async () => { test.setTimeout(180_000); await off.start(); });
+  test.afterAll(async () => { await off.kill(); });
+
+  test('the rail keeps Schemas, marked off, and the page says how to turn it on', async ({ page }) => {
+    await page.goto(off.console + 'topics');
+    await expect(page.locator('nav.rail a.nav', { hasText: 'Schemas' })).toContainText('off');
+    await page.locator('nav.rail a.nav', { hasText: 'Schemas' }).click();
+    await expect(page.locator('main h1 + .note')).toContainText('switched off');
+    await expect(page.locator('main [data-copy-command]')).toHaveAttribute('data-copy', /--schema-registry$/);
+  });
+});
+

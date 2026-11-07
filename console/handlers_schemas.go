@@ -54,6 +54,9 @@ func (c *Console) schemas(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	list, ids, err := c.reg.Catalogue(ctx)
 	if err != nil {
+		if c.registryDenied(w, r, err) {
+			return
+		}
 		c.fail(w, r, err)
 		return
 	}
@@ -208,6 +211,34 @@ func schemaFromForm(r *http.Request) (schemaBody, error) {
 	return b, nil
 }
 
+// registryDenied draws Sc-13 for a page the registry refused the console (401): the
+// registry's refusal, the user the console signs in as, and how a client and a
+// person by hand give it theirs. The sign-in form the board draws is cut (SCH-19):
+// the console has one user, the broker's, and asks for no other.
+func (c *Console) registryDenied(w http.ResponseWriter, r *http.Request, err error) bool {
+	var re *regError
+	if !errors.As(err, &re) || re.Status != http.StatusUnauthorized || !wantsPage(r) {
+		return false
+	}
+	regURL := c.facts.RegistryURL
+	if regURL == "" {
+		regURL = c.reg.base
+	}
+	raw, _ := json.Marshal(map[string]any{"error_code": 401, "message": re.Message})
+	user := c.reg.user
+	data := map[string]any{"Page": "schemas", "View": "schemas_denied", "Title": "Schemas", "RegistryURL": regURL,
+		"RegistryHost": strings.TrimPrefix(strings.TrimPrefix(regURL, "http://"), "https://"), "Raw": string(raw), "User": user,
+		"SASL": len(c.facts.SASLMechanisms) > 0 || user != "", "AppUser": "<user>"}
+	if user != "" {
+		data["AppUser"] = user
+	}
+	maps.Copy(data, c.dockData(DockFilter{Registry: true}))
+	w.Header().Set("X-Doze-Page", "error")
+	c.shellData(r, data)
+	c.execute(w, http.StatusUnauthorized, "schemas_denied", data, true)
+	return true
+}
+
 // registryExample is where the registry would listen by default: port 8081 on the
 // broker's own host.
 func registryExample(broker string) string {
@@ -223,6 +254,9 @@ func registryExample(broker string) string {
 // does have that are close to the name, whether it was soft-deleted, and a way to
 // register it; anything else is the foundation's refusal.
 func (c *Console) failSubject(w http.ResponseWriter, r *http.Request, err error, subject string) {
+	if c.registryDenied(w, r, err) {
+		return
+	}
 	f := refusalFor(err)
 	if !f.NotFound || !wantsPage(r) {
 		c.fail(w, r, err)

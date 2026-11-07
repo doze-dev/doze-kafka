@@ -198,17 +198,52 @@ what is kept.
 With the built-in [schema registry](schema-registry.md) running, the console grows a
 **Schemas** section (its subjects are in the command palette, under Subjects).
 
-- The list shows every subject with its language (Avro, JSON Schema, Protobuf) and
-  its newest version.
-- A subject's page has its **versions** as tabs, and for any version after the first
-  a **Changes from vN** view: the schema as text, compared with the version before,
-  added lines in green and removed lines in red. The compatibility level is shown, and
-  can be set for the subject or handed back to the registry's default.
-- **New version** starts from the latest schema. **Check compatibility** says
-  whether it may be registered under the level in force and, if not, why; **Register**
-  does it. A schema that does not parse is reported as such, beside the form.
-- **Delete** removes a version, or the whole subject, after asking.
-- **Register schema** (the list's *New*) creates a subject from a pasted schema.
+- The home lists every subject with its language, versions, latest id, level and
+  the topic it is named for, with the registry's address for clients. With nothing
+  registered it says how a stock serializer registers on its first produce (Sc-01).
+  Subjects a client soft-deleted are listed apart, under *Soft-deleted*, with *Delete
+  for good*.
+- **A subject** (Sc-05, Sc-07, Sc-08, Sc-18) lists its versions newest first: what
+  each changed, said in fields ("added optional coupon (null or string, default
+  null)", "added carrier = 4"), when it was registered, and whether it passes the
+  subject's level against the version before. The schema is printed as the registry
+  holds it (an Avro record a field a line), with each language's notes (Protobuf's
+  canonical form, a JSON Schema's properties table). *Try it* encodes a JSON value with
+  the version and shows the bytes a serializer would send, or validates it; nothing is
+  sent. A row opens the version on the right: its id, what references it, the other
+  subjects with the same schema, and the messages on its id. A version a client's
+  serializer registered says so, with the software that sent it. *Raw* is the
+  registry's own answer.
+- **Diff** (`d`, Sc-06): two versions side by side or unified (`u`), the lines added,
+  removed and changed, what the change means for readers, and whether it would pass
+  at BACKWARD, FORWARD and FULL. Checking at another level changes nothing.
+- **Compatibility** (Sc-09): the levels as a table, with what each asks of a new
+  version; the scope (this subject, or the registry's default) and the mode (READWRITE,
+  READONLY); *Remove it* hands the subject back to the registry's level; *Try it*
+  checks the latest version at the chosen level without saving it.
+- **Used by** (Sc-11): which of the subject's ids the messages on its topic, and the
+  topics named after it, carry, each with its share and the message to open. A message
+  that carries an id the registry does not have is listed with the reason, and opens
+  raw (Sc-17).
+- **Register** (`n` on a subject, `c` on the home, Sc-02 to Sc-04): one page for a new
+  subject and the next version of one: the subject, the type, the schema with its line
+  numbers, its references (Sc-10, with the resolved view: the referenced types written
+  in, as a client sees them) and normalize. *Check* (`⌘↵`) asks the registry whether
+  it parses and may follow, and stores nothing; each reason it gives is a row, with a
+  fix where the console knows one (a field with no default gets its type's zero).
+  *Register* (`⇧⌘↵`) is on once a check passes; refused, it answers in the same place
+  with the registry's message, and nothing is stored. A read-only subject is said to be
+  one before the check, and its refusal (42205) offers *Set READWRITE* (Sc-15).
+- **Delete** (Sc-12): a version's delete is the soft delete (it leaves the list and
+  lookups; its id still resolves, so messages written with it still decode); a
+  subject's is for good, the soft and the permanent call in that order, once its name
+  is typed. Each dialog says what goes and what stays, the ids kept reserved, and the
+  messages that carry them.
+- A subject that is not there (Sc-16) is the registry's 40401, the subjects close to
+  the name, whether it was soft-deleted, and *Register* under that name. A registry
+  that refuses the console (401, Sc-13) is said to be one, with the user the console
+  signs in as. With no registry (`--schema-registry=false`, Sc-14) the section stays in
+  the rail, marked off, and its page gives the command that turns it on (`c` copies it).
 
 Where a topic has `<topic>-key` or `<topic>-value` subjects, its page links them.
 
@@ -314,7 +349,11 @@ matter on the page you are on, and while a dialog is open, that dialog's (a conf
 | `e` | On Traffic: errors only, and back |
 | `u` / `m` / `c` | On Traffic, with a request or client open: unfold a folded row, all of a client's metrics, copy a request's decoded fields |
 | `r` | Retry now, when the broker is not reachable |
-| `⌘Enter` / `Ctrl+Enter` | Send, from the composer; create, on a create form |
+| `⌘Enter` / `Ctrl+Enter` | Send, from the composer; create, on a create form; check, on the register page |
+| `⇧⌘Enter` | Register, on the register page, once a check has passed |
+| `d` / `n` | On a subject: diff with the version before; register a new version |
+| `1` to `4` | On a group or a subject: its tabs by number |
+| `[` / `]`, `u` | On a diff: the older and the newer pair; unified or side by side |
 | `Esc` | Close a dialog or the inspector, or clear the filter |
 
 Single keys act only when you are not typing in a field, with no modifier held, and

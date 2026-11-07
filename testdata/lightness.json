@@ -4,7 +4,7 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 28836882,
+      "binaryBytes": 28853442,
       "idleHeapBytes": 1375088,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
@@ -12,7 +12,7 @@
       "where": "macOS 27, Apple M-series, native"
     },
     "linux/arm64": {
-      "binaryBytes": 27984032,
+      "binaryBytes": 28049568,
       "idleHeapBytes": 1383880,
       "idleHeapNoiseBytes": 7160,
       "go": "go1.27.3",
@@ -355,6 +355,34 @@
       "from": 27590816,
       "to": 27984032,
       "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 27,918,496 and the pages of 2026-11-08 to 27,984,032 (65,536)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28836882,
+      "to": 28853442,
+      "reason": "Schemas: Sc-13 (the registry refusing the console), the registry's route ledger (each route recorded as registered), the inspector's soft delete: 16,560 bytes"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28853442,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,836,882 and Sc-13 and the route ledger of 2026-11-08 (16,560)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27984032,
+      "to": 28049568,
+      "reason": "Schemas: Sc-13 and the route ledger, the same code as the darwin/arm64 raise of this date to 28,853,442: one 64 KiB page (built in golang:1.27.3 on linux/arm64)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27590816,
+      "to": 28049568,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 27,984,032 and Sc-13 and the route ledger of 2026-11-08 to 28,049,568 (65,536)"
     }
   ]
 }

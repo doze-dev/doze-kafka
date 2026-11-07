@@ -2,6 +2,8 @@ package console
 
 import (
 	"encoding/json"
+	"github.com/doze-dev/doze-kafka/schemaregistry"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -261,5 +263,30 @@ func TestUsedByTab(t *testing.T) {
 		if got := idRangesText(rs); got != want {
 			t.Errorf("%s: %q, want %q", in, got, want)
 		}
+	}
+}
+
+// Sc-13: the registry refuses the console (401). The page says so, names the user
+// the console signs in as, and how an app and a person give theirs.
+func TestRegistryRefusesTheConsole(t *testing.T) {
+	reg, err := schemaregistry.Open(schemaregistry.NewMemoryStorage())
+	if err != nil {
+		t.Fatal(err)
+	}
+	api := schemaregistry.NewAPI(reg, schemaregistry.Options{Auth: func(user, pass string) bool { return user == "alice" && pass == "right" }})
+	ts := httptest.NewServer(api)
+	t.Cleanup(ts.Close)
+	c, _ := newTestConsoleAddr(t, func(o *Options) { o.RegistryURL, o.RegistryUser, o.RegistryPass = ts.URL, "checkout", "wrong" })
+	rec := req(t, c, "GET", "/_console/schemas", nil)
+	page := readable(rec.Body.String())
+	for _, want := range []string{"Subjects not loaded", "wants a user name and password", "Refused", "401 Unauthorized", "The console's own sign-in",
+		"signs in to the registry as checkout", "Open Access to see the users", "basic.auth.user.info=checkout:<password>", "curl -u checkout:<password>", "try again"} {
+		if rec.Code != 401 || !strings.Contains(page, want) {
+			t.Errorf("Sc-13 (%d) is missing %q", rec.Code, want)
+		}
+	}
+	// A subject's page is refused the same way.
+	if rec := req(t, c, "GET", "/_console/schemas/orders-value", nil); rec.Code != 401 || !strings.Contains(readable(rec.Body.String()), "Subjects not loaded") {
+		t.Errorf("a subject's page: %d", rec.Code)
 	}
 }

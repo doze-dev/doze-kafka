@@ -1049,6 +1049,9 @@
       // A page that is one question (Ac-05's checker, data-enter) asks it.
       var ask = document.querySelector("main form[data-enter]");
       if (ask) { e.preventDefault(); ask.requestSubmit(); return; }
+      // The registry refused the console (Sc-13): ↵ tries again.
+      var again = document.querySelector("main [data-retry-page]");
+      if (again) { e.preventDefault(); again.click(); return; }
       // A subject not found (Sc-16): ↵ opens the closest one.
       var closest = document.querySelector("main [data-closest]");
       if (closest) { e.preventDefault(); closest.click(); return; }

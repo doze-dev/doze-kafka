@@ -89,7 +89,7 @@
   </div>{{end}}
   <div class="grow"></div>
   <div class="row g8">{{if .DiffURL}}<a class="btn w5" href="{{.DiffURL}}">Diff with v{{.Prev}}</a>{{end}}
-    <a class="btn w5" href="{{.SubjectURL}}?version={{.V.Version}}&confirm=delete">Delete v{{.V.Version}} ···</a></div>
+    <button type="button" class="btn" hx-disabled-elt="this" hx-post="{{.SubjectURL}}/delete" hx-vals='{"version":"{{.V.Version}}"}' data-confirm-url="{{confirmURL "schema.version.delete" "subject" .Subject "version" .V.Version}}" data-confirm-title="{{(index .Confirm "schema.version.delete").Title}}" data-confirm-verb="{{(index .Confirm "schema.version.delete").Verb}}" hx-confirm="{{(index .Confirm "schema.version.delete").Text}}">Delete v{{.V.Version}} ···</button></div>
 </div>
 {{end}}
 

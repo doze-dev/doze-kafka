@@ -26,11 +26,11 @@ func originOf(r *http.Request) Origin {
 }
 
 func (a *API) dozeRoutes() {
-	a.mux.HandleFunc("GET /_doze/overview", func(w http.ResponseWriter, r *http.Request) {
+	a.handleFunc("GET /_doze/overview", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, a.reg.Overview())
 	})
 	// A check at any level, the subject's left as it is, with each reason taken apart.
-	a.mux.HandleFunc("POST /_doze/subjects/{subject}/check", func(w http.ResponseWriter, r *http.Request) {
+	a.handleFunc("POST /_doze/subjects/{subject}/check", func(w http.ResponseWriter, r *http.Request) {
 		in, e := readInput(r)
 		if e != nil {
 			writeErr(w, e)
@@ -61,7 +61,7 @@ func (a *API) dozeRoutes() {
 		}
 		writeJSON(w, 200, out)
 	})
-	a.mux.HandleFunc("GET /_doze/subjects/{subject}/versions/{version}/resolved", func(w http.ResponseWriter, r *http.Request) {
+	a.handleFunc("GET /_doze/subjects/{subject}/versions/{version}/resolved", func(w http.ResponseWriter, r *http.Request) {
 		v, e := a.reg.Resolved(r.PathValue("subject"), r.PathValue("version"))
 		if e != nil {
 			writeErr(w, e)
@@ -69,13 +69,13 @@ func (a *API) dozeRoutes() {
 		}
 		writeJSON(w, 200, v)
 	})
-	a.mux.HandleFunc("GET /_doze/requests", func(w http.ResponseWriter, r *http.Request) {
+	a.handleFunc("GET /_doze/requests", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		before, _ := strconv.ParseUint(q.Get("before"), 10, 64)
 		limit, _ := strconv.Atoi(q.Get("limit"))
 		writeJSON(w, 200, a.Requests(RequestFilter{Subject: q.Get("subject"), Before: before, Limit: limit}))
 	})
-	a.mux.HandleFunc("GET /_doze/subjects/{subject}/versions/{version}", func(w http.ResponseWriter, r *http.Request) {
+	a.handleFunc("GET /_doze/subjects/{subject}/versions/{version}", func(w http.ResponseWriter, r *http.Request) {
 		v, e := a.reg.VersionInfo(r.PathValue("subject"), r.PathValue("version"))
 		if e != nil {
 			writeErr(w, e)

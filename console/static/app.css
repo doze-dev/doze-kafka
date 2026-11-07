@@ -1767,3 +1767,5 @@ a.well.sc-still { padding: 8px 12px; text-decoration: none; }
 .sc-idin { width: 90px; }
 /* Sc-16: the subject closest to a name that is not there. */
 .list .li.near { background: var(--okbg); }
+.sc-denied-side { width: 480px; flex: none; }
+.sc-snip { margin: 4px 0 0; }

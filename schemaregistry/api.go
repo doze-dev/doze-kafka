@@ -45,6 +45,14 @@ type API struct {
 	sleep  func(time.Duration) // time.Sleep; a test's own
 
 	reqs requestRing // the newest requests (requests.go)
+
+	patterns []string // every route, as registered: what the ledger in docs/api-support.md lists (ledger.go)
+}
+
+// handleFunc registers a route and records its pattern.
+func (a *API) handleFunc(pattern string, h func(http.ResponseWriter, *http.Request)) {
+	a.patterns = append(a.patterns, pattern)
+	a.mux.HandleFunc(pattern, h)
 }
 
 // NewAPI builds the HTTP handler over a registry.
@@ -327,11 +335,10 @@ func readInput(r *http.Request) (SchemaInput, *Error) {
 }
 
 func (a *API) routes() {
-	m := a.mux
 	defer a.dozeRoutes()
 	// handle wraps a handler that returns an error as the registry's JSON error.
 	handle := func(pattern string, h func(w http.ResponseWriter, r *http.Request) *Error) {
-		m.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+		a.handleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 			if e := h(w, r); e != nil {
 				writeErr(w, e)
 			}
