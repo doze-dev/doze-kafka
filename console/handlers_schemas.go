@@ -2,6 +2,7 @@ package console
 
 import (
 	"context"
+	"errors"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -93,6 +94,23 @@ func (c *Console) schemas(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+	}
+	// Subjects a client soft-deleted (SCH-17): no longer listed or looked up, their text
+	// still held until they are deleted for good.
+	if deleted, err := c.reg.DeletedSubjects(ctx); err == nil && len(deleted) > 0 {
+		type gone struct {
+			Name    string
+			Confirm confirmView
+		}
+		var rows []gone
+		for _, d := range deleted {
+			f := confirmFacts{Name: d, SoftDeleted: true}
+			if vs, err := c.reg.AllVersions(ctx, d); err == nil {
+				f.Versions = len(vs)
+			}
+			rows = append(rows, gone{Name: d, Confirm: viewOf("schema.delete", f)})
+		}
+		data["Deleted"] = rows
 	}
 	maps.Copy(data, c.dockData(DockFilter{Registry: true}))
 	c.render(w, r, "schemas_home", data)
@@ -199,10 +217,17 @@ func (c *Console) failSubject(w http.ResponseWriter, r *http.Request, err error,
 	c.renderError(w, r, f, page)
 }
 
+// schemaDelete is Sc-12's two deletes. A version is soft-deleted: it leaves the
+// list and lookups, and its id still resolves, so every message written with it
+// still decodes. A subject is deleted for good, which is two calls in the order the
+// registry asks for them (a soft delete, then the permanent one), and only when its
+// name was typed to confirm it (confirm=<subject>). A subject a client already
+// soft-deleted (SCH-17) takes the permanent call alone.
 func (c *Console) schemaDelete(w http.ResponseWriter, r *http.Request) {
 	if c.registryOff(w, r) {
 		return
 	}
+	ctx := r.Context()
 	subject := groupFromSegment(r.PathValue("subject"))
 	if v := r.FormValue("version"); v != "" {
 		n, err := strconv.Atoi(v)
@@ -210,22 +235,34 @@ func (c *Console) schemaDelete(w http.ResponseWriter, r *http.Request) {
 			c.fail(w, r, badInput("%q is not a version", v))
 			return
 		}
-		if err := c.reg.DeleteVersion(r.Context(), subject, n); err != nil {
+		if err := c.reg.SoftDeleteVersion(ctx, subject, n); err != nil {
 			c.fail(w, r, err)
 			return
 		}
-		if rest, err := c.reg.Versions(r.Context(), subject); err == nil && len(rest) > 0 {
-			c.redirect(w, r, c.schemaURL(subject), "Version "+v+" deleted")
+		if rest, err := c.reg.Versions(ctx, subject); err == nil && len(rest) > 0 {
+			c.redirect(w, r, c.schemaURL(subject), "Version "+v+" soft-deleted; its id still resolves")
 			return
 		}
-		c.redirect(w, r, schemasPath(c.prefix), "Version deleted — that was the last one, so the subject is gone")
+		c.redirect(w, r, schemasPath(c.prefix), "Version "+v+" soft-deleted: it was the last one, so the subject is listed under Soft-deleted")
 		return
 	}
-	if err := c.reg.DeleteSubject(r.Context(), subject); err != nil {
+	if r.FormValue("confirm") != subject {
+		c.fail(w, r, badInput("type the subject's name to delete it for good"))
+		return
+	}
+	if err := c.reg.SoftDeleteSubject(ctx, subject); err != nil {
+		var re *regError
+		// 40404: a client soft-deleted it already; the permanent call is what is left.
+		if !errors.As(err, &re) || re.Code != 40404 {
+			c.fail(w, r, err)
+			return
+		}
+	}
+	if err := c.reg.PermanentDeleteSubject(ctx, subject); err != nil {
 		c.fail(w, r, err)
 		return
 	}
-	c.redirect(w, r, schemasPath(c.prefix), "Subject deleted")
+	c.redirect(w, r, schemasPath(c.prefix), "Subject deleted for good")
 }
 
 // topicSchemas lists the subjects that belong to a topic by the usual naming

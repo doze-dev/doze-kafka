@@ -52,20 +52,34 @@ func TestSchemaActionsRedirectsAndFlashes(t *testing.T) {
 	if code, l := post("/_console/schemas/orders-value/delete", url.Values{"version": {"x"}}); code != 400 {
 		t.Errorf("a version that is not a number: %d %s", code, l)
 	}
-	if code, l := post("/_console/schemas/orders-value/delete", url.Values{"version": {"1"}}); code != 303 || l != "/_console/schemas/orders-value?flash=Version+1+deleted" {
+	if code, l := post("/_console/schemas/orders-value/delete", url.Values{"version": {"1"}}); code != 303 || l != "/_console/schemas/orders-value?flash=Version+1+soft-deleted%3B+its+id+still+resolves" {
 		t.Errorf("one of two: %d %s", code, l)
 	}
-	if code, l := post("/_console/schemas/orders-value/delete", url.Values{"version": {"2"}}); code != 303 || l != "/_console/schemas?flash=Version+deleted+%E2%80%94+that+was+the+last+one%2C+so+the+subject+is+gone" {
+	if code, l := post("/_console/schemas/orders-value/delete", url.Values{"version": {"2"}}); code != 303 || l != "/_console/schemas?flash=Version+2+soft-deleted%3A+it+was+the+last+one%2C+so+the+subject+is+listed+under+Soft-deleted" {
 		t.Errorf("the last: %d %s", code, l)
 	}
 	register(t, c, "kept-value", userV1)
-	if code, l := post("/_console/schemas/kept-value/delete", nil); code != 303 || l != "/_console/schemas?flash=Subject+deleted" {
+	// For good: only with its name typed, then two calls (soft, permanent).
+	if code, _ := post("/_console/schemas/kept-value/delete", nil); code != 400 {
+		t.Errorf("a subject deleted without its name typed: %d", code)
+	}
+	if code, l := post("/_console/schemas/kept-value/delete", url.Values{"confirm": {"kept-value"}}); code != 303 || l != "/_console/schemas?flash=Subject+deleted+for+good" {
 		t.Errorf("the subject: %d %s", code, l)
 	}
 	if got := c.reg.SubjectNames(context.Background()); len(got) != 0 {
 		t.Errorf("subjects left: %v", got)
 	}
-	if code, _ := post("/_console/schemas/nobody/delete", nil); code != 404 {
+	// orders-value was soft-deleted with its last version (SCH-17): the permanent call alone.
+	if d, _ := c.reg.DeletedSubjects(context.Background()); len(d) != 1 || d[0] != "orders-value" {
+		t.Errorf("soft-deleted: %v", d)
+	}
+	if code, _ := post("/_console/schemas/orders-value/delete", url.Values{"confirm": {"orders-value"}}); code != 303 {
+		t.Errorf("a soft-deleted subject for good: %d", code)
+	}
+	if d, _ := c.reg.DeletedSubjects(context.Background()); len(d) != 0 {
+		t.Errorf("still held: %v", d)
+	}
+	if code, _ := post("/_console/schemas/nobody/delete", url.Values{"confirm": {"nobody"}}); code != 404 {
 		t.Errorf("a subject that is not there: %d", code)
 	}
 }

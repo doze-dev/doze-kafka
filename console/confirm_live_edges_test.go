@@ -121,10 +121,10 @@ func TestConfirmLiveSentences(t *testing.T) {
 		}
 	}
 	code, got = confirmOf(t, c, "schema.version.delete?subject=s-value&version=1")
-	if code != 200 || !strings.Contains(got["text"].(string), `Delete version 1 of "s-value"? It is one of 2; the other 1 stay and version 2 becomes the latest.`) {
+	if code != 200 || !strings.Contains(got["text"].(string), "Soft delete version 1 of s-value.") || !strings.Contains(got["text"].(string), "The latest stays v2.") || got["callTop"] != "DELETE /subjects/s-value/versions/1" {
 		t.Errorf("version: %d %v", code, got)
 	}
-	if _, got = confirmOf(t, c, "schema.delete?subject=s-value"); !strings.Contains(got["text"].(string), "with all 2 versions") {
+	if _, got = confirmOf(t, c, "schema.delete?subject=s-value"); !strings.Contains(got["text"].(string), "All 2 versions") || got["typed"] != "s-value" || got["danger"] != true {
 		t.Errorf("subject: %v", got)
 	}
 	if code, _ = confirmOf(t, c, "schema.delete?subject=nobody"); code != 404 {

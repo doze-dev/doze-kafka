@@ -128,7 +128,7 @@ func TestSchemaSubjectLifecycle(t *testing.T) {
 		t.Errorf("delete a version: %d → %s", rec.Code, rec.Header().Get("Location"))
 	}
 	// Delete the subject: it is gone, with a page that says so.
-	req(t, c, "POST", "/_console/schemas/orders-value/delete", url.Values{})
+	req(t, c, "POST", "/_console/schemas/orders-value/delete", url.Values{"confirm": {"orders-value"}})
 	rec = req(t, c, "GET", "/_console/schemas/orders-value", nil)
 	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "no subject named") {
 		t.Errorf("a deleted subject = %d, want a 404 page that names it", rec.Code)

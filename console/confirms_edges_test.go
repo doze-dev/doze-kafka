@@ -42,21 +42,43 @@ func TestGroupConfirmsCountWhatAResetMoves(t *testing.T) {
 }
 
 func TestSubjectConfirmsKeepAVersionToBeLatest(t *testing.T) {
+	// Sc-12: a version is soft-deleted, and says what becomes latest.
 	v := subjectConfirms("s", []int{1, 2, 3}, 2)
-	if txt := v["schema.version.delete"].Text; !strings.Contains(txt, `Delete version 2 of "s"? It is one of 3; the other 2 stay and version 3 becomes the latest.`) {
+	if txt := v["schema.version.delete"].Text; !strings.Contains(txt, "Soft delete version 2 of s.") || !strings.Contains(txt, "The latest stays v3.") || !strings.Contains(txt, "(v4), not v2") {
 		t.Errorf("middle: %s", txt)
 	}
-	if txt := subjectConfirms("s", []int{1, 2, 3}, 3)["schema.version.delete"].Text; !strings.Contains(txt, "version 2 becomes the latest") {
+	if txt := subjectConfirms("s", []int{1, 2, 3}, 3)["schema.version.delete"].Text; !strings.Contains(txt, "Latest becomes v2.") {
 		t.Errorf("newest: %s", txt)
 	}
-	if txt := subjectConfirms("s", []int{1, 2, 3}, 1)["schema.version.delete"].Text; !strings.Contains(txt, "version 3 becomes the latest") {
+	if txt := subjectConfirms("s", []int{1, 2, 3}, 1)["schema.version.delete"].Text; !strings.Contains(txt, "The latest stays v3.") {
 		t.Errorf("oldest: %s", txt)
 	}
-	if txt := v["schema.delete"].Text; !strings.Contains(txt, `Delete subject "s" with all 3 versions?`) {
+	if txt := subjectConfirms("s", []int{7}, 7)["schema.version.delete"].Text; !strings.Contains(txt, "the subject's last version") {
+		t.Errorf("the last one: %s", txt)
+	}
+	// The subject is deleted for good, behind its name.
+	if txt := v["schema.delete"].Text; !strings.Contains(txt, "Permanently delete subject s.") || !strings.Contains(txt, "All 3 versions") || !strings.Contains(txt, "Type s to confirm.") {
 		t.Errorf("subject: %s", txt)
 	}
-	if txt := subjectConfirms("s", []int{4}, 4)["schema.delete"].Text; !strings.Contains(txt, "with all 1 version?") {
+	if txt := subjectConfirms("s", []int{4}, 4)["schema.delete"].Text; !strings.Contains(txt, "Its one version and its schema text") {
 		t.Errorf("one version: %s", txt)
+	}
+	// Measured: the ids, the next id, the messages that carry them.
+	f := confirmFacts{Name: "s", Versions: 3, IDs: []int{1, 4, 7}, SchemaID: 7, NextID: 11, Scanned: true, CarryTopic: "t", Carry: 8378, CarryAll: 14452}
+	m := subjectConfirmsWith(f, []int{1, 2, 3}, 3)
+	if txt := m["schema.delete"].Text; !strings.Contains(txt, "Ids 1, 4 and 7 are never handed out again") || !strings.Contains(txt, "A new registration gets id 11 or later.") || !strings.Contains(txt, "The 14,452 messages on t that carry those ids") {
+		t.Errorf("measured subject: %s", txt)
+	}
+	if txt := m["schema.version.delete"].Text; !strings.Contains(txt, "8,378 messages on t carry id 7.") || !strings.Contains(txt, "/schemas/ids/7") {
+		t.Errorf("measured version: %s", txt)
+	}
+	f.Carry = 1
+	if txt := subjectConfirmsWith(f, []int{1, 2, 3}, 3)["schema.version.delete"].Text; !strings.Contains(txt, "1 message on t carries id 7.") {
+		t.Errorf("one message: %s", txt)
+	}
+	f.IDs, f.CarryAll = []int{5}, 0
+	if txt := subjectConfirmsWith(f, []int{1}, 1)["schema.delete"].Text; !strings.Contains(txt, "Id 5 is never handed out again") || !strings.Contains(txt, "None of the newest messages on t carries those ids.") {
+		t.Errorf("one id, none carried: %s", txt)
 	}
 }
 

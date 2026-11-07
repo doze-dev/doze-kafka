@@ -106,7 +106,7 @@ func TestEveryRouteRefusesInTheOneVocabulary(t *testing.T) {
 		{"POST /new/schema", "registering a new version the registry cannot parse", c, "POST", "/_console/new/schema", form("subject", "orders-value", "schema", "{not json", "schemaType", "AVRO"), true, nil, answer{400, refused, "registry", "42201"}},
 		{"POST /schemas/{subject}/config", "a compatibility level that does not exist", c, "POST", "/_console/schemas/orders-value/config", form("level", "SIDEWAYS"), true, nil, answer{400, refused, "registry", "42203"}},
 		{"POST /schemas/{subject}/config", "a level the registry does not implement", unimplemented, "POST", "/_console/schemas/orders-value/config", form("level", "FULL"), true, nil, answer{501, notImpl, "registry", "50101"}},
-		{"POST /schemas/{subject}/delete", "deleting a subject that is not there", c, "POST", "/_console/schemas/ghost/delete", nil, true, nil, answer{404, refused, "registry", "40401"}},
+		{"POST /schemas/{subject}/delete", "deleting a subject that is not there", c, "POST", "/_console/schemas/ghost/delete", form("confirm", "ghost"), true, nil, answer{404, refused, "registry", "40401"}},
 		{"GET /groups", "the groups when the broker is not there", down, "GET", "/_console/groups", nil, false, nil, answer{502, failed, "", ""}},
 		{"GET /live/groups", "the groups' poll when the broker is not there", down, "GET", "/_console/live/groups", nil, true, nil, answer{502, failed, "console", ""}},
 		// Kafka describes a group it does not know as Dead with no error: that it is not

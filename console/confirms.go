@@ -59,6 +59,18 @@ type confirmFacts struct {
 	ResetAt               string // the time a timestamp reset goes to, as written.
 	OffsetTopics          []string
 	Members               int // members a group has now.
+	// A subject's: the shown version's schema id, every version's ids, the id the
+	// next new schema gets, and the messages that carry them (Scanned: counted in the
+	// topic the subject is named for, CarryTopic).
+	SchemaID    int
+	IDs         []int
+	NextID      int
+	Carry       int64 // messages carrying SchemaID.
+	CarryAll    int64 // messages carrying any of IDs.
+	CarryTopic  string
+	Scanned     bool
+	NextVersion int  // the number a version registered next gets.
+	SoftDeleted bool // the subject is soft-deleted already (SCH-17): the permanent call is all that is left.
 }
 
 // confirmNote is a callout under a confirm's sentence (Gr-15): what is and is not touched.
@@ -67,6 +79,7 @@ type confirmNote struct {
 	Name string       `json:"name,omitempty"` // the Kafka answer the note names, in the mono face.
 	Body []confirmSeg `json:"body"`
 	Deny bool         `json:"deny,omitempty"`
+	Warn bool         `json:"warn,omitempty"`
 }
 
 // confirmSeg is a run of a confirm's text: plain, in the mono face (a name, a
@@ -93,6 +106,15 @@ type confirmSay struct {
 	Notes []confirmNote
 	Call  string // the request the verb sends, beside the buttons ("OffsetDelete").
 	Verb  string
+	// Sc-12's: the request written under the title (CallTop), a red title (Danger),
+	// notes before the parts (Lead), the parts as bold heads with their text, and a
+	// name to type before the verb is on (Typed, with the field's label).
+	CallTop    string
+	Danger     bool
+	Lead       []confirmNote
+	Parts      []confirmNote
+	Typed      string
+	TypedLabel string
 }
 
 // Text is the whole confirm as one string: the dialog's text when the console
@@ -109,11 +131,26 @@ func (s confirmSay) Text() string {
 		b.WriteString(segsText(r.Value))
 		b.WriteString(".")
 	}
-	for _, n := range s.Notes {
+	for _, n := range s.Lead {
+		b.WriteString(" ")
+		b.WriteString(segsText(n.Body))
+	}
+	for _, n := range s.Parts {
 		b.WriteString(" ")
 		b.WriteString(n.Head)
 		b.WriteString(": ")
 		b.WriteString(segsText(n.Body))
+	}
+	for _, n := range s.Notes {
+		b.WriteString(" ")
+		if n.Head != "" {
+			b.WriteString(n.Head)
+			b.WriteString(": ")
+		}
+		b.WriteString(segsText(n.Body))
+	}
+	if s.Typed != "" {
+		b.WriteString(" Type " + s.Typed + " to confirm.")
 	}
 	return b.String()
 }
@@ -325,17 +362,73 @@ var confirmTable = []confirmSpec{
 	},
 	{
 		ID: "schema.version.delete", Method: "POST", Path: "/schemas/{subject}/delete",
-		Say: sentence("Delete version", "Delete version", func(f confirmFacts) string {
-			return fmt.Sprintf("Delete version %d of %q? It is one of %d; the other %d stay and version %d becomes the latest.",
-				f.Version, f.Name, f.Versions, f.Versions-1, f.NewLatest)
-		}),
+		Say: func(f confirmFacts) confirmSay {
+			say := confirmSay{Title: fmt.Sprintf("Soft delete version %d of %s", f.Version, f.Name), Verb: fmt.Sprintf("Soft delete v%d", f.Version),
+				CallTop: fmt.Sprintf("DELETE /subjects/%s/versions/%d", f.Name, f.Version)}
+			goes := fmt.Sprintf("Version %d stops appearing in the version list and in lookups.", f.Version)
+			switch {
+			case f.NewLatest == 0:
+				goes += " It is the subject's last version, so the subject goes from the list too, until it is deleted for good or registered again."
+			case f.NewLatest < f.Version:
+				goes += fmt.Sprintf(" Latest becomes v%d.", f.NewLatest)
+			default:
+				goes += fmt.Sprintf(" The latest stays v%d.", f.NewLatest)
+			}
+			stays := []confirmSeg{txt("Schema id " + strconv.Itoa(f.SchemaID) + " still resolves at "), mono(fmt.Sprintf("/schemas/ids/%d", f.SchemaID)),
+				txt(fmt.Sprintf(", so every message already written with it still decodes. The version can be brought back by registering the same schema again; it then gets a new version number (v%d), not v%d.", f.NextVersion, f.Version))}
+			say.Parts = []confirmNote{
+				{Head: "What goes", Body: []confirmSeg{txt(goes)}},
+				{Head: "What stays", Body: stays},
+				{Head: "Not permanent", Body: []confirmSeg{txt("This is the soft delete. Removing it for good is a second step, on the subject, and is not offered until this one is done.")}},
+			}
+			if f.Scanned && f.Carry > 0 {
+				verb := "carry"
+				if f.Carry == 1 {
+					verb = "carries"
+				}
+				say.Notes = []confirmNote{{Warn: true, Body: []confirmSeg{txt(numCount(f.Carry, "message", "messages") + " on "), mono(f.CarryTopic), txt(fmt.Sprintf(" %s id %d.", verb, f.SchemaID))}}}
+			}
+			return say
+		},
 	},
 	{
 		ID: "schema.delete", Method: "POST", Path: "/schemas/{subject}/delete",
-		Say: sentence("Delete subject", "Delete subject", func(f confirmFacts) string {
-			return fmt.Sprintf("Delete subject %q with all %s? Messages already written with them stay on their topics, but nothing can decode them by id afterwards.",
-				f.Name, nounCount(f.Versions, "version", "versions"))
-		}),
+		Say: func(f confirmFacts) confirmSay {
+			say := confirmSay{Title: "Permanently delete subject " + f.Name, Verb: "Delete subject for good", Danger: true,
+				CallTop: fmt.Sprintf("DELETE /subjects/%s?permanent=true", f.Name), Typed: f.Name, TypedLabel: "Type the subject name to confirm"}
+			say.Lead = []confirmNote{{Body: []confirmSeg{txt("Two calls, in this order: a soft delete, then the permanent one. Confluent's registry makes the same rule, a permanent delete needs a soft delete first, and refuses the permanent call alone.")}}}
+			if f.SoftDeleted {
+				say.Lead = []confirmNote{{Body: []confirmSeg{txt("A client soft-deleted it already, so this is the permanent call alone. Its versions are no longer listed or looked up; their schema text is still held, and this removes it.")}}}
+			}
+			ids := make([]string, len(f.IDs))
+			for i, id := range f.IDs {
+				ids[i] = strconv.Itoa(id)
+			}
+			idsText := "Its ids are"
+			if len(ids) == 1 {
+				idsText = "Id " + ids[0] + " is"
+			} else if len(ids) > 1 {
+				idsText = "Ids " + strings.Join(ids[:len(ids)-1], ", ") + " and " + ids[len(ids)-1] + " are"
+			}
+			reserved := idsText + " never handed out again, even to the same schema text."
+			if f.NextID > 0 {
+				reserved += fmt.Sprintf(" A new registration gets id %d or later.", f.NextID)
+			}
+			messages := "Messages that carry those ids stay on their topics."
+			switch {
+			case f.Scanned && f.CarryAll == 0:
+				messages = fmt.Sprintf("None of the newest messages on %s carries those ids.", f.CarryTopic)
+			case f.Scanned:
+				messages = fmt.Sprintf("The %s on %s that carry those ids stay on their topics.", numCount(f.CarryAll, "message", "messages"), f.CarryTopic)
+			}
+			messages += " The console can no longer decode them and shows them raw (error 40403, schema not found)."
+			say.Parts = []confirmNote{
+				{Head: "What goes", Body: []confirmSeg{txt(subjectGoes(f.Versions))}},
+				{Head: "Ids stay reserved", Body: []confirmSeg{txt(reserved)}},
+				{Head: "Messages are not touched", Body: []confirmSeg{txt(messages)}},
+			}
+			return say
+		},
 	},
 }
 
@@ -622,15 +715,71 @@ func offsetDeleteConfirm(group, topic string, partition int32, committed int64, 
 // subjectConfirms are the confirms of a subject's page: all of it, and the version
 // on show (when there is another to keep).
 func subjectConfirms(subject string, versions []int, shown int) map[string]confirmView {
-	out := map[string]confirmView{"schema.delete": viewOf("schema.delete", confirmFacts{Name: subject, Versions: len(versions)})}
+	return subjectConfirmsWith(confirmFacts{Name: subject, Versions: len(versions)}, versions, shown)
+}
+
+// subjectConfirmsWith is subjectConfirms with what was measured (ids, the next id,
+// the messages that carry them).
+func subjectConfirmsWith(f confirmFacts, versions []int, shown int) map[string]confirmView {
+	out := map[string]confirmView{"schema.delete": viewOf("schema.delete", f)}
 	newLatest := 0
 	for _, v := range versions {
 		if v != shown {
 			newLatest = max(newLatest, v)
 		}
 	}
-	out["schema.version.delete"] = viewOf("schema.version.delete", confirmFacts{Name: subject, Version: shown, Versions: len(versions), NewLatest: newLatest})
+	f.Version, f.NewLatest = shown, newLatest
+	if len(versions) > 0 {
+		f.NextVersion = versions[len(versions)-1] + 1
+	}
+	out["schema.version.delete"] = viewOf("schema.version.delete", f)
 	return out
+}
+
+// subjectGoes is the permanent delete's "What goes".
+func subjectGoes(versions int) string {
+	if versions == 1 {
+		return "Its one version and its schema text, and the compatibility level set on this subject. Nothing can bring them back."
+	}
+	return fmt.Sprintf("All %d versions and their schema text, and the compatibility level set on this subject. Nothing can bring them back.", versions)
+}
+
+// subjectFacts measures what deleting a subject or one of its versions touches:
+// the versions' schema ids, the id the registry gives next, and the messages on the
+// topic the subject is named for that carry them (the schema scan, bounded).
+func (c *Console) subjectFacts(ctx context.Context, subject string, versions []int, shown int) confirmFacts {
+	f := confirmFacts{Name: subject, Versions: len(versions)}
+	for _, v := range versions {
+		// VersionInfo answers for a soft-deleted version too (SCH-17).
+		if sv, ok := c.reg.VersionInfo(ctx, subject, v); ok {
+			f.IDs = append(f.IDs, sv.ID)
+			if v == shown {
+				f.SchemaID = sv.ID
+			}
+		} else if sv, err := c.reg.Version(ctx, subject, v); err == nil {
+			f.IDs = append(f.IDs, sv.ID)
+			if v == shown {
+				f.SchemaID = sv.ID
+			}
+		}
+	}
+	if o, ok := c.reg.Overview(ctx); ok {
+		f.NextID = o.NextID
+	}
+	if topic := subjectTopic(subject); topic != "" {
+		if scan, err := c.scanSchemaIDs(ctx, topic); err == nil {
+			f.Scanned, f.CarryTopic = true, topic
+			for _, id := range f.IDs {
+				if u := scan.idUse(id); u != nil {
+					f.CarryAll += int64(u.Count)
+					if id == f.SchemaID {
+						f.Carry = int64(u.Count)
+					}
+				}
+			}
+		}
+	}
+	return f
 }
 
 // confirmURL is where a button's confirm fetches its sentence at the moment it is
@@ -706,12 +855,21 @@ func (c *Console) confirmLive(w http.ResponseWriter, r *http.Request) {
 		}
 		subject := q.Get("subject")
 		versions, err := c.reg.Versions(ctx, subject)
+		soft := false
+		if err != nil && id == "schema.delete" {
+			// A subject a client soft-deleted is listed under Soft-deleted (SCH-17).
+			if all, aerr := c.reg.AllVersions(ctx, subject); aerr == nil && len(all) > 0 {
+				versions, err, soft = all, nil, true
+			}
+		}
 		if err != nil {
 			c.failSubject(w, r, err, subject)
 			return
 		}
 		shown, _ := strconv.Atoi(q.Get("version"))
-		views = subjectConfirms(subject, versions, shown)
+		f := c.subjectFacts(ctx, subject, versions, shown)
+		f.SoftDeleted = soft
+		views = subjectConfirmsWith(f, versions, shown)
 	default:
 		c.fail(w, r, fmt.Errorf("%w: there is no confirm %q", errNotFound, id))
 		return
@@ -723,5 +881,6 @@ func (c *Console) confirmLive(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
-	json.NewEncoder(w).Encode(map[string]any{"text": v.Text, "title": v.Title, "verb": v.Verb, "body": v.Say.Body, "rows": v.Say.Rows, "notes": v.Say.Notes, "call": v.Say.Call})
+	json.NewEncoder(w).Encode(map[string]any{"text": v.Text, "title": v.Title, "verb": v.Verb, "body": v.Say.Body, "rows": v.Say.Rows, "notes": v.Say.Notes, "call": v.Say.Call,
+		"callTop": v.Say.CallTop, "danger": v.Say.Danger, "lead": v.Say.Lead, "parts": v.Say.Parts, "typed": v.Say.Typed, "typedLabel": v.Say.TypedLabel})
 }

@@ -1744,3 +1744,14 @@ progress.gr-used::-moz-progress-bar{background:var(--ink);border-radius:2px}
 .sc-ro .seg { align-self: flex-start; }
 .sc-ro-btn { align-self: flex-start; margin-top: 4px; }
 #level-answer:not(:has(*)) { display: none; }
+/* Sc-12: the request under the confirm's title, its parts, the typed name. */
+.confirm-calltop { overflow-wrap: anywhere; }
+.confirm-parts .confirm-part-h { margin-top: 4px; }
+#confirm-title.bad { color: var(--bad); }
+.list-deleted { border-top: 1px solid var(--line2); padding-top: 6px; }
+.list-deleted > .cap { padding: 4px 12px; display: block; }
+#confirm .modal.sc-confirm { width: 640px; }
+#confirm .modal.sc-confirm.danger { width: 660px; }
+#confirm .modal.sc-confirm > .pad { gap: 8px; padding: 16px 18px; }
+#confirm .modal.sc-confirm .confirm-f { margin-top: 4px; }
+#confirm .modal.sc-confirm .btn:disabled { opacity: .55; }

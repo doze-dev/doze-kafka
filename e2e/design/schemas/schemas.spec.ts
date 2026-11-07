@@ -4,7 +4,7 @@ import { SHELL } from '../lib/probes';
 import { openLive } from '../lib/render';
 import { OwnBroker } from '../../ownbroker';
 import { ALLOW } from './allow';
-import { COMPAT, DIFF, FINDINGS, NONE, READONLY, REGISTER, REGISTER_NEW, SCHEMA, SUBJECT_HEAD, TRY, VERSION_INSP, VERSIONS, DOCK } from './boards';
+import { COMPAT, confirmProbes, DIFF, FINDINGS, NONE, READONLY, REGISTER, REGISTER_NEW, SCHEMA, SUBJECT_HEAD, TRY, VERSION_INSP, VERSIONS, DOCK } from './boards';
 import { AUDIT, DISPATCH, DISPATCH_V3, INVOICE, ORDERS, POINTS, SchemasWorld } from './world';
 
 // The Schemas boards against the live pages, element by element, in light and dark.
@@ -70,6 +70,14 @@ test.describe('on the boards\' world: their subjects, under their names', () => 
     // The inspector's messages on id 7 are the one record the composer wrote with v3.
     const insp = await text(`inspect/version?key=${seg(`${seg(ORDERS)}:3`)}`);
     expect(insp).toContain('1 of the newest 1 on harbour.checkout.orders carry id 7');
+    // Sc-12's dialogs, measured: the ids, the next id, the record that carries id 7.
+    const soft = await (await request.get(w.console + `confirm/schema.version.delete?subject=${seg(ORDERS)}&version=3`)).json();
+    expect(soft.text).toContain('1 message on harbour.checkout.orders carries id 7.');
+    expect(soft.text).toContain('Latest becomes v2.');
+    const hard = await (await request.get(w.console + `confirm/schema.delete?subject=${seg(ORDERS)}`)).json();
+    expect(hard.text).toContain('Ids 1, 4 and 7 are never handed out again');
+    expect(hard.text).toContain('A new registration gets id 11 or later.');
+    expect(hard.typed).toBe(ORDERS);
   });
 
   test('Sc-05 matches an Avro subject with its latest version open', async ({ browser }) => {
@@ -174,4 +182,20 @@ test.describe('on the boards\' world: their subjects, under their names', () => 
     const out = await runBoard(browser, { id: 'Sc-15', file: 'Sc-15-Readonly', live: livePage(w.console, `new/schema?subject=${seg(DISPATCH)}`, refused), probes: [...SHELL, ...READONLY], allow: ALLOW });
     expect(out.text, out.text).toBe('');
   });
+
+  // Sc-12: the board draws both deletes side by side; the console opens one at a time.
+  // Each is compared with its own specimen, measured from the dialog's corner.
+  for (const [n, verb] of [[0, /Delete v3$/], [1, /Delete subject$/]] as const) {
+    test(`Sc-12 dialog ${n + 1} matches the live confirm`, async ({ browser }) => {
+      test.setTimeout(120_000);
+      const open = async (p: import('@playwright/test').Page) => {
+        await p.locator('main [data-more]').click();
+        await p.locator('main .menu button', { hasText: verb }).click();
+        await p.locator('#confirm:not([hidden]) .confirm-parts:not([hidden])').waitFor();
+        await p.waitForTimeout(250); // the pop-in animation.
+      };
+      const out = await runBoard(browser, { id: `Sc-12 dialog ${n + 1}`, file: 'Sc-12-Confirms', live: livePage(w.console, `schemas/${seg(ORDERS)}`, open), probes: confirmProbes(n), allow: ALLOW });
+      expect(out.text, out.text).toBe('');
+    });
+  }
 });

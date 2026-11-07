@@ -166,6 +166,10 @@ test('deleting a subject asks first, and then it is gone', async ({ page, unique
   await expect(page.locator('.idband h1')).toHaveText(subject);
   await page.getByRole('button', { name: 'More actions' }).click();
   await page.getByRole('button', { name: 'Delete subject' }).click();
+  // Sc-12: for good, two calls, and only once the name is typed.
+  await expect(page.locator('#confirm-title')).toHaveText(`Permanently delete subject ${subject}`);
+  await expect(page.locator('#confirm-yes')).toBeDisabled();
+  await page.locator('#confirm-type').fill(subject);
   await confirmDialog('accept');
   await expect(page).toHaveURL(/\/schemas$/);
   await expect(page.locator(`.list .li[data-name="${subject}"]`)).toHaveCount(0);

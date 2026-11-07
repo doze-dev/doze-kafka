@@ -101,3 +101,33 @@ func TestCompatibilityTab(t *testing.T) {
 		t.Fatal(rec.Code)
 	}
 }
+
+// SCH-17: a subject a client soft-deleted is listed under Soft-deleted on the home,
+// and is deleted for good with the permanent call alone.
+func TestSoftDeletedSubjectIsListedAndRemovable(t *testing.T) {
+	c, _, _ := newRegistryConsole(t)
+	register(t, c, "kept-value", userV1)
+	register(t, c, "gone-value", userV1)
+	register(t, c, "gone-value", userV2)
+	if err := c.reg.SoftDeleteSubject(t.Context(), "gone-value"); err != nil {
+		t.Fatal(err)
+	}
+	home := req(t, c, "GET", "/_console/schemas", nil).Body.String()
+	section := between(home, `id="list-deleted"`, "</aside>")
+	if !strings.Contains(section, "Soft-deleted") || !strings.Contains(section, "gone-value") || strings.Contains(section, "kept-value") || !strings.Contains(section, "Delete for good") {
+		t.Errorf("the soft-deleted section: %s", readable(section))
+	}
+	_, got := confirmOf(t, c, "schema.delete?subject=gone-value")
+	if !strings.Contains(got["text"].(string), "A client soft-deleted it already") || !strings.Contains(got["text"].(string), "All 2 versions") || !strings.Contains(got["text"].(string), "Ids 1 and 2") {
+		t.Errorf("its confirm: %v", got["text"])
+	}
+	if rec := req(t, c, "POST", "/_console/schemas/gone-value/delete", url.Values{"confirm": {"gone-value"}}); rec.Code != 303 {
+		t.Fatalf("delete for good: %d %s", rec.Code, rec.Body)
+	}
+	if d, _ := c.reg.DeletedSubjects(t.Context()); len(d) != 0 {
+		t.Errorf("still held: %v", d)
+	}
+	if strings.Contains(req(t, c, "GET", "/_console/schemas", nil).Body.String(), `id="list-deleted"`) {
+		t.Error("the section stays with nothing in it")
+	}
+}

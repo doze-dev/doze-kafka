@@ -15,13 +15,17 @@
     </a>
     {{end}}
     <div class="note list-note" id="list-none" hidden>No subject matches the filter.</div>
+    {{if .Deleted}}<div class="list-deleted" id="list-deleted"><span class="cap">Soft-deleted</span>
+      {{range .Deleted}}<div class="li two" data-name="{{.Name}}"><span class="col grow"><span class="m el mut">{{.Name}}</span><span class="note">not listed or looked up</span></span>
+        <button type="button" class="btn sm danger" hx-post="{{schemaURL .Name}}/delete" hx-disabled-elt="this" data-confirm-url="{{confirmURL "schema.delete" "subject" .Name}}" data-confirm-title="{{.Confirm.Title}}" data-confirm-verb="{{.Confirm.Verb}}" hx-confirm="{{.Confirm.Text}}" aria-label="Delete {{.Name}} for good">Delete for good</button></div>{{end}}
+    </div>{{end}}
   </div>
   {{if .List}}<div class="note list-note list-foot ruled">{{len .List}} subject{{if ne (len .List) 1}}s{{end}}{{with .IDs}}{{if .Count}}, {{.Count}} schema{{if ne .Count 1}}s{{end}}, {{if eq .From .To}}id {{.From}}{{else}}ids {{.From}} to {{.To}}{{end}}{{end}}{{end}}.{{with .IDs}}{{if .Unused}} {{if eq (len .Unused) 1}}Id{{else}}Ids{{end}} {{range $i, $u := .Unused}}{{if $i}}, {{end}}{{$u}}{{end}}{{if .More}} and {{.More}} more{{end}} {{if and (eq (len .Unused) 1) (not .More)}}is{{else}}are{{end}} not in use here.{{end}}{{end}}</div>{{end}}
 </aside>
 {{end}}
 
 {{define "schemas_home"}}{{template "shell_top" .}}
-  {{template "schema_lp" (dict "List" .List "Sel" "" "IDs" .IDs "Cols" true)}}
+  {{template "schema_lp" (dict "List" .List "Sel" "" "IDs" .IDs "Cols" true "Deleted" .Deleted)}}
   <main class="main{{if not .Rows}} sc-none-main{{end}}" id="detail">
     <div class="row sb ce idband">
       <div class="col"><h1 class="h1">Schemas</h1><span class="note">{{if .Rows}}The built-in registry{{if .RegistryHost}} at <span class="m">{{.RegistryHost}}</span>{{end}}. Confluent's REST API, so stock serializers work with only <span class="m">schema.registry.url</span> changed.{{else}}The built-in registry{{if .RegistryHost}} at <span class="m">{{.RegistryHost}}</span>{{end}} is running and empty.{{end}}</span></div>

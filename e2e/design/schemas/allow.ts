@@ -37,6 +37,8 @@ const OWN_LEVEL = 'the world\'s orders subject follows the registry\'s level (gl
 const FIX_DEFAULT = 'the fix gives the field its type\'s zero ("" for a string); the board\'s sample default is "web", which the console cannot guess, so the button is narrower and Register beside it further left';
 const RAW_409 = 'the registry\'s 409 is Confluent\'s own message, which also names the old schema and its validate flags; the board shortens it, so the callout is two lines taller and what follows it lower';
 const ON_REGISTER = 'DEVIATES: Sc-15 draws the refusal in the subject\'s frame (its strip: m change mode, n register new version); the console draws it on the register page where the register was refused, with that page\'s strip and its callouts the width of the form (plan/00-foundation.md, Sc-15)';
+const ONE_DIALOG = 'Sc-12 draws the soft delete and the permanent delete side by side as two specimens, placed absolutely over a scrim; the console opens one at a time, centred in an overlay with the board\'s 150 px above it (homes/allow.ts has the same entry for Tp-24)';
+const SPECIMEN_CAP = 'the board labels its specimens "Dialog 1 of 2" and "Dialog 2 of 2" above their titles; the console\'s dialog has no such label, so its title and what follows are the label\'s 24 px higher';
 const NEIGHBOURS_ONE = 'the board\'s neighbours are three with long notes (a decoded count, a dead-letter topic, a group), which wrap to three lines in a main the inspector narrows; the world\'s subject has its topic and no group or dead-letter topic, one line: the band is shorter and everything under it is higher by the difference';
 
 export const ALLOW: Allowed[] = [
@@ -311,4 +313,14 @@ export const ALLOW: Allowed[] = [
   at('Sc-15', 'keys strip', 'text', 'mchange mode nregister new version ⌘Kjump or act', '⌘↵check ⇧⌘↵register esccancel ⌘Kjump or act', ON_REGISTER),
   at('Sc-15', 'mode title', 'w', '394', '446', ON_REGISTER),
   at('Sc-15', 'why title', 'w', '394', '446', ON_REGISTER),
+  at('Sc-12 dialog 1', 'scrim', 'display', 'block', 'grid', ONE_DIALOG),
+  at('Sc-12 dialog 1', 'scrim', 'padding', '0px', '150px 16px 16px', ONE_DIALOG),
+  at('Sc-12 dialog 1', 'scrim', 'tracks', '', '1408px', ONE_DIALOG),
+  at('Sc-12 dialog 2', 'scrim', 'display', 'block', 'grid', ONE_DIALOG),
+  at('Sc-12 dialog 2', 'scrim', 'padding', '0px', '150px 16px 16px', ONE_DIALOG),
+  at('Sc-12 dialog 2', 'scrim', 'tracks', '', '1408px', ONE_DIALOG),
+  at('Sc-12 dialog 1', 'title', 'y', '41', '17', SPECIMEN_CAP),
+  at('Sc-12 dialog 1', 'call', 'y', '69', '45', SPECIMEN_CAP),
+  at('Sc-12 dialog 2', 'title', 'y', '41', '17', SPECIMEN_CAP),
+  at('Sc-12 dialog 2', 'call', 'y', '69', '45', SPECIMEN_CAP),
 ];

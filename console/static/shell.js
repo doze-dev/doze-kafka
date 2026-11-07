@@ -476,6 +476,21 @@
       el.appendChild(n);
     });
   }
+  // A callout under a confirm's sentence (Gr-15, Sc-12): a head when it has one, then
+  // its text; a deny or warn tint.
+  function noteBox(n) {
+    var box = document.createElement("div"), body = document.createElement("span");
+    box.className = "callout" + (n.deny ? " deny" : "") + (n.warn ? " warn" : ""); box.setAttribute("role", "note");
+    if (n.head) {
+      var head = document.createElement("div"), b = document.createElement("span");
+      head.className = "row ce g8"; b.className = "b"; b.textContent = n.head; head.appendChild(b);
+      if (n.name) { var nm = document.createElement("span"); nm.className = "m"; nm.textContent = n.name; head.appendChild(nm); }
+      box.appendChild(head);
+    }
+    body.className = "note"; segs(body, n.body);
+    box.appendChild(body);
+    return box;
+  }
   document.addEventListener("htmx:confirm", function (e) {
     var box = document.getElementById("confirm");
     var q = e.detail.question;
@@ -520,18 +535,52 @@
     if (notes) {
       notes.textContent = "";
       (say.notes || []).forEach(function (n) {
-        var box = document.createElement("div"), head = document.createElement("div"), b = document.createElement("span"), body = document.createElement("span");
-        box.className = "callout" + (n.deny ? " deny" : ""); box.setAttribute("role", "note");
-        head.className = "row ce g8"; b.className = "b"; b.textContent = n.head; head.appendChild(b);
-        if (n.name) { var nm = document.createElement("span"); nm.className = "m"; nm.textContent = n.name; head.appendChild(nm); }
-        body.className = "note"; segs(body, n.body);
-        box.appendChild(head); box.appendChild(body); notes.appendChild(box);
+        notes.appendChild(noteBox(n));
       });
       notes.hidden = !(say.notes && say.notes.length);
     }
     if (call) { call.textContent = say.call || ""; call.hidden = !say.call; }
+    // Sc-12's: the request under the title, a red title, notes before the parts, the
+    // parts (bold heads), and a name to type before the verb is on.
+    var title = document.getElementById("confirm-title");
+    title.classList.toggle("bad", !!say.danger);
+    // Sc-12's dialogs are the boards' wider ones, their parts 8 px apart.
+    var modal = box.querySelector(".modal");
+    if (modal) { modal.classList.toggle("sc-confirm", !!(say.parts && say.parts.length)); modal.classList.toggle("danger", !!say.danger); }
+    var top = document.getElementById("confirm-calltop");
+    if (top) { top.textContent = say.callTop || ""; top.hidden = !say.callTop; }
+    var lead = document.getElementById("confirm-lead");
+    if (lead) {
+      lead.textContent = "";
+      (say.lead || []).forEach(function (n) { lead.appendChild(noteBox(n)); });
+      lead.hidden = !(say.lead && say.lead.length);
+    }
+    var parts = document.getElementById("confirm-parts");
+    if (parts) {
+      parts.textContent = "";
+      (say.parts || []).forEach(function (p, i) {
+        var h = document.createElement("span"), t = document.createElement("span");
+        h.className = "b" + (i ? " confirm-part-h" : ""); h.textContent = p.head; segs(t, p.body);
+        parts.appendChild(h); parts.appendChild(t);
+      });
+      parts.hidden = !(say.parts && say.parts.length);
+    }
+    msg.hidden = !say.body && !!(say.parts && say.parts.length);
+    var typedBox = document.getElementById("confirm-typed"), typed = document.getElementById("confirm-type");
     var yes = document.getElementById("confirm-yes"), no = document.getElementById("confirm-no");
     yes.textContent = say.verb || "Confirm";
+    yes.disabled = false;
+    if (typedBox && typed) {
+      typedBox.hidden = !say.typed;
+      typed.value = "";
+      typed.placeholder = say.typed || "";
+      document.getElementById("confirm-type-l").textContent = say.typedLabel || "Type the name to confirm";
+      typed.oninput = null;
+      if (say.typed) {
+        yes.disabled = true;
+        typed.oninput = function () { yes.disabled = typed.value !== say.typed; };
+      }
+    }
     box.hidden = false;
     // The keys strip says what the keys do in the dialog while it is open (Tp-24).
     root.setAttribute("data-dialog", "confirm");
@@ -545,11 +594,21 @@
       if (ev.key === "Escape") { close(true); ev.preventDefault(); ev.stopPropagation(); return; }
       trapTab(box, ev);
     }
-    yes.onclick = function () { close(false); e.detail.issueRequest(true); };
+    yes.onclick = function () {
+      if (yes.disabled) return;
+      // A confirm that asked for a name sends it (the server checks it too).
+      if (say.typed && elt.setAttribute) {
+        var vals = {};
+        try { vals = JSON.parse(elt.getAttribute("hx-vals") || "{}"); } catch (err) {}
+        vals.confirm = typed.value;
+        elt.setAttribute("hx-vals", JSON.stringify(vals));
+      }
+      close(false); e.detail.issueRequest(true);
+    };
     no.onclick = function () { close(true); };
     box.onclick = function (ev) { if (ev.target === box) close(true); };
     document.addEventListener("keydown", onKey, true);
-    no.focus();
+    if (say.typed && typed) typed.focus(); else no.focus();
     }
   });
 

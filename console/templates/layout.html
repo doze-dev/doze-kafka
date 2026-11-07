@@ -115,9 +115,13 @@ window.dozeView=function(){var p=location.pathname.replace("{{.Prefix}}","").rep
     <div class="modal anim" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-msg confirm-rows">
       <div class="pad col g12">
         <h2 class="h2" id="confirm-title">Are you sure?</h2>
+        <span class="m confirm-calltop" id="confirm-calltop" hidden></span>
+        <div class="confirm-notes" id="confirm-lead" hidden></div>
         <p id="confirm-msg"></p>
+        <div class="col g4 confirm-parts" id="confirm-parts" hidden></div>
         <div class="kv" id="confirm-rows" style="--c: 118px 1fr" hidden></div>
         <div class="confirm-notes" id="confirm-notes" hidden></div>
+        <div class="col g4" id="confirm-typed" hidden><label class="b" for="confirm-type" id="confirm-type-l">Type the name to confirm</label><input class="inp m" id="confirm-type" aria-label="Type the name to confirm" autocomplete="off" spellcheck="false"></div>
         <div class="row g8 confirm-f"><span class="note confirm-call" id="confirm-call" hidden></span>
           <button type="button" class="btn" id="confirm-no">Cancel</button>
           <button type="button" class="btn danger" id="confirm-yes">Confirm</button>

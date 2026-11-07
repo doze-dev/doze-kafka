@@ -4,7 +4,7 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 28769714,
+      "binaryBytes": 28786546,
       "idleHeapBytes": 1375088,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
@@ -313,6 +313,20 @@
       "from": 28415122,
       "to": 28769714,
       "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,753,010 and the Compatibility tab of 2026-11-08 (16,704)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28769714,
+      "to": 28786546,
+      "reason": "Schemas: Sc-12's deletes (the soft delete of a version, the subject's two calls behind its typed name, the measured ids and messages) and the soft-deleted subjects (SCH-17): 16,832 bytes (linux/arm64 unchanged at 27,918,496)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28786546,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,769,714 and Sc-12's deletes of 2026-11-08 (16,832)"
     }
   ]
 }

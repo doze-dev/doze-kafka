@@ -252,3 +252,27 @@ export const READONLY: Probe[] = [
   { el: 'why', board: 'main > .row.g12 > .col > .callout', live: '#reg-answer .sc-ro > .callout', nth: 1, free: { y: ON_REGISTER, x: ON_REGISTER, w: ON_REGISTER, h: ON_REGISTER } },
   { el: 'why title', board: 'main > .row.g12 > .col > .callout .b', live: '#reg-answer .sc-ro > .callout .b', nth: 1, text: true, free: { y: ON_REGISTER, x: ON_REGISTER } },
 ];
+
+// Inside a dialog, x and y are measured from the dialog's corner (homes/confirms.spec.ts).
+const IN = (n: number) => ({ board: '.modal', live: '#confirm .modal', nth: n, liveNth: 0 });
+const DIALOG_TEXT = 'its height is its text, which is this world\'s subject and counts';
+/** Sc-12: the soft delete of a version (0) and the permanent delete of the subject (1). */
+export const confirmProbes = (n: number): Probe[] => [
+  { el: 'scrim', board: '.scrim', live: '#confirm.overlay' },
+  { el: 'dialog', board: '.modal', live: '#confirm .modal', nth: n, liveNth: 0, free: { h: DIALOG_TEXT, x: 'the board draws its two specimens at the sides of the page; the console centres the one that is open', y: 'the board draws its two specimens at the sides of the page; the console centres the one that is open' } },
+  { el: 'dialog pad', board: '.modal > .pad', live: '#confirm .modal > .pad', nth: n, liveNth: 0, origin: IN(n), free: { h: DIALOG_TEXT } },
+  { el: 'title', board: '.modal .h2', live: '#confirm-title', nth: n, liveNth: 0, origin: IN(n), free: { w: DIALOG_TEXT, text: DIALOG_TEXT } },
+  { el: 'call', board: '.modal .h2 + .m', live: '#confirm-calltop', nth: n, liveNth: 0, origin: IN(n), free: { w: DIALOG_TEXT, text: DIALOG_TEXT } },
+  { el: 'part head', board: '.modal .col.g4 > .b', live: '#confirm-parts > .b', nth: n * 3, liveNth: 0, origin: IN(n), text: true, free: { y: DIALOG_TEXT } },
+  { el: 'part text', board: '.modal .col.g4 > span:not(.b)', live: '#confirm-parts > span:not(.b)', nth: n * 3, liveNth: 0, origin: IN(n), free: { h: DIALOG_TEXT, w: DIALOG_TEXT, text: DIALOG_TEXT, y: DIALOG_TEXT } },
+  { el: 'part head 2', board: '.modal .col.g4 > .b', live: '#confirm-parts > .b', nth: n * 3 + 1, liveNth: 1, origin: IN(n), text: true, free: { y: DIALOG_TEXT } },
+  { el: 'part head 3', board: '.modal .col.g4 > .b', live: '#confirm-parts > .b', nth: n * 3 + 2, liveNth: 2, origin: IN(n), text: true, free: { y: DIALOG_TEXT } },
+  { el: 'callout', board: '.modal .callout', live: '#confirm .modal .callout', nth: n, liveNth: 0, origin: IN(n), free: { h: DIALOG_TEXT, y: DIALOG_TEXT } },
+  { el: 'buttons', board: '.modal .row.g8.ce', live: '#confirm .confirm-f', nth: n, liveNth: 0, origin: IN(n), free: { y: DIALOG_TEXT } },
+  { el: 'cancel', board: '.modal .row.g8.ce .btn:not(.danger)', live: '#confirm-no', nth: n, liveNth: 0, text: true, origin: IN(n), free: { y: DIALOG_TEXT } },
+  { el: 'verb', board: '.modal .row.g8.ce .btn.danger', live: '#confirm-yes', nth: n, liveNth: 0, origin: IN(n), text: true, free: { y: DIALOG_TEXT } },
+  ...(n === 1 ? [
+    { el: 'typed label', board: '.modal label[for=cf]', live: '#confirm-type-l', liveNth: 0, origin: IN(1), text: true, free: { y: DIALOG_TEXT } },
+    { el: 'typed', board: '.modal #cf', live: '#confirm-type', liveNth: 0, origin: IN(1), free: { y: DIALOG_TEXT } },
+  ] as Probe[] : []),
+];

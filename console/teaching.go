@@ -130,11 +130,12 @@ var formFields = map[string]formField{
 // that is a link. TestEveryFormFieldHasASettingsRecordOrSaysWhyNot holds every control
 // with no name to this list, keyed by its aria-label or its class.
 var unnamedFields = map[string]string{
-	"Filter principals": "narrows the page's list of principals; sends nothing",
-	"Filter Topics":     "narrows the list pane; sends nothing",
-	"Filter Groups":     "narrows the list pane; sends nothing",
-	"Filter Schemas":    "narrows the list pane; sends nothing",
-	"Filter groups":     "narrows the groups table; sends nothing",
+	"Type the name to confirm": "the confirm's typed name (Sc-12); the dialog sends it as confirm= with the action it guards",
+	"Filter principals":        "narrows the page's list of principals; sends nothing",
+	"Filter Topics":            "narrows the list pane; sends nothing",
+	"Filter Groups":            "narrows the list pane; sends nothing",
+	"Filter Schemas":           "narrows the list pane; sends nothing",
+	"Filter groups":            "narrows the groups table; sends nothing",
 	"Jump to a topic, group, subject or action": "the palette's search; sends nothing",
 	"Header key":       "a record header's key, sent with its value in the form's headers",
 	"Header value":     "a record header's value, sent with its key in the form's headers",
