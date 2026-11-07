@@ -4,7 +4,7 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 28853442,
+      "binaryBytes": 28870178,
       "idleHeapBytes": 1375088,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
@@ -383,6 +383,20 @@
       "from": 27590816,
       "to": 28049568,
       "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 27,984,032 and Sc-13 and the route ledger of 2026-11-08 to 28,049,568 (65,536)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28853442,
+      "to": 28870178,
+      "reason": "Schemas: the permanent delete's confirm counts soft-deleted versions and names the ids another subject keeps (TestDeleteConfirmsMatchTheRequests): 16,736 bytes"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28870178,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,853,442 and the delete confirm's shared ids of 2026-11-08 (16,736)"
     }
   ]
 }
