@@ -2,8 +2,8 @@ cmd/doze-kafka 86.3 darwin
 cmd/doze-kafka 87 linux
 conformance 88.9 darwin
 conformance 88.9 linux
-console 88.9 darwin
-console 88.9 linux
+console 90 darwin
+console 90 linux
 e2e/seed 78.7 darwin
 e2e/seed 78.7 linux
 internal/broker 91.5 darwin
@@ -30,8 +30,8 @@ internal/telemetry 98.8 darwin
 internal/telemetry 98.8 linux
 internal/traffic 99.6 darwin
 internal/traffic 99.6 linux
-schemaregistry 90 darwin
-schemaregistry 90 linux
+schemaregistry 92 darwin
+schemaregistry 92 linux
 scripts/apisurface 82.5 darwin
 scripts/apisurface 82.5 linux
 scripts/coverage 86.8 darwin
