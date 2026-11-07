@@ -4,6 +4,7 @@ import (
 	"html/template"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 // protoTint colours .proto text the way the boards do (Sc-07): keywords and scalar
@@ -14,7 +15,7 @@ import (
 func protoTint(s string) template.HTML {
 	var b strings.Builder
 	last := 0
-	for _, m := range protoTokenRe.FindAllStringSubmatchIndex(s, -1) {
+	for _, m := range protoTokenRe().FindAllStringSubmatchIndex(s, -1) {
 		b.WriteString(template.HTMLEscapeString(s[last:m[0]]))
 		class := "n"
 		switch {
@@ -30,4 +31,8 @@ func protoTint(s string) template.HTML {
 	return template.HTML(b.String())
 }
 
-var protoTokenRe = regexp.MustCompile(`("(?:[^"\\]|\\.)*")|\b(syntax|package|import|option|message|enum|oneof|map|service|rpc|returns|reserved|extend|repeated|optional|required|double|float|int32|int64|uint32|uint64|sint32|sint64|fixed32|fixed64|sfixed32|sfixed64|bool|string|bytes)\b|\b\d+\b`)
+// protoTokenRe is built on first use: it is a long alternation, and a broker whose
+// console never shows a Protobuf schema should not hold it (testdata/lightness.json).
+var protoTokenRe = sync.OnceValue(func() *regexp.Regexp {
+	return regexp.MustCompile(`("(?:[^"\\]|\\.)*")|\b(syntax|package|import|option|message|enum|oneof|map|service|rpc|returns|reserved|extend|repeated|optional|required|double|float|int32|int64|uint32|uint64|sint32|sint64|fixed32|fixed64|sfixed32|sfixed64|bool|string|bytes)\b|\b\d+\b`)
+})

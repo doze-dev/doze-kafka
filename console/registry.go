@@ -160,8 +160,12 @@ func (v schemaVersion) Type() string {
 	return v.SchemaType
 }
 
-// Pretty is the schema as shown: JSON re-indented, Protobuf as it is.
+// Pretty is the schema as shown: an Avro record or a JSON Schema object as the
+// boards print them (printSchema), other JSON re-indented, Protobuf as it is.
 func (v schemaVersion) Pretty() string {
+	if out, ok := printSchema(v.Type(), v.Schema); ok {
+		return out
+	}
 	if v.Type() != schemaregistry.TypeProtobuf {
 		if p, ok := indentJSON([]byte(v.Schema)); ok {
 			return p

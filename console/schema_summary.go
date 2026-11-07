@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/doze-dev/doze-kafka/schemaregistry"
 )
@@ -133,9 +134,14 @@ func avroTypeWords(raw json.RawMessage) string {
 	return obj.Type
 }
 
+// The .proto patterns are built on first use (testdata/lightness.json: nothing a
+// page has not asked for is held at idle).
 var (
-	protoMessageRe = regexp.MustCompile(`^\s*message\s+(\w+)\s*\{`)
-	protoFieldRe   = regexp.MustCompile(`^\s*(?:(repeated|optional)\s+)?([\w.]+(?:<[^>]*>)?)\s+(\w+)\s*=\s*(\d+)`)
+	protoMessageRe = sync.OnceValue(func() *regexp.Regexp { return regexp.MustCompile(`^\s*message\s+(\w+)\s*\{`) })
+	protoFieldRe   = sync.OnceValue(func() *regexp.Regexp {
+		return regexp.MustCompile(`^\s*(?:(repeated|optional)\s+)?([\w.]+(?:<[^>]*>)?)\s+(\w+)\s*=\s*(\d+)`)
+	})
+	draftRe = sync.OnceValue(func() *regexp.Regexp { return regexp.MustCompile(`draft-\d+|\d{4}-\d{2}`) })
 )
 
 // protoShape reads the canonical .proto text: the message types, and the fields of
@@ -144,7 +150,7 @@ func protoShape(text string) schemaShape {
 	s := schemaShape{}
 	depth := 0
 	for _, line := range strings.Split(text, "\n") {
-		if m := protoMessageRe.FindStringSubmatch(line); m != nil {
+		if m := protoMessageRe().FindStringSubmatch(line); m != nil {
 			if depth == 0 {
 				s.Messages = append(s.Messages, m[1])
 				if len(s.Messages) == 1 {
@@ -155,7 +161,7 @@ func protoShape(text string) schemaShape {
 			continue
 		}
 		if depth == 1 && len(s.Messages) == 1 {
-			if m := protoFieldRe.FindStringSubmatch(line); m != nil {
+			if m := protoFieldRe().FindStringSubmatch(line); m != nil {
 				t := m[2]
 				if m[1] == "repeated" {
 					t = "repeated " + t
@@ -188,7 +194,7 @@ func jsonSchemaShape(text string) schemaShape {
 		return schemaShape{}
 	}
 	s := schemaShape{Record: doc.Title, Required: len(doc.Required), Closed: doc.Additional == false, ok: true}
-	if m := regexp.MustCompile(`draft-\d+|\d{4}-\d{2}`).FindString(doc.Schema); m != "" {
+	if m := draftRe().FindString(doc.Schema); m != "" {
 		s.Draft = m
 	}
 	req := map[string]bool{}

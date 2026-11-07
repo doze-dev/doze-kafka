@@ -132,16 +132,7 @@ func (c *Console) schemaDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		data["RawPath"] = fmt.Sprintf("GET /subjects/%s/versions/%d", subject, cur.Version)
 	}
-	// The topic this subject is named for, when there is one.
-	if topics, err := c.be.ListTopics(ctx); err == nil {
-		var names []string
-		for _, t := range topics {
-			names = append(names, t.Name)
-		}
-		g := NewGraph()
-		g.AddSubjects([]string{subject}, names)
-		data["Neighbours"] = c.neighbourClauses(g, NodeSubject, subject)
-	}
+	data["SubjectNeighbours"] = c.subjectNeighbours(ctx, subject)
 	data["Confirm"] = subjectConfirms(subject, versions, cur.Version)
 	switch {
 	case data["ByClient"] == true || cur.Type() == schemaregistry.TypeJSON:
@@ -417,4 +408,39 @@ func changedHTML(parts []changePart) template.HTML {
 		b.WriteString(template.HTMLEscapeString(p.After))
 	}
 	return template.HTML(b.String())
+}
+
+// subjectNeighbour is one of a subject's neighbours (Sc-05): the topic it is named
+// for, or a group that reads that topic.
+type subjectNeighbour struct {
+	Kind, Name, URL, Note string
+}
+
+// subjectNeighbours is the topic a subject is named for (TopicNameStrategy), when the
+// broker has it, and the groups with offsets committed on it.
+func (c *Console) subjectNeighbours(ctx context.Context, subject string) []subjectNeighbour {
+	topic := subjectTopic(subject)
+	if topic == "" {
+		return nil
+	}
+	topics, err := c.be.ListTopics(ctx)
+	if err != nil {
+		return nil
+	}
+	found := false
+	for _, t := range topics {
+		found = found || t.Name == topic
+	}
+	if !found {
+		return nil
+	}
+	part := "value"
+	if strings.HasSuffix(subject, "-key") {
+		part = "key"
+	}
+	out := []subjectNeighbour{{Kind: "topic", Name: topic, URL: c.topicURL(topic), Note: part + " schema"}}
+	for _, g := range c.topicConsumers(ctx, topic) {
+		out = append(out, subjectNeighbour{Kind: "group", Name: g.Group, URL: c.groupURL(g.Group), Note: "reads it"})
+	}
+	return out
 }

@@ -185,15 +185,7 @@ func (c *Console) schemaDiff(w http.ResponseWriter, r *http.Request) {
 		tabs = append(tabs, tabLink{Key: t.Key, Label: t.Label, URL: u, On: t.Key == "versions"})
 	}
 	data["Tabs"] = tabs
-	if topics, err := c.be.ListTopics(ctx); err == nil {
-		var names []string
-		for _, t := range topics {
-			names = append(names, t.Name)
-		}
-		g := NewGraph()
-		g.AddSubjects([]string{subject}, names)
-		data["Neighbours"] = c.neighbourClauses(g, NodeSubject, subject)
-	}
+	data["SubjectNeighbours"] = c.subjectNeighbours(ctx, subject)
 	data["Confirm"] = subjectConfirms(subject, versions, to)
 	maps.Copy(data, c.dockData(DockFilter{Subject: subject}))
 	c.render(w, r, "schema_diff", data)

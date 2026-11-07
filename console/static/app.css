@@ -1692,8 +1692,7 @@ progress.gr-used::-moz-progress-bar{background:var(--ink);border-radius:2px}
 :root:not([data-theme="contrast"]) .sc-none span.num { background: #17191c; color: #ffffff; }
 /* Sc-05, Sc-07, Sc-08, Sc-18: one subject. */
 .main.sc-main { gap: 10px; }
-.sc-pair { align-items: flex-start; }
-.sc-pair > pre.code { margin: 0; }
+.sc-pair > pre.code { margin: -4px 0 0; }
 .sc-pull { margin-top: -4px; }
 .sc-side { width: 360px; flex: none; margin-top: -4px; }
 .sc-props { width: 400px; flex: none; }
@@ -1701,7 +1700,7 @@ progress.gr-used::-moz-progress-bar{background:var(--ink);border-radius:2px}
 .sc-client-note { width: 420px; flex: none; }
 .sc-raw { white-space: pre; overflow: auto; }
 .sc-bytes { white-space: pre-wrap; word-break: break-all; margin: 0; }
-.try-pill:empty { display: none; }
+.try-pill { display: contents; }
 .sc-client { gap: 4px; }
 .versionb .sc-msg { padding: 7px 10px; text-decoration: none; }
 .versionb .kv a { text-decoration: none; }
@@ -1712,3 +1711,6 @@ progress.gr-used::-moz-progress-bar{background:var(--ink);border-radius:2px}
 .sc-diff .r.dl-del { background: var(--badbg); }
 .sc-diff .r > .dl-none { background: var(--well); }
 .sc-vsel { width: 90px; }
+.nbwell.sc-nb { padding: 7px 12px; }
+.sc-text { line-height: 19px; }
+#try-result:not(:has(*)) { display: none; }

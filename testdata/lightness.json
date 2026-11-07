@@ -4,19 +4,19 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 28567442,
+      "binaryBytes": 28702738,
       "idleHeapBytes": 1368256,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
-      "recorded": "2026-11-07",
+      "recorded": "2026-11-08",
       "where": "macOS 27, Apple M-series, native"
     },
     "linux/arm64": {
-      "binaryBytes": 27721888,
+      "binaryBytes": 27852960,
       "idleHeapBytes": 1383880,
       "idleHeapNoiseBytes": 7160,
       "go": "go1.27.3",
-      "recorded": "2026-11-07",
+      "recorded": "2026-11-08",
       "where": "golang:1.27 container, linux/arm64, native on Apple M-series (Docker VM); idleHeapBytes from GitHub's linux/arm64 runner (CI run 41501006646)"
     }
   },
@@ -236,6 +236,34 @@
       "from": 28415122,
       "to": 28567442,
       "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the 2026-11-07 raise from 28,415,122 to 28,550,354 and Sc-01 with the registry's wire dock (17,088)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28567442,
+      "to": 28702738,
+      "reason": "Schemas: the subject page (Sc-05, Sc-07, Sc-08, Sc-18) and the diff (Sc-06), the registry client's /_doze/ and mode calls, the change summaries and the boards' schema printing: 135,296 bytes"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28702738,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises of 2026-11-07 to 28,567,442 and the subject pages of 2026-11-08 (135,296)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27721888,
+      "to": 27852960,
+      "reason": "Schemas: the subject page (Sc-05, Sc-07, Sc-08, Sc-18) and the diff (Sc-06), the same code as the darwin/arm64 raise of this date: two 64 KiB pages (built in golang:1.27.3 on linux/arm64)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27590816,
+      "to": 27852960,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raise of 2026-11-07 to 27,721,888 and the subject pages of 2026-11-08 (131,072)"
     }
   ]
 }

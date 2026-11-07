@@ -35,7 +35,7 @@ func TestSchemaDiffPage(t *testing.T) {
 	if rec.Code != 200 {
 		t.Fatalf("%d", rec.Code)
 	}
-	for _, want := range []string{"v1 to v2", "lines added", "the change is allowed at BACKWARD: the new field has a default",
+	for _, want := range []string{"v1 to v2", "1 line added", "1 line changed", "the change is allowed at BACKWARD: the new field has a default",
 		"A consumer on v2 reading a v1 message fills email from the default", "At BACKWARD, the subject's level, v2 passes.", "At FORWARD it would pass.", "At FULL it would pass.",
 		"Side by side", "Unified", "older, newer pair", "back to versions"} {
 		if !strings.Contains(text, want) {

@@ -15,12 +15,12 @@
   <div class="dh">{{if .DockFilter.ACL}}<span class="cap">The wire, underneath</span>{{else}}<span class="b">The wire, underneath</span>{{end}}
     {{if .DockToggle}}<button type="button" class="livetoggle" data-live-toggle aria-pressed="false" title="Pause live updates"><span class="livedot" aria-hidden="true"></span><span class="livetoggle-l">Live</span></button>
     {{else}}<span class="pill ok"><span class="dot" aria-hidden="true"></span>live</span>{{end}}
-    <span class="note">{{if .DockFilter.ACL}}{{if .DockPaged}}older {{end}}ACL requests and refusals{{else if .DockFilter.Registry}}{{if .DockPaged}}older {{end}}requests to the registry, newest first{{else}}{{if .DockPaged}}older requests{{else}}requests{{end}} that touched {{if .DockFilter.Topic}}{{.DockFilter.Topic}}{{else if .DockFilter.Group}}{{.DockFilter.Group}}{{else}}{{.DockFilter.Subject}}{{end}}{{end}}</span>
+    <span class="note">{{if .DockFilter.ACL}}{{if .DockPaged}}older {{end}}ACL requests and refusals{{else if .DockFilter.Registry}}{{if .DockPaged}}older {{end}}requests to the registry, newest first{{else if and .DockRegistry .DockFilter.Subject}}{{if .DockPaged}}older {{end}}registry calls that touched this subject{{else}}{{if .DockPaged}}older requests{{else}}requests{{end}} that touched {{if .DockFilter.Topic}}{{.DockFilter.Topic}}{{else if .DockFilter.Group}}{{.DockFilter.Group}}{{else}}{{.DockFilter.Subject}}{{end}}{{end}}</span>
   </div>
   {{if not .DockKnown}}
   <div class="note dock-more">This registry keeps no request log that the console can read, so there is nothing to show here.</div>
   {{else if and .DockRegistry .DockRows}}
-  <div class="r h"><span>Time</span><span>Method</span><span>Path</span><span>Result</span><span class="ra">Took</span></div>
+  {{if not .DockFilter.Subject}}<div class="r h"><span>Time</span><span>Method</span><span>Path</span><span>Result</span><span class="ra">Took</span></div>{{end}}
   <div id="wire-dock-rows">
     {{range .DockRows}}<div class="r{{if ge .Status 300}} {{.StatusClass}}row{{end}}" id="wd-{{.ID}}" data-reg-row>
       <span class="m">{{when .Time "clockms"}}</span>

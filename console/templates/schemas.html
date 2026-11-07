@@ -4,7 +4,7 @@
 {{define "schema_lp"}}
 <aside class="list" aria-label="Subjects">
   <div class="list-filter list-filter-first"><input class="inp m" type="search" placeholder="Filter subjects" aria-label="Filter Schemas" data-filter-target=".list .li" data-filter-none="#list-none" spellcheck="false" autocomplete="off"></div>
-  {{if .List}}<div class="row sb list-cols"><span class="cap">Subject</span><span class="cap">Versions</span></div>{{end}}
+  {{if and .List .Cols}}<div class="row sb list-cols"><span class="cap">Subject</span><span class="cap">Versions</span></div>{{end}}
   <div class="list-scroll">
     {{if not .List}}<div class="col g4 list-none"><span class="b">{{t "schemas.none.title"}}</span><span class="note">{{t "schemas.none.hint"}}</span></div>{{end}}
     {{range .List}}
@@ -20,7 +20,7 @@
 {{end}}
 
 {{define "schemas_home"}}{{template "shell_top" .}}
-  {{template "schema_lp" (dict "List" .List "Sel" "" "IDs" .IDs)}}
+  {{template "schema_lp" (dict "List" .List "Sel" "" "IDs" .IDs "Cols" true)}}
   <main class="main{{if not .Rows}} sc-none-main{{end}}" id="detail">
     <div class="row sb ce idband">
       <div class="col"><h1 class="h1">Schemas</h1><span class="note">{{if .Rows}}The built-in registry{{if .RegistryHost}} at <span class="m">{{.RegistryHost}}</span>{{end}}. Confluent's REST API, so stock serializers work with only <span class="m">schema.registry.url</span> changed.{{else}}The built-in registry{{if .RegistryHost}} at <span class="m">{{.RegistryHost}}</span>{{end}} is running and empty.{{end}}</span></div>
@@ -116,7 +116,7 @@
     <div class="row sb ce idband">
       <div class="row ce g8"><h1 class="h1 m">{{.Subject}}</h1><span class="pill">{{template "schema_type_pill" .Cur.Type}}</span>{{if .ByClient}}<span class="pill ok">registered by a client</span>{{end}}</div>
       <div class="row g8 ce idband-acts">
-        <a class="btn pri" href="{{.NewVersionURL}}" data-create data-new-version>Register new version</a>
+        <a class="btn pri w5" href="{{.NewVersionURL}}" data-create data-new-version>Register new version</a>
         <div class="more"><button type="button" class="btn" aria-label="More actions" title="More actions" aria-expanded="false" data-more>···</button>
           <div class="menu" role="group" aria-label="More actions" hidden>
             <button class="btn danger" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" data-confirm-url="{{confirmURL "schema.delete" "subject" .Subject}}" data-confirm-title="{{(index .Confirm "schema.delete").Title}}" data-confirm-verb="{{(index .Confirm "schema.delete").Verb}}" hx-confirm="{{(index .Confirm "schema.delete").Text}}">{{icon "trash"}} Delete subject</button>
@@ -126,6 +126,12 @@
       </div>
     </div>
 {{end}}
+
+{{/* A subject's neighbours (Sc-05): the topic it is named for and the groups that read
+     it, in the board's well. */}}
+{{define "subject_neighbours"}}{{if .SubjectNeighbours}}<div class="well row ce g12 nbwell sc-nb" id="neighbours"><span class="cap">Neighbours</span>
+{{range $i, $n := .SubjectNeighbours}}{{if $i}}<span class="mut" aria-hidden="true">·</span>{{end}}<a class="row ce g6" href="{{$n.URL}}">{{if eq $n.Kind "topic"}}<span class="sv sm c-tp" aria-hidden="true">TP</span>{{else}}<span class="sv sm c-gr" aria-hidden="true">GR</span>{{end}}<span class="m">{{$n.Name}}</span>{{if $n.Note}}<span class="note">{{$n.Note}}</span>{{end}}</a>{{end}}
+</div>{{end}}{{end}}
 
 {{/* One subject: Sc-05 (Avro), Sc-07 (Protobuf), Sc-08 (JSON Schema), Sc-18 (one version a
      client's serializer registered). The version a row opens is in the inspector. */}}
@@ -154,7 +160,7 @@
       {{end}}
     </div>
 
-    {{template "neighbours" .}}
+    {{template "subject_neighbours" .}}
 
     <nav class="tabs" aria-label="Subject tabs">
       {{range .Tabs}}<a class="tab {{if .On}}on{{end}}" href="{{.URL}}"{{if .On}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}
@@ -184,7 +190,7 @@
     <div class="card" id="versions-table" style="--c: {{if .ByClient}}70px 60px 1fr 180px 150px{{else}}70px 60px 1fr 150px 150px{{end}}">
       <div class="r h"><span>Version</span><span class="ra">Id</span>{{if .ByClient}}<span>Schema</span><span>Registered</span><span>By</span>{{else}}<span>What changed</span><span>Registered</span><span>Checked against</span>{{end}}</div>
       {{range .VersionRows}}
-      <a class="r{{if .On}} on{{end}}" href="{{.URL}}" data-row data-open-keys="version:{{.Open}}"{{if .On}} aria-current="true"{{end}}>
+      <a class="r{{if .On}} on{{end}}" href="{{.URL}}" data-row{{if .On}} aria-current="true"{{end}}>
         <span class="m b">v{{.Version}}{{if .Latest}} latest{{end}}</span>
         <span class="m ra">{{.ID}}</span>
         {{if $.ByClient}}<span class="el m">{{.Shape}}</span>
@@ -199,14 +205,14 @@
 
     {{if .ByClient}}
     <div class="row g12 sc-pair">
-      <pre class="code grow schema-text">{{jsonTint .Text}}</pre>
+      <pre class="code grow sc-text">{{jsonTint .Text}}</pre>
       <div class="callout sc-client-note"><span class="b">Check what the client settled on</span><span class="note">The serializer built this schema from its own class. If it is not what you meant, register a corrected version here; {{.Compat}} then decides if it may follow.</span></div>
     </div>
     {{else if eq .Cur.Type "JSON"}}
     <div class="row g12 sc-pair">
       <div class="col grow g8">
         <div class="row sb ce" id="schema-head"><div class="row ce g8"><span class="h2">Schema v{{.Cur.Version}}</span><span class="note">id {{.Cur.ID}}{{if .Shape.Draft}} · {{.Shape.Draft}}{{end}}</span></div><button type="button" class="btn sm" data-copy="{{.Cur.Schema}}" aria-label="Copy the schema">Copy</button></div>
-        <pre class="code schema-text">{{jsonTint .Text}}</pre>
+        <pre class="code sc-text">{{jsonTint .Text}}</pre>
       </div>
       {{if .Shape.Fields}}<div class="col g8 sc-props">
         <span class="h2">Properties</span>
@@ -219,17 +225,17 @@
     </div>
     {{else}}
     <div class="row sb ce" id="schema-head"><div class="row ce g8"><span class="h2">Schema v{{.Cur.Version}}</span><span class="note">id {{.Cur.ID}}{{if eq .Cur.Type "PROTOBUF"}} · printed in the registry's canonical form{{else if .Shape.Fields}} · {{len .Shape.Fields}} field{{if ne (len .Shape.Fields) 1}}s{{end}}{{end}}</span></div>
-      <div class="row g8">{{if .Prev}}<a class="btn sm" href="{{schemaURL .Subject}}/diff?from={{.Prev}}&to={{.Cur.Version}}" data-diff>Diff v{{.Prev}} to v{{.Cur.Version}}</a>{{end}}<button type="button" class="btn sm" data-copy="{{.Cur.Schema}}" aria-label="Copy the schema">Copy</button></div></div>
+      <div class="row g8">{{if .Prev}}<a class="btn sm w5" href="{{schemaURL .Subject}}/diff?from={{.Prev}}&to={{.Cur.Version}}" data-diff>Diff v{{.Prev}} to v{{.Cur.Version}}</a>{{end}}<button type="button" class="btn sm" data-copy="{{.Cur.Schema}}" aria-label="Copy the schema">Copy</button></div></div>
     {{if eq .Cur.Type "PROTOBUF"}}
     <div class="row g12 sc-pair">
-      <pre class="code grow schema-text">{{protoTint .Text}}</pre>
+      <pre class="code grow sc-text">{{protoTint .Text}}</pre>
       <div class="col g8 sc-side">
         <div class="callout"><span class="b">Canonical form</span><span class="note">However a client sent it (<span class="m">.proto</span> text, or the base64 of a descriptor from confluent-kafka for Python), the registry stores and returns this one printing. Type names keep their leading dot where a descriptor had one. Comments are not kept.</span></div>
         <div class="callout"><span class="b">What is compared</span><span class="note">Message and field declarations: wire-compatible type groups, labels, oneofs, names. Enums and services are not compared, as in Confluent.</span></div>
       </div>
     </div>
     {{else}}
-    <pre class="code schema-text sc-pull">{{jsonTint .Text}}</pre>
+    <pre class="code sc-text sc-pull">{{jsonTint .Text}}</pre>
     {{end}}
     {{end}}
 
@@ -263,7 +269,7 @@
       <span class="m warn">{{.ChangedLines}} line{{if ne .ChangedLines 1}}s{{end}} changed</span>
       {{if .Allowed}}<span class="mut">·</span><span class="note">{{.Allowed}}</span>{{end}}
     </div>
-    {{template "neighbours" .}}
+    {{template "subject_neighbours" .}}
     <nav class="tabs" aria-label="Subject tabs">
       {{range .Tabs}}<a class="tab {{if .On}}on{{end}}" href="{{.URL}}"{{if .On}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}
     </nav>
@@ -303,8 +309,11 @@
 
 {{/* Try it's answer: the bytes, or why the value does not fit. */}}
 {{define "schema_try"}}
+{{/* A check's verdict is the pill beside the buttons (Sc-08); why it failed, and what
+     an encode made, go under them. */}}
+<span id="try-pill" class="try-pill" hx-swap-oob="true">{{if eq .Do "check"}}{{if .Err}}<span class="pill bad" role="status">not valid</span>{{else}}<span class="pill ok" role="status">valid</span>{{end}}{{end}}</span>
 {{if .Err}}<div class="callout bad" role="alert"><span class="b">{{if eq .Do "check"}}Does not fit v{{.Version}}{{else}}Not encoded{{end}}</span><span class="note m">{{.Err}}</span></div>
-{{else if eq .Do "check"}}<div class="row ce g8" role="status"><span class="pill ok">valid</span><span class="note">The value fits v{{.Version}}.</span></div>
+{{else if eq .Do "check"}}
 {{else}}<div class="col g4" role="status"><span class="note">{{.Len}} bytes: magic byte 0, id {{.ID}} (4 bytes), then the value.</span><pre class="code sc-bytes">{{.Bytes}}</pre></div>
 {{end}}
 {{end}}

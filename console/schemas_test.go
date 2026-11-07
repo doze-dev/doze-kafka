@@ -101,7 +101,7 @@ func TestSchemaSubjectLifecycle(t *testing.T) {
 		}
 	}
 	rec = req(t, c, "GET", "/_console/schemas/orders-value?version=1", nil)
-	if strings.Contains(between(rec.Body.String(), `class="code schema-text`, "</pre>"), "email") {
+	if strings.Contains(between(rec.Body.String(), `class="code sc-text`, "</pre>"), "email") {
 		t.Error("version 1 page shows version 2's field")
 	}
 
