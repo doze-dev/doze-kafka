@@ -419,9 +419,10 @@ func TestUnknownIDBackoff(t *testing.T) {
 	}
 }
 
-// The console's registry requests are its own, and the registry's request log leaves
-// them out.
-func TestConsoleRequestsAreLeftOutOfTheRegistryLog(t *testing.T) {
+// The console's reads are its own (its pages' polling), and the registry's request log
+// leaves them out; what a person does through the console, a register here, is a
+// request like any client's and is kept, so the dock shows it (Sc-03, Sc-04).
+func TestConsoleReadsAreLeftOutOfTheRegistryLog(t *testing.T) {
 	reg, err := schemaregistry.Open(schemaregistry.NewMemoryStorage())
 	if err != nil {
 		t.Fatal(err)
@@ -434,7 +435,8 @@ func TestConsoleRequestsAreLeftOutOfTheRegistryLog(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.reg.Subjects(context.Background())
-	if got := api.Requests(schemaregistry.RequestFilter{}); len(got.Requests) != 0 {
-		t.Errorf("the registry kept the console's own requests: %+v", got.Requests)
+	got := api.Requests(schemaregistry.RequestFilter{})
+	if len(got.Requests) != 1 || got.Requests[0].Method != "POST" || got.Requests[0].Path != "/subjects/s/versions" {
+		t.Errorf("the registry kept %+v: want the register alone, not the console's read", got.Requests)
 	}
 }

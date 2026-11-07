@@ -1,12 +1,12 @@
 {{/* Schemas. The list (Sc-Home): subject, its language and how many versions it has;
      the page is the home, or one subject (Sc-05: Versions, Compatibility, Register).
-     The registry's own requests are not recorded, so there is no wire dock here. */}}
+     Each ends with the wire dock, read from the registry's own request log. */}}
 {{define "schema_lp"}}
 <aside class="list" aria-label="Subjects">
   <div class="list-filter list-filter-first"><input class="inp m" type="search" placeholder="Filter subjects" aria-label="Filter Schemas" data-filter-target=".list .li" data-filter-none="#list-none" spellcheck="false" autocomplete="off"></div>
-  <div class="row sb list-cols"><span class="cap">Subject</span><span class="cap">Versions</span></div>
+  {{if .List}}<div class="row sb list-cols"><span class="cap">Subject</span><span class="cap">Versions</span></div>{{end}}
   <div class="list-scroll">
-    {{if not .List}}<div class="note list-note"><b>{{t "schemas.none.title"}}</b><br>{{t "schemas.none.hint"}}</div>{{end}}
+    {{if not .List}}<div class="col g4 list-none"><span class="b">{{t "schemas.none.title"}}</span><span class="note">{{t "schemas.none.hint"}}</span></div>{{end}}
     {{range .List}}
     <a class="li two {{if eq .Name $.Sel}}on{{end}}" href="{{schemaURL .Name}}" data-name="{{.Name}}"{{if eq .Name $.Sel}} aria-current="page"{{end}}>
       <span class="col grow"><span class="m el">{{.Name}}</span><span class="note">{{.TypeLabel}}</span></span>
@@ -15,15 +15,15 @@
     {{end}}
     <div class="note list-note" id="list-none" hidden>No subject matches the filter.</div>
   </div>
-  <div class="note list-note list-foot ruled">{{len .List}} subject{{if ne (len .List) 1}}s{{end}}{{with .IDs}}{{if .Count}}, {{.Count}} schema{{if ne .Count 1}}s{{end}}, {{if eq .From .To}}id {{.From}}{{else}}ids {{.From}} to {{.To}}{{end}}{{end}}{{end}}.{{with .IDs}}{{if .Unused}} {{if eq (len .Unused) 1}}Id{{else}}Ids{{end}} {{range $i, $u := .Unused}}{{if $i}}, {{end}}{{$u}}{{end}}{{if .More}} and {{.More}} more{{end}} {{if and (eq (len .Unused) 1) (not .More)}}is{{else}}are{{end}} not in use here.{{end}}{{end}}</div>
+  {{if .List}}<div class="note list-note list-foot ruled">{{len .List}} subject{{if ne (len .List) 1}}s{{end}}{{with .IDs}}{{if .Count}}, {{.Count}} schema{{if ne .Count 1}}s{{end}}, {{if eq .From .To}}id {{.From}}{{else}}ids {{.From}} to {{.To}}{{end}}{{end}}{{end}}.{{with .IDs}}{{if .Unused}} {{if eq (len .Unused) 1}}Id{{else}}Ids{{end}} {{range $i, $u := .Unused}}{{if $i}}, {{end}}{{$u}}{{end}}{{if .More}} and {{.More}} more{{end}} {{if and (eq (len .Unused) 1) (not .More)}}is{{else}}are{{end}} not in use here.{{end}}{{end}}</div>{{end}}
 </aside>
 {{end}}
 
 {{define "schemas_home"}}{{template "shell_top" .}}
   {{template "schema_lp" (dict "List" .List "Sel" "" "IDs" .IDs)}}
-  <main class="main" id="detail">
+  <main class="main{{if not .Rows}} sc-none-main{{end}}" id="detail">
     <div class="row sb ce idband">
-      <div class="col"><h1 class="h1">Schemas</h1><span class="note">The built-in registry{{if .RegistryHost}} at <span class="m">{{.RegistryHost}}</span>{{end}}. Confluent's REST API, so stock serializers work with only <span class="m">schema.registry.url</span> changed.</span></div>
+      <div class="col"><h1 class="h1">Schemas</h1><span class="note">{{if .Rows}}The built-in registry{{if .RegistryHost}} at <span class="m">{{.RegistryHost}}</span>{{end}}. Confluent's REST API, so stock serializers work with only <span class="m">schema.registry.url</span> changed.{{else}}The built-in registry{{if .RegistryHost}} at <span class="m">{{.RegistryHost}}</span>{{end}} is running and empty.{{end}}</span></div>
       <div class="row g8 ce"><a class="btn pri w5" href="{{newSchemaURL ""}}" data-create>Register schema</a></div>
     </div>
 
@@ -55,9 +55,28 @@
       {{if .RegistryURL}}<div class="callout grow"><span class="b">Point a client here</span><span class="m">schema.registry.url={{.RegistryURL}}</span><span class="note">{{if .SASL}}SASL is on, so clients also send <span class="m">basic.auth.user.info</span> with the same user and password.{{else}}No authentication is needed.{{end}}</span></div>{{end}}
     </div>
     {{else}}
-    <div class="callout"><span class="b">{{t "schemas.none.title"}}</span><span class="note">{{t "schemas.none.hint"}}</span></div>
+    {{/* Sc-01: nothing registered. What a stock serializer does on its first produce,
+         with this broker's and this registry's addresses. */}}
+    <div class="callout sc-none-lead"><span class="b">Nothing exists yet. This is not an error.</span>
+      <span>Stock serializers register their own schema the first time they produce. You do not have to register anything by hand to start.</span></div>
+    <div class="row g12 sc-none">
+      <div class="card grow"><div class="pad col g8">
+        <span class="h2">How a stock serializer registers on first produce</span>
+        <div class="row g8"><span class="num">1</span><span>The producer is configured with the registry address.</span></div>
+        <pre class="code sc-props">{{range $i, $p := .ProducerProps}}{{if $i}}
+{{end}}{{if .Comment}}<span class="c">{{.Key}}</span>{{else if eq .Key "schema.registry.url"}}<span class="kw">{{.Key}}</span>={{.Value}}{{else}}{{.Key}}={{.Value}}{{end}}{{end}}</pre>
+        <div class="row g8"><span class="num">2</span><span>On the first record, the serializer sends the schema to <span class="m">POST /subjects/{{.SampleTopic}}-value/versions</span>. The subject name is the topic name plus <span class="m">-value</span> (TopicNameStrategy).</span></div>
+        <div class="row g8"><span class="num">3</span><span>The registry answers with an id. The serializer prefixes every message with magic byte 0 and that id (5 bytes), and this console uses the id to decode the message.</span></div>
+      </div></div>
+      <div class="col g12 sc-none-side">
+        <div class="callout"><span class="b">Use a different strategy</span><span class="note">With <span class="m">RecordNameStrategy</span> the subject is the record's full name, for example <span class="m">harbour.checkout.Order</span>. Both work here.</span></div>
+        <div class="callout"><span class="b">Or register by hand</span><span class="note">Useful when the producer runs with <span class="m">auto.register.schemas=false</span>, or when you want to test compatibility rules first.</span><a class="btn w5" href="{{newSchemaURL ""}}">Register schema</a></div>
+      </div>
+    </div>
+    <div class="grow"></div>
     {{end}}
   </main>
+  {{template "wire_dock" .}}
 {{template "shell_bottom" .}}{{end}}
 
 {{define "schemas_off"}}{{template "shell_top" .}}
@@ -87,6 +106,7 @@
       </div>
     </form>
   </main>
+  {{template "wire_dock" .}}
 {{template "shell_bottom" .}}{{end}}
 
 {{define "schema_detail"}}{{template "shell_top" .}}
@@ -180,6 +200,7 @@
     {{end}}
     {{end}}
   </main>
+  {{template "wire_dock" .}}
 {{template "shell_bottom" .}}{{end}}
 
 {{define "schema_check"}}

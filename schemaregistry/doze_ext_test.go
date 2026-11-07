@@ -152,7 +152,7 @@ func TestOverviewNextIDMatchesRegister(t *testing.T) {
 
 // The registry keeps its newest requests (SCH-21): 2,500 asked, the newest 2,000 kept,
 // newest first, with a cursor; filtered by subject, which includes a request by id for
-// a schema the subject holds; no body is kept; the extension routes and requests marked
+// a schema the subject holds; the query is kept with the path, no body is kept; the extension routes and requests marked
 // as the console's own are not.
 func TestRequestRingBounds(t *testing.T) {
 	r, _ := openReg(t)
@@ -168,13 +168,13 @@ func TestRequestRingBounds(t *testing.T) {
 		api.ServeHTTP(httptest.NewRecorder(), req)
 	}
 	do("POST", "/subjects/orders-value/versions", schemaBody(avroUser1), false)
-	do("GET", "/schemas/ids/1", "", false)
+	do("GET", "/schemas/ids/1?fetchMaxId=true", "", false)
 	do("GET", "/subjects/other/versions", "", false)
 	do("GET", "/subjects", "", true)
 	do("GET", "/_doze/overview", "", false)
 
 	got := api.Requests(RequestFilter{Subject: "orders-value"})
-	if len(got.Requests) != 2 || got.Requests[0].Path != "/schemas/ids/1" || got.Requests[1].Method != "POST" || got.Requests[1].Status != 200 {
+	if len(got.Requests) != 2 || got.Requests[0].Path != "/schemas/ids/1?fetchMaxId=true" || got.Requests[1].Method != "POST" || got.Requests[1].Status != 200 {
 		t.Fatalf("orders-value's requests: %+v", got.Requests)
 	}
 	if all := api.Requests(RequestFilter{}); len(all.Requests) != 3 {

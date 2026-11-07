@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -98,10 +99,14 @@ func (rc *registryClient) call(ctx context.Context, method, path string, body, o
 	if err != nil {
 		return err
 	}
-	// The console's own requests: doze-kafka's registry answers them and leaves them out
-	// of its request log, so the console's polling does not push out what clients asked
-	// (schemaregistry/requests.go). Another registry ignores the header.
-	req.Header.Set("X-Doze-Own", "1")
+	// The console's own reads: doze-kafka's registry answers them and leaves them out of
+	// its request log, so the pages' polling does not push out what clients asked
+	// (schemaregistry/requests.go). What a person does here (register, check, delete, a
+	// level set) is a request like any client's and is kept: the dock shows it. Another
+	// registry ignores the header.
+	if method == http.MethodGet {
+		req.Header.Set("X-Doze-Own", "1")
+	}
 	req.Header.Set("Content-Type", "application/vnd.schemaregistry.v1+json")
 	req.Header.Set("Accept", "application/vnd.schemaregistry.v1+json, application/json")
 	if rc.user != "" {
@@ -606,4 +611,36 @@ func diffLines(a, b string) []diffLine {
 		out = append(out, diffLine{"add", y[j]})
 	}
 	return out
+}
+
+// regRequests is a page of the registry's request log (GET /_doze/requests), newest
+// first: doze-kafka's registry keeps it; another registry has no such route.
+type regRequests struct {
+	Requests []struct {
+		Seq    uint64    `json:"seq"`
+		At     time.Time `json:"at"`
+		Method string    `json:"method"`
+		Path   string    `json:"path"`
+		Status int       `json:"status"`
+		Took   int64     `json:"tookNanos"`
+		User   string    `json:"user"`
+		From   string    `json:"from"`
+		Agent  string    `json:"agent"`
+	} `json:"requests"`
+	Next uint64 `json:"next"`
+}
+
+// Requests reads the registry's request log: all of it, or the requests about one
+// subject; before is the cursor (0 for the newest).
+func (rc *registryClient) Requests(ctx context.Context, subject string, before uint64, limit int) (regRequests, error) {
+	q := url.Values{"limit": {strconv.Itoa(limit)}}
+	if subject != "" {
+		q.Set("subject", subject)
+	}
+	if before != 0 {
+		q.Set("before", strconv.FormatUint(before, 10))
+	}
+	var out regRequests
+	err := rc.call(ctx, http.MethodGet, "/_doze/requests?"+q.Encode(), nil, &out)
+	return out, err
 }

@@ -399,13 +399,13 @@ span.num {
 /* Ac-Home's wire: time, client, the request and what it was about, the result. */
 .dock-acl .r { --c: 92px 120px 1fr 190px; }
 /* Tp-05's six columns: time, client, request, detail, result, took. */
-.dock:not(.dock-acl) .r { --c: 92px 120px 100px minmax(120px, 1fr) 60px 48px; }
+.dock:not(.dock-acl):not(.dock-reg) .r { --c: 92px 120px 100px minmax(120px, 1fr) 60px 48px; }
 /* With a selection open beside it (Tp-06), the page is 576 px and the six need 634:
    Tp-06's five, time 92, client 110, request 80, detail, result 40; the time it took is
    in the request's inspector. */
 @media (min-width: 1101px) {
-  body:has(#inspector:not([hidden])) .dock:not(.dock-acl) .r { --c: 92px 110px 80px minmax(0, 1fr) 40px; }
-  body:has(#inspector:not([hidden])) .dock:not(.dock-acl) .r > .took { display: none; }
+  body:has(#inspector:not([hidden])) .dock:not(.dock-acl):not(.dock-reg) .r { --c: 92px 110px 80px minmax(0, 1fr) 40px; }
+  body:has(#inspector:not([hidden])) .dock:not(.dock-acl):not(.dock-reg) .r > .took { display: none; }
 }
 
 .keys {
@@ -1672,3 +1672,21 @@ progress.gr-used::-moz-progress-bar{background:var(--ink);border-radius:2px}
 
 /* Topics, slice 4: the Config tab's row being edited (Tp-19). */
 .card .r.editing { background: var(--sel, rgba(120, 140, 255, .08)); }
+
+/* ---- Schemas (Sc-01 .. Sc-18) ---- */
+/* The registry's wire dock: the board's five columns, a refusal's row tinted. */
+.dock.dock-reg .r { --c: 100px 60px 1fr 70px 60px; }
+.dock.dock-reg .r.h { min-height: 26px; }
+.dock.dock-reg .r:not(.h) { min-height: 28px; }
+/* The boards draw the registry's dock with its header row and up to three requests. */
+.dock.dock-reg { max-height: 141px; }
+.dock.dock-reg .r.denyrow { background: var(--denybg); }
+.dock.dock-reg .r.badrow { background: var(--badbg); }
+/* Sc-01: nothing registered. */
+.main.sc-none-main { gap: 12px; }
+.sc-none-lead { padding: 16px 18px; gap: 6px; }
+.sc-none-side { width: 380px; flex: none; }
+.sc-none-side .btn { align-self: flex-start; margin-top: 4px; }
+.sc-none pre.sc-props { margin: 0 0 0 28px; }
+.code .kw { color: var(--deny); }
+:root:not([data-theme="contrast"]) .sc-none span.num { background: #17191c; color: #ffffff; }

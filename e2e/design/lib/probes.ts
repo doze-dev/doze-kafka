@@ -82,5 +82,5 @@ export const HOME: Probe[] = [
   { el: 'foot note', board: 'main > .note', live: 'main > .note', text: true },
   { el: 'dock', board: '.dock', live: '.dock' },
   { el: 'dock head', board: '.dock .dh', live: '.dock .dh' },
-  { el: 'dock row', board: '.dock .r', live: '.dock .r:not(.h)' },
+  { el: 'dock row', board: '.dock .r:not(.h)', live: '.dock .r:not(.h)' },
 ];

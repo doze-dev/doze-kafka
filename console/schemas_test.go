@@ -74,7 +74,7 @@ func TestSchemasSectionIsOnlyThereWithARegistry(t *testing.T) {
 // the subject.
 func TestSchemaSubjectLifecycle(t *testing.T) {
 	c, _, _ := newRegistryConsole(t)
-	if rec := req(t, c, "GET", "/_console/schemas", nil); rec.Code != 200 || !strings.Contains(rec.Body.String(), "No schemas yet") {
+	if rec := req(t, c, "GET", "/_console/schemas", nil); rec.Code != 200 || !strings.Contains(rec.Body.String(), "No subjects") {
 		t.Fatalf("empty Schemas page: %d", rec.Code)
 	}
 	register(t, c, "orders-value", userV1)

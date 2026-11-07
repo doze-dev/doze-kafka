@@ -72,7 +72,12 @@ func (a *API) record(r *http.Request, status int, took time.Duration) {
 		return
 	}
 	o := originOf(r)
+	// The query is kept with the path: it changes what was asked (?verbose=true,
+	// ?permanent=true, ?deleted=true) and carries nothing secret.
 	path := r.URL.Path
+	if r.URL.RawQuery != "" {
+		path += "?" + r.URL.RawQuery
+	}
 	if len(path) > maxRequestURL {
 		path = path[:maxRequestURL]
 	}

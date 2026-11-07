@@ -4,7 +4,7 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 28550354,
+      "binaryBytes": 28567442,
       "idleHeapBytes": 1368256,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
@@ -222,6 +222,20 @@
       "from": 1374400,
       "to": 1383880,
       "reason": "Stage 5 schema registry (schemas-stage5): GitHub's linux/arm64 runner measured a median of 1,370,872 to 1,373,640 over five starts up to commit 8669fb1, and 1,376,992 to 1,380,328 from 21f219d on (CI runs for f73f379, 21f219d, 250473c, 1b81377), after the /_doze/ extension routes and the JSON Schema and Protobuf sentence tables, which are built at package load (the request ring is empty at idle); the budget is the largest single start the runner measured, 1,383,880 (250473c), as the 2026-11-03 raise took the runner's figure"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28550354,
+      "to": 28567442,
+      "reason": "Schemas Sc-01 and the registry's wire dock: the empty registry's page and its producer lines, the dock's registry source over /_doze/requests and its rows: 17,088 bytes (linux/arm64 unchanged at 27,721,888, built in golang:1.27.3 on linux/arm64)"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28567442,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the 2026-11-07 raise from 28,415,122 to 28,550,354 and Sc-01 with the registry's wire dock (17,088)"
     }
   ]
 }

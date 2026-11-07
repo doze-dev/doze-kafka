@@ -35,6 +35,7 @@ One library (`lib/`), three gates (`shell/`, `homes/`, `traffic/`).
 | `lib/diff.ts`, `lib/ledger.ts` | The pair form of the comparison (Traffic): a `Pair` is a list of elements on each side, compared index by index; `traffic/allow.json` entries name board, theme, width, element, index, property and both values, and quote the words of `plan/00-foundation.md` that record why (an entry whose words the plan no longer has fails). A pair whose text is data names the truth check that compares it with the clients' ledger (`lib/ledger.ts` reads it back). |
 | `lib/goprog.ts` | Builds and runs a Go program of the repository (`truth/`, `gen/`). |
 | `shell/` | Sy-01 to Sy-08, and `common-allow.ts` (what every board's top bar may differ in). |
+| `schemas/` | Sc-01 to Sc-18 as they are drawn: `boards.ts`, `allow.ts`, `schemas.spec.ts`. |
 | `homes/` | Tp-Home, Gr-Home, Sc-Home, Tc-Home, Ac-Home, Cl-Home, the homes at 960 and 390, and Tp-24; `bite.spec.ts`. |
 | `traffic/` | Main and Traf-02 to Traf-12: `traffic.spec.ts` (the gate), `boards.ts` (each board, the state the page is put in, the pairs), `truth.ts` (the truth checks: counts, clients, times, sizes, offsets and metrics against the ledger, with the exact bounds a client's own timestamps allow), `world.ts` (a broker of its own and the scenario: joins, a leave, a member killed and expired), `up.ts` (keeps the world running for working on the pages; `DESIGN_WORLD=1` measures it), `allow.json`. |
 | `gen/` | The traffic: real franz-go clients (classic and KIP-848 groups, a transactional producer, a refused Produce, a denied group, a client that reports its metrics and one that does not), each writing its ledger. |
@@ -121,6 +122,7 @@ The comparison and data checks are:
 | `shell/dialogs.spec.ts` | Sy-05's palette, Sy-06's shortcuts, light and dark | |
 | `shell/themes.spec.ts` | Sy-07's switch; its specimens in light, dark and high contrast | every token, every printed ratio, the selection outline |
 | `shell/firstrun.spec.ts` | Sy-08 on an empty broker of its own, light and dark | |
+| `schemas/schemas.spec.ts` | Sc-01 (an empty registry on a broker of its own) at 1440, light and dark | the producer's addresses; the dock shows a client's request and not the console's reads |
 | `topics/topics.spec.ts` | Tp-01 (an empty broker of its own), Tp-02, Tp-03, Tp-04 (the create form, with its settings, refused) and Tp-05 (the topic page, merged across partitions) at 1440, light and dark | |
 | `traffic/traffic.spec.ts` | Main and Traf-02 to Traf-12 at 1440, light and dark, in one run of the world (an empty broker, the scenario's traffic, then the broker stopped) | every count, client, time, size, offset and metric, against the clients' ledger |
 

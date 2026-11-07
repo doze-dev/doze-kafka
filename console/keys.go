@@ -175,6 +175,9 @@ func pageHints(view string) []keyHint {
 		return []keyHint{hintMove, {Keys: []string{"↵"}, Label: "open member"}, {Keys: []string{"esc"}, Label: "close"}, hintTabs, hintJump}
 	case "group":
 		return []keyHint{hintMove, hintOpen, hintClose, {Keys: []string{"g", "g"}, Label: "groups"}, hintHelp}
+	case "schemas_none":
+		// Sc-01: nothing registered, so nothing to move over or open: register, jump, keys.
+		return []keyHint{{Keys: []string{"c"}, Label: "register schema"}, hintJump, {Keys: []string{"?"}, Label: "keys"}}
 	case "schemas":
 		return []keyHint{hintMove, {Keys: []string{"↵"}, Label: "open subject"}, hintFilter, {Keys: []string{"c"}, Label: "register schema"}, hintJump}
 	case "schema":
