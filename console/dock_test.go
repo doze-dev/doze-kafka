@@ -119,7 +119,7 @@ func TestADockTakesARegistrySource(t *testing.T) {
 		t.Errorf("subject dock rows = %+v", rows)
 	}
 	rec := req(t, c, "GET", "/_console/dock?subject=orders-value", nil)
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "GET /subjects/orders-value") {
+	if body := rec.Body.String(); rec.Code != 200 || !strings.Contains(body, `<span class="m b">GET</span>`) || !strings.Contains(body, ">/subjects/orders-value") {
 		t.Errorf("subject poll: %d %s", rec.Code, rec.Body)
 	}
 }

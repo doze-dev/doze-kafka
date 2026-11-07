@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"github.com/doze-dev/doze-kafka/internal/config"
+	"github.com/doze-dev/doze-kafka/internal/storage/meta"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -186,5 +189,88 @@ func TestRegistryGetsItsOwnNameInTheZone(t *testing.T) {
 	z.close()
 	if _, ok := reg.Snapshot()["schema.shop.doze"]; ok {
 		t.Error("the registry's name outlived the instance")
+	}
+}
+
+// A client that sends a request's headers and then trickles nothing is cut off when
+// the read timeout passes, and an idle kept-alive connection is closed: neither holds
+// a connection for good. (SCH-10)
+func TestRegistryTimesOutSlowAndIdleClients(t *testing.T) {
+	defer func(r, i time.Duration) { registryReadTimeout, registryIdleTimeout = r, i }(registryReadTimeout, registryIdleTimeout)
+	registryReadTimeout, registryIdleTimeout = 300*time.Millisecond, 300*time.Millisecond
+	out, stop := start(t, "--data-dir", t.TempDir())
+	defer stop()
+	addr := strings.TrimPrefix(summaryRegistry(t, out), "http://")
+
+	slow, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer slow.Close()
+	io.WriteString(slow, "POST /subjects/x/versions HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{")
+	slow.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if _, err := io.ReadAll(slow); err != nil {
+		t.Errorf("a request whose body never came: %v, want the connection closed by the registry", err)
+	}
+
+	idle, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer idle.Close()
+	io.WriteString(idle, "GET /subjects HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+	idle.SetReadDeadline(time.Now().Add(5 * time.Second))
+	buf := make([]byte, 4096)
+	if _, err := idle.Read(buf); err != nil {
+		t.Fatalf("reading the answer: %v", err)
+	}
+	for {
+		if _, err := idle.Read(buf); err != nil {
+			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				t.Errorf("an idle kept-alive connection was still open after 5 s")
+			}
+			break
+		}
+	}
+}
+
+// A registry record that cannot be read does not take Kafka down: the broker starts
+// with the registry off, the summary and the Schemas page say why, and meta.db is left
+// as it was. (SCH-13)
+func TestBrokerStartsWithAnUnreadableRegistry(t *testing.T) {
+	data := t.TempDir()
+	st, err := meta.Open(filepath.Join(data, config.MetaDBFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bad := map[string][]byte{"schema\x000000000001": []byte("not json")}
+	if err := st.RegistryApply(bad, nil); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+
+	out, stop := start(t, "--data-dir", data)
+	waitFor(t, "the summary", func() bool { return strings.Contains(out.String(), "doze-kafka is up") })
+	if !strings.Contains(out.String(), "registry  off") {
+		t.Errorf("the summary does not say the registry is off:\n%s", out.String())
+	}
+	m := regexp.MustCompile(`console   (http://\S+)`).FindStringSubmatch(out.String())
+	if m == nil {
+		t.Fatalf("no console in the summary:\n%s", out.String())
+	}
+	if code, body := call(t, "GET", strings.TrimSuffix(m[1], "/")+"/_console/schemas", "", "", ""); code != 200 || !strings.Contains(body, "data-registry-off-reason") || !strings.Contains(body, "schema") {
+		t.Errorf("the Schemas page: %d, want the reason the registry is off:\n%.400s", code, body)
+	}
+	if err := stop(); err != nil {
+		t.Fatal(err)
+	}
+	st, err = meta.Open(filepath.Join(data, config.MetaDBFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	all, _ := st.RegistryAll()
+	if string(all["schema\x000000000001"]) != "not json" {
+		t.Errorf("the unreadable record was changed: %q", all["schema\x000000000001"])
 	}
 }

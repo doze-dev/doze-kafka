@@ -20,6 +20,7 @@ import (
 	"math/big"
 	"sort"
 	"strings"
+	"unicode/utf16"
 )
 
 // jkind is the kind of schema a node is, as the validator library classes them. A
@@ -471,16 +472,17 @@ var jsonCompatible = map[string]bool{
 	"REQUIRED_ATTRIBUTE_WITH_DEFAULT_ADDED": true, "REQUIRED_ATTRIBUTE_REMOVED": true,
 	"DEPENDENCY_ARRAY_REMOVED": true, "DEPENDENCY_ARRAY_NARROWED": true,
 	"PROPERTY_REMOVED_FROM_OPEN_CONTENT_MODEL": true, "PROPERTY_ADDED_TO_CLOSED_CONTENT_MODEL": true,
-	"PROPERTY_ADDED_IS_COVERED_BY_PARTIALLY_OPEN_CONTENT_MODEL":   true,
-	"PROPERTY_REMOVED_IS_COVERED_BY_PARTIALLY_OPEN_CONTENT_MODEL": true,
-	"ADDITIONAL_PROPERTIES_ADDED":                                 true, "ADDITIONAL_PROPERTIES_EXTENDED": true,
+	"REQUIRED_PROPERTY_WITH_DEFAULT_ADDED_TO_UNOPEN_CONTENT_MODEL": true,
+	"PROPERTY_ADDED_IS_COVERED_BY_PARTIALLY_OPEN_CONTENT_MODEL":    true,
+	"PROPERTY_REMOVED_IS_COVERED_BY_PARTIALLY_OPEN_CONTENT_MODEL":  true,
+	"ADDITIONAL_PROPERTIES_ADDED":                                  true, "ADDITIONAL_PROPERTIES_EXTENDED": true,
 	"MAX_PROPERTIES_REMOVED": true, "MAX_PROPERTIES_INCREASED": true, "MIN_PROPERTIES_REMOVED": true, "MIN_PROPERTIES_DECREASED": true,
 	"MAX_ITEMS_REMOVED": true, "MAX_ITEMS_INCREASED": true, "MIN_ITEMS_REMOVED": true, "MIN_ITEMS_DECREASED": true,
 	"UNIQUE_ITEMS_REMOVED": true, "ADDITIONAL_ITEMS_ADDED": true, "ADDITIONAL_ITEMS_EXTENDED": true,
 	"ITEM_REMOVED_FROM_CLOSED_CONTENT_MODEL": true, "ITEM_ADDED_IS_COVERED_BY_PARTIALLY_OPEN_CONTENT_MODEL": true,
 	"ITEM_REMOVED_IS_COVERED_BY_PARTIALLY_OPEN_CONTENT_MODEL": true, "ITEM_REMOVED_FROM_OPEN_CONTENT_MODEL": true,
 	"ITEM_ADDED_TO_CLOSED_CONTENT_MODEL": true,
-	"ENUM_ARRAY_EXTENDED":                true, "COMBINED_TYPE_EXTENDED": true, "PRODUCT_TYPE_EXTENDED": true, "SUM_TYPE_EXTENDED": true,
+	"ENUM_ARRAY_EXTENDED":                true, "COMBINED_TYPE_EXTENDED": true, "PRODUCT_TYPE_NARROWED": true, "SUM_TYPE_EXTENDED": true,
 	"NOT_TYPE_NARROWED": true, "TYPE_NARROWED_NOT": false,
 }
 
@@ -512,26 +514,86 @@ func compatibleDiff(o, u *jnode) bool {
 
 // jsonCanRead: a reader of `reader` reads what a writer of `writer` wrote when going
 // from writer to reader changes nothing incompatibly.
-func jsonCanRead(reader, writer *jsonSchema) []string {
-	return jsonDiffMessages(writer, reader)
-}
-
-func jsonDiffMessages(older, newer *jsonSchema) []string {
-	o, n := older.node, newer.node
+func jsonCanRead(reader, writer *jsonSchema, readerIs, writerIs string) []CompatReason {
+	o, n := writer.node, reader.node
 	if o == nil || n == nil {
 		return nil
 	}
 	var d jdiff
 	d.compare(o, n, "#")
-	var msgs []string
+	var out []CompatReason
 	for _, c := range d.bad() {
-		msgs = append(msgs, fmt.Sprintf("{errorType:\"%s\", description:\"%s\"}", c.typ, describeJSONChange(c)))
+		desc := describeJSONChange(c, readerIs, writerIs)
+		// The closing quote is Confluent's own: a double quote opens the description
+		// and a single one closes it (recorded: testdata/compat/json-reasons.json).
+		out = append(out, CompatReason{Type: c.typ, Path: c.path, Description: desc,
+			Text: fmt.Sprintf("{errorType:\"%s\", description:\"%s'}", c.typ, desc)})
 	}
-	return msgs
+	return out
 }
 
-func describeJSONChange(c jchange) string {
-	return fmt.Sprintf("The new schema at path '%s' is not compatible with the old schema (%s)", c.path, strings.ToLower(strings.ReplaceAll(c.typ, "_", " ")))
+// jsonSentences are Confluent's descriptions by change type, R the reader's side and W
+// the writer's (each recorded for the corpus).
+var jsonSentences = map[string]string{
+	"TYPE_CHANGED":                         jsonTypeDiffers,
+	"TYPE_NARROWED":                        jsonTypeDiffers,
+	"COMBINED_TYPE_CHANGED":                jsonTypeDiffers,
+	"COMBINED_TYPE_SUBSCHEMAS_CHANGED":     jsonTypeDiffers,
+	"ENUM_ARRAY_CHANGED":                   jsonTypeDiffers,
+	"MULTIPLE_OF_CHANGED":                  jsonValueDiffers,
+	"PATTERN_CHANGED":                      jsonValueDiffers,
+	"ITEM_ADDED_TO_OPEN_CONTENT_MODEL":     "The R schema has an open content model and has a property or item at path '%s' which is missing in the W schema",
+	"PROPERTY_ADDED_TO_OPEN_CONTENT_MODEL": "The R schema has an open content model and has a property or item at path '%s' which is missing in the W schema",
+	"PROPERTY_ADDED_NOT_COVERED_BY_PARTIALLY_OPEN_CONTENT_MODEL":   "The R schema has a property or item at path '%s' which is missing in the W schema and is not covered by its partially open content model",
+	"ITEM_ADDED_NOT_COVERED_BY_PARTIALLY_OPEN_CONTENT_MODEL":       "The R schema has a property or item at path '%s' which is missing in the W schema and is not covered by its partially open content model",
+	"PROPERTY_REMOVED_FROM_CLOSED_CONTENT_MODEL":                   "The R has a closed content model and is missing a property or item present at path '%s' in the W schema",
+	"ITEM_REMOVED_FROM_CLOSED_CONTENT_MODEL":                       "The R has a closed content model and is missing a property or item present at path '%s' in the W schema",
+	"PROPERTY_REMOVED_NOT_COVERED_BY_PARTIALLY_OPEN_CONTENT_MODEL": "A property or item is missing in the R schema but present at path '%s' in the W schema and is not covered by its partially open content model",
+	"ITEM_REMOVED_NOT_COVERED_BY_PARTIALLY_OPEN_CONTENT_MODEL":     "A property or item is missing in the R schema but present at path '%s' in the W schema and is not covered by its partially open content model",
+	"REQUIRED_PROPERTY_ADDED_TO_UNOPEN_CONTENT_MODEL":              "The R schema has an unopen content model and has a required property at path '%s' which is missing in the W schema",
+	"SCHEMA_ADDED": "",
+}
+
+const (
+	jsonTypeDiffers  = "A type at path '%s' is different between the R schema and the W schema"
+	jsonValueDiffers = "The value at path '%s' is different between the R and W schema"
+	jsonNotPresent   = "The keyword at path '%s' in the R schema is not present in the W schema"
+	jsonMoreThan     = "The value at path '%s' in the R schema is more than its value in the W schema"
+	jsonLessThan     = "The value at path '%s' in the R schema is less than its value in the W schema"
+	jsonFewer        = "An array or combined type at path '%s' has fewer elements in the R schema than the W schema"
+	jsonMore         = "An array or combined type at path '%s' has more elements in the R schema than the W schema"
+)
+
+// describeJSONChange is Confluent's sentence for a change, the reader's side and the
+// writer's named. A type the corpus has not shown takes its family's sentence (all
+// the *_ADDED, *_INCREASED ... that were recorded share one each).
+func describeJSONChange(c jchange, readerIs, writerIs string) string {
+	t, ok := jsonSentences[c.typ]
+	if !ok {
+		switch {
+		case strings.HasSuffix(c.typ, "_ADDED"), strings.HasSuffix(c.typ, "_REMOVED"):
+			t = jsonNotPresent
+		case strings.HasSuffix(c.typ, "_INCREASED"), strings.HasSuffix(c.typ, "_EXPANDED"):
+			t = jsonMoreThan
+		case strings.HasSuffix(c.typ, "_DECREASED"), strings.HasSuffix(c.typ, "_REDUCED"):
+			t = jsonLessThan
+		case strings.HasSuffix(c.typ, "_NARROWED"):
+			t = jsonFewer
+		case strings.HasSuffix(c.typ, "_EXTENDED"):
+			t = jsonMore
+		default:
+			t = jsonTypeDiffers
+		}
+	}
+	if !strings.Contains(t, "%s") {
+		return t
+	}
+	path := c.path
+	if path == "#" {
+		path = "#/" // the root, as Confluent writes it
+	}
+	t = strings.NewReplacer("R schema", readerIs+" schema", "W schema", writerIs+" schema", "The R has", "The "+readerIs+" has", "R and W", readerIs+" and "+writerIs).Replace(t)
+	return fmt.Sprintf(t, path)
 }
 
 func (d *jdiff) compare(o, u *jnode, path string) {
@@ -541,20 +603,68 @@ func (d *jdiff) compare(o, u *jnode, path string) {
 		return
 	case o.kind == jFalse && u.kind == jFalse:
 		return
-	case o.kind == jFalse:
+	case o.kind == jFalse, uAny:
+		// Nothing was accepted before, or anything is now: compatible.
 		d.add("TYPE_EXTENDED", path)
 		return
-	case u.kind == jFalse:
-		d.add("TYPE_NARROWED", path)
-		return
-	case oAny:
-		d.add("TYPE_NARROWED", path)
-		return
-	case uAny:
-		d.add("TYPE_EXTENDED", path)
+	case u.kind == jFalse, oAny:
+		// Two different kinds of schema, as Confluent's diff sees them.
+		d.add("TYPE_CHANGED", path)
 		return
 	}
-	if o.kind == jCombined || u.kind == jCombined {
+	// A combination of one schema is that schema.
+	if o.kind == jCombined && len(o.subs) == 1 && u.kind != jCombined {
+		d.compare(o.subs[0], u, path)
+		return
+	}
+	if u.kind == jCombined && len(u.subs) == 1 && o.kind != jCombined {
+		d.compare(o, u.subs[0], path)
+		return
+	}
+	// A conjunction against a single schema (how a type with not, or with if/then/else,
+	// is held here): dropping parts of it accepts more when what is left is one of
+	// them; adding parts to a single schema is a change of kind (recorded: "not
+	// added", "not removed", "if then else added").
+	if o.kind == jCombined && o.criterion == "allOf" && u.kind != jCombined {
+		for _, sub := range o.subs {
+			var sd jdiff
+			sd.compare(sub, u, path)
+			if len(sd.bad()) == 0 {
+				d.changes = append(d.changes, sd.changes...)
+				d.add("PRODUCT_TYPE_NARROWED", path)
+				return
+			}
+		}
+		d.add("TYPE_CHANGED", path)
+		return
+	}
+	if u.kind == jCombined && u.criterion == "allOf" && o.kind != jCombined {
+		d.add("TYPE_CHANGED", path)
+		return
+	}
+	// One schema becoming a choice that includes it accepts more; any other change
+	// between a choice and a single schema is a change of kind (recorded:
+	// "type to type array superset", "type array to type subset").
+	if o.kind != jCombined && u.kind == jCombined {
+		if u.criterion == "anyOf" || u.criterion == "oneOf" {
+			for _, sub := range u.subs {
+				var sd jdiff
+				sd.compare(o, sub, path)
+				if len(sd.bad()) == 0 {
+					d.changes = append(d.changes, sd.changes...)
+					d.add("SUM_TYPE_EXTENDED", path)
+					return
+				}
+			}
+		}
+		d.add("TYPE_CHANGED", path)
+		return
+	}
+	if o.kind == jCombined && u.kind != jCombined {
+		d.add("TYPE_CHANGED", path)
+		return
+	}
+	if o.kind == jCombined {
 		d.combined(o, u, path)
 		return
 	}
@@ -575,7 +685,7 @@ func (d *jdiff) compare(o, u *jnode, path string) {
 		d.enum(o, u, path)
 	case jConst:
 		if o.values[0] != u.values[0] {
-			d.add("TYPE_CHANGED", path)
+			d.add("ENUM_ARRAY_CHANGED", path+"/const") // recorded: "const changed"
 		}
 	case jCond:
 		for i := range o.cond {
@@ -595,27 +705,23 @@ func (d *jdiff) compare(o, u *jnode, path string) {
 	}
 }
 
-func intChange(d *jdiff, path, what string, o, u *int64, upIsCompat bool) {
+func intChange(d *jdiff, path, what string, o, u *int64) {
 	switch {
 	case o == nil && u == nil:
 	case o == nil:
-		d.add(what+"_ADDED", path+"/"+strings.ToLower(what[:1])+what[1:])
+		d.add(what+"_ADDED", path)
 	case u == nil:
 		d.add(what+"_REMOVED", path)
 	case *u > *o:
-		if upIsCompat {
-			d.add(what+"_INCREASED", path)
-		} else {
-			d.add(what+"_INCREASED", path)
-		}
+		d.add(what+"_INCREASED", path)
 	case *u < *o:
 		d.add(what+"_DECREASED", path)
 	}
 }
 
 func (d *jdiff) str(o, u *jnode, path string) {
-	intChange(d, path+"/maxLength", "MAX_LENGTH", o.maxLen, u.maxLen, true)
-	intChange(d, path+"/minLength", "MIN_LENGTH", o.minLen, u.minLen, false)
+	intChange(d, path+"/maxLength", "MAX_LENGTH", o.maxLen, u.maxLen)
+	intChange(d, path+"/minLength", "MIN_LENGTH", o.minLen, u.minLen)
 	switch {
 	case o.pattern == nil && u.pattern != nil:
 		d.add("PATTERN_ADDED", path+"/pattern")
@@ -644,12 +750,16 @@ func floatChange(d *jdiff, path, what string, o, u *big.Float) {
 }
 
 func (d *jdiff) number(o, u *jnode, path string) {
-	switch {
-	case o.integer && !u.integer:
-		d.add("TYPE_EXTENDED", path)
-	case !o.integer && u.integer:
-		d.add("TYPE_NARROWED", path)
-	}
+	// The limits first, then whether it became integer only (Confluent's order,
+	// recorded: "random 114").
+	defer func() {
+		switch {
+		case o.integer && !u.integer:
+			d.add("TYPE_EXTENDED", path)
+		case !o.integer && u.integer:
+			d.add("TYPE_NARROWED", path)
+		}
+	}()
 	floatChange(d, path+"/maximum", "MAXIMUM", o.max, u.max)
 	floatChange(d, path+"/minimum", "MINIMUM", o.min, u.min)
 	floatChange(d, path+"/exclusiveMaximum", "EXCLUSIVE_MAXIMUM", o.exMax, u.exMax)
@@ -713,8 +823,8 @@ func subset(a, b map[string]bool) bool {
 }
 
 func (d *jdiff) array(o, u *jnode, path string) {
-	intChange(d, path+"/maxItems", "MAX_ITEMS", o.maxItems, u.maxItems, true)
-	intChange(d, path+"/minItems", "MIN_ITEMS", o.minItems, u.minItems, false)
+	intChange(d, path+"/maxItems", "MAX_ITEMS", o.maxItems, u.maxItems)
+	intChange(d, path+"/minItems", "MIN_ITEMS", o.minItems, u.minItems)
 	switch {
 	case !o.unique && u.unique:
 		d.add("UNIQUE_ITEMS_ADDED", path+"/uniqueItems")
@@ -724,14 +834,17 @@ func (d *jdiff) array(o, u *jnode, path string) {
 	any := &jnode{kind: jEmpty}
 	switch {
 	case o.tuple == nil && u.tuple == nil:
-		oi, ui := o.items, u.items
-		if oi == nil {
-			oi = any
+		// An items schema on one side only is a schema added or removed, as Confluent
+		// names it (recorded: "array items added", "array items removed").
+		switch oi, ui := o.items, u.items; {
+		case oi == nil && ui == nil:
+		case oi == nil:
+			d.add("SCHEMA_ADDED", path+"/items")
+		case ui == nil:
+			d.add("SCHEMA_REMOVED", path+"/items")
+		default:
+			d.compare(oi, ui, path+"/items")
 		}
-		if ui == nil {
-			ui = any
-		}
-		d.compare(oi, ui, path+"/items")
 	default:
 		// Positional items. A position beyond the tuple is governed by additionalItems.
 		rest := func(n *jnode) *jnode {
@@ -822,11 +935,13 @@ func (d *jdiff) additional(o, u *jnode, path, prefix string) {
 }
 
 func (d *jdiff) object(o, u *jnode, path string) {
-	intChange(d, path+"/maxProperties", "MAX_PROPERTIES", o.maxProps, u.maxProps, true)
-	intChange(d, path+"/minProperties", "MIN_PROPERTIES", o.minProps, u.minProps, false)
+	// In Confluent's order (recorded: testdata/compat/json-reasons.json): required,
+	// then each property, then additionalProperties, then the counts, then
+	// dependencies. Properties come in the order a Java HashMap gives their names, the
+	// old schema's first, as Confluent's diff walks them.
 
-	// Required properties: one that is newly required and declared is a breaking change
-	// unless it has a default.
+	// A property both schemas declare that is now required narrows what is accepted,
+	// unless it has a default. One the new schema adds is judged with the property.
 	var added, removed []string
 	for r := range u.required {
 		if !o.required[r] {
@@ -838,35 +953,33 @@ func (d *jdiff) object(o, u *jnode, path string) {
 			removed = append(removed, r)
 		}
 	}
-	sort.Strings(added)
-	sort.Strings(removed)
-	for _, r := range added {
+	for _, r := range javaHashOrder(added) {
 		ps, declared := u.props[r]
+		_, before := o.props[r]
 		switch {
-		case !declared:
+		case !declared || !before:
 		case ps.hasDefault:
 			d.add("REQUIRED_ATTRIBUTE_WITH_DEFAULT_ADDED", path+"/required/"+r)
 		default:
 			d.add("REQUIRED_ATTRIBUTE_ADDED", path+"/required/"+r)
 		}
 	}
-	for _, r := range removed {
+	for _, r := range javaHashOrder(removed) {
 		d.add("REQUIRED_ATTRIBUTE_REMOVED", path+"/required/"+r)
 	}
 
-	names := map[string]bool{}
+	// Inserted the compared-from schema's names first: two names in one bucket keep
+	// that order (recorded: "random 003", "a2" before "a").
+	var oNames, uOnly []string
 	for n := range o.props {
-		names[n] = true
+		oNames = append(oNames, n)
 	}
 	for n := range u.props {
-		names[n] = true
+		if _, ok := o.props[n]; !ok {
+			uOnly = append(uOnly, n)
+		}
 	}
-	sorted := make([]string, 0, len(names))
-	for n := range names {
-		sorted = append(sorted, n)
-	}
-	sort.Strings(sorted)
-	for _, name := range sorted {
+	for _, name := range javaHashInserted(append(javaHashOrder(oNames), javaHashOrder(uOnly)...)) {
 		op, inO := o.props[name]
 		up, inU := u.props[name]
 		p := path + "/properties/" + name
@@ -875,15 +988,29 @@ func (d *jdiff) object(o, u *jnode, path string) {
 			d.compare(op, up, p)
 		case inU:
 			// A property the old schema did not name.
-			switch {
-			case o.additional == nil:
+			if o.additional == nil {
 				d.add("PROPERTY_ADDED_TO_OPEN_CONTENT_MODEL", p)
+				continue
+			}
+			switch {
 			case o.additional.kind == jFalse:
 				d.add("PROPERTY_ADDED_TO_CLOSED_CONTENT_MODEL", p)
-			case compatibleDiff(o.additional, up) && compatibleDiff(up, o.additional):
+			case compatibleDiff(o.additional, up):
 				d.add("PROPERTY_ADDED_IS_COVERED_BY_PARTIALLY_OPEN_CONTENT_MODEL", p)
 			default:
+				// Why it is not covered first, as Confluent lists it.
+				var why jdiff
+				why.compare(o.additional, up, p)
+				d.changes = append(d.changes, why.bad()...)
 				d.add("PROPERTY_ADDED_NOT_COVERED_BY_PARTIALLY_OPEN_CONTENT_MODEL", p)
+			}
+			// Required in a model that was not open: data written before it has none.
+			if u.required[name] {
+				if up.hasDefault {
+					d.add("REQUIRED_PROPERTY_WITH_DEFAULT_ADDED_TO_UNOPEN_CONTENT_MODEL", p)
+				} else {
+					d.add("REQUIRED_PROPERTY_ADDED_TO_UNOPEN_CONTENT_MODEL", p)
+				}
 			}
 		default:
 			switch {
@@ -891,9 +1018,12 @@ func (d *jdiff) object(o, u *jnode, path string) {
 				d.add("PROPERTY_REMOVED_FROM_OPEN_CONTENT_MODEL", p)
 			case u.additional.kind == jFalse:
 				d.add("PROPERTY_REMOVED_FROM_CLOSED_CONTENT_MODEL", p)
-			case compatibleDiff(op, u.additional) && compatibleDiff(u.additional, op):
+			case compatibleDiff(op, u.additional):
 				d.add("PROPERTY_REMOVED_IS_COVERED_BY_PARTIALLY_OPEN_CONTENT_MODEL", p)
 			default:
+				var why jdiff
+				why.compare(op, u.additional, p)
+				d.changes = append(d.changes, why.bad()...)
 				d.add("PROPERTY_REMOVED_NOT_COVERED_BY_PARTIALLY_OPEN_CONTENT_MODEL", p)
 			}
 		}
@@ -913,12 +1043,24 @@ func (d *jdiff) object(o, u *jnode, path string) {
 		} else {
 			d.add("ADDITIONAL_PROPERTIES_EXTENDED", path+"/additionalProperties")
 		}
-	default:
+	case o.additional.kind == jFalse || u.additional.kind == jFalse:
 		d.additional(o.additional, u.additional, path+"/additionalProperties", "ADDITIONAL_PROPERTIES")
+	default:
+		// Both allow more properties of a schema: what changed in that schema is the
+		// change (recorded: "partial: widen additional type").
+		d.compare(o.additional, u.additional, path+"/additionalProperties")
 	}
 
+	intChange(d, path+"/maxProperties", "MAX_PROPERTIES", o.maxProps, u.maxProps)
+	intChange(d, path+"/minProperties", "MIN_PROPERTIES", o.minProps, u.minProps)
+
 	// Dependencies: a property that now depends on more is a narrowing.
-	for k, uv := range u.dependencies {
+	var deps []string
+	for k := range u.dependencies {
+		deps = append(deps, k)
+	}
+	for _, k := range javaHashOrder(deps) {
+		uv := u.dependencies[k]
 		ov, had := o.dependencies[k]
 		switch {
 		case !had:
@@ -931,11 +1073,44 @@ func (d *jdiff) object(o, u *jnode, path string) {
 			}
 		}
 	}
+	var gone []string
 	for k := range o.dependencies {
 		if _, ok := u.dependencies[k]; !ok {
-			d.add("DEPENDENCY_ARRAY_REMOVED", path+"/dependencies/"+k)
+			gone = append(gone, k)
 		}
 	}
+	for _, k := range javaHashOrder(gone) {
+		d.add("DEPENDENCY_ARRAY_REMOVED", path+"/dependencies/"+k)
+	}
+}
+
+// javaHashOrder is the order a java.util.HashMap built from these names iterates
+// them in: by bucket (String.hashCode, spread, masked by a capacity that grows from
+// 16 at three quarters full), and within a bucket in the order they were put in,
+// taken here to be by name.
+func javaHashOrder(names []string) []string {
+	out := append([]string(nil), names...)
+	sort.Strings(out)
+	return javaHashInserted(out)
+}
+
+// javaHashInserted is javaHashOrder for names inserted in the order given.
+func javaHashInserted(names []string) []string {
+	out := append([]string(nil), names...)
+	capacity := 16
+	for len(out) > capacity*3/4 {
+		capacity *= 2
+	}
+	bucket := func(s string) uint32 {
+		var h int32
+		for _, c := range utf16.Encode([]rune(s)) {
+			h = 31*h + int32(c)
+		}
+		u := uint32(h)
+		return (u ^ u>>16) & uint32(capacity-1)
+	}
+	sort.SliceStable(out, func(i, j int) bool { return bucket(out[i]) < bucket(out[j]) })
+	return out
 }
 
 func equalStrings(a, b []string) bool {
@@ -966,23 +1141,36 @@ func (d *jdiff) combined(o, u *jnode, path string) {
 		case oc.criterion == "oneOf" && uc.criterion == "anyOf":
 			crit = "anyOf"
 		case oc.criterion == "anyOf" && uc.criterion == "oneOf":
-			d.add("COMPOSITION_METHOD_CHANGED", path)
+			d.add("COMBINED_TYPE_CHANGED", path)
 			return
 		case len(oc.subs) == 1:
 			crit = uc.criterion
 		case len(uc.subs) == 1:
 			crit = oc.criterion
 		default:
-			d.add("COMPOSITION_METHOD_CHANGED", path)
+			d.add("COMBINED_TYPE_CHANGED", path)
 			return
 		}
 	}
-	// Pair each old branch with a new one: first the identical ones, then the ones
-	// that only differ by a compatible change. What is left over on the old side is the
-	// schema narrowing (a sum) or widening (a product); what is left on the new side is
-	// the reverse.
+	// As Confluent's diff: a change in the number of branches is named by which side
+	// has more (an allOf with more is narrower, an anyOf or oneOf with more is wider);
+	// then each old branch is paired with a new one it is compatible with, identical
+	// ones first, and if fewer pair up than the smaller side has, the branches changed;
+	// otherwise each pair is compared.
+	switch {
+	case len(oc.subs) < len(uc.subs) && crit == "allOf":
+		d.add("PRODUCT_TYPE_EXTENDED", path)
+	case len(oc.subs) < len(uc.subs):
+		d.add("SUM_TYPE_EXTENDED", path)
+	case len(oc.subs) > len(uc.subs) && crit == "allOf":
+		d.add("PRODUCT_TYPE_NARROWED", path)
+	case len(oc.subs) > len(uc.subs):
+		d.add("SUM_TYPE_NARROWED", path)
+	}
 	usedOld := make([]bool, len(oc.subs))
 	usedNew := make([]bool, len(uc.subs))
+	type pairing struct{ i, j int }
+	var pairs []pairing
 	pair := func(ok func(a, b *jnode) bool) {
 		for i, ob := range oc.subs {
 			if usedOld[i] {
@@ -993,9 +1181,7 @@ func (d *jdiff) combined(o, u *jnode, path string) {
 					continue
 				}
 				usedOld[i], usedNew[j] = true, true
-				var sub jdiff
-				sub.compare(ob, ub, fmt.Sprintf("%s/%s/%d", path, crit, i))
-				d.changes = append(d.changes, sub.changes...)
+				pairs = append(pairs, pairing{i, j})
 				break
 			}
 		}
@@ -1006,30 +1192,14 @@ func (d *jdiff) combined(o, u *jnode, path string) {
 		return len(sub.changes) == 0
 	})
 	pair(compatibleDiff)
-	unmatchedOld, unmatchedNew := 0, 0
-	for _, used := range usedOld {
-		if !used {
-			unmatchedOld++
-		}
-	}
-	for _, used := range usedNew {
-		if !used {
-			unmatchedNew++
-		}
-	}
-	if crit == "allOf" {
-		if unmatchedOld > 0 {
-			d.add("PRODUCT_TYPE_EXTENDED", path)
-		}
-		if unmatchedNew > 0 {
-			d.add("PRODUCT_TYPE_NARROWED", path)
-		}
+	if len(pairs) < min(len(oc.subs), len(uc.subs)) {
+		d.add("COMBINED_TYPE_SUBSCHEMAS_CHANGED", path)
 		return
 	}
-	if unmatchedOld > 0 {
-		d.add("SUM_TYPE_NARROWED", path)
-	}
-	if unmatchedNew > 0 {
-		d.add("SUM_TYPE_EXTENDED", path)
+	sort.Slice(pairs, func(a, b int) bool { return pairs[a].i < pairs[b].i })
+	for _, pr := range pairs {
+		var sub jdiff
+		sub.compare(oc.subs[pr.i], uc.subs[pr.j], fmt.Sprintf("%s/%s/%d", path, crit, pr.i))
+		d.changes = append(d.changes, sub.changes...)
 	}
 }

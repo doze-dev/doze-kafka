@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/doze-dev/doze-kafka/schemaregistry"
 )
@@ -86,50 +87,49 @@ func TestCodecCacheKeepsGoodAnswersAndForgetsBadOnesAfterAWhile(t *testing.T) {
 	if n.Load() != before {
 		t.Errorf("a known schema id was asked of the registry again (%d requests)", n.Load()-before)
 	}
-	// An id the registry does not know is cached too, briefly.
+	// An id the registry does not know is cached too, for 30 seconds.
 	if _, err := c.reg.codecFor(ctx, 9999, ""); err == nil {
 		t.Fatal("an unknown id has a codec")
 	}
 	before = n.Load()
 	if _, err := c.reg.codecFor(ctx, 9999, ""); err == nil || n.Load() != before {
-		t.Errorf("an unknown id was asked again within the 5 seconds (%d requests, %v)", n.Load()-before, err)
+		t.Errorf("an unknown id was asked again within the 30 seconds (%d requests, %v)", n.Load()-before, err)
 	}
 	c.reg.mu.Lock()
-	c.reg.codecs[9999].at = c.reg.codecs[9999].at.Add(-6e9)
+	c.reg.codecs[9999].at = c.reg.codecs[9999].at.Add(-unknownFor - time.Second)
 	c.reg.mu.Unlock()
 	if _, err := c.reg.codecFor(ctx, 9999, ""); err == nil || n.Load() == before {
-		t.Errorf("a refusal older than 5 seconds was not asked again (%v)", err)
+		t.Errorf("a refusal older than 30 seconds was not asked again (%v)", err)
 	}
 }
 
-func TestCodecCacheIsEmptiedPast512Entries(t *testing.T) {
+func TestCodecCacheDropsTheOldestPast512Entries(t *testing.T) {
 	c, _, _ := countingRegistry(t)
 	ctx := context.Background()
 	id, err := c.reg.Register(ctx, "t-value", schemaBody{Schema: userV1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	fill := func(n int) {
-		c.reg.mu.Lock()
-		c.reg.codecs = map[int]*codecEntry{}
-		for i := 0; i < n; i++ {
-			c.reg.codecs[100000+i] = &codecEntry{}
-		}
-		c.reg.mu.Unlock()
+	c.reg.mu.Lock()
+	c.reg.codecs = map[int]*codecEntry{}
+	now := time.Now()
+	for i := 0; i < maxCodecs; i++ {
+		c.reg.codecs[100000+i] = &codecEntry{at: now.Add(time.Duration(i) * time.Millisecond)}
 	}
-	fill(512)
+	c.reg.mu.Unlock()
 	if _, err := c.reg.codecFor(ctx, id, ""); err != nil {
 		t.Fatal(err)
 	}
-	if n := len(c.reg.codecs); n != 513 {
-		t.Errorf("512 entries and one more: %d kept", n)
+	c.reg.mu.Lock()
+	defer c.reg.mu.Unlock()
+	if n := len(c.reg.codecs); n != maxCodecs {
+		t.Errorf("%d entries and one more: %d kept, want %d", maxCodecs, n, maxCodecs)
 	}
-	fill(513)
-	if _, err := c.reg.codecFor(ctx, id, ""); err != nil {
-		t.Fatal(err)
+	if _, ok := c.reg.codecs[100000]; ok {
+		t.Error("the entry asked longest ago was kept")
 	}
-	if n := len(c.reg.codecs); n != 1 {
-		t.Errorf("513 entries and one more: %d kept, want the cache started over", n)
+	if _, ok := c.reg.codecs[id]; !ok {
+		t.Error("the new entry was not kept")
 	}
 }
 
@@ -167,9 +167,11 @@ func TestDecodeNamesTheSubjectOfTheTopic(t *testing.T) {
 	}
 }
 
-// References are followed to their text, but not without end.
+// References are followed to their text: a chain as deep as the registry takes (the
+// registry has no depth limit of its own past its 1,000 schemas), and a diamond without
+// fetching or following a schema twice.
 func TestReferenceDepthIsBounded(t *testing.T) {
-	c, _, _ := countingRegistry(t)
+	c, n, _ := countingRegistry(t)
 	ctx := context.Background()
 	record := func(k int, ref bool) string {
 		if !ref {
@@ -177,7 +179,7 @@ func TestReferenceDepthIsBounded(t *testing.T) {
 		}
 		return fmt.Sprintf(`{"type":"record","name":"t%d","fields":[{"name":"next","type":"t%d"}]}`, k, k+1)
 	}
-	const levels = 18
+	const levels = 40
 	for k := levels; k >= 0; k-- {
 		b := schemaBody{Schema: record(k, k < levels)}
 		if k < levels {
@@ -187,28 +189,47 @@ func TestReferenceDepthIsBounded(t *testing.T) {
 			t.Fatalf("register s%d: %v", k, err)
 		}
 	}
-	// s2 has 16 schemas beneath it; s1 has 17.
-	for _, tc := range []struct {
-		subject string
-		ok      bool
-	}{{"s3", true}, {"s2", true}, {"s1", false}, {"s0", false}} {
-		v, err := c.reg.Version(ctx, tc.subject, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = c.reg.resolve(ctx, v, 0)
-		if tc.ok && err != nil {
-			t.Errorf("%s: %v", tc.subject, err)
-		}
-		if !tc.ok && (err == nil || !strings.Contains(err.Error(), "nested too deeply")) {
-			t.Errorf("%s: %v, want the nesting refused", tc.subject, err)
+	v, err := c.reg.Version(ctx, "s0", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	refs, err := c.reg.resolve(ctx, v)
+	if err != nil || len(refs) != levels {
+		t.Fatalf("a chain of %d: %d refs, %v", levels, len(refs), err)
+	}
+
+	// A diamond: each level names the one below twice; each is fetched once.
+	if _, err := c.reg.Register(ctx, "d0", schemaBody{SchemaType: "JSON", Schema: `{"type":"string"}`}); err != nil {
+		t.Fatal(err)
+	}
+	const depth = 20
+	for k := 1; k <= depth; k++ {
+		b := schemaBody{SchemaType: "JSON", Schema: fmt.Sprintf(`{"type":"object","properties":{"a":{"$ref":"a%d.json"},"b":{"$ref":"b%d.json"}}}`, k, k),
+			References: []map[string]any{
+				{"name": fmt.Sprintf("a%d.json", k), "subject": fmt.Sprintf("d%d", k-1), "version": 1},
+				{"name": fmt.Sprintf("b%d.json", k), "subject": fmt.Sprintf("d%d", k-1), "version": 1},
+			}}
+		if _, err := c.reg.Register(ctx, fmt.Sprintf("d%d", k), b); err != nil {
+			t.Fatalf("register d%d: %v", k, err)
 		}
 	}
+	top, err := c.reg.Version(ctx, fmt.Sprintf("d%d", depth), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := n.Load()
+	if _, err := c.reg.resolve(ctx, top); err != nil {
+		t.Fatal(err)
+	}
+	if asked := n.Load() - before; asked > depth {
+		t.Errorf("a %d-level diamond took %d requests, want one per schema", depth, asked)
+	}
+
 	var dangling schemaVersion
 	if err := json.Unmarshal([]byte(`{"references":[{"name":"x","subject":"missing","version":1}]}`), &dangling); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.reg.resolve(ctx, dangling, 0); err == nil {
+	if _, err := c.reg.resolve(ctx, dangling); err == nil {
 		t.Error("a reference to a subject that is not there resolved")
 	}
 	if _, err := c.reg.Version(ctx, "s2", 0); err != nil {
@@ -340,5 +361,82 @@ func TestSchemaFromForm(t *testing.T) {
 	}
 	if _, err := post(url.Values{"schema": {"x"}, "references": {"{not json"}}); err == nil || !strings.Contains(err.Error(), "not a JSON list") {
 		t.Errorf("bad references: %v", err)
+	}
+}
+
+// A registry that cannot be reached is probed once and then left alone, longer each
+// time it is still down; values read meanwhile say why (framedUnread), and the first
+// answer it gives ends the wait. (SCH-24)
+func TestUnknownIDBackoff(t *testing.T) {
+	var asked atomic.Int64
+	var down atomic.Bool
+	down.Store(true)
+	reg, err := schemaregistry.Open(schemaregistry.NewMemoryStorage())
+	if err != nil {
+		t.Fatal(err)
+	}
+	api := schemaregistry.NewAPI(reg, schemaregistry.Options{})
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked.Add(1)
+		if down.Load() {
+			conn, _, _ := w.(http.Hijacker).Hijack()
+			conn.Close() // not an answer: as a registry that went away
+			return
+		}
+		api.ServeHTTP(w, r)
+	}))
+	defer ts.Close()
+	c, _ := newTestConsoleAddr(t, func(o *Options) { o.RegistryURL = ts.URL })
+	ctx := context.Background()
+	for id := 1; id <= 200; id++ {
+		value := append([]byte{0, 0, 0, 0, byte(id)}, 2, 'h', 'i')
+		if _, state, err := c.reg.decodeState(ctx, "t", value); state != framedUnread || err == nil {
+			t.Fatalf("id %d with the registry down: state %v, %v", id, state, err)
+		}
+	}
+	if n := asked.Load(); n > 2 { // one probe (the client may retry an idempotent GET once)
+		t.Errorf("200 values with the registry down asked it %d times, want one probe", n)
+	}
+	c.reg.mu.Lock()
+	first := c.reg.downFor
+	c.reg.downUntil = time.Time{} // the wait is over
+	c.reg.mu.Unlock()
+	c.reg.decodeState(ctx, "t", []byte{0, 0, 0, 0, 1, 2, 'h', 'i'})
+	c.reg.mu.Lock()
+	if c.reg.downFor != 2*first {
+		t.Errorf("still down after a wait of %s: the next wait is %s, want twice it", first, c.reg.downFor)
+	}
+	c.reg.downUntil = time.Time{}
+	c.reg.mu.Unlock()
+	down.Store(false)
+	if _, state, _ := c.reg.decodeState(ctx, "t", []byte{0, 0, 0, 0, 7, 2, 'h', 'i'}); state != framedUnknown {
+		t.Errorf("the registry back, an id it does not hold: state %v, want framedUnknown", state)
+	}
+	c.reg.mu.Lock()
+	defer c.reg.mu.Unlock()
+	if c.reg.downFor != 0 || !c.reg.downUntil.IsZero() {
+		t.Errorf("an answer did not end the wait: %s until %s", c.reg.downFor, c.reg.downUntil)
+	}
+}
+
+// The console's reads are its own (its pages' polling), and the registry's request log
+// leaves them out; what a person does through the console, a register here, is a
+// request like any client's and is kept, so the dock shows it (Sc-03, Sc-04).
+func TestConsoleReadsAreLeftOutOfTheRegistryLog(t *testing.T) {
+	reg, err := schemaregistry.Open(schemaregistry.NewMemoryStorage())
+	if err != nil {
+		t.Fatal(err)
+	}
+	api := schemaregistry.NewAPI(reg, schemaregistry.Options{})
+	ts := httptest.NewServer(api)
+	defer ts.Close()
+	c, _ := newTestConsoleAddr(t, func(o *Options) { o.RegistryURL = ts.URL })
+	if _, err := c.reg.Register(context.Background(), "s", schemaBody{Schema: userV1}); err != nil {
+		t.Fatal(err)
+	}
+	c.reg.Subjects(context.Background())
+	got := api.Requests(schemaregistry.RequestFilter{})
+	if len(got.Requests) != 1 || got.Requests[0].Method != "POST" || got.Requests[0].Path != "/subjects/s/versions" {
+		t.Errorf("the registry kept %+v: want the register alone, not the console's read", got.Requests)
 	}
 }

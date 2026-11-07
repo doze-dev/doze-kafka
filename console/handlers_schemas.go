@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"strconv"
 	"strings"
@@ -31,7 +32,7 @@ func (c *Console) registryOff(w http.ResponseWriter, r *http.Request) bool {
 		c.fail(w, r, fmt.Errorf("%w: no schema registry is connected to this console", errNotFound))
 		return true
 	}
-	c.render(w, r, "schemas_off", map[string]any{"Page": "schemas", "Title": "Schemas"})
+	c.render(w, r, "schemas_off", map[string]any{"Page": "schemas", "Title": "Schemas", "Reason": c.regOff})
 	return true
 }
 
@@ -78,10 +79,51 @@ func (c *Console) schemas(w http.ResponseWriter, r *http.Request) {
 	}
 	host := strings.TrimPrefix(strings.TrimPrefix(regURL, "http://"), "https://")
 	mode, _ := c.reg.Mode(ctx)
-	c.render(w, r, "schemas_home", map[string]any{"List": list, "Rows": rows, "Page": "schemas", "Title": "Schemas",
+	data := map[string]any{"List": list, "Rows": rows, "Page": "schemas", "Title": "Schemas",
 		"VersionCount": versions, "GlobalLevel": global, "RegistryURL": regURL, "RegistryHost": host, "Mode": mode,
-		"BuiltIn": c.facts.RegistryBuiltIn, "IDs": idSummary(ids),
-		"SASL": len(c.facts.SASLMechanisms) > 0 || c.be.opts.SASLUser != ""})
+		"BuiltIn": c.facts.RegistryBuiltIn, "IDs": idSummary(ids), "Bootstrap": c.be.displayAddr(),
+		"SASL": len(c.facts.SASLMechanisms) > 0 || c.be.opts.SASLUser != ""}
+	if len(rows) == 0 {
+		data["View"] = "schemas_none"
+		data["ProducerProps"], data["SampleTopic"] = c.producerProps(r), "<topic>"
+		if tps, err := c.be.ListTopics(ctx); err == nil {
+			for _, t := range tps {
+				if !strings.HasPrefix(t.Name, "__") {
+					data["SampleTopic"] = t.Name
+					break
+				}
+			}
+		}
+	}
+	maps.Copy(data, c.dockData(DockFilter{Registry: true}))
+	c.render(w, r, "schemas_home", data)
+}
+
+// propLine is one line of a properties file: a key and its value, or a comment.
+type propLine struct {
+	Key, Value string
+	Comment    bool
+}
+
+// producerProps is Sc-01's producer.properties: this broker's client settings (the
+// Connect page's, so the login is the same), the registry's address, and the value
+// serializer, with the default it relies on said.
+func (c *Console) producerProps(r *http.Request) []propLine {
+	f := c.connectFacts(r)
+	out := []propLine{{Key: "# producer.properties", Comment: true}}
+	for _, p := range f.Properties {
+		if strings.HasPrefix(p, "#") {
+			out = append(out, propLine{Key: p, Comment: true})
+			continue
+		}
+		k, v, _ := strings.Cut(p, "=")
+		out = append(out, propLine{Key: k, Value: v})
+		if k == "bootstrap.servers" && f.Registry != "" {
+			out = append(out, propLine{Key: "schema.registry.url", Value: f.Registry})
+		}
+	}
+	return append(out, propLine{Key: "value.serializer", Value: "io.confluent.kafka.serializers.KafkaAvroSerializer"},
+		propLine{Key: "# auto.register.schemas=true is the default", Comment: true})
 }
 
 // idSpan is Sc-Home's list foot: how many schemas, the ids they span, and the ids in
@@ -120,8 +162,10 @@ func (c *Console) schemaCreatePage(w http.ResponseWriter, r *http.Request) {
 	}
 	list, _ := c.reg.Subjects(r.Context())
 	subject := r.URL.Query().Get("subject")
-	c.render(w, r, "schema_create", map[string]any{"List": list, "Page": "schemas", "Title": "Register schema", "Subject": subject,
-		"Types": []string{schemaregistry.TypeAvro, schemaregistry.TypeJSON, schemaregistry.TypeProtobuf}})
+	data := map[string]any{"List": list, "Page": "schemas", "Title": "Register schema", "Subject": subject,
+		"Types": []string{schemaregistry.TypeAvro, schemaregistry.TypeJSON, schemaregistry.TypeProtobuf}}
+	maps.Copy(data, c.dockData(DockFilter{Registry: true}))
+	c.render(w, r, "schema_create", data)
 }
 
 func (c *Console) schemaCreate(w http.ResponseWriter, r *http.Request) {
@@ -146,6 +190,8 @@ func (c *Console) schemaCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 // schemaFromForm reads a schema text, its type and any references from a form.
+//
+//fuzz:parser class=console-forms FuzzSchemaForms
 func schemaFromForm(r *http.Request) (schemaBody, error) {
 	text := strings.TrimSpace(r.FormValue("schema"))
 	if text == "" {
@@ -287,6 +333,7 @@ func (c *Console) schemaDetail(w http.ResponseWriter, r *http.Request) {
 		g.AddSubjects([]string{subject}, names)
 		data["Neighbours"] = c.neighbourClauses(g, NodeSubject, subject)
 	}
+	maps.Copy(data, c.dockData(DockFilter{Subject: subject}))
 	c.render(w, r, "schema_detail", data)
 }
 

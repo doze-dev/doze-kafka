@@ -1,0 +1,78 @@
+[
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/cm/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "is_compatible": true
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/cm/versions/latest",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "is_compatible": true
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/cm/versions/1",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 404,
+    "response": {
+      "error_code": 40402,
+      "message": "Version 1 not found."
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/cm/versions?verbose=true",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "is_compatible": true,
+      "messages": []
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/cm/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/cm/versions/9",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 404,
+    "response": {
+      "error_code": 40402,
+      "message": "Version 9 not found."
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/cm/versions/abc",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42202,
+      "message": "The specified version 'abc' is not a valid version id. Allowed values are between [1, 2^31-1] and the string \"latest\""
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/cm/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 200,
+    "response": {
+      "is_compatible": true
+    }
+  }
+]

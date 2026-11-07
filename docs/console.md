@@ -284,7 +284,13 @@ to paste and how to check it.
 A topic or group page ends with the requests that touched it, live, with the same
 pause control as the tape. It shows the newest eight; **Older** pages back through the
 rest in place (the older page keeps refreshing as itself) and **Newest** returns, and
-"Traffic page" opens Traffic filtered to that topic or group. Under a topic's title one sentence says who writes it, who
+"Traffic page" opens Traffic filtered to that topic or group. The Schemas pages end with
+the registry's requests instead (time, method, path with its query, status, duration),
+read from the registry's own log: every request on the Schemas home, a subject's on its
+page (a request by id counts for each subject holding that id). The console's own reads
+are not kept there, so its polling does not push out what clients asked; what you do
+through the console (register, check, delete, set a level) is kept like any client's
+request. Under a topic's title one sentence says who writes it, who
 reads it and which schema subject describes it ("Written by checkout-api, read by
 g-order-validator, schema subject orders-value"), each name a link.
 

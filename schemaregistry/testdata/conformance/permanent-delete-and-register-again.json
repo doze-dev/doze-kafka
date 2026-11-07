@@ -1,0 +1,152 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/pd/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pd/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/pd/versions/2",
+    "status": 200,
+    "response": 2
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/pd/versions/2?permanent=true",
+    "status": 200,
+    "response": 2
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pd/versions",
+    "status": 200,
+    "response": [
+      1
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@2",
+    "status": 404,
+    "response": {
+      "error_code": 40403,
+      "message": "Schema @2 not found"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pd/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null},{\\\"name\\\":\\\"age\\\",\\\"type\\\":[\\\"null\\\",\\\"int\\\"],\\\"default\\\":null}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 3
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pd/versions",
+    "status": 200,
+    "response": [
+      1,
+      2
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pd/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 4
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pd/versions",
+    "status": 200,
+    "response": [
+      1,
+      2,
+      3
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/pd",
+    "status": 200,
+    "response": [
+      1,
+      2,
+      3
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/pd?permanent=true",
+    "status": 200,
+    "response": [
+      1,
+      2,
+      3
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pd/versions",
+    "status": 404,
+    "response": {
+      "error_code": 40401,
+      "message": "Subject 'pd' not found."
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@1",
+    "status": 404,
+    "response": {
+      "error_code": 40403,
+      "message": "Schema @1 not found"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/pd/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 5
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pd/versions",
+    "status": 200,
+    "response": [
+      1
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/pd/versions/latest",
+    "status": 200,
+    "response": {
+      "subject": "pd",
+      "version": 1,
+      "id": 5,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  }
+]

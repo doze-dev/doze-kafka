@@ -6,15 +6,18 @@ package console
 // group, newest first, with a cursor) is the traffic stage's to provide.
 //
 // Until then the dock reads what the traffic source already offers (its topic and
-// group filters), which is enough for a topic or a group. A subject has no source
-// yet: the registry's requests are not recorded, so its dock says so.
+// group filters), which is enough for a topic or a group. A subject's dock, and the
+// Schemas home's, read the registry's own request log (registryDock), since the
+// traffic recorder sees only Kafka requests.
 
 import (
+	"context"
 	"fmt"
 	"hash/fnv"
 	"html/template"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -25,7 +28,12 @@ type DockFilter struct {
 	// ACL is the Access page's dock: the requests about ACLs (DescribeAcls, CreateAcls,
 	// DeleteAcls) and every request an ACL refused.
 	ACL bool
+	// Registry is the Schemas home's dock: every request the registry kept.
+	Registry bool
 }
+
+// registry says whether the dock is about the schema registry's requests.
+func (f DockFilter) registry() bool { return f.Subject != "" || f.Registry }
 
 func (f DockFilter) empty() bool { return f == DockFilter{} }
 
@@ -44,6 +52,8 @@ func (f DockFilter) values() url.Values {
 		v.Set("subject", f.Subject)
 	case f.ACL:
 		v.Set("acl", "1")
+	case f.Registry:
+		v.Set("registry", "1")
 	}
 	return v
 }
@@ -64,6 +74,21 @@ type DockEvent struct {
 	// Kind is the inspector kind the row opens ("request"), or empty for a row that
 	// has none.
 	Kind string
+	// A registry request's method, path (with its query) and HTTP status.
+	Method, Path string
+	Status       int
+}
+
+// StatusClass is how a registry row's status is coloured: a refusal is the board's
+// deny, a failure of the registry's own is bad.
+func (e DockEvent) StatusClass() string {
+	switch {
+	case e.Status < 300:
+		return "ok"
+	case e.Status < 500:
+		return "deny"
+	}
+	return "bad"
 }
 
 // DockSource is what a dock needs: the events for one resource, newest first, at
@@ -150,14 +175,63 @@ func (r dockRow) Name() string {
 	return r.Request[:i]
 }
 
-func (c *Console) dockSource() DockSource {
-	if c.dock != nil {
+// dockSource is where a dock's rows come from: the one given (a test's), the
+// registry's log for a subject or the Schemas home, the traffic source otherwise.
+func (c *Console) dockSource(f DockFilter) DockSource {
+	switch {
+	case c.dock != nil:
 		return c.dock
-	}
-	if c.traffic != nil {
+	case f.registry():
+		if c.reg != nil {
+			return &registryDock{rc: c.reg}
+		}
+	case c.traffic != nil:
 		return trafficDock{c.traffic}
 	}
 	return nil
+}
+
+// registryDock reads the registry's request log (GET /_doze/requests). A registry
+// that keeps none (one that is not doze-kafka's) answers 404, and the dock says so.
+type registryDock struct {
+	rc  *registryClient
+	err error
+}
+
+// registryDockWait bounds the read: the dock is a page's last part, and polled.
+const registryDockWait = 2 * time.Second
+
+func (d *registryDock) DockEvents(f DockFilter, limit int, after string) ([]DockEvent, string) {
+	var before uint64
+	if after != "" {
+		n, err := strconv.ParseUint(after, 10, 64)
+		if err != nil || n == 0 {
+			return nil, "" // not a cursor of this log: nothing is after it.
+		}
+		before = n
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), registryDockWait)
+	defer cancel()
+	page, err := d.rc.Requests(ctx, f.Subject, before, limit)
+	if err != nil {
+		d.err = err
+		return nil, ""
+	}
+	out := make([]DockEvent, 0, len(page.Requests))
+	for _, q := range page.Requests {
+		who := q.User
+		if who == "" {
+			who = q.From
+		}
+		out = append(out, DockEvent{ID: strconv.FormatUint(q.Seq, 10), Time: q.At, Source: "registry", Client: who,
+			Request: q.Method + " " + q.Path, Method: q.Method, Path: q.Path, Status: q.Status,
+			Took: shortDuration(time.Duration(q.Took)), Count: 1})
+	}
+	next := ""
+	if page.Next != 0 {
+		next = strconv.FormatUint(page.Next, 10)
+	}
+	return out, next
 }
 
 // dockView is which dock is asked for: the resource, the cursor (the id of the last
@@ -193,12 +267,13 @@ func (c *Console) dockData(f DockFilter) map[string]any { return c.dockPage(dock
 // that has been paged polls the page it shows, not the newest rows.
 func (c *Console) dockPage(v dockView) map[string]any {
 	f := v.DockFilter
-	src := c.dockSource()
-	d := map[string]any{"Prefix": c.prefix, "DockFilter": f, "HasDock": src != nil, "DockToggle": v.Toggle, "DockPaged": v.After != ""}
+	src := c.dockSource(f)
+	d := map[string]any{"Prefix": c.prefix, "DockFilter": f, "HasDock": src != nil, "DockToggle": v.Toggle, "DockPaged": v.After != "",
+		"DockRegistry": f.registry(), "DockKnown": true}
 	d["DockLive"] = c.dockURL(v)
 	// The Traffic page filters by topic and by group. It has no filter for a subject,
 	// so a subject's dock does not link there as if it had.
-	if f.Subject == "" && !f.ACL {
+	if !f.registry() && !f.ACL {
 		d["DockTraffic"] = template.URL(c.prefix + "/traffic?" + f.values().Encode())
 	}
 	if src == nil {
@@ -209,6 +284,10 @@ func (c *Console) dockPage(v dockView) map[string]any {
 	h := fnv.New64a()
 	fmt.Fprint(h, v.After, "|")
 	for _, e := range events {
+		if e.Source == "registry" && e.Method == "" {
+			// A source that gives the request whole ("GET /subjects"): its two parts.
+			e.Method, e.Path, _ = strings.Cut(e.Request, " ")
+		}
 		rows = append(rows, dockRow{DockEvent: e})
 		fmt.Fprint(h, e.ID, e.Count, e.Error, ";")
 	}
@@ -220,7 +299,9 @@ func (c *Console) dockPage(v dockView) map[string]any {
 	if v.After != "" {
 		d["DockNewest"] = c.dockURL(dockView{DockFilter: f, Toggle: v.Toggle})
 	}
-	d["DockKnown"] = f.Subject == "" || c.dock != nil // a subject has no source until the registry records its requests.
+	if rd, ok := src.(*registryDock); ok && rd.err != nil {
+		d["DockKnown"] = false // the registry keeps no request log, or did not answer.
+	}
 	return d
 }
 
@@ -228,9 +309,9 @@ func (c *Console) dockPage(v dockView) map[string]any {
 // cursor on (after=, the contract's cursor: foundation A4), or 204 when nothing moved.
 func (c *Console) dockLive(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	f := DockFilter{Topic: q.Get("topic"), Group: q.Get("group"), Subject: q.Get("subject"), ACL: q.Get("acl") == "1"}
+	f := DockFilter{Topic: q.Get("topic"), Group: q.Get("group"), Subject: q.Get("subject"), ACL: q.Get("acl") == "1", Registry: q.Get("registry") == "1"}
 	if f.empty() {
-		c.fail(w, r, badInput("a dock is about one topic, group or subject"))
+		c.fail(w, r, badInput("a dock is about one topic, group or subject, or the registry"))
 		return
 	}
 	v := dockView{DockFilter: f, After: q.Get("after"), Toggle: q.Get("t") == "1"}

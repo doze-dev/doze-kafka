@@ -1,0 +1,151 @@
+[
+  {
+    "method": "GET",
+    "path": "/",
+    "auth": "none",
+    "status": 401,
+    "response": {
+      "error_code": 401,
+      "message": "Unauthorized"
+    },
+    "challenge": "basic"
+  },
+  {
+    "method": "GET",
+    "path": "/subjects",
+    "auth": "none",
+    "status": 401,
+    "response": {
+      "error_code": 401,
+      "message": "Unauthorized"
+    },
+    "challenge": "basic"
+  },
+  {
+    "method": "GET",
+    "path": "/subjects",
+    "auth": "alice:wrong",
+    "status": 401,
+    "response": {
+      "error_code": 401,
+      "message": "Unauthorized"
+    },
+    "challenge": "basic"
+  },
+  {
+    "method": "GET",
+    "path": "/subjects",
+    "auth": "mallory:alice-secret",
+    "status": 401,
+    "response": {
+      "error_code": 401,
+      "message": "Unauthorized"
+    },
+    "challenge": "basic"
+  },
+  {
+    "method": "GET",
+    "path": "/subjects",
+    "auth": ":",
+    "status": 401,
+    "response": {
+      "error_code": 401,
+      "message": "Unauthorized"
+    },
+    "challenge": "basic"
+  },
+  {
+    "method": "GET",
+    "path": "/no/such/route",
+    "auth": "none",
+    "status": 401,
+    "response": {
+      "error_code": 401,
+      "message": "Unauthorized"
+    },
+    "challenge": "basic"
+  },
+  {
+    "method": "GET",
+    "path": "/schemas/ids/@999",
+    "auth": "none",
+    "status": 401,
+    "response": {
+      "error_code": 401,
+      "message": "Unauthorized"
+    },
+    "challenge": "basic"
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ba/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "auth": "none",
+    "status": 401,
+    "response": {
+      "error_code": 401,
+      "message": "Unauthorized"
+    },
+    "challenge": "basic"
+  },
+  {
+    "method": "PUT",
+    "path": "/config",
+    "body": "{\"compatibility\":\"FULL\"}",
+    "auth": "none",
+    "status": 401,
+    "response": "",
+    "challenge": "basic"
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/ba",
+    "auth": "none",
+    "status": 401,
+    "response": "",
+    "challenge": "basic"
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ba/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects",
+    "status": 200,
+    "response": [
+      "ba"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/",
+    "status": 200,
+    "response": {}
+  },
+  {
+    "method": "GET",
+    "path": "/no/such/route",
+    "status": 404,
+    "response": {
+      "error_code": 404,
+      "message": "HTTP 404 Not Found"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/ba/versions",
+    "auth": "alice:wrong",
+    "status": 401,
+    "response": {
+      "error_code": 401,
+      "message": "Unauthorized"
+    },
+    "challenge": "basic"
+  }
+]

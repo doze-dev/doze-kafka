@@ -57,6 +57,10 @@ type ManagerOptions struct {
 	// discards them.
 	Logger *slog.Logger
 
+	// noStartSweep keeps the maintenance loop from sweeping unopened partitions as
+	// it starts, for a test that has to see one sweep act alone.
+	noStartSweep bool
+
 	// What the manager knows about a partition it is opening (cleanstop.go):
 	// vouched, that the last stop was clean and flushed it; unvalidated, that its
 	// sealed segments are not known to be whole. A partition opened without a
@@ -636,8 +640,10 @@ func (m *Manager) maintain() {
 	// Cold partitions are swept once now and then once a minute: it reads the
 	// whole data directory, which is not something to do every second. The sweeps
 	// themselves do nothing where no retention is in force.
-	if err := m.EnforceClosedRetention(); err != nil {
-		m.log.Warn("retention of unopened partitions failed", "err", err)
+	if !m.opts.noStartSweep {
+		if err := m.EnforceClosedRetention(); err != nil {
+			m.log.Warn("retention of unopened partitions failed", "err", err)
+		}
 	}
 	closedT := time.NewTicker(closedRetentionInterval)
 	defer closedT.Stop()

@@ -1,0 +1,173 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/ct1/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "contentType": "none",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ct2/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "contentType": "text/plain",
+    "status": 415,
+    "response": {
+      "error_code": 415,
+      "message": "HTTP 415 Unsupported Media Type"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ct3/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "contentType": "application/json",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ct4/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "contentType": "application/vnd.schemaregistry+json",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ct5/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "contentType": "application/vnd.schemaregistry.v1+json",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ct6/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "contentType": "application/octet-stream",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ct7/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "contentType": "application/xml",
+    "status": 415,
+    "response": {
+      "error_code": 415,
+      "message": "HTTP 415 Unsupported Media Type"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ct8/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "contentType": "application/x-www-form-urlencoded",
+    "status": 415,
+    "response": {
+      "error_code": 415,
+      "message": "HTTP 415 Unsupported Media Type"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ct9/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "contentType": "multipart/form-data; boundary=x",
+    "status": 415,
+    "response": {
+      "error_code": 415,
+      "message": "HTTP 415 Unsupported Media Type"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ct10/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "contentType": "application/json; charset=utf-8",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/ct3/versions/latest",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "contentType": "text/plain",
+    "status": 415,
+    "response": {
+      "error_code": 415,
+      "message": "HTTP 415 Unsupported Media Type"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ct3",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "contentType": "text/plain",
+    "status": 415,
+    "response": {
+      "error_code": 415,
+      "message": "HTTP 415 Unsupported Media Type"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/ct3",
+    "body": "{\"compatibility\":\"FULL\"}",
+    "contentType": "text/plain",
+    "status": 415,
+    "response": {
+      "error_code": 415,
+      "message": "HTTP 415 Unsupported Media Type"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/mode/ct3",
+    "body": "{\"mode\":\"READONLY\"}",
+    "contentType": "text/plain",
+    "status": 415,
+    "response": {
+      "error_code": 415,
+      "message": "HTTP 415 Unsupported Media Type"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/ct3",
+    "body": "{\"compatibility\":\"FULL\"}",
+    "contentType": "none",
+    "status": 200,
+    "response": {
+      "compatibility": "FULL"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects",
+    "status": 200,
+    "response": [
+      "ct1",
+      "ct10",
+      "ct3",
+      "ct4",
+      "ct5",
+      "ct6"
+    ]
+  }
+]

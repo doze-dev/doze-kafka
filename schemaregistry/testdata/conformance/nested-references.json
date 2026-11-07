@@ -1,0 +1,453 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/leaf/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"v\\\":{\\\"type\\\":\\\"string\\\"}}}\",\"schemaType\":\"JSON\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/mid/versions",
+    "body": "{\"references\":[{\"name\":\"x.json\",\"subject\":\"leaf\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"p0\\\":{\\\"$ref\\\":\\\"x.json\\\"}}}\",\"schemaType\":\"JSON\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/top/versions",
+    "body": "{\"references\":[{\"name\":\"x.json\",\"subject\":\"mid\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"p0\\\":{\\\"$ref\\\":\\\"x.json\\\"}}}\",\"schemaType\":\"JSON\"}",
+    "status": 200,
+    "response": {
+      "id": 3
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/top2/versions",
+    "body": "{\"references\":[{\"name\":\"y.json\",\"subject\":\"mid\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"p0\\\":{\\\"$ref\\\":\\\"y.json\\\"}}}\",\"schemaType\":\"JSON\"}",
+    "status": 200,
+    "response": {
+      "id": 4
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/diamond/versions",
+    "body": "{\"references\":[{\"name\":\"a.json\",\"subject\":\"mid\",\"version\":1},{\"name\":\"b.json\",\"subject\":\"top2\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"p0\\\":{\\\"$ref\\\":\\\"a.json\\\"},\\\"p1\\\":{\\\"$ref\\\":\\\"b.json\\\"}}}\",\"schemaType\":\"JSON\"}",
+    "status": 200,
+    "response": {
+      "id": 5
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/leaf/versions/1/referencedby",
+    "status": 200,
+    "response": [
+      2
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/mid/versions/1/referencedby",
+    "status": 200,
+    "response": [
+      3,
+      4,
+      5
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/top2/versions/1",
+    "status": 422,
+    "response": {
+      "error_code": 42206,
+      "message": "One or more references exist to the schema {magic=1,keytype=SCHEMA,subject=top2,version=1}."
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/mid/versions/1/referencedby",
+    "status": 200,
+    "response": [
+      3,
+      4,
+      5
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain0/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C0\\\",\\\"fields\\\":[{\\\"name\\\":\\\"v\\\",\\\"type\\\":\\\"int\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 6
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain1/versions",
+    "body": "{\"references\":[{\"name\":\"C0\",\"subject\":\"chain0\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C1\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C0\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 7
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain2/versions",
+    "body": "{\"references\":[{\"name\":\"C1\",\"subject\":\"chain1\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C2\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C1\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 8
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain3/versions",
+    "body": "{\"references\":[{\"name\":\"C2\",\"subject\":\"chain2\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C3\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C2\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 9
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain4/versions",
+    "body": "{\"references\":[{\"name\":\"C3\",\"subject\":\"chain3\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C4\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C3\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 10
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain5/versions",
+    "body": "{\"references\":[{\"name\":\"C4\",\"subject\":\"chain4\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C5\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C4\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 11
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain6/versions",
+    "body": "{\"references\":[{\"name\":\"C5\",\"subject\":\"chain5\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C6\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C5\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 12
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain7/versions",
+    "body": "{\"references\":[{\"name\":\"C6\",\"subject\":\"chain6\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C7\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C6\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 13
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain8/versions",
+    "body": "{\"references\":[{\"name\":\"C7\",\"subject\":\"chain7\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C8\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C7\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 14
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain9/versions",
+    "body": "{\"references\":[{\"name\":\"C8\",\"subject\":\"chain8\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C9\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C8\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 15
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain10/versions",
+    "body": "{\"references\":[{\"name\":\"C9\",\"subject\":\"chain9\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C10\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C9\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 16
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain11/versions",
+    "body": "{\"references\":[{\"name\":\"C10\",\"subject\":\"chain10\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C11\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C10\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 17
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain12/versions",
+    "body": "{\"references\":[{\"name\":\"C11\",\"subject\":\"chain11\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C12\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C11\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 18
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain13/versions",
+    "body": "{\"references\":[{\"name\":\"C12\",\"subject\":\"chain12\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C13\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C12\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 19
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain14/versions",
+    "body": "{\"references\":[{\"name\":\"C13\",\"subject\":\"chain13\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C14\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C13\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 20
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain15/versions",
+    "body": "{\"references\":[{\"name\":\"C14\",\"subject\":\"chain14\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C15\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C14\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 21
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain16/versions",
+    "body": "{\"references\":[{\"name\":\"C15\",\"subject\":\"chain15\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C16\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C15\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 22
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain17/versions",
+    "body": "{\"references\":[{\"name\":\"C16\",\"subject\":\"chain16\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C17\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C16\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 23
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain18/versions",
+    "body": "{\"references\":[{\"name\":\"C17\",\"subject\":\"chain17\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C18\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C17\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 24
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain19/versions",
+    "body": "{\"references\":[{\"name\":\"C18\",\"subject\":\"chain18\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C19\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C18\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 25
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain20/versions",
+    "body": "{\"references\":[{\"name\":\"C19\",\"subject\":\"chain19\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C20\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C19\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 26
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain21/versions",
+    "body": "{\"references\":[{\"name\":\"C20\",\"subject\":\"chain20\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C21\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C20\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 27
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain22/versions",
+    "body": "{\"references\":[{\"name\":\"C21\",\"subject\":\"chain21\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C22\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C21\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 28
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain23/versions",
+    "body": "{\"references\":[{\"name\":\"C22\",\"subject\":\"chain22\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C23\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C22\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 29
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain24/versions",
+    "body": "{\"references\":[{\"name\":\"C23\",\"subject\":\"chain23\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C24\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C23\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 30
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain25/versions",
+    "body": "{\"references\":[{\"name\":\"C24\",\"subject\":\"chain24\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C25\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C24\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 31
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain26/versions",
+    "body": "{\"references\":[{\"name\":\"C25\",\"subject\":\"chain25\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C26\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C25\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 32
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain27/versions",
+    "body": "{\"references\":[{\"name\":\"C26\",\"subject\":\"chain26\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C27\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C26\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 33
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain28/versions",
+    "body": "{\"references\":[{\"name\":\"C27\",\"subject\":\"chain27\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C28\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C27\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 34
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain29/versions",
+    "body": "{\"references\":[{\"name\":\"C28\",\"subject\":\"chain28\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C29\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C28\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 35
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain30/versions",
+    "body": "{\"references\":[{\"name\":\"C29\",\"subject\":\"chain29\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C30\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C29\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 36
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain31/versions",
+    "body": "{\"references\":[{\"name\":\"C30\",\"subject\":\"chain30\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C31\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C30\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 37
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain32/versions",
+    "body": "{\"references\":[{\"name\":\"C31\",\"subject\":\"chain31\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C32\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C31\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 38
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain33/versions",
+    "body": "{\"references\":[{\"name\":\"C32\",\"subject\":\"chain32\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C33\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C32\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 39
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain34/versions",
+    "body": "{\"references\":[{\"name\":\"C33\",\"subject\":\"chain33\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C34\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C33\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 40
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain35/versions",
+    "body": "{\"references\":[{\"name\":\"C34\",\"subject\":\"chain34\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C35\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C34\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 41
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain36/versions",
+    "body": "{\"references\":[{\"name\":\"C35\",\"subject\":\"chain35\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C36\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C35\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 42
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain37/versions",
+    "body": "{\"references\":[{\"name\":\"C36\",\"subject\":\"chain36\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C37\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C36\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 43
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain38/versions",
+    "body": "{\"references\":[{\"name\":\"C37\",\"subject\":\"chain37\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C38\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C37\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 44
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain39/versions",
+    "body": "{\"references\":[{\"name\":\"C38\",\"subject\":\"chain38\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C39\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C38\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 45
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/chain40/versions",
+    "body": "{\"references\":[{\"name\":\"C39\",\"subject\":\"chain39\",\"version\":1}],\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"C40\\\",\\\"fields\\\":[{\\\"name\\\":\\\"prev\\\",\\\"type\\\":\\\"C39\\\"}]}\",\"schemaType\":\"AVRO\"}",
+    "status": 200,
+    "response": {
+      "id": 46
+    }
+  }
+]

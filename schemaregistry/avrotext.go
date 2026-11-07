@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -320,6 +321,21 @@ func (w *avroWriter) reference(name string, enclosing *string) error {
 	return nil
 }
 
+// avroReserved are the attribute names Avro gives a meaning to. On an unnamed type
+// (a primitive, an array, a map) the ones that are not its own are dropped, as Avro's
+// parser drops them; any other attribute is kept as a property.
+var avroReserved = []string{"type", "doc", "fields", "items", "name", "namespace", "size", "symbols", "values", "aliases"}
+
+// hasProps tells whether n has a key outside reserved.
+func hasProps(n *node, reserved ...string) bool {
+	for _, k := range n.keys {
+		if !slices.Contains(reserved, k) {
+			return true
+		}
+	}
+	return false
+}
+
 func (w *avroWriter) object(n *node, enclosing *string) error {
 	t := n.get("type")
 	if t == nil {
@@ -332,8 +348,10 @@ func (w *avroWriter) object(n *node, enclosing *string) error {
 	switch t.str {
 	case "record", "error", "enum", "fixed", "array", "map":
 	default:
-		if len(n.keys) == 1 {
-			// {"type":"string"} is just "string".
+		if !hasProps(n, avroReserved...) {
+			// {"type":"string"} is just "string", and so is {"type":"string","doc":"d"}:
+			// an unnamed type has no doc, aliases or name, and Avro drops them
+			// (recorded: avro-attributes-on-unnamed-types).
 			return w.reference(t.str, enclosing)
 		}
 	}
@@ -408,7 +426,7 @@ func (w *avroWriter) object(n *node, enclosing *string) error {
 				return err
 			}
 		}
-		w.props(&first, n, "type", "items")
+		w.props(&first, n, avroReserved...)
 	case "map":
 		w.field(&first, "type")
 		w.str("map")
@@ -418,12 +436,12 @@ func (w *avroWriter) object(n *node, enclosing *string) error {
 				return err
 			}
 		}
-		w.props(&first, n, "type", "values")
+		w.props(&first, n, avroReserved...)
 	default:
 		// A primitive with attributes ({"type":"long","logicalType":"timestamp-millis"}).
 		w.field(&first, "type")
 		w.str(t.str)
-		w.props(&first, n, "type")
+		w.props(&first, n, avroReserved...)
 	}
 	w.b.WriteByte('}')
 	return nil

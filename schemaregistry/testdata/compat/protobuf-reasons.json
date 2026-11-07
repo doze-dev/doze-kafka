@@ -1,0 +1,2979 @@
+{
+  "type": "PROTOBUF",
+  "reasons": {
+    "add message": {
+      "FORWARD": [
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The old schema is missing a MESSAGE type at path '#/N' in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The old schema is missing a MESSAGE type at path '#/N' in the new schema\"}"
+      ]
+    },
+    "enum to string": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "map key type": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "map to repeated message": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The old schema is missing a MESSAGE type at path '#/Entry' in the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The old schema is missing a MESSAGE type at path '#/Entry' in the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "message field retyped": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_NAMED_TYPE_CHANGED\", description:\"The type of a MESSAGE field at path '#/B/1' in the new schema does not match its type in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_NAMED_TYPE_CHANGED\", description:\"The type of a MESSAGE field at path '#/B/1' in the old schema does not match its type in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_NAMED_TYPE_CHANGED\", description:\"The type of a MESSAGE field at path '#/B/1' in the old schema does not match its type in the new schema\"}",
+        "{errorType:\"FIELD_NAMED_TYPE_CHANGED\", description:\"The type of a MESSAGE field at path '#/B/1' in the new schema does not match its type in the old schema\"}"
+      ]
+    },
+    "message field to scalar": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/B/1' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/B/1' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/B/1' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/B/1' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "multiple messages one changes": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/N/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/N/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/N/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/N/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "nested message added": {
+      "FORWARD": [
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The old schema is missing a MESSAGE type at path '#/O/I' in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The old schema is missing a MESSAGE type at path '#/O/I' in the new schema\"}"
+      ]
+    },
+    "nested message moved": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_NAMED_TYPE_CHANGED\", description:\"The type of a MESSAGE field at path '#/O/1' in the new schema does not match its type in the old schema\"}",
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The new schema is missing a MESSAGE type at path '#/O/I' in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The old schema is missing a MESSAGE type at path '#/I' in the new schema\"}",
+        "{errorType:\"FIELD_NAMED_TYPE_CHANGED\", description:\"The type of a MESSAGE field at path '#/O/1' in the old schema does not match its type in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The old schema is missing a MESSAGE type at path '#/I' in the new schema\"}",
+        "{errorType:\"FIELD_NAMED_TYPE_CHANGED\", description:\"The type of a MESSAGE field at path '#/O/1' in the old schema does not match its type in the new schema\"}",
+        "{errorType:\"FIELD_NAMED_TYPE_CHANGED\", description:\"The type of a MESSAGE field at path '#/O/1' in the new schema does not match its type in the old schema\"}",
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The new schema is missing a MESSAGE type at path '#/O/I' in the old schema\"}"
+      ]
+    },
+    "nested message removed": {
+      "BACKWARD": [
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The new schema is missing a MESSAGE type at path '#/O/I' in the old schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The new schema is missing a MESSAGE type at path '#/O/I' in the old schema\"}"
+      ]
+    },
+    "oneof add member": {
+      "FORWARD": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The old schema is missing a oneof field at path '#/M/o/2' in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The old schema is missing a oneof field at path '#/M/o/2' in the new schema\"}"
+      ]
+    },
+    "oneof member moved between oneofs": {
+      "FORWARD": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The old schema is missing a oneof field at path '#/M/o/2' in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The old schema is missing a oneof field at path '#/M/o/2' in the new schema\"}"
+      ]
+    },
+    "oneof remove member": {
+      "BACKWARD": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The new schema is missing a oneof field at path '#/M/o/2' in the old schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The new schema is missing a oneof field at path '#/M/o/2' in the old schema\"}"
+      ]
+    },
+    "package added": {
+      "BACKWARD": [
+        "{errorType:\"PACKAGE_CHANGED\", description:\"The package at '#/' in the new schema does not match the package in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"PACKAGE_CHANGED\", description:\"The package at '#/' in the old schema does not match the package in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"PACKAGE_CHANGED\", description:\"The package at '#/' in the old schema does not match the package in the new schema\"}",
+        "{errorType:\"PACKAGE_CHANGED\", description:\"The package at '#/' in the new schema does not match the package in the old schema\"}"
+      ]
+    },
+    "package changed": {
+      "BACKWARD": [
+        "{errorType:\"PACKAGE_CHANGED\", description:\"The package at '#/' in the new schema does not match the package in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"PACKAGE_CHANGED\", description:\"The package at '#/' in the old schema does not match the package in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"PACKAGE_CHANGED\", description:\"The package at '#/' in the old schema does not match the package in the new schema\"}",
+        "{errorType:\"PACKAGE_CHANGED\", description:\"The package at '#/' in the new schema does not match the package in the old schema\"}"
+      ]
+    },
+    "package removed": {
+      "BACKWARD": [
+        "{errorType:\"PACKAGE_CHANGED\", description:\"The package at '#/' in the new schema does not match the package in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"PACKAGE_CHANGED\", description:\"The package at '#/' in the old schema does not match the package in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"PACKAGE_CHANGED\", description:\"The package at '#/' in the old schema does not match the package in the new schema\"}",
+        "{errorType:\"PACKAGE_CHANGED\", description:\"The package at '#/' in the new schema does not match the package in the old schema\"}"
+      ]
+    },
+    "proto2 add required": {
+      "BACKWARD": [
+        "{errorType:\"REQUIRED_FIELD_ADDED\", description:\"A required field  at path '#/M/2' in the new schema is missing in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"REQUIRED_FIELD_REMOVED\", description:\"The old schema is missing a required field at path: '#/M/2' in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"REQUIRED_FIELD_REMOVED\", description:\"The old schema is missing a required field at path: '#/M/2' in the new schema\"}",
+        "{errorType:\"REQUIRED_FIELD_ADDED\", description:\"A required field  at path '#/M/2' in the new schema is missing in the old schema\"}"
+      ]
+    },
+    "proto2 optional to repeated": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_NUMERIC_LABEL_CHANGED\", description:\"The label for a NUMERIC field at path '#/M/1' in the new schema does not match its label in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_NUMERIC_LABEL_CHANGED\", description:\"The label for a NUMERIC field at path '#/M/1' in the old schema does not match its label in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_NUMERIC_LABEL_CHANGED\", description:\"The label for a NUMERIC field at path '#/M/1' in the old schema does not match its label in the new schema\"}",
+        "{errorType:\"FIELD_NUMERIC_LABEL_CHANGED\", description:\"The label for a NUMERIC field at path '#/M/1' in the new schema does not match its label in the old schema\"}"
+      ]
+    },
+    "proto2 optional to required": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_NUMERIC_LABEL_CHANGED\", description:\"The label for a NUMERIC field at path '#/M/1' in the new schema does not match its label in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_NUMERIC_LABEL_CHANGED\", description:\"The label for a NUMERIC field at path '#/M/1' in the old schema does not match its label in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_NUMERIC_LABEL_CHANGED\", description:\"The label for a NUMERIC field at path '#/M/1' in the old schema does not match its label in the new schema\"}",
+        "{errorType:\"FIELD_NUMERIC_LABEL_CHANGED\", description:\"The label for a NUMERIC field at path '#/M/1' in the new schema does not match its label in the old schema\"}"
+      ]
+    },
+    "proto2 remove required": {
+      "BACKWARD": [
+        "{errorType:\"REQUIRED_FIELD_REMOVED\", description:\"The new schema is missing a required field at path: '#/M/2' in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"REQUIRED_FIELD_ADDED\", description:\"A required field  at path '#/M/2' in the old schema is missing in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"REQUIRED_FIELD_ADDED\", description:\"A required field  at path '#/M/2' in the old schema is missing in the new schema\"}",
+        "{errorType:\"REQUIRED_FIELD_REMOVED\", description:\"The new schema is missing a required field at path: '#/M/2' in the old schema\"}"
+      ]
+    },
+    "proto2 required to optional": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_NUMERIC_LABEL_CHANGED\", description:\"The label for a NUMERIC field at path '#/M/1' in the new schema does not match its label in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_NUMERIC_LABEL_CHANGED\", description:\"The label for a NUMERIC field at path '#/M/1' in the old schema does not match its label in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_NUMERIC_LABEL_CHANGED\", description:\"The label for a NUMERIC field at path '#/M/1' in the old schema does not match its label in the new schema\"}",
+        "{errorType:\"FIELD_NUMERIC_LABEL_CHANGED\", description:\"The label for a NUMERIC field at path '#/M/1' in the new schema does not match its label in the old schema\"}"
+      ]
+    },
+    "random 002": {
+      "BACKWARD": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The new schema is missing a oneof field at path '#/M/o/1' in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The old schema is missing a oneof field at path '#/M/o/21' in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The old schema is missing a oneof field at path '#/M/o/21' in the new schema\"}",
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The new schema is missing a oneof field at path '#/M/o/1' in the old schema\"}"
+      ]
+    },
+    "random 003": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "random 016": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "random 018": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/5' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/5' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/5' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/5' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "random 022": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "random 035": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 045": {
+      "BACKWARD": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The new schema is missing a oneof field at path '#/M/o/3' in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The old schema is missing a oneof field at path '#/M/o/4' in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The old schema is missing a oneof field at path '#/M/o/4' in the new schema\"}",
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The new schema is missing a oneof field at path '#/M/o/3' in the old schema\"}"
+      ]
+    },
+    "random 052": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/5' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/5' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/5' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/5' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 064": {
+      "BACKWARD": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The new schema is missing a oneof field at path '#/M/o/2' in the old schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The new schema is missing a oneof field at path '#/M/o/2' in the old schema\"}"
+      ]
+    },
+    "random 065": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/2' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/2' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/2' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/2' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "random 080": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 093": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/3' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/3' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/3' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/3' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 101": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 127": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/5' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/5' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/5' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/5' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "random 142": {
+      "BACKWARD": [
+        "{errorType:\"MULTIPLE_FIELDS_MOVED_TO_ONEOF\", description:\"Multiple fields in the oneof at path '#/M/o' in the new schema are outside a oneof in the old schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"MULTIPLE_FIELDS_MOVED_TO_ONEOF\", description:\"Multiple fields in the oneof at path '#/M/o' in the new schema are outside a oneof in the old schema\"}"
+      ]
+    },
+    "random 144": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 145": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/5' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/5' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/5' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/5' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "random 154": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 157": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/4' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/4' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/4' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/4' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 159": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 161": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_MOVED_TO_EXISTING_ONEOF\", description:\"A field in the oneof at path '#/M/o' in the new schema is outside an existing oneof in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The old schema is missing a oneof field at path '#/M/o/1' in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The old schema is missing a oneof field at path '#/M/o/1' in the new schema\"}",
+        "{errorType:\"FIELD_MOVED_TO_EXISTING_ONEOF\", description:\"A field in the oneof at path '#/M/o' in the new schema is outside an existing oneof in the old schema\"}"
+      ]
+    },
+    "random 164": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 169": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/2' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/2' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/2' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/2' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "random 174": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_NUMERIC_LABEL_CHANGED\", description:\"The label for a NUMERIC field at path '#/M/2' in the new schema does not match its label in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_NUMERIC_LABEL_CHANGED\", description:\"The label for a NUMERIC field at path '#/M/2' in the old schema does not match its label in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_NUMERIC_LABEL_CHANGED\", description:\"The label for a NUMERIC field at path '#/M/2' in the old schema does not match its label in the new schema\"}",
+        "{errorType:\"FIELD_NUMERIC_LABEL_CHANGED\", description:\"The label for a NUMERIC field at path '#/M/2' in the new schema does not match its label in the old schema\"}"
+      ]
+    },
+    "random 188": {
+      "BACKWARD": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The new schema is missing a oneof field at path '#/M/o/3' in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The old schema is missing a oneof field at path '#/M/o/25' in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The old schema is missing a oneof field at path '#/M/o/25' in the new schema\"}",
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The new schema is missing a oneof field at path '#/M/o/3' in the old schema\"}"
+      ]
+    },
+    "random 204": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 208": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 226": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 228": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 234": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 247": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 260": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "random 263": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 264": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/5' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/5' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/5' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/5' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 270": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 275": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/5' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/5' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/5' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/5' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 282": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/2' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "random 283": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/o/5' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/o/5' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/o/5' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/o/5' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "random 289": {
+      "BACKWARD": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The new schema is missing a oneof field at path '#/M/o/2' in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The old schema is missing a oneof field at path '#/M/o/23' in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The old schema is missing a oneof field at path '#/M/o/23' in the new schema\"}",
+        "{errorType:\"ONEOF_FIELD_REMOVED\", description:\"The new schema is missing a oneof field at path '#/M/o/2' in the old schema\"}"
+      ]
+    },
+    "remove and reuse number": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/2' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/2' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/2' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/2' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "remove message": {
+      "BACKWARD": [
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The new schema is missing a MESSAGE type at path '#/N' in the old schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The new schema is missing a MESSAGE type at path '#/N' in the old schema\"}"
+      ]
+    },
+    "rename message": {
+      "BACKWARD": [
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The new schema is missing a MESSAGE type at path '#/M' in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The old schema is missing a MESSAGE type at path '#/Other' in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The old schema is missing a MESSAGE type at path '#/Other' in the new schema\"}",
+        "{errorType:\"MESSAGE_REMOVED\", description:\"The new schema is missing a MESSAGE type at path '#/M' in the old schema\"}"
+      ]
+    },
+    "scalar bool to bytes": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bool to double": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bool to fixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bool to fixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bool to float": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bool to sfixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bool to sfixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bool to sint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bool to sint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bool to string": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bytes to bool": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bytes to double": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bytes to fixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bytes to fixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bytes to float": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bytes to int32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bytes to int64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bytes to sfixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bytes to sfixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bytes to sint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bytes to sint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bytes to uint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar bytes to uint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar double to bool": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar double to bytes": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar double to fixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar double to fixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar double to float": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar double to int32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar double to int64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar double to sfixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar double to sfixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar double to sint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar double to sint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar double to string": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar double to uint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar double to uint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed32 to bool": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed32 to bytes": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed32 to double": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed32 to fixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed32 to float": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed32 to int32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed32 to int64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed32 to sfixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed32 to sint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed32 to sint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed32 to string": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed32 to uint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed32 to uint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed64 to bool": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed64 to bytes": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed64 to double": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed64 to fixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed64 to float": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed64 to int32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed64 to int64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed64 to sfixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed64 to sint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed64 to sint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed64 to string": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed64 to uint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar fixed64 to uint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar float to bool": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar float to bytes": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar float to double": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar float to fixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar float to fixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar float to int32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar float to int64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar float to sfixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar float to sfixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar float to sint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar float to sint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar float to string": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar float to uint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar float to uint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int32 to bytes": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int32 to double": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int32 to fixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int32 to fixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int32 to float": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int32 to sfixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int32 to sfixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int32 to sint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int32 to sint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int32 to string": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int64 to bytes": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int64 to double": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int64 to fixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int64 to fixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int64 to float": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int64 to sfixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int64 to sfixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int64 to sint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int64 to sint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar int64 to string": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed32 to bool": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed32 to bytes": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed32 to double": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed32 to fixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed32 to float": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed32 to int32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed32 to int64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed32 to sfixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed32 to sint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed32 to sint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed32 to string": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed32 to uint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed32 to uint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed64 to bool": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed64 to bytes": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed64 to double": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed64 to fixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed64 to float": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed64 to int32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed64 to int64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed64 to sfixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed64 to sint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed64 to sint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed64 to string": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed64 to uint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sfixed64 to uint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint32 to bool": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint32 to bytes": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint32 to double": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint32 to fixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint32 to fixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint32 to float": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint32 to int32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint32 to int64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint32 to sfixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint32 to sfixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint32 to string": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint32 to uint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint32 to uint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint64 to bool": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint64 to bytes": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint64 to double": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint64 to fixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint64 to fixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint64 to float": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint64 to int32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint64 to int64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint64 to sfixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint64 to sfixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint64 to string": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint64 to uint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar sint64 to uint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar string to bool": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar string to double": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar string to fixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar string to fixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar string to float": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar string to int32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar string to int64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar string to sfixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar string to sfixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar string to sint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar string to sint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar string to uint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar string to uint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar to message field": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/B/1' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/B/1' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/B/1' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/B/1' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "scalar uint32 to bytes": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint32 to double": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint32 to fixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint32 to fixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint32 to float": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint32 to sfixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint32 to sfixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint32 to sint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint32 to sint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint32 to string": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint64 to bytes": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint64 to double": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint64 to fixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint64 to fixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint64 to float": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint64 to sfixed32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint64 to sfixed64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint64 to sint32": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint64 to sint64": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "scalar uint64 to string": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "swap field numbers": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/2' in the new schema does not match its kind in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/2' in the old schema does not match its kind in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/2' in the old schema does not match its kind in the new schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/1' in the new schema does not match its kind in the old schema\"}",
+        "{errorType:\"FIELD_SCALAR_KIND_CHANGED\", description:\"The kind of a SCALAR field at path '#/M/2' in the new schema does not match its kind in the old schema\"}"
+      ]
+    },
+    "well-known field retyped": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_NAMED_TYPE_CHANGED\", description:\"The type of a MESSAGE field at path '#/M/1' in the new schema does not match its type in the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_NAMED_TYPE_CHANGED\", description:\"The type of a MESSAGE field at path '#/M/1' in the old schema does not match its type in the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_NAMED_TYPE_CHANGED\", description:\"The type of a MESSAGE field at path '#/M/1' in the old schema does not match its type in the new schema\"}",
+        "{errorType:\"FIELD_NAMED_TYPE_CHANGED\", description:\"The type of a MESSAGE field at path '#/M/1' in the new schema does not match its type in the old schema\"}"
+      ]
+    },
+    "well-known to scalar": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ]
+    },
+    "wrapper to scalar": {
+      "BACKWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ],
+      "FORWARD": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}"
+      ],
+      "FULL": [
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the old schema does not match the new schema\"}",
+        "{errorType:\"FIELD_KIND_CHANGED\", description:\"The type of a field at path '#/M/1' in the new schema does not match the old schema\"}"
+      ]
+    }
+  }
+}

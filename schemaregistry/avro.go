@@ -67,15 +67,6 @@ func parseAvro(text string, refs []resolvedRef) (parsedSchema, error) {
 	return &avroSchema{text: canon, norm: norm, schema: s}, nil
 }
 
-// avroCanRead reports why a reader using `reader` cannot read data written with
-// `writer`, or nil when it can.
-func avroCanRead(reader, writer *avroSchema) []string {
-	if err := avro.NewSchemaCompatibility().Compatible(reader.schema, writer.schema); err != nil {
-		return []string{err.Error()}
-	}
-	return nil
-}
-
 // relaxDefaults rewrites a schema so every field default is one its type accepts,
 // keeping which fields have a default.
 func relaxDefaults(text string) (string, error) {

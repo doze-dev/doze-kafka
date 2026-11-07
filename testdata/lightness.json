@@ -4,19 +4,19 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 28415122,
+      "binaryBytes": 28567442,
       "idleHeapBytes": 1368256,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
-      "recorded": "2026-11-02",
+      "recorded": "2026-11-07",
       "where": "macOS 27, Apple M-series, native"
     },
     "linux/arm64": {
-      "binaryBytes": 27590816,
-      "idleHeapBytes": 1374400,
+      "binaryBytes": 27721888,
+      "idleHeapBytes": 1383880,
       "idleHeapNoiseBytes": 7160,
       "go": "go1.27.3",
-      "recorded": "2026-11-02",
+      "recorded": "2026-11-07",
       "where": "golang:1.27 container, linux/arm64, native on Apple M-series (Docker VM); idleHeapBytes from GitHub's linux/arm64 runner (CI run 41501006646)"
     }
   },
@@ -159,6 +159,83 @@
       "from": 1365104,
       "to": 1374400,
       "reason": "GitHub's linux/arm64 runner measures 1,374,400 (PR 3, CI run 41501006646, job Lightness budget (linux/arm64)), 9,296 above the 1,365,104 recorded in a local golang container on Apple silicon (the gate runs on the runner, so its figure is the budget); the new console code and the environment both contribute and how much each was not separated"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28481970,
+      "reason": "Stage 5 schema registry (schemas-stage5): Avro compatibility ported from Avro's own reader/writer rules (avrocompat.go), Confluent's sentences for JSON Schema and Protobuf reasons, the request log and sign-in throttle, body and nesting limits, Protobuf descriptor imports compiled from references, and stored schemas indexed under the current canonical form: 66,848 bytes (0.24%) over main 894c8b5 on darwin/arm64; which part grew by how much was not measured"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27590816,
+      "to": 27656352,
+      "reason": "Stage 5 schema registry (schemas-stage5), the same code as the darwin/arm64 raise of this date: 65,536 bytes, one page of the linux/arm64 binary (built in golang:1.27.3 on linux/arm64, and measured the same by CI run 42275898340, job Lightness budget (linux/arm64), on the first commit that crossed it)"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28481970,
+      "to": 28533266,
+      "reason": "Stage 5 schema registry, row 6 (85dd728): the /_doze/ extension routes (overview, version metadata, request ring, check at a level), the structured CompatReason beside Confluent's text, and the package-level sentence tables for JSON Schema and Protobuf reasons: binary 51,296 bytes over the 2026-11-07 record; idle heap median 1,372,960 over 20 starts against 1,371,224 earlier the same day (+1,736, the tables built at package load; the request ring is empty at idle)"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28533266,
+      "to": 28533474,
+      "reason": "Console registry client (218aa6e): the registry-down backoff, oldest-first codec eviction and the once-each reference walk: 208 bytes"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28550354,
+      "reason": "Stage 5 schema registry (schemas-stage5, 135,232 bytes or 0.48% over main 894c8b5): the resolved view with the Avro inliner (16,880); Avro compatibility ported from Avro's own reader/writer rules (avrocompat.go), Confluent's sentences for JSON Schema and Protobuf reasons, the request log and sign-in throttle, body and nesting limits, Protobuf descriptor imports compiled from references, stored schemas indexed under the current canonical form (66,848 together); the /_doze/ extension routes, overview, version metadata, request ring and check at a level with CompatReason (51,296); the console registry client's backoff and once-each reference walk (208); measured at each step on darwin/arm64 natively"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28533474,
+      "to": 28550354,
+      "reason": "The schema registry's resolved view, with the Avro inliner (avroinline.go, the Resolved route): 16,880 bytes"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27656352,
+      "to": 27721888,
+      "reason": "The schema registry's resolved view, with the Avro inliner: one more 64 KiB page of the linux/arm64 binary (built in golang:1.27.3 on linux/arm64)"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27590816,
+      "to": 27721888,
+      "reason": "Stage 5 schema registry (schemas-stage5) over main 894c8b5, two 64 KiB pages of the linux/arm64 binary: the same code as the darwin/arm64 raise from 28,415,122 to 28,550,354 of this date (one entry for the step the pull request's merge commit makes)"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "linux/arm64 idleHeapBytes",
+      "from": 1374400,
+      "to": 1383880,
+      "reason": "Stage 5 schema registry (schemas-stage5): GitHub's linux/arm64 runner measured a median of 1,370,872 to 1,373,640 over five starts up to commit 8669fb1, and 1,376,992 to 1,380,328 from 21f219d on (CI runs for f73f379, 21f219d, 250473c, 1b81377), after the /_doze/ extension routes and the JSON Schema and Protobuf sentence tables, which are built at package load (the request ring is empty at idle); the budget is the largest single start the runner measured, 1,383,880 (250473c), as the 2026-11-03 raise took the runner's figure"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28550354,
+      "to": 28567442,
+      "reason": "Schemas Sc-01 and the registry's wire dock: the empty registry's page and its producer lines, the dock's registry source over /_doze/requests and its rows: 17,088 bytes (linux/arm64 unchanged at 27,721,888, built in golang:1.27.3 on linux/arm64)"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28567442,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the 2026-11-07 raise from 28,415,122 to 28,550,354 and Sc-01 with the registry's wire dock (17,088)"
     }
   ]
 }

@@ -298,8 +298,35 @@ func (c *Console) runTrace(j *traceJob) {
 // scanRanges reads the ranges with an ordinary consumer and keeps the records that
 // carry the job's trace id.
 func (c *Console) scanRanges(ctx context.Context, j *traceJob, ranges []partRange) (hits []traceHit, timedOut bool, unread []string, err error) {
+	timedOut, unread, err = c.readRanges(ctx, ranges, traceMaxTime, func(r *kgo.Record) bool {
+		j.scanned.Add(1)
+		hdrs := make([]MessageHeader, len(r.Headers))
+		for i, h := range r.Headers {
+			hdrs[i] = MessageHeader{Key: h.Key, Value: h.Value}
+		}
+		if ref, ok := carries(hdrs, c.traceHeader, j.trace); ok {
+			k := tpKey{r.Topic, r.Partition}
+			hits = append(hits, traceHit{
+				Topic: r.Topic, Partition: r.Partition, Offset: r.Offset, Time: r.Timestamp, Key: previewKey(r.Key), Ref: ref,
+				Anchor: j.anchor.Set && j.anchor.tpKey == k && j.anchor.Offset == r.Offset,
+			})
+		}
+		return true
+	}, func() {
+		j.mu.Lock()
+		j.partsDone++
+		j.mu.Unlock()
+	})
+	return hits, timedOut, unread, err
+}
+
+// readRanges is the console's one bounded reader (Trace and the schema scan): it
+// reads the ranges with an ordinary consumer, gives each record in them to each, stops
+// at maxTime or when each returns false, and says what it left unread when time ran
+// out. done, if set, is told each time a partition's range has been read to its end.
+func (c *Console) readRanges(ctx context.Context, ranges []partRange, maxTime time.Duration, each func(*kgo.Record) bool, done func()) (timedOut bool, unread []string, err error) {
 	if len(ranges) == 0 {
-		return nil, false, nil, nil
+		return false, nil, nil
 	}
 	want := map[tpKey]partRange{}
 	assign := map[string]map[int32]kgo.Offset{}
@@ -312,18 +339,19 @@ func (c *Console) scanRanges(ctx context.Context, j *traceJob, ranges []partRang
 	}
 	cl, err := c.be.newReader(assign)
 	if err != nil {
-		return nil, false, nil, err
+		return false, nil, err
 	}
 	defer cl.Close()
 
-	sctx, cancel := context.WithTimeout(ctx, traceMaxTime)
+	sctx, cancel := context.WithTimeout(ctx, maxTime)
 	defer cancel()
 	reached := map[tpKey]int64{} // the next offset not yet seen, per partition.
 	for k, r := range want {
 		reached[k] = r.From
 	}
 	remaining := len(want)
-	for remaining > 0 {
+	stopped := false
+	for remaining > 0 && !stopped {
 		// An empty poll within the second means the log has a gap where records were
 		// planned (compaction, retention since the plan): stop waiting for them.
 		pctx, pcancel := context.WithTimeout(sctx, 1500*time.Millisecond)
@@ -336,27 +364,20 @@ func (c *Console) scanRanges(ctx context.Context, j *traceJob, ranges []partRang
 		fs.EachRecord(func(r *kgo.Record) {
 			k := tpKey{r.Topic, r.Partition}
 			rg, ok := want[k]
-			if !ok || reached[k] >= rg.To || r.Offset >= rg.To {
+			if stopped || !ok || reached[k] >= rg.To || r.Offset >= rg.To {
 				return
 			}
 			got++
-			j.scanned.Add(1)
 			reached[k] = r.Offset + 1
-			hdrs := make([]MessageHeader, len(r.Headers))
-			for i, h := range r.Headers {
-				hdrs[i] = MessageHeader{Key: h.Key, Value: h.Value}
-			}
-			if ref, ok := carries(hdrs, c.traceHeader, j.trace); ok {
-				hits = append(hits, traceHit{
-					Topic: r.Topic, Partition: r.Partition, Offset: r.Offset, Time: r.Timestamp, Key: previewKey(r.Key), Ref: ref,
-					Anchor: j.anchor.Set && j.anchor.tpKey == k && j.anchor.Offset == r.Offset,
-				})
+			if !each(r) {
+				stopped = true
+				return
 			}
 			if reached[k] >= rg.To {
 				remaining--
-				j.mu.Lock()
-				j.partsDone++
-				j.mu.Unlock()
+				if done != nil {
+					done()
+				}
 				cl.PauseFetchPartitions(map[string][]int32{r.Topic: {r.Partition}})
 			}
 		})
@@ -374,7 +395,7 @@ func (c *Console) scanRanges(ctx context.Context, j *traceJob, ranges []partRang
 		}
 	}
 	sort.Strings(unread)
-	return hits, timedOut, unread, nil
+	return timedOut, unread, nil
 }
 
 // previewKey is a record's key as short text for a row, or "" for none.

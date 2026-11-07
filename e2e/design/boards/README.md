@@ -27,6 +27,8 @@ Topic-page boards Tp-19 to Tp-22 (message, compose, partitions, config and the e
 
 Topic-page boards Tp-15 to Tp-18 (message, compose, partitions, config and the empty states) were read at 1792149264-d921 only, copied unchanged.
 
+Schemas boards Sc-01 to Sc-04 (none, register, register checked, register refused) were read at 1794025743-7ea7 and copied unchanged, each verified by its sha256 from the artifact's file list. At that version Sc-Home, `con.css` and `canvas.json` are byte-identical to the copies here, as are the eight others checked (Main, Sy-01, Tp-Home, Tp-05, Gr-Home, Gr-01, Gr-15, Traf-12).
+
 Topic-page boards Tp-07 to Tp-13 (message, compose, partitions, config and the empty states) were read at 1792149264-d921 only, copied unchanged.
   the artifact version they were read at was not recorded.
   The Groups boards Gr-04 to Gr-18 were read at 1792149264-d921, each verified by its

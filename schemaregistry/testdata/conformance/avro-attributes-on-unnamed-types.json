@@ -1,0 +1,142 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/un1/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"string\\\",\\\"doc\\\":\\\"d\\\"}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/un1/versions/latest",
+    "status": 200,
+    "response": {
+      "subject": "un1",
+      "version": 1,
+      "id": 1,
+      "schema": "\"string\""
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/un2/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"string\\\",\\\"foo\\\":\\\"bar\\\"}\"}",
+    "status": 200,
+    "response": {
+      "id": 2
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/un2/versions/latest",
+    "status": 200,
+    "response": {
+      "subject": "un2",
+      "version": 1,
+      "id": 2,
+      "schema": "{\"type\":\"string\",\"foo\":\"bar\"}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/un3/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"array\\\",\\\"items\\\":\\\"int\\\",\\\"doc\\\":\\\"d\\\"}\"}",
+    "status": 200,
+    "response": {
+      "id": 3
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/un3/versions/latest",
+    "status": 200,
+    "response": {
+      "subject": "un3",
+      "version": 1,
+      "id": 3,
+      "schema": "{\"type\":\"array\",\"items\":\"int\"}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/un4/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"map\\\",\\\"values\\\":\\\"int\\\",\\\"doc\\\":\\\"d\\\",\\\"foo\\\":1}\"}",
+    "status": 200,
+    "response": {
+      "id": 4
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/un4/versions/latest",
+    "status": 200,
+    "response": {
+      "subject": "un4",
+      "version": 1,
+      "id": 4,
+      "schema": "{\"type\":\"map\",\"values\":\"int\",\"foo\":1}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/un5/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"string\\\",\\\"logicalType\\\":\\\"uuid\\\",\\\"doc\\\":\\\"d\\\"}\"}",
+    "status": 200,
+    "response": {
+      "id": 5
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/un5/versions/latest",
+    "status": 200,
+    "response": {
+      "subject": "un5",
+      "version": 1,
+      "id": 5,
+      "schema": "{\"type\":\"string\",\"logicalType\":\"uuid\"}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/un6/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"long\\\",\\\"doc\\\":\\\"d\\\",\\\"aliases\\\":[\\\"x\\\"],\\\"name\\\":\\\"n\\\",\\\"default\\\":1}\"}",
+    "status": 200,
+    "response": {
+      "id": 6
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/un6/versions/latest",
+    "status": 200,
+    "response": {
+      "subject": "un6",
+      "version": 1,
+      "id": 6,
+      "schema": "{\"type\":\"long\",\"default\":1}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/un7/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"R\\\",\\\"fields\\\":[{\\\"name\\\":\\\"f\\\",\\\"type\\\":{\\\"type\\\":\\\"int\\\",\\\"doc\\\":\\\"inner\\\"}}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 7
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/un7/versions/latest",
+    "status": 200,
+    "response": {
+      "subject": "un7",
+      "version": 1,
+      "id": 7,
+      "schema": "{\"type\":\"record\",\"name\":\"R\",\"fields\":[{\"name\":\"f\",\"type\":\"int\"}]}"
+    }
+  }
+]
