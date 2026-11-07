@@ -179,6 +179,11 @@ func TestCompare(t *testing.T) {
 		{"one byte of binary over", m(28_000_001, 10, 1_400_000), "OVER     linux/amd64 binaryBytes: 28000001 > budget 28000000 (1 over)"},
 		{"the heap inside what was measured as variation", m(28_000_000, 10, 1_370_000, 1_406_000), ""},
 		{"the heap just past it", m(28_000_000, 10, 1_370_000, 1_406_001), "OVER     linux/amd64 idleHeapBytes"},
+		// The median of the starts is the heap: one start far above the others
+		// is a noisy start, not a heavier broker (CI's linux/arm64 runner did
+		// this with nothing grown).
+		{"one start far over, the median steady", m(28_000_000, 10, 1_390_000, 1_395_000, 1_398_000, 1_399_000, 1_500_000), ""},
+		{"the median over", m(28_000_000, 10, 1_390_000, 1_407_000, 1_407_000, 1_407_000, 1_408_000), "OVER     linux/amd64 idleHeapBytes"},
 		{"64 KiB more heap", m(28_000_000, 10, 1_465_536), "OVER     linux/amd64 idleHeapBytes"},
 		{"one module more", m(28_000_000, 11, 1_400_000), "OVER     modules: 11 > budget 10"},
 		{"lighter everywhere", m(27_000_000, 9, 1_300_000), ""},
@@ -209,13 +214,13 @@ func TestRecordOnlyGoesDownWithoutAReason(t *testing.T) {
 		t.Fatalf("lighter needs no reason: %v", refused)
 	}
 	p := b.Platforms["linux/amd64"]
-	if p.BinaryBytes != 27_000_000 || p.IdleHeapBytes != 1_301_000 || p.IdleHeapNoiseBytes != 1_000 || b.Modules != 9 || len(b.Raises) != 0 {
+	if p.BinaryBytes != 27_000_000 || p.IdleHeapBytes != 1_300_000 || p.IdleHeapNoiseBytes != 1_000 || b.Modules != 9 || len(b.Raises) != 0 {
 		t.Errorf("recorded %+v, modules %d, raises %v", p, b.Modules, b.Raises)
 	}
 	// The same heap as far as it can be measured does not move the budget.
-	same := &Measured{Platform: "linux/amd64", Go: "go1.27.2", BinaryBytes: 27_000_000, Modules: 9, Heaps: []int64{1_300_500, 1_301_900}}
+	same := &Measured{Platform: "linux/amd64", Go: "go1.27.2", BinaryBytes: 27_000_000, Modules: 9, Heaps: []int64{1_300_200, 1_300_600, 1_301_500}}
 	Record(b, same, "ci", "", "2026-10-12")
-	if got := b.Platforms["linux/amd64"].IdleHeapBytes; got != 1_301_000 {
+	if got := b.Platforms["linux/amd64"].IdleHeapBytes; got != 1_300_000 {
 		t.Errorf("a re-record inside the variation walked the budget to %d", got)
 	}
 	heavier := &Measured{Platform: "linux/amd64", Go: "go1.27.2", BinaryBytes: 27_000_100, Modules: 10, Heaps: []int64{1_400_000}}
