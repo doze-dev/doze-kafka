@@ -70,9 +70,23 @@ func (Driver) Plan(_ context.Context, inst engine.Instance, tc engine.Toolchain)
 		version = "4"
 	}
 	advertise := inst.Endpoint.TCPAddr // client-facing host:port, populated by core
+	if a, ok := inst.Grant.Addr(engine.MainListener); ok {
+		advertise = a
+	}
 
 	args := []string{"__serve", "--socket", socket, "--datadir", inst.DataDir, "--version", version}
-	if advertise != "" {
+	if c, ok := inst.Grant.Backend("console"); ok {
+		// doze holds the console's and the registry's ports and forwards each
+		// to a socket here (engine.Networked), so opening either wakes the broker.
+		args = append(args, "--advertise", advertise, "--console-socket", c)
+		if r, ok := inst.Grant.Backend("registry"); ok {
+			args = append(args, "--registry-socket", r)
+			if u := inst.Grant.Listeners["registry"].URL; u != "" {
+				args = append(args, "--registry-url", u)
+			}
+		}
+	} else if advertise != "" {
+		// An older doze gives no grant: the console binds its own port, one up.
 		args = append(args, "--advertise", advertise)
 		// The web console rides the same per-instance IP one port up (the
 		// broker's own port speaks the Kafka wire protocol, which can't share
@@ -112,9 +126,31 @@ func (Driver) BackendSocket(socketDir string, _ int) string { return socketPath(
 
 func socketPath(socketDir string) string { return filepath.Join(socketDir, socketName) }
 
+// Network implements engine.Networked: the broker on the declared port, the
+// web console on the instance's name (http://events.<stack>.doze), and the
+// schema registry on its child (http://registry.events.<stack>.doze), Confluent's
+// port. Kafka's wire protocol carries no host, so the broker is reached at its
+// port; the two HTTP listeners also without one.
+func (Driver) Network(engine.Instance) engine.Network {
+	return engine.Network{Listeners: []engine.Listener{
+		{Name: engine.MainListener, Protocol: engine.ProtocolTCP},
+		{Name: "console", Port: consolePort, Protocol: engine.ProtocolHTTP, Routes: []string{engine.RouteSelf}},
+		{Name: "registry", Port: registryPort, Protocol: engine.ProtocolHTTP, Routes: []string{"registry"}},
+	}}
+}
+
+// The console's and the schema registry's ports on the instance's address.
+const (
+	consolePort  = 9093
+	registryPort = 8081 // Confluent's own
+)
+
 // ConnString implements engine.Driver: KAFKA_BROKERS is a bare host:port with
-// no scheme (the endpoints layer rewrites it to the instance's domain:port).
-func (Driver) ConnString(_ engine.Instance, ep engine.Endpoint) (string, string) {
+// no scheme: the broker's granted address, or the endpoint an older doze gives.
+func (Driver) ConnString(inst engine.Instance, ep engine.Endpoint) (string, string) {
+	if a, ok := inst.Grant.Addr(engine.MainListener); ok {
+		return "KAFKA_BROKERS", a
+	}
 	host := ep.TCPAddr
 	if host == "" {
 		host = "localhost:9092"
