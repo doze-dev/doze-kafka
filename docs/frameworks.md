@@ -78,12 +78,17 @@ their state in a Kafka topic here:
 
 ## UIs
 
-Both connect and list topics and consumer groups, with no API they need missing:
+Both connect and list topics and consumer groups, with no API they need missing, and list
+the [built-in registry](schema-registry.md)'s subjects with their schemas:
 
-- **Kafbat UI** (`ghcr.io/kafbat/kafka-ui`): `KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS` at the broker.
-  It shows the cluster's controller as ZooKeeper and the version as unknown: doze-kafka has
-  neither.
-- **Redpanda Console** (`redpandadata/console`): `KAFKA_BROKERS` at the broker.
+- **Kafbat UI** (`ghcr.io/kafbat/kafka-ui`): `KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS` at the broker,
+  `KAFKA_CLUSTERS_0_SCHEMAREGISTRY` at the registry. It shows the cluster's controller as
+  ZooKeeper and the version as unknown: doze-kafka has neither.
+- **Redpanda Console** (`redpandadata/console`): `KAFKA_BROKERS` at the broker,
+  `SCHEMAREGISTRY_ENABLED=true` and `SCHEMAREGISTRY_URLS` at the registry.
 
-For SASL/SCRAM and TLS, give them the same credentials and CA as any client; the matrix's
+For SASL/SCRAM and TLS, give them the same credentials and CA as any client, and the same user
+and password to the registry as basic authentication
+(`KAFKA_CLUSTERS_0_SCHEMAREGISTRYAUTH_USERNAME` and `_PASSWORD`;
+`SCHEMAREGISTRY_AUTHENTICATION_BASIC_ENABLED`, `_USERNAME` and `_PASSWORD`); the matrix's
 scripts (`compat/kafbat-ui/run.sh`, `compat/redpanda-console/run.sh`) are working examples.

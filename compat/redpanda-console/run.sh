@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Redpanda Console, pointed at a Kafka broker: it connects and lists topics and consumer groups.
+# Redpanda Console, pointed at a Kafka broker: it connects and lists topics and consumer groups,
+# and the built-in registry's subjects.
 set -euo pipefail
 . ../lib.sh
 need_docker; trap_cleanup
@@ -7,8 +8,17 @@ T=rp-$$
 printf 'a\nb\nc\n' | kafka_tool kafka-console-producer.sh --topic "$T" >/dev/null 2>&1 || fail "seeding a topic"
 kafka_tool kafka-console-consumer.sh --topic "$T" --group "g-$T" --from-beginning --max-messages 3 >/dev/null 2>&1 || fail "seeding a consumer group"
 
+# A subject in the built-in registry (registered from the host, on loopback), for the
+# UI's schema pages (Stage 5).
+HOST_REG=${REGISTRY_URL/host.docker.internal/127.0.0.1}; REG_AUTH=()
+[ -z "${REGISTRY_USER:-}" ] || REG_AUTH=(-u "$REGISTRY_USER:$REGISTRY_PASS")
+curl -fsS ${REG_AUTH[@]+"${REG_AUTH[@]}"} -H 'Content-Type: application/vnd.schemaregistry.v1+json' \
+  -d '{"schema":"{\"type\":\"record\",\"name\":\"Greeting\",\"fields\":[{\"name\":\"text\",\"type\":\"string\"}]}"}' \
+  "$HOST_REG/subjects/$T-value/versions" >/dev/null || fail "registering a schema"
+
 CONTAINER=compat-redpanda-$$
-ENVS=(-e "KAFKA_BROKERS=$BOOTSTRAP")
+ENVS=(-e "KAFKA_BROKERS=$BOOTSTRAP" -e SCHEMAREGISTRY_ENABLED=true -e "SCHEMAREGISTRY_URLS=$REGISTRY_URL")
+[ -z "${REGISTRY_USER:-}" ] || ENVS+=(-e SCHEMAREGISTRY_AUTHENTICATION_BASIC_ENABLED=true -e "SCHEMAREGISTRY_AUTHENTICATION_BASIC_USERNAME=$REGISTRY_USER" -e "SCHEMAREGISTRY_AUTHENTICATION_BASIC_PASSWORD=$REGISTRY_PASS")
 MOUNT=()
 if [ "$SECURITY" = scram-tls ]; then
   ENVS+=(-e KAFKA_TLS_ENABLED=true -e KAFKA_TLS_CAFILEPATH=/ca.pem -e KAFKA_SASL_ENABLED=true
@@ -27,3 +37,6 @@ curl -fsS "$URL/api/consumer-groups" | grep -q "g-$T" || fail "the consumer grou
 ok "the consumer group list shows the group"
 curl -fsS "$URL/api/cluster/overview" 2>/dev/null | grep -q -i 'broker\|kafka' || curl -fsS "$URL/api/cluster" | grep -q -i 'broker\|kafka' || fail "the cluster overview did not load"
 ok "the cluster overview loads"
+curl -fsS "$URL/api/schema-registry/subjects" | grep -q "\"$T-value\"" || fail "the schema registry's subject list lacks $T-value: $(curl -sS "$URL/api/schema-registry/subjects" | head -c 400)"
+curl -fsS "$URL/api/schema-registry/subjects/$T-value/versions/latest" | grep -q 'Greeting' || fail "the subject's latest schema did not load: $(curl -sS "$URL/api/schema-registry/subjects/$T-value/versions/latest" | head -c 400)"
+ok "the schema registry page lists the registry's subject, and its latest version loads"

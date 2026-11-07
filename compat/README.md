@@ -28,7 +28,7 @@ pass, skip and fail).
 | `java` | Docker | Java client 4.3: admin (create with config, describe, alter configs, grow, list, delete, delete records, groups), `offsetsForTimes`, idempotent and transactional producers, `read_committed`, consume-transform-produce, classic groups and `group.protocol=consumer` (KIP-848); **Kafka Streams** word count with `exactly_once_v2`, its compacted changelog, and a fresh instance restoring from it |
 | `spring` | Docker | Spring Boot 3.4 / Spring Kafka: `KafkaAdmin` creating `NewTopic` beans and growing one on the next start; a transactional `@KafkaListener` whose aborted delivery is redelivered with exactly-once output |
 | `python` | `uv` | `confluent-kafka` (librdkafka): admin, idempotent producer, groups that commit and resume, KIP-848, transactions with `read_committed` and `read_uncommitted` |
-| `kcat` | `kcat` | librdkafka's command line: metadata, keys and headers, a group that resumes |
+| `kcat` | `kcat` (with Avro: libserdes) | librdkafka's command line: metadata, keys and headers, a group that resumes, an Avro record decoded through the registry |
 | `kcat-telemetry` | `kcat` (librdkafka 2.5+) | KIP-714: a producer left connected pushes its metrics and its client id appears on the Traffic page with them |
 | `java-telemetry` | Docker | KIP-714 with the Java client: Kafka's own console producer, same assertion |
 | `kafkajs` | `bun` or `node` | KafkaJS: admin, idempotent producer, group consume and commit |
