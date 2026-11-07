@@ -237,58 +237,6 @@ func TestReferenceDepthIsBounded(t *testing.T) {
 	}
 }
 
-// Deleting a version or a subject is permanent: it is gone, not set aside.
-func TestDeletesAreAlsoPermanent(t *testing.T) {
-	c, _, ts := countingRegistry(t)
-	ctx := context.Background()
-	for _, s := range []string{"b-value", "a-value", "c-value"} {
-		if _, err := c.reg.Register(ctx, s, schemaBody{Schema: userV1}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if _, err := c.reg.Register(ctx, "a-value", schemaBody{Schema: userV2}); err != nil {
-		t.Fatal(err)
-	}
-	if got := strings.Join(c.reg.SubjectNames(ctx), ","); got != "a-value,b-value,c-value" {
-		t.Errorf("subjects %s", got)
-	}
-	soft := func(path string) string {
-		resp, err := http.Get(ts.URL + path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer resp.Body.Close()
-		var b strings.Builder
-		buf := make([]byte, 4096)
-		for {
-			n, err := resp.Body.Read(buf)
-			b.Write(buf[:n])
-			if err != nil {
-				break
-			}
-		}
-		return b.String()
-	}
-	if err := c.reg.DeleteVersion(ctx, "a-value", 1); err != nil {
-		t.Fatal(err)
-	}
-	if got := soft("/subjects/a-value/versions?deleted=true"); strings.Contains(got, "1,") || got != "[2]\n" && got != "[2]" {
-		t.Errorf("after deleting version 1 for good, versions incl. deleted: %s", got)
-	}
-	if err := c.reg.DeleteSubject(ctx, "b-value"); err != nil {
-		t.Fatal(err)
-	}
-	if got := soft("/subjects?deleted=true"); strings.Contains(got, "b-value") {
-		t.Errorf("a deleted subject is still held: %s", got)
-	}
-	if err := c.reg.DeleteVersion(ctx, "a-value", 7); err == nil {
-		t.Error("deleting a version that does not exist")
-	}
-	if err := c.reg.DeleteSubject(ctx, "nobody"); err == nil {
-		t.Error("deleting a subject that does not exist")
-	}
-}
-
 // The subject page: the versions newest first with what each changed, and the diff
 // from the version before the one on show.
 func TestSchemaPageVersionsAndDiff(t *testing.T) {

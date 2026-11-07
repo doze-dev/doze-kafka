@@ -280,7 +280,13 @@ func (c *Console) schemaCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := c.regPage(ctx, d)
-	if _, err := c.reg.Register(ctx, d.Subject, d.body()); err != nil {
+	before, _ := c.reg.Versions(ctx, d.Subject)
+	nextID := 0
+	if o, ok := c.reg.Overview(ctx); ok {
+		nextID = o.NextID
+	}
+	id, err := c.reg.Register(ctx, d.Subject, d.body())
+	if err != nil {
 		var re *regError
 		if errors.As(err, &re) && re.Code == 42205 && r.Header.Get("HX-Request") == "true" {
 			// Sc-15: the subject (or the registry) is read-only.
@@ -302,7 +308,34 @@ func (c *Console) schemaCreate(w http.ResponseWriter, r *http.Request) {
 		c.fail(w, r, err)
 		return
 	}
-	c.redirect(w, r, c.schemaURL(d.Subject), "Schema registered")
+	after, _ := c.reg.Versions(ctx, d.Subject)
+	c.redirect(w, r, c.schemaURL(d.Subject), c.registeredSay(ctx, d.Subject, id, nextID, before, after))
+}
+
+// registeredSay is what a register did (SCH-33): a schema the subject already held
+// creates nothing; one the registry holds under another subject keeps its id; only a
+// schema never seen takes the next free id. nextID is the overview's before the call
+// (0: not known).
+func (c *Console) registeredSay(ctx context.Context, subject string, id, nextID int, before, after []int) string {
+	if len(after) > 0 && len(after) == len(before) {
+		for _, v := range after {
+			if sv, err := c.reg.Version(ctx, subject, v); err == nil && sv.ID == id {
+				return fmt.Sprintf("Already registered as v%d, id %d: nothing was created", v, id)
+			}
+		}
+		return fmt.Sprintf("Already registered, id %d: nothing was created", id)
+	}
+	v := 0
+	if len(after) > 0 {
+		v = after[len(after)-1]
+	}
+	if nextID > 0 && id < nextID {
+		if others := c.reg.IDOtherSubjects(ctx, id, subject); len(others) > 0 {
+			return fmt.Sprintf("Registered v%d with id %d, the id this schema already has under %s", v, id, sayList(others))
+		}
+		return fmt.Sprintf("Registered v%d with id %d, the id this schema had in a deleted version", v, id)
+	}
+	return fmt.Sprintf("Registered v%d, id %d", v, id)
 }
 
 // refusalJSON is the registry's refusal as it was on the wire.

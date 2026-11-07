@@ -107,7 +107,7 @@ test('trying a schema says whether it may be registered, and why not', async ({ 
   await expect(result).toContainText('Compatible');
   await page.locator('#reg-acts [data-register]').click();
   await expect(page.locator('#versions-table a.r', { hasText: 'v2' })).toHaveAttribute('aria-current', 'true');
-  await expect(page.locator('.flash')).toContainText('Schema registered');
+  await expect(page.locator('.flash')).toContainText(/Registered v2, id \d+/);
   await expect(page.locator('#versions-table a.r').first()).toContainText('added optional email');
 });
 
@@ -248,7 +248,7 @@ async function checkAndRegister(page: import('@playwright/test').Page, answer: s
   await page.locator('#reg-acts').getByRole('button', { name: /Check/ }).click();
   await expect(page.locator('#reg-answer')).toContainText(answer);
   await page.locator('#reg-acts [data-register]').click();
-  await expect(page.locator('.flash')).toContainText('Schema registered');
+  await expect(page.locator('.flash')).toContainText(/Registered v\d+/);
 }
 
 test('a version is soft-deleted, the last one takes the subject to Soft-deleted, and it is deleted for good from there', async ({ page, uniqueName, confirmDialog }) => {

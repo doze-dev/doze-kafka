@@ -13,10 +13,10 @@ func TestSchemaActionsRedirectsAndFlashes(t *testing.T) {
 		rec := req(t, c, "POST", path, form)
 		return rec.Code, rec.Header().Get("Location")
 	}
-	if code, l := post("/_console/new/schema", url.Values{"subject": {" orders-value "}, "schema": {userV1}}); code != 303 || l != "/_console/schemas/orders-value?flash=Schema+registered" {
+	if code, l := post("/_console/new/schema", url.Values{"subject": {" orders-value "}, "schema": {userV1}}); code != 303 || l != "/_console/schemas/orders-value?flash=Registered+v1%2C+id+1" {
 		t.Errorf("register: %d %s", code, l)
 	}
-	if code, l := post("/_console/new/schema", url.Values{"subject": {"orders-value"}, "schema": {userV2}}); code != 303 || l != "/_console/schemas/orders-value?flash=Schema+registered" {
+	if code, l := post("/_console/new/schema", url.Values{"subject": {"orders-value"}, "schema": {userV2}}); code != 303 || l != "/_console/schemas/orders-value?flash=Registered+v2%2C+id+2" {
 		t.Errorf("register a version: %d %s", code, l)
 	}
 	if code, _ := post("/_console/new/schema", url.Values{"subject": {"  "}, "schema": {userV1}}); code != 400 {

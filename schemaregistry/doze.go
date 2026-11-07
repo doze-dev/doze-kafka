@@ -45,6 +45,7 @@ func millis(ms int64) *time.Time {
 type Overview struct {
 	NextID     int            `json:"nextId"`     // what the next new schema is given
 	IDsInUse   [][2]int       `json:"idsInUse"`   // the ids that resolve, as ranges [first, last]
+	LiveIDs    [][2]int       `json:"liveIds"`    // the ids a version that is not deleted holds, as ranges
 	Level      string         `json:"level"`      // the global level
 	LevelSetAt *time.Time     `json:"levelSetAt"` // nil: never set here, or before this was kept
 	Mode       string         `json:"mode"`       // the global mode
@@ -84,19 +85,27 @@ func (r *Registry) Overview() Overview {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	o := Overview{NextID: r.nextID, Level: r.effectiveCompat(""), LevelSetAt: millis(r.compatAt[""]),
-		Mode: r.effectiveMode(""), ModeSetAt: millis(r.modeAt[""]), IDsInUse: [][2]int{}, Subjects: []SubjectState{}}
+		Mode: r.effectiveMode(""), ModeSetAt: millis(r.modeAt[""]), IDsInUse: [][2]int{}, LiveIDs: [][2]int{}, Subjects: []SubjectState{}}
 	ids := make([]int, 0, len(r.schemas))
 	for id := range r.schemas {
 		ids = append(ids, id)
 	}
 	sort.Ints(ids)
-	for _, id := range ids {
-		if n := len(o.IDsInUse); n > 0 && o.IDsInUse[n-1][1] == id-1 {
-			o.IDsInUse[n-1][1] = id
-		} else {
-			o.IDsInUse = append(o.IDsInUse, [2]int{id, id})
+	o.IDsInUse = idRuns(ids)
+	live := map[int]bool{}
+	for _, vs := range r.subj {
+		for _, v := range vs {
+			if !v.Deleted {
+				live[v.ID] = true
+			}
 		}
 	}
+	liveIDs := make([]int, 0, len(live))
+	for id := range live {
+		liveIDs = append(liveIDs, id)
+	}
+	sort.Ints(liveIDs)
+	o.LiveIDs = idRuns(liveIDs)
 	names := make([]string, 0, len(r.subj))
 	for name := range r.subj {
 		names = append(names, name)
@@ -131,6 +140,19 @@ func (r *Registry) Overview() Overview {
 		o.Subjects = append(o.Subjects, s)
 	}
 	return o
+}
+
+// idRuns is sorted ids as runs [first, last].
+func idRuns(ids []int) [][2]int {
+	out := [][2]int{}
+	for _, id := range ids {
+		if n := len(out); n > 0 && out[n-1][1] == id-1 {
+			out[n-1][1] = id
+		} else {
+			out = append(out, [2]int{id, id})
+		}
+	}
+	return out
 }
 
 // levelFor is the level a check uses: the one asked for, or the subject's.

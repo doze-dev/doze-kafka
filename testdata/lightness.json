@@ -4,7 +4,7 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 28870370,
+      "binaryBytes": 28870386,
       "idleHeapBytes": 1375088,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
@@ -411,6 +411,20 @@
       "from": 28415122,
       "to": 28870370,
       "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,870,178 and the registry-down refusal of 2026-11-08 (192)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28870370,
+      "to": 28870386,
+      "reason": "Schemas: the subject list from the overview (SCH-8), the register message (SCH-33), liveIds; the console's unused delete helpers removed: 16 bytes"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28870386,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,870,370 and the subject list and register message of 2026-11-08 (16)"
     }
   ]
 }

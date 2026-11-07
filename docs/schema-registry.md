@@ -143,7 +143,7 @@ them:
 
 | Route | Answers |
 |---|---|
-| `GET /_doze/overview` | every subject (soft-deleted ones included) with its type, live and deleted version counts, latest version and id, level and mode and whether each is its own, when they were set, when it last took a version; the global level and mode; the ids in use as ranges; the next free id |
+| `GET /_doze/overview` | every subject (soft-deleted ones included) with its type, live and deleted version counts, latest version and id, level and mode and whether each is its own, when they were set, when it last took a version; the global level and mode; the ids that resolve (`idsInUse`) and the ids a version that is not deleted holds (`liveIds`), as ranges; the next free id |
 | `GET /_doze/subjects/{subject}/versions/{version}` | a version as `GET /subjects/{subject}/versions/{version}` gives it, deleted ones included, with when it was registered and the basic-authentication user, address and `User-Agent` of the request that registered it (none of these for a version registered before they were kept; none of them names a Kafka client) |
 | `GET /_doze/subjects/{subject}/versions/{version}/resolved` | every schema the version reaches through its references, with its text; for Avro, the schema with each referenced type written out where it is first used (docs, defaults and properties kept; the same schema, as Avro reads it) |
 | `POST /_doze/subjects/{subject}/check?level=&version=` | the compatibility check, at a level other than the subject's if asked (the subject's is not changed), with the versions compared and each reason taken apart: type, path, sentence, additional information |

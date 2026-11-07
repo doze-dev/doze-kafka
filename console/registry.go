@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -238,6 +239,26 @@ func (rc *registryClient) Subjects(ctx context.Context) ([]SubjectRow, error) {
 // Catalogue is every subject with its latest version and how many versions it has,
 // and the schema id of every version: one request (GET /schemas).
 func (rc *registryClient) Catalogue(ctx context.Context) ([]SubjectRow, []int, error) {
+	// doze-kafka's registry has the overview: every subject in one answer and no schema
+	// text (SCH-8). Another registry is read through GET /schemas, which sends every
+	// version's text.
+	if o, ok := rc.Overview(ctx); ok {
+		out := make([]SubjectRow, 0, len(o.Subjects))
+		for _, s := range o.Subjects {
+			if s.Deleted || s.Versions == 0 {
+				continue
+			}
+			out = append(out, SubjectRow{Name: s.Subject, Versions: s.Versions, Latest: s.LatestVersion, ID: s.LatestID, Type: s.Type, TypeLabel: typeLabel(s.Type)})
+		}
+		sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+		var ids []int
+		for _, r := range o.LiveIDs {
+			for id := r[0]; id <= r[1]; id++ {
+				ids = append(ids, id)
+			}
+		}
+		return out, ids, nil
+	}
 	var all []schemaVersion
 	if err := rc.call(ctx, "GET", "/schemas", nil, &all); err != nil {
 		return nil, nil, err
@@ -260,7 +281,8 @@ func (rc *registryClient) Catalogue(ctx context.Context) ([]SubjectRow, []int, e
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	sort.Ints(ids)
-	return out, ids, nil
+	// One schema registered under two subjects is one id.
+	return out, slices.Compact(ids), nil
 }
 
 // Mode is the registry's global mode (READWRITE, READONLY, IMPORT).
@@ -347,22 +369,6 @@ func (rc *registryClient) Register(ctx context.Context, subject string, b schema
 	}
 	err = rc.call(ctx, "POST", "/subjects/"+segment(subject)+"/versions", b, &out)
 	return out.ID, err
-}
-
-func (rc *registryClient) DeleteVersion(ctx context.Context, subject string, version int) error {
-	p := "/subjects/" + segment(subject) + "/versions/" + fmt.Sprint(version)
-	if err := rc.call(ctx, "DELETE", p, nil, nil); err != nil {
-		return err
-	}
-	return rc.call(ctx, "DELETE", p+"?permanent=true", nil, nil)
-}
-
-func (rc *registryClient) DeleteSubject(ctx context.Context, subject string) error {
-	p := "/subjects/" + segment(subject)
-	if err := rc.call(ctx, "DELETE", p, nil, nil); err != nil {
-		return err
-	}
-	return rc.call(ctx, "DELETE", p+"?permanent=true", nil, nil)
 }
 
 // SubjectNames lists the subjects, for choosing one to encode with.
