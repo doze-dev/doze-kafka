@@ -121,7 +121,7 @@ func TestSoftDeletedSubjectIsListedAndRemovable(t *testing.T) {
 		t.Errorf("the soft-deleted section: %s", readable(section))
 	}
 	_, got := confirmOf(t, c, "schema.delete?subject=gone-value")
-	if !strings.Contains(got["text"].(string), "A client soft-deleted it already") || !strings.Contains(got["text"].(string), "All 2 versions") || !strings.Contains(got["text"].(string), "Ids 1 and 2") {
+	if !strings.Contains(got["text"].(string), "A client soft-deleted it already") || !strings.Contains(got["text"].(string), "All 2 versions") || !strings.Contains(got["text"].(string), "Id 2 is never handed out again") || !strings.Contains(got["text"].(string), "Id 1 stays: kept-value uses it too") {
 		t.Errorf("its confirm: %v", got["text"])
 	}
 	if rec := req(t, c, "POST", "/_console/schemas/gone-value/delete", url.Values{"confirm": {"gone-value"}}); rec.Code != 303 {

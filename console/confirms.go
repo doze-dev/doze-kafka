@@ -71,6 +71,12 @@ type confirmFacts struct {
 	Scanned     bool
 	NextVersion int  // the number a version registered next gets.
 	SoftDeleted bool // the subject is soft-deleted already (SCH-17): the permanent call is all that is left.
+	// Shared is, for an id of IDs that another subject holds too, those subjects: a
+	// permanent delete leaves that id resolving.
+	Shared map[int][]string
+	// SoftVersions is how many of the subject's versions are soft-deleted already; a
+	// permanent delete removes them with the rest.
+	SoftVersions int
 }
 
 // confirmNote is a callout under a confirm's sentence (Gr-15): what is and is not touched.
@@ -400,31 +406,50 @@ var confirmTable = []confirmSpec{
 			if f.SoftDeleted {
 				say.Lead = []confirmNote{{Body: []confirmSeg{txt("A client soft-deleted it already, so this is the permanent call alone. Its versions are no longer listed or looked up; their schema text is still held, and this removes it.")}}}
 			}
-			ids := make([]string, len(f.IDs))
-			for i, id := range f.IDs {
+			var gone []int
+			var stays []string
+			for _, id := range f.IDs {
+				if others := f.Shared[id]; len(others) > 0 {
+					stays = append(stays, fmt.Sprintf("Id %d stays: %s %s it too, so it still resolves and its messages still decode.", id, sayList(others), map[bool]string{true: "uses", false: "use"}[len(others) == 1]))
+				} else {
+					gone = append(gone, id)
+				}
+			}
+			ids := make([]string, len(gone))
+			for i, id := range gone {
 				ids[i] = strconv.Itoa(id)
 			}
-			idsText := "Its ids are"
-			if len(ids) == 1 {
-				idsText = "Id " + ids[0] + " is"
-			} else if len(ids) > 1 {
-				idsText = "Ids " + strings.Join(ids[:len(ids)-1], ", ") + " and " + ids[len(ids)-1] + " are"
+			reserved := ""
+			switch len(ids) {
+			case 0:
+			case 1:
+				reserved = "Id " + ids[0] + " is never handed out again, even to the same schema text."
+			default:
+				reserved = "Ids " + strings.Join(ids[:len(ids)-1], ", ") + " and " + ids[len(ids)-1] + " are never handed out again, even to the same schema text."
 			}
-			reserved := idsText + " never handed out again, even to the same schema text."
-			if f.NextID > 0 {
+			if f.NextID > 0 && len(ids) > 0 {
 				reserved += fmt.Sprintf(" A new registration gets id %d or later.", f.NextID)
 			}
+			reserved = strings.TrimSpace(reserved + " " + strings.Join(stays, " "))
 			messages := "Messages that carry those ids stay on their topics."
 			switch {
+			case len(gone) == 0:
+				messages = "Messages stay on their topics, and every id this subject uses is another subject's too, so they still decode."
 			case f.Scanned && f.CarryAll == 0:
-				messages = fmt.Sprintf("None of the newest messages on %s carries those ids.", f.CarryTopic)
+				messages = fmt.Sprintf("None of the newest messages on %s carries %s.", f.CarryTopic, idWord(gone))
 			case f.Scanned:
-				messages = fmt.Sprintf("The %s on %s that carry those ids stay on their topics.", numCount(f.CarryAll, "message", "messages"), f.CarryTopic)
+				messages = fmt.Sprintf("The %s on %s that carry %s stay on their topics.", numCount(f.CarryAll, "message", "messages"), f.CarryTopic, idWord(gone))
 			}
-			messages += " The console can no longer decode them and shows them raw (error 40403, schema not found)."
+			if len(gone) > 0 {
+				messages += " The console can no longer decode them and shows them raw (error 40403, schema not found)."
+			}
+			head := "Ids stay reserved"
+			if len(gone) == 0 {
+				head = "Ids stay"
+			}
 			say.Parts = []confirmNote{
-				{Head: "What goes", Body: []confirmSeg{txt(subjectGoes(f.Versions))}},
-				{Head: "Ids stay reserved", Body: []confirmSeg{txt(reserved)}},
+				{Head: "What goes", Body: []confirmSeg{txt(subjectGoes(f.Versions, f.SoftVersions, len(stays) > 0))}},
+				{Head: head, Body: []confirmSeg{txt(reserved)}},
 				{Head: "Messages are not touched", Body: []confirmSeg{txt(messages)}},
 			}
 			return say
@@ -737,11 +762,45 @@ func subjectConfirmsWith(f confirmFacts, versions []int, shown int) map[string]c
 }
 
 // subjectGoes is the permanent delete's "What goes".
-func subjectGoes(versions int) string {
-	if versions == 1 {
-		return "Its one version and its schema text, and the compatibility level set on this subject. Nothing can bring them back."
+func subjectGoes(versions, soft int, shared bool) string {
+	text := "their schema text"
+	if shared {
+		text = "the schema text no other subject holds"
 	}
-	return fmt.Sprintf("All %d versions and their schema text, and the compatibility level set on this subject. Nothing can bring them back.", versions)
+	if versions == 1 {
+		if !shared {
+			text = "its schema text"
+		}
+		return "Its one version and " + text + ", and the compatibility level set on this subject. Nothing can bring them back."
+	}
+	all := fmt.Sprintf("All %d versions", versions)
+	switch {
+	case soft == 1 && versions > soft:
+		all += ", the soft-deleted one included,"
+	case soft > 1 && versions > soft:
+		all += fmt.Sprintf(", the %d soft-deleted ones included,", soft)
+	}
+	return fmt.Sprintf("%s and %s, and the compatibility level set on this subject. Nothing can bring them back.", all, text)
+}
+
+// idWord is "id 7" or "ids 2 and 3".
+func idWord(ids []int) string {
+	s := make([]string, len(ids))
+	for i, id := range ids {
+		s[i] = strconv.Itoa(id)
+	}
+	if len(s) == 1 {
+		return "id " + s[0]
+	}
+	return "ids " + strings.Join(s[:len(s)-1], ", ") + " and " + s[len(s)-1]
+}
+
+// sayList is "a", "a and b", "a, b and c".
+func sayList(xs []string) string {
+	if len(xs) <= 1 {
+		return strings.Join(xs, "")
+	}
+	return strings.Join(xs[:len(xs)-1], ", ") + " and " + xs[len(xs)-1]
 }
 
 // subjectFacts measures what deleting a subject or one of its versions touches:
@@ -763,6 +822,14 @@ func (c *Console) subjectFacts(ctx context.Context, subject string, versions []i
 			}
 		}
 	}
+	for _, id := range f.IDs {
+		if others := c.reg.IDOtherSubjects(ctx, id, subject); len(others) > 0 {
+			if f.Shared == nil {
+				f.Shared = map[int][]string{}
+			}
+			f.Shared[id] = others
+		}
+	}
 	if o, ok := c.reg.Overview(ctx); ok {
 		f.NextID = o.NextID
 	}
@@ -771,7 +838,9 @@ func (c *Console) subjectFacts(ctx context.Context, subject string, versions []i
 			f.Scanned, f.CarryTopic = true, topic
 			for _, id := range f.IDs {
 				if u := scan.idUse(id); u != nil {
-					f.CarryAll += int64(u.Count)
+					if len(f.Shared[id]) == 0 {
+						f.CarryAll += int64(u.Count)
+					}
 					if id == f.SchemaID {
 						f.Carry = int64(u.Count)
 					}
@@ -855,11 +924,14 @@ func (c *Console) confirmLive(w http.ResponseWriter, r *http.Request) {
 		}
 		subject := q.Get("subject")
 		versions, err := c.reg.Versions(ctx, subject)
-		soft := false
-		if err != nil && id == "schema.delete" {
-			// A subject a client soft-deleted is listed under Soft-deleted (SCH-17).
+		soft, softN := false, 0
+		if id == "schema.delete" {
+			// The permanent delete removes every version, the soft-deleted ones too; a
+			// subject a client soft-deleted is listed under Soft-deleted (SCH-17).
 			if all, aerr := c.reg.AllVersions(ctx, subject); aerr == nil && len(all) > 0 {
-				versions, err, soft = all, nil, true
+				soft = err != nil
+				softN = len(all) - len(versions)
+				versions, err = all, nil
 			}
 		}
 		if err != nil {
@@ -868,7 +940,7 @@ func (c *Console) confirmLive(w http.ResponseWriter, r *http.Request) {
 		}
 		shown, _ := strconv.Atoi(q.Get("version"))
 		f := c.subjectFacts(ctx, subject, versions, shown)
-		f.SoftDeleted = soft
+		f.SoftDeleted, f.SoftVersions = soft, softN
 		views = subjectConfirmsWith(f, versions, shown)
 	default:
 		c.fail(w, r, fmt.Errorf("%w: there is no confirm %q", errNotFound, id))

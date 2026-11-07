@@ -66,7 +66,7 @@ func TestSubjectConfirmsKeepAVersionToBeLatest(t *testing.T) {
 	// Measured: the ids, the next id, the messages that carry them.
 	f := confirmFacts{Name: "s", Versions: 3, IDs: []int{1, 4, 7}, SchemaID: 7, NextID: 11, Scanned: true, CarryTopic: "t", Carry: 8378, CarryAll: 14452}
 	m := subjectConfirmsWith(f, []int{1, 2, 3}, 3)
-	if txt := m["schema.delete"].Text; !strings.Contains(txt, "Ids 1, 4 and 7 are never handed out again") || !strings.Contains(txt, "A new registration gets id 11 or later.") || !strings.Contains(txt, "The 14,452 messages on t that carry those ids") {
+	if txt := m["schema.delete"].Text; !strings.Contains(txt, "Ids 1, 4 and 7 are never handed out again") || !strings.Contains(txt, "A new registration gets id 11 or later.") || !strings.Contains(txt, "The 14,452 messages on t that carry ids 1, 4 and 7") {
 		t.Errorf("measured subject: %s", txt)
 	}
 	if txt := m["schema.version.delete"].Text; !strings.Contains(txt, "8,378 messages on t carry id 7.") || !strings.Contains(txt, "/schemas/ids/7") {
@@ -77,7 +77,7 @@ func TestSubjectConfirmsKeepAVersionToBeLatest(t *testing.T) {
 		t.Errorf("one message: %s", txt)
 	}
 	f.IDs, f.CarryAll = []int{5}, 0
-	if txt := subjectConfirmsWith(f, []int{1}, 1)["schema.delete"].Text; !strings.Contains(txt, "Id 5 is never handed out again") || !strings.Contains(txt, "None of the newest messages on t carries those ids.") {
+	if txt := subjectConfirmsWith(f, []int{1}, 1)["schema.delete"].Text; !strings.Contains(txt, "Id 5 is never handed out again") || !strings.Contains(txt, "None of the newest messages on t carries id 5.") {
 		t.Errorf("one id, none carried: %s", txt)
 	}
 }

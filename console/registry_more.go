@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strconv"
 
@@ -155,6 +156,24 @@ func (rc *registryClient) IDVersions(ctx context.Context, id int) ([]subjectVers
 	var out []subjectVersion
 	err := rc.call(ctx, http.MethodGet, fmt.Sprintf("/schemas/ids/%d/versions", id), nil, &out)
 	return out, err
+}
+
+// IDOtherSubjects is the subjects other than subject that hold id, soft-deleted
+// versions included: while one does, a permanent delete of subject leaves the id's
+// schema text where it is and the id still resolves.
+func (rc *registryClient) IDOtherSubjects(ctx context.Context, id int, subject string) []string {
+	var vs []subjectVersion
+	if rc.call(ctx, http.MethodGet, fmt.Sprintf("/schemas/ids/%d/versions?deleted=true", id), nil, &vs) != nil {
+		return nil
+	}
+	var out []string
+	for _, v := range vs {
+		if v.Subject != subject && !slices.Contains(out, v.Subject) {
+			out = append(out, v.Subject)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // SoftDeleteVersion and SoftDeleteSubject are the first delete: the version or
