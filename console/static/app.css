@@ -1755,3 +1755,15 @@ progress.gr-used::-moz-progress-bar{background:var(--ink);border-radius:2px}
 #confirm .modal.sc-confirm > .pad { gap: 8px; padding: 16px 18px; }
 #confirm .modal.sc-confirm .confirm-f { margin-top: 4px; }
 #confirm .modal.sc-confirm .btn:disabled { opacity: .55; }
+.sc-reg-it { align-self: flex-start; margin-top: 4px; }
+.sc-cmd { margin: 0; }
+.sc-where { width: 480px; flex: none; }
+.sc-where .card { margin-top: 2px; }
+a.well.sc-still { padding: 8px 12px; text-decoration: none; }
+.list .list-none.sc-off-none { padding: 16px 14px; }
+/* Sc-11: the share of a topic's messages each id has. */
+.sc-pull2 { margin-top: -2px; }
+.lane > div.kid { background: var(--mut); }
+.sc-idin { width: 90px; }
+/* Sc-16: the subject closest to a name that is not there. */
+.list .li.near { background: var(--okbg); }

@@ -48,6 +48,11 @@ test('a subject shows its versions and what changed from the one before', async 
   await expect(page.getByRole('link', { name: /^Diff v/ })).toHaveCount(0); // nothing before version 1.
   // The version opens in the inspector.
   await expect(page.locator('#inspector .versionb')).toContainText('Schema id');
+  // Used by (Sc-11): the ids the topic's messages carry, and the newest on one.
+  await page.getByRole('link', { name: 'Used by', exact: true }).click();
+  await expect(page.locator('#used-table')).toContainText('seed-events');
+  await page.locator('#open-id').getByRole('button', { name: /^Open on/ }).click();
+  await expect(page).toHaveURL(/\/topics\/seed-events\/message\?partition=\d+&offset=\d+/);
 });
 
 /** Registers a first version through the register page and lands on the subject. */
@@ -175,7 +180,7 @@ test('deleting a subject asks first, and then it is gone', async ({ page, unique
   await expect(page.locator(`.list .li[data-name="${subject}"]`)).toHaveCount(0);
   const gone = await page.goto(`schemas/${subject}`);
   expect(gone?.status()).toBe(404);
-  await expect(page.locator('main')).toContainText('no subject named');
+  await expect(page.locator('main')).toContainText(`No subject called ${subject}`);
 });
 
 test('a topic links its schema, and its records are shown as the JSON they mean', async ({ page }) => {

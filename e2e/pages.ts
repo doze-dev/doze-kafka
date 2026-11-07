@@ -35,6 +35,7 @@ export const PAGES: Record<string, string[]> = {
 // The routes that are not pages, each with what it is; each is drawn inside a page
 // above, or a state below, and is swept there.
 export const PARTIALS: Record<string, string> = {
+  '/schemas/{subject}/open-id': 'a redirect to the newest message on a schema id (Sc-11\'s Try it); schemas.spec drives it',
   '/static/': 'the stylesheet, scripts and fonts',
   '/live/topics': 'Tp-Home\'s table, swept on topics',
   '/new/topic/shell': 'the create form\'s command, swept on new/topic',

@@ -100,6 +100,7 @@ func TestEveryRouteRefusesInTheOneVocabulary(t *testing.T) {
 		{"POST /new/schema/fix", "fixing a field that is not there", c, "POST", "/_console/new/schema/fix", form("schema", userV1, "path", "/fields/9"), true, nil, answer{400, refused, "console", ""}},
 		{"POST /schemas/{subject}/mode", "a mode not said", c, "POST", "/_console/schemas/orders-value/mode", form("mode", ""), true, nil, answer{400, refused, "console", ""}},
 		{"POST /schemas/{subject}/level-check", "a level that does not exist", c, "POST", "/_console/schemas/orders-value/level-check", form("level", "SIDEWAYS"), true, nil, answer{400, refused, "console", ""}},
+		{"GET /schemas/{subject}/open-id", "an id that is not a number", c, "GET", "/_console/schemas/orders-value/open-id?id=x", nil, true, nil, answer{400, refused, "console", ""}},
 		{"GET /schemas/{subject}/diff", "comparing the versions of a subject that is not there", c, "GET", "/_console/schemas/ghost/diff", nil, true, nil, answer{404, refused, "registry", "40401"}},
 		{"POST /schemas/{subject}/try", "trying a value with a subject that is not there", c, "POST", "/_console/schemas/ghost/try", form("doc", "{}"), true, nil, answer{404, refused, "registry", "40401"}},
 		{"POST /new/schema/check", "a check the registry does not implement", unimplemented, "POST", "/_console/new/schema/check", form("subject", "orders-value", "schema", userV1), true, nil, answer{501, notImpl, "registry", "50101"}},

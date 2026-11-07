@@ -50,12 +50,13 @@ func register(t *testing.T, c *Console, subject, schema string) {
 
 func TestSchemasSectionIsOnlyThereWithARegistry(t *testing.T) {
 	without := newTestConsole(t)
+	// SCH-32 (Sc-14): the rail keeps Schemas, marked off, and its page says why.
 	rec := req(t, without, "GET", "/_console/topics", nil)
-	if strings.Contains(rec.Body.String(), "/_console/schemas") {
-		t.Error("the rail links Schemas although no registry is connected")
+	if rail := between(rec.Body.String(), `<nav class="rail"`, "</nav>"); !strings.Contains(rail, `href="/_console/schemas"`) || !strings.Contains(readable(rail), "Schemasoff") {
+		t.Errorf("the rail without a registry: %s", readable(rail))
 	}
 	rec = req(t, without, "GET", "/_console/schemas", nil)
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "No schema registry is connected") {
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "switched off") || !strings.Contains(rec.Body.String(), "No registry to list") {
 		t.Errorf("Schemas without a registry = %d, want a page that says so", rec.Code)
 	}
 	if rec = req(t, without, "POST", "/_console/new/schema", url.Values{"subject": {"s"}, "schema": {userV1}}); rec.Code != http.StatusNotFound {
@@ -130,7 +131,7 @@ func TestSchemaSubjectLifecycle(t *testing.T) {
 	// Delete the subject: it is gone, with a page that says so.
 	req(t, c, "POST", "/_console/schemas/orders-value/delete", url.Values{"confirm": {"orders-value"}})
 	rec = req(t, c, "GET", "/_console/schemas/orders-value", nil)
-	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "no subject named") {
+	if rec.Code != http.StatusNotFound || !strings.Contains(readable(rec.Body.String()), "No subject called orders-value") {
 		t.Errorf("a deleted subject = %d, want a 404 page that names it", rec.Code)
 	}
 }

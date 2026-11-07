@@ -144,6 +144,7 @@ func (c *Console) routeTable() []routeRow {
 		withoutMutating(post("/new/schema/fix", specSchemas, "the draft with a finding's fix applied; sends nothing", c.schemaRegisterFix)),
 		get("/schemas/{subject}", specSchemas, "one subject", c.schemaDetail),
 		get("/schemas/{subject}/diff", specSchemas, "two versions compared", c.schemaDiff),
+		get("/schemas/{subject}/open-id", specSchemas, "the newest message on the subject's topics that carries an id", c.schemaOpenID),
 		withoutMutating(post("/schemas/{subject}/try", specSchemas, "encode or check a JSON value with a version; sends nothing to the registry", c.schemaTry)),
 		post("/schemas/{subject}/config", specSchemas, "set the compatibility level and the mode, of the subject or the registry", c.schemaConfig),
 		post("/schemas/{subject}/mode", specSchemas, "set the subject's mode", c.schemaMode),

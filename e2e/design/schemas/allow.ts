@@ -27,7 +27,7 @@ const BY_AGENT = 'DEVIATES: a registry request carries no Kafka client id, so th
 const DOCK_CLIENT = 'DEVIATES: Sc-18\'s dock is the client\'s registry and broker calls in one sequence (its schema POST, then its Metadata and Produce), headed as a table; the console\'s subject dock is the registry\'s calls about the subject, with no head row as Sc-05 to Sc-07 draw it; the client\'s Kafka requests are on Traffic (plan/00-foundation.md, Sc-18)';
 const HEADER_LINE = 'the boards disagree: Sc-05 prints the record\'s header and "fields": [ on one line, Sc-06 on two; the console prints them as Sc-05 does, so its diff is one line shorter and what follows it 21 px higher';
 const SENTENCES = 'the callouts\' sentences are the console\'s own, made from the change and from the checks at the other levels; they are shorter than the board\'s, so the callout is a line shorter';
-const REG_MORE = 'CUT: the board draws a ··· after Register with nothing for it to hold on the register page (Cancel is Esc and the back link); without it the button is the ···\'s width and gap further right';
+const REG_MORE = 'CUT: the board draws a ··· after the primary button with nothing for it to hold on this page (Cancel is Esc and the back link); without it the button is the ···\'s width and gap further right';
 const DOCK_REG_NOTE = 'the register page\'s dock is the registry\'s request log, newest first, as on Sc-Home and Sc-01; the board\'s note on Sc-02 ("what Register will send, nothing yet") describes a dock of what this page will send, which the console does not draw before it sends';
 const ADD_REF = 'a new version keeps an Add reference button beside "None." (a draft can gain a reference, Sc-10); the board writes "None." alone, so the form is the button\'s 4 px taller and what follows it 4 px lower';
 const BOARD_LINES = 'the board says "8 lines" of a schema it draws in 10; the console counts the lines it holds';
@@ -39,10 +39,15 @@ const RAW_409 = 'the registry\'s 409 is Confluent\'s own message, which also nam
 const ON_REGISTER = 'DEVIATES: Sc-15 draws the refusal in the subject\'s frame (its strip: m change mode, n register new version); the console draws it on the register page where the register was refused, with that page\'s strip and its callouts the width of the form (plan/00-foundation.md, Sc-15)';
 const ONE_DIALOG = 'Sc-12 draws the soft delete and the permanent delete side by side as two specimens, placed absolutely over a scrim; the console opens one at a time, centred in an overlay with the board\'s 150 px above it (homes/allow.ts has the same entry for Tp-24)';
 const SPECIMEN_CAP = 'the board labels its specimens "Dialog 1 of 2" and "Dialog 2 of 2" above their titles; the console\'s dialog has no such label, so its title and what follows are the label\'s 24 px higher';
+const USED_WHY = 'the first callout says why the oldest id still has messages, in the world\'s words and counts; it is shorter than the board\'s, so the callout beside it is narrower and a line taller, and Try it under them lower';
+const NO_R = 'CUT: the board\'s r (raw or decoded) is the message inspector\'s Raw view, which has no key of its own; the strip names the keys the page has';
+const ID_LOOKUP = 'the board\'s dock leads with a client\'s lookup of id 9, answered 40403; the subject\'s dock lists the calls that name the subject, and an id lookup names none, so its newest row is a register';
+const NEAR_ORDER = 'the list is in name order, so its first row is harbour.checkout.orders-key; the board lists the closest subject first, marked; the console marks the closest where it is in the list';
+const DATA_DIR = 'the note names this broker\'s data directory, whose path is longer than the board\'s ./data and wraps to more lines';
 const NEIGHBOURS_ONE = 'the board\'s neighbours are three with long notes (a decoded count, a dead-letter topic, a group), which wrap to three lines in a main the inspector narrows; the world\'s subject has its topic and no group or dead-letter topic, one line: the band is shorter and everything under it is higher by the difference';
 
 export const ALLOW: Allowed[] = [
-  ...['Sc-01', 'Sc-02', 'Sc-03', 'Sc-04', 'Sc-05', 'Sc-06', 'Sc-07', 'Sc-08', 'Sc-09', 'Sc-10', 'Sc-15', 'Sc-18'].flatMap((b) => shellAllow(b)),
+  ...['Sc-01', 'Sc-02', 'Sc-03', 'Sc-04', 'Sc-05', 'Sc-06', 'Sc-07', 'Sc-08', 'Sc-09', 'Sc-10', 'Sc-11', 'Sc-14', 'Sc-15', 'Sc-16', 'Sc-17', 'Sc-18'].flatMap((b) => shellAllow(b)),
   at('Sc-01', 'keys strip', 'text', 'nregister schema ⌘Kjump or act ?keys', 'cregister schema ⌘Kjump or act ?keys', SY06_C),
   at('Sc-01', 'key', 'text', 'n', 'c', SY06_C),
   at('Sc-01', 'h1', 'w', '340.5', '347.7', HOME_MORE),
@@ -323,4 +328,90 @@ export const ALLOW: Allowed[] = [
   at('Sc-12 dialog 1', 'call', 'y', '69', '45', SPECIMEN_CAP),
   at('Sc-12 dialog 2', 'title', 'y', '41', '17', SPECIMEN_CAP),
   at('Sc-12 dialog 2', 'call', 'y', '69', '45', SPECIMEN_CAP),
+  at('Sc-11', 'dock', 'h', '87', '141', DOCK_ROWS),
+  at('Sc-11', 'dock', 'margin', '0px -20px', '0px', DOCK_IN_MAIN),
+  at('Sc-11', 'dock', 'y', '785', '731', DOCK_ROWS),
+  at('Sc-11', 'dock head', 'y', '786', '732', DOCK_ROWS),
+  at('Sc-11', 'dock method', 'y', '819.5', '765.5', DOCK_ROWS),
+  at('Sc-11', 'dock note', 'presence', 'absent', 'present', DOCK_NOTE),
+  at('Sc-11', 'dock path', 'y', '819.5', '765.5', DOCK_ROWS),
+  at('Sc-11', 'dock pill', 'y', '790.5', '736.5', DOCK_ROWS),
+  at('Sc-11', 'dock row', 'y', '816', '762', DOCK_ROWS),
+  at('Sc-11', 'dock status', 'y', '819.5', '765.5', DOCK_ROWS),
+  at('Sc-11', 'dock time', 'y', '819.5', '765.5', DOCK_ROWS),
+  at('Sc-11', 'dock title', 'y', '790.5', '736.5', DOCK_ROWS),
+  at('Sc-11', 'list item', 'deco', 'underline', 'none', LIST_UNDERLINE),
+  at('Sc-11', 'list item', 'y', '133', '93', LIST_ORDER),
+  at('Sc-11', 'list item on', 'deco', 'underline', 'none', LIST_UNDERLINE),
+  at('Sc-11', 'list item on', 'y', '93', '133', LIST_ORDER),
+  at('Sc-11', 'list name', 'y', '132.5', '92.5', LIST_ORDER),
+  at('Sc-11', 'list pill', 'y', '142.5', '102.5', LIST_ORDER),
+  at('Sc-11', 'main', 'h', '828', '687', DOCK_IN_MAIN_ROWS),
+  at('Sc-11', 'used callout', 'h', '86', '106', USED_WHY),
+  at('Sc-11', 'used try', 'y', '516', '536', USED_WHY),
+  at('Sc-11', 'used try button', 'y', '557', '577', USED_WHY),
+  at('Sc-11', 'used try field', 'y', '557', '577', USED_WHY),
+  at('Sc-11', 'used try title', 'y', '529', '549', USED_WHY),
+  at('Sc-17', 'callout title', 'y', '505', '485', NEIGHBOURS_ONE),
+  at('Sc-17', 'callouts', 'h', '56', '36', SENTENCES),
+  at('Sc-17', 'dock', 'h', '87', '141', DOCK_ROWS),
+  at('Sc-17', 'dock', 'margin', '0px -20px', '0px', DOCK_IN_MAIN),
+  at('Sc-17', 'dock', 'y', '785', '731', DOCK_ROWS),
+  at('Sc-17', 'dock head', 'y', '786', '732', DOCK_ROWS),
+  at('Sc-17', 'dock method', 'y', '819.5', '765.5', DOCK_ROWS),
+  at('Sc-17', 'dock note', 'presence', 'absent', 'present', DOCK_NOTE),
+  at('Sc-17', 'dock path', 'y', '819.5', '765.5', DOCK_ROWS),
+  at('Sc-17', 'dock pill', 'y', '790.5', '736.5', DOCK_ROWS),
+  at('Sc-17', 'dock row', 'y', '816', '762', DOCK_ROWS),
+  at('Sc-17', 'dock status', 'y', '819.5', '765.5', DOCK_ROWS),
+  at('Sc-17', 'dock time', 'y', '819.5', '765.5', DOCK_ROWS),
+  at('Sc-17', 'dock title', 'y', '790.5', '736.5', DOCK_ROWS),
+  at('Sc-17', 'list head', 'y', '402', '382', LIST_ORDER),
+  at('Sc-17', 'list item', 'deco', 'underline', 'none', LIST_UNDERLINE),
+  at('Sc-17', 'list item', 'y', '133', '93', LIST_ORDER),
+  at('Sc-17', 'list item on', 'deco', 'underline', 'none', LIST_UNDERLINE),
+  at('Sc-17', 'list item on', 'y', '93', '133', LIST_ORDER),
+  at('Sc-17', 'list name', 'y', '132.5', '92.5', LIST_ORDER),
+  at('Sc-17', 'list pill', 'y', '142.5', '102.5', LIST_ORDER),
+  at('Sc-17', 'list title', 'y', '402', '382', LIST_ORDER),
+  at('Sc-17', 'main', 'h', '828', '687', DOCK_IN_MAIN_ROWS),
+  at('Sc-17', 'neighbours', 'h', '56', '36', NEIGHBOURS_ONE),
+  at('Sc-17', 'neighbours cap', 'y', '176', '166', NEIGHBOURS_ONE),
+  at('Sc-17', 'tab', 'y', '222', '202', NEIGHBOURS_ONE),
+  at('Sc-17', 'tab 3', 'y', '222', '202', NEIGHBOURS_ONE),
+  at('Sc-17', 'tab on', 'y', '222', '202', NEIGHBOURS_ONE),
+  at('Sc-17', 'tabs', 'y', '222', '202', NEIGHBOURS_ONE),
+  at('Sc-17', 'why', 'y', '262', '242', NEIGHBOURS_ONE),
+  at('Sc-17', 'why code', 'y', '273', '253', NEIGHBOURS_ONE),
+  at('Sc-17', 'why raw', 'y', '297', '277', NEIGHBOURS_ONE),
+  at('Sc-17', 'why title', 'y', '273', '253', NEIGHBOURS_ONE),
+  at('Sc-17', 'keys strip', 'text', 'jkmove ↵open message rraw or decoded ⌘Kjump or act', 'jkmove ↵open message ⌘Kjump or act', NO_R),
+  at('Sc-17', 'undecoded', 'y', '428', '408', NEIGHBOURS_ONE),
+  at('Sc-17', 'undecoded head cell', 'y', '433.5', '413.5', NEIGHBOURS_ONE),
+  at('Sc-17', 'undecoded id', 'y', '458.5', '438.5', NEIGHBOURS_ONE),
+  at('Sc-17', 'undecoded open', 'y', '458.5', '438.5', NEIGHBOURS_ONE),
+  at('Sc-17', 'undecoded row', 'y', '455', '435', NEIGHBOURS_ONE),
+  { ...at('Sc-17', 'dock row', 'bg', 'rgb(236, 228, 246)', 'rgba(0, 0, 0, 0)', ID_LOOKUP), at: ['1440-light'] },
+  { ...at('Sc-17', 'dock status', 'color', 'rgb(103, 60, 156)', 'rgb(22, 107, 63)', ID_LOOKUP), at: ['1440-light'] },
+  { ...at('Sc-17', 'dock row', 'bg', 'rgb(42, 32, 64)', 'rgba(0, 0, 0, 0)', ID_LOOKUP), at: ['1440-dark'] },
+  { ...at('Sc-17', 'dock status', 'color', 'rgb(195, 163, 242)', 'rgb(95, 202, 143)', ID_LOOKUP), at: ['1440-dark'] },
+  at('Sc-16', 'dock', 'h', '87', '59', DOCK_ROWS),
+  at('Sc-16', 'dock', 'margin', '0px -20px', '0px', DOCK_IN_MAIN),
+  at('Sc-16', 'dock', 'y', '785', '813', DOCK_ROWS),
+  at('Sc-16', 'dock head', 'y', '786', '814', DOCK_ROWS),
+  at('Sc-16', 'dock method', 'y', '819.5', '847.5', DOCK_ROWS),
+  at('Sc-16', 'dock note', 'presence', 'absent', 'present', DOCK_NOTE),
+  at('Sc-16', 'dock path', 'y', '819.5', '847.5', DOCK_ROWS),
+  at('Sc-16', 'dock pill', 'y', '790.5', '818.5', DOCK_ROWS),
+  at('Sc-16', 'dock row', 'y', '816', '844', DOCK_ROWS),
+  at('Sc-16', 'dock status', 'y', '819.5', '847.5', DOCK_ROWS),
+  at('Sc-16', 'dock time', 'y', '819.5', '847.5', DOCK_ROWS),
+  at('Sc-16', 'dock title', 'y', '790.5', '818.5', DOCK_ROWS),
+  { ...at('Sc-16', 'list item', 'bg', 'rgb(227, 241, 232)', 'rgba(0, 0, 0, 0)', NEAR_ORDER), at: ['1440-light'] },
+  { ...at('Sc-16', 'list item', 'bg', 'rgb(23, 48, 31)', 'rgba(0, 0, 0, 0)', NEAR_ORDER), at: ['1440-dark'] },
+  at('Sc-16', 'list item', 'deco', 'underline', 'none', LIST_UNDERLINE),
+  at('Sc-16', 'main', 'h', '828', '769', DOCK_IN_MAIN_ROWS),
+  at('Sc-16', 'open button', 'x', '1133.1', '1177.8', REG_MORE),
+  at('Sc-14', 'copy button', 'x', '1167.8', '1212.5', REG_MORE),
+  at('Sc-14', 'list none', 'h', '116', '176', DATA_DIR),
 ];

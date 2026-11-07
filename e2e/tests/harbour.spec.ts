@@ -19,11 +19,13 @@ test('Groups: four harbour groups', async ({ page }) => {
   await expect(page.locator('.list .li[data-name^="harbour-"]')).toHaveCount(4);
 });
 
-test('Schemas: five subjects, and the soft-deleted one is not listed', async ({ page }) => {
+test('Schemas: five subjects, and the soft-deleted one is listed under Soft-deleted only', async ({ page }) => {
   await page.goto('schemas');
-  const rows = page.locator('.list .li[data-name^="harbour-"]');
+  const rows = page.locator('.list .list-scroll > .li[data-name^="harbour-"]');
   await expect(rows).toHaveCount(5);
-  await expect(page.locator('.list .li[data-name="harbour-retired-value"]')).toHaveCount(0);
+  await expect(page.locator('.list .list-scroll > .li[data-name="harbour-retired-value"]')).toHaveCount(0);
+  // SCH-17: it is still held, so it is listed apart, with Delete for good.
+  await expect(page.locator('#list-deleted .li[data-name="harbour-retired-value"]')).toHaveCount(1);
 });
 
 test('Access: six ACLs', async ({ page }) => {

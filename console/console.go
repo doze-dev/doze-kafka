@@ -458,7 +458,8 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 		// keyCaps splits how a key is drawn into its caps: "g r" is two keys.
 		"keyCaps": func(show string) []string { return strings.Fields(show) },
 		// num writes a count with thousands separators (14,407), as the boards do.
-		"num": num,
+		"num":      num,
+		"idRanges": idRangesText,
 		// needsLook is whether a topic's number is coloured in the list: a dead-letter
 		// topic that has records in it.
 		"needsLook": func(name string, msgs int64) bool { return isDeadLetterName(name) && msgs > 0 },

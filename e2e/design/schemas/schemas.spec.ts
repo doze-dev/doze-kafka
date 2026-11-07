@@ -4,7 +4,7 @@ import { SHELL } from '../lib/probes';
 import { openLive } from '../lib/render';
 import { OwnBroker } from '../../ownbroker';
 import { ALLOW } from './allow';
-import { COMPAT, confirmProbes, DIFF, FINDINGS, NONE, READONLY, REGISTER, REGISTER_NEW, SCHEMA, SUBJECT_HEAD, TRY, VERSION_INSP, VERSIONS, DOCK } from './boards';
+import { COMPAT, confirmProbes, DIFF, NOT_FOUND, OFF, UNDECODED, USED, FINDINGS, NONE, READONLY, REGISTER, REGISTER_NEW, SCHEMA, SUBJECT_HEAD, TRY, VERSION_INSP, VERSIONS, DOCK } from './boards';
 import { AUDIT, DISPATCH, DISPATCH_V3, INVOICE, ORDERS, POINTS, SchemasWorld } from './world';
 
 // The Schemas boards against the live pages, element by element, in light and dark.
@@ -69,10 +69,10 @@ test.describe('on the boards\' world: their subjects, under their names', () => 
     for (const want of ['v2 to v3', '1 line added', '0 removed', '1 line changed', 'the change is allowed at BACKWARD: the new field has a default', 'At FULL it would pass.']) expect(diff).toContain(want);
     // The inspector's messages on id 7 are the one record the composer wrote with v3.
     const insp = await text(`inspect/version?key=${seg(`${seg(ORDERS)}:3`)}`);
-    expect(insp).toContain('1 of the newest 1 on harbour.checkout.orders carry id 7');
+    expect(insp).toContain('8 of the newest 18 on harbour.checkout.orders carry id 7');
     // Sc-12's dialogs, measured: the ids, the next id, the record that carries id 7.
     const soft = await (await request.get(w.console + `confirm/schema.version.delete?subject=${seg(ORDERS)}&version=3`)).json();
-    expect(soft.text).toContain('1 message on harbour.checkout.orders carries id 7.');
+    expect(soft.text).toContain('8 messages on harbour.checkout.orders carry id 7.');
     expect(soft.text).toContain('Latest becomes v2.');
     const hard = await (await request.get(w.console + `confirm/schema.delete?subject=${seg(ORDERS)}`)).json();
     expect(hard.text).toContain('Ids 1, 4 and 7 are never handed out again');
@@ -162,6 +162,32 @@ test.describe('on the boards\' world: their subjects, under their names', () => 
     expect(out.text, out.text).toBe('');
   });
 
+  test('Sc-11 matches the Used by tab', async ({ browser }) => {
+    test.setTimeout(120_000);
+    const out = await runBoard(browser, { id: 'Sc-11', file: 'Sc-11-Topics', live: livePage(w.console, `schemas/${seg(ORDERS)}?tab=used`), probes: [...SUBJECT_HEAD.filter((p) => p.el !== 'facts' && p.el !== 'fact'), ...USED, ...DOCK], allow: ALLOW });
+    expect(out.text, out.text).toBe('');
+  });
+
+  test('Sc-17 matches a message whose schema id the registry does not have', async ({ browser }) => {
+    test.setTimeout(120_000);
+    await w.produceOrphan();
+    // The board has the message open on the right.
+    const opened = async (p: import('@playwright/test').Page) => {
+      await p.locator('#undecoded-table .r.on').click();
+      await p.locator('#inspector:not([hidden]) #inspector-title').waitFor();
+    };
+    const out = await runBoard(browser, { id: 'Sc-17', file: 'Sc-17-Decode-Failed', live: livePage(w.console, `schemas/${seg(ORDERS)}?tab=used`, opened), probes: [...SUBJECT_HEAD, ...UNDECODED, ...DOCK], allow: ALLOW });
+    expect(out.text, out.text).toBe('');
+  });
+
+  test('Sc-16 matches a subject that is not there', async ({ browser }) => {
+    test.setTimeout(120_000);
+    // A client looked the name up first, and was told 40401.
+    await w.call('GET', '/subjects/harbour.checkout.order-value/versions');
+    const out = await runBoard(browser, { id: 'Sc-16', file: 'Sc-16-Not-Found', live: livePage(w.console, 'schemas/harbour.checkout.order-value'), probes: [...NOT_FOUND, ...DOCK], allow: ALLOW });
+    expect(out.text, out.text).toBe('');
+  });
+
   test('Sc-18 matches a subject a client registered', async ({ browser }) => {
     test.setTimeout(120_000);
     await w.registerByClient();
@@ -198,4 +224,16 @@ test.describe('on the boards\' world: their subjects, under their names', () => 
       expect(out.text, out.text).toBe('');
     });
   }
+});
+
+test.describe('on a broker started with the registry off', () => {
+  const off = new OwnBroker('schemas-off', 80, ['--schema-registry=false']);
+  test.beforeAll(async () => { test.setTimeout(180_000); await off.start(); });
+  test.afterAll(async () => { await off.kill(); });
+
+  test('Sc-14 matches the Schemas page with no registry', async ({ browser }) => {
+    test.setTimeout(120_000);
+    const out = await runBoard(browser, { id: 'Sc-14', file: 'Sc-14-Registry-Off', live: async (b, place) => openLive(b, off.console + 'schemas', place.size, place.theme), probes: OFF, allow: ALLOW });
+    expect(out.text, out.text).toBe('');
+  });
 });

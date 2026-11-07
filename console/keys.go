@@ -195,9 +195,21 @@ func pageHints(view string) []keyHint {
 	case "schema_register":
 		// Sc-02 to Sc-04: ⌘↵ checks, ⇧⌘↵ registers, Esc goes back.
 		return []keyHint{{Keys: []string{"⌘↵"}, Label: "check"}, {Keys: []string{"⇧⌘↵"}, Label: "register"}, {Keys: []string{"esc"}, Label: "cancel"}, hintJump}
+	case "schema_used":
+		// Sc-11 and Sc-17: j k over the rows, ↵ opens the message the row names.
+		return []keyHint{hintMove, {Keys: []string{"↵"}, Label: "open messages"}, hintJump}
+	case "schema_undecoded":
+		// Sc-17: ↵ opens the message, raw, on the right.
+		return []keyHint{hintMove, {Keys: []string{"↵"}, Label: "open message"}, hintJump}
 	case "schema_compat":
 		// Sc-09: j k choose a level, ⌘↵ saves, Esc discards (back to the versions).
 		return []keyHint{{Keys: []string{"j", "k"}, Label: "choose level"}, {Keys: []string{"⌘↵"}, Label: "save"}, {Keys: []string{"esc"}, Label: "discard"}, hintJump}
+	case "schemas_off":
+		// Sc-14: c copies the command that turns it on.
+		return []keyHint{{Keys: []string{"c"}, Label: "copy command"}, {Keys: []string{"g", "t"}, Label: "Topics"}, hintJump}
+	case "schema_notfound":
+		// Sc-16: ↵ opens the closest subject, / filters the list.
+		return []keyHint{{Keys: []string{"↵"}, Label: "open closest"}, {Keys: []string{"/"}, Label: "filter subjects"}, hintJump}
 	case "schema_diff":
 		// Sc-06.
 		return []keyHint{{Keys: []string{"[", "]"}, Label: "older, newer pair"}, {Keys: []string{"u"}, Label: "unified"}, {Keys: []string{"esc"}, Label: "back to versions"}, hintJump}

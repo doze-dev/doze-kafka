@@ -9,7 +9,7 @@
     {{if .New}}<div class="li two on" aria-current="page"><span class="col grow"><span class="m el">New subject</span><span class="note">not saved yet</span></span></div>{{end}}
     {{if and (not .List) (not .New)}}<div class="col g4 list-none"><span class="b">{{t "schemas.none.title"}}</span><span class="note">{{t "schemas.none.hint"}}</span></div>{{end}}
     {{range .List}}
-    <a class="li two {{if eq .Name $.Sel}}on{{end}}" href="{{schemaURL .Name}}" data-name="{{.Name}}"{{if eq .Name $.Sel}} aria-current="page"{{end}}>
+    <a class="li two {{if eq .Name $.Sel}}on{{end}}{{if and $.Near (eq .Name $.Near)}} near{{end}}" href="{{schemaURL .Name}}" data-name="{{.Name}}"{{if eq .Name $.Sel}} aria-current="page"{{end}}>
       <span class="col grow"><span class="m el">{{.Name}}</span><span class="note">{{.TypeLabel}}</span></span>
       <span class="pill">{{.TypeShort}}</span><span class="m b">{{.Versions}}</span>
     </a>
@@ -17,7 +17,7 @@
     <div class="note list-note" id="list-none" hidden>No subject matches the filter.</div>
     {{if .Deleted}}<div class="list-deleted" id="list-deleted"><span class="cap">Soft-deleted</span>
       {{range .Deleted}}<div class="li two" data-name="{{.Name}}"><span class="col grow"><span class="m el mut">{{.Name}}</span><span class="note">not listed or looked up</span></span>
-        <button type="button" class="btn sm danger" hx-post="{{schemaURL .Name}}/delete" hx-disabled-elt="this" data-confirm-url="{{confirmURL "schema.delete" "subject" .Name}}" data-confirm-title="{{.Confirm.Title}}" data-confirm-verb="{{.Confirm.Verb}}" hx-confirm="{{.Confirm.Text}}" aria-label="Delete {{.Name}} for good">Delete for good</button></div>{{end}}
+        <button type="button" class="btn sm danger" hx-post="{{schemaURL .Name}}/delete" hx-disabled-elt="this" data-confirm-url="{{confirmURL "schema.delete" "subject" .Name}}" data-confirm-title="{{.Confirm.Title}}" data-confirm-verb="{{.Confirm.Verb}}" hx-confirm="{{.Confirm.Text}}" aria-label="Delete for good: {{.Name}}">Delete for good</button></div>{{end}}
     </div>{{end}}
   </div>
   {{if .List}}<div class="note list-note list-foot ruled">{{len .List}} subject{{if ne (len .List) 1}}s{{end}}{{with .IDs}}{{if .Count}}, {{.Count}} schema{{if ne .Count 1}}s{{end}}, {{if eq .From .To}}id {{.From}}{{else}}ids {{.From}} to {{.To}}{{end}}{{end}}{{end}}.{{with .IDs}}{{if .Unused}} {{if eq (len .Unused) 1}}Id{{else}}Ids{{end}} {{range $i, $u := .Unused}}{{if $i}}, {{end}}{{$u}}{{end}}{{if .More}} and {{.More}} more{{end}} {{if and (eq (len .Unused) 1) (not .More)}}is{{else}}are{{end}} not in use here.{{end}}{{end}}</div>{{end}}
@@ -84,11 +84,58 @@
   {{template "wire_dock" .}}
 {{template "shell_bottom" .}}{{end}}
 
+{{/* Sc-14: no registry. Switched off at start (--schema-registry=false), or its
+     records in meta.db could not be read (Reason). The rail keeps Schemas (SCH-32). */}}
 {{define "schemas_off"}}{{template "shell_top" .}}
-  <main class="main" id="detail">
-    <div class="row sb ce idband"><div class="col"><h1 class="h1">Schemas</h1><span class="note">No schema registry is connected to this console.</span></div></div>
-    {{if .Reason}}<div class="callout" role="alert" data-registry-off-reason><span class="note">The schema registry did not start: its records in meta.db could not be read ({{.Reason}}). The broker runs without it, and nothing in meta.db was changed.</span></div>
-    {{else}}<div class="callout" role="note"><span class="note">doze-kafka serves a Confluent-compatible schema registry beside the broker (<code>--schema-registry</code>, on by default). Start it, or give the console one, to see subjects, versions and decoded messages here.</span></div>{{end}}
+  <aside class="list" aria-label="Subjects">
+    <div class="list-filter list-filter-first"><input class="inp m" type="search" placeholder="Filter subjects" aria-label="Filter Schemas" disabled></div>
+    <div class="col g4 list-none sc-off-none"><span class="b">No registry to list</span><span class="note">Subjects live in the registry, and it is not running. Nothing was lost: schemas, if any, stay in <span class="m">{{.DataDir}}/meta.db</span>.</span></div>
+  </aside>
+  <main class="main sc-none-main" id="detail">
+    <div class="row sb ce idband">
+      <div class="col"><h1 class="h1">Schemas</h1><span class="note">{{if .Reason}}The schema registry did not start for this broker.{{else}}The schema registry is switched off for this broker.{{end}}</span></div>
+      <div class="row g8 ce idband-acts"><button type="button" class="btn pri" data-copy="{{.TurnOn}}" data-copy-command>Copy the command to turn it on</button></div>
+    </div>
+    {{if .Reason}}<div class="callout bad" role="alert" data-registry-off-reason>
+      <div class="row ce g8"><span class="b">Did not start</span><span class="m">meta.db</span></div>
+      <span>The registry's records in meta.db could not be read ({{.Reason}}). The broker runs without it, and nothing in meta.db was changed.</span>
+    </div>
+    {{else}}<div class="callout warn" role="note">
+      <div class="row ce g8"><span class="b">Not running</span><span class="m">--schema-registry=false</span></div>
+      <span>doze-kafka was started with the registry off, so nothing listens for it and clients that point <span class="m">schema.registry.url</span> at it get connection refused. This is a choice made at start, not a fault.</span>
+    </div>{{end}}
+    <div class="row g12">
+      <div class="card grow"><div class="pad col g8">
+        <span class="h2">Turn it on</span>
+        <span class="note">Restart the broker without the flag. The default is on, so removing <span class="m">--schema-registry=false</span> is enough.</span>
+        <pre class="code sc-cmd"><span class="c"># now</span>
+doze-kafka --data-dir {{.DataDir}} --schema-registry=false
+<span class="c"># to turn it on</span>
+{{.TurnOn}}
+<span class="c"># or choose where it listens</span>
+doze-kafka --data-dir {{.DataDir}} --schema-registry-addr {{.Example}}</pre>
+        <span class="note">The console cannot restart the broker for you, so this page gives the command and stops there.</span>
+      </div></div>
+      <div class="card sc-where"><div class="pad col g8">
+        <span class="h2">Where it listens when it is on</span>
+        <div class="card" style="--c: 1fr 1fr">
+          <div class="r h"><span>Mode</span><span>Address</span></div>
+          <div class="r"><span>Beside the broker (default)</span><span class="m el">port 8081 on its address</span></div>
+          <div class="r"><span class="m">--listen</span><span class="m">{{.Example}}</span></div>
+          <div class="r"><span class="m el">--schema-registry-addr</span><span class="m">host:port</span></div>
+        </div>
+        <span class="note">A taken port is an error naming <span class="m">--schema-registry-addr</span>, not a registry that quietly is not there.</span>
+      </div></div>
+    </div>
+    <div class="card pad col g8">
+      <span class="h2">What still works without it</span>
+      <div class="row g16 wrap">
+        <a class="well pad col grow sc-still" href="{{prefix}}/topics"><span class="b">Topics</span><span class="note">Messages show as plain text, JSON or raw bytes. A message with the 5-byte schema header is shown raw, with the reason "registry is off".</span></a>
+        <a class="well pad col grow sc-still" href="{{prefix}}/traffic"><span class="b">Traffic and Trace</span><span class="note">Unchanged. Producers that use a registry fail on the client side, and show up there.</span></a>
+        <a class="well pad col grow sc-still" href="{{prefix}}/connect"><span class="b">Connect an app</span><span class="note">The snippets leave the registry line out while it is off.</span></a>
+      </div>
+    </div>
+    <div class="grow"></div>
   </main>
 {{template "shell_bottom" .}}{{end}}
 
@@ -247,7 +294,12 @@
     {{template "schema_band" .}}
 
     <div class="row ce g8 wrap" id="subject-facts">
-      {{if eq .Tab "compat"}}
+      {{if eq .Tab "used"}}
+      <span class="m">{{len .Versions}} version{{if ne (len .Versions) 1}}s{{end}}</span><span class="mut">·</span>
+      <span class="m">id{{if ne (len .IDList) 1}}s{{end}} {{range $i, $id := .IDList}}{{if $i}}, {{end}}{{$id}}{{end}}</span>
+      {{if .UnknownCount}}<span class="mut">·</span><span class="m warn">{{.UnknownCount}} message{{if eq .UnknownCount 1}} carries{{else}}s carry{{end}} id{{if ne (len .UnknownIDs) 1}}s{{end}} {{range $i, $id := .UnknownIDs}}{{if $i}}, {{end}}{{$id}}{{end}}, unknown here</span>{{end}}
+      {{if .Framed}}<span class="mut">·</span><span class="m">{{num .Decoded}} of {{num .Framed}} decoded</span>{{end}}
+      {{else if eq .Tab "compat"}}
       <span class="m">{{len .Versions}} version{{if ne (len .Versions) 1}}s{{end}}</span><span class="mut">·</span>
       <span class="m">level {{.Compat}}, {{if .CompatOwn}}set on this subject{{else}}the global default{{end}}</span><span class="mut">·</span>
       <span class="m">global default {{.GlobalLevel}}</span><span class="mut">·</span>
@@ -298,7 +350,35 @@
       <div id="level-answer" aria-live="polite"></div>
     </form>
     {{else if eq .Tab "used"}}
-    <div class="callout" id="used-by"><span class="note">The topics whose records carry this subject's ids.</span></div>
+    {{if .Undecoded}}{{with index .Undecoded 0}}<div class="callout warn" role="status" id="undecoded-why">
+      <div class="row ce g8"><span class="b">Shown raw, not decoded</span><span class="m">40403</span><span class="mut">·</span><span class="m">schema id {{.ID}}</span></div>
+      <span class="m">{"error_code":40403,"message":"Schema {{.ID}} not found"}</span>
+      <span class="note">The message starts with magic byte 0 and id {{.ID}}, so a serializer wrote it against a registry that knew id {{.ID}}. This registry has {{idRanges $.IDsInUse}} only. Probably another broker's registry, or a data directory that was reset. The bytes are intact; only the decoding is missing.</span>
+    </div>{{end}}
+    <div class="row ce sb"><span class="h2">Messages that could not be decoded</span><span class="note">{{.UnknownCount}} of {{num .Framed}} on {{.UsedTopic}}</span></div>
+    <div class="card sc-pull" id="undecoded-table" style="--c: 40px 80px 150px 70px 1fr 140px">
+      <div class="r h"><span>Part.</span><span class="ra">Offset</span><span>Key</span><span>Id</span><span>Why</span><span>Open</span></div>
+      {{range $i, $u := .Undecoded}}<div class="r{{if eq $i 0}} on{{end}}" data-row tabindex="0" role="button" data-inspector-open hx-get="{{$u.URL}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" aria-label="Open the message at p{{$u.Partition}} offset {{$u.Offset}}"><span class="m">p{{$u.Partition}}</span><span class="m ra">{{num $u.Offset}}</span><span class="m el">{{$u.Key}}</span><span class="m warn">{{$u.ID}}</span><span class="el">schema id {{$u.ID}} is not registered here (40403)</span><a class="m" href="{{$u.URL}}">message, raw</a></div>{{end}}
+    </div>
+    <div class="row g12">
+      <div class="callout grow"><span class="b">Bring the id back</span><span class="note">Register the schema that wrote it. Ids are handed out in order, so it will not get id {{(index .Undecoded 0).ID}} back; the message stays undecoded unless a registry hands that exact id out. Better: have the producer re-send it.</span></div>
+      <div class="callout grow"><span class="b">Consumers feel it too</span><span class="note">A deserializer using this registry fails on this offset with the same 40403 and stops its poll loop, unless it skips bad records.</span></div>
+    </div>
+    {{else}}
+    <div class="row ce sb"><span class="h2">Which schema id the messages carry</span><span class="note">counted from the 5-byte header of {{if .Unread}}the newest {{num .Scanned}} messages{{else}}every message{{end}} on the {{if eq (len .UsedRows) 0}}topic{{else}}topics{{end}}</span></div>
+    {{if .UsedRows}}<div class="card sc-pull2" id="used-table" style="--c: 1fr 70px 60px 220px 90px 150px">
+      <div class="r h"><span>Topic</span><span>Position</span><span>Id</span><span>Share of messages</span><span class="ra">Messages</span><span>Open</span></div>
+      {{range $i, $r := .UsedRows}}<div class="r{{if eq $i 0}} on{{end}}" data-row><span class="m{{if $r.FirstOfTopic}} b{{else}} mut{{end}}">{{$r.Topic}}</span><span class="m{{if not $r.FirstOfTopic}} mut{{end}}">{{$r.Part}}</span><span class="m">{{$r.ID}} · v{{$r.Version}}</span><div class="row ce g8"><div class="lane grow" aria-hidden="true"><div{{if $r.Old}} class="kid"{{end}} style="width: {{printf "%.1f" $r.Share}}%"></div></div><span class="m">{{printf "%.1f" $r.Share}}%</span></div><span class="m ra">{{num $r.Count}}</span><a class="m" href="{{$r.OpenURL}}">{{$r.Open}}</a></div>{{end}}
+    </div>{{else}}<div class="callout" role="note"><span class="note">No message read on {{if .UsedTopic}}<span class="m">{{.UsedTopic}}</span>{{else}}any topic{{end}} carries one of this subject's ids.</span></div>{{end}}
+    <div class="row g12">
+      {{with .OldRow}}<div class="callout grow"><span class="b">Why {{num .Count}} {{if eq .Count 1}}is{{else}}are{{end}} still on v{{.Version}}</span><span class="note">They were produced while v{{.Version}} was the version the serializer used. They stay readable for as long as the topic keeps them, and decode with v{{.Version}}; nothing is wrong.</span></div>{{end}}
+      <div class="callout grow"><span class="b">Topics with no schema in front</span><span class="note">A topic is listed only if a message on it carries this subject's id. A topic whose messages carry no 5-byte header shows as plain JSON or raw on its own page.</span></div>
+    </div>
+    {{if .UsedTopic}}<form class="card pad col g8" id="open-id" method="get" action="{{schemaURL .Subject}}/open-id">
+      <div class="row sb ce"><span class="h2">Try it</span><span class="note">Open the newest message that carries a given id</span></div>
+      <div class="row g8 ce"><label class="note" for="idin">Schema id</label><input id="idin" class="inp m sc-idin" name="id" value="{{.LatestID}}" inputmode="numeric"><button class="btn" type="submit">Open on {{.UsedTopic}}</button></div>
+    </form>{{end}}
+    {{end}}
     {{else if eq .Tab "raw"}}
     <div class="row sb ce"><span class="note m">{{.RawPath}}</span><button type="button" class="btn sm" data-copy="{{.Raw}}" aria-label="Copy the answer">Copy</button></div>
     <pre class="code sc-raw" id="raw">{{jsonTint .Raw}}</pre>
@@ -432,6 +512,36 @@
 {{else}}<div class="callout bad" role="alert"><div class="row ce g8"><span class="b">Would fail</span><span class="m">v{{.Latest}} at {{.Level}}</span></div><span class="note">{{.Why}}. Existing versions are not re-checked when the level changes; the next register is.</span></div>
 {{end}}
 {{end}}
+
+{{/* Sc-16: a subject the registry does not have. */}}
+{{define "schema_notfound"}}{{template "shell_top" .}}
+  {{template "schema_lp" (dict "List" .List "Sel" "" "Near" .Near)}}
+  <main class="main sc-none-main" id="detail">
+    <div class="row sb ce idband">
+      <div class="col"><h1 class="h1">Schemas</h1><span class="note">No subject called <span class="m">{{.Subject}}</span>. The registry has {{.Others}} other{{if ne .Others 1}}s{{end}}.</span></div>
+      <div class="row g8 ce idband-acts">{{if .Close}}{{with index .Close 0}}<a class="btn pri w5" href="{{schemaURL .Name}}" data-closest>Open {{.Name}}</a>{{end}}{{else}}<a class="btn pri w5" href="{{.RegisterURL}}">Register {{.Subject}}</a>{{end}}</div>
+    </div>
+    <div class="callout deny" role="alert" data-refusal-kind="refused" data-refusal-source="registry" data-refusal-name="{{.Code}}">
+      <div class="row ce g8"><span class="b">Not found</span><span class="m">{{.Code}}</span><span class="mut">·</span><span class="m">HTTP 404</span></div>
+      <span class="m sc-wrap">{{.Raw}}</span>
+      <span class="note">Rule: the subject has no versions, or it was soft deleted. Nothing is wrong with the registry. A real Confluent registry answers <span class="m">GET /subjects/{{.Subject}}/versions</span> with the same status and code.</span>
+    </div>
+    {{if .Close}}<div class="card pad col g8" id="did-you-mean">
+      <span class="h2">Did you mean</span>
+      <div class="card" style="--c: 1fr 80px 70px 120px">
+        <div class="r h"><span>Subject</span><span>Type</span><span class="ra">Versions</span><span></span></div>
+        {{range $i, $s := .Close}}<div class="r{{if eq $i 0}} on{{end}}" data-row><span class="m b">{{$s.Name}}</span><span class="m">{{$s.TypeName}}</span><span class="m ra">{{$s.Versions}}</span><a class="btn sm w5" href="{{schemaURL $s.Name}}">Open</a></div>{{end}}
+      </div>
+      <span class="note">Matched on the name you asked for: {{.Why}} Suggestions are the registry's own subjects, nothing else.</span>
+    </div>{{end}}
+    <div class="row g12">
+      <div class="callout grow"><span class="b">Was it deleted?</span><span class="note">{{if .SoftDeleted}}Yes: <span class="m">{{.Subject}}</span> is soft-deleted. It is listed under Soft-deleted on <a href="{{prefix}}/schemas">Schemas</a>, where it can be deleted for good.{{else}}A soft deleted subject answers 40401 until it is registered again. Look for it with <span class="m">GET /subjects?deleted=true</span>.{{end}}</span></div>
+      <div class="callout grow"><span class="b">Or is it just not registered yet</span><span class="note">A serializer registers its subject on first produce. Make the name here by hand if you want to try the rules first.</span><a class="btn w5 sc-reg-it" href="{{.RegisterURL}}">Register {{.Subject}}</a></div>
+    </div>
+    <div class="grow"></div>
+  </main>
+  {{template "wire_dock" .}}
+{{template "shell_bottom" .}}{{end}}
 
 {{/* Try it's answer: the bytes, or why the value does not fit. */}}
 {{define "schema_try"}}

@@ -112,6 +112,9 @@ func (c *Console) schemaDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	switch tab {
+	case "used":
+		data["View"] = "schema_used"
+		c.usedBy(ctx, subject, versions, data)
 	case "compat":
 		data["GlobalLevel"], _ = c.reg.GlobalCompat(ctx)
 		data["GlobalMode"], _ = c.reg.Mode(ctx)
@@ -147,7 +150,7 @@ func (c *Console) schemaDetail(w http.ResponseWriter, r *http.Request) {
 	data["SubjectNeighbours"] = c.subjectNeighbours(ctx, subject)
 	data["Confirm"] = subjectConfirms(subject, versions, cur.Version)
 	switch {
-	case tab == "compat":
+	case tab == "compat", tab == "used":
 	case data["ByClient"] == true || cur.Type() == schemaregistry.TypeJSON:
 		data["View"] = "schema_one"
 	case cur.Type() == schemaregistry.TypeProtobuf:

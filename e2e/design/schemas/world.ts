@@ -43,6 +43,25 @@ export const INVOICE = `{
 /** Sc-03's draft: dispatch v3, a field with a new number. */
 export const DISPATCH_V3 = 'syntax = "proto3";\npackage harbour.depot;\n\nmessage Dispatch {\n  string order_id = 1;\n  string depot = 2;\n  int32 parcels = 3;\n  string carrier = 4;\n  string slot = 5;\n}\n';
 
+// Avro's binary encoding, enough for an Order: zig-zag varints, strings, doubles.
+function zigzag(n: number): number[] {
+  let v = BigInt.asUintN(64, (BigInt(n) << 1n) ^ (BigInt(n) >> 63n));
+  const out: number[] = [];
+  do { let b = Number(v & 0x7fn); v >>= 7n; if (v) b |= 0x80; out.push(b); } while (v);
+  return out;
+}
+const avroString = (s: string) => { const b = [...Buffer.from(s, 'utf8')]; return [...zigzag(b.length), ...b]; };
+const avroDouble = (d: number) => { const b = Buffer.alloc(8); b.writeDoubleLE(d); return [...b]; };
+/** An Order as version v writes it, framed for the registry with id. */
+export function orderRecord(v: 1 | 2 | 3, id: number, orderId: string): string {
+  const body = [...avroString(orderId), ...zigzag(3), ...avroDouble(84.2)];
+  if (v >= 2) body.push(...avroString('EUR'));
+  if (v >= 3) body.push(...zigzag(0)); // coupon: the union's null branch
+  const frame = Buffer.alloc(5);
+  frame.writeUInt32BE(id, 1);
+  return Buffer.concat([frame, Buffer.from(body)]).toString('base64');
+}
+
 export class SchemasWorld {
   readonly broker: OwnBroker;
   constructor(offset: number) { this.broker = new OwnBroker('schemas-boards', offset); }
@@ -66,7 +85,7 @@ export class SchemasWorld {
 
   async start(): Promise<void> {
     await this.broker.start();
-    for (const t of ['harbour.checkout.orders', 'harbour.depot.dispatch', 'harbour.loyalty.points', 'harbour.inventory.levels', 'harbour.audit.events']) {
+    for (const t of ['harbour.checkout.orders', 'harbour.checkout.orders.dlq', 'harbour.depot.dispatch', 'harbour.loyalty.points', 'harbour.inventory.levels', 'harbour.audit.events']) {
       await fetch(this.console + 'new/topic', { method: 'POST', body: new URLSearchParams({ name: t, partitions: '3' }) });
     }
     const ids = [
@@ -86,11 +105,26 @@ export class SchemasWorld {
     const produced = await fetch(this.console + 'topics/harbour.checkout.orders/produce', { method: 'POST', body: new URLSearchParams({
       key: 'HRB-2026-04811', value: '{"orderId":"HRB-2026-04811","lines":3,"total":84.2,"currency":"EUR","coupon":null}', schema_subject: ORDERS, partition: '1' }) });
     if (!produced.ok) throw new Error(`produce: ${produced.status} ${await produced.text()}`);
+    // Sc-11's: messages on each version's id, on the topic and its dead-letter topic.
+    for (const [topic, v, id, n] of [['harbour.checkout.orders', 1, 1, 6], ['harbour.checkout.orders', 2, 4, 4], ['harbour.checkout.orders', 3, 7, 7],
+      ['harbour.checkout.orders.dlq', 3, 7, 3], ['harbour.checkout.orders.dlq', 2, 4, 1]] as const) {
+      for (let i = 0; i < n; i++) await this.produce(topic, `HRB-2026-0${4700 + i}`, orderRecord(v, id, `HRB-2026-0${4700 + i}`));
+    }
     if (ids.join(',') !== '1,2,3,4,5,6,7,8,9,10') throw new Error(`the boards' ids are 1 to 10 in order, got ${ids}`);
     // The orders subject has BACKWARD as its own level, as Sc-04 and Sc-09 draw it.
     await this.call('PUT', `/config/${encodeURIComponent(ORDERS)}`, { compatibility: 'BACKWARD' });
     await this.call('DELETE', '/subjects/harbour.scratch-value');
     await this.call('DELETE', '/subjects/harbour.scratch-value?permanent=true');
+  }
+
+  async produce(topic: string, key: string, base64: string): Promise<void> {
+    const r = await fetch(this.console + `topics/${encodeURIComponent(topic)}/produce`, { method: 'POST', body: new URLSearchParams({ key, value: base64, value_enc: 'base64', partition: '0' }) });
+    if (!r.ok) throw new Error(`produce to ${topic}: ${r.status} ${await r.text()}`);
+  }
+
+  /** Sc-17: a message on id 9, which the world deleted for good. */
+  async produceOrphan(): Promise<void> {
+    await this.produce('harbour.checkout.orders', 'HRB-2026-04798', orderRecord(2, 9, 'HRB-2026-04798'));
   }
 
   /** Sc-18: the audit subject, as a Java client's serializer registers it on its first produce. */

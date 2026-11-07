@@ -4,7 +4,7 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 28786546,
+      "binaryBytes": 28836882,
       "idleHeapBytes": 1375088,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
@@ -12,7 +12,7 @@
       "where": "macOS 27, Apple M-series, native"
     },
     "linux/arm64": {
-      "binaryBytes": 27918496,
+      "binaryBytes": 27984032,
       "idleHeapBytes": 1383880,
       "idleHeapNoiseBytes": 7160,
       "go": "go1.27.3",
@@ -327,6 +327,34 @@
       "from": 28415122,
       "to": 28786546,
       "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,769,714 and Sc-12's deletes of 2026-11-08 (16,832)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28786546,
+      "to": 28836882,
+      "reason": "Schemas: Used by (Sc-11, Sc-17: the ids the topic's messages carry, the undecoded ones), a subject not found (Sc-16) and the registry off (Sc-14): 50,336 bytes"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28836882,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,786,546 and Sc-11, Sc-14, Sc-16 and Sc-17 of 2026-11-08 (50,336)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27918496,
+      "to": 27984032,
+      "reason": "Schemas: Used by, not found and registry off, the same code as the darwin/arm64 raise of this date to 28,836,882: one 64 KiB page (built in golang:1.27.3 on linux/arm64)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27590816,
+      "to": 27984032,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 27,918,496 and the pages of 2026-11-08 to 27,984,032 (65,536)"
     }
   ]
 }

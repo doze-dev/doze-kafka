@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net"
 	"net/http"
+	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -32,7 +35,15 @@ func (c *Console) registryOff(w http.ResponseWriter, r *http.Request) bool {
 		c.fail(w, r, fmt.Errorf("%w: no schema registry is connected to this console", errNotFound))
 		return true
 	}
-	c.render(w, r, "schemas_off", map[string]any{"Page": "schemas", "Title": "Schemas", "Reason": c.regOff})
+	dir := c.facts.DataDir
+	if dir == "" {
+		dir = "./data"
+	}
+	if strings.ContainsAny(dir, " '\"") {
+		dir = "'" + strings.ReplaceAll(dir, "'", `'\''`) + "'"
+	}
+	c.render(w, r, "schemas_off", map[string]any{"Page": "schemas", "View": "schemas_off", "Title": "Schemas", "Reason": c.regOff,
+		"DataDir": dir, "TurnOn": "doze-kafka --data-dir " + dir + " --schema-registry", "Example": registryExample(c.be.displayAddr())})
 	return true
 }
 
@@ -197,24 +208,102 @@ func schemaFromForm(r *http.Request) (schemaBody, error) {
 	return b, nil
 }
 
-// failSubject is failResource for a subject, which is in the Schemas section.
+// registryExample is where the registry would listen by default: port 8081 on the
+// broker's own host.
+func registryExample(broker string) string {
+	host, _, err := net.SplitHostPort(broker)
+	if err != nil || host == "" {
+		return "host:8081"
+	}
+	return net.JoinHostPort(host, "8081")
+}
+
+// failSubject is failResource for a subject: a page asked for a subject the
+// registry does not have gets Sc-16, the registry's refusal and the subjects it
+// does have that are close to the name, whether it was soft-deleted, and a way to
+// register it; anything else is the foundation's refusal.
 func (c *Console) failSubject(w http.ResponseWriter, r *http.Request, err error, subject string) {
 	f := refusalFor(err)
 	if !f.NotFound || !wantsPage(r) {
 		c.fail(w, r, err)
 		return
 	}
-	f.Heading = "Subject not found"
-	f.Message = fmt.Sprintf("There is no subject named %q in the schema registry.", subject)
-	page := errorPage{Section: "schemas", Back: schemasPath(c.prefix)}
-	if rows, lerr := c.reg.Subjects(r.Context()); lerr == nil {
-		var names []string
-		for _, row := range rows {
-			names = append(names, row.Name)
-		}
-		page.Suggestions = c.closeNames(names, subject, c.schemaURL)
+	ctx := r.Context()
+	list, _ := c.reg.Subjects(ctx)
+	var names []string
+	byName := map[string]SubjectRow{}
+	for _, row := range list {
+		names = append(names, row.Name)
+		byName[row.Name] = row
 	}
-	c.renderError(w, r, f, page)
+	var close []SubjectRow
+	for _, s := range c.closeNames(names, subject, c.schemaURL) {
+		if row, ok := byName[s.Name]; ok {
+			close = append(close, row)
+		}
+	}
+	code, msg := 40401, fmt.Sprintf("Subject '%s' not found.", subject)
+	var re *regError
+	if errors.As(err, &re) {
+		code, msg = re.Code, re.Message
+	}
+	raw, _ := json.Marshal(map[string]any{"error_code": code, "message": msg})
+	data := map[string]any{"List": list, "Page": "schemas", "View": "schema_notfound", "Title": "Subject not found",
+		"Subject": subject, "Close": close, "Others": len(list), "Code": code, "Raw": string(raw),
+		"RegisterURL": newSchemaPath(c.prefix) + "?subject=" + url.QueryEscape(subject)}
+	if deleted, err := c.reg.DeletedSubjects(ctx); err == nil {
+		data["SoftDeleted"] = slices.Contains(deleted, subject)
+	}
+	if len(close) > 0 {
+		data["Why"] = closeWhy(subject, close[0].Name)
+	}
+	if len(close) > 0 {
+		data["Near"] = close[0].Name
+	}
+	// The dock is the calls that named this subject: a client's lookup that was told 40401.
+	maps.Copy(data, c.dockData(DockFilter{Subject: subject}))
+	w.Header().Set("X-Doze-Page", "error")
+	c.shellData(r, data)
+	c.execute(w, http.StatusNotFound, "schema_notfound", data, true)
+}
+
+// closeWhy is Sc-16's "Matched on the name you asked for: one letter short of
+// orders."
+func closeWhy(asked, found string) string {
+	d := editDistance(strings.ToLower(asked), strings.ToLower(found))
+	// The word of the name that differs, when one does ("orders" against "order").
+	of := "it"
+	if d == 1 {
+		split := func(s string) []string {
+			return strings.FieldsFunc(strings.ToLower(s), func(r rune) bool { return r == '.' || r == '-' || r == '_' })
+		}
+		have := map[string]bool{}
+		for _, w := range split(asked) {
+			have[w] = true
+		}
+		var differ []string
+		for _, w := range split(found) {
+			if !have[w] {
+				differ = append(differ, w)
+			}
+		}
+		if len(differ) == 1 {
+			of = differ[0]
+		}
+	}
+	switch {
+	case d == 1 && len(found) == len(asked)+1:
+		return "one letter short of " + of + "."
+	case d == 1 && len(asked) == len(found)+1:
+		return "one letter more than " + of + "."
+	case d == 1:
+		return "one letter differs from " + of + "."
+	case strings.Contains(found, asked):
+		return fmt.Sprintf("%q is part of its name.", asked)
+	case strings.Contains(asked, found):
+		return fmt.Sprintf("its name is part of %q.", asked)
+	}
+	return fmt.Sprintf("%d letters differ.", d)
 }
 
 // schemaDelete is Sc-12's two deletes. A version is soft-deleted: it leaves the

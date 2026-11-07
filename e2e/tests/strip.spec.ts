@@ -33,7 +33,7 @@ test.afterAll(() => { hold?.kill('SIGTERM'); });
 
 const PAGES = [
   '', 'topics', 'topics/seed-orders', 'topics/seed-orders?tab=partitions', 'topics/seed-orders?tab=config',
-  'groups', 'groups/g-lag', 'groups/g-lag?tab=offsets', 'groups/strip-hold-group?tab=members', 'schemas', 'schemas/seed-events-value',
+  'groups', 'groups/g-lag', 'groups/g-lag?tab=offsets', 'groups/strip-hold-group?tab=members', 'schemas', 'schemas/seed-events-value', 'schemas/seed-events-value?tab=used',
   'trace', 'traffic', 'traffic?view=clients', 'access', 'access/check?principal=User:ANONYMOUS&operation=read&resource=topic&name=seed-orders',
   'new/acl', 'cluster', 'connect', 'new/topic', 'new/schema',
 ];
@@ -124,7 +124,7 @@ async function effect(page: Page, path: string, h: Hint) {
       await press(page, ['r']);
       await expect(page, where).toHaveURL(/[?&]tab=offsets#reset/);
       return;
-    case 'open': case 'open subject': case 'open client': case 'open member': case 'follow':
+    case 'open': case 'open subject': case 'open client': case 'open member': case 'follow': case 'open messages': case 'open message':
       return opens(page, where);
     case 'close panel': case 'close':
       await opens(page, where);

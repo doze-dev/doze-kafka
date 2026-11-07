@@ -1,6 +1,7 @@
 package console
 
 import (
+	"encoding/json"
 	"net/url"
 	"strings"
 	"testing"
@@ -129,5 +130,136 @@ func TestSoftDeletedSubjectIsListedAndRemovable(t *testing.T) {
 	}
 	if strings.Contains(req(t, c, "GET", "/_console/schemas", nil).Body.String(), `id="list-deleted"`) {
 		t.Error("the section stays with nothing in it")
+	}
+}
+
+// Sc-16: a subject the registry does not have, close names offered, a soft-deleted
+// one said to be so, and the way to register it.
+func TestSubjectNotFoundPage(t *testing.T) {
+	c, _, _ := newRegistryConsole(t)
+	register(t, c, "orders-value", userV1)
+	register(t, c, "orders-key", userV1)
+	rec := req(t, c, "GET", "/_console/schemas/order-value", nil)
+	page := readable(rec.Body.String())
+	for _, want := range []string{"No subject called order-value. The registry has 2 others.", "Open orders-value", "Not found", "40401", "HTTP 404",
+		"Did you mean", "orders-value", "one letter short of orders", "Was it deleted?", "GET /subjects?deleted=true", "Register order-value", "open closest"} {
+		if rec.Code != 404 || !strings.Contains(page, want) {
+			t.Errorf("Sc-16 (%d) is missing %q", rec.Code, want)
+		}
+	}
+	if !strings.Contains(rec.Body.String(), `href="/_console/new/schema?subject=order-value"`) {
+		t.Error("no way to register it")
+	}
+	// A soft-deleted subject is said to be one.
+	register(t, c, "gone-value", userV1)
+	if err := c.reg.SoftDeleteSubject(t.Context(), "gone-value"); err != nil {
+		t.Fatal(err)
+	}
+	if b := readable(req(t, c, "GET", "/_console/schemas/gone-value", nil).Body.String()); !strings.Contains(b, "gone-value is soft-deleted") {
+		t.Errorf("a soft-deleted subject: %s", between(b, "Was it deleted?", "Or is it"))
+	}
+	// Nothing close: Register is the band's button.
+	if b := readable(req(t, c, "GET", "/_console/schemas/zzzzzzzzzzzzzz", nil).Body.String()); strings.Contains(b, "Did you mean") || !strings.Contains(b, "Register zzzzzzzzzzzzzz") {
+		t.Errorf("nothing close: %s", between(b, "Schemas", "Rule"))
+	}
+	for asked, want := range map[string]string{"orders": `"orders" is part of its name.`, "orders-value-x": `its name is part of "orders-value-x".`, "orders-valu": "one letter short of value.", "orders-valuee": "one letter more than value.", "ordrs-valeu": "3 letters differ.", "orders-valve": "one letter differs from value.", "order-value": "one letter short of orders."} {
+		if got := closeWhy(asked, "orders-value"); got != want {
+			t.Errorf("%s: %q, want %q", asked, got, want)
+		}
+	}
+}
+
+// SCH-32 (Sc-14): with no registry the rail keeps Schemas, marked off, and the page
+// says why (switched off, or its records could not be read), with the command that
+// turns it on, where it would listen, and what still works.
+func TestRailKeepsSchemasWhenOff(t *testing.T) {
+	for _, reason := range []string{"", "meta.db: a registry record does not parse"} {
+		c, _ := newTestConsoleAddr(t, func(o *Options) {
+			o.RegistryOffReason = reason
+			o.Facts.DataDir = "/var/lib/doze kafka"
+		})
+		rec := req(t, c, "GET", "/_console/schemas", nil)
+		page := readable(rec.Body.String())
+		for _, want := range []string{"No registry to list", "Copy the command to turn it on", "Turn it on", "Where it listens when it is on", "What still works without it",
+			"doze-kafka --data-dir '/var/lib/doze kafka' --schema-registry", ":8081", "copy command"} {
+			if rec.Code != 200 || !strings.Contains(page, want) {
+				t.Errorf("%q: Sc-14 (%d) is missing %q", reason, rec.Code, want)
+			}
+		}
+		if reason == "" && (!strings.Contains(page, "switched off") || !strings.Contains(page, "--schema-registry=false")) {
+			t.Error("switched off: not said")
+		}
+		if reason != "" && (!strings.Contains(page, "did not start") || !strings.Contains(page, reason)) {
+			t.Errorf("did not start: %s", between(page, "Schemas", "Turn it on"))
+		}
+		if !strings.Contains(between(rec.Body.String(), `<nav class="rail"`, "</nav>"), `data-ct="schemas-off"`) {
+			t.Error("the rail item is not marked off")
+		}
+	}
+	if got := registryExample("broker.example:9092"); got != "broker.example:8081" {
+		t.Error(got)
+	}
+	if got := registryExample("nonsense"); got != "host:8081" {
+		t.Error(got)
+	}
+}
+
+// Sc-11 and Sc-17: which of the subject's ids the topic's messages carry, and the
+// messages that carry an id the registry does not have.
+func TestUsedByTab(t *testing.T) {
+	c, _, _ := newRegistryConsole(t)
+	topicWith(t, c, "orders", 1, 0)
+	register(t, c, "orders-value", userV1)
+	produce := func(form url.Values) {
+		t.Helper()
+		if rec := req(t, c, "POST", "/_console/topics/orders/produce", form); rec.Code >= 400 {
+			t.Fatalf("produce: %d %s", rec.Code, rec.Body)
+		}
+	}
+	for i := 0; i < 3; i++ {
+		produce(url.Values{"key": {"a"}, "value": {`{"id": 1}`}, "schema_subject": {"orders-value"}})
+	}
+	register(t, c, "orders-value", userV2)
+	produce(url.Values{"key": {"b"}, "value": {`{"id": 2, "email": null}`}, "schema_subject": {"orders-value"}})
+	// An id nothing registered: magic byte 0, id 99, then bytes.
+	produce(url.Values{"key": {"orphan"}, "value": {"AAAAAGMCAgI="}, "value_enc": {"base64"}})
+
+	page := readable(req(t, c, "GET", "/_console/schemas/orders-value?tab=used", nil).Body.String())
+	for _, want := range []string{"ids 1, 2", "1 message carries id 99, unknown here", "4 of 5 decoded", "Shown raw, not decoded", "schema id 99",
+		"This registry has ids 1 to 2 only", "Messages that could not be decoded", "orphan", "message, raw", "Bring the id back"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("Sc-17 is missing %q:\n%s", want, between(page, "Used by", "The wire"))
+		}
+	}
+	// Without the orphan the tab is Sc-11's: each id, its share and where to open it.
+	c2, _, _ := newRegistryConsole(t)
+	topicWith(t, c2, "orders", 1, 0)
+	register(t, c2, "orders-value", userV1)
+	for i := 0; i < 3; i++ {
+		req(t, c2, "POST", "/_console/topics/orders/produce", url.Values{"key": {"a"}, "value": {`{"id": 1}`}, "schema_subject": {"orders-value"}})
+	}
+	register(t, c2, "orders-value", userV2)
+	req(t, c2, "POST", "/_console/topics/orders/produce", url.Values{"key": {"b"}, "value": {`{"id": 2, "email": null}`}, "schema_subject": {"orders-value"}})
+	page = readable(req(t, c2, "GET", "/_console/schemas/orders-value?tab=used", nil).Body.String())
+	for _, want := range []string{"Which schema id the messages carry", "2 · v2", "25.0%", "1 · v1", "75.0%", "newest on this id", "offsets 0 to 2", "Why 3 are still on v1", "Open on orders"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("Sc-11 is missing %q:\n%s", want, between(page, "Used by", "The wire"))
+		}
+	}
+	// Try it: the newest message on an id, or a refusal.
+	if rec := req(t, c2, "GET", "/_console/schemas/orders-value/open-id?id=1", nil); rec.Code != 303 || !strings.Contains(rec.Header().Get("Location"), "/topics/orders/message?partition=0&offset=2") {
+		t.Errorf("open id 1: %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+	if rec := req(t, c2, "GET", "/_console/schemas/orders-value/open-id?id=55", nil); rec.Code != 404 {
+		t.Errorf("an id no message carries: %d", rec.Code)
+	}
+	for in, want := range map[string]string{"[[1,8],[10,10]]": "ids 1 to 8 and 10", "[[3,3]]": "id 3", "[]": "no ids", "[[1,2],[4,4],[6,9]]": "ids 1 to 2, 4 and 6 to 9"} {
+		var rs [][2]int
+		if err := json.Unmarshal([]byte(in), &rs); err != nil {
+			t.Fatal(err)
+		}
+		if got := idRangesText(rs); got != want {
+			t.Errorf("%s: %q, want %q", in, got, want)
+		}
 	}
 }

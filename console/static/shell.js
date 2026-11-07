@@ -1040,15 +1040,24 @@
         // The click puts focus on the inspector's Close button; left alone, this
         // same Enter then activates that button and shuts what it just opened.
         e.preventDefault();
-        cursorEl.click();
+        // A row that is not a link itself opens what its own link does (Sc-11's
+        // "newest on this id", Sc-17's "message, raw").
+        var opens = cursorEl.matches("a[href], button, [hx-get], [data-inspector-open]") ? cursorEl : (cursorEl.querySelector("a[href]") || cursorEl);
+        opens.click();
         return;
       }
       // A page that is one question (Ac-05's checker, data-enter) asks it.
       var ask = document.querySelector("main form[data-enter]");
       if (ask) { e.preventDefault(); ask.requestSubmit(); return; }
+      // A subject not found (Sc-16): ↵ opens the closest one.
+      var closest = document.querySelector("main [data-closest]");
+      if (closest) { e.preventDefault(); closest.click(); return; }
       return false;
     },
     create: function () {
+      // Sc-14: c copies the command that turns the registry on.
+      var cc = document.querySelector("main [data-copy-command]");
+      if (cc) { cc.click(); return; }
       var nb = document.querySelector("[data-create]");
       if (nb) nb.click(); else return false;
     },
