@@ -76,3 +76,7 @@ c222b1b9de5ba7a30afb6d07047abb939ae8306a28853ed1171d6a075406b485  Gr-06-Reset.dc
 86cf4fd22c843989a53afc7e86918cc0550a58fc2dd6013492ca93f7941f445f  Gr-16-Denied.dc.html
 ae85e4da13cce714c90d136a1f4f885389d3dc2c8748f887add54c82d88cfa42  Gr-17-Flapping.dc.html
 f80b058253c7563d9387caad0181853a761fde5a486fa3998e6eb9804a52c084  Gr-18-Empty-Expired.dc.html
+7208cb3b3b8d5e4c885ef0ce75697d93ed2fea1e078edfe4eb9657f18b5a66cd  Sc-01-None.dc.html
+2a60f37649d7d2edf3fce4aec56cdb7eb2aa4174abe63e23fbffb1e762cce750  Sc-02-Register.dc.html
+05c6606ef3115a595200d00cefbb8a0b678a3ed02c69dc289daff8b6773044d4  Sc-03-Register-Check.dc.html
+ff29dcffe4f1139012d80ae59f6a08f31deeef2e9caadebe3538ea2de8e6322c  Sc-04-Incompatible.dc.html
