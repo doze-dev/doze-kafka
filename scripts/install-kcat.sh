@@ -48,6 +48,10 @@ name=librdkafka
 echo "== libserdes v$LIBSERDES_VERSION ($LIBSERDES_COMMIT)"
 fetch confluentinc/libserdes "$LIBSERDES_COMMIT" "$work/libserdes"
 name=libserdes
+# glibc 2.34+ declares C11's once_flag and call_once in <stdlib.h> (under _GNU_SOURCE,
+# which libserdes's bundled tinycthread sets), and GCC 15 refuses tinycthread's own
+# definitions beside them: compat/kcat/libserdes-glibc-once.patch uses libc's.
+patch -d "$work/libserdes" -p1 <"$(dirname "$0")/../compat/kcat/libserdes-glibc-once.patch" >"$logs/$name-patch" 2>&1 || { cat "$logs/$name-patch"; exit 1; }
 ( cd "$work/libserdes" && ./configure --prefix="$prefix" >"$logs/$name-configure" 2>&1 || { tail -40 "$logs/$name-configure"; exit 1; }
   make -j"$jobs" >"$logs/$name-make" 2>&1 || { tail -60 "$logs/$name-make"; exit 1; }
   $sudo make install >"$logs/$name-install" 2>&1 || { tail -40 "$logs/$name-install"; exit 1; } )
