@@ -139,7 +139,9 @@ func (c *Console) routeTable() []routeRow {
 		// Schemas: the built-in registry.
 		get("/schemas", specSchemas, "the list", c.schemas),
 		get("/new/schema", specSchemas, "the register form", c.schemaCreatePage),
-		post("/new/schema", specSchemas, "register a first version", c.schemaCreate),
+		post("/new/schema", specSchemas, "register a version: a new subject's first, or the next", c.schemaCreate),
+		withoutMutating(post("/new/schema/check", specSchemas, "whether the draft parses and may follow the subject's versions: asks the registry, and sends nothing it stores", c.schemaRegisterCheck)),
+		withoutMutating(post("/new/schema/fix", specSchemas, "the draft with a finding's fix applied; sends nothing", c.schemaRegisterFix)),
 		get("/schemas/{subject}", specSchemas, "one subject", c.schemaDetail),
 		get("/schemas/{subject}/diff", specSchemas, "two versions compared", c.schemaDiff),
 		withoutMutating(post("/schemas/{subject}/try", specSchemas, "encode or check a JSON value with a version; sends nothing to the registry", c.schemaTry)),

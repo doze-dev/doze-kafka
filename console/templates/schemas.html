@@ -6,7 +6,8 @@
   <div class="list-filter list-filter-first"><input class="inp m" type="search" placeholder="Filter subjects" aria-label="Filter Schemas" data-filter-target=".list .li" data-filter-none="#list-none" spellcheck="false" autocomplete="off"></div>
   {{if and .List .Cols}}<div class="row sb list-cols"><span class="cap">Subject</span><span class="cap">Versions</span></div>{{end}}
   <div class="list-scroll">
-    {{if not .List}}<div class="col g4 list-none"><span class="b">{{t "schemas.none.title"}}</span><span class="note">{{t "schemas.none.hint"}}</span></div>{{end}}
+    {{if .New}}<div class="li two on" aria-current="page"><span class="col grow"><span class="m el">New subject</span><span class="note">not saved yet</span></span></div>{{end}}
+    {{if and (not .List) (not .New)}}<div class="col g4 list-none"><span class="b">{{t "schemas.none.title"}}</span><span class="note">{{t "schemas.none.hint"}}</span></div>{{end}}
     {{range .List}}
     <a class="li two {{if eq .Name $.Sel}}on{{end}}" href="{{schemaURL .Name}}" data-name="{{.Name}}"{{if eq .Name $.Sel}} aria-current="page"{{end}}>
       <span class="col grow"><span class="m el">{{.Name}}</span><span class="note">{{.TypeLabel}}</span></span>
@@ -87,27 +88,112 @@
   </main>
 {{template "shell_bottom" .}}{{end}}
 
-{{define "schema_create"}}{{template "shell_top" .}}
-  {{template "schema_lp" (dict "List" .List "Sel" "")}}
-  <main class="main" id="detail">
-    <div class="backrow"><a class="btn sm" href="{{prefix}}/schemas">‹ Schemas</a></div>
-    <div class="row sb ce idband"><div class="col"><h1 class="h1">Register schema</h1><span class="note">The first version of a subject. The registry checks that the text parses.</span></div></div>
-    <form class="form-page" hx-post="{{newSchemaURL ""}}" hx-disabled-elt="find button[type=submit]">
-      <div class="card form-sec"><div class="panel-h"><h2>Subject</h2></div><div class="form-b">
-        <div class="field"><label for="f-subject">Subject <span class="hint">{{subjectNameRule}}</span></label><input class="input mono" id="f-subject" name="subject" value="{{.Subject}}" placeholder="orders-value" required autocomplete="off" autofocus></div>
-        <div class="field narrow"><label for="f-type">Language</label>
-          <select class="input" id="f-type" name="type">{{range .Types}}<option value="{{.}}">{{.}}</option>{{end}}</select></div>
-        <div class="field"><label for="f-schema">Schema</label><textarea class="input mono schema-text" id="f-schema" name="schema" rows="14" required spellcheck="false" placeholder='{"type":"record","name":"Order","fields":[{"name":"id","type":"long"}]}'></textarea></div>
-      </div></div>
-      <div class="err form-err" data-err-slot hidden role="alert"></div>
-      <div class="det-foot">
-        <a class="btn" href="{{prefix}}/schemas">Cancel</a>
-        <button class="btn pri" type="submit">Register</button>
+{{/* Register (Sc-02 to Sc-04, Sc-10): a new subject, or the next version of one. The form
+     is the page's column; Check answers in #reg-answer, and so does Register when the
+     registry refuses (Sc-04). */}}
+{{define "schema_register"}}{{template "shell_top" .}}
+  {{template "schema_lp" (dict "List" .List "Sel" .Sel "New" (not .P.Existing))}}
+  <main class="main sc-main" id="detail">
+    <div class="backrow"><a class="btn sm" href="{{if .P.Existing}}{{.SubjectURL}}{{else}}{{prefix}}/schemas{{end}}" data-esc>‹&nbsp;{{if .P.Existing}}{{.P.Draft.Subject}}{{else}}Schemas{{end}}</a></div>
+    <form id="reg-form" class="sc-reg-form" hx-post="{{newSchemaURL ""}}/check" hx-target="#reg-answer" hx-select="unset" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]" data-mod-enter>
+    <div class="row sb ce idband">
+      <div class="col"><h1 class="h1">{{if .P.Existing}}Register a new version{{else}}Register schema{{end}}</h1>
+        <span class="note">{{if .P.Existing}}Subject <a class="m" href="{{.SubjectURL}}">{{.P.Draft.Subject}}</a> · latest is v{{.P.Latest}}, id {{.P.LatestID}} · level {{.P.Level}}{{if not .P.Own}} (global){{end}}{{else}}A new subject, or a new version of an existing one. Same fields as <span class="m">POST /subjects/{subject}/versions</span>.{{end}}</span></div>
+      <div class="row g8 ce idband-acts">{{template "schema_reg_head" (dict "Existing" .P.Existing "Latest" .P.Latest "OK" false)}}</div>
+    </div>
+
+    <div class="card"><div class="pad col g12">
+      <div class="row g16">
+        <div class="col g4 grow"><label class="b" for="f-subject">Subject</label><input id="f-subject" class="inp m" name="subject" value="{{.P.Draft.Subject}}" placeholder="orders-value" required autocomplete="off" spellcheck="false"{{if .P.Existing}} readonly{{else}} autofocus{{end}}>
+          {{if not .P.Existing}}<span class="note">Topic-name strategy: the subject is the topic name plus <span class="m">-value</span> (or <span class="m">-key</span>).{{if .P.Topic}} The topic <span class="m">{{.P.Topic}}</span> {{if .P.TopicOK}}exists{{else}}does not exist yet; a subject can be registered before its topic{{end}}.{{end}}</span>{{end}}</div>
+        <div class="col g4 sc-opt"><span class="b">Type</span>
+          <div class="seg sc-seg" role="radiogroup" aria-label="Schema type">{{range .Types}}<label class="{{if eq . $.P.Draft.Type}}on{{end}}"><input type="radio" class="sr-only" name="type" value="{{.}}"{{if eq . $.P.Draft.Type}} checked{{end}}{{if $.P.Existing}} disabled{{end}}>{{if eq . "PROTOBUF"}}Protobuf{{else if eq . "JSON"}}JSON Schema{{else}}Avro{{end}}</label>{{end}}</div>
+          {{if .P.Existing}}<input type="hidden" name="type" value="{{.P.Draft.Type}}">{{else}}<span class="note">Sent as <span class="m">schemaType</span>; Avro is the default when it is left out.</span>{{end}}</div>
       </div>
+      <div class="col g4">
+        <div class="row sb ce"><label class="b" for="f-schema">Schema</label><span class="note" id="reg-stats">{{template "schema_reg_stats" (dict "D" .P.Draft)}}</span></div>
+        {{template "schema_reg_text" .}}
+      </div>
+      <div class="row g16">
+        <div class="col g4 grow" id="reg-refs"><span class="b">References</span>
+          {{if .P.Draft.Refs}}<div class="card sc-refs" style="--c: 1fr 1fr 56px 52px">
+            <div class="r h"><span>Name used in the schema</span><span>Subject</span><span>Version</span><span></span></div>
+            {{range .P.Draft.Refs}}<div class="r" data-ref-row><span class="m el">{{.Name}}</span><a class="m el" href="{{schemaURL .Subject}}?version={{.Version}}">{{.Subject}}</a><span class="m">{{.Version}}</span><button type="button" class="btn ghost sm" aria-label="Remove reference" data-ref-remove>×</button>
+              <input type="hidden" name="ref_name" value="{{.Name}}"><input type="hidden" name="ref_subject" value="{{.Subject}}"><input type="hidden" name="ref_version" value="{{.Version}}"></div>{{end}}
+          </div>
+          <div class="row g8 ce"><button type="button" class="btn sm" data-add-ref>Add reference</button><span class="note">A reference is the pair subject and version. The registry parses this schema with that one in scope. A referenced version cannot be deleted while anything references it (error 42206).</span></div>
+          {{else if .P.Existing}}<div class="row ce g8 sc-refs-few"><span class="note">None.</span><button type="button" class="btn ghost sm" data-add-ref>Add reference</button></div>
+          {{else}}<div class="well row sb ce sc-refs-none"><span class="note">None. A reference names another subject's version this schema uses (Avro named type, JSON Schema <span class="m">$ref</span>, Protobuf <span class="m">import</span>).</span><button type="button" class="btn sm" data-add-ref>Add reference</button></div>{{end}}
+          <template id="ref-row-new"><div class="row g8 ce sc-ref-new" data-ref-row><input class="inp m" name="ref_name" placeholder="name in the schema" aria-label="Name used in the schema"><input class="inp m" name="ref_subject" placeholder="subject" aria-label="Subject"><input class="inp m sc-ref-v" name="ref_version" placeholder="1" aria-label="Version" inputmode="numeric"><button type="button" class="btn ghost sm" aria-label="Remove reference" data-ref-remove>×</button></div></template>
+        </div>
+        {{if .P.Existing}}<label class="row ce g8 sc-opt"><input type="checkbox" name="normalize" value="1" aria-label="Normalize"{{if .P.Draft.Normalize}} checked{{end}}> <span title="?normalize=true: field order and namespaces are rewritten to the canonical form, so the same schema written two ways gets one id">Normalize before storing</span></label>
+        {{else}}<div class="col g4 sc-opt"><span class="b">Options</span>
+          <label class="row ce g8"><input type="checkbox" name="normalize" value="1" aria-label="Normalize"{{if .P.Draft.Normalize}} checked{{end}}> <span>Normalize before storing <span class="m mut">?normalize=true</span></span></label>
+          <span class="note">Rewrites field order and namespaces to the canonical form, so the same schema written two ways gets one id.</span></div>{{end}}
+      </div>
+      <div class="err form-err" data-err-slot data-err-html hidden role="alert"></div>
+    </div></div>
+
+    {{if .Resolved}}<div class="col g8" id="reg-resolved"><div class="row sb ce"><span class="h2">Resolved view</span><span class="note">referenced types inlined, as a client sees it</span></div>
+      <pre class="code sc-text sc-pull">{{jsonTint .Resolved}}</pre></div>{{end}}
+
+    <div id="reg-answer" aria-live="polite">{{template "schema_reg_first" .P}}</div>
+    {{template "schema_reg_acts" (dict "P" .P "OK" false)}}
     </form>
+    <div class="grow"></div>
   </main>
   {{template "wire_dock" .}}
 {{template "shell_bottom" .}}{{end}}
+
+{{define "schema_reg_stats"}}{{with .D}}{{if eq .Type "PROTOBUF"}}Protobuf{{else if eq .Type "JSON"}}JSON Schema{{else}}Avro{{end}}{{if .Schema}} · {{lines .Schema}} line{{if ne (lines .Schema) 1}}s{{end}}{{end}}{{if not .Schema}} · empty{{else if $.Parsed}} · parses{{else if eq .Type "PROTOBUF"}}{{else if jsonValid .Schema}} · parses{{else}} · not JSON yet{{end}}{{end}}{{end}}
+
+{{/* The schema field: the editor, with the board's line numbers. Its own element, so a
+     fix (Sc-04's Add default) replaces the text and nothing else. */}}
+{{define "schema_reg_text"}}<div class="row sc-code" id="reg-text"><pre class="code sc-gutter" aria-hidden="true" data-gutter>{{gutter .P.Draft.Schema}}</pre><textarea class="code grow sc-editor" id="f-schema" name="schema" rows="{{if .P.Draft.Schema}}{{lines .P.Draft.Schema}}{{else}}11{{end}}" required spellcheck="false" autocomplete="off" aria-label="Schema">{{.P.Draft.Schema}}</textarea></div>{{end}}
+
+{{/* A fix's answer: the text with it applied, and the actions with Check again. */}}
+{{define "schema_reg_fixed"}}{{template "schema_reg_text" .}}
+{{template "schema_reg_acts" (dict "P" .P "Checked" true "OOB" true)}}{{end}}
+
+{{define "schema_reg_head"}}<button class="btn pri" type="button" id="reg-head-btn" data-register{{if not .OK}} disabled{{end}}{{if .OOB}} hx-swap-oob="true"{{end}} hx-post="{{newSchemaURL ""}}" hx-include="#reg-form" hx-target="#reg-answer" hx-select="unset" hx-swap="innerHTML" hx-disabled-elt="this">Register{{if .Existing}} v{{inc .Latest}}{{end}}</button>{{end}}
+
+{{define "schema_reg_first"}}<div class="callout"><span class="b">Not checked yet</span><span class="note">{{if .Existing}}Check compares this with v{{.Latest}} at {{.Level}}{{if not .Own}} (global){{end}}{{if hasSuffix .Level "_TRANSITIVE"}}, and every version before it{{end}}. Nothing is stored until you register.{{else}}New subject: there is no earlier version to be compatible with, so Register will create <span class="m">v1</span>.{{if .NextID}} The first stored schema gets the next free id ({{.NextID}}).{{end}}{{end}}</span></div>{{end}}
+
+{{define "schema_reg_acts"}}<div class="row g8 ce" id="reg-acts"{{if .OOB}} hx-swap-oob="true"{{end}}>
+  {{if .Fix}}<button class="btn" type="button" hx-post="{{newSchemaURL ""}}/fix" hx-include="#reg-form" hx-vals='{"path":"{{.Fix.Path}}"}' hx-target="#reg-text" hx-select="unset" hx-swap="outerHTML">Fix: <span class="m">{{.Fix.FixLabel}}</span></button>
+  {{else}}<button class="btn" type="submit">{{if .Checked}}Check again{{else}}Check compatibility{{end}}</button>{{end}}
+  <button class="btn pri" type="button" data-register{{if not .OK}} disabled{{end}} hx-post="{{newSchemaURL ""}}" hx-include="#reg-form" hx-target="#reg-answer" hx-select="unset" hx-swap="innerHTML" hx-disabled-elt="this">Register{{if .P.Existing}} v{{inc .P.Latest}}{{end}}</button>
+  <div class="grow"></div>
+  <span class="note">{{if .Refused}}{{if .P.Existing}}Or relax this subject to NONE under <a href="{{schemaURL .P.Draft.Subject}}?tab=compat">Compatibility</a>. {{end}}Nothing was stored.{{else if .OK}}Registering creates <span class="m">v{{if .P.Existing}}{{inc .P.Latest}}{{else}}1{{end}}</span>{{if .P.NextID}} with the next free id, <span class="m">{{.P.NextID}}</span>{{end}}.{{else}}Registering needs SASL credentials when SASL is on. The console signs in as <span class="m">__console</span>.{{end}}</span>
+</div>{{end}}
+
+{{/* What Check and a refused Register answer, in #reg-answer, with the actions under it. */}}
+{{define "schema_reg_answer"}}
+{{if .Refusal}}{{template "refusal" .Refusal}}
+{{else if .Refused}}<div class="callout deny" role="alert">
+  <div class="row ce g8"><span class="b">Refused</span><span class="m">409 Conflict</span><span class="mut">·</span><span class="m">error_code {{.Refused.Code}}</span></div>
+  <span class="m sc-wrap">{{.RawRefusal}}</span>
+  <span class="note">Rule: {{.Rule}} Confluent Schema Registry refuses the same call with the same status, error code and reasons.</span>
+</div>
+{{template "schema_reg_findings" .}}
+{{else if .Parses}}<div class="callout ok" role="status"><div class="row ce g8"><span class="b ok">Parses</span><span class="m">a first version, v1</span></div>
+  <span class="note">Checked just now: the registry parsed it. A new subject has nothing to be compatible with. Nothing is stored yet.</span></div>
+{{else if .OK}}<div class="callout ok" role="status"><div class="row ce g8"><span class="b ok">Compatible</span><span class="m">compatible with {{range $i, $v := .Compared}}{{if $i}}, {{end}}v{{$v}}{{else}}v{{.P.Latest}}{{end}} ({{.Level}})</span></div>
+  <span class="note">Checked just now against {{if gt (len .Compared) 1}}every earlier version{{else}}the latest version{{end}} with <span class="m">POST /compatibility/subjects/{{.P.Draft.Subject}}/versions/latest</span>. {{.Why}} Nothing is stored yet.</span></div>
+{{else}}<div class="callout bad" role="alert"><div class="row ce g8"><span class="b">Not compatible</span><span class="m">with {{range $i, $v := .Compared}}{{if $i}}, {{end}}v{{$v}}{{end}} ({{.Level}})</span></div>
+  <span class="note">Registering it would be refused (409). Nothing is stored.</span></div>
+{{template "schema_reg_findings" .}}
+{{end}}
+{{if not .Refusal}}<span class="note" id="reg-stats" hx-swap-oob="true">{{template "schema_reg_stats" (dict "D" .P.Draft "Parsed" true)}}</span>
+{{template "schema_reg_acts" (dict "P" .P "OK" (or .OK .Parses) "Checked" true "Refused" (or .Refused .Findings) "Fix" (firstFix .Findings) "OOB" true)}}
+{{template "schema_reg_head" (dict "Existing" .P.Existing "Latest" .P.Latest "OK" (or .OK .Parses) "OOB" true)}}{{end}}
+{{end}}
+
+{{define "schema_reg_findings"}}{{if .Findings}}<div class="card sc-findings" style="--c: 36px 250px 1fr 120px">
+  <div class="r h"><span>#</span><span>Incompatibility</span><span>Where and why</span><span>Fix</span></div>
+  {{range .Findings}}<div class="r"><span class="m">{{.N}}</span><span class="m b bad el" title="{{.Type}}">{{.Type}}</span><span class="el" title="{{.Description}}">{{if .Path}}<span class="m">{{.Path}}</span>: {{end}}{{.Description}}</span>
+    {{if .Fix}}<button type="button" class="btn sm" hx-post="{{newSchemaURL ""}}/fix" hx-include="#reg-form" hx-vals='{"path":"{{.Path}}"}' hx-target="#reg-text" hx-select="unset" hx-swap="outerHTML" title="{{.FixWhat}}">{{.Fix}}</button>{{else}}<span class="note">—</span>{{end}}</div>{{end}}
+</div>{{end}}{{end}}
 
 {{define "schema_type_pill"}}{{if eq . "PROTOBUF"}}PROTOBUF{{else if eq . "JSON"}}JSON SCHEMA{{else}}AVRO{{end}}{{end}}
 

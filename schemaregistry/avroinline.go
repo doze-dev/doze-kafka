@@ -190,3 +190,15 @@ func cloneNode(n *node) *node {
 	}
 	return &cp
 }
+
+// InlineAvro is the resolved view of an Avro schema that is not registered yet (a
+// draft on the console's register page, Sc-10): text with the named types its
+// references define written out where they are first used. refs are the referenced
+// schemas' texts; only their names and texts are read.
+func InlineAvro(text string, refs []Ref) (string, error) {
+	rs := make([]resolvedRef, len(refs))
+	for i, r := range refs {
+		rs[i] = resolvedRef{Reference: Reference{Name: r.Name}, Type: r.Type, Text: r.Text}
+	}
+	return avroInline(text, rs)
+}

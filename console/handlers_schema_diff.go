@@ -233,6 +233,8 @@ func allowedNote(a checkAnswer, parts []changePart) string {
 
 // readersMeaning is "What this means for readers": for fields added with a
 // default, what an old and a new reader each do.
+//
+//fuzz:not-a-parser writes a sentence from change phrases the console made (changeSummary); it reads no outside bytes
 func readersMeaning(typ string, parts []changePart, from, to int) string {
 	var added, removed []string
 	for _, p := range parts {

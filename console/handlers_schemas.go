@@ -156,39 +156,6 @@ func idSummary(ids []int) idSpan {
 	return s
 }
 
-func (c *Console) schemaCreatePage(w http.ResponseWriter, r *http.Request) {
-	if c.registryOff(w, r) {
-		return
-	}
-	list, _ := c.reg.Subjects(r.Context())
-	subject := r.URL.Query().Get("subject")
-	data := map[string]any{"List": list, "Page": "schemas", "Title": "Register schema", "Subject": subject,
-		"Types": []string{schemaregistry.TypeAvro, schemaregistry.TypeJSON, schemaregistry.TypeProtobuf}}
-	maps.Copy(data, c.dockData(DockFilter{Registry: true}))
-	c.render(w, r, "schema_create", data)
-}
-
-func (c *Console) schemaCreate(w http.ResponseWriter, r *http.Request) {
-	if c.registryOff(w, r) {
-		return
-	}
-	subject := strings.TrimSpace(r.FormValue("subject"))
-	if subject == "" {
-		c.fail(w, r, badInput("give the subject a name, such as orders-value"))
-		return
-	}
-	body, err := schemaFromForm(r)
-	if err != nil {
-		c.fail(w, r, err)
-		return
-	}
-	if _, err := c.reg.Register(r.Context(), subject, body); err != nil {
-		c.fail(w, r, err)
-		return
-	}
-	c.redirect(w, r, c.schemaURL(subject), "Schema registered")
-}
-
 // schemaFromForm reads a schema text, its type and any references from a form.
 //
 //fuzz:parser class=console-forms FuzzSchemaForms

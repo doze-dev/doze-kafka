@@ -491,8 +491,30 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 		"sub":  func(a, b int) int { return a - b },
 		// when is the one formatter for a moment in time (timefmt.go); whenText is
 		// its plain text, for an attribute.
-		"when":    when,
-		"changed": changedHTML,
+		"when":      when,
+		"changed":   changedHTML,
+		"inc":       func(n int) int { return n + 1 },
+		"jsonValid": func(s string) bool { return json.Valid([]byte(s)) },
+		"gutter": func(s string) string {
+			n := max(strings.Count(strings.TrimRight(s, "\n"), "\n")+1, 11)
+			var b strings.Builder
+			for i := 1; i <= n; i++ {
+				if i > 1 {
+					b.WriteByte('\n')
+				}
+				b.WriteString(strconv.Itoa(i))
+			}
+			return b.String()
+		},
+		"lines": func(s string) int { return strings.Count(strings.TrimRight(s, "\n"), "\n") + 1 },
+		"firstFix": func(fs []regFinding) *regFinding {
+			for i := range fs {
+				if fs[i].Fix != "" {
+					return &fs[i]
+				}
+			}
+			return nil
+		},
 		// the declared key map, for the help overlay and for shell.js (keys.go).
 		"keyGroups":       keyGroups,
 		"dialogHints":     dialogHints,

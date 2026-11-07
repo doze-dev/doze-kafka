@@ -161,3 +161,54 @@ export const DIFF: Probe[] = [
   { el: 'levels', board: 'main > .row.g12 > .callout', live: 'main > .row.g12 > .callout', nth: 1 },
   { el: 'levels title', board: 'main > .row.g12 > .callout .b', live: 'main > .row.g12 > .callout .b', nth: 1, text: true },
 ];
+
+/** The register page (Sc-02 to Sc-04): the title band, the form, the answer and the actions. */
+export const REGISTER: Probe[] = [
+  ...SHELL,
+  { el: 'list', board: '.list', live: 'aside.list' },
+  { el: 'list item on', board: '.list .li.on', live: '.list .li.on' },
+  { el: 'list item', board: '.list .li:not(.on)', live: '.list .li:not(.on)' },
+  { el: 'main', board: 'main.main', live: 'main.main' },
+  { el: 'id band', board: 'main > .row.sb', live: 'main .idband' },
+  { el: 'h1', board: 'main h1', live: 'main h1', text: true },
+  { el: 'h1 note', board: 'main h1 + .note', live: 'main h1 + .note', text: true },
+  { el: 'head button', board: 'main > .row.sb .btn.pri', live: 'main .idband .btn.pri', text: true },
+  { el: 'form card', board: 'main > .row.sb + .card', live: 'main .sc-reg-form > .card' },
+  { el: 'subject label', board: 'main label[for=subj]', live: 'main label[for=f-subject]', text: true },
+  { el: 'subject', board: 'main #subj', live: 'main #f-subject' },
+  { el: 'type label', board: 'main .card .row.g16 > .col:nth-child(2) > .b', live: 'main .sc-reg-form > .card .row.g16 > .col:nth-child(2) > .b', text: true },
+  { el: 'type', board: 'main .seg', live: 'main .sc-seg' },
+  { el: 'type on', board: 'main .seg .on', live: 'main .sc-seg .on', text: true },
+  { el: 'schema label', board: 'main label[for=sch]', live: 'main label[for=f-schema]', text: true },
+  { el: 'schema stats', board: 'main label[for=sch] + .note', live: 'main #reg-stats', text: true },
+  { el: 'gutter', board: 'main pre.code[aria-hidden]', live: 'main pre.sc-gutter' },
+  { el: 'schema', board: 'main pre#sch', live: 'main #f-schema' },
+  { el: 'answer', board: 'main > .callout', live: 'main #reg-answer > .callout' },
+  { el: 'answer title', board: 'main > .callout .b', live: 'main #reg-answer > .callout .b', text: true },
+  { el: 'answer note', board: 'main > .callout .note', live: 'main #reg-answer > .callout .note' },
+  { el: 'actions', board: 'main > .row.g8.ce', live: 'main #reg-acts' },
+  { el: 'action', board: 'main > .row.g8.ce > .btn:not(.pri)', live: 'main #reg-acts > .btn:not(.pri)', text: true },
+  { el: 'register', board: 'main > .row.g8.ce > .btn.pri', live: 'main #reg-acts > .btn.pri', text: true },
+  { el: 'actions note', board: 'main > .row.g8.ce > .note', live: 'main #reg-acts > .note' },
+];
+
+/** Sc-02's extras: the subject's note, the references and the options. */
+export const REGISTER_NEW: Probe[] = [
+  { el: 'subject note', board: 'main #subj + .note', live: 'main #f-subject + .note', free: { text: SAMPLE } },
+  { el: 'type note', board: 'main .seg + .note', live: 'main .sc-seg + input + .note, main .sc-seg + .note', text: true },
+  { el: 'refs label', board: 'main .card .row.g16:last-child > .col:first-child > .b', live: 'main #reg-refs > .b', text: true },
+  { el: 'refs none', board: 'main .card .well', live: 'main #reg-refs .well' },
+  { el: 'refs none note', board: 'main .card .well .note', live: 'main #reg-refs .well .note', text: true },
+  { el: 'refs add', board: 'main .card .well .btn', live: 'main #reg-refs .well .btn', text: true },
+  { el: 'normalize', board: 'main label:has(input[type=checkbox])', live: 'main label:has(input[name=normalize])', text: true },
+];
+
+/** Sc-04's table of what the registry found. */
+export const FINDINGS: Probe[] = [
+  { el: 'findings', board: 'main > .callout + .card', live: 'main .sc-findings' },
+  { el: 'findings head', board: 'main > .callout + .card .r.h', live: 'main .sc-findings .r.h' },
+  { el: 'findings head cell', board: 'main > .callout + .card .r.h > span', live: 'main .sc-findings .r.h > span', text: true },
+  { el: 'finding', board: 'main > .callout + .card .r:not(.h)', live: 'main .sc-findings .r:not(.h)' },
+  { el: 'finding type', board: 'main > .callout + .card .r:not(.h) > :nth-child(2)', live: 'main .sc-findings .r:not(.h) > :nth-child(2)', text: true },
+  { el: 'finding fix', board: 'main > .callout + .card .r:not(.h) .btn', live: 'main .sc-findings .r:not(.h) .btn', text: true },
+];

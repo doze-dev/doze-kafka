@@ -892,6 +892,11 @@
     // ⌘⏎ sends from the composer, from a plain field or from inside the editor.
     // Once per press: a held key repeats, and each repeat used to send a record.
     if (mod && e.key === "Enter") {
+      // ⇧⌘⏎ registers, on the register page (Sc-02): its Register button.
+      if (e.shiftKey) {
+        var reg = document.querySelector("main [data-register]:not([disabled])");
+        if (reg) { e.preventDefault(); if (!e.repeat) reg.click(); return; }
+      }
       // A create form (data-mod-enter, Ac-03) is sent from anywhere on its page.
       var form = (active.closest ? active.closest("form") : null) || document.querySelector("main form[data-mod-enter]");
       if (form && (form.hasAttribute("data-mod-enter") || form.querySelector("textarea, .cm-editor"))) {
@@ -1289,6 +1294,9 @@
   }
   document.addEventListener("DOMContentLoaded", syncInspectorFromURL);
   window.addEventListener("popstate", syncInspectorFromURL);
+  // A boosted link that names a selection (a subject's version row, ?open=version:…)
+  // opens it once its page is in.
+  document.addEventListener("htmx:afterSettle", function (e) { if (e.detail && e.detail.boosted && openParamNow() != null) syncInspectorFromURL(); });
   // "Send again" closes the inspector once the broker has taken the copy; on a
   // failure it stays open, and the error is a toast.
   document.addEventListener("htmx:afterRequest", function (e) {
@@ -1984,6 +1992,48 @@ document.addEventListener("click", function (e) {
 })();
 
 // Groups: 1 to 4 open the group's tabs by number; r follows its Reset offsets button.
+// The register page (Sc-02): the type segment is radio buttons drawn as the board's
+// segment, and a reference is a row added from a template and removed by its ×.
+document.addEventListener("change", function (e) {
+  var r = e.target;
+  if (!r || !r.matches || !r.matches('.sc-seg input[type="radio"]')) return;
+  r.closest(".sc-seg").querySelectorAll("label").forEach(function (l) { l.classList.toggle("on", l.contains(r)); });
+});
+// The schema field's line numbers follow its lines.
+document.addEventListener("input", function (e) {
+  var ta = e.target;
+  if (!ta || ta.id !== "f-schema") return;
+  var g = ta.parentNode && ta.parentNode.querySelector("[data-gutter]");
+  if (!g) return;
+  var lines = ta.value.replace(/\n+$/, "").split("\n").length;
+  var n = Math.max(lines, 11), out = [];
+  for (var i = 1; i <= n; i++) out.push(i);
+  g.textContent = out.join("\n");
+  // "Avro · 11 lines · parses": what the field holds, said as Sc-02 says it. Avro and JSON
+  // Schema are JSON, so parsing is a JSON parse; Protobuf the registry parses on Check.
+  var stats = document.getElementById("reg-stats");
+  if (!stats) return;
+  var t = document.querySelector('.sc-seg input:checked, #reg-form input[type=hidden][name=type]');
+  var type = t ? t.value : "AVRO", label = type === "PROTOBUF" ? "Protobuf" : type === "JSON" ? "JSON Schema" : "Avro";
+  if (!ta.value.trim()) { stats.textContent = label + " · empty"; return; }
+  var say = label + " · " + lines + " line" + (lines === 1 ? "" : "s");
+  if (type !== "PROTOBUF") { try { JSON.parse(ta.value); say += " · parses"; } catch (err) { say += " · not JSON yet"; } }
+  stats.textContent = say;
+});
+document.addEventListener("click", function (e) {
+  var add = e.target.closest && e.target.closest("[data-add-ref]");
+  if (add) {
+    var tpl = document.getElementById("ref-row-new"), box = document.getElementById("reg-refs");
+    if (!tpl || !box) return;
+    var row = tpl.content.firstElementChild.cloneNode(true);
+    box.insertBefore(row, tpl);
+    var first = row.querySelector("input");
+    if (first) first.focus();
+    return;
+  }
+  var rm = e.target.closest && e.target.closest("[data-ref-remove]");
+  if (rm) { var row = rm.closest("[data-ref-row]"); if (row) row.remove(); }
+});
 function groupsTabN(key) {
   var tabs = Array.prototype.filter.call(document.querySelectorAll("#group-live nav.tabs a.tab, main nav.tabs[aria-label='Subject tabs'] a.tab"), function (t) { return t.offsetParent !== null; });
   var to = tabs[parseInt(key, 10) - 1];

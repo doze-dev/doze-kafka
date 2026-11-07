@@ -79,7 +79,8 @@ var keyMap = []keyBinding{
 	{"u", "u", "unfold", "Unfold the open folded row (on Traffic)", ScopePage, ""},
 	{"m", "m", "metrics", "All metrics of the open client (on Traffic)", ScopePage, ""},
 	{"c", "c", "copy", "Copy the decoded fields of the open request (on Traffic)", ScopePage, ""},
-	{"Mod+Enter", "⌘↵", "send", "Send from the composer; create, on a create form", ScopePage, ""},
+	{"Mod+Enter", "⌘↵", "send", "Send from the composer; create, on a create form; check, on the register page", ScopePage, ""},
+	{"Mod+Shift+Enter", "⇧⌘↵", "register", "Register (on the register page)", ScopePage, ""},
 	{"?", "?", "help", "This help", ScopePage, ""},
 
 	{"ArrowDown", "↓", "palette-down", "Next result in the palette", ScopeDialogs, ""},
@@ -191,6 +192,9 @@ func pageHints(view string) []keyHint {
 	case "schema_proto":
 		// Sc-07.
 		return []keyHint{{Keys: []string{"j", "k"}, Label: "version"}, {Keys: []string{"d"}, Label: "diff with previous"}, {Keys: []string{"n"}, Label: "register new version"}, hintJump}
+	case "schema_register":
+		// Sc-02 to Sc-04: ⌘↵ checks, ⇧⌘↵ registers, Esc goes back.
+		return []keyHint{{Keys: []string{"⌘↵"}, Label: "check"}, {Keys: []string{"⇧⌘↵"}, Label: "register"}, {Keys: []string{"esc"}, Label: "cancel"}, hintJump}
 	case "schema_diff":
 		// Sc-06.
 		return []keyHint{{Keys: []string{"[", "]"}, Label: "older, newer pair"}, {Keys: []string{"u"}, Label: "unified"}, {Keys: []string{"esc"}, Label: "back to versions"}, hintJump}

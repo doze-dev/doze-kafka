@@ -29,56 +29,82 @@ test('a subject shows its versions and what changed from the one before', async 
   await expect(page.locator('.idband h1')).toHaveText('seed-events-value');
   await expect(page.locator('#versions-table a.r').first()).toContainText('v2');
   await expect(page.locator('#versions-table a.r').first()).toHaveAttribute('aria-current', 'true');
-  // The newest version opens on its changes from the first: the added field is a + line.
-  await expect(page.getByRole('button', { name: 'Changes from v1' })).toHaveAttribute('aria-pressed', 'true');
-  const added = page.locator('.diff .dl.add');
-  await expect(added.filter({ hasText: '"note"' }).first()).toBeVisible();
-  await expect(page.locator('.diff .dl.del')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Schema', exact: true }).click();
-  await expect(page.locator('.schema-view .valuebox').last()).toContainText('"kind"');
+  // Each version says what it changed, in fields, and whether it passes the level against the one before.
+  await expect(page.locator('#versions-table a.r').first()).toContainText('note');
+  await expect(page.locator('#versions-table a.r').first()).toContainText('v1, BACKWARD ok');
+  await expect(page.locator('#versions-table a.r').last()).toContainText('first version');
+  await expect(page.locator('main pre.sc-text')).toContainText('"kind"');
+  // The diff: the added field is a line of its own.
+  await page.getByRole('link', { name: 'Diff v1 to v2' }).click();
+  await expect(page).toHaveURL(/\/diff\?from=1&to=2/);
+  await expect(page.locator('#diff-table .dl-add').filter({ hasText: '"note"' }).first()).toBeVisible();
+  await expect(page.locator('#diff-facts')).toContainText('v1 to v2');
+  await page.goBack();
   await page.locator('#versions-table a.r').last().click();
   await expect(page.locator('#versions-table a.r').last()).toHaveAttribute('aria-current', 'true');
-  await expect(page.getByRole('button', { name: /Changes from/ })).toHaveCount(0); // nothing before version 1.
+  await expect(page.getByRole('link', { name: /^Diff v/ })).toHaveCount(0); // nothing before version 1.
+  // The version opens in the inspector.
+  await expect(page.locator('#inspector .versionb')).toContainText('Schema id');
 });
+
+/** Registers a first version through the register page and lands on the subject. */
+async function registerFirst(page: import('@playwright/test').Page, subject: string, schema: string) {
+  await page.goto('new/schema');
+  await page.locator('#f-subject').fill(subject);
+  await page.locator('#f-schema').fill(schema);
+  // Register is enabled by a check that passes (Sc-02).
+  await expect(page.locator('#reg-acts [data-register]')).toBeDisabled();
+  await page.locator('#reg-acts').getByRole('button', { name: 'Check compatibility' }).click();
+  await expect(page.locator('#reg-answer')).toContainText('Parses');
+  await page.locator('#reg-acts [data-register]').click();
+  await expect(page.locator('.idband h1')).toHaveText(subject);
+}
 
 test('trying a schema says whether it may be registered, and why not', async ({ page, uniqueName }) => {
   const subject = uniqueName('check');
-  await page.goto('new/schema');
-  await page.locator('#f-subject').fill(subject);
-  await page.locator('#f-schema').fill(AVRO());
-  await page.getByRole('button', { name: 'Register', exact: true }).click();
-  await expect(page.locator('.idband h1')).toHaveText(subject);
+  await registerFirst(page, subject, AVRO());
 
   await page.getByRole('link', { name: 'Register new version' }).click();
-  const editor = page.locator('#newver #f-schema');
+  await expect(page.locator('main h1')).toHaveText('Register a new version');
+  const editor = page.locator('#f-schema');
+  await expect(editor).toHaveValue(/"id"/); // it starts from the latest version.
   await editor.fill(AVRO(`,{"name":"email","type":"string"}`)); // a field with no default: older data cannot be read.
   await settled(page);
   await page.getByRole('button', { name: 'Check compatibility' }).click();
-  const result = page.locator('#check-result');
+  const result = page.locator('#reg-answer');
   await expect(result).toContainText('Not compatible');
-  await expect(result).toContainText('email');
+  await expect(result).toContainText('READER_FIELD_MISSING_DEFAULT_VALUE');
+  // The fix gives the field a default, and the draft then passes.
+  await page.locator('#reg-acts').getByRole('button', { name: /^Fix: add "default"/ }).click();
+  await expect(editor).toHaveValue(/"default": ""/);
+  await page.locator('#reg-acts').getByRole('button', { name: /Check/ }).click();
+  await expect(result).toContainText('Compatible');
 
   await editor.fill(`{"type":"record"`);
-  await page.getByRole('button', { name: 'Check compatibility' }).click();
+  await page.locator('#reg-acts').getByRole('button', { name: /Check/ }).click();
   // The registry's refusal of a schema it cannot read, said as one (A2): its kind and code.
   await expect(result.locator('[data-refusal-kind="refused"][data-refusal-source="registry"][data-refusal-name="42201"]')).toBeVisible();
 
-  await editor.fill(AVRO(`,{"name":"email","type":["null","string"],"default":null}`));
-  await page.getByRole('button', { name: 'Check compatibility' }).click();
-  await expect(result).toContainText('Compatible.');
+  // Registering a breaking change anyway: refused where the answer is, nothing stored (Sc-04).
+  await editor.fill(AVRO(`,{"name":"email","type":"string"}`));
+  await page.locator('#reg-acts [data-register]').click();
+  await expect(result).toContainText('409 Conflict');
+  await expect(page.locator('#reg-acts')).toContainText('Nothing was stored');
 
-  await page.locator('#newver').getByRole('button', { name: 'Register', exact: true }).click();
+  await editor.fill(AVRO(`,{"name":"email","type":["null","string"],"default":null}`));
+  await expect(page.locator('#reg-acts [data-register]')).toBeDisabled(); // off after a refusal, until a check passes.
+  // The row is Fix and Register (Sc-04); ⌘↵ checks from the editor.
+  await editor.press('ControlOrMeta+Enter');
+  await expect(result).toContainText('Compatible');
+  await page.locator('#reg-acts [data-register]').click();
   await expect(page.locator('#versions-table a.r', { hasText: 'v2' })).toHaveAttribute('aria-current', 'true');
   await expect(page.locator('.flash')).toContainText('Schema registered');
-  await expect(page.locator('.diff .dl.add').filter({ hasText: 'email' }).first()).toBeVisible();
+  await expect(page.locator('#versions-table a.r').first()).toContainText('added optional email');
 });
 
 test('a subject can be given its own compatibility level, then handed back', async ({ page, uniqueName }) => {
   const subject = uniqueName('level');
-  await page.goto('new/schema');
-  await page.locator('#f-subject').fill(subject);
-  await page.locator('#f-schema').fill(AVRO());
-  await page.getByRole('button', { name: 'Register', exact: true }).click();
+  await registerFirst(page, subject, AVRO());
   await expect(page.locator('#subject-facts')).toContainText('level BACKWARD (global)');
   await page.getByRole('link', { name: 'Compatibility', exact: true }).click();
   await settled(page);
@@ -89,8 +115,10 @@ test('a subject can be given its own compatibility level, then handed back', asy
   await expect(page.locator('#subject-facts')).not.toContainText('global');
   // With NONE, a breaking change registers.
   await page.getByRole('link', { name: 'Register new version' }).click();
-  await page.locator('#newver #f-schema').fill(AVRO(`,{"name":"email","type":"string"}`));
-  await page.locator('#newver').getByRole('button', { name: 'Register', exact: true }).click();
+  await page.locator('#f-schema').fill(AVRO(`,{"name":"email","type":"string"}`));
+  await page.locator('#reg-acts').getByRole('button', { name: 'Check compatibility' }).click();
+  await expect(page.locator('#reg-answer')).toContainText('Compatible');
+  await page.locator('#reg-acts [data-register]').click();
   await expect(page.locator('#versions-table a.r', { hasText: 'v2' })).toHaveAttribute('aria-current', 'true');
   await settled(page);
   await page.getByRole('link', { name: 'Compatibility', exact: true }).click();
@@ -102,11 +130,7 @@ test('a subject can be given its own compatibility level, then handed back', asy
 
 test('deleting a subject asks first, and then it is gone', async ({ page, uniqueName, confirmDialog }) => {
   const subject = uniqueName('gone');
-  await page.goto('new/schema');
-  await page.locator('#f-subject').fill(subject);
-  await page.locator('#f-schema').fill(AVRO());
-  await page.getByRole('button', { name: 'Register', exact: true }).click();
-  await expect(page.locator('.idband h1')).toHaveText(subject);
+  await registerFirst(page, subject, AVRO());
   await settled(page);
   await page.getByRole('button', { name: 'More actions' }).click();
   await page.getByRole('button', { name: 'Delete subject' }).click();
@@ -151,11 +175,7 @@ test('Protobuf records are decoded too', async ({ page }) => {
 
 test('the composer writes a record encoded with the topic\'s schema, and says when the value does not fit', async ({ page, uniqueName, send, setEditor }) => {
   const topic = uniqueName('enc');
-  await page.goto('new/schema');
-  await page.locator('#f-subject').fill(`${topic}-value`);
-  await page.locator('#f-schema').fill(AVRO());
-  await page.getByRole('button', { name: 'Register', exact: true }).click();
-  await expect(page.locator('.idband h1')).toHaveText(`${topic}-value`);
+  await registerFirst(page, `${topic}-value`, AVRO());
 
   await page.goto('new/topic');
   await page.locator('#f-name').fill(topic);

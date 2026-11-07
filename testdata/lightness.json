@@ -4,15 +4,15 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 28702738,
-      "idleHeapBytes": 1368256,
+      "binaryBytes": 28753010,
+      "idleHeapBytes": 1375088,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
       "recorded": "2026-11-08",
       "where": "macOS 27, Apple M-series, native"
     },
     "linux/arm64": {
-      "binaryBytes": 27852960,
+      "binaryBytes": 27918496,
       "idleHeapBytes": 1383880,
       "idleHeapNoiseBytes": 7160,
       "go": "go1.27.3",
@@ -264,6 +264,41 @@
       "from": 27590816,
       "to": 27852960,
       "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raise of 2026-11-07 to 27,721,888 and the subject pages of 2026-11-08 (131,072)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28702738,
+      "to": 28753010,
+      "reason": "Schemas: the register page (Sc-02 to Sc-04, Sc-10's references and resolved view), its check, refusal table and fix, and the registry's InlineAvro for a draft: 50,272 bytes"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28753010,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,702,738 and the register page of 2026-11-08 (50,272)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27852960,
+      "to": 27918496,
+      "reason": "Schemas: the register page, the same code as the darwin/arm64 raise of this date to 28,753,010: one 64 KiB page (built in golang:1.27.3 on linux/arm64)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27590816,
+      "to": 27918496,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 27,852,960 and the register page of 2026-11-08 (65,536)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 idleHeapBytes",
+      "from": 1368256,
+      "to": 1375088,
+      "reason": "Stage 5's Schemas pages (schemas-stage5, 2026-11-08): the median of 20 starts went from about 1,374,100 to 1,375,088 with the register page, after 1,373,360 with the subject pages; what grew at idle is package-level tables the pages add (key bindings, routes, form-field records, the subject's tabs), not templates (parsed on the first console request). The budget is the median of 20 starts, as the gate now judges (2026-11-08); it was 1,368,256, the largest of 20 at the time, and main's"
     }
   ]
 }

@@ -28,6 +28,21 @@ const POINTS_V1 = JSON.stringify({
 const level = (fields: string) => JSON.stringify(JSON.parse(`{"type":"record","name":"Level","namespace":"harbour.inventory","fields":[${fields}]}`));
 const AUDIT_V1 = JSON.stringify({ type: 'record', name: 'AuditEvent', namespace: 'harbour.audit', fields: [{ name: 'actor', type: 'string' }, { name: 'action', type: 'string' }, { name: 'at', type: 'long' }] });
 
+/** Sc-02's draft: a first version of a new subject. */
+export const INVOICE = `{
+  "type": "record",
+  "name": "Invoice",
+  "namespace": "harbour.checkout",
+  "fields": [
+    {"name": "invoiceId", "type": "string"},
+    {"name": "orderId", "type": "string"},
+    {"name": "amount", "type": "double"},
+    {"name": "currency", "type": "string", "default": "EUR"}
+  ]
+}`;
+/** Sc-03's draft: dispatch v3, a field with a new number. */
+export const DISPATCH_V3 = 'syntax = "proto3";\npackage harbour.depot;\n\nmessage Dispatch {\n  string order_id = 1;\n  string depot = 2;\n  int32 parcels = 3;\n  string carrier = 4;\n  string slot = 5;\n}\n';
+
 export class SchemasWorld {
   readonly broker: OwnBroker;
   constructor(offset: number) { this.broker = new OwnBroker('schemas-boards', offset); }
@@ -56,7 +71,7 @@ export class SchemasWorld {
     }
     const ids = [
       await this.register(ORDERS, order(ORDER_V1)),
-      await this.register(ORDERS_KEY, '"string"'),
+      await this.register(ORDERS_KEY, JSON.stringify({ type: 'record', name: 'OrderKey', namespace: 'harbour.checkout', fields: [{ name: 'orderId', type: 'string' }] })),
       await this.register(DISPATCH, DISPATCH_V1, 'PROTOBUF'),
       await this.register(ORDERS, order(ORDER_V2)),
       await this.register(POINTS, POINTS_V1, 'JSON'),

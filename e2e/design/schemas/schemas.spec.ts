@@ -3,8 +3,8 @@ import { livePage, runBoard } from '../lib/gate';
 import { openLive } from '../lib/render';
 import { OwnBroker } from '../../ownbroker';
 import { ALLOW } from './allow';
-import { DIFF, NONE, SCHEMA, SUBJECT_HEAD, TRY, VERSION_INSP, VERSIONS, DOCK } from './boards';
-import { AUDIT, DISPATCH, ORDERS, POINTS, SchemasWorld } from './world';
+import { DIFF, FINDINGS, NONE, REGISTER, REGISTER_NEW, SCHEMA, SUBJECT_HEAD, TRY, VERSION_INSP, VERSIONS, DOCK } from './boards';
+import { AUDIT, DISPATCH, DISPATCH_V3, INVOICE, ORDERS, POINTS, SchemasWorld } from './world';
 
 // The Schemas boards against the live pages, element by element, in light and dark.
 // What may differ is in allow.ts, each with its reason.
@@ -99,6 +99,48 @@ test.describe('on the boards\' world: their subjects, under their names', () => 
       await p.locator('#try-pill .pill.ok').waitFor();
     };
     const out = await runBoard(browser, { id: 'Sc-08', file: 'Sc-08-JsonSchema', live: livePage(w.console, `schemas/${seg(POINTS)}`, validated), probes: [...SUBJECT_HEAD, ...VERSIONS, ...TRY, ...DOCK], allow: ALLOW });
+    expect(out.text, out.text).toBe('');
+  });
+
+  test('Sc-02 matches the register page with a new subject filled in', async ({ browser }) => {
+    test.setTimeout(120_000);
+    const filled = async (p: import('@playwright/test').Page) => {
+      await p.locator('#f-schema').fill(INVOICE);
+      await p.locator('#f-schema').blur();
+      await p.evaluate(() => document.querySelector('main')?.scrollTo(0, 0));
+    };
+    const out = await runBoard(browser, { id: 'Sc-02', file: 'Sc-02-Register', live: livePage(w.console, 'new/schema?subject=harbour.checkout.invoices-value', filled), probes: [...REGISTER, ...REGISTER_NEW, ...DOCK], allow: ALLOW });
+    expect(out.text, out.text).toBe('');
+  });
+
+  test('Sc-03 matches a new version checked and compatible', async ({ browser }) => {
+    test.setTimeout(120_000);
+    const checked = async (p: import('@playwright/test').Page) => {
+      await p.locator('#f-schema').fill(DISPATCH_V3);
+      await p.locator('#reg-acts').getByRole('button', { name: 'Check compatibility' }).click();
+      await p.locator('#reg-answer .callout.ok').waitFor();
+      await p.evaluate(() => document.querySelector('main')?.scrollTo(0, 0));
+    };
+    const out = await runBoard(browser, { id: 'Sc-03', file: 'Sc-03-Register-Check', live: livePage(w.console, `new/schema?subject=${seg(DISPATCH)}`, checked), probes: [...REGISTER, ...DOCK], allow: ALLOW });
+    expect(out.text, out.text).toBe('');
+  });
+
+  test('Sc-04 matches a new version the registry refused', async ({ browser }) => {
+    test.setTimeout(120_000);
+    // The way there: a check passes (Register comes on), the draft changes, Register.
+    const refused = async (p: import('@playwright/test').Page) => {
+      await p.locator('#reg-acts').getByRole('button', { name: 'Check compatibility' }).click();
+      await p.locator('#reg-answer .callout.ok').waitFor();
+      // A field with no default, typed into the printed v3 as a person would.
+      const v3 = await p.locator('#f-schema').inputValue();
+      await p.locator('#f-schema').fill(v3.replace(/\n\]\}$/, ',\n  {"name": "channel",  "type": "string"}\n]}'));
+      await p.locator('#reg-acts [data-register]').click();
+      await p.locator('#reg-answer .callout.deny').waitFor();
+      // The dock polls: its newest row is the refused POST.
+      await p.locator('#wire-dock [data-reg-row]').first().locator('.deny').waitFor({ timeout: 10_000 });
+      await p.evaluate(() => document.querySelector('main')?.scrollTo(0, 0));
+    };
+    const out = await runBoard(browser, { id: 'Sc-04', file: 'Sc-04-Incompatible', live: livePage(w.console, `new/schema?subject=${seg(ORDERS)}`, refused), probes: [...REGISTER, ...FINDINGS, ...DOCK], allow: ALLOW });
     expect(out.text, out.text).toBe('');
   });
 

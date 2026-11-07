@@ -96,6 +96,8 @@ func TestEveryRouteRefusesInTheOneVocabulary(t *testing.T) {
 		{"POST /new/schema", "registering with no subject", c, "POST", "/_console/new/schema", form("subject", "", "schema", userV1), true, nil, answer{400, refused, "console", ""}},
 		{"GET /schemas/{subject}", "a subject that is not there", c, "GET", "/_console/schemas/ghost", nil, true, nil, answer{404, refused, "registry", "40401"}},
 		{"GET /schemas/{subject}", "a subject the registry cannot show", unimplemented, "GET", "/_console/schemas/orders-value", nil, true, nil, answer{501, notImpl, "registry", "50101"}},
+		{"POST /new/schema/check", "checking a draft with no subject", c, "POST", "/_console/new/schema/check", form("subject", "", "schema", userV1), true, nil, answer{400, refused, "console", ""}},
+		{"POST /new/schema/fix", "fixing a field that is not there", c, "POST", "/_console/new/schema/fix", form("schema", userV1, "path", "/fields/9"), true, nil, answer{400, refused, "console", ""}},
 		{"GET /schemas/{subject}/diff", "comparing the versions of a subject that is not there", c, "GET", "/_console/schemas/ghost/diff", nil, true, nil, answer{404, refused, "registry", "40401"}},
 		{"POST /schemas/{subject}/try", "trying a value with a subject that is not there", c, "POST", "/_console/schemas/ghost/try", form("doc", "{}"), true, nil, answer{404, refused, "registry", "40401"}},
 		{"POST /schemas/{subject}/check", "a check the registry does not implement", unimplemented, "POST", "/_console/schemas/orders-value/check", form("schema", userV1), true, nil, answer{501, notImpl, "registry", "50101"}},

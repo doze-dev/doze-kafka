@@ -171,6 +171,13 @@ async function effect(page: Page, path: string, h: Hint) {
       return;
     }
     case 'check':
+      if (path.startsWith('new/schema')) {
+        // Nothing is filled in: checking asks the browser to check the form first, which
+        // puts the focus on the subject it lacks. It sends nothing.
+        await press(page, ['⌘↵']);
+        await expect(page.locator('#f-subject'), where).toBeFocused();
+        return;
+      }
       await press(page, ['↵']);
       await expect(page, where).toHaveURL(/\/access\/check\?/);
       await expect(page.locator('#check-answer'), where).toBeVisible();
@@ -217,10 +224,19 @@ async function effect(page: Page, path: string, h: Hint) {
       await press(page, h.keys);
       await expect(page, where).toHaveURL(SECTION[h.label]);
       return;
+    case 'register':
+      // Nothing is checked yet, so Register is off (Sc-02) and the key does nothing.
+      await expect(page.locator('#reg-acts [data-register]'), where).toBeDisabled();
+      await press(page, ['ControlOrMeta+Shift+Enter']);
+      await expect(page.locator('#reg-answer'), where).toContainText('Not checked yet');
+      await expect(page, where).toHaveURL(/\/new\/schema$/);
+      return;
     case 'cancel':
       if (await page.locator('main [data-esc]').count()) {
+        const back = await page.locator('main [data-esc]').first().getAttribute('href');
+        await page.locator('body').click({ position: { x: 1, y: 1 } }); // out of the form's fields
         await press(page, ['esc']);
-        await expect(page, where).toHaveURL(/\/access$/);
+        await expect(page, where).toHaveURL(new RegExp(`${(back ?? '').replace(/[.?]/g, '\\$&')}$`));
       }
       return; // a confirm's own cancel: confirms.spec and keys.spec press it.
     case 'move between buttons': case 'press the focused button':
