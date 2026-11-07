@@ -100,6 +100,8 @@ var formFields = map[string]formField{
 	"ref_version":    {Not: "the version of the subject a reference names"},
 	"normalize":      {Not: "whether the registry stores the schema in its canonical form; a request's choice (?normalize=true), not a setting"},
 	"layout":         {Not: "how a comparison is laid out"},
+	"scope":          {Not: "whether a level or mode is the subject's or the registry's default"},
+	"mode":           {Not: "a subject's or the registry's mode (READWRITE, READONLY); the registry's own state, not a broker setting"},
 	"schema":         {Not: "the text of a schema"},
 	"type":           {Not: "a schema's format"},
 	"doc":            {Not: "a JSON value to try a schema with (Try it)"},

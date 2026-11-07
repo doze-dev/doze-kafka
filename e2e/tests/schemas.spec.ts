@@ -34,6 +34,9 @@ test('a subject shows its versions and what changed from the one before', async 
   await expect(page.locator('#versions-table a.r').first()).toContainText('v1, BACKWARD ok');
   await expect(page.locator('#versions-table a.r').last()).toContainText('first version');
   await expect(page.locator('main pre.sc-text')).toContainText('"kind"');
+  // Try it: the bytes a serializer would send for a value, sent nowhere.
+  await page.locator('#try-it').getByRole('button', { name: 'Encode' }).click();
+  await expect(page.locator('#try-result')).toContainText('magic byte 0');
   // The diff: the added field is a line of its own.
   await page.getByRole('link', { name: 'Diff v1 to v2' }).click();
   await expect(page).toHaveURL(/\/diff\?from=1&to=2/);
@@ -108,12 +111,14 @@ test('a subject can be given its own compatibility level, then handed back', asy
   await expect(page.locator('#subject-facts')).toContainText('level BACKWARD (global)');
   await page.getByRole('link', { name: 'Compatibility', exact: true }).click();
   await settled(page);
-  await page.locator('.compat-form select').selectOption('NONE');
-  await page.locator('.compat-form').getByRole('button', { name: 'Save' }).click();
+  // Sc-09: the levels are a table of choices; j and k choose too.
+  await page.getByRole('radio', { name: 'NONE', exact: true }).check();
+  await expect(page.locator('#level-body')).toHaveText('{"compatibility":"NONE"}');
+  await page.getByRole('button', { name: 'Save level' }).click();
   await expect(page.locator('.flash')).toContainText('Compatibility updated');
-  await expect(page.locator('#subject-facts')).toContainText('level NONE');
-  await expect(page.locator('#subject-facts')).not.toContainText('global');
+  await expect(page.locator('#subject-facts')).toContainText('level NONE, set on this subject');
   // With NONE, a breaking change registers.
+  await page.getByRole('link', { name: 'Versions', exact: true }).click();
   await page.getByRole('link', { name: 'Register new version' }).click();
   await page.locator('#f-schema').fill(AVRO(`,{"name":"email","type":"string"}`));
   await page.locator('#reg-acts').getByRole('button', { name: 'Check compatibility' }).click();
@@ -123,9 +128,32 @@ test('a subject can be given its own compatibility level, then handed back', asy
   await settled(page);
   await page.getByRole('link', { name: 'Compatibility', exact: true }).click();
   await settled(page);
-  await page.locator('.compat-form select').selectOption('default');
-  await page.locator('.compat-form').getByRole('button', { name: 'Save' }).click();
-  await expect(page.locator('#subject-facts')).toContainText('level BACKWARD (global)');
+  // Checked at BACKWARD before it is saved, the breaking v2 would fail.
+  await page.getByRole('radio', { name: 'BACKWARD', exact: true }).check();
+  await page.getByRole('button', { name: 'Test v2 against this level' }).click();
+  await expect(page.locator('#level-answer')).toContainText('Would fail');
+  await page.getByRole('button', { name: 'Remove it' }).click();
+  await expect(page.locator('#subject-facts')).toContainText('level BACKWARD, the global default');
+});
+
+test('a read-only subject refuses a new version, and can be opened again', async ({ page, uniqueName }) => {
+  const subject = uniqueName('frozen');
+  await registerFirst(page, subject, AVRO());
+  await page.getByRole('link', { name: 'Compatibility', exact: true }).click();
+  await settled(page);
+  await page.locator('#compat-form').getByText('READONLY', { exact: true }).click();
+  await page.getByRole('button', { name: 'Save level' }).click();
+  await expect(page.locator('#subject-facts')).toContainText('mode READONLY, set on this subject');
+  await page.goto(`new/schema?subject=${subject}`);
+  await expect(page.locator('#reg-answer')).toContainText('This subject is read-only');
+  await page.locator('#f-schema').fill(AVRO(`,{"name":"email","type":["null","string"],"default":null}`));
+  await page.locator('#reg-acts').getByRole('button', { name: 'Check compatibility' }).click();
+  await expect(page.locator('#reg-answer')).toContainText('Register will be refused with 42205');
+  await page.locator('#reg-acts [data-register]').click();
+  await expect(page.locator('#reg-answer')).toContainText('42205');
+  await page.getByRole('button', { name: 'Set READWRITE for this subject' }).click();
+  await expect(page.locator('.flash')).toContainText('Mode is READWRITE');
+  await expect(page.locator('main h1 + .pill + .pill')).toHaveCount(0);
 });
 
 test('deleting a subject asks first, and then it is gone', async ({ page, uniqueName, confirmDialog }) => {

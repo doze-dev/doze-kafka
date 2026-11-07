@@ -4,7 +4,7 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 28753010,
+      "binaryBytes": 28769714,
       "idleHeapBytes": 1375088,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
@@ -299,6 +299,20 @@
       "from": 1368256,
       "to": 1375088,
       "reason": "Stage 5's Schemas pages (schemas-stage5, 2026-11-08): the median of 20 starts went from about 1,374,100 to 1,375,088 with the register page, after 1,373,360 with the subject pages; what grew at idle is package-level tables the pages add (key bindings, routes, form-field records, the subject's tabs), not templates (parsed on the first console request). The budget is the median of 20 starts, as the gate now judges (2026-11-08); it was 1,368,256, the largest of 20 at the time, and main's"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28753010,
+      "to": 28769714,
+      "reason": "Schemas: the Compatibility tab (Sc-09: levels, scope, mode, a check at a level) and read-only (Sc-15: the 42205 refusal, the mode); the per-subject check and register routes removed: 16,704 bytes (linux/arm64 unchanged at 27,918,496)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28769714,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,753,010 and the Compatibility tab of 2026-11-08 (16,704)"
     }
   ]
 }

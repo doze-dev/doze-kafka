@@ -60,7 +60,7 @@ func TestTheSchemasDockIsTheRegistrysOwnLog(t *testing.T) {
 
 	// What a person does through the console is a request like any client's: the
 	// register is kept, so the dock shows it (Sc-04 draws the console's own 409).
-	r := req(t, c, "POST", "/_console/schemas/orders-value/register", url.Values{"schema": {`"int"`}, "type": {"AVRO"}})
+	r := req(t, c, "POST", "/_console/new/schema", url.Values{"subject": {"orders-value"}, "schema": {`"int"`}, "type": {"AVRO"}})
 	if r.Code >= 300 && r.Code != 303 {
 		t.Logf("register through the console answered %d", r.Code)
 	}

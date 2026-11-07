@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { livePage, runBoard } from '../lib/gate';
+import { SHELL } from '../lib/probes';
 import { openLive } from '../lib/render';
 import { OwnBroker } from '../../ownbroker';
 import { ALLOW } from './allow';
-import { DIFF, FINDINGS, NONE, REGISTER, REGISTER_NEW, SCHEMA, SUBJECT_HEAD, TRY, VERSION_INSP, VERSIONS, DOCK } from './boards';
+import { COMPAT, DIFF, FINDINGS, NONE, READONLY, REGISTER, REGISTER_NEW, SCHEMA, SUBJECT_HEAD, TRY, VERSION_INSP, VERSIONS, DOCK } from './boards';
 import { AUDIT, DISPATCH, DISPATCH_V3, INVOICE, ORDERS, POINTS, SchemasWorld } from './world';
 
 // The Schemas boards against the live pages, element by element, in light and dark.
@@ -58,7 +59,7 @@ test.describe('on the boards\' world: their subjects, under their names', () => 
   test('what the subject pages say is the registry\'s', async ({ request }) => {
     const text = async (path: string) => (await (await request.get(w.console + path)).text()).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
     const orders = await text(`schemas/${seg(ORDERS)}`);
-    for (const want of ['3 versions', 'latest v3, id 7', 'level BACKWARD (global)', 'mode READWRITE', 'added optional coupon (null or string, default null)',
+    for (const want of ['3 versions', 'latest v3, id 7', 'level BACKWARD ·', 'mode READWRITE', 'added optional coupon (null or string, default null)',
       'added currency with default EUR', 'first version: orderId, lines, total', 'v2, BACKWARD ok', 'v1, BACKWARD ok', 'id 7 · 5 fields', 'Diff v2 to v3']) expect(orders).toContain(want);
     expect(await text(`schemas/${seg(DISPATCH)}`)).toContain('added carrier = 4');
     expect(await text(`schemas/${seg(DISPATCH)}`)).toContain('1 message type: Dispatch');
@@ -144,10 +145,33 @@ test.describe('on the boards\' world: their subjects, under their names', () => 
     expect(out.text, out.text).toBe('');
   });
 
+  test('Sc-09 matches the Compatibility tab of a subject with its own level', async ({ browser }) => {
+    test.setTimeout(120_000);
+    // The board's dock is the reads a client made of the level; the world's newest is
+    // Sc-04's refused register, so a client reads the level first.
+    await w.call('GET', `/config/${seg(ORDERS)}`);
+    const out = await runBoard(browser, { id: 'Sc-09', file: 'Sc-09-Compat-Level', live: livePage(w.console, `schemas/${seg(ORDERS)}?tab=compat`), probes: [...SUBJECT_HEAD.filter((p) => p.el !== 'register button'), ...COMPAT, ...DOCK], allow: ALLOW });
+    expect(out.text, out.text).toBe('');
+  });
+
   test('Sc-18 matches a subject a client registered', async ({ browser }) => {
     test.setTimeout(120_000);
     await w.registerByClient();
     const out = await runBoard(browser, { id: 'Sc-18', file: 'Sc-18-Registered-By-Client', live: livePage(w.console, `schemas/${seg(AUDIT)}`), probes: [...SUBJECT_HEAD, ...VERSIONS, ...DOCK], allow: ALLOW });
+    expect(out.text, out.text).toBe('');
+  });
+
+  test('Sc-15 matches a register refused because the subject is read-only', async ({ browser }) => {
+    test.setTimeout(120_000);
+    await w.call('PUT', `/mode/${seg(DISPATCH)}`, { mode: 'READONLY' });
+    const refused = async (p: import('@playwright/test').Page) => {
+      await p.locator('#f-schema').fill(DISPATCH_V3);
+      await p.locator('#reg-acts').getByRole('button', { name: 'Check compatibility' }).click();
+      await p.locator('#reg-answer .callout.ok').waitFor();
+      await p.locator('#reg-acts [data-register]').click();
+      await p.locator('#reg-answer .sc-ro').waitFor();
+    };
+    const out = await runBoard(browser, { id: 'Sc-15', file: 'Sc-15-Readonly', live: livePage(w.console, `new/schema?subject=${seg(DISPATCH)}`, refused), probes: [...SHELL, ...READONLY], allow: ALLOW });
     expect(out.text, out.text).toBe('');
   });
 });

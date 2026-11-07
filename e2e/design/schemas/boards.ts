@@ -212,3 +212,43 @@ export const FINDINGS: Probe[] = [
   { el: 'finding type', board: 'main > .callout + .card .r:not(.h) > :nth-child(2)', live: 'main .sc-findings .r:not(.h) > :nth-child(2)', text: true },
   { el: 'finding fix', board: 'main > .callout + .card .r:not(.h) .btn', live: 'main .sc-findings .r:not(.h) .btn', text: true },
 ];
+
+/** Sc-09: the levels, the scope, the mode and Try it. */
+export const COMPAT: Probe[] = [
+  { el: 'levels', board: 'main > .row.g12 > .card', live: '#compat-form > .card' },
+  { el: 'levels head', board: 'main > .row.g12 > .card .r.h', live: '#compat-form > .card .r.h' },
+  { el: 'levels head cell', board: 'main > .row.g12 > .card .r.h > span', live: '#compat-form > .card .r.h > span', text: true },
+  { el: 'level', board: 'main > .row.g12 > .card .r:not(.h):not(.on)', live: '#compat-form > .card .r:not(.h):not(.on)' },
+  { el: 'level on', board: 'main > .row.g12 > .card .r.on', live: '#compat-form > .card .r.on' },
+  { el: 'level name', board: 'main > .row.g12 > .card .r:not(.h) > .m', live: '#compat-form > .card .r:not(.h) > .m', text: true },
+  { el: 'level says', board: 'main > .row.g12 > .card .r:not(.h) > .el', live: '#compat-form > .card .r:not(.h) > .el', text: true },
+  { el: 'level now', board: 'main > .row.g12 > .card .tag', live: '#compat-form > .card .tag', text: true },
+  { el: 'side', board: 'main > .row.g12 > .col', live: '#compat-form > .col' },
+  { el: 'scope', board: 'main > .row.g12 > .col > .callout', live: '#compat-form > .col > .callout' },
+  { el: 'scope title', board: 'main > .row.g12 > .col > .callout .b', live: '#compat-form > .col > .callout .b', text: true },
+  { el: 'scope seg', board: 'main > .row.g12 > .col > .callout .seg', live: '#compat-form > .col > .callout .seg' },
+  { el: 'scope on', board: 'main > .row.g12 > .col > .callout .seg .on', live: '#compat-form > .col > .callout .seg .on', text: true },
+  { el: 'changing', board: 'main > .row.g12 > .col > .callout', live: '#compat-form > .col > .callout', nth: 1 },
+  { el: 'changing note', board: 'main > .row.g12 > .col > .callout .note', live: '#compat-form > .col > .callout .note', nth: 1, text: true },
+  { el: 'mode', board: 'main > .row.g12 > .col > .callout', live: '#compat-form > .col > .callout', nth: 2 },
+  { el: 'mode on', board: 'main > .row.g12 > .col > .callout .seg .on', live: '#compat-form > .col > .callout .seg .on', nth: 1, text: true },
+  { el: 'try', board: 'main > .card.pad', live: '#level-try' },
+  { el: 'try title', board: 'main > .card.pad .h2', live: '#level-try .h2', text: true },
+  { el: 'try body', board: 'main > .card.pad .m.grow', live: '#level-try .m.grow', text: true },
+  { el: 'try button', board: 'main > .card.pad .btn', live: '#level-try .btn', text: true },
+];
+
+const ON_REGISTER = 'DEVIATES: Sc-15 draws the refusal in the subject\'s frame, above "The attempt"; the console draws it on the register page, where the register was refused, under the form (plan/00-foundation.md, Sc-15)';
+/** Sc-15: a register refused because the subject is read-only (42205). */
+export const READONLY: Probe[] = [
+  { el: 'refusal', board: 'main > .callout.deny', live: '#reg-answer > .callout.deny', free: { y: ON_REGISTER, x: ON_REGISTER, w: ON_REGISTER } },
+  { el: 'refusal title', board: 'main > .callout.deny .b', live: '#reg-answer > .callout.deny .b', text: true, free: { y: ON_REGISTER, x: ON_REGISTER } },
+  { el: 'refusal code', board: 'main > .callout.deny .row .m', live: '#reg-answer > .callout.deny .row .m', text: true, free: { y: ON_REGISTER, x: ON_REGISTER } },
+  { el: 'refusal note', board: 'main > .callout.deny > .note', live: '#reg-answer > .callout.deny > .note', free: { y: ON_REGISTER, x: ON_REGISTER, w: ON_REGISTER, h: ON_REGISTER, text: 'the next id is this world\'s' } },
+  { el: 'mode callout', board: 'main > .row.g12 > .col > .callout', live: '#reg-answer .sc-ro > .callout', free: { y: ON_REGISTER, x: ON_REGISTER, w: ON_REGISTER, h: ON_REGISTER } },
+  { el: 'mode title', board: 'main > .row.g12 > .col > .callout .b', live: '#reg-answer .sc-ro > .callout .b', text: true, free: { y: ON_REGISTER, x: ON_REGISTER } },
+  { el: 'mode seg on', board: 'main > .row.g12 > .col > .callout .seg .on', live: '#reg-answer .sc-ro > .callout .seg .on', text: true, free: { y: ON_REGISTER, x: ON_REGISTER } },
+  { el: 'mode button', board: 'main > .row.g12 > .col > .callout .btn', live: '#reg-answer .sc-ro > .callout .btn', text: true, free: { y: ON_REGISTER, x: ON_REGISTER } },
+  { el: 'why', board: 'main > .row.g12 > .col > .callout', live: '#reg-answer .sc-ro > .callout', nth: 1, free: { y: ON_REGISTER, x: ON_REGISTER, w: ON_REGISTER, h: ON_REGISTER } },
+  { el: 'why title', board: 'main > .row.g12 > .col > .callout .b', live: '#reg-answer .sc-ro > .callout .b', nth: 1, text: true, free: { y: ON_REGISTER, x: ON_REGISTER } },
+];

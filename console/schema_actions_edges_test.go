@@ -16,7 +16,7 @@ func TestSchemaActionsRedirectsAndFlashes(t *testing.T) {
 	if code, l := post("/_console/new/schema", url.Values{"subject": {" orders-value "}, "schema": {userV1}}); code != 303 || l != "/_console/schemas/orders-value?flash=Schema+registered" {
 		t.Errorf("register: %d %s", code, l)
 	}
-	if code, l := post("/_console/schemas/orders-value/register", url.Values{"schema": {userV2}}); code != 303 || l != "/_console/schemas/orders-value?flash=Schema+registered" {
+	if code, l := post("/_console/new/schema", url.Values{"subject": {"orders-value"}, "schema": {userV2}}); code != 303 || l != "/_console/schemas/orders-value?flash=Schema+registered" {
 		t.Errorf("register a version: %d %s", code, l)
 	}
 	if code, _ := post("/_console/new/schema", url.Values{"subject": {"  "}, "schema": {userV1}}); code != 400 {
@@ -30,7 +30,7 @@ func TestSchemaActionsRedirectsAndFlashes(t *testing.T) {
 	}
 
 	// Compatibility: set, then back to the registry's default (also when none was set).
-	if code, l := post("/_console/schemas/orders-value/config", url.Values{"level": {"FULL"}}); code != 303 || !strings.HasSuffix(l, "?flash=Compatibility+updated") {
+	if code, l := post("/_console/schemas/orders-value/config", url.Values{"level": {"FULL"}}); code != 303 || !strings.HasSuffix(l, "?tab=compat&flash=Compatibility+updated") {
 		t.Errorf("set: %d %s", code, l)
 	}
 	if lvl, own, _ := c.reg.Compat(context.Background(), "orders-value"); lvl != "FULL" || !own {
@@ -75,7 +75,7 @@ func TestSchemaCheckAnswers(t *testing.T) {
 	c, _, _ := newRegistryConsole(t)
 	register(t, c, "orders-value", userV1)
 	check := func(schema string) string {
-		rec := req(t, c, "POST", "/_console/schemas/orders-value/check", url.Values{"schema": {schema}})
+		rec := req(t, c, "POST", "/_console/new/schema/check", url.Values{"subject": {"orders-value"}, "schema": {schema}})
 		if rec.Code != 200 {
 			t.Fatalf("%d %s", rec.Code, rec.Body)
 		}
@@ -91,7 +91,7 @@ func TestSchemaCheckAnswers(t *testing.T) {
 	if got := check("{broken"); got == "" {
 		t.Error("a schema that does not parse is an answer, not a blank")
 	}
-	if rec := req(t, c, "POST", "/_console/schemas/orders-value/check", url.Values{"schema": {" "}}); rec.Code != 400 {
+	if rec := req(t, c, "POST", "/_console/new/schema/check", url.Values{"subject": {"orders-value"}, "schema": {" "}}); rec.Code != 400 {
 		t.Errorf("no schema: %d", rec.Code)
 	}
 	if rec := req(t, c, "GET", "/_console/new/schema?subject=a+b", nil); rec.Code != 200 || !strings.Contains(rec.Body.String(), "a b") {

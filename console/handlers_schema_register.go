@@ -102,6 +102,8 @@ type regPage struct {
 	NextID   int
 	Topic    string // the topic the subject is named for, and whether the broker has it.
 	TopicOK  bool
+	Mode     string // the subject's mode, and whether it is its own (Sc-15).
+	ModeOwn  bool
 }
 
 func (c *Console) regPage(ctx context.Context, d regDraft) regPage {
@@ -114,6 +116,7 @@ func (c *Console) regPage(ctx context.Context, d regDraft) regPage {
 			p.Existing, p.Latest, p.LatestID = true, v.Version, v.ID
 		}
 		p.Level, p.Own, _ = c.reg.Compat(ctx, d.Subject)
+		p.Mode, p.ModeOwn, _ = c.reg.SubjectMode(ctx, d.Subject)
 		if t := subjectTopic(d.Subject); t != "" {
 			p.Topic = t
 			if topics, err := c.be.ListTopics(ctx); err == nil {
@@ -279,6 +282,11 @@ func (c *Console) schemaCreate(w http.ResponseWriter, r *http.Request) {
 	p := c.regPage(ctx, d)
 	if _, err := c.reg.Register(ctx, d.Subject, d.body()); err != nil {
 		var re *regError
+		if errors.As(err, &re) && re.Code == 42205 && r.Header.Get("HX-Request") == "true" {
+			// Sc-15: the subject (or the registry) is read-only.
+			c.partial(w, "schema_reg_answer", map[string]any{"P": p, "Did": "register", "SubjectURL": c.schemaURL(d.Subject), "ReadOnly": re, "RawRefusal": refusalJSON(re)})
+			return
+		}
 		if errors.As(err, &re) && re.Status == http.StatusConflict && r.Header.Get("HX-Request") == "true" {
 			out := map[string]any{"P": p, "Did": "register", "SubjectURL": c.schemaURL(d.Subject), "Refused": re, "RawRefusal": refusalJSON(re)}
 			if a, err := c.reg.CheckAt(ctx, d.Subject, d.body(), "", "", d.Normalize); err == nil {

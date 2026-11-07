@@ -852,6 +852,9 @@
     cursorEl = rows[next];
     cursorEl.classList.add("cursor");
     cursorEl.scrollIntoView({ block: "nearest" });
+    // On the Compatibility tab (Sc-09) j and k choose the level the cursor is on.
+    var lv = cursorEl.matches(".sc-levels label.r") && cursorEl.querySelector('input[type="radio"]');
+    if (lv && !lv.checked) lv.click();
   }
   function focusComposer() {
     var panel = document.getElementById("compose-panel");
@@ -1996,8 +1999,16 @@ document.addEventListener("click", function (e) {
 // segment, and a reference is a row added from a template and removed by its ×.
 document.addEventListener("change", function (e) {
   var r = e.target;
-  if (!r || !r.matches || !r.matches('.sc-seg input[type="radio"]')) return;
-  r.closest(".sc-seg").querySelectorAll("label").forEach(function (l) { l.classList.toggle("on", l.contains(r)); });
+  if (!r || !r.matches) return;
+  if (r.matches('.sc-seg input[type="radio"]')) {
+    r.closest(".sc-seg").querySelectorAll("label").forEach(function (l) { l.classList.toggle("on", l.contains(r)); });
+  }
+  // Sc-09: the chosen level is the row drawn on, and the body Try it would send.
+  if (r.matches('.sc-levels input[name="level"]')) {
+    r.closest(".sc-levels").querySelectorAll("label.r").forEach(function (l) { l.classList.toggle("on", l.contains(r)); });
+    var body = document.getElementById("level-body");
+    if (body) body.textContent = JSON.stringify({ compatibility: r.value });
+  }
 });
 // The schema field's line numbers follow its lines.
 document.addEventListener("input", function (e) {

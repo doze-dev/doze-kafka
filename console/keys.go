@@ -195,6 +195,9 @@ func pageHints(view string) []keyHint {
 	case "schema_register":
 		// Sc-02 to Sc-04: ⌘↵ checks, ⇧⌘↵ registers, Esc goes back.
 		return []keyHint{{Keys: []string{"⌘↵"}, Label: "check"}, {Keys: []string{"⇧⌘↵"}, Label: "register"}, {Keys: []string{"esc"}, Label: "cancel"}, hintJump}
+	case "schema_compat":
+		// Sc-09: j k choose a level, ⌘↵ saves, Esc discards (back to the versions).
+		return []keyHint{{Keys: []string{"j", "k"}, Label: "choose level"}, {Keys: []string{"⌘↵"}, Label: "save"}, {Keys: []string{"esc"}, Label: "discard"}, hintJump}
 	case "schema_diff":
 		// Sc-06.
 		return []keyHint{{Keys: []string{"[", "]"}, Label: "older, newer pair"}, {Keys: []string{"u"}, Label: "unified"}, {Keys: []string{"esc"}, Label: "back to versions"}, hintJump}

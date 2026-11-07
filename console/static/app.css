@@ -1735,3 +1735,12 @@ progress.gr-used::-moz-progress-bar{background:var(--ink);border-radius:2px}
 .sc-wrap { white-space: normal; overflow-wrap: anywhere; }
 .sc-reg-form .btn:disabled { opacity: .55; }
 .sc-refs-few { min-height: 20px; }
+/* Sc-09: the levels as a table of choices, the scope and the mode beside it. */
+.sc-levels label.r { min-height: 34px; cursor: pointer; }
+.sc-levels label.r input { margin: 0; }
+.sc-side-wide { width: 360px; flex: none; }
+#compat-form .callout .seg { align-self: flex-start; }
+.linkbtn { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
+.sc-ro .seg { align-self: flex-start; }
+.sc-ro-btn { align-self: flex-start; margin-top: 4px; }
+#level-answer:not(:has(*)) { display: none; }

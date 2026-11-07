@@ -14,7 +14,7 @@ func TestRefusalsKeepTheRegistryCode(t *testing.T) {
 	c, _, ts := newRegistryConsole(t)
 	register(t, c, "s", userV1)
 	bad := `{"type":"record","name":"User","fields":[{"name":"id","type":"long"},{"name":"email","type":"string"}]}`
-	rec := req(t, c, "POST", "/_console/schemas/s/register", url.Values{"schema": {bad}})
+	rec := req(t, c, "POST", "/_console/new/schema", url.Values{"subject": {"s"}, "schema": {bad}})
 	body := rec.Body.String()
 	if !strings.Contains(body, `data-refusal-kind="refused" data-refusal-source="registry" data-refusal-name="409"`) ||
 		!strings.Contains(body, "READER_FIELD_MISSING_DEFAULT_VALUE") || !strings.Contains(readable(body), "not compatible with the versions") {
@@ -26,7 +26,7 @@ func TestRefusalsKeepTheRegistryCode(t *testing.T) {
 	if resp, err := http.DefaultClient.Do(put); err != nil || resp.StatusCode != 200 {
 		t.Fatalf("set READONLY: %v %v", resp, err)
 	}
-	rec = req(t, c, "POST", "/_console/schemas/s/register", url.Values{"schema": {userV2}})
+	rec = req(t, c, "POST", "/_console/new/schema", url.Values{"subject": {"s"}, "schema": {userV2}})
 	body = rec.Body.String()
 	if !strings.Contains(body, `data-refusal-name="42205"`) || !strings.Contains(body, "read-only mode") {
 		t.Errorf("registering in a READONLY subject: %d\n%s", rec.Code, readable(body))

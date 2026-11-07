@@ -116,7 +116,7 @@ func TestEveryFailingHandlerAnswersWithARefusal(t *testing.T) {
 		{"an offset that is not a number", "POST", "/_console/groups/ghost/offset", form("topic", "orders", "partition", "0", "offset", "x"), true, nil, 400, want{"refused", "", ""}},
 		// Schemas.
 		{"a subject that is not there", "GET", "/_console/schemas/ghost", nil, false, nil, 404, want{"refused", "40401", "registry"}},
-		{"registering a schema the registry cannot parse", "POST", "/_console/schemas/orders-value/register", form("schema", "{not json", "schemaType", "AVRO"), true, nil, 400, want{"refused", "", "registry"}},
+		{"registering a schema the registry cannot parse", "POST", "/_console/new/schema", form("subject", "orders-value", "schema", "{not json", "schemaType", "AVRO"), true, nil, 400, want{"refused", "", "registry"}},
 		{"a compatibility level that does not exist", "POST", "/_console/schemas/orders-value/config", form("level", "SIDEWAYS"), true, nil, 400, want{"refused", "", ""}},
 		{"deleting a subject that is not there", "POST", "/_console/schemas/ghost/delete", nil, true, nil, 404, want{"refused", "40401", "registry"}},
 		// Traffic, trace and the inspector.

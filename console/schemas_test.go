@@ -89,7 +89,7 @@ func TestSchemaSubjectLifecycle(t *testing.T) {
 	}
 
 	// A second version through the form; the page compares it with the first.
-	rec = req(t, c, "POST", "/_console/schemas/orders-value/register", url.Values{"schema": {userV2}, "type": {"AVRO"}})
+	rec = req(t, c, "POST", "/_console/new/schema", url.Values{"subject": {"orders-value"}, "schema": {userV2}, "type": {"AVRO"}})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("register v2: %d %s", rec.Code, rec.Body)
 	}
@@ -141,13 +141,13 @@ func TestSchemaCheckSaysWhyNot(t *testing.T) {
 	c, _, _ := newRegistryConsole(t)
 	register(t, c, "s", userV1)
 	check := func(schema string) string {
-		rec := req(t, c, "POST", "/_console/schemas/s/check", url.Values{"schema": {schema}, "type": {"AVRO"}})
+		rec := req(t, c, "POST", "/_console/new/schema/check", url.Values{"subject": {"s"}, "schema": {schema}, "type": {"AVRO"}})
 		if rec.Code != 200 {
 			t.Fatalf("check: %d %s", rec.Code, rec.Body)
 		}
 		return rec.Body.String()
 	}
-	if got := check(userV2); !strings.Contains(got, "Compatible.") {
+	if got := readable(check(userV2)); !strings.Contains(got, "Compatible") || strings.Contains(got, "Not compatible") {
 		t.Errorf("a compatible schema: %s", got)
 	}
 	bad := check(`{"type":"record","name":"User","fields":[{"name":"id","type":"long"},{"name":"email","type":"string"}]}`)
@@ -160,7 +160,7 @@ func TestSchemaCheckSaysWhyNot(t *testing.T) {
 		t.Errorf("a broken schema: %s", got)
 	}
 	// Registering the incompatible one is refused with the registry's reason.
-	rec := req(t, c, "POST", "/_console/schemas/s/register", url.Values{"schema": {`{"type":"record","name":"User","fields":[{"name":"id","type":"long"},{"name":"email","type":"string"}]}`}})
+	rec := req(t, c, "POST", "/_console/new/schema", url.Values{"subject": {"s"}, "schema": {`{"type":"record","name":"User","fields":[{"name":"id","type":"long"},{"name":"email","type":"string"}]}`}})
 	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "incompatible") {
 		t.Errorf("registering an incompatible schema = %d %s", rec.Code, rec.Body)
 	}

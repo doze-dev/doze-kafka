@@ -104,7 +104,19 @@ func (c *Console) schemaDetail(w http.ResponseWriter, r *http.Request) {
 	if lv, err := c.reg.Version(ctx, subject, 0); err == nil {
 		data["LatestID"] = lv.ID
 	}
+	if modeOwn {
+		if o, ok := c.reg.Overview(ctx); ok {
+			if st := subjectState(o, subject); st != nil && st.ModeSetAt != nil {
+				data["ModeSetAt"] = *st.ModeSetAt
+			}
+		}
+	}
 	switch tab {
+	case "compat":
+		data["GlobalLevel"], _ = c.reg.GlobalCompat(ctx)
+		data["GlobalMode"], _ = c.reg.Mode(ctx)
+		data["LevelRows"] = levelRows(level)
+		data["View"] = "schema_compat"
 	case "versions":
 		rows := c.versionRows(ctx, subject, versions, level, cur.Version)
 		data["VersionRows"] = rows
@@ -135,6 +147,7 @@ func (c *Console) schemaDetail(w http.ResponseWriter, r *http.Request) {
 	data["SubjectNeighbours"] = c.subjectNeighbours(ctx, subject)
 	data["Confirm"] = subjectConfirms(subject, versions, cur.Version)
 	switch {
+	case tab == "compat":
 	case data["ByClient"] == true || cur.Type() == schemaregistry.TypeJSON:
 		data["View"] = "schema_one"
 	case cur.Type() == schemaregistry.TypeProtobuf:

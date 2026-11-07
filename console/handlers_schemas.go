@@ -3,7 +3,6 @@ package console
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -198,73 +197,6 @@ func (c *Console) failSubject(w http.ResponseWriter, r *http.Request, err error,
 		page.Suggestions = c.closeNames(names, subject, c.schemaURL)
 	}
 	c.renderError(w, r, f, page)
-}
-
-// schemaCheck answers, beside the form, whether the schema in it may be registered.
-func (c *Console) schemaCheck(w http.ResponseWriter, r *http.Request) {
-	if c.registryOff(w, r) {
-		return
-	}
-	subject := groupFromSegment(r.PathValue("subject"))
-	body, err := schemaFromForm(r)
-	if err != nil {
-		c.fail(w, r, err)
-		return
-	}
-	ok, reasons, err := c.reg.Check(r.Context(), subject, body)
-	if err != nil {
-		var re *regError
-		if errors.As(err, &re) && re.Status == http.StatusUnprocessableEntity {
-			// A schema that does not parse is an answer to this question, not a failure:
-			// the registry's refusal (42201), said as one (A2), in the check's place.
-			c.partial(w, "schema_check", map[string]any{"Invalid": refusalFor(err).data(nil)})
-			return
-		}
-		c.fail(w, r, err)
-		return
-	}
-	level, _, _ := c.reg.Compat(r.Context(), subject)
-	c.partial(w, "schema_check", map[string]any{"OK": ok, "Reasons": reasons, "Level": level})
-}
-
-func (c *Console) schemaRegister(w http.ResponseWriter, r *http.Request) {
-	if c.registryOff(w, r) {
-		return
-	}
-	subject := groupFromSegment(r.PathValue("subject"))
-	body, err := schemaFromForm(r)
-	if err != nil {
-		c.fail(w, r, err)
-		return
-	}
-	if _, err := c.reg.Register(r.Context(), subject, body); err != nil {
-		c.fail(w, r, err)
-		return
-	}
-	c.redirect(w, r, c.schemaURL(subject), "Schema registered")
-}
-
-func (c *Console) schemaConfig(w http.ResponseWriter, r *http.Request) {
-	if c.registryOff(w, r) {
-		return
-	}
-	subject := groupFromSegment(r.PathValue("subject"))
-	level := r.FormValue("level")
-	var err error
-	if level == "" || level == "default" {
-		err = c.reg.ClearCompat(r.Context(), subject)
-		var re *regError
-		if errors.As(err, &re) && re.Status == http.StatusNotFound {
-			err = nil // it was not set.
-		}
-	} else {
-		err = c.reg.SetCompat(r.Context(), subject, level)
-	}
-	if err != nil {
-		c.fail(w, r, err)
-		return
-	}
-	c.redirect(w, r, c.schemaURL(subject), "Compatibility updated")
 }
 
 func (c *Console) schemaDelete(w http.ResponseWriter, r *http.Request) {

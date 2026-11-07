@@ -87,6 +87,8 @@ export class SchemasWorld {
       key: 'HRB-2026-04811', value: '{"orderId":"HRB-2026-04811","lines":3,"total":84.2,"currency":"EUR","coupon":null}', schema_subject: ORDERS, partition: '1' }) });
     if (!produced.ok) throw new Error(`produce: ${produced.status} ${await produced.text()}`);
     if (ids.join(',') !== '1,2,3,4,5,6,7,8,9,10') throw new Error(`the boards' ids are 1 to 10 in order, got ${ids}`);
+    // The orders subject has BACKWARD as its own level, as Sc-04 and Sc-09 draw it.
+    await this.call('PUT', `/config/${encodeURIComponent(ORDERS)}`, { compatibility: 'BACKWARD' });
     await this.call('DELETE', '/subjects/harbour.scratch-value');
     await this.call('DELETE', '/subjects/harbour.scratch-value?permanent=true');
   }

@@ -157,7 +157,9 @@
 
 {{define "schema_reg_head"}}<button class="btn pri" type="button" id="reg-head-btn" data-register{{if not .OK}} disabled{{end}}{{if .OOB}} hx-swap-oob="true"{{end}} hx-post="{{newSchemaURL ""}}" hx-include="#reg-form" hx-target="#reg-answer" hx-select="unset" hx-swap="innerHTML" hx-disabled-elt="this">Register{{if .Existing}} v{{inc .Latest}}{{end}}</button>{{end}}
 
-{{define "schema_reg_first"}}<div class="callout"><span class="b">Not checked yet</span><span class="note">{{if .Existing}}Check compares this with v{{.Latest}} at {{.Level}}{{if not .Own}} (global){{end}}{{if hasSuffix .Level "_TRANSITIVE"}}, and every version before it{{end}}. Nothing is stored until you register.{{else}}New subject: there is no earlier version to be compatible with, so Register will create <span class="m">v1</span>.{{if .NextID}} The first stored schema gets the next free id ({{.NextID}}).{{end}}{{end}}</span></div>{{end}}
+{{define "schema_reg_readonly"}}{{if eq .Mode "READONLY"}}<div class="callout warn" role="note" data-readonly><span class="b">This subject is read-only</span><span class="note">Its mode is READONLY{{if not .ModeOwn}} (the registry's){{end}}: a check still answers, as Confluent's does, but Register will be refused with 42205 until the mode is READWRITE.</span></div>{{end}}{{end}}
+
+{{define "schema_reg_first"}}{{template "schema_reg_readonly" .}}<div class="callout"><span class="b">Not checked yet</span><span class="note">{{if .Existing}}Check compares this with v{{.Latest}} at {{.Level}}{{if not .Own}} (global){{end}}{{if hasSuffix .Level "_TRANSITIVE"}}, and every version before it{{end}}. Nothing is stored until you register.{{else}}New subject: there is no earlier version to be compatible with, so Register will create <span class="m">v1</span>.{{if .NextID}} The first stored schema gets the next free id ({{.NextID}}).{{end}}{{end}}</span></div>{{end}}
 
 {{define "schema_reg_acts"}}<div class="row g8 ce" id="reg-acts"{{if .OOB}} hx-swap-oob="true"{{end}}>
   {{if .Fix}}<button class="btn" type="button" hx-post="{{newSchemaURL ""}}/fix" hx-include="#reg-form" hx-vals='{"path":"{{.Fix.Path}}"}' hx-target="#reg-text" hx-select="unset" hx-swap="outerHTML">Fix: <span class="m">{{.Fix.FixLabel}}</span></button>
@@ -170,15 +172,27 @@
 {{/* What Check and a refused Register answer, in #reg-answer, with the actions under it. */}}
 {{define "schema_reg_answer"}}
 {{if .Refusal}}{{template "refusal" .Refusal}}
+{{else if .ReadOnly}}<div class="callout deny" role="alert">
+  <div class="row ce g8"><span class="b">Refused</span><span class="m">{{.ReadOnly.Code}}</span><span class="mut">·</span><span class="m">HTTP {{.ReadOnly.Status}}</span></div>
+  <span class="m sc-wrap">{{.RawRefusal}}</span>
+  <span class="note">Rule: a subject in READONLY mode takes no new versions, no deletes and no level changes; reads go on working. Confluent's registry refuses the same register call with the same error code. Nothing was stored{{if .P.NextID}}; the next id is still {{.P.NextID}}{{end}}.</span>
+</div>
+<div class="row g12 sc-ro">
+  <div class="callout grow"><span class="b">Mode</span>
+    <div class="seg" role="group" aria-label="Mode"><span>READWRITE</span><span class="on">READONLY</span></div>
+    <span class="note">{{if .P.ModeOwn}}Set on this subject.{{else}}The registry's own mode, which this subject follows.{{end}} IMPORT and READONLY_OVERRIDE are not supported here.</span>
+    {{if .P.ModeOwn}}<button class="btn sc-ro-btn" type="button" hx-post="{{schemaURL .P.Draft.Subject}}/mode" hx-vals='{"mode":"READWRITE"}'>Set READWRITE for this subject</button>{{end}}</div>
+  <div class="callout grow"><span class="b">Why would it be read-only</span><span class="note">Someone froze it on purpose, to stop a producer with <span class="m">auto.register.schemas=true</span> from adding versions. The producer then fails with this same {{.ReadOnly.Code}}.</span></div>
+</div>
 {{else if .Refused}}<div class="callout deny" role="alert">
   <div class="row ce g8"><span class="b">Refused</span><span class="m">409 Conflict</span><span class="mut">·</span><span class="m">error_code {{.Refused.Code}}</span></div>
   <span class="m sc-wrap">{{.RawRefusal}}</span>
   <span class="note">Rule: {{.Rule}} Confluent Schema Registry refuses the same call with the same status, error code and reasons.</span>
 </div>
 {{template "schema_reg_findings" .}}
-{{else if .Parses}}<div class="callout ok" role="status"><div class="row ce g8"><span class="b ok">Parses</span><span class="m">a first version, v1</span></div>
+{{else if .Parses}}{{template "schema_reg_readonly" .P}}<div class="callout ok" role="status"><div class="row ce g8"><span class="b ok">Parses</span><span class="m">a first version, v1</span></div>
   <span class="note">Checked just now: the registry parsed it. A new subject has nothing to be compatible with. Nothing is stored yet.</span></div>
-{{else if .OK}}<div class="callout ok" role="status"><div class="row ce g8"><span class="b ok">Compatible</span><span class="m">compatible with {{range $i, $v := .Compared}}{{if $i}}, {{end}}v{{$v}}{{else}}v{{.P.Latest}}{{end}} ({{.Level}})</span></div>
+{{else if .OK}}{{template "schema_reg_readonly" .P}}<div class="callout ok" role="status"><div class="row ce g8"><span class="b ok">Compatible</span><span class="m">compatible with {{range $i, $v := .Compared}}{{if $i}}, {{end}}v{{$v}}{{else}}v{{.P.Latest}}{{end}} ({{.Level}})</span></div>
   <span class="note">Checked just now against {{if gt (len .Compared) 1}}every earlier version{{else}}the latest version{{end}} with <span class="m">POST /compatibility/subjects/{{.P.Draft.Subject}}/versions/latest</span>. {{.Why}} Nothing is stored yet.</span></div>
 {{else}}<div class="callout bad" role="alert"><div class="row ce g8"><span class="b">Not compatible</span><span class="m">with {{range $i, $v := .Compared}}{{if $i}}, {{end}}v{{$v}}{{end}} ({{.Level}})</span></div>
   <span class="note">Registering it would be refused (409). Nothing is stored.</span></div>
@@ -200,9 +214,10 @@
 {{/* A subject's title band: its name and type, Register new version, and ···. */}}
 {{define "schema_band"}}
     <div class="row sb ce idband">
-      <div class="row ce g8"><h1 class="h1 m">{{.Subject}}</h1><span class="pill">{{template "schema_type_pill" .Cur.Type}}</span>{{if .ByClient}}<span class="pill ok">registered by a client</span>{{end}}</div>
+      <div class="row ce g8"><h1 class="h1 m">{{.Subject}}</h1><span class="pill">{{template "schema_type_pill" .Cur.Type}}</span>{{if eq .Mode "READONLY"}}<span class="pill warn">READONLY</span>{{end}}{{if .ByClient}}<span class="pill ok">registered by a client</span>{{end}}</div>
       <div class="row g8 ce idband-acts">
-        <a class="btn pri w5" href="{{.NewVersionURL}}" data-create data-new-version>Register new version</a>
+        {{if eq .Tab "compat"}}<button class="btn pri" type="submit" form="compat-form" data-save>Save level</button>
+        {{else}}<a class="btn pri w5" href="{{.NewVersionURL}}" data-create data-new-version>Register new version</a>{{end}}
         <div class="more"><button type="button" class="btn" aria-label="More actions" title="More actions" aria-expanded="false" data-more>···</button>
           <div class="menu" role="group" aria-label="More actions" hidden>
             <button class="btn danger" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" data-confirm-url="{{confirmURL "schema.delete" "subject" .Subject}}" data-confirm-title="{{(index .Confirm "schema.delete").Title}}" data-confirm-verb="{{(index .Confirm "schema.delete").Verb}}" hx-confirm="{{(index .Confirm "schema.delete").Text}}">{{icon "trash"}} Delete subject</button>
@@ -228,7 +243,12 @@
     {{template "schema_band" .}}
 
     <div class="row ce g8 wrap" id="subject-facts">
-      {{if .ByClient}}
+      {{if eq .Tab "compat"}}
+      <span class="m">{{len .Versions}} version{{if ne (len .Versions) 1}}s{{end}}</span><span class="mut">·</span>
+      <span class="m">level {{.Compat}}, {{if .CompatOwn}}set on this subject{{else}}the global default{{end}}</span><span class="mut">·</span>
+      <span class="m">global default {{.GlobalLevel}}</span><span class="mut">·</span>
+      <span class="m{{if eq .Mode "READONLY"}} warn{{end}}">mode {{.Mode}}{{if .ModeOwn}}, set on this subject{{end}}</span>
+      {{else if .ByClient}}
       <span class="m">1 version</span><span class="mut">·</span><span class="m">v{{.Latest}}, id {{.LatestID}}</span><span class="mut">·</span>
       <span class="m">level {{.Compat}}{{if not .CompatOwn}} (global){{end}}</span><span class="mut">·</span>
       <span class="m">registered {{when .LastAt "clock"}}{{if .By}} by {{.By}}{{end}}</span>
@@ -239,7 +259,7 @@
       {{if eq .Cur.Type "JSON"}}{{if .Shape.Fields}}<span class="mut">·</span><span class="m">{{.Shape.Required}} required of {{len .Shape.Fields}} propert{{if eq (len .Shape.Fields) 1}}y{{else}}ies{{end}}</span>
         <span class="mut">·</span><span class="m">{{if .Shape.Closed}}closed: additionalProperties false{{else}}open: other properties allowed{{end}}</span>{{end}}
       {{else}}
-      {{if .Mode}}<span class="mut">·</span><span class="m"{{if .ModeOwn}} title="set for this subject"{{end}}>mode {{.Mode}}</span>{{end}}
+      {{if .Mode}}<span class="mut">·</span><span class="m{{if eq .Mode "READONLY"}} warn{{end}}">mode {{.Mode}}{{if .ModeOwn}}, set on this subject{{if .ModeSetAt}} at {{when .ModeSetAt "clock"}}{{end}}{{end}}</span>{{end}}
       {{if eq .Cur.Type "PROTOBUF"}}{{if .Shape.Messages}}<span class="mut">·</span><span class="m">{{len .Shape.Messages}} message type{{if ne (len .Shape.Messages) 1}}s{{end}}: {{range $i, $m := .Shape.Messages}}{{if $i}}, {{end}}{{$m}}{{end}}</span>{{end}}
       {{else if .LastAt}}{{if not .LastAt.IsZero}}<span class="mut">·</span><span class="m">last registered {{when .LastAt "day"}}</span>{{end}}{{end}}
       {{end}}
@@ -253,18 +273,26 @@
     </nav>
 
     {{if eq .Tab "compat"}}
-    <div class="card pad col g8" id="compat-card">
-      <span class="h2">Compatibility level</span>
-      <form class="compat-form" hx-post="{{schemaURL .Subject}}/config">
-        <label class="scope"><span class="sr-only">Compatibility level for {{.Subject}}</span>
-          <select class="input" name="level">
-            <option value="default" {{if not .CompatOwn}}selected{{end}}>registry default ({{if .CompatOwn}}…{{else}}{{.Compat}}{{end}})</option>
-            {{range .Levels}}<option value="{{.}}" {{if and $.CompatOwn (eq . $.Compat)}}selected{{end}}>{{.}}</option>{{end}}
-          </select></label>
-        <button class="btn pri" type="submit" hx-disabled-elt="this">Save</button>
-        <span class="hint teach">{{teach "registry" .Compat}}</span>
-      </form>
-    </div>
+    <form class="row g12" id="compat-form" hx-post="{{schemaURL .Subject}}/config" hx-disabled-elt="find button[type=submit]" data-mod-enter>
+      <div class="card grow sc-levels" role="radiogroup" aria-label="Compatibility level" style="--c: 24px 190px 1fr">
+        <div class="r h"><span></span><span>Level</span><span>What a new version must satisfy</span></div>
+        {{range .LevelRows}}<label class="r{{if .On}} on{{end}}" data-row title="{{teach "registry" .Level}}"><input type="radio" name="level" value="{{.Level}}" aria-label="{{.Level}}"{{if .On}} checked{{end}}><span class="m b">{{.Level}}{{if .Now}} <span class="tag">now</span>{{end}}</span><span class="el">{{.Says}}</span></label>{{end}}
+      </div>
+      <div class="col g8 sc-side-wide">
+        <div class="callout"><span class="b">Scope</span>
+          <div class="seg sc-seg" role="radiogroup" aria-label="Scope"><label class="on"><input type="radio" class="sr-only" name="scope" value="subject" checked>This subject</label><label><input type="radio" class="sr-only" name="scope" value="global">Global default</label></div>
+          <span class="note">A level on the subject wins over the global one. {{if .CompatOwn}}<button type="submit" class="linkbtn" name="level" value="default" formnovalidate>Remove it</button> to follow the global level ({{.GlobalLevel}}) again.{{else}}Remove it to follow the global level again.{{end}}</span></div>
+        <div class="callout"><span class="b">What changing it does</span><span class="note">Existing versions are not re-checked. The new level applies to the next register or compatibility check. Raising to a TRANSITIVE level can make a schema that passed today fail against v1.</span></div>
+        <div class="callout"><span class="b">Mode</span>
+          <div class="seg sc-seg" role="radiogroup" aria-label="Mode">{{range (list "READWRITE" "READONLY")}}<label{{if eq . $.Mode}} class="on"{{end}}><input type="radio" class="sr-only" name="mode" value="{{.}}"{{if eq . $.Mode}} checked{{end}}>{{.}}</label>{{end}}</div>
+          <span class="note">{{if .ModeOwn}}Set on this subject. {{end}}{{if ne .GlobalMode .Mode}}The global mode is {{.GlobalMode}}. {{end}}IMPORT is not supported here.</span></div>
+      </div>
+    </form>
+    <form class="card pad col g8" id="level-try" hx-post="{{schemaURL .Subject}}/level-check" hx-include="#compat-form" hx-target="#level-answer" hx-select="unset" hx-swap="innerHTML">
+      <div class="row sb ce"><span class="h2">Try it</span><span class="note">Same as <span class="m">PUT /config/{subject}</span></span></div>
+      <div class="row g8 ce"><span class="m grow" id="level-body">{"compatibility":"{{.Compat}}"}</span><button class="btn" type="submit">Test v{{.Latest}} against this level</button></div>
+      <div id="level-answer" aria-live="polite"></div>
+    </form>
     {{else if eq .Tab "used"}}
     <div class="callout" id="used-by"><span class="note">The topics whose records carry this subject's ids.</span></div>
     {{else if eq .Tab "raw"}}
@@ -393,6 +421,14 @@
   {{template "wire_dock" .}}
 {{template "shell_bottom" .}}{{end}}
 
+{{/* Sc-09's "Test vN against this level". */}}
+{{define "schema_level_check"}}
+{{if .Alone}}<div class="callout" role="status"><span class="note">v{{.Latest}} is the only version: there is nothing to check it against.</span></div>
+{{else if .OK}}<div class="callout ok" role="status"><div class="row ce g8"><span class="b ok">Passes</span><span class="m">v{{.Latest}} against {{range $i, $v := .Compared}}{{if $i}}, {{end}}v{{$v}}{{end}} at {{.Level}}</span></div><span class="note">Nothing is saved: the level is what the form says until Save level.</span></div>
+{{else}}<div class="callout bad" role="alert"><div class="row ce g8"><span class="b">Would fail</span><span class="m">v{{.Latest}} at {{.Level}}</span></div><span class="note">{{.Why}}. Existing versions are not re-checked when the level changes; the next register is.</span></div>
+{{end}}
+{{end}}
+
 {{/* Try it's answer: the bytes, or why the value does not fit. */}}
 {{define "schema_try"}}
 {{/* A check's verdict is the pill beside the buttons (Sc-08); why it failed, and what
@@ -404,10 +440,4 @@
 {{end}}
 {{end}}
 
-{{define "schema_check"}}
-{{if .Invalid}}{{template "refusal" .Invalid}}
-{{else if .OK}}<div class="callout ok" role="status"><span class="b">Compatible.</span><span class="note">This schema may be registered under the {{.Level}} rule.</span></div>
-{{else}}<div class="callout bad" role="alert"><span class="b">Not compatible with the {{.Level}} rule.</span>
-  <ul class="reasons">{{range .Reasons}}<li class="mono">{{.}}</li>{{end}}</ul></div>
-{{end}}
-{{end}}
+
