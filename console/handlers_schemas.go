@@ -2,8 +2,8 @@ package console
 
 import (
 	"context"
-	"errors"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
