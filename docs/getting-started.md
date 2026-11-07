@@ -1,26 +1,29 @@
-# Getting started
+---
+title: "Getting started"
+description: "Install doze-kafka, run a broker, round-trip a message through it and confirm it survives a restart."
+---
 
 This walks you from nothing to a running broker with a message round-tripped
 through it, and confirms your data survives a restart. It takes a couple of minutes.
 
-## Prerequisites
+You need a Kafka client to talk to it. Any will do; the examples use
+[`kcat`](https://github.com/edenhill/kcat) because it's a single command, but see
+[Clients](clients.md) for franz-go, Sarama, kafkajs, the Java client, and more.
 
-- **Go 1.27+** to build the binary. That's the only build dependency.
-- A Kafka client to talk to it. Any will do; the examples use
-  [`kcat`](https://github.com/edenhill/kcat) because it's a single command, but see
-  [Clients](clients.md) for franz-go, Sarama, kafkajs, the Java client, and more.
-
-## Build
-
-doze-kafka is a normal Go program:
+## Install
 
 ```sh
-git clone https://github.com/doze-dev/doze-kafka
-cd doze-kafka
-go build -o doze-kafka ./cmd/doze-kafka
+curl -fsSL https://raw.githubusercontent.com/doze-dev/doze-kafka/main/install.sh | sh
+exec $SHELL
 ```
 
-You now have a single self-contained binary named `doze-kafka`.
+The installer picks the prebuilt binary for your OS and architecture (Linux and
+macOS, amd64 and arm64), checks its SHA-256 against the release's checksums, and puts
+it in `~/.doze-kafka/bin`. It adds that directory to your PATH in `.zshrc` (zsh) or
+`.bashrc` or `.bash_profile` (bash); `exec $SHELL` starts a shell that has it. With another shell it
+prints the `export` line for you to add. `--uninstall` takes it away again and
+leaves your data alone; the [README](../README.md#install) lists every option. To
+build it yourself instead, see [Build from source](#build-from-source).
 
 ## Run
 
@@ -30,7 +33,7 @@ everything under the current directory in `./data`: the partition logs, and
 `meta.db`, the topic and offset registry:
 
 ```sh
-./doze-kafka
+doze-kafka
 ```
 
 You'll see it come up, with everything you need to connect (the `time=` and `level=`
@@ -62,7 +65,7 @@ only when both its input and its error output are a terminal, and only Enter, `y
 on a password; it never runs `sudo` there. `doze-kafka --listen 127.0.0.1:9092` skips names entirely.
 
 That's it — there's a Kafka broker at that name, and a web console at the URL on the
-next line ([Console](console.md)). Run the `eval "$(doze-kafka env ...)"` line the
+next line ([Console](console.mdx)). Run the `eval "$(doze-kafka env ...)"` line the
 summary ends with, in the client terminal, so the commands below find it. By name it is
 `eval "$(doze-kafka env)"`, run in the project directory; under `--listen` the summary
 spells out the flags that give this broker's addresses (`env` reads only its own flags
@@ -113,7 +116,7 @@ level=INFO msg="shutting down: flushing logs to disk"
 Start it again with the same command, and read the topic once more:
 
 ```sh
-./doze-kafka &
+doze-kafka &
 kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -t demo -C -o beginning -e
 ```
 
@@ -127,10 +130,23 @@ three
 Your messages — and any committed consumer-group offsets — are still there, because
 they were written to `./data` (the logs and `meta.db`), not held in memory.
 
+## Build from source
+
+doze-kafka is a normal Go program. **Go 1.27+** is the only build dependency:
+
+```sh
+git clone https://github.com/doze-dev/doze-kafka
+cd doze-kafka
+go build -o doze-kafka ./cmd/doze-kafka
+```
+
+You now have the same self-contained binary in the current directory. Run it as
+`./doze-kafka` where this page says `doze-kafka`, or move it onto your PATH.
+
 ## Where to next
 
 - Look at your topics, messages and consumer groups in a browser →
-  [Console](console.md).
+  [Console](console.mdx).
 - Change ports, storage location, retention, or the emulated Kafka version →
   [Configuration](configuration.md). Reach the broker from a container or another
   machine → [Endpoints](endpoints.md).

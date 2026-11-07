@@ -1,4 +1,7 @@
-# doze-kafka documentation
+---
+title: "doze-kafka documentation"
+description: "Every doze-kafka page: getting started, the console, clients, consumer groups, transactions, the schema registry, security, the reference and the design."
+---
 
 doze-kafka is a single Go binary that speaks the Kafka protocol, stores data on
 disk, and runs on your laptop to aid development. No JVM, no ZooKeeper, no cluster.
@@ -9,10 +12,10 @@ at a local broker. If you just want to get going, read
 
 ## Guides
 
-1. **[Getting started](getting-started.md)** — build it, run it, produce and consume
+1. **[Getting started](getting-started.md)** — install it, run it, produce and consume
    your first message, confirm it survives a restart.
-2. **[Console](console.md)** — the web console: topics, messages, consumer groups,
-   cluster, and what each page shows.
+2. **[Console](console.mdx)** — the web console: topics, messages, consumer groups,
+   traffic, schemas, cluster, and what each page shows.
 3. **[Configuration](configuration.md)** — every command-line flag, its default and
    meaning, and copy-paste examples (data location, retention, partitions, Kafka
    version to emulate).
@@ -44,9 +47,3 @@ at a local broker. If you just want to get going, read
 15. **[Observability](observability.md)** — the console's traffic tail and group
     timeline: what your app asked the broker, and why a group rebalances.
 
-## Development history
-
-The [testing strategy](reports/TESTING.md) is current. The phase-by-phase build notes
-and acceptance evidence are in [reports/history/](reports/history/), a record of how
-the broker was built and verified — useful if you're contributing, skippable if
-you're just using it.

@@ -107,7 +107,7 @@ func checkLinks(tr tree, rel, md string) []string {
 			bad = append(bad, fmt.Sprintf("%s: link to %q: %s %s", rel, l, target, why))
 			continue
 		}
-		if frag == "" || isDir || !strings.HasSuffix(target, ".md") {
+		if frag == "" || isDir || !(strings.HasSuffix(target, ".md") || strings.HasSuffix(target, ".mdx")) {
 			continue
 		}
 		body, err := tr.read(target)

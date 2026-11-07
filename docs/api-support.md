@@ -1,4 +1,7 @@
-# API support
+---
+title: "API support"
+description: "The Kafka APIs and versions doze-kafka advertises, per emulated Kafka major."
+---
 
 doze-kafka implements the Kafka APIs a client needs to discover the cluster, produce,
 consume, use consumer groups, and do basic administration. It advertises them through

@@ -1,4 +1,7 @@
-# Storage & durability
+---
+title: "Storage and durability"
+description: "How doze-kafka stores messages, how retention works, what a restart or crash keeps, and why idle memory stays flat."
+---
 
 The thing that separates doze-kafka from an in-memory fake is that your data is
 really on disk. This page explains what's stored where, what a restart or crash

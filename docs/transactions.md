@@ -1,4 +1,7 @@
-# Transactions (exactly-once)
+---
+title: "Transactions"
+description: "Transactional producers and read_committed consumers on doze-kafka: what is atomic, and what exactly-once covers."
+---
 
 doze-kafka runs transactions. A producer configured with a `transactional.id` can write
 to several partitions and commit consumer offsets atomically, and a consumer that reads

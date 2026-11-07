@@ -1,4 +1,7 @@
-# Architecture
+---
+title: "Architecture"
+description: "A tour of doze-kafka's internals, for the curious and for contributors."
+---
 
 You don't need any of this to *use* doze-kafka — but if you're curious how a Kafka
 broker fits in a few thousand lines of Go, or you want to contribute, here's the tour.
@@ -85,7 +88,7 @@ of the broker**: it talks Kafka wire protocol through franz-go like any applicat
 and imports nothing from `internal/`. That keeps it honest (it shows what clients
 see) and lets it run in the same process (the CLI) or against a unix socket (the doze
 module). Pages are plain HTML; live views poll a partial that answers `204` when
-nothing changed. See [Console](console.md).
+nothing changed. See [Console](console.mdx).
 
 The one thing a Kafka client cannot see is the broker's own view of its traffic, so that
 is handed to the console rather than reached into: the connection loop tells an

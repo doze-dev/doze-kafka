@@ -1,4 +1,7 @@
-# Consumer groups
+---
+title: "Consumer groups"
+description: "Use consumer groups on doze-kafka: the classic and KIP-848 protocols, committing and resuming offsets, and rebalancing."
+---
 
 Consumer groups are how Kafka lets several consumers share the work of a topic and
 remember where they left off. doze-kafka implements them fully, including both the

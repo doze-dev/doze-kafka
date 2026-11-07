@@ -1,4 +1,7 @@
-# Frameworks and tools
+---
+title: "Frameworks"
+description: "Kafka Streams, Spring Kafka, Connect, schema registries and UIs against doze-kafka, as run in CI."
+---
 
 What teams run beside Kafka, pointed at doze-kafka. Each of these is run in CI by the
 [compatibility matrix](../compat/README.md), with no authentication and over SASL/SCRAM and

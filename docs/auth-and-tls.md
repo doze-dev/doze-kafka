@@ -1,4 +1,7 @@
-# Auth & TLS
+---
+title: "Auth and TLS"
+description: "Turn on SASL/PLAIN, SASL/SCRAM and TLS on doze-kafka, with the matching client settings."
+---
 
 By default doze-kafka listens in the clear with no authentication — which is usually
 what you want on `localhost`. When you need to test an authenticated or encrypted

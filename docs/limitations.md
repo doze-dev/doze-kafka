@@ -1,4 +1,7 @@
-# Limitations
+---
+title: "Limitations"
+description: "What doze-kafka deliberately does not do, and why: a single node, no clustering, and the parts of Kafka left out."
+---
 
 doze-kafka is a development tool. It is deliberately a **single node with no
 clustering**, and a fair amount of Kafka is intentionally absent. This page is the

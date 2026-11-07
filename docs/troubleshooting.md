@@ -1,4 +1,7 @@
-# Troubleshooting
+---
+title: "Troubleshooting"
+description: "Fixes for the usual reasons a client cannot connect to doze-kafka."
+---
 
 Most problems connecting to doze-kafka are the same ones you'd hit with any Kafka
 broker. Here are the common ones and their fixes.

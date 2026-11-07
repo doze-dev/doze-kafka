@@ -214,7 +214,7 @@ func walkMarkdown(root string) ([]string, error) {
 			}
 			return nil
 		}
-		if strings.HasSuffix(rel, ".md") {
+		if strings.HasSuffix(rel, ".md") || strings.HasSuffix(rel, ".mdx") {
 			files = append(files, rel)
 		}
 		return nil
@@ -234,7 +234,7 @@ func repoMarkdown(t testing.TB, root string, withGit bool) []string {
 		}
 		return files
 	}
-	all, err := gitFiles(root, "*.md")
+	all, err := gitFiles(root, "*.md", "*.mdx")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,11 @@ func userDocs(t testing.TB) map[string]string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	names = append(names, filepath.Join(root, "README.md"))
+	mdx, err := filepath.Glob(filepath.Join(root, "docs", "*.mdx")) // pages with components (the console's captures)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names = append(append(names, mdx...), filepath.Join(root, "README.md"))
 	docs := map[string]string{}
 	for _, n := range names {
 		b, err := os.ReadFile(n)

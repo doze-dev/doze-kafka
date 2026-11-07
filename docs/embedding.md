@@ -1,4 +1,7 @@
-# Embedding doze-kafka
+---
+title: "Embedding"
+description: "Start a doze-kafka broker in-process from Go, for tests: no Docker, no ports to pick."
+---
 
 doze-kafka is a Go library as well as a binary. Tests that need a real Kafka can
 start one in-process: no Docker, no ports to pick, no cleanup beyond cancelling a

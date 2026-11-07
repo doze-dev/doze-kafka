@@ -85,7 +85,7 @@ kcat -b "$KAFKA_BOOTSTRAP_SERVERS" -t demo -C -o beginning -e
 ```
 
 Open the console URL it prints (**http://kafka.&lt;name&gt;.doze**) for the web console: browse topics and messages,
-send a record, watch a consumer group's lag. ([Console](docs/console.md))
+send a record, watch a consumer group's lag. ([Console](docs/console.mdx))
 
 Press Ctrl-C to stop — it flushes to disk and exits cleanly. Start it again over the
 same `--data-dir` and your topics, messages, and committed offsets are all still
@@ -144,7 +144,7 @@ Start here → **[docs/](docs/README.md)**
 |---|---|
 | [Installer](install.sh) | Install/uninstall, version pinning, and options — its header, or `install.sh --help`. |
 | [Getting started](docs/getting-started.md) | Build, run, and round-trip your first message. |
-| [Console](docs/console.md) | The web console: what each page shows and does. |
+| [Console](docs/console.mdx) | The web console: what each page shows and does. |
 | [Configuration](docs/configuration.md) | Every flag and TOML config-file key, defaults, and worked examples. |
 | [Endpoints](docs/endpoints.md) | Every port and file it opens, the `.doze` names, containers. |
 | [Embedding](docs/embedding.md) | Starting a broker from Go code, for tests. |

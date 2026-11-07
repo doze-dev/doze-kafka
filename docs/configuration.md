@@ -1,4 +1,7 @@
-# Configuration
+---
+title: "Configuration"
+description: "Every doze-kafka flag and doze-kafka.toml key, its default and meaning, with examples."
+---
 
 doze-kafka is configured with command-line flags **or** a TOML config file — every
 setting is available either way, under the same name (with two exceptions, the
@@ -152,7 +155,7 @@ where this one says `kafka-version`; that spelling is still read.
 | `--acl-default` | `allow` | What a resource with no ACL allows: `allow`, or `deny` (Kafka's own default). ACLs you create are enforced either way. See [Authorization](authorization.md). |
 | `--acl-super-user` | *(none)* | A principal ACLs never refuse, as `User:admin`. Repeatable. |
 
-### Console (see [Console](console.md))
+### Console (see [Console](console.mdx))
 
 | Flag | Default | Meaning |
 |---|---|---|

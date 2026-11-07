@@ -1,4 +1,7 @@
-# Observability
+---
+title: "Observability"
+description: "The console's traffic tail and group timeline: what your app asked the broker, why a group rebalances, and how far to trust it."
+---
 
 What the console can tell you about your app's use of the broker, and how much of it
 to trust. Everything here is **in memory, for the life of the broker**: nothing is

@@ -1,4 +1,7 @@
-# Endpoints, ports and the `.doze` name
+---
+title: "Endpoints"
+description: "Every port and file doze-kafka opens, its .doze names, and how to reach it from a container."
+---
 
 Everything doze-kafka opens on your machine, and what each is for. The start-up
 summary prints the first two for the run you are in.

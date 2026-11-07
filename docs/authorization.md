@@ -1,4 +1,7 @@
-# Authorization (ACLs)
+---
+title: "Authorization"
+description: "ACLs on doze-kafka, enforced with Kafka's rules."
+---
 
 doze-kafka enforces the ACLs you create, with Kafka's rules. If `kafka-acls`,
 Terraform or an admin client says an operation is denied, it is.

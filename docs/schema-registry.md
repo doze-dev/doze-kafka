@@ -1,4 +1,7 @@
-# Schema Registry
+---
+title: "Schema Registry"
+description: "The built-in, Confluent-compatible schema registry: Avro, JSON Schema and Protobuf, where it listens, and where it differs."
+---
 
 doze-kafka has a schema registry built in. It speaks Confluent's REST API, so the
 serializers and tools that expect a registry work with only `schema.registry.url`
@@ -73,7 +76,7 @@ certificate, as it does for the broker (`curl --cacert cert.pem`).
 
 ## In the console
 
-The [console](console.md) has a Schemas section: subjects, versions and the changes
+The [console](console.mdx) has a Schemas section: subjects, versions and the changes
 between them, the compatibility level, a "check before you register" form, decoded
 messages (an Avro, JSON Schema or Protobuf record is shown as JSON, with its schema
 named), and a composer that encodes JSON with a subject's schema.

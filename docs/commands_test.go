@@ -112,6 +112,10 @@ func TestOutputComparisonFindsAFalseLine(t *testing.T) {
 	}
 }
 
+// installLine is the install command getting-started.md gives first. It is not run:
+// it fetches a release, and the test runs this checkout's build in its place.
+const installLine = "curl -fsSL https://raw.githubusercontent.com/doze-dev/doze-kafka/main/install.sh | sh"
+
 // The commands of getting-started.md, run in order as a reader runs them, against a
 // binary built by the document's own build line; and every output block in it,
 // compared with what the program printed. An output block is a fence with no shell
@@ -227,13 +231,17 @@ func TestGettingStartedRunsAsWrittenAndPrintsWhatItShows(t *testing.T) {
 			switch {
 			case first == "git", first == "cd":
 				t.Logf("not run (the clone needs the network, and this is the clone): %s", c)
+			case c == installLine, c == "exec $SHELL":
+				// The installer needs the network and a release; this test runs the
+				// binary built from this checkout in its place.
+				t.Logf("not run (installs a release; the test runs this checkout's build): %s", c)
 			case c == buildLine:
 				// Built once by binary(), by this line, into a temporary directory.
-			case c == "./doze-kafka" || c == "./doze-kafka &":
+			case c == "doze-kafka" || c == "doze-kafka &" || c == "./doze-kafka" || c == "./doze-kafka &":
 				if b != nil {
 					t.Fatalf("getting-started.md:%d: %q starts a second broker while one runs; the document stops it first", blk.line, c)
 				}
-				if starts > 0 && c != "./doze-kafka &" {
+				if starts > 0 && !strings.HasSuffix(c, " &") {
 					t.Logf("restart: %s", c)
 				}
 				b = startBroker(t, dir, kafka, true)

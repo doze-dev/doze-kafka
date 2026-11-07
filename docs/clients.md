@@ -1,4 +1,7 @@
-# Clients
+---
+title: "Clients"
+description: "Connect franz-go, Sarama, kafkajs, librdkafka clients and the Java client to doze-kafka, and the usual connection gotchas."
+---
 
 doze-kafka speaks the real Kafka wire protocol, so you connect to it exactly like
 you'd connect to Apache Kafka: give your client its bootstrap address and go. With no flags that is
