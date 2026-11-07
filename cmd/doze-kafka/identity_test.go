@@ -103,6 +103,37 @@ func TestSecondIdentity(t *testing.T) {
 		if code, body := get(console + "/ops/kafka-ui/cluster"); code != 200 || !strings.Contains(body, "SASL") {
 			t.Errorf("round %d: the cluster page = %d, want 200 saying SASL", round, code)
 		}
+		// The registry, over TLS with the broker's certificate and its SASL user as
+		// basic auth: a schema registered in the first round is the console's, under
+		// its prefix, in both.
+		reg := regexp.MustCompile(`registry {2}(https://127\.0\.0\.1:\d+)`).FindStringSubmatch(text)
+		if reg == nil {
+			t.Fatalf("round %d: the summary names no TLS registry:\n%s", round, text)
+		}
+		tlsClient := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
+		regCall := func(method, path, body string) (int, string) {
+			req, _ := http.NewRequest(method, reg[1]+path, strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/vnd.schemaregistry.v1+json")
+			req.SetBasicAuth("second", "s3cret")
+			resp, err := tlsClient.Do(req)
+			if err != nil {
+				t.Fatalf("round %d: %s %s: %v", round, method, path, err)
+			}
+			defer resp.Body.Close()
+			b, _ := io.ReadAll(resp.Body)
+			return resp.StatusCode, string(b)
+		}
+		if round == 1 {
+			if code, body := regCall("POST", "/subjects/second-identity-value/versions", `{"schema":"\"string\""}`); code != 200 {
+				t.Fatalf("round 1: register over TLS = %d %s", code, body)
+			}
+		}
+		if code, body := regCall("GET", "/subjects", ""); code != 200 || !strings.Contains(body, "second-identity-value") {
+			t.Errorf("round %d: GET /subjects over TLS = %d %s", round, code, body)
+		}
+		if code, body := get(console + "/ops/kafka-ui/schemas"); code != 200 || !strings.Contains(body, "/ops/kafka-ui/schemas/second-identity-value") {
+			t.Errorf("round %d: the console's Schemas under its prefix = %d, want 200 linking second-identity-value", round, code)
+		}
 		if code, _ := get(console + "/healthz"); code != 200 {
 			t.Errorf("round %d: /healthz = %d", round, code)
 		}

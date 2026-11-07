@@ -123,7 +123,11 @@ func refusalFor(err error) Refusal {
 	var re *regError
 	var gne *groupNotEmpty
 	var rule *ruledError
+	var ru *registryUnreachable
 	switch {
+	case errors.As(err, &ru):
+		return Refusal{Kind: Failed, Source: SourceConsole, Status: http.StatusBadGateway, Heading: "Can't reach the schema registry", Retry: true,
+			Message: "The console could not get an answer from the schema registry at " + ru.base + ". It may have stopped. The broker is not affected: topics and groups still work."}
 	case errors.As(err, &re):
 		return registryRefusal(re, err)
 	case errors.As(err, &kr):

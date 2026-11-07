@@ -24,7 +24,7 @@ func slack(d time.Duration) time.Duration {
 // while it resolves, so a slow resolve stalls every other client. (SCH-1)
 func TestReferenceGraphIsLinear(t *testing.T) {
 	r, _ := openReg(t)
-	const levels = 24
+	const levels = 26
 	mustRegister(t, r, "l0", SchemaInput{SchemaType: TypeJSON, Schema: `{"type":"string"}`})
 	var took time.Duration
 	for i := 1; i <= levels; i++ {

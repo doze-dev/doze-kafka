@@ -24,6 +24,19 @@ import (
 // the same against a registry in another process (or another vendor's, as long as it
 // speaks Confluent's API).
 
+// registryUnreachable is a registry call that got no answer at all: the registry is
+// stopped, or not where the console was told. The broker may be fine, so it is not
+// the broker's "Can't reach" page.
+type registryUnreachable struct {
+	base string
+	err  error
+}
+
+func (e *registryUnreachable) Error() string {
+	return "the schema registry is not reachable: " + e.err.Error()
+}
+func (e *registryUnreachable) Unwrap() error { return e.err }
+
 // regError is an answer from the registry that was not success.
 type regError struct {
 	Status  int
@@ -115,7 +128,7 @@ func (rc *registryClient) call(ctx context.Context, method, path string, body, o
 	}
 	resp, err := rc.hc.Do(req)
 	if err != nil {
-		return fmt.Errorf("the schema registry is not reachable: %w", err)
+		return &registryUnreachable{base: rc.base, err: err}
 	}
 	defer resp.Body.Close()
 	data, _ := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
