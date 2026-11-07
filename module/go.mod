@@ -7,7 +7,7 @@ go 1.27.0
 // free of the plugin SDK and gRPC.
 require (
 	github.com/doze-dev/doze-kafka v1.2.0
-	github.com/doze-dev/doze-sdk v0.7.1-0.20261010145324-086b5b57ecdc
+	github.com/doze-dev/doze-sdk v0.12.0
 	github.com/hashicorp/hcl/v2 v2.25.0
 	github.com/twmb/franz-go v1.22.1
 	github.com/twmb/franz-go/pkg/kadm v1.19.0
